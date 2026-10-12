@@ -1,28 +1,40 @@
-import { For, Show, createEffect, createSignal, on, onMount } from 'solid-js'
+import { For, Show, createSignal, onMount } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import type { BridgeNodes, BridgeProject } from '@acorn/protocol/extensionBridge.ts'
+import type { BridgeAgentHint, BridgeNodes } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
 import { CallFailure, type CallError, type HostState } from '../messages'
 import { bridgeClient } from './bridgeClient'
 import { errorGuidance, hostGuidance, statusGuidance } from './guidance'
+import { Destination } from './Destination'
 import { Pairing } from './Pairing'
 
-type Projects = { nodeId: string; projects: BridgeProject[] }
+// Online, or online with live updates paused: either way the Node answers requests.
+const connected = (status: NodeStatus | null) => status?.state === 'online' || status?.state === 'degraded'
 
 export function App(props: { api: BrowserApi }) {
   const [host, setHost] = createSignal<HostState>({ state: 'connecting', message: null, restoreError: null })
   const [fleet, setFleet] = createSignal<BridgeNodes | null>(null)
   const [status, setStatus] = createSignal<NodeStatus | null>(null)
-  const [projects, setProjects] = createSignal<Projects | null>(null)
   const [problem, setProblem] = createSignal<CallError | null>(null)
   const [pairing, setPairing] = createSignal(false)
+  const [hint, setHint] = createSignal<BridgeAgentHint | null>(null)
+  // Counts each return of the selected Node's connection. What the sidebar shows may have changed
+  // while it was away, and frames missed in a gap are never replayed, so a return means read again.
+  const [reconnects, setReconnects] = createSignal(0)
 
+  const showStatus = (next: NodeStatus | null) => {
+    const wasUp = connected(status())
+    setStatus(next)
+    if (!wasUp && connected(next)) setReconnects((count) => count + 1)
+  }
   const client = bridgeClient(props.api, {
     host: setHost,
     // Only the selected Node's status matters, and only while it is still selected.
-    status: (next) => next.nodeId === fleet()?.activeNodeId && setStatus(next),
+    status: (next) => next.nodeId === fleet()?.activeNodeId && showStatus(next),
+    agents: (next) => next.nodeId === fleet()?.activeNodeId && setHint(next),
   })
   const selected = () => fleet()?.nodes.find((node) => node.nodeId === fleet()?.activeNodeId) ?? null
+  const online = () => host().state === 'connected' && connected(status())
 
   const attempt = async (work: () => Promise<void>) => {
     setProblem(null)
@@ -36,35 +48,12 @@ export function App(props: { api: BrowserApi }) {
   }
   const showFleet = (next: BridgeNodes) => {
     setFleet(next)
-    setStatus(next.status)
+    showStatus(next.status)
   }
   const refresh = () => attempt(async () => showFleet(await client.call({ op: 'nodes.list' })))
   const select = (nodeId: string | null) =>
     attempt(async () => showFleet(await client.call({ op: 'node.select', nodeId })))
   const forget = (nodeId: string) => attempt(async () => showFleet(await client.call({ op: 'node.forget', nodeId })))
-
-  // Projects follow the selection. A reply for a Node that is no longer selected is dropped here as
-  // well as refused by the host, so a slow read can't fill another Node's list.
-  const loadProjects = (nodeId: string) =>
-    attempt(async () => {
-      try {
-        const result = await client.call({ op: 'projects.list', nodeId })
-        if (fleet()?.activeNodeId === result.nodeId) setProjects(result)
-      } catch (error) {
-        // A list the Node can no longer vouch for is not shown as if it were current.
-        if (fleet()?.activeNodeId === nodeId) setProjects(null)
-        throw error
-      }
-    })
-  createEffect(
-    on(
-      () => fleet()?.activeNodeId ?? null,
-      (nodeId) => {
-        setProjects(null)
-        if (nodeId) void loadProjects(nodeId)
-      },
-    ),
-  )
 
   onMount(() => void refresh())
 
@@ -143,38 +132,26 @@ export function App(props: { api: BrowserApi }) {
 
       <Show when={selected()}>
         {(node) => (
-          <section class="card" aria-label="Projects">
-            <h2>Projects on {node().label}</h2>
+          <section class="card" aria-label="Selected Node">
+            <h2>{node().label}</h2>
             <p class="status" data-testid="node-status">
               {statusGuidance(status()).label}
               <Show when={statusGuidance(status()).detail}>{(detail) => <span> · {detail()}</span>}</Show>
             </p>
-            <Show
-              when={projects()}
-              fallback={<p class="quiet">{problem() ? 'Projects are unavailable.' : 'Loading projects…'}</p>}
-            >
-              {(loaded) => (
-                <Show
-                  when={loaded().projects.some((project) => !project.hidden)}
-                  fallback={<p class="quiet">No projects.</p>}
-                >
-                  <ul class="projects">
-                    <For each={loaded().projects.filter((project) => !project.hidden)}>
-                      {(project) => (
-                        <li>
-                          <strong>{project.name}</strong>
-                          <Show when={project.path}>{(path) => <span class="quiet">{path()}</span>}</Show>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                </Show>
-              )}
-            </Show>
-            <button type="button" class="quiet" onClick={() => void loadProjects(node().nodeId)}>
-              Refresh
-            </button>
           </section>
+        )}
+      </Show>
+      <Show when={fleet()?.activeNodeId} keyed>
+        {(nodeId) => (
+          <Destination
+            client={client}
+            storage={props.api.storage.local}
+            nodeId={nodeId}
+            nodeLabel={selected()?.label ?? nodeId}
+            online={online()}
+            hint={hint()}
+            reconnects={reconnects()}
+          />
         )}
       </Show>
     </main>

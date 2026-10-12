@@ -98,9 +98,9 @@ describe('sidebar', () => {
     held[1]!.release()
     held[0]!.release()
     await settle()
-    expect(root.textContent).toContain('Projects on Node b')
-    expect(root.textContent).toContain('b project')
-    expect(root.textContent).not.toContain('a project')
+    expect(root.querySelector('[aria-label="Selected Node"]')!.textContent).toContain('Node b')
+    const options = [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
+    expect(options).toEqual(['Choose a project', 'b project'])
   })
 
   it('shows the identity words before asking for a code, then pairs and selects', async () => {
@@ -124,7 +124,7 @@ describe('sidebar', () => {
     type(input(root, 'pairing-code'), 'GOOD')
     root.querySelectorAll('form')[1]!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await settle()
-    expect(root.textContent).toContain('Projects on Node new')
+    expect(root.querySelector('[aria-label="Selected Node"]')!.textContent).toContain('Node new')
   })
 
   it('tells the person how to install a missing bridge', async () => {

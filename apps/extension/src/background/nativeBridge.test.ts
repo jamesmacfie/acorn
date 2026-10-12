@@ -8,13 +8,18 @@ function subject(flavor: 'chrome' | 'firefox' = 'chrome', firstReplyMs?: number)
   const fake = fakeBrowser({ flavor })
   const hostStates: Pick<HostState, 'state' | 'message'>[] = []
   const statuses: unknown[] = []
+  const hints: unknown[] = []
   const bridge = nativeBridge(
     fake.api,
     'com.acorn.browser_bridge',
-    { status: (status) => statuses.push(status), host: (state) => hostStates.push(state) },
+    {
+      status: (status) => statuses.push(status),
+      agents: (hint) => hints.push(hint),
+      host: (state) => hostStates.push(state),
+    },
     { firstReplyMs },
   )
-  return { fake, bridge, hostStates, statuses }
+  return { fake, bridge, hostStates, statuses, hints }
 }
 
 const idOf = (message: unknown) => (message as { id: string }).id
@@ -100,5 +105,15 @@ describe('native bridge', () => {
     }
     await expect(bridge.request({ op: 'node.select', nodeId: 'n' })).rejects.toMatchObject({ code: 'unknown_node' })
     expect(statuses).toEqual([{ nodeId: 'n', state: 'online' }])
+  })
+
+  it('passes an agents hint on without its envelope', async () => {
+    const { fake, bridge, hints } = subject()
+    fake.onNativeMessage = (message, host) => {
+      host.send({ v: 1, event: 'agent', nodeId: 'n', sessions: ['s1'], tasks: [], missed: false })
+      host.send({ v: 1, id: idOf(message), ok: true, result: { nodes: [], activeNodeId: null, status: null } })
+    }
+    await bridge.request({ op: 'nodes.list' })
+    expect(hints).toEqual([{ nodeId: 'n', sessions: ['s1'], tasks: [], missed: false }])
   })
 })

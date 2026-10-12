@@ -3,13 +3,22 @@ import { NodeBroker, toNodeRecord, type FleetStore } from '@acorn/custody/broker
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
 import type { NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
 import type {
+  BridgeAgentHint,
   BridgeErrorCode,
   BridgeNodes,
   BridgeProject,
   BridgeRequest,
   BridgeResults,
 } from '@acorn/protocol/extensionBridge.ts'
-import { projectsRoute, type ProjectsResponse } from '@acorn/protocol/api.ts'
+import { projectsRoute, tasksRoute, type ProjectsResponse, type Task } from '@acorn/protocol/api.ts'
+import type {
+  AgentProviderDescriptor,
+  AgentSession,
+  AgentSessionList,
+  AgentSessionSnapshot,
+  AgentTurn,
+} from '@acorn/plugin-agents/contract/wire.ts'
+import { agentHints, agentsRoute, bridgeProfile, bridgeSession, bridgeSessionRead, sessionRoute } from './agents'
 
 export class BridgeFailure extends Error {
   constructor(
@@ -31,6 +40,7 @@ export function createBridge(options: {
   fleet: FleetStore
   deviceName: string
   status(status: NodeStatus): void
+  hint?(hint: BridgeAgentHint): void
   probe?: typeof probeNode
   pair?: typeof pairWithNode
 }) {
@@ -44,8 +54,11 @@ export function createBridge(options: {
   // The probe is held here rather than returned, so pairing can only complete the endpoint whose
   // fingerprint the person was shown.
   let pending: Probe | null = null
+  const hints = agentHints(options.hint ?? (() => {}))
   const broker = new NodeBroker({
-    frame() {},
+    frame(nodeId, frame) {
+      if (nodeId === activeNodeId) hints.note(nodeId, frame)
+    },
     bytes() {},
     status(status) {
       if (status.nodeId === activeNodeId) options.status(status)
@@ -96,40 +109,71 @@ export function createBridge(options: {
     }
   }
 
-  async function listProjects(nodeId: string): Promise<BridgeResults['projects.list']> {
+  // One Node route for the selected node. A read is refused if the selection moved while it was out;
+  // a write isn't, because once sent it may have happened, and the caller must hear its outcome.
+  async function nodeRequest(
+    nodeId: string,
+    request: { method: 'GET' | 'POST'; path: string; body?: unknown; key?: string },
+  ): Promise<unknown> {
     requireSelected(nodeId)
+    const write = request.method !== 'GET'
     let response: NodeFetchResponse
     try {
       response = await broker.fetch(nodeId, {
         requestId: randomUUID(),
-        path: projectsRoute,
-        method: 'GET',
-        headers: {},
+        path: request.path,
+        method: request.method,
+        headers: {
+          ...(request.key ? { 'idempotency-key': request.key } : {}),
+          ...(request.body !== undefined ? { 'content-type': 'application/json' } : {}),
+        },
+        ...(request.body !== undefined
+          ? { body: { kind: 'bytes' as const, bytes: new TextEncoder().encode(JSON.stringify(request.body)) } }
+          : {}),
       })
     } catch (error) {
-      requireSelected(nodeId)
-      if (await presentsAnotherCertificate(nodeId)) {
-        requireSelected(nodeId)
+      if (!write) requireSelected(nodeId)
+      if (activeNodeId === nodeId && (await presentsAnotherCertificate(nodeId)) && activeNodeId === nodeId) {
         identityChanged = nodeId
         broker.remove(nodeId)
         options.status(changedIdentityStatus(nodeId))
         throw new BridgeFailure('identity_mismatch', 'The Node presented a different certificate. Pair it again.')
       }
+      if (write)
+        throw new BridgeFailure(
+          'ambiguous_mutation',
+          `The Node did not confirm the change, so it may or may not have happened: ${messageOf(error)}`,
+        )
+      requireSelected(nodeId)
       throw new BridgeFailure('node_unreachable', `The Node did not answer: ${messageOf(error)}`)
     }
-    requireSelected(nodeId)
+    if (!write) requireSelected(nodeId)
     const body = parseJson(response)
     if (response.status === 401)
       throw new BridgeFailure('revoked', 'The Node no longer accepts this browser. Forget it and pair again.')
     if (response.status >= 400) {
       const message = (body as { error?: { message?: unknown } } | null)?.error?.message
       throw new BridgeFailure(
-        'node_error',
+        response.status === 404 ? 'not_found' : 'node_error',
         typeof message === 'string' ? message : `The Node answered ${response.status}.`,
       )
     }
-    const rows = (body as ProjectsResponse | null)?.projects
-    if (!Array.isArray(rows)) throw new BridgeFailure('node_error', 'The Node returned an unreadable project list.')
+    return body
+  }
+
+  const readList = async <Row>(nodeId: string, path: string, rows: (body: unknown) => unknown): Promise<Row[]> => {
+    const list = rows(await nodeRequest(nodeId, { method: 'GET', path }))
+    if (!Array.isArray(list))
+      throw new BridgeFailure('node_error', `The Node returned an unreadable list from ${path}.`)
+    return list as Row[]
+  }
+
+  async function listProjects(nodeId: string): Promise<BridgeResults['projects.list']> {
+    const rows = await readList<ProjectsResponse['projects'][number]>(
+      nodeId,
+      projectsRoute,
+      (body) => (body as ProjectsResponse | null)?.projects,
+    )
     const projects: BridgeProject[] = rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -137,6 +181,15 @@ export function createBridge(options: {
       hidden: row.hidden,
     }))
     return { nodeId, projects }
+  }
+
+  // Active tasks only, in the Node's order. The route lists every project's, so this keeps one.
+  async function listTasks(nodeId: string, projectId: string): Promise<BridgeResults['tasks.list']> {
+    const rows = await readList<Task>(nodeId, tasksRoute, (body) => body)
+    const tasks = rows
+      .filter((task) => task.projectId === projectId)
+      .map((task) => ({ id: task.id, title: task.title, branch: task.branch }))
+    return { nodeId, projectId, tasks }
   }
 
   async function handle(request: BridgeRequest): Promise<BridgeResults[BridgeRequest['op']]> {
@@ -198,10 +251,67 @@ export function createBridge(options: {
         return nodes()
       case 'projects.list':
         return listProjects(request.nodeId)
+      case 'tasks.list':
+        return listTasks(request.nodeId, request.projectId)
+      case 'agents.profiles': {
+        const rows = await readList<AgentProviderDescriptor>(request.nodeId, `${agentsRoute}/providers`, (b) => b)
+        return { nodeId: request.nodeId, profiles: rows.map(bridgeProfile) }
+      }
+      case 'sessions.list': {
+        // The newest hundred, which is one page of the route. Archived sessions are left out.
+        const query = new URLSearchParams({ taskId: request.taskId, archived: 'false', limit: '100' })
+        const rows = await readList<AgentSession>(
+          request.nodeId,
+          `${agentsRoute}/sessions?${query}`,
+          (body) => (body as AgentSessionList | null)?.sessions,
+        )
+        return { nodeId: request.nodeId, taskId: request.taskId, sessions: rows.map(bridgeSession) }
+      }
+      case 'session.read': {
+        const query = `?afterSeq=${request.afterSeq}&limit=${request.limit}&fold=1`
+        const snapshot = (await nodeRequest(request.nodeId, {
+          method: 'GET',
+          path: `${sessionRoute(request.sessionId)}${query}`,
+        })) as AgentSessionSnapshot | null
+        if (!snapshot?.session || !Array.isArray(snapshot.events) || !Array.isArray(snapshot.turns))
+          throw new BridgeFailure('node_error', 'The Node returned an unreadable session.')
+        return bridgeSessionRead(request.nodeId, snapshot, request.afterSeq)
+      }
+      case 'session.create': {
+        // Normal session defaults: no config, so the Node applies whatever any other client would get.
+        const session = (await nodeRequest(request.nodeId, {
+          method: 'POST',
+          path: `${agentsRoute}/sessions`,
+          key: request.key,
+          body: {
+            taskId: request.taskId,
+            providerId: request.providerId,
+            profileId: request.profileId,
+            kind: 'interactive',
+            config: {},
+          },
+        })) as AgentSession
+        return { nodeId: request.nodeId, session: bridgeSession(session) }
+      }
+      case 'turn.submit': {
+        const turn = (await nodeRequest(request.nodeId, {
+          method: 'POST',
+          path: `${sessionRoute(request.sessionId)}/turns`,
+          key: request.key,
+          body: { input: [{ type: 'text', text: request.text }], source: 'interactive', effectivePolicy: {} },
+        })) as AgentTurn
+        return { nodeId: request.nodeId, sessionId: request.sessionId, turnId: turn.id }
+      }
     }
   }
 
-  return { handle, dispose: () => broker.dispose() }
+  return {
+    handle,
+    dispose: () => {
+      hints.dispose()
+      broker.dispose()
+    },
+  }
 }
 
 const changedIdentityStatus = (nodeId: string): NodeStatus => ({

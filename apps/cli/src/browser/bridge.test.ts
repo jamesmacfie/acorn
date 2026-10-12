@@ -33,7 +33,14 @@ afterEach(async () => {
 
 // A Node that answers the routes pairing and project reads use, with knobs for each failure.
 async function fakeNode(nodeId: string, options: { protocolVersion?: number } = {}) {
-  const state = { revoked: false, projectsDelay: null as Promise<void> | null }
+  const state = {
+    revoked: false,
+    projectsDelay: null as Promise<void> | null,
+    // Accept the next turn, then drop the connection before answering.
+    dropTurnReply: false,
+    turns: new Map<string, { id: string; text: string }>(),
+    lastQuery: '',
+  }
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown) => {
       res.writeHead(status, { 'content-type': 'application/json' })
@@ -58,9 +65,69 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         device: { id: 'device-1', name: 'browser', createdAt: 1, lastSeenAt: null, revokedAt: null },
       })
     }
-    if (req.url === '/v1/core/projects') {
+    if (req.url?.startsWith('/v1/core/') || req.url?.startsWith('/v1/p/agents/')) {
       if (state.revoked || req.headers.authorization !== `Bearer ${TOKEN}`)
         return reply(401, { error: { code: 'unauthenticated', message: 'Unauthenticated.' } })
+    }
+    const url = new URL(req.url ?? '/', 'https://node.test')
+    if (url.pathname === '/v1/core/tasks')
+      return reply(200, [
+        { id: 't1', title: 'Fix it', projectId: 'p1', branch: 'fix', status: 'active' },
+        { id: 't2', title: 'Elsewhere', projectId: 'p2', branch: null, status: 'active' },
+      ])
+    if (url.pathname === '/v1/p/agents/providers')
+      return reply(200, [
+        {
+          id: 'claude',
+          profileId: 'claude-code',
+          label: 'Claude Code',
+          installed: true,
+          authenticated: false,
+          diagnostics: ['Not signed in'],
+          configOptions: [],
+        },
+      ])
+    if (url.pathname === '/v1/p/agents/sessions' && req.method === 'GET') {
+      state.lastQuery = url.search
+      return reply(200, { sessions: [agentSession('s1')], delegations: [], nextCursor: null })
+    }
+    if (url.pathname === '/v1/p/agents/sessions' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      return reply(200, { ...agentSession('s2'), ...JSON.parse(body), config: {} })
+    }
+    if (url.pathname === '/v1/p/agents/sessions/s1')
+      return reply(200, {
+        session: agentSession('s1'),
+        turns: [],
+        requests: [],
+        events: [
+          {
+            id: 'e1',
+            sessionId: 's1',
+            turnId: null,
+            seq: 1,
+            schemaVersion: 1,
+            createdAt: 1,
+            event: { type: 'user_message', text: 'hi' },
+          },
+        ],
+      })
+    if (url.pathname === '/v1/p/agents/sessions/gone')
+      return reply(404, { error: { code: 'not_found', message: 'Not found.' } })
+    if (url.pathname === '/v1/p/agents/sessions/s1/turns') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      const key = String(req.headers['idempotency-key'])
+      const turn = state.turns.get(key) ?? { id: `turn-${state.turns.size + 1}`, text: JSON.parse(body).input[0].text }
+      state.turns.set(key, turn)
+      if (state.dropTurnReply) {
+        state.dropTurnReply = false
+        return req.socket.destroy()
+      }
+      return reply(200, { id: turn.id, sessionId: 's1', status: 'queued' })
+    }
+    if (req.url === '/v1/core/projects') {
       await state.projectsDelay
       return reply(200, {
         projects: [{ id: 'p1', name: `${nodeId} project`, path: '/src/p1', workspaceId: 'w', sort: 0, hidden: false }],
@@ -86,6 +153,21 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     },
   }
 }
+
+const agentSession = (id: string) => ({
+  id,
+  taskId: 't1',
+  title: 'Chat',
+  providerId: 'claude',
+  profileId: 'claude-code',
+  kind: 'interactive',
+  runtimeState: 'ready',
+  attention: 'none',
+  lastEventSeq: 1,
+  archivedAt: null,
+  updatedAt: 1,
+  config: {},
+})
 
 function bridge() {
   const dir = mkdtempSync(join(tmpdir(), 'acorn-bridge-custody-'))
@@ -201,5 +283,82 @@ describe('browser bridge selection', () => {
     const { call } = await paired()
     await call({ op: 'node.select', nodeId: 'node-a' })
     expect(await call({ op: 'node.forget', nodeId: 'node-a' })).toEqual({ nodes: [], activeNodeId: null, status: null })
+  })
+})
+
+describe('browser bridge agent operations', () => {
+  async function selected() {
+    const subject = await paired()
+    await subject.call({ op: 'node.select', nodeId: 'node-a' })
+    return subject
+  }
+
+  it('lists one project tasks, the agent profiles, and a task sessions', async () => {
+    const { call, node } = await selected()
+    expect(await call({ op: 'tasks.list', nodeId: 'node-a', projectId: 'p1' })).toEqual({
+      nodeId: 'node-a',
+      projectId: 'p1',
+      tasks: [{ id: 't1', title: 'Fix it', branch: 'fix' }],
+    })
+    expect(await call({ op: 'agents.profiles', nodeId: 'node-a' })).toEqual({
+      nodeId: 'node-a',
+      profiles: [
+        {
+          providerId: 'claude',
+          profileId: 'claude-code',
+          label: 'Claude Code',
+          installed: true,
+          authenticated: false,
+          diagnostics: ['Not signed in'],
+        },
+      ],
+    })
+    const listed = await call({ op: 'sessions.list', nodeId: 'node-a', taskId: 't1' })
+    expect(listed.sessions.map((session: { id: string }) => session.id)).toEqual(['s1'])
+    expect(listed.sessions[0]).not.toHaveProperty('config')
+    expect(node.state.lastQuery).toBe('?taskId=t1&archived=false&limit=100')
+  })
+
+  it('reads a session page and reports a missing session as not found', async () => {
+    const { call } = await selected()
+    const read = await call({ op: 'session.read', nodeId: 'node-a', sessionId: 's1', afterSeq: 0, limit: 50 })
+    expect(read).toMatchObject({ nodeId: 'node-a', sessionId: 's1', reach: 1, queued: [] })
+    expect(read.records).toEqual([
+      { id: 'e1', seq: 1, turnId: null, createdAt: 1, event: { type: 'user_message', text: 'hi' } },
+    ])
+    await expect(
+      call({ op: 'session.read', nodeId: 'node-a', sessionId: 'gone', afterSeq: 0, limit: 50 }),
+    ).rejects.toMatchObject({ code: 'not_found' })
+  })
+
+  it('starts a session with the normal defaults', async () => {
+    const { call } = await selected()
+    const created = await call({
+      op: 'session.create',
+      nodeId: 'node-a',
+      taskId: 't1',
+      providerId: 'claude',
+      profileId: 'claude-code',
+      key: 'create-key-1',
+    })
+    expect(created).toMatchObject({ nodeId: 'node-a', session: { id: 's2', taskId: 't1', kind: 'interactive' } })
+  })
+
+  it('reports an unanswered write as uncertain, and a retry with the same key makes no second turn', async () => {
+    const { call, node } = await selected()
+    node.state.dropTurnReply = true
+    const submit = { op: 'turn.submit', nodeId: 'node-a', sessionId: 's1', text: 'hello', key: 'turn-key-1' }
+    await expect(call(submit)).rejects.toMatchObject({ code: 'ambiguous_mutation' })
+    expect(await call(submit)).toEqual({ nodeId: 'node-a', sessionId: 's1', turnId: 'turn-1' })
+    expect([...node.state.turns.values()]).toEqual([{ id: 'turn-1', text: 'hello' }])
+  })
+
+  it('refuses a write for a Node that is no longer selected before sending it', async () => {
+    const { call, node } = await selected()
+    await call({ op: 'node.select', nodeId: null })
+    await expect(
+      call({ op: 'turn.submit', nodeId: 'node-a', sessionId: 's1', text: 'hello', key: 'turn-key-1' }),
+    ).rejects.toMatchObject({ code: 'not_selected' })
+    expect(node.state.turns.size).toBe(0)
   })
 })

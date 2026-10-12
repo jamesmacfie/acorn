@@ -74,6 +74,7 @@ export function runNativeHost(argv: string[]): void {
     fleet: custody(args.bridgeDir).fleet,
     deviceName: `Acorn for ${args.browser === 'chrome' ? 'Chrome' : 'Firefox'} on ${hostname()}`,
     status: (status) => send({ v: BROWSER_BRIDGE_PROTOCOL_VERSION, event: 'status', status }),
+    hint: (hint) => send({ v: BROWSER_BRIDGE_PROTOCOL_VERSION, event: 'agent', ...hint }),
   })
   const close = (code: number): void => {
     bridge.dispose()

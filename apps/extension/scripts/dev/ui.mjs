@@ -12,7 +12,8 @@ import { processIsAlive, readJson, runningManifest } from './state.mjs'
 //   open                 open the sidebar page in a tab, or reuse the open one
 //   text                 print the sidebar's visible text
 //   click TEXT           click the button whose text is TEXT
-//   fill NAME VALUE      type VALUE into the input named NAME
+//   fill NAME VALUE      type VALUE into the input or text area named NAME, or pick the option of the
+//                        select named NAME whose value or text is VALUE
 //   check NAME           toggle the checkbox named NAME
 //   eval EXPRESSION      evaluate EXPRESSION in the sidebar and print the result
 //   pairing-code         ask the session's own Node for a fresh pairing code
@@ -32,7 +33,20 @@ const actions = {
   click: (text) =>
     `(() => { const target = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(text)}); if (!target) throw new Error('No button reads ' + ${JSON.stringify(text)}); target.click(); return 'clicked' })()`,
   fill: (name, value) =>
-    `(() => { const input = document.querySelector('input[name=' + ${JSON.stringify(JSON.stringify(name))} + ']'); if (!input) throw new Error('No input is named ' + ${JSON.stringify(name)}); input.value = ${JSON.stringify(value)}; input.dispatchEvent(new Event('input', { bubbles: true })); return 'filled' })()`,
+    `(() => {
+      const field = document.querySelector('[name=' + ${JSON.stringify(JSON.stringify(name))} + ']')
+      if (!field) throw new Error('No field is named ' + ${JSON.stringify(name)})
+      let next = ${JSON.stringify(value)}
+      if (field.tagName === 'SELECT') {
+        const option = [...field.options].find((o) => o.value === next || o.textContent.trim() === next)
+        if (!option) throw new Error('No option reads ' + next)
+        next = option.value
+      }
+      field.value = next
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+      field.dispatchEvent(new Event('change', { bubbles: true }))
+      return 'filled'
+    })()`,
   check: (name) =>
     `(() => { const input = document.querySelector('input[name=' + ${JSON.stringify(JSON.stringify(name))} + ']'); if (!input) throw new Error('No checkbox is named ' + ${JSON.stringify(name)}); input.click(); return input.checked })()`,
   eval: (expression) => expression,

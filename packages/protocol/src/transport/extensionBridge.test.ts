@@ -10,6 +10,21 @@ describe('browser bridge requests', () => {
       { v: 1, id: 'a', op: 'node.select', nodeId: null },
       { v: 1, id: 'a', op: 'node.forget', nodeId: 'n1' },
       { v: 1, id: 'a', op: 'projects.list', nodeId: 'n1' },
+      { v: 1, id: 'a', op: 'tasks.list', nodeId: 'n1', projectId: 'p1' },
+      { v: 1, id: 'a', op: 'agents.profiles', nodeId: 'n1' },
+      { v: 1, id: 'a', op: 'sessions.list', nodeId: 'n1', taskId: 't1' },
+      { v: 1, id: 'a', op: 'session.read', nodeId: 'n1', sessionId: 's1', afterSeq: 0, limit: 500 },
+      {
+        v: 1,
+        id: 'a',
+        op: 'session.create',
+        nodeId: 'n1',
+        taskId: 't1',
+        providerId: 'p',
+        profileId: 'p',
+        key: 'k'.repeat(8),
+      },
+      { v: 1, id: 'a', op: 'turn.submit', nodeId: 'n1', sessionId: 's1', text: 'hi', key: 'k'.repeat(36) },
     ])
       expect(bridgeRequestSchema.safeParse(request).success).toBe(true)
   })
@@ -21,6 +36,19 @@ describe('browser bridge requests', () => {
       { v: 1, id: 'a', op: 'node.pair', code: 'X', label: 'L', endpoint: 'https://other.test' },
       { v: 1, id: 'a', op: 'projects.list' },
       { v: 1, id: '', op: 'nodes.list' },
+      { v: 1, id: 'a', op: 'session.read', nodeId: 'n1', sessionId: 's1', afterSeq: 0, limit: 501 },
+      { v: 1, id: 'a', op: 'turn.submit', nodeId: 'n1', sessionId: 's1', text: 'hi', key: 'short' },
+      { v: 1, id: 'a', op: 'turn.submit', nodeId: 'n1', sessionId: 's1', text: 'x'.repeat(60_001), key: 'k'.repeat(8) },
+      {
+        v: 1,
+        id: 'a',
+        op: 'turn.submit',
+        nodeId: 'n1',
+        sessionId: 's1',
+        text: 'hi',
+        key: 'k'.repeat(8),
+        source: 'plugin',
+      },
     ])
       expect(bridgeRequestSchema.safeParse(request).success).toBe(false)
   })

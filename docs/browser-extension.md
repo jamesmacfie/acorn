@@ -5,12 +5,17 @@ through: who owns what, the native messaging contract, pairing, and the states t
 Read it before you change the extension, the bridge, or an operation between them. The plan for later
 features is in [the extension programme](./future/extension/README.md).
 
+Topic pages:
+
+- [Agent conversations](./browser-extension/conversations.md): the agent operations, change hints,
+  the conversation window, send retries, and browser storage.
+
 ## What runs where
 
 Three pieces carry a request from the sidebar to a Node:
 
 1. The extension, `apps/extension/`. Its sidebar page (`src/sidebar/`) draws pairing, the Node list,
-   and projects. Its background (`src/background/`) owns the one native port. Chrome runs the
+   and a chosen task's agent conversation. Its background (`src/background/`) owns the one native port. Chrome runs the
    background as a module service worker and shows the page in its side panel. Firefox runs it as a
    background script and shows the page in its sidebar. `src/browser.ts` types the slice of the
    extension API both use.
@@ -24,7 +29,7 @@ Data flows sidebar → background → native host → pinned Node connection →
 extension never hold a token or certificate. The desktop app takes no part: the bridge pairs and
 connects on its own, so the desktop can stay closed.
 
-Phase 01 has no content scripts and asks for no host access. The manifests (`src/manifest.ts`) ask for
+The extension has no content scripts yet and asks for no host access. The manifests (`src/manifest.ts`) ask for
 `nativeMessaging` and `storage`, plus `sidePanel` in Chrome, and turn off private windows.
 
 ## Identities and registrations
@@ -55,9 +60,17 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `node.select` | `nodeId` or `null` | `{ nodes, activeNodeId, status }` |
 | `node.forget` | `nodeId` | `{ nodes, activeNodeId, status }` |
 | `projects.list` | `nodeId` | `{ nodeId, projects }`, each `{ id, name, path, hidden }` |
+| `tasks.list` | `nodeId`, `projectId` | `{ nodeId, projectId, tasks }`: that project's active tasks, each `{ id, title, branch }` |
+| `agents.profiles` | `nodeId` | `{ nodeId, profiles }`: the agents plugin's providers, each with `installed`, `authenticated`, and `diagnostics` |
+| `sessions.list` | `nodeId`, `taskId` | `{ nodeId, taskId, sessions }`: the task's newest 100 unarchived sessions |
+| `session.read` | `nodeId`, `sessionId`, `afterSeq`, `limit` (at most 500) | `{ nodeId, sessionId, session, records, reach, queued }` |
+| `session.create` | `nodeId`, `taskId`, `providerId`, `profileId`, `key` | `{ nodeId, session }` |
+| `turn.submit` | `nodeId`, `sessionId`, `text` (at most 60,000 characters), `key` | `{ nodeId, sessionId, turnId }` |
 
 A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, message } }`. The host
-also sends `{ v, event: 'status', status }` when the selected Node's connection changes. A request
+also sends `{ v, event: 'status', status }` when the selected Node's connection changes, and
+`{ v, event: 'agent', nodeId, sessions, tasks, missed }` as a change hint. [Agent conversations](./browser-extension/conversations.md) covers the agent
+operations, hints, and what the sidebar keeps in browser storage. A request
 that doesn't match the schema gets a `bad_request` reply when it has a usable `id`, and nothing
 otherwise. Add an operation together with the phase that first calls it.
 
@@ -99,7 +112,8 @@ The sidebar also drops a reply whose `nodeId` is no longer selected. A slow read
 Node's list either way.
 
 The host keeps the selection only while it runs. The background stores `selectedNodeId` in
-`storage.local`, and that ID is all the extension stores. Each time the background starts the host, it
+`storage.local`. The sidebar's drafts are the only other thing stored, in
+[browser storage](./browser-extension/conversations.md#browser-storage). Each time the background starts the host, it
 sends `node.select` with the stored ID before any other call. If that fails, the sidebar shows why,
 and pairing and forgetting still work. An unknown Node's ID is removed from storage.
 
@@ -116,6 +130,11 @@ Each failure has a next step, written in `src/sidebar/guidance.ts`:
 | Offline | The broker reports `offline`, or a read fails | Check that the Node is running |
 | Revoked | The Node answers 401 `unauthenticated` | Forget the Node and pair again |
 | Identity changed | A failed read, then a probe whose fingerprint differs from the pin | Check with the Node's owner, then pair again |
+| No agent can start | Every profile is uninstalled or signed out | The profile's own diagnostic |
+| Conversation gone | `session.read` answers `not_found` | The draft is kept; choose another conversation |
+| Conversation archived | The session row has `archivedAt` | The draft is kept; sending is off |
+| Node away | The selected Node's status is neither online nor degraded | The draft is kept; sending is off until it returns |
+| Agent waiting | The session's `attention` is `permission` or `question` | Answer it in the Acorn app for now |
 
 A regenerated certificate fails the pinned TLS chain before the fingerprint comparison runs, so the
 broker reports it as unreachable. The host probes after a failed read to tell the two apart, as
@@ -128,8 +147,12 @@ broker reports it as unreachable. The host probes after a failed read to tell th
 - In Firefox 151, the background's first native port after the browser starts has been seen to get no
   host process and no close. The 10-second deadline above recovers from it, and the selection restore
   retries once on a fresh port. A port opened from the sidebar page at the same moment answers.
+- The sidebar can't answer an agent's question or permission request yet, and draws no tool details,
+  attachments, or subagent streams.
+- Drafts are never expired.
 - The real-browser results and their gaps are in
-  [phase 01](./future/extension/01-native-pairing.md#real-browser-results).
+  [phase 01](./future/extension/01-native-pairing.md#real-browser-results) and
+  [phase 02](./future/extension/02-agent-conversation.md#real-browser-results).
 
 ## Why
 

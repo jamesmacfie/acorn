@@ -52,7 +52,8 @@ pnpm dev:extension:ui -- --session my-change stop
 
 `open` loads the sidebar page in a tab. There it has the same extension APIs as in the panel. `text`
 prints its visible text. `click` finds a button by its text, and `fill` and `check` find an input by
-its `name`. `eval EXPRESSION` runs code in the page. `pairing-code` asks the session's own Node for a
+its `name`. `fill` also types into a text area, such as `message`, and picks a select's option by its
+value or text, as in `fill session "Fix the flaky test"`. `eval EXPRESSION` runs code in the page. `pairing-code` asks the session's own Node for a
 fresh code. Leave out `--session` when exactly one session is running.
 
 The driver talks CDP to Chrome and WebDriver BiDi to Firefox, at the endpoint in `session.json`. It

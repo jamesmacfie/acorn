@@ -25,6 +25,7 @@ export function startBackground(api: BrowserApi, hostName: string): void {
 
   const bridge = nativeBridge(api, hostName, {
     status: (status) => broadcast({ type: 'status', status }),
+    agents: (hint) => broadcast({ type: 'agent', hint }),
     host: (state) => setHost(state),
   })
 

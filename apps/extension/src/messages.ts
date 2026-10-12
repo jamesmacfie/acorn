@@ -1,5 +1,5 @@
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import type { BridgeErrorCode, BridgeRequest } from '@acorn/protocol/extensionBridge.ts'
+import type { BridgeAgentHint, BridgeErrorCode, BridgeRequest } from '@acorn/protocol/extensionBridge.ts'
 
 // Between the sidebar and the background. The background owns the one native connection, so the
 // sidebar names an operation and the background adds the protocol envelope.
@@ -25,6 +25,7 @@ export type BackgroundMessage =
   | { type: 'reply'; id: string; ok: true; result: unknown }
   | { type: 'reply'; id: string; ok: false; error: CallError }
   | { type: 'status'; status: NodeStatus }
+  | { type: 'agent'; hint: BridgeAgentHint }
   | { type: 'host'; host: HostState }
 
 export class CallFailure extends Error {

@@ -2,6 +2,7 @@ import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import {
   BROWSER_BRIDGE_PROTOCOL_VERSION,
   NATIVE_REPLY_MAX_CHARS,
+  type BridgeAgentHint,
   type BridgeOperation,
   type BridgeResults,
 } from '@acorn/protocol/extensionBridge.ts'
@@ -25,7 +26,11 @@ const FIRST_REPLY_MS = 10_000
 export function nativeBridge(
   api: BrowserApi,
   hostName: string,
-  events: { status(status: NodeStatus): void; host(state: Pick<HostState, 'state' | 'message'>): void },
+  events: {
+    status(status: NodeStatus): void
+    agents(hint: BridgeAgentHint): void
+    host(state: Pick<HostState, 'state' | 'message'>): void
+  },
   options: { firstReplyMs?: number } = {},
 ) {
   let port: Port | null = null
@@ -47,6 +52,10 @@ export function nativeBridge(
     events.host({ state: 'connected', message: null })
     const value = message as Record<string, unknown>
     if (value.event === 'status') return events.status(value.status as NodeStatus)
+    if (value.event === 'agent') {
+      const { v: _v, event: _event, ...hint } = value
+      return events.agents(hint as BridgeAgentHint)
+    }
     if (typeof value.id !== 'string') return
     if (value.chunk) return receiveChunk(value.id, value.chunk as { index: number; count: number; data: string })
     if (value.ok === true) settle(value.id, { result: value.result })

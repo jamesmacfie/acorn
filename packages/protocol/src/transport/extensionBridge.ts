@@ -42,8 +42,18 @@ export const NATIVE_REQUEST_MAX_BYTES = 256 * 1024
 // The largest reply the extension reassembles from chunks before it gives up on that request.
 export const NATIVE_REPLY_MAX_CHARS = 16 * 1024 * 1024
 
+// The most conversation events one `session.read` asks for. A page folds tool updates and drops the
+// bulky fields before it leaves the host, so a full page stays far below NATIVE_REPLY_MAX_CHARS.
+const SESSION_READ_MAX_EVENTS = 500
+// The longest message the sidebar may send. Three UTF-8 bytes a character keeps the request frame
+// under NATIVE_REQUEST_MAX_BYTES.
+export const TURN_TEXT_MAX_CHARS = 60_000
+
 const requestId = z.string().min(1).max(64)
 const nodeId = z.string().min(1).max(128)
+const rowId = z.string().min(1).max(128)
+// The agents routes' own bounds on an idempotency key.
+const operationKey = z.string().min(8).max(200)
 const envelope = { v: z.literal(BROWSER_BRIDGE_PROTOCOL_VERSION), id: requestId }
 
 export const bridgeRequestSchema = z.discriminatedUnion('op', [
@@ -60,12 +70,103 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('node.forget'), nodeId }),
   // Bound to the node it was asked of. The host refuses it once that node is no longer selected.
   z.strictObject({ ...envelope, op: z.literal('projects.list'), nodeId }),
+  z.strictObject({ ...envelope, op: z.literal('tasks.list'), nodeId, projectId: rowId }),
+  z.strictObject({ ...envelope, op: z.literal('agents.profiles'), nodeId }),
+  z.strictObject({ ...envelope, op: z.literal('sessions.list'), nodeId, taskId: rowId }),
+  z.strictObject({
+    ...envelope,
+    op: z.literal('session.read'),
+    nodeId,
+    sessionId: rowId,
+    afterSeq: z.number().int().nonnegative(),
+    limit: z.number().int().min(1).max(SESSION_READ_MAX_EVENTS),
+  }),
+  // Writes carry the key the sidebar keeps with its draft, so an explicit retry can't make a second
+  // session or turn. The host checks the selection before a write and never after: once sent, its
+  // outcome is reported whatever was selected since.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('session.create'),
+    nodeId,
+    taskId: rowId,
+    providerId: z.string().min(1).max(100),
+    profileId: z.string().min(1).max(100),
+    key: operationKey,
+  }),
+  z.strictObject({
+    ...envelope,
+    op: z.literal('turn.submit'),
+    nodeId,
+    sessionId: rowId,
+    text: z.string().min(1).max(TURN_TEXT_MAX_CHARS),
+    key: operationKey,
+  }),
 ])
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
 export type BridgeOperation = BridgeRequest['op']
 
 export type BridgeProject = { id: string; name: string; path: string | null; hidden: boolean }
 export type BridgeNodes = { nodes: NodeRecord[]; activeNodeId: string | null; status: NodeStatus | null }
+
+export type BridgeTask = { id: string; title: string; branch: string | null }
+
+// An agent harness the Node can start a session with, from the agents plugin's provider roster.
+export type BridgeAgentProfile = {
+  providerId: string
+  profileId: string
+  label: string
+  installed: boolean
+  authenticated: boolean | null
+  diagnostics: string[]
+}
+
+// The fields of the agents plugin's session row the sidebar draws. `runtimeState` and `attention`
+// carry that plugin's values unchanged.
+export type BridgeAgentSession = {
+  id: string
+  taskId: string
+  title: string
+  providerId: string
+  profileId: string
+  kind: string
+  runtimeState: string
+  attention: string
+  lastEventSeq: number
+  archivedAt: number | null
+  updatedAt: number
+}
+
+// What the sidebar draws of one agent event: the session's own messages, its tool calls, and its
+// errors. The host keeps the agents plugin's record identity and drops everything else, including a
+// tool's input and output, which a summary never shows and which can be megabytes.
+export type BridgeConversationEvent =
+  | { type: 'user_message'; text: string }
+  | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean }
+  // `title` and `status` absent mean unchanged, as on the agents plugin's tool call.
+  | { type: 'tool'; toolId: string; title?: string; status?: string }
+  | { type: 'error'; message: string }
+
+export type BridgeConversationRecord = {
+  id: string
+  seq: number
+  turnId: string | null
+  createdAt: number
+  // Set when the Node folded later updates of this tool call into it: the last seq it absorbed.
+  foldedThroughSeq?: number
+  event: BridgeConversationEvent
+}
+
+export type BridgeSessionRead = {
+  nodeId: string
+  sessionId: string
+  session: BridgeAgentSession
+  records: BridgeConversationRecord[]
+  // The furthest seq the page covered, counting the events the host left out. The next read starts
+  // here.
+  reach: number
+  // Turns accepted but not yet sent to the agent. Their message joins the conversation at dispatch.
+  queued: { id: string; text: string }[]
+}
 
 export type BridgeResults = {
   'nodes.list': BridgeNodes
@@ -74,7 +175,18 @@ export type BridgeResults = {
   'node.select': BridgeNodes
   'node.forget': BridgeNodes
   'projects.list': { nodeId: string; projects: BridgeProject[] }
+  'tasks.list': { nodeId: string; projectId: string; tasks: BridgeTask[] }
+  'agents.profiles': { nodeId: string; profiles: BridgeAgentProfile[] }
+  'sessions.list': { nodeId: string; taskId: string; sessions: BridgeAgentSession[] }
+  'session.read': BridgeSessionRead
+  'session.create': { nodeId: string; session: BridgeAgentSession }
+  'turn.submit': { nodeId: string; sessionId: string; turnId: string }
 }
+
+// Which sessions and tasks changed on the selected Node since the last hint. Nothing more: the
+// sidebar reads the durable state again rather than trusting a pushed copy. `missed` means the Node
+// dropped frames for this reader, so anything may have changed.
+export type BridgeAgentHint = { nodeId: string; sessions: string[]; tasks: string[]; missed: boolean }
 
 export type BridgeErrorCode =
   | 'bad_request'
@@ -87,13 +199,17 @@ export type BridgeErrorCode =
   | 'identity_mismatch'
   | 'revoked'
   | 'node_unreachable'
+  | 'not_found'
+  // A write whose request may have reached the Node. Retry it with the same key.
+  | 'ambiguous_mutation'
   | 'node_error'
 type BridgeError = { code: BridgeErrorCode; message: string }
 
 // Host to extension. A reply answers one request; chunks carry a reply too large for one message;
-// a status event reports the selected node's connection.
+// a status event reports the selected node's connection; an agents event is a coalesced change hint.
 export type BridgeHostMessage =
   | { v: 1; id: string; ok: true; result: unknown }
   | { v: 1; id: string; ok: false; error: BridgeError }
   | { v: 1; id: string; chunk: { index: number; count: number; data: string } }
   | { v: 1; event: 'status'; status: NodeStatus }
+  | ({ v: 1; event: 'agent' } & BridgeAgentHint)
