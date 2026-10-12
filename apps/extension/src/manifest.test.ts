@@ -15,7 +15,7 @@ describe('extension manifests', () => {
   it('gives Chrome a module service worker and a side panel', () => {
     expect(extensionManifest('chrome', '1.0.0')).toMatchObject({
       manifest_version: 3,
-      permissions: ['nativeMessaging', 'storage', 'sidePanel'],
+      permissions: ['nativeMessaging', 'storage', 'sidePanel', 'activeTab', 'scripting'],
       background: { service_worker: 'background.js', type: 'module' },
       side_panel: { default_path: 'sidebar.html' },
       incognito: 'not_allowed',
@@ -25,7 +25,7 @@ describe('extension manifests', () => {
   it('gives Firefox a background script, a sidebar, and its pinned ID', () => {
     const manifest = extensionManifest('firefox', '1.0.0')
     expect(manifest).toMatchObject({
-      permissions: ['nativeMessaging', 'storage'],
+      permissions: ['nativeMessaging', 'storage', 'activeTab', 'scripting'],
       background: { scripts: ['background.js'], type: 'module' },
       sidebar_action: { default_panel: 'sidebar.html' },
       browser_specific_settings: { gecko: { id: FIREFOX_EXTENSION_ID } },
@@ -34,10 +34,11 @@ describe('extension manifests', () => {
     expect(manifest).not.toHaveProperty('key')
   })
 
-  it('asks for no host access and sets no page policy of its own', () => {
+  it('holds no host access at install, only sites the person may grant, and sets no page policy', () => {
     for (const browser of ['chrome', 'firefox'] as const) {
       const manifest = extensionManifest(browser, '1.0.0')
       expect(manifest).not.toHaveProperty('host_permissions')
+      expect(manifest.optional_host_permissions).toEqual(['https://*/*', 'http://*/*'])
       expect(manifest).not.toHaveProperty('content_security_policy')
       expect(manifest).not.toHaveProperty('content_scripts')
     }

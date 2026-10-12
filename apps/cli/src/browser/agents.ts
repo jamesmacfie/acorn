@@ -1,12 +1,16 @@
 import type {
+  AgentAttachment,
   AgentEventRecord,
   AgentProviderDescriptor,
   AgentSession,
   AgentSessionSnapshot,
+  AgentTurn,
 } from '@acorn/plugin-agents/contract/wire.ts'
 import type {
   BridgeAgentHint,
   BridgeAgentProfile,
+  BridgeAttachment,
+  BridgeAttachmentRef,
   BridgeAgentSession,
   BridgeConversationEvent,
   BridgeConversationRecord,
@@ -18,6 +22,32 @@ import type {
 
 export const agentsRoute = '/v1/p/agents'
 export const sessionRoute = (sessionId: string) => `${agentsRoute}/sessions/${encodeURIComponent(sessionId)}`
+export const attachmentRoute = (attachmentId: string) =>
+  `${agentsRoute}/attachments/${encodeURIComponent(attachmentId)}`
+
+export const bridgeAttachment = (attachment: AgentAttachment): BridgeAttachment => ({
+  id: attachment.id,
+  taskId: attachment.taskId,
+  filename: attachment.filename,
+  mediaType: attachment.mediaType,
+  byteSize: attachment.byteSize,
+})
+
+// What a turn sent besides its text, as the agents plugin's `messageAttachments` reads it.
+const turnAttachments = (turn: AgentTurn | undefined): BridgeAttachmentRef[] =>
+  (turn?.input ?? []).flatMap((part): BridgeAttachmentRef[] => {
+    if (part.type === 'image') return [{ id: part.attachmentId, image: true, name: part.alt ?? null }]
+    if (part.type === 'attachment') return [{ id: part.attachmentId, image: false, name: null }]
+    return []
+  })
+
+// The turn's text names each attachment as `[Attachment: <id>]` for the agent. Once the attachments
+// are listed beside it, the line says the same thing twice, so it goes, as in the agents transcript.
+const withoutAttachmentLines = (text: string): string =>
+  text
+    .replace(/^\[Attachment: [^\]\n]+\]$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 
 export const bridgeProfile = (provider: AgentProviderDescriptor): BridgeAgentProfile => ({
   providerId: provider.id,
@@ -42,12 +72,18 @@ export const bridgeSession = (session: AgentSession): BridgeAgentSession => ({
   updatedAt: session.updatedAt,
 })
 
-// A subagent's messages and tools belong to its own stream, which the sidebar doesn't draw.
-function conversationEvent(record: AgentEventRecord): BridgeConversationEvent | null {
+// A subagent's messages and tools belong to its own stream, which the sidebar doesn't draw. An
+// automatic message isn't the person's, so the turn's attachments aren't drawn under it.
+function conversationEvent(record: AgentEventRecord, turn: AgentTurn | undefined): BridgeConversationEvent | null {
   const event = record.event
   switch (event.type) {
-    case 'user_message':
-      return event.subagentId ? null : { type: 'user_message', text: event.text }
+    case 'user_message': {
+      if (event.subagentId) return null
+      const attachments = event.automatic ? [] : turnAttachments(turn)
+      return attachments.length
+        ? { type: 'user_message', text: withoutAttachmentLines(event.text), attachments }
+        : { type: 'user_message', text: event.text }
+    }
     case 'assistant_message':
       if (event.subagentId) return null
       return {
@@ -75,10 +111,11 @@ function conversationEvent(record: AgentEventRecord): BridgeConversationEvent | 
 // the records left out, so the next read starts past them rather than reading them again.
 export function bridgeSessionRead(nodeId: string, snapshot: AgentSessionSnapshot, afterSeq: number): BridgeSessionRead {
   const records: BridgeConversationRecord[] = []
+  const turns = new Map(snapshot.turns.map((turn) => [turn.id, turn]))
   let reach = afterSeq
   for (const record of snapshot.events) {
     reach = Math.max(reach, record.foldedThroughSeq ?? record.seq)
-    const event = conversationEvent(record)
+    const event = conversationEvent(record, record.turnId ? turns.get(record.turnId) : undefined)
     if (!event) continue
     records.push({
       id: record.id,
@@ -100,6 +137,7 @@ export function bridgeSessionRead(nodeId: string, snapshot: AgentSessionSnapshot
       .map((turn) => ({
         id: turn.id,
         text: turn.input.flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('\n'),
+        attachments: turnAttachments(turn),
       })),
   }
 }

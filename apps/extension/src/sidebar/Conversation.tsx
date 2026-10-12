@@ -1,14 +1,14 @@
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
-import { TURN_TEXT_MAX_CHARS, type BridgeAgentHint } from '@acorn/protocol/extensionBridge.ts'
+import type { BridgeAgentHint, BridgeAttachmentRef } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
 import { CallFailure } from '../messages'
+import { attachmentPreviews } from './attachmentPreviews'
 import type { BridgeClient } from './bridgeClient'
+import type { CaptureKind, PageCapture } from './capture'
+import { Composer } from './Composer'
 import { conversationItems, conversationReader, type ConversationWindow } from './conversationWindow'
 import { errorGuidance } from './guidance'
-import { acknowledgeDraft, loadDraft, saveDraft, type Draft, type DraftTarget } from './localState'
-
-// Failures after which a write may or may not have reached the Node.
-const UNCERTAIN = new Set(['ambiguous_mutation', 'host_unavailable', 'node_unreachable'])
+import type { DraftTarget } from './localState'
 
 const STATE_LABELS: Record<string, string> = {
   creating: 'Starting',
@@ -37,16 +37,14 @@ export function Conversation(props: {
   online: boolean
   hint: BridgeAgentHint | null
   reconnects: number
+  capture(kind: CaptureKind): Promise<PageCapture>
 }) {
   const target = props.target
   const [view, setView] = createSignal<ConversationWindow | null>(null)
   const [readError, setReadError] = createSignal<CallFailure | null>(null)
-  const [text, setText] = createSignal('')
-  const [pending, setPending] = createSignal<Draft['pending']>()
-  const [sending, setSending] = createSignal(false)
-  const [sendNote, setSendNote] = createSignal<string | null>(null)
-  let mounted = true
-  let typed = false
+  const previews = attachmentPreviews((attachmentId) =>
+    props.client.call({ op: 'attachment.read', nodeId: target.nodeId, taskId: target.taskId, attachmentId }),
+  )
 
   const reader = conversationReader({
     read: (afterSeq, limit) =>
@@ -60,19 +58,11 @@ export function Conversation(props: {
       setReadError(error instanceof CallFailure ? error : new CallFailure('node_error', String(error))),
   })
   onCleanup(() => {
-    mounted = false
     reader.dispose()
+    previews.dispose()
   })
 
-  onMount(() => {
-    void reader.refresh()
-    // A draft typed before storage answered wins over the stored one.
-    void loadDraft(props.storage, target).then((draft) => {
-      if (!mounted || typed) return
-      setText(draft.text)
-      setPending(draft.pending)
-    })
-  })
+  onMount(() => void reader.refresh())
   createEffect(
     on(
       () => props.hint,
@@ -91,14 +81,6 @@ export function Conversation(props: {
     ),
   )
 
-  const persist = () => void saveDraft(props.storage, target, { text: text(), pending: pending() })
-  const edit = (value: string) => {
-    typed = true
-    setText(value)
-    setSendNote(null)
-    persist()
-  }
-
   const session = () => view()?.session ?? null
   const gone = () => readError()?.code === 'not_found'
   const blocked = (): string | null => {
@@ -107,45 +89,6 @@ export function Conversation(props: {
     if (!props.online) return 'The Node is not connected. Your draft is kept until it is.'
     return null
   }
-  const retrying = () => pending()?.text === text().trim()
-
-  const send = async (event: SubmitEvent) => {
-    event.preventDefault()
-    const message = text().trim()
-    if (!message || sending() || blocked()) return
-    // The same text as an unconfirmed send goes with that send's key, so the Node makes at most one turn.
-    const key = pending()?.text === message ? pending()!.key : crypto.randomUUID()
-    setPending({ key, text: message })
-    persist()
-    setSending(true)
-    setSendNote(null)
-    try {
-      await props.client.call({
-        op: 'turn.submit',
-        nodeId: target.nodeId,
-        sessionId: target.sessionId,
-        text: message,
-        key,
-      })
-      if (mounted) {
-        if (text().trim() === message) setText('')
-        setPending(undefined)
-        await saveDraft(props.storage, target, { text: text() })
-      } else await acknowledgeDraft(props.storage, target, message)
-    } catch (error) {
-      const failure = error instanceof CallFailure ? error : new CallFailure('node_error', String(error))
-      if (UNCERTAIN.has(failure.code))
-        setSendNote(
-          "The Node didn't confirm this message, so it may have arrived. The conversation was read again; if the message isn't there, Retry sends it once, never twice.",
-        )
-      else if (failure.code === 'not_selected') setSendNote('That Node is no longer selected, so nothing was sent.')
-      else setSendNote(errorGuidance(failure))
-    } finally {
-      setSending(false)
-      void reader.refresh()
-    }
-  }
-
   const items = createMemo(() => conversationItems(view()?.records ?? []))
 
   return (
@@ -182,7 +125,12 @@ export function Conversation(props: {
                 ) : (
                   <li class={item.kind}>
                     <strong>{item.kind === 'you' ? 'You' : item.kind === 'agent' ? 'Agent' : 'Error'}</strong>
-                    <p>{item.text}</p>
+                    <Show when={item.text}>
+                      <p>{item.text}</p>
+                    </Show>
+                    <Show when={item.kind === 'you' && item.attachments}>
+                      {(attachments) => <Attachments attachments={attachments()} url={previews.url} />}
+                    </Show>
                   </li>
                 )
               }
@@ -191,27 +139,47 @@ export function Conversation(props: {
               {(turn) => (
                 <li class="you queued">
                   <strong>You · queued</strong>
-                  <p>{turn.text}</p>
+                  <Show when={turn.text}>
+                    <p>{turn.text}</p>
+                  </Show>
+                  <Attachments attachments={turn.attachments} url={previews.url} />
                 </li>
               )}
             </For>
           </ol>
         </Show>
       </Show>
-      <form onSubmit={(event) => void send(event)}>
-        <textarea
-          name="message"
-          rows={3}
-          maxLength={TURN_TEXT_MAX_CHARS}
-          placeholder="Message the agent"
-          value={text()}
-          onInput={(event) => edit(event.currentTarget.value)}
-        />
-        <Show when={blocked() ?? sendNote()}>{(note) => <p class="notice">{note()}</p>}</Show>
-        <button type="submit" disabled={sending() || !text().trim() || blocked() !== null}>
-          {sending() ? 'Sending…' : retrying() ? 'Retry' : 'Send'}
-        </button>
-      </form>
+      <Composer
+        client={props.client}
+        storage={props.storage}
+        target={target}
+        destination={props.destination}
+        capture={props.capture}
+        blocked={blocked()}
+        settled={() => void reader.refresh()}
+      />
     </section>
+  )
+}
+
+// The attachments a turn sent: a picture for each screenshot, read through the bridge, and the name of
+// anything else.
+function Attachments(props: { attachments: BridgeAttachmentRef[]; url(attachmentId: string): Promise<string | null> }) {
+  return (
+    <Show when={props.attachments.length}>
+      <div class="attachments">
+        <For each={props.attachments}>
+          {(attachment) => {
+            const [url, setUrl] = createSignal<string | null>(null)
+            if (attachment.image) void props.url(attachment.id).then(setUrl)
+            return (
+              <Show when={url()} fallback={<span class="quiet">{attachment.name ?? 'Attachment'}</span>}>
+                {(source) => <img src={source()} alt={attachment.name ?? 'Screenshot'} />}
+              </Show>
+            )
+          }}
+        </For>
+      </div>
+    </Show>
   )
 }

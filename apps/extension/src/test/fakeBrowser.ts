@@ -1,8 +1,8 @@
-import type { BrowserApi, Port } from '../browser'
+import type { BrowserApi, Port, Tab } from '../browser'
 
 // The one fake of the extension API, shared by background and sidebar tests. It models what those
 // tests depend on: asynchronous port delivery, both browsers' ways of reporting a closed port,
-// profile storage, and a native host the test scripts. Native messaging itself, permissions,
+// profile storage, a native host the test scripts, and the active tab page capture reads. Native messaging itself, permissions,
 // gestures, and real selectors are checked in a browser through `pnpm dev:extension`.
 
 type Listener = (...args: never[]) => void
@@ -57,7 +57,7 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
   const flavor = options.flavor ?? 'chrome'
   const storage = new Map<string, unknown>()
   const onConnect = listeners<(port: Port) => void>()
-  const onClicked = listeners<() => void>()
+  const onClicked = listeners<(tab: Tab) => void>()
   const runtime: BrowserApi['runtime'] = {
     lastError: null,
     onConnect,
@@ -109,7 +109,13 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     // Replaced by a test to script the host. By default a host answers nothing.
     onNativeConnect: (_host: FakeHost): void => {},
     onNativeMessage: (_message: unknown, _host: FakeHost): void => {},
-    clickAction: () => onClicked.emit(),
+    // The toolbar button, clicked on the active tab.
+    clickAction: () => onClicked.emit({ ...fake.activeTab }),
+    // The tab beside the sidebar. Without `url` the extension may not read it, as without activeTab.
+    activeTab: { id: 1, windowId: 1, url: 'https://example.test/docs', title: 'Docs' } as Tab,
+    selection: '',
+    // Replaced by a test to script a screenshot. By default a small JPEG.
+    onCapture: async (_windowId: number): Promise<string> => 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
     api: {
       runtime,
       storage: {
@@ -121,17 +127,29 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
         },
       },
       action: { onClicked },
+      tabs: {
+        query: async (): Promise<Tab[]> => [{ ...fake.activeTab }],
+        captureVisibleTab: (windowId: number): Promise<string> => fake.onCapture(windowId),
+      },
+      scripting: {
+        executeScript: async <Result>(_injection: { target: { tabId: number } }): Promise<{ result?: Result }[]> => {
+          if (fake.activeTab.url === undefined) throw new Error('Missing host permission for the tab')
+          return [{ result: fake.selection as Result }]
+        },
+      },
       ...(flavor === 'chrome'
         ? {
             sidePanel: {
               setPanelBehavior: async (behavior: { openPanelOnActionClick: boolean }) =>
                 void (fake.panelBehavior = behavior),
+              open: async ({ windowId }: { windowId: number }) => void fake.panelOpens.push(windowId),
             },
           }
-        : { sidebarAction: { toggle: async () => void fake.sidebarToggles++ } }),
+        : { sidebarAction: { open: async () => void fake.panelOpens.push(null) } }),
     } satisfies BrowserApi as BrowserApi,
     panelBehavior: null as { openPanelOnActionClick: boolean } | null,
-    sidebarToggles: 0,
+    // Each opening of the panel: the window in Chrome, null in Firefox, whose sidebar has no window.
+    panelOpens: [] as (number | null)[],
   }
   return fake
 }

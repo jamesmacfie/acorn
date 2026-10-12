@@ -9,6 +9,7 @@ import type {
 import type { BrowserApi } from '../browser'
 import { CallFailure } from '../messages'
 import type { BridgeClient } from './bridgeClient'
+import type { CaptureKind, PageCapture } from './capture'
 import { Conversation } from './Conversation'
 import { errorGuidance } from './guidance'
 import { loadDestination, saveDestination, type Destination as Remembered } from './localState'
@@ -33,6 +34,7 @@ export function Destination(props: {
   online: boolean
   hint: BridgeAgentHint | null
   reconnects: number
+  capture(kind: CaptureKind): Promise<PageCapture>
 }) {
   const nodeId = props.nodeId
   const [projects, setProjects] = createSignal<BridgeProject[] | null>(null)
@@ -344,6 +346,7 @@ export function Destination(props: {
             online={props.online}
             hint={props.hint}
             reconnects={props.reconnects}
+            capture={props.capture}
           />
         )}
       </Show>

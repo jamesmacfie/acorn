@@ -60,6 +60,24 @@ The driver talks CDP to Chrome and WebDriver BiDi to Firefox, at the endpoint in
 ends each BiDi session, because Firefox allows one at a time. It can't open the panel itself, because
 that takes a toolbar click.
 
+## Check page capture
+
+The driver's `open` shows the sidebar in a tab, which makes that tab the active one, so a capture
+from it reads the sidebar itself. Capture checks need the real panel beside the page:
+
+- **Chrome.** Open the page with CDP's `/json/new?URL`. Then send the browser-level CDP command
+  `Extensions.triggerAction` with the extension ID and the page's `tab` target from
+  `Target.getTargets`. It runs the toolbar click: the panel opens with `activeTab` for that page.
+  Close any sidebar tab first, and the driver's verbs act on the panel. A click inside the panel
+  grants no access, and a persistent site grant needs Chrome's own prompt, which CDP can't answer.
+- **Firefox.** WebDriver BiDi can't click the toolbar, and Firefox counts only real input as a
+  gesture. In the sidebar tab, add a button that calls `browser.sidebarAction.open()`, and press it
+  with `input.performActions`. Then drive the panel from that tab through
+  `browser.extension.getViews({ type: 'sidebar' })`. To grant a site, set
+  `extensions.webextOptionalPermissionPrompts` to `false` in the profile's `user.js` and press a
+  button that calls `browser.permissions.request()`. Firefox doesn't take a screenshot on a site
+  grant alone, so a Firefox screenshot needs a person's toolbar click.
+
 ## Tests without a browser
 
 `apps/extension/src/test/fakeBrowser.ts` is the one fake of the extension API. Background and sidebar

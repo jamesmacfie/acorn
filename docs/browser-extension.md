@@ -9,6 +9,8 @@ Topic pages:
 
 - [Agent conversations](./browser-extension/conversations.md): the agent operations, change hints,
   the conversation window, send retries, and browser storage.
+- [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
+  page access, sending them, and the attachment operations.
 
 ## What runs where
 
@@ -29,8 +31,15 @@ Data flows sidebar → background → native host → pinned Node connection →
 extension never hold a token or certificate. The desktop app takes no part: the bridge pairs and
 connects on its own, so the desktop can stay closed.
 
-The extension has no content scripts yet and asks for no host access. The manifests (`src/manifest.ts`) ask for
-`nativeMessaging` and `storage`, plus `sidePanel` in Chrome, and turn off private windows.
+The extension has no content scripts and holds no host access at install. The manifests
+(`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, and `scripting`, plus
+`sidePanel` in Chrome. They list `http://*/*` and `https://*/*` as optional host access, which only
+the person can grant, and turn off private windows.
+
+The toolbar button opens the sidebar and lets [page capture](./browser-extension/page-capture.md#page-access)
+read the tab it was clicked on. The background handles the click and opens the panel itself, in both
+browsers, because Chrome's own open-on-click grants no page access. A second click leaves the panel
+open.
 
 ## Identities and registrations
 
@@ -65,19 +74,24 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `sessions.list` | `nodeId`, `taskId` | `{ nodeId, taskId, sessions }`: the task's newest 100 unarchived sessions |
 | `session.read` | `nodeId`, `sessionId`, `afterSeq`, `limit` (at most 500) | `{ nodeId, sessionId, session, records, reach, queued }` |
 | `session.create` | `nodeId`, `taskId`, `providerId`, `profileId`, `key` | `{ nodeId, session }` |
-| `turn.submit` | `nodeId`, `sessionId`, `text` (at most 60,000 characters), `key` | `{ nodeId, sessionId, turnId }` |
+| `turn.submit` | `nodeId`, `sessionId`, `input`, `key` | `{ nodeId, sessionId, turnId }` |
+| `attachment.upload`, `attachment.read`, `attachment.delete` | `nodeId`, `taskId`, and the attachment | See [page capture](./browser-extension/page-capture.md#attachment-operations) |
 
 A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, message } }`. The host
 also sends `{ v, event: 'status', status }` when the selected Node's connection changes, and
 `{ v, event: 'agent', nodeId, sessions, tasks, missed }` as a change hint. [Agent conversations](./browser-extension/conversations.md) covers the agent
-operations, hints, and what the sidebar keeps in browser storage. A request
+operations, hints, and what the sidebar keeps in browser storage. `turn.submit`'s `input` is the
+agents plugin's turn input, limited to the parts [page capture](./browser-extension/page-capture.md)
+sends: at most one `text` part of 60,000 characters, eight `context` parts, and eight `image` parts. A request
 that doesn't match the schema gets a `bad_request` reply when it has a usable `id`, and nothing
 otherwise. Add an operation together with the phase that first calls it.
 
 The host enforces these limits:
 
-- A request frame over 256 KiB closes the host. A length header can't be trusted to resynchronize, so
-  the host doesn't allocate it.
+- A request frame over 14 MiB closes the host. A length header can't be trusted to resynchronize, so
+  the host doesn't buffer it. Every request the schema accepts fits, including an attachment upload
+  at the 10 MiB limit. Chrome sends up to 64 MiB to a host and Firefox up to 4 GiB, so a request is
+  never split.
 - A malformed JSON frame is logged to stderr and skipped.
 - Bytes of an unfinished frame at end of input are discarded and logged.
 - Both browsers refuse a host message over 1 MiB, so a reply longer than 262,144 UTF-16 units goes out
@@ -135,6 +149,8 @@ Each failure has a next step, written in `src/sidebar/guidance.ts`:
 | Conversation archived | The session row has `archivedAt` | The draft is kept; sending is off |
 | Node away | The selected Node's status is neither online nor degraded | The draft is kept; sending is off until it returns |
 | Agent waiting | The session's `attention` is `permission` or `question` | Answer it in the Acorn app for now |
+| No page access | The active tab has no readable address, or the browser refuses the capture | Click the Acorn toolbar button on the page, then capture again |
+| Page changed | The active tab or its address changed while a capture ran | Capture again |
 
 A regenerated certificate fails the pinned TLS chain before the fingerprint comparison runs, so the
 broker reports it as unreachable. The host probes after a failed read to tell the two apart, as
@@ -147,12 +163,13 @@ broker reports it as unreachable. The host probes after a failed read to tell th
 - In Firefox 151, the background's first native port after the browser starts has been seen to get no
   host process and no close. The 10-second deadline above recovers from it, and the selection restore
   retries once on a fresh port. A port opened from the sidebar page at the same moment answers.
-- The sidebar can't answer an agent's question or permission request yet, and draws no tool details,
-  attachments, or subagent streams.
+- The sidebar can't answer an agent's question or permission request yet, and draws no tool details or
+  subagent streams. It draws the screenshots a turn sent and names any other attachment.
 - Drafts are never expired.
 - The real-browser results and their gaps are in
-  [phase 01](./future/extension/01-native-pairing.md#real-browser-results) and
-  [phase 02](./future/extension/02-agent-conversation.md#real-browser-results).
+  [phase 01](./future/extension/01-native-pairing.md#real-browser-results),
+  [phase 02](./future/extension/02-agent-conversation.md#real-browser-results), and
+  [phase 03](./future/extension/03-page-capture.md#real-browser-results).
 
 ## Why
 

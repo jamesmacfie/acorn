@@ -14,6 +14,8 @@ export type Port = {
   error?: { message?: string } | null
 }
 
+export type Tab = { id?: number; windowId: number; url?: string; title?: string }
+
 export type BrowserApi = {
   runtime: {
     connectNative(application: string): Port
@@ -28,11 +30,23 @@ export type BrowserApi = {
       remove(keys: string[]): Promise<void>
     }
   }
-  action: { onClicked: Listeners<() => void> }
+  action: { onClicked: Listeners<(tab: Tab) => void> }
+  // `url` and `title` are present only for a tab this extension may read: the one the toolbar button
+  // was just clicked on (`activeTab`), or a site the person granted.
+  tabs: {
+    query(query: { active: true; currentWindow: true }): Promise<Tab[]>
+    captureVisibleTab(windowId: number, options: { format: 'jpeg'; quality: number }): Promise<string>
+  }
+  scripting: {
+    executeScript<Result>(injection: { target: { tabId: number }; func: () => Result }): Promise<{ result?: Result }[]>
+  }
   // Chrome only.
-  sidePanel?: { setPanelBehavior(behavior: { openPanelOnActionClick: boolean }): Promise<void> }
+  sidePanel?: {
+    setPanelBehavior(behavior: { openPanelOnActionClick: boolean }): Promise<void>
+    open(options: { windowId: number }): Promise<void>
+  }
   // Firefox only.
-  sidebarAction?: { toggle(): Promise<void> }
+  sidebarAction?: { open(): Promise<void> }
 }
 
 export const browserApi = (): BrowserApi => {

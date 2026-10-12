@@ -1,24 +1,37 @@
 import { randomUUID } from 'node:crypto'
 import { NodeBroker, toNodeRecord, type FleetStore } from '@acorn/custody/broker'
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
-import type { NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
-import type {
-  BridgeAgentHint,
-  BridgeErrorCode,
-  BridgeNodes,
-  BridgeProject,
-  BridgeRequest,
-  BridgeResults,
+import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
+import {
+  ATTACHMENT_MAX_BYTES,
+  type BridgeAgentHint,
+  type BridgeAttachment,
+  type BridgeErrorCode,
+  type BridgeNodes,
+  type BridgeProject,
+  type BridgeRequest,
+  type BridgeResults,
 } from '@acorn/protocol/extensionBridge.ts'
 import { projectsRoute, tasksRoute, type ProjectsResponse, type Task } from '@acorn/protocol/api.ts'
 import type {
+  AgentAttachment,
+  AgentInputPart,
   AgentProviderDescriptor,
   AgentSession,
   AgentSessionList,
   AgentSessionSnapshot,
   AgentTurn,
 } from '@acorn/plugin-agents/contract/wire.ts'
-import { agentHints, agentsRoute, bridgeProfile, bridgeSession, bridgeSessionRead, sessionRoute } from './agents'
+import {
+  agentHints,
+  agentsRoute,
+  attachmentRoute,
+  bridgeAttachment,
+  bridgeProfile,
+  bridgeSession,
+  bridgeSessionRead,
+  sessionRoute,
+} from './agents'
 
 export class BridgeFailure extends Error {
   constructor(
@@ -111,10 +124,17 @@ export function createBridge(options: {
 
   // One Node route for the selected node. A read is refused if the selection moved while it was out;
   // a write isn't, because once sent it may have happened, and the caller must hear its outcome.
-  async function nodeRequest(
+  async function nodeResponse(
     nodeId: string,
-    request: { method: 'GET' | 'POST'; path: string; body?: unknown; key?: string },
-  ): Promise<unknown> {
+    request: {
+      method: 'GET' | 'POST' | 'DELETE'
+      path: string
+      body?: unknown
+      form?: Extract<NodeFetchBody, { kind: 'form' }>
+      key?: string
+      maxResponseBytes?: number
+    },
+  ): Promise<NodeFetchResponse> {
     requireSelected(nodeId)
     const write = request.method !== 'GET'
     let response: NodeFetchResponse
@@ -129,7 +149,10 @@ export function createBridge(options: {
         },
         ...(request.body !== undefined
           ? { body: { kind: 'bytes' as const, bytes: new TextEncoder().encode(JSON.stringify(request.body)) } }
-          : {}),
+          : request.form
+            ? { body: request.form }
+            : {}),
+        ...(request.maxResponseBytes ? { maxResponseBytes: request.maxResponseBytes } : {}),
       })
     } catch (error) {
       if (!write) requireSelected(nodeId)
@@ -148,17 +171,28 @@ export function createBridge(options: {
       throw new BridgeFailure('node_unreachable', `The Node did not answer: ${messageOf(error)}`)
     }
     if (!write) requireSelected(nodeId)
-    const body = parseJson(response)
     if (response.status === 401)
       throw new BridgeFailure('revoked', 'The Node no longer accepts this browser. Forget it and pair again.')
     if (response.status >= 400) {
-      const message = (body as { error?: { message?: unknown } } | null)?.error?.message
+      const message = (parseJson(response) as { error?: { message?: unknown } } | null)?.error?.message
       throw new BridgeFailure(
         response.status === 404 ? 'not_found' : 'node_error',
         typeof message === 'string' ? message : `The Node answered ${response.status}.`,
       )
     }
-    return body
+    return response
+  }
+
+  const nodeRequest = async (nodeId: string, request: Parameters<typeof nodeResponse>[1]): Promise<unknown> =>
+    parseJson(await nodeResponse(nodeId, request))
+
+  // An attachment of the named task. The agents routes confine a task's own agent to its task, but this
+  // browser holds a device credential, which they don't confine, so the host checks the owner itself.
+  // Another task's attachment reads as missing, the same answer the Node gives a confined caller.
+  async function taskAttachment(nodeId: string, taskId: string, attachmentId: string): Promise<BridgeAttachment> {
+    const row = (await nodeRequest(nodeId, { method: 'GET', path: attachmentRoute(attachmentId) })) as AgentAttachment
+    if (row?.taskId !== taskId) throw new BridgeFailure('not_found', 'That attachment is not part of this task.')
+    return bridgeAttachment(row)
   }
 
   const readList = async <Row>(nodeId: string, path: string, rows: (body: unknown) => unknown): Promise<Row[]> => {
@@ -294,13 +328,54 @@ export function createBridge(options: {
         return { nodeId: request.nodeId, session: bridgeSession(session) }
       }
       case 'turn.submit': {
+        const input: AgentInputPart[] = request.input
         const turn = (await nodeRequest(request.nodeId, {
           method: 'POST',
           path: `${sessionRoute(request.sessionId)}/turns`,
           key: request.key,
-          body: { input: [{ type: 'text', text: request.text }], source: 'interactive', effectivePolicy: {} },
+          body: { input, source: 'interactive', effectivePolicy: {} },
         })) as AgentTurn
         return { nodeId: request.nodeId, sessionId: request.sessionId, turnId: turn.id }
+      }
+      case 'attachment.upload': {
+        const bytes = Buffer.from(request.data, 'base64')
+        if (bytes.byteLength > ATTACHMENT_MAX_BYTES)
+          throw new BridgeFailure('bad_request', 'Attachments are limited to 10 MiB each.')
+        const query = new URLSearchParams({ taskId: request.taskId })
+        const row = (await nodeRequest(request.nodeId, {
+          method: 'POST',
+          path: `${agentsRoute}/attachments?${query}`,
+          form: {
+            kind: 'form',
+            parts: [{ name: 'file', filename: request.filename, type: request.mediaType, bytes }],
+          },
+        })) as AgentAttachment
+        return { nodeId: request.nodeId, taskId: request.taskId, attachment: bridgeAttachment(row) }
+      }
+      case 'attachment.read': {
+        const attachment = await taskAttachment(request.nodeId, request.taskId, request.attachmentId)
+        if (!attachment.mediaType.startsWith('image/') || attachment.byteSize > ATTACHMENT_MAX_BYTES)
+          return { nodeId: request.nodeId, taskId: request.taskId, attachment, data: null }
+        const content = await nodeResponse(request.nodeId, {
+          method: 'GET',
+          path: `${attachmentRoute(request.attachmentId)}/content`,
+          maxResponseBytes: ATTACHMENT_MAX_BYTES,
+        })
+        const data = Buffer.from(content.body).toString('base64')
+        return { nodeId: request.nodeId, taskId: request.taskId, attachment, data }
+      }
+      case 'attachment.delete': {
+        await taskAttachment(request.nodeId, request.taskId, request.attachmentId)
+        const result = (await nodeRequest(request.nodeId, {
+          method: 'DELETE',
+          path: attachmentRoute(request.attachmentId),
+        })) as { removed?: unknown } | null
+        return {
+          nodeId: request.nodeId,
+          taskId: request.taskId,
+          attachmentId: request.attachmentId,
+          removed: result?.removed === true,
+        }
       }
     }
   }

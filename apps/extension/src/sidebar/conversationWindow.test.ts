@@ -21,7 +21,7 @@ describe('conversation items', () => {
         record(6, { type: 'error', message: 'Out of credit' }),
       ]),
     ).toEqual([
-      { key: 'e1', kind: 'you', text: 'Fix the test' },
+      { key: 'e1', kind: 'you', text: 'Fix the test', attachments: [] },
       { key: 'e2', kind: 'tool', title: 'Run tests', status: 'completed' },
       { key: 'e3', kind: 'agent', text: 'Looking.' },
       { key: 'e6', kind: 'error', text: 'Out of credit' },

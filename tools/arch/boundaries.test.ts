@@ -845,6 +845,7 @@ describe('architecture boundaries', () => {
       ['packages/protocol/src/plugin/manifest/commandDescriptors.ts', "the 'terminal' command category"],
       // `terminal` an agent controller and a driver kind; `context` an agent input part.
       ['packages/protocol/src/agents/agentContext.ts', "'context' the agent input part"],
+      ['packages/protocol/src/transport/extensionBridge.ts', "'context' the agent input part the sidebar sends"],
       ['packages/client-core/src/features/agent/contextSnapshot.ts', "'context' the agent input part"],
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
       ['packages/node-core/src/server/plugins/coreFacets.ts', "'context' the core facet name"],

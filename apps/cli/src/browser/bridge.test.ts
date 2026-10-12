@@ -40,6 +40,15 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     dropTurnReply: false,
     turns: new Map<string, { id: string; text: string }>(),
     lastQuery: '',
+    lastTurnInput: null as unknown,
+    // Uploads keyed by content, as the agents plugin keeps one row per task and content.
+    uploads: [] as { taskId: string; body: string }[],
+    attachments: new Map([
+      ['a1', { id: 'a1', taskId: 't1', filename: 'shot.png', mediaType: 'image/png', byteSize: 4, createdAt: 1 }],
+      ['a2', { id: 'a2', taskId: 't2', filename: 'other.png', mediaType: 'image/png', byteSize: 4, createdAt: 1 }],
+      ['a3', { id: 'a3', taskId: 't1', filename: 'notes.txt', mediaType: 'text/plain', byteSize: 4, createdAt: 1 }],
+    ]),
+    deleted: [] as string[],
   }
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown) => {
@@ -119,6 +128,7 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       let body = ''
       for await (const chunk of req) body += chunk
       const key = String(req.headers['idempotency-key'])
+      state.lastTurnInput = JSON.parse(body).input
       const turn = state.turns.get(key) ?? { id: `turn-${state.turns.size + 1}`, text: JSON.parse(body).input[0].text }
       state.turns.set(key, turn)
       if (state.dropTurnReply) {
@@ -126,6 +136,38 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         return req.socket.destroy()
       }
       return reply(200, { id: turn.id, sessionId: 's1', status: 'queued' })
+    }
+    if (url.pathname === '/v1/p/agents/attachments' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      const taskId = url.searchParams.get('taskId')!
+      const content = /\r\n\r\n([\s\S]*)\r\n--/.exec(body)?.[1] ?? ''
+      let index = state.uploads.findIndex((upload) => upload.taskId === taskId && upload.body === content)
+      if (index < 0) index = state.uploads.push({ taskId, body: content }) - 1
+      const filename = /filename="([^"]*)"/.exec(body)?.[1]
+      const type = /content-type: ([^\r]*)/i.exec(body)?.[1]
+      return reply(200, {
+        id: `up-${index}`,
+        taskId,
+        filename,
+        mediaType: type,
+        byteSize: content.length,
+        createdAt: 1,
+      })
+    }
+    const attachment = /^\/v1\/p\/agents\/attachments\/([^/]+)(\/content)?$/.exec(url.pathname)
+    if (attachment) {
+      const row = state.attachments.get(attachment[1]!)
+      if (!row) return reply(500, { error: { code: 'internal', message: 'Attachment not found.' } })
+      if (req.method === 'DELETE') {
+        state.deleted.push(row.id)
+        return reply(200, { removed: row.id !== 'a1' })
+      }
+      if (attachment[2]) {
+        res.writeHead(200, { 'content-type': row.mediaType })
+        return res.end(Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+      }
+      return reply(200, row)
     }
     if (req.url === '/v1/core/projects') {
       await state.projectsDelay
@@ -347,7 +389,13 @@ describe('browser bridge agent operations', () => {
   it('reports an unanswered write as uncertain, and a retry with the same key makes no second turn', async () => {
     const { call, node } = await selected()
     node.state.dropTurnReply = true
-    const submit = { op: 'turn.submit', nodeId: 'node-a', sessionId: 's1', text: 'hello', key: 'turn-key-1' }
+    const submit = {
+      op: 'turn.submit',
+      nodeId: 'node-a',
+      sessionId: 's1',
+      input: [{ type: 'text', text: 'hello' }],
+      key: 'turn-key-1',
+    }
     await expect(call(submit)).rejects.toMatchObject({ code: 'ambiguous_mutation' })
     expect(await call(submit)).toEqual({ nodeId: 'node-a', sessionId: 's1', turnId: 'turn-1' })
     expect([...node.state.turns.values()]).toEqual([{ id: 'turn-1', text: 'hello' }])
@@ -357,8 +405,95 @@ describe('browser bridge agent operations', () => {
     const { call, node } = await selected()
     await call({ op: 'node.select', nodeId: null })
     await expect(
-      call({ op: 'turn.submit', nodeId: 'node-a', sessionId: 's1', text: 'hello', key: 'turn-key-1' }),
+      call({
+        op: 'turn.submit',
+        nodeId: 'node-a',
+        sessionId: 's1',
+        input: [{ type: 'text', text: 'hello' }],
+        key: 'turn-key-1',
+      }),
     ).rejects.toMatchObject({ code: 'not_selected' })
     expect(node.state.turns.size).toBe(0)
+  })
+
+  it('passes captured context and screenshots to the Node as the turn input', async () => {
+    const { call, node } = await selected()
+    const input = [
+      { type: 'text', text: 'Look at this' },
+      {
+        type: 'context',
+        contextId: 'c1',
+        label: 'Page: Docs',
+        content: 'https://example.test/docs',
+        source: 'browser-extension',
+        capturedAt: 5,
+      },
+      { type: 'image', attachmentId: 'a1', alt: 'Screenshot of Docs' },
+    ]
+    await call({ op: 'turn.submit', nodeId: 'node-a', sessionId: 's1', input, key: 'turn-key-2' })
+    expect(node.state.lastTurnInput).toEqual(input)
+  })
+})
+
+describe('browser bridge attachments', () => {
+  async function selected() {
+    const subject = await paired()
+    await subject.call({ op: 'node.select', nodeId: 'node-a' })
+    return subject
+  }
+  const png = Buffer.from('\x89PNG fake screenshot').toString('base64')
+
+  it('uploads to the named task, and the same bytes answer with the same attachment', async () => {
+    const { call, node } = await selected()
+    const upload = {
+      op: 'attachment.upload',
+      nodeId: 'node-a',
+      taskId: 't1',
+      filename: 'Screenshot.png',
+      mediaType: 'image/png',
+      data: png,
+    }
+    const first = await call(upload)
+    expect(first).toMatchObject({
+      nodeId: 'node-a',
+      taskId: 't1',
+      attachment: { id: 'up-0', taskId: 't1', filename: 'Screenshot.png', mediaType: 'image/png' },
+    })
+    expect((await call(upload)).attachment.id).toBe('up-0')
+    expect(node.state.uploads).toHaveLength(1)
+  })
+
+  it('reads an image of the task as base64, and only names one that is not an image', async () => {
+    const { call } = await selected()
+    const read = await call({ op: 'attachment.read', nodeId: 'node-a', taskId: 't1', attachmentId: 'a1' })
+    expect(read).toMatchObject({ attachment: { id: 'a1', filename: 'shot.png' } })
+    expect(Buffer.from(read.data, 'base64')).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+    expect(await call({ op: 'attachment.read', nodeId: 'node-a', taskId: 't1', attachmentId: 'a3' })).toMatchObject({
+      attachment: { id: 'a3' },
+      data: null,
+    })
+  })
+
+  it('refuses to read or delete another task attachment', async () => {
+    const { call, node } = await selected()
+    for (const op of ['attachment.read', 'attachment.delete'])
+      await expect(call({ op, nodeId: 'node-a', taskId: 't1', attachmentId: 'a2' })).rejects.toMatchObject({
+        code: 'not_found',
+      })
+    expect(node.state.deleted).toEqual([])
+  })
+
+  it('reports whether the Node removed a draft attachment', async () => {
+    const { call } = await selected()
+    expect(await call({ op: 'attachment.delete', nodeId: 'node-a', taskId: 't1', attachmentId: 'a3' })).toEqual({
+      nodeId: 'node-a',
+      taskId: 't1',
+      attachmentId: 'a3',
+      removed: true,
+    })
+    // The Node keeps an attachment a turn has sent.
+    expect(await call({ op: 'attachment.delete', nodeId: 'node-a', taskId: 't1', attachmentId: 'a1' })).toMatchObject({
+      removed: false,
+    })
   })
 })

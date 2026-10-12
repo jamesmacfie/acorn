@@ -34,6 +34,16 @@ describe('native frame reader', () => {
     ])
   })
 
+  it('reads a large frame that arrives as many small reads', () => {
+    const reader = frameReader(1024 * 1024)
+    const body = JSON.stringify({ data: 'x'.repeat(500_000) })
+    const bytes = frame(body)
+    const frames = []
+    for (let at = 0; at < bytes.length; at += 4096) frames.push(...reader.push(bytes.subarray(at, at + 4096)))
+    expect(frames).toEqual([{ ok: true, value: JSON.parse(body) }])
+    expect(reader.pendingBytes()).toBe(0)
+  })
+
   it('holds an unfinished frame as pending bytes', () => {
     const reader = frameReader(1024)
     reader.push(frame('{"a":1}').subarray(0, 7))

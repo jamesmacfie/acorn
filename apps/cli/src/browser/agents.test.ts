@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentEventRecord, AgentSessionSnapshot } from '@acorn/plugin-agents/contract/wire.ts'
+import type { AgentEventRecord, AgentInputPart, AgentSessionSnapshot } from '@acorn/plugin-agents/contract/wire.ts'
 import type { BridgeAgentHint } from '@acorn/protocol/extensionBridge.ts'
 import { agentHints, bridgeSessionRead } from './agents'
 
@@ -82,7 +82,38 @@ describe('session pages for the sidebar', () => {
     )
     expect(read.records).toEqual([])
     expect(read.reach).toBe(4)
-    expect(read.queued).toEqual([{ id: 'next', text: 'later' }])
+    expect(read.queued).toEqual([{ id: 'next', text: 'later', attachments: [] }])
+  })
+
+  it('lists what the person turn sent, without the lines that name it for the agent', () => {
+    const input: AgentInputPart[] = [
+      { type: 'text', text: 'Look' },
+      { type: 'image', attachmentId: 'a1', alt: 'Screenshot of Docs' },
+      { type: 'attachment', attachmentId: 'a2' },
+    ]
+    const read = bridgeSessionRead(
+      'n1',
+      snapshot(
+        [
+          record(1, { type: 'user_message', text: 'Look\n\n[Attachment: a1]\n\n[Attachment: a2]' }),
+          record(2, { type: 'user_message', text: 'Continue.\n\n[Attachment: a1]', automatic: true }),
+        ],
+        [
+          { id: 't1', status: 'completed', input },
+          { id: 'next', status: 'queued', input },
+        ],
+      ),
+      0,
+    )
+    const sent = [
+      { id: 'a1', image: true, name: 'Screenshot of Docs' },
+      { id: 'a2', image: false, name: null },
+    ]
+    expect(read.records.map((row) => row.event)).toEqual([
+      { type: 'user_message', text: 'Look', attachments: sent },
+      { type: 'user_message', text: 'Continue.\n\n[Attachment: a1]' },
+    ])
+    expect(read.queued).toEqual([{ id: 'next', text: 'Look', attachments: sent }])
   })
 })
 

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_AGENT_CONTEXT_BYTES } from '../agents/agentContext.ts'
 import type { NodeProbeResult, NodeRecord, NodeStatus } from './broker.ts'
 
 // The browser extension's native messaging contract: the identities a host registration allows, the
@@ -36,18 +37,27 @@ export function nativeHostRegistration(browser: BridgeBrowser, name: string, pat
 // this many UTF-16 units: each costs at most three UTF-8 bytes, or two for an escaped quote, so a
 // chunk and its envelope stay under the limit.
 export const NATIVE_REPLY_CHUNK_CHARS = 256 * 1024
-// The largest request frame the host accepts. Requests are small; a larger length header means the
-// stream is corrupt or hostile, and the host closes rather than allocating it.
-export const NATIVE_REQUEST_MAX_BYTES = 256 * 1024
+// The agents plugin's limit on one attachment, and on how many one turn may carry.
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+export const TURN_MAX_ATTACHMENTS = 8
+// An attachment crosses native messaging as base64: four characters for every three bytes.
+const ATTACHMENT_MAX_BASE64_CHARS = 4 * Math.ceil(ATTACHMENT_MAX_BYTES / 3)
+// The largest request frame the host accepts: one upload at the attachment limit, with room for its
+// envelope. Every request the schema below accepts fits. A larger length header means the stream is
+// corrupt or hostile, and the host closes rather than buffering it. Both browsers send far larger
+// messages to a host (Chrome 64 MiB, Firefox 4 GiB), so a request is never split.
+export const NATIVE_REQUEST_MAX_BYTES = 14 * 1024 * 1024
 // The largest reply the extension reassembles from chunks before it gives up on that request.
 export const NATIVE_REPLY_MAX_CHARS = 16 * 1024 * 1024
 
 // The most conversation events one `session.read` asks for. A page folds tool updates and drops the
 // bulky fields before it leaves the host, so a full page stays far below NATIVE_REPLY_MAX_CHARS.
 const SESSION_READ_MAX_EVENTS = 500
-// The longest message the sidebar may send. Three UTF-8 bytes a character keeps the request frame
-// under NATIVE_REQUEST_MAX_BYTES.
+// The longest message the sidebar may send.
 export const TURN_TEXT_MAX_CHARS = 60_000
+// Captured page context a turn may carry: a page link or selected text each make one context part.
+// The Node refuses more than MAX_AGENT_CONTEXT_BYTES of context content in one turn.
+export const TURN_MAX_CONTEXTS = 8
 
 const requestId = z.string().min(1).max(64)
 const nodeId = z.string().min(1).max(128)
@@ -55,6 +65,47 @@ const rowId = z.string().min(1).max(128)
 // The agents routes' own bounds on an idempotency key.
 const operationKey = z.string().min(8).max(200)
 const envelope = { v: z.literal(BROWSER_BRIDGE_PROTOCOL_VERSION), id: requestId }
+
+// The parts of an agents plugin turn the sidebar sends, in that plugin's shape (`AgentInputPart`), so
+// the host passes them on unchanged. Captured page context is a `context` part, which the Node hands
+// the agent inside an escaped block, so page text can't read as the person's own words. A screenshot
+// is an `image` part naming an attachment this task already holds.
+const bridgeInputPartSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('text'), text: z.string().min(1).max(TURN_TEXT_MAX_CHARS) }),
+  z.strictObject({
+    type: z.literal('context'),
+    contextId: z.string().min(1).max(200),
+    label: z.string().min(1).max(500),
+    content: z.string().min(1),
+    source: z.literal('browser-extension'),
+    resourceId: z.string().max(1_000).optional(),
+    capturedAt: z.number().int().nonnegative(),
+  }),
+  z.strictObject({
+    type: z.literal('image'),
+    attachmentId: rowId,
+    alt: z.string().max(1_000).optional(),
+  }),
+])
+export type BridgeInputPart = z.infer<typeof bridgeInputPartSchema>
+
+const turnInputSchema = z
+  .array(bridgeInputPartSchema)
+  .min(1)
+  .refine((input) => input.filter((part) => part.type === 'text').length <= 1, 'One text part at most.')
+  .refine((input) => input.filter((part) => part.type === 'context').length <= TURN_MAX_CONTEXTS, 'Too many contexts.')
+  // In characters, which is never more than the Node's byte count. It keeps the frame bounded: a
+  // character costs at most six bytes as escaped JSON.
+  .refine(
+    (input) =>
+      input.reduce((total, part) => total + (part.type === 'context' ? part.content.length : 0), 0) <=
+      MAX_AGENT_CONTEXT_BYTES,
+    'Too much context.',
+  )
+  .refine(
+    (input) => input.filter((part) => part.type === 'image').length <= TURN_MAX_ATTACHMENTS,
+    'Too many attachments.',
+  )
 
 export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('nodes.list') }),
@@ -98,9 +149,24 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     op: z.literal('turn.submit'),
     nodeId,
     sessionId: rowId,
-    text: z.string().min(1).max(TURN_TEXT_MAX_CHARS),
+    input: turnInputSchema,
     key: operationKey,
   }),
+  // Draft attachments are the agents plugin's, scoped to a task. Each operation names that task, and
+  // the host refuses an attachment that belongs to another. The upload carries no key: the Node keeps
+  // one row per task and content, so sending the same bytes again answers with the same attachment.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('attachment.upload'),
+    nodeId,
+    taskId: rowId,
+    filename: z.string().min(1).max(200),
+    mediaType: z.enum(['image/png', 'image/jpeg']),
+    data: z.string().min(1).max(ATTACHMENT_MAX_BASE64_CHARS),
+  }),
+  z.strictObject({ ...envelope, op: z.literal('attachment.read'), nodeId, taskId: rowId, attachmentId: rowId }),
+  // The Node deletes only an attachment no turn has sent, and answers `removed: false` for one a turn has.
+  z.strictObject({ ...envelope, op: z.literal('attachment.delete'), nodeId, taskId: rowId, attachmentId: rowId }),
 ])
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
 export type BridgeOperation = BridgeRequest['op']
@@ -139,8 +205,13 @@ export type BridgeAgentSession = {
 // What the sidebar draws of one agent event: the session's own messages, its tool calls, and its
 // errors. The host keeps the agents plugin's record identity and drops everything else, including a
 // tool's input and output, which a summary never shows and which can be megabytes.
+// An attachment a turn sent: a screenshot is an `image`, anything else a plain attachment.
+export type BridgeAttachmentRef = { id: string; image: boolean; name: string | null }
+
 export type BridgeConversationEvent =
-  | { type: 'user_message'; text: string }
+  // `attachments` lists what the person's turn sent. When it's present, the text no longer carries the
+  // `[Attachment: <id>]` lines that name them for the agent.
+  | { type: 'user_message'; text: string; attachments?: BridgeAttachmentRef[] }
   | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean }
   // `title` and `status` absent mean unchanged, as on the agents plugin's tool call.
   | { type: 'tool'; toolId: string; title?: string; status?: string }
@@ -165,8 +236,11 @@ export type BridgeSessionRead = {
   // here.
   reach: number
   // Turns accepted but not yet sent to the agent. Their message joins the conversation at dispatch.
-  queued: { id: string; text: string }[]
+  queued: { id: string; text: string; attachments: BridgeAttachmentRef[] }[]
 }
+
+// The agents plugin's attachment row.
+export type BridgeAttachment = { id: string; taskId: string; filename: string; mediaType: string; byteSize: number }
 
 export type BridgeResults = {
   'nodes.list': BridgeNodes
@@ -181,6 +255,10 @@ export type BridgeResults = {
   'session.read': BridgeSessionRead
   'session.create': { nodeId: string; session: BridgeAgentSession }
   'turn.submit': { nodeId: string; sessionId: string; turnId: string }
+  'attachment.upload': { nodeId: string; taskId: string; attachment: BridgeAttachment }
+  // `data` is the content as base64, or null when it isn't an image or passes ATTACHMENT_MAX_BYTES.
+  'attachment.read': { nodeId: string; taskId: string; attachment: BridgeAttachment; data: string | null }
+  'attachment.delete': { nodeId: string; taskId: string; attachmentId: string; removed: boolean }
 }
 
 // Which sessions and tasks changed on the selected Node since the last hint. Nothing more: the

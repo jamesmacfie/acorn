@@ -4,6 +4,7 @@ import type { BridgeAgentHint, BridgeNodes } from '@acorn/protocol/extensionBrid
 import type { BrowserApi } from '../browser'
 import { CallFailure, type CallError, type HostState } from '../messages'
 import { bridgeClient } from './bridgeClient'
+import { capturePage } from './capture'
 import { errorGuidance, hostGuidance, statusGuidance } from './guidance'
 import { Destination } from './Destination'
 import { Pairing } from './Pairing'
@@ -151,6 +152,7 @@ export function App(props: { api: BrowserApi }) {
             online={online()}
             hint={hint()}
             reconnects={reconnects()}
+            capture={(kind) => capturePage(props.api, kind)}
           />
         )}
       </Show>

@@ -114,16 +114,20 @@ describe('background', () => {
     })
   })
 
-  it('opens the sidebar from the toolbar in each browser', async () => {
+  it('opens the sidebar from the toolbar in each browser, handling the click itself', async () => {
     const chrome = fakeBrowser({ flavor: 'chrome' })
     startBackground(chrome.api, 'com.acorn.browser_bridge')
     await settle()
-    expect(chrome.panelBehavior).toEqual({ openPanelOnActionClick: true })
-
+    // Chrome's own open-on-click grants no page access, so the extension opens the panel itself.
+    expect(chrome.panelBehavior).toEqual({ openPanelOnActionClick: false })
+    chrome.clickAction()
+    chrome.clickAction()
+    await settle()
+    expect(chrome.panelOpens).toEqual([1, 1])
     const firefox = fakeBrowser({ flavor: 'firefox' })
     startBackground(firefox.api, 'com.acorn.browser_bridge')
     firefox.clickAction()
     await settle()
-    expect(firefox.sidebarToggles).toBe(1)
+    expect(firefox.panelOpens).toEqual([null])
   })
 })

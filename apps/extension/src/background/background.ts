@@ -87,8 +87,13 @@ export function startBackground(api: BrowserApi, hostName: string): void {
     })
   })
 
-  // The toolbar button opens the sidebar. Chrome does it for us once told; Firefox needs the call
-  // inside the click handler, where the gesture still counts.
-  if (api.sidePanel) void api.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-  else api.action.onClicked.addListener(() => void api.sidebarAction?.toggle())
+  // The toolbar button opens the sidebar and lets the extension read the page it was clicked on: a
+  // click the extension handles itself grants `activeTab`. Chrome's own open-on-click grants nothing,
+  // so it stays off, and each browser's open call runs inside the click, where the gesture counts.
+  // Opening rather than toggling keeps the panel up when the person clicks again to capture a page.
+  if (api.sidePanel) void api.sidePanel.setPanelBehavior({ openPanelOnActionClick: false })
+  api.action.onClicked.addListener((tab) => {
+    if (api.sidePanel) void api.sidePanel.open({ windowId: tab.windowId })
+    else void api.sidebarAction?.open()
+  })
 }

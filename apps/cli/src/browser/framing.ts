@@ -12,19 +12,30 @@ export type Frame = { ok: true; value: unknown } | { ok: false; reason: string }
 export class FrameError extends Error {}
 
 // Reads frames from a byte stream. A length header above the bound throws: the stream can't be
-// trusted to resynchronise, so the host closes instead of allocating what the header asks for.
+// trusted to resynchronise, so the host closes instead of buffering what the header asks for. Chunks
+// are kept apart until a whole frame is in, because an upload frame arrives as hundreds of pipe reads
+// and joining on each one would copy it hundreds of times.
 export function frameReader(maxBytes: number) {
-  let buffered: Buffer = Buffer.alloc(0)
+  let chunks: Buffer[] = []
+  let buffered = 0
+  const joined = (): Buffer => {
+    if (chunks.length > 1) chunks = [Buffer.concat(chunks, buffered)]
+    return chunks[0]!
+  }
   return {
     push(chunk: Buffer): Frame[] {
-      buffered = buffered.length ? Buffer.concat([buffered, chunk]) : chunk
+      chunks.push(chunk)
+      buffered += chunk.length
       const frames: Frame[] = []
-      while (buffered.length >= 4) {
-        const length = buffered.readUInt32LE(0)
+      while (buffered >= 4) {
+        const length = (chunks[0]!.length >= 4 ? chunks[0]! : joined()).readUInt32LE(0)
         if (length > maxBytes) throw new FrameError(`A ${length}-byte frame exceeds the ${maxBytes}-byte limit.`)
-        if (buffered.length < 4 + length) break
-        const body = buffered.subarray(4, 4 + length).toString('utf8')
-        buffered = buffered.subarray(4 + length)
+        if (buffered < 4 + length) break
+        const all = joined()
+        const body = all.subarray(4, 4 + length).toString('utf8')
+        const rest = all.subarray(4 + length)
+        chunks = rest.length ? [rest] : []
+        buffered = rest.length
         try {
           frames.push({ ok: true, value: JSON.parse(body) })
         } catch {
@@ -34,7 +45,7 @@ export function frameReader(maxBytes: number) {
       return frames
     },
     // Bytes of a frame that never finished. Non-zero at end of input means a transfer was cut short.
-    pendingBytes: () => buffered.length,
+    pendingBytes: () => buffered,
   }
 }
 

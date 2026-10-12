@@ -1,5 +1,6 @@
 import type {
   BridgeAgentSession,
+  BridgeAttachmentRef,
   BridgeConversationRecord,
   BridgeSessionRead,
 } from '@acorn/protocol/extensionBridge.ts'
@@ -11,7 +12,8 @@ import type {
 export const CONVERSATION_PAGE = 200
 
 export type ConversationItem =
-  | { key: string; kind: 'you' | 'agent' | 'error'; text: string }
+  | { key: string; kind: 'you'; text: string; attachments: BridgeAttachmentRef[] }
+  | { key: string; kind: 'agent' | 'error'; text: string }
   | { key: string; kind: 'tool'; title: string; status: string | null }
 
 // Messages, tool summaries, and errors in seq order. A streamed message arrives as appends on one
@@ -41,7 +43,8 @@ export function conversationItems(records: readonly BridgeConversationRecord[]):
       continue
     }
     message = null
-    if (event.type === 'user_message') items.push({ key: record.id, kind: 'you', text: event.text })
+    if (event.type === 'user_message')
+      items.push({ key: record.id, kind: 'you', text: event.text, attachments: event.attachments ?? [] })
     else if (event.type === 'error') items.push({ key: record.id, kind: 'error', text: event.message })
     else {
       const toolKey = `${record.turnId ?? 'session'}:${event.toolId}`
