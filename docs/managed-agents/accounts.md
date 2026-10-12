@@ -44,7 +44,9 @@ logout against the folder before deleting it. Otherwise a later account given th
 the old Keychain login.
 
 Each account shows as its own row in **New**, on the empty pane's cards, and in the palette, labeled
-`Claude Code · work`. A signed-out account's row is disabled. Custom agents start on the default login.
+`Claude Code · work`. Once a harness has an account, its plain row goes away, so the default login
+can't start a new session from **New**. Add your usual login as an account too if you want to keep
+picking it. A signed-out account's row is disabled. Custom agents start on the default login.
 
 ## Plan usage
 

@@ -33,7 +33,7 @@ describe('new session choices', () => {
     expect(choiceDescription({ provider: provider('codex'), agent: agent('Reviewer', 'codex') })).toBe('Codex · high')
   })
 
-  it('follows each harness with its extra accounts, and a signed-out one cannot start', () => {
+  it('lists a harness with extra accounts as those accounts only, and a signed-out one cannot start', () => {
     const claude = {
       ...provider('claude'),
       accounts: [
@@ -42,9 +42,9 @@ describe('new session choices', () => {
       ],
     }
     const choices = newSessionChoices([claude, provider('codex')], [])
-    expect(choices.map(choiceLabel)).toEqual(['Claude Code', 'Claude Code · work', 'Claude Code · old', 'Codex'])
-    expect(choices.map(choiceAvailable)).toEqual([true, true, false, true])
-    expect(choiceStart(choices[1]!)).toEqual({ account: 'work' })
-    expect(choiceDescription(choices[2]!)).toMatch(/Not signed in/)
+    expect(choices.map(choiceLabel)).toEqual(['Claude Code · work', 'Claude Code · old', 'Codex'])
+    expect(choices.map(choiceAvailable)).toEqual([true, false, true])
+    expect(choiceStart(choices[0]!)).toEqual({ account: 'work' })
+    expect(choiceDescription(choices[1]!)).toMatch(/Not signed in/)
   })
 })

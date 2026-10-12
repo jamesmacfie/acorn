@@ -6,8 +6,10 @@ import type { CustomAgent } from '../../shared/customAgents'
 export type NewSessionChoice = { provider: AgentProviderDescriptor; agent?: CustomAgent; account?: string }
 
 /**
- * The harnesses first, each followed by its extra accounts, then the custom agents, for the pane's New
- * picker, its empty-state cards and the palette, so the three never list different things. An agent
+ * The harnesses first, then the custom agents, for the pane's New picker, its empty-state cards and
+ * the palette, so the three never list different things. A harness with extra accounts is listed as
+ * those accounts instead, because once the person has named their logins the unnamed default is noise
+ * (docs/managed-agents/accounts.md). An agent
  * whose harness this node does not register at all is left out, since nothing could start it; one
  * whose harness is registered but not installed stays, disabled, beside that harness. A custom agent
  * runs on its harness's default login.
@@ -17,10 +19,11 @@ export function newSessionChoices(
   agents: readonly CustomAgent[],
 ): NewSessionChoice[] {
   return [
-    ...providers.flatMap((provider) => [
-      { provider },
-      ...(provider.accounts ?? []).map((account) => ({ provider, account: account.name })),
-    ]),
+    ...providers.flatMap((provider) =>
+      provider.accounts?.length
+        ? provider.accounts.map((account) => ({ provider, account: account.name }))
+        : [{ provider }],
+    ),
     ...agents.flatMap((agent) => {
       const provider = providers.find((candidate) => candidate.id === agent.providerId)
       return provider ? [{ provider, agent }] : []
