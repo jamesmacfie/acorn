@@ -97,6 +97,8 @@ describe('loading rollbar from disk', () => {
           { target: 'pane', id: 'rollbar-item', scope: 'project' },
         ],
         sources: [{ id: 'rollbar-items', items: '/v1/p/rollbar/rail-items' }],
+        // The item handoff survives the build and the loader's route-ownership check.
+        browserHandoffs: [{ id: 'item', resolve: '/v1/p/rollbar/browser/item' }],
       })
 
       plugins = await initPlugins([loaded[0].plugin], {

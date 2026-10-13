@@ -108,6 +108,20 @@ export default {
       placeholder: 'Find a Rollbar item…',
       onSelect: { verb: 'navigate', surface: 'rollbar-item' },
     }],
+    // The browser extension's "Open in Acorn" on an item (docs/integrations/rollbar.md § Browser
+    // handoff). Only Rollbar's permalink, which names the item by its system-wide id, the same address
+    // normalize.ts gives every item. The route asks each connection for that id and takes the project
+    // counter from Rollbar's answer, never from the address. The grammar allows the trailing slash.
+    //
+    // No anchors: the item view needs a signed-in session, and no selector has been checked against
+    // it, so the extension offers the handoff in its sidebar instead of guessing where a button goes.
+    browserHandoffs: [{
+      id: 'item',
+      label: 'Open in Acorn',
+      match: ['https://rollbar.com/item/{itemId}'],
+      anchors: [],
+      resolve: '/v1/p/rollbar/browser/item',
+    }],
     keybindings: [{ command: 'open', defaultChord: 'meta+shift+o', when: 'task' }],
     // Room above an error's detail for another plugin's badge or short section, as linear's
     // `issue-summary` is above a ticket (docs/plugins/detail-regions.md). Mounted with the rail row's

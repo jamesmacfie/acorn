@@ -1,4 +1,5 @@
 import { testSecretEnv } from '@acorn/node-core/testkit'
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -90,13 +91,13 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
 
   const env = () => ({ ...testSecretEnv(ENC_KEY) }) as unknown as Env
 
-  const connect = async (name = 'acme-api'): Promise<string> => {
+  const connect = async (name = 'acme-api', token = 'read-token'): Promise<string> => {
     vi.mocked(rollbarFetch).mockResolvedValueOnce(rollbarJson({ id: 7, name }))
     const res = await app.fetch(
       new Request('http://acorn.test/api/integrations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ providerId: 'rollbar', credentials: { token: 'read-token' } }),
+        body: JSON.stringify({ providerId: 'rollbar', credentials: { token } }),
       }),
       env(),
     )
@@ -420,6 +421,90 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
       env(),
     )
     expect(res.status).toBe(404)
+  })
+
+  // The browser extension's item handoff. The page names the item by its system id (999); Rollbar's
+  // answer supplies the project counter (142), and only the project that has the item answers.
+  const handOff = (itemId = '999') =>
+    app.fetch(
+      new Request('http://acorn.test/api/rollbar/browser/item', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: `https://rollbar.com/item/${itemId}/`, captures: { itemId } }),
+      }),
+      env(),
+    )
+  const rollbarAnswers = (answers: Record<string, () => Response>) =>
+    vi
+      .mocked(rollbarFetch)
+      .mockImplementation(async (token, path) =>
+        token === 'web-token' && answers[path] ? answers[path]() : new Response('{}', { status: 404 }),
+      )
+
+  it('hands off an item by its system id from a fresh read of every connection', async () => {
+    const web = await connect('web', 'web-token')
+    await connect('api', 'api-token')
+    rollbarAnswers({
+      '/item/999': () => rollbarJson(API_ITEM),
+      '/item/999/instances?limit=50': () => rollbarJson({ instances: [INSTANCE] }),
+      '/instance/555': () => rollbarJson(INSTANCE),
+    })
+
+    const response = await handOff()
+
+    expect(response.status).toBe(200)
+    const { items } = (await response.json()) as {
+      items: { identifier: string; connection: { id: string }; seed: unknown; context: { content: string } }[]
+    }
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      identifier: '#142',
+      connection: { id: web },
+      seed: { origin: 'rollbar', links: [{ connectionId: web, identifier: '142', ref: { externalId: '999' } }] },
+    })
+    expect(items[0]!.context.content).toContain('TypeError: token is null')
+    expect(items[0]!.context.content).toContain('Request: POST /api/login')
+    expect(items[0]!.context.content).not.toContain('SECRET')
+    // Both projects were asked by system id. The item read cached it under its counter, so the
+    // occurrence reads found its id there instead of asking Rollbar to resolve the counter.
+    const paths = vi.mocked(rollbarFetch).mock.calls.slice(2)
+    expect(
+      paths
+        .filter(([, path]) => path === '/item/999')
+        .map(([token]) => token)
+        .sort(),
+    ).toEqual(['api-token', 'web-token'])
+    expect(paths.some(([, path]) => path.startsWith('/item_by_counter'))).toBe(false)
+    expect(await t.db.select().from(schema.issues)).toMatchObject([{ integrationId: web, identifier: '142' }])
+  })
+
+  it('asks for a reconnect rather than handing off a cached item when the token needs it', async () => {
+    const web = await connect('web', 'web-token')
+    rollbarAnswers({ '/item/999': () => rollbarJson(API_ITEM) })
+    expect((await handOff()).status).toBe(200)
+    await t.db.update(schema.integrations).set({ status: 'needs-auth' }).where(eq(schema.integrations.id, web))
+
+    const response = await handOff()
+
+    expect(response.status).toBe(403)
+    expect(await response.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
+  })
+
+  it('reports a refused token as 403 and a rate limit as 429', async () => {
+    await connect('web', 'web-token')
+    rollbarAnswers({ '/item/999': () => new Response('{}', { status: 401 }) })
+    const refused = await handOff()
+    expect(refused.status).toBe(403)
+    expect(await refused.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
+
+    rollbarAnswers({ '/item/998': () => new Response('{}', { status: 429 }) })
+    expect((await handOff('998')).status).toBe(429)
+  })
+
+  it('says no connected project has an item none of them can read', async () => {
+    await connect('web', 'web-token')
+    rollbarAnswers({})
+    expect((await handOff()).status).toBe(404)
   })
 
   it('disconnect performs the core cascade', async () => {

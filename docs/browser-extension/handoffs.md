@@ -46,7 +46,7 @@ until the person opens the sidebar. A sidebar that is already open gets it at on
 
 The sidebar also offers each handoff that matches the page beside it, as a button over the Node's
 project list. That is the same action for a site whose layout has no anchor, for a handoff that
-declares no anchors, such as Linear's, and for Firefox. The sidebar reads the page again when the tab
+declares no anchors, such as Linear's and Rollbar's, and for Firefox. The sidebar reads the page again when the tab
 finishes loading, so the offer goes when the tab moves to a page it may not read.
 
 ## The handoff card
@@ -98,6 +98,7 @@ and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#w
 | --- | --- | --- | --- |
 | GitHub | Pull requests and their tabs | In the header | One per GitHub account that can see it ([GitHub](../github-integration/tasks-and-references.md#browser-handoff)) |
 | Linear | Issues, short and slug addresses | None, sidebar only | One per Linear connection in the page's workspace ([Linear](../integrations/linear.md#browser-handoff)) |
+| Rollbar | Item permalinks, `rollbar.com/item/<id>/` | None, sidebar only | One per Rollbar connection whose project has the item, numbered by its project counter ([Rollbar](../integrations/rollbar.md#browser-handoff)) |
 
 ## Gaps
 
@@ -113,9 +114,17 @@ and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#w
   and the Node's parity tests cover a resolution, two workspaces with the same key, and the projects.
 - Linear has no in-page button, so there is no button to check. Its handoff is offered in the sidebar.
 - The sidebar's site list says "Buttons show on linear.app" after a grant, though Linear draws no
-  button. The grant still lets the sidebar read the page.
-The full results are in [phase 04](../future/extension/04-github-handoff.md#real-browser-results) and
-[phase 05](../future/extension/05-linear-handoff.md#real-browser-results).
+  button. The grant still lets the sidebar read the page. Rollbar's grant reads the same way.
+- A Rollbar resolution against Rollbar's API wasn't checked in a browser. Fake tokens reached Rollbar
+  and came back as "reconnect". Unit tests and the Node's parity tests cover a resolution.
+- Signed out, Rollbar redirects an item's permalink to its login page. The browser checks therefore
+  answered the item address with a stub page through the browser's debugging protocol. The handoff
+  itself still went through the native host, the Node, and Rollbar's API. The address a signed-in
+  item view settles on wasn't seen.
+
+The full results are in [phase 04](../future/extension/04-github-handoff.md#real-browser-results),
+[phase 05](../future/extension/05-linear-handoff.md#real-browser-results), and
+[phase 06](../future/extension/06-rollbar-handoff.md#real-browser-results).
 
 ## Why
 

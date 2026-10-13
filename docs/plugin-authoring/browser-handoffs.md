@@ -87,6 +87,11 @@ provider's answer. A key like `ENG-42` can exist in two workspaces, and only one
 the person is looking at. Linear compares the workspace in the address with the workspace in
 Linear's own address for the issue.
 
+The number in an address may not be the one your task links use. Rollbar's permalink names an item
+by its system-wide id, and its links use the project's counter. Its route
+(`plugins/rollbar/src/server/browserHandoff.ts`) reads the item by the id and takes the counter from
+Rollbar's answer, never from the address.
+
 ## What the host does with the answer
 
 The extension never sees the route or the seed. The host:
