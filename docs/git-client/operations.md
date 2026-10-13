@@ -103,6 +103,9 @@ The banner covers the common path. A terminal in the task checkout covers the re
 
 External terminals and Git clients don't take part in checkout admission. The HEAD and operation
 checks narrow the window for a conflicting external write but can't close it.
+Admission queues work by the repository's Git common directory and remembers that directory for each
+project folder for 60 seconds. If you replace a project folder with a different repository while
+Acorn runs, admission can use the old repository's queue for up to a minute.
 
 ## Routes
 

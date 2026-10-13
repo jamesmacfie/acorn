@@ -1,7 +1,8 @@
-import { expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { createCheckoutAdmission } from './checkoutAdmission'
 import type { TaskService } from './tasks'
 import type { ProjectService } from './projectRefs'
+import type { CoreGitService } from './index'
 import { makeTestDb } from '../../testkit/db'
 import { schema } from '../db'
 import { setupCheckoutActivity, taskScriptEvidence, taskScripts } from '../taskScripts/service'
@@ -235,4 +236,56 @@ it('requires the named readers and refuses checkout movement while queued', asyn
   release.resolve()
   await first
   await expect(write).rejects.toMatchObject({ code: 'checkout_moved' })
+})
+
+function countingGit() {
+  const git = {
+    calls: 0,
+    fail: false,
+    git: async () => {
+      git.calls++
+      return git.fail
+        ? { code: 128, stdout: '', stderr: 'fatal: not a git repository' }
+        : { code: 0, stdout: '/private/tmp/acorn-repository/.git\n', stderr: '' }
+    },
+  }
+  const task = { id: 'task', projectId: 'project', worktreePath: null }
+  const service = createCheckoutAdmission(
+    { load: async () => task, active: async () => [task] } as unknown as TaskService,
+    { byId: async () => ({ path: '/private/tmp/acorn-checkout' }) } as unknown as ProjectService,
+    git as unknown as CoreGitService,
+  )
+  return { git, service }
+}
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+it('asks git for a known repository once across lookups', async () => {
+  const { git, service } = countingGit()
+  await service.admitWork('task', async () => {})
+  await service.admitWork('task', async () => {})
+  await Promise.all([1, 2, 3].map(() => service.admitWork('task', async () => {})))
+  expect(git.calls).toBe(1)
+})
+
+it('asks git again once the remembered repository expires', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  const { git, service } = countingGit()
+  await service.admitWork('task', async () => {})
+  vi.advanceTimersByTime(60_001)
+  await service.admitWork('task', async () => {})
+  expect(git.calls).toBe(2)
+})
+
+it('does not remember a failed repository lookup', async () => {
+  const { git, service } = countingGit()
+  git.fail = true
+  await service.admitWork('task', async () => {})
+  expect(git.calls).toBe(2)
+  git.fail = false
+  await service.admitWork('task', async () => {})
+  await service.admitWork('task', async () => {})
+  expect(git.calls).toBe(3)
 })

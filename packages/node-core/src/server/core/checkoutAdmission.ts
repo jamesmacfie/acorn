@@ -20,6 +20,13 @@ export const admitCheckout = <T>(db: AppDatabase, taskId: string, action: () => 
   return admission.admitWork(taskId, action)
 }
 
+// How long a mapped path's Git common directory stays in use as its queue key. Every admission reads
+// the key twice, the second time while holding the queue, so without this a repository's lookups wait
+// in line behind each other's `git` processes. The directory changes only when something replaces the
+// folder with another repository, which admission doesn't cover. The limit bounds how long one
+// repository can have two keys after that.
+const REPOSITORY_KEY_TTL_MS = 60_000
+
 /** Serializes Acorn's admission decisions for one canonical checkout. Owner state stays with its owner. */
 export function createCheckoutAdmission(
   tasks: TaskService,
@@ -30,6 +37,7 @@ export function createCheckoutAdmission(
 ) {
   const readers = new Map<string, CheckoutActivityReader>()
   const tails = new Map<string, Promise<void>>()
+  const repositoryKeys = new Map<string, { key: string; expiresAt: number }>()
   const canonical = async (path: string) => realpath(path).catch(() => resolve(path))
   const identity = async (taskId: string) => {
     const task = await tasks.load(taskId)
@@ -39,24 +47,34 @@ export function createCheckoutAdmission(
     // An unmaterialized branch is conservatively associated with its project checkout.
     return canonical(task.worktreePath ?? project.path)
   }
-  const lockKey = async (taskId: string) => {
-    const task = await tasks.load(taskId)
-    if (!task) return `task:${taskId}`
-    const project = await projects.byId(task.projectId)
-    const mappedPath = project?.path ?? task.worktreePath
-    if (!mappedPath) return `task:${taskId}`
+  const repositoryKey = async (mappedPath: string) => {
+    const cached = repositoryKeys.get(mappedPath)
+    if (cached && cached.expiresAt > Date.now()) return cached.key
     if (git) {
       try {
         const common = await git.git(['rev-parse', '--path-format=absolute', '--git-common-dir'], {
           cwd: mappedPath,
           maxOutputBytes: 8192,
         })
-        if (common.code === 0) return canonical(common.stdout.trim())
+        if (common.code === 0) {
+          const key = await canonical(common.stdout.trim())
+          repositoryKeys.set(mappedPath, { key, expiresAt: Date.now() + REPOSITORY_KEY_TTL_MS })
+          return key
+        }
       } catch {
         /* A missing project checkout still uses its mapped path as the admission key. */
       }
     }
+    repositoryKeys.delete(mappedPath)
     return canonical(mappedPath)
+  }
+  const lockKey = async (taskId: string) => {
+    const task = await tasks.load(taskId)
+    if (!task) return `task:${taskId}`
+    const project = await projects.byId(task.projectId)
+    const mappedPath = project?.path ?? task.worktreePath
+    if (!mappedPath) return `task:${taskId}`
+    return repositoryKey(mappedPath)
   }
   const withKey = async <T>(key: string, operation: () => Promise<T>): Promise<T> => {
     const before = tails.get(key) ?? Promise.resolve()

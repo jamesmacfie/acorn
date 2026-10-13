@@ -1,6 +1,53 @@
 # Phase 06: git calls in checkout admission
 
-Status: planned, October 13, 2026.
+Status: landed October 13, 2026. The Sentry comparison for a working day is still open.
+
+## Completion note
+
+October 13, 2026.
+
+**What landed.** `createCheckoutAdmission` remembers each mapped path's queue key, the canonical Git
+common directory, for 60 seconds. A failed `rev-parse` removes the entry, so a missing checkout falls
+back to its mapped path every time and is never remembered. `lockKey` still reads the task and project
+on every call, so the `checkout_moved` check behaves as before. Three tests in
+`checkoutAdmission.test.ts` use a fake `git` that counts calls. They cover repeated and concurrent
+lookups, expiry after 60 seconds, and a failed lookup. All three fail on the old code, and the seven
+tests that were there before pass unchanged. [Git client operations](../../git-client/operations.md)
+says how long a replaced folder can keep its old queue.
+
+**What I measured.** A throwaway test ran `admitWork` against this checkout with the real `git`,
+after one lookup warmed the cache, in three rounds of 10 concurrent lookups. The old code started 20
+`git` processes per round and took 315, 513, and 410 ms. The new code started none and took under
+1 ms. The test isn't committed.
+
+**Decisions and deviations.**
+
+- Step 1, counting `lockKey` calls against `git.rev_parse.count` over a working hour, didn't happen.
+  It needs a person's real day, and an agent can't run one. The fake-git count shows that each lookup
+  started two processes and a warm lookup starts none.
+- The cache keeps resolved keys, not pending promises. When several lookups miss at once, each still
+  starts one `git` call, outside the queue. After that the check inside the queue reads the cache.
+  Sharing the pending call would also save the cold misses, but it adds cleanup code for a case that
+  happens about once a minute per project.
+- Expired entries are replaced when the path is next looked up, not swept. The map holds one entry per
+  project folder or unmapped worktree, so it stays small.
+
+**What a person still needs to compare in Sentry**, against the
+[baseline](../../testing/sentry-baseline-2026-10-13.md), after a full working day on a build with this
+change:
+
+- `git.rev_parse.count` for owner `core`, which must fall by at least half from 34,575.
+- Process starts for owner `core`, 47,401 in the baseline.
+- The medians of `/v1/p/git/tasks/:id/local/status`, 502 ms in the baseline, and
+  `/v1/core/tasks/:id/tools`, 537 ms. Both need to fall below 250 ms, or show fewer slow calls,
+  because Sentry drops spans under 250 ms.
+- `/v1/core/task-statuses`, 443 ms at the median, to see whether it fell too.
+
+Record the day in a dated page under `docs/testing/`.
+
+**For later phases.** Other `git` calls in core and in the plugins are unchanged. If the `core`
+`rev-parse` count doesn't halve, the next suspect is another caller, such as `repositoryMetadataKey`
+in the worktree code. Count that one before adding another cache.
 
 Read the [programme page](./README.md) first. This phase needs nothing else and is the one to start
 with. The numbers come from the [Sentry baseline](../../testing/sentry-baseline-2026-10-13.md).
