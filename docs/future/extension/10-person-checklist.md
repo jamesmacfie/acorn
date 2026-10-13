@@ -10,9 +10,7 @@ account, a second computer, or the desktop app closed. Follow them in order. Wri
 
 ## Before you start
 
-1. Pack the release with `pnpm pack:node`. It stops at the Node service size budget until that is
-   settled (see [phase 10's decisions](./10-developer-release.md#decisions-made-while-building)). Raise
-   `ceiling` in `apps/node/scripts/check-service-budget.mjs` locally for this run, and put it back after.
+1. Pack the release with `pnpm pack:node`.
 2. Unpack the archive outside the checkout, and run `npm ci --omit=dev` and
    `node scripts/prune-runtime.mjs` inside it.
 3. Run `pnpm --filter @acorn/extension build` in the checkout.
