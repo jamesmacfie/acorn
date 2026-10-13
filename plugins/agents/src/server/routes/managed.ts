@@ -65,6 +65,12 @@ export type ManagedAgentsBridge = {
   addAccount(providerId: string, name: string): Promise<AgentProviderDescriptor[]>
   removeAccount(providerId: string, name: string): Promise<AgentProviderDescriptor[]>
   setDefaultAccount(providerId: string, name: string | null): Promise<AgentProviderDescriptor[]>
+  setAccountDetails(
+    providerId: string,
+    name: string,
+    change: { label?: string | null; icon?: string | null },
+  ): Promise<AgentProviderDescriptor[]>
+  setAccountDisplay(show: 'name' | 'icon'): Promise<AgentProviderDescriptor[]>
   // Settings > Storage and memory. Node-wide, like `runs`.
   footprint(): Promise<AgentFootprint>
   stopIdleNow(): Promise<{ stopped: number }>
@@ -280,6 +286,25 @@ export const managedAgents = new Hono<AppEnv>()
     return viaBridge(c, MANAGED_AGENTS, (bridge) =>
       bridge.setDefaultAccount(c.req.param('providerId'), parsed.data.name),
     )
+  })
+  .patch('/providers/:providerId/accounts/:name', requireDevice, async (c) => {
+    const name = c.req.param('name')
+    const parsed = z
+      .object({
+        label: z.string().trim().min(1).max(40).nullable().optional(),
+        icon: z.string().trim().min(1).max(200).nullable().optional(),
+      })
+      .safeParse(await c.req.json().catch(() => null))
+    if (!isAccountName(name) || !parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
+      bridge.setAccountDetails(c.req.param('providerId'), name, parsed.data),
+    )
+  })
+  // One choice for every harness's accounts.
+  .put('/account-display', requireDevice, async (c) => {
+    const parsed = z.object({ show: z.enum(['name', 'icon']) }).safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.setAccountDisplay(parsed.data.show))
   })
   .delete('/providers/:providerId/accounts/:name', requireDevice, (c) => {
     const name = c.req.param('name')

@@ -53,6 +53,14 @@ export const managedAgentApi = {
     jsonWrite<AgentProviderDescriptor[]>(`${ROOT}/providers/${encodeURIComponent(providerId)}/default-account`, 'PUT', {
       name,
     }),
+  setAccountDetails: (providerId: string, name: string, change: { label?: string | null; icon?: string | null }) =>
+    jsonWrite<AgentProviderDescriptor[]>(
+      `${ROOT}/providers/${encodeURIComponent(providerId)}/accounts/${encodeURIComponent(name)}`,
+      'PATCH',
+      change,
+    ),
+  setAccountDisplay: (show: 'name' | 'icon') =>
+    jsonWrite<AgentProviderDescriptor[]>(`${ROOT}/account-display`, 'PUT', { show }),
   removeAccount: (providerId: string, name: string) =>
     jsonWrite<AgentProviderDescriptor[]>(
       `${ROOT}/providers/${encodeURIComponent(providerId)}/accounts/${encodeURIComponent(name)}`,

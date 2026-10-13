@@ -3,6 +3,12 @@ import { join } from 'node:path'
 import { isAccountName } from '../shared/accounts'
 import type { HarnessAccounts } from './drivers/types'
 
+export type AccountShowAs = 'name' | 'icon'
+
+/** What the person calls an account and the icon they gave it. The folder keeps the name it was made
+ *  with, because the CLI finds its login and its sessions by the folder's path. */
+export type AccountDetails = { label?: string; icon?: string }
+
 export const agentAccountsRoot = (dataDir: string): string => join(dataDir, 'agent-accounts')
 
 /**
@@ -42,6 +48,9 @@ export class AgentAccounts {
 
   async remove(providerId: string, name: string): Promise<void> {
     await rm(this.home(providerId, name), { recursive: true, force: true })
+    // Rewrites the details file without this account, so a later account of the same name starts
+    // without its display name and icon.
+    await writeFile(this.detailsFile(providerId), JSON.stringify(await this.details(providerId)))
   }
 
   /** The account a new session of this harness starts on when it names none: the chosen one, else the
@@ -60,9 +69,61 @@ export class AgentAccounts {
     await writeFile(this.defaultFile(providerId), `${name}\n`)
   }
 
-  // A dot name, so `list` never reads it as an account.
+  /** The display name and icon the person gave each of this harness's accounts. An account that's
+   *  gone is left out. */
+  async details(providerId: string): Promise<Record<string, AccountDetails>> {
+    const names = await this.list(providerId)
+    const saved: Record<string, AccountDetails | undefined> = await readFile(this.detailsFile(providerId), 'utf8')
+      .then((text) => JSON.parse(text))
+      .catch(() => ({}))
+    return Object.fromEntries(
+      names.flatMap((name) => {
+        const { label, icon } = saved[name] ?? {}
+        const details = {
+          ...(typeof label === 'string' ? { label } : {}),
+          ...(typeof icon === 'string' ? { icon } : {}),
+        }
+        return Object.keys(details).length ? [[name, details]] : []
+      }),
+    )
+  }
+
+  /** Changes an account's display name or icon. Null clears one, and absent leaves it. */
+  async setDetails(
+    providerId: string,
+    name: string,
+    change: { [Key in keyof AccountDetails]?: string | null },
+  ): Promise<void> {
+    if (!(await this.has(providerId, name))) throw new Error(`The '${name}' account was not found.`)
+    const all = await this.details(providerId)
+    const next: AccountDetails = { ...all[name] }
+    for (const key of ['label', 'icon'] as const) {
+      const value = change[key]
+      if (value === null) delete next[key]
+      else if (value !== undefined) next[key] = value
+    }
+    all[name] = next
+    await writeFile(this.detailsFile(providerId), JSON.stringify(all))
+  }
+
+  /** Whether surfaces name accounts or draw their icons. One choice for every harness. */
+  async showAs(): Promise<AccountShowAs> {
+    const saved = await readFile(join(this.root, '.show-as'), 'utf8').catch(() => '')
+    return saved.trim() === 'icon' ? 'icon' : 'name'
+  }
+
+  async setShowAs(show: AccountShowAs): Promise<void> {
+    await mkdir(this.root, { recursive: true, mode: 0o700 })
+    await writeFile(join(this.root, '.show-as'), `${show}\n`)
+  }
+
+  // Dot names, so `list` never reads them as accounts.
   private defaultFile(providerId: string): string {
     return join(this.root, providerId, '.default')
+  }
+
+  private detailsFile(providerId: string): string {
+    return join(this.root, providerId, '.accounts.json')
   }
 }
 

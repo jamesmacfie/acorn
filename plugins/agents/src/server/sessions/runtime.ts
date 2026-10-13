@@ -366,6 +366,24 @@ export class ManagedAgentRuntime {
     return this.providers.list(true)
   }
 
+  /** Sets an account's display name or icon. Null clears one. The folder keeps its name. */
+  async setAccountDetails(
+    providerId: string,
+    name: string,
+    change: { label?: string | null; icon?: string | null },
+  ): Promise<AgentProviderDescriptor[]> {
+    if (!this.registry.create(providerId)?.accounts)
+      throw new Error(`'${providerId}' doesn't support a second account.`)
+    await this.engine.accounts.setDetails(providerId, name, change)
+    return this.providers.list(true)
+  }
+
+  /** Chooses whether every harness's accounts show by name or by icon. */
+  async setAccountDisplay(show: 'name' | 'icon'): Promise<AgentProviderDescriptor[]> {
+    await this.engine.accounts.setShowAs(show)
+    return this.providers.list(true)
+  }
+
   /** Signs the account out, then deletes its folder. A session pinned to it can no longer start. */
   async removeAccount(providerId: string, name: string): Promise<AgentProviderDescriptor[]> {
     const accounts = this.registry.create(providerId)?.accounts

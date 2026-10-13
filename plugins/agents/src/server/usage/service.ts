@@ -32,7 +32,7 @@ export type AgentUsageServiceOptions = {
   accounts?: (providerId: string) => Promise<UsageAccount[]>
 }
 
-type UsageAccount = { name: string; home: string }
+type UsageAccount = { name: string; home: string; label?: string }
 
 export type AgentUsageService = {
   read(options: { userId: string; force?: boolean }): Promise<AgentUsageSnapshot>
@@ -81,9 +81,10 @@ function failedProvider(
 const named = ({ entry, account }: UsageTarget, usage: AgentProviderUsageReading): AgentProviderUsage => ({
   ...usage,
   provider: entry.provider,
-  label: account ? `${entry.label} · ${account.name}` : entry.label,
+  label: account ? `${entry.label} · ${account.label ?? account.name}` : entry.label,
   ...(entry.glyph ? { glyph: entry.glyph } : {}),
   ...(account ? { accountName: account.name } : {}),
+  ...(account?.label ? { accountLabel: account.label } : {}),
 })
 
 export function createAgentUsageService(options: AgentUsageServiceOptions): AgentUsageService {

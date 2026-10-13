@@ -62,6 +62,22 @@ Once a harness has an account, the section shows a **Default account** dropdown 
 accounts. `PUT /v1/p/agents/providers/:providerId/default-account` saves it,
 and the provider descriptor reports it as `defaultAccount`.
 
+Each account row has a display name field and an icon picker. The display name replaces the
+folder's name everywhere Acorn shows the account, including the plan usage tabs. Clear it to go back to
+the folder's name. The folder itself keeps its name, because the CLI finds its login and its sessions
+by the folder's path, and sessions and routes keep naming the account by it.
+
+The section has one **Show accounts as** switch, with **Name** and **Icon**, for every harness. With
+**Icon** on, the **New** menu, the empty pane's cards, the task sidebar's session rows, and the
+session header draw an account's icon in place of its name. An account with no icon keeps its name.
+The palette, search, the usage tabs, and screen readers still use the name.
+
+Display names and icons live in an `.accounts.json` file beside each harness's `.default`, which drops
+an account's entry when the account goes (`AgentAccounts.details`). The switch is a `.show-as` file at
+the top of `agent-accounts`. `PATCH /v1/p/agents/providers/:providerId/accounts/:name` and
+`PUT /v1/p/agents/account-display` save them, and the provider descriptor reports each account's
+`label` and `icon`, and `accountDisplay`.
+
 `POST /v1/p/agents/providers/:providerId/accounts` and `DELETE …/accounts/:name` back the page. Both
 are device-only and answer the fresh provider list. A provider descriptor lists its accounts under
 `accounts`, each with its sign-in state from the CLI's own status command. **Remove** runs the CLI's

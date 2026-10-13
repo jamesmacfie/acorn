@@ -57,6 +57,7 @@ let dispose: (() => void) | undefined
 const mount = (sessions: AgentSession[], delegations: Record<string, AgentSessionDelegation>): void => {
   const model = {
     taskSessions: () => sessions,
+    providers: () => [],
     sessionRoster: () => agentSessionRoster(sessions, delegations),
     selectedSessionId: () => selectedManagedSession(taskId),
     sessionsLoaded: Promise.resolve(sessions),

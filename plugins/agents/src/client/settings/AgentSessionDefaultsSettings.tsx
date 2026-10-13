@@ -10,8 +10,8 @@ import {
 } from '@acorn/plugin-api/client'
 import {
   Alert,
-  Badge,
   Checkbox,
+  Icon,
   Inline,
   Link,
   ModelBackendPicker,
@@ -157,9 +157,11 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
             <SettingRow label={provider.label} description={harnessState(provider)}>
               <Inline>
                 <ProviderGlyph glyph={provider.glyph} label={provider.label} />
-                <Badge tone={provider.installed ? 'ok' : 'neutral'}>
-                  {provider.installed ? 'Installed' : 'Not installed'}
-                </Badge>
+                <Icon
+                  name={provider.installed ? 'circle-check' : 'circle-dashed'}
+                  tone={provider.installed ? 'ok' : 'muted'}
+                  title={provider.installed ? 'Installed' : 'Not installed'}
+                />
               </Inline>
             </SettingRow>
           )}
