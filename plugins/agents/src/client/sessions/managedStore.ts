@@ -22,6 +22,7 @@ import type {
 } from '../../contract/wire.ts'
 import { managedAgentApi } from './managedClient'
 import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
+import { createConversationProjection, type AgentConversationItem } from './conversationItems'
 import { mergeAgentUsage, openUsageLine } from '../../shared/usageFold'
 import { clearComposerDraft } from '../composer/composerState'
 import { clearComposerExpansion } from '../composer/composerPrefs'
@@ -98,6 +99,9 @@ const KEEP_RECENT = 3
 const holds = new Map<string, number>()
 // Every stored snapshot's id, least recently drawn first. A load and a release both move one to the end.
 const recent = new Set<string>()
+// Each kept snapshot's transcript projection, so going back to a session continues its fold instead
+// of folding every event again. It goes with the snapshot's events (forgetSnapshot).
+const projections = new Map<string, (events: AgentEventRecord[]) => AgentConversationItem[]>()
 
 function touch(sessionId: string): void {
   recent.delete(sessionId)
@@ -114,6 +118,7 @@ function forgetSnapshot(sessionId: string): void {
   seenEventIds.delete(sessionId)
   usageLines.delete(sessionId)
   completeThrough.delete(sessionId)
+  projections.delete(sessionId)
 }
 
 // Drop what is past the bound. A session being read is left alone: its load is about to put it back
@@ -714,6 +719,21 @@ export const managedAgentStore = {
       trimSnapshots()
     }
   },
+  /**
+   * The transcript projection for this session's events, kept while the store keeps its snapshot.
+   *
+   * Every surface that draws the session folds through this one, so two panes on a session share it.
+   * That is safe because the projection checks each call's events against the ones it already took,
+   * and rebuilds when they differ (`createConversationProjection`).
+   */
+  projection(sessionId: string): (events: AgentEventRecord[]) => AgentConversationItem[] {
+    let project = projections.get(sessionId)
+    if (!project) {
+      project = createConversationProjection()
+      projections.set(sessionId, project)
+    }
+    return project
+  },
   upsertSession,
   upsertSessions,
   removeSession,
@@ -737,6 +757,7 @@ export const managedAgentStore = {
     seenEventIds.clear()
     usageLines.clear()
     completeThrough.clear()
+    projections.clear()
     recent.clear()
     eventSeqs.clear()
     taskLoads.clear() // another node's tasks, and the window would serve its answers for this one

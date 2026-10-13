@@ -531,6 +531,16 @@ describe('which snapshots the store keeps', () => {
     release()
   })
 
+  it('keeps a session’s projection with its events, and starts a new one once they are dropped', async () => {
+    await visit('a')
+    const project = managedAgentStore.projection('a')
+    await visit('b', 'c')
+    expect(managedAgentStore.projection('a')).toBe(project)
+    await visit('d')
+    expect(kept()).not.toContain('a')
+    expect(managedAgentStore.projection('a')).not.toBe(project)
+  })
+
   it('leaves a session alone while it is being read', async () => {
     await visit('a', 'b', 'c')
     let open_ = (): void => undefined

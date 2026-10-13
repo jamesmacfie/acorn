@@ -23,6 +23,11 @@ describe('parsing a flow', () => {
     expect(() => parseFlow(stage([{ measure: { phase: 'streaming', state: 'eval()' } }, assertion]))).toThrow(/state/)
   })
 
+  it('accepts the session revisit flow', async () => {
+    const flow = parseFlow(await readFile(join(import.meta.dirname, 'flows', 'session-revisit.json'), 'utf8'))
+    expect(flow.stages.map((stage) => stage.name)).toEqual(['open', 'revisit'])
+  })
+
   it('rejects an action it does not know', () => {
     expect(() => parseFlow(stage([{ hover: { target: { name: 'x' } } }, assertion]))).toThrow(/unknown action "hover"/)
   })

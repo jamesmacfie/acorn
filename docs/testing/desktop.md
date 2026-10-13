@@ -81,7 +81,10 @@ Two generators own the data:
   record or hold back each segment request.
 - `plugins/agents/src/testkit/largeSession.ts` writes the session's turns through the plugin's own
   store, the way an imported transcript is written. The session ends stopped with every request
-  resolved, so a booting Node has nothing to recover.
+  resolved, so a booting Node has nothing to recover. The `large-surfaces` fixture also writes a
+  `small`-profile session titled **Small session** first, so the long session stays the one that
+  opens by default and the `session-revisit` flow has a session to step away to.
+  [The session revisit check](./session-revisit-2026-10-13.md) says how to run that flow.
 
 The `tui-navigation` variant adds a second task and a second workspace to the same data. Both agent
 launchers accept `--fixture tui-navigation --profile small|scale|canonical --seed N`. Run the terminal

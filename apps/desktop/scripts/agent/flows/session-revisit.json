@@ -1,0 +1,33 @@
+{
+  "name": "session-revisit",
+  "description": "Step from the long fixture session to the small one and back, five times each way. Each switch's time is an acorn:agents.session.open span in the report, so start the session with --telemetry on and set acorn.perf. Start it with --fixture large-surfaces --profile canonical.",
+  "stages": [
+    {
+      "name": "open",
+      "steps": [
+        { "click": { "target": { "role": "button", "nameStartsWith": "Large surfaces (" } } },
+        { "click": { "target": { "role": "button", "name": "Agent" } } },
+        { "wait": { "surface": "timeline", "until": "mounted", "timeoutMs": 600000 } },
+        { "checkpoint": "long-session-first" }
+      ]
+    },
+    {
+      "name": "revisit",
+      "steps": [
+        {
+          "repeat": {
+            "times": 5,
+            "steps": [
+              { "switchSession": { "target": { "role": "option", "nameStartsWith": "Small session" } } },
+              { "wait": { "surface": "timeline", "until": "mounted", "timeoutMs": 60000 } },
+              { "switchSession": { "target": { "role": "option", "nameStartsWith": "Large-surface fixture (" } } },
+              { "wait": { "surface": "timeline", "until": "mounted", "timeoutMs": 60000 } }
+            ]
+          }
+        },
+        { "checkpoint": "long-session-back" },
+        { "assert": { "surface": "timeline", "invariant": "boundedMount" } }
+      ]
+    }
+  ]
+}

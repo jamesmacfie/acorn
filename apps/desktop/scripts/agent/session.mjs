@@ -160,7 +160,7 @@ async function main() {
 
     if (options.fixture && options.reuse && previous?.fixture) {
       // A reused session keeps the fixture it was generated with, data and repository both.
-      if (options.fixture === 'streaming-replay' && options.telemetry && previous.fixture.telemetry !== options.telemetry)
+      if (options.telemetry && previous.fixture.telemetry !== options.telemetry)
         throw new Error('This session was seeded with a different --telemetry mode. Choose a new session name.')
       fixture = previous.fixture
       options.project = fixture.project

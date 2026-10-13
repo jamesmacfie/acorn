@@ -6,7 +6,6 @@ import type { AgentNormalizedEvent, AgentSessionSnapshot } from '../../contract/
 import AgentEventCard from './AgentEventCard'
 import {
   cardTurnId,
-  createConversationProjection,
   findSubagentItem,
   isChatItem,
   visibleConversationItems,
@@ -28,6 +27,7 @@ import { subagentSummary } from './subagentDisplay'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPrefs'
 import { readingPlace, rememberReadingPlace } from './readingPlaceStore'
+import { managedAgentStore } from './managedStore'
 import { codexPlanHandoffState, type CodexPlanHandoffState } from '../../shared/codexPlanHandoff'
 
 // The session's stream, as a `Timeline` of cards. The scroller, staying on the newest turn until the
@@ -67,9 +67,10 @@ export default function AgentTranscript(props: {
   })
   // Kept open across events, so a streamed row costs the fold one record rather than the whole
   // session (createConversationProjection). An item no event touched keeps last time's object, so the
-  // rows below can tell which card an event changed.
-  const project = createConversationProjection()
+  // rows below can tell which card an event changed. The store keeps it with the snapshot, so coming
+  // back to a recent session continues the fold rather than starting it again.
   const conversation = createMemo<AgentConversationItem[]>(() => {
+    const project = managedAgentStore.projection(props.snapshot.session.id)
     agentTelemetry.observe('agents.transcript.events', props.snapshot.events.length)
     return agentTelemetry.measure('agents.transcript.project', () => project(props.snapshot.events))
   })

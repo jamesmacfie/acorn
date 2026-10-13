@@ -27,7 +27,7 @@ export function parseAgentSessionOptions(argv) {
   if (options.onboarding && argv.includes('--project')) throw new Error('Use either --onboarding or --project, not both.')
   if (options.workspaces !== null && !['on', 'off'].includes(options.workspaces)) throw new Error('--workspaces must be on or off.')
   if (options.telemetry !== null && !['on', 'off'].includes(options.telemetry)) throw new Error('--telemetry must be on or off.')
-  if (options.telemetry !== null && options.fixture !== 'streaming-replay') throw new Error('--telemetry is only for --fixture streaming-replay.')
+  if (options.telemetry !== null && !['streaming-replay', 'large-surfaces'].includes(options.fixture)) throw new Error('--telemetry is only for --fixture streaming-replay or large-surfaces.')
   if (options.onboarding && options.workspaces) throw new Error('--workspaces cannot be used with --onboarding.')
   if (options.fixture !== null) {
     if (!FIXTURES.includes(options.fixture)) throw new Error(`Unknown fixture: ${options.fixture}. Known: ${FIXTURES.join(', ')}.`)

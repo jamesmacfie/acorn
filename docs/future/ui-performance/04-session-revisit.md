@@ -1,6 +1,28 @@
 # Phase 04: session revisit
 
-Status: planned, October 13, 2026.
+Completion note, October 13, 2026: Step 1 landed. The transcript store keeps each kept snapshot's
+projection (`managedAgentStore.projection`) and drops it with the events, so a return continues the
+fold. `AgentTranscript` asks the store for it by session ID, and two panes on one session share it.
+Step 2, the parsed-Markdown cache, wasn't built. The large-surface fixture gained a second session,
+**Small session**. The `session-revisit` flow steps between the two, and `--telemetry` works with
+that fixture so the flow's switches land as `acorn:agents.session.open` spans.
+
+An agent-launched window is always hidden, so every number came from jsdom, at base `487855a53`, in
+base, candidate, candidate, base order. A return to the canonical session took a median of 66.4 and
+67.6 ms before and 62.9 and 62.7 ms after. The saving matches a fresh fold of the 7,011 events, 2.7
+to 3.5 ms. Parsing the drawn page's Markdown took about 0.15 ms, about 0.2% of a return, so a
+character-bounded cache in the shared kit `Markdown` wasn't worth its state. Nearly all of a return
+is mounting 200 cards and disposing the session you left. A kept canonical projection holds about
+1.3 MB of heap beside 4.2 MB of events, so the store holds at most about 3.8 MB more. The dated
+[session revisit check](../../testing/session-revisit-2026-10-13.md) has the method, the numbers,
+and the real-window steps a person still needs to run: the flow on both builds, and memory after
+eight sessions.
+
+For phase 05 and later: if a real-window return is well above 100 ms, the cost is in mounting
+cards, not in the fold or the parse. Keeping a hidden conversation mounted is the remaining option
+this page refused, and reopening it needs real-window numbers first.
+
+Status: step 1 implemented; step 2 measured and not built; real-window numbers pending, October 13, 2026.
 
 Read the [programme page](./README.md) first. This phase needs phase 01's `switchSession` step for
 its before and after.

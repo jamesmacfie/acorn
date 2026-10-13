@@ -58,6 +58,13 @@ snapshot drops its events, seen IDs, usage line, and mark. The row stays in the 
 reading place, and live sequence. Opening it again reads from the start. Eight real sessions opened in
 turn used to hold 46 MB of JSON.
 
+The store also keeps each kept snapshot's transcript projection (`managedAgentStore.projection`), and
+drops it with the events. Going back to a session continues its fold instead of folding every event
+again, which saved about 3 ms of a 63 to 67 ms return to the canonical session in jsdom. A canonical
+projection holds about 1.3 MB beside the 4.2 MB of its events. Two panes on one session share it,
+because the projection checks each call's events against the ones it took and rebuilds when they
+differ ([the session revisit check](../testing/session-revisit-2026-10-13.md)).
+
 ## How the ledger stores a tool call
 
 A tool call is stored as two rows: the one that opened it, and one with its latest state. A measured

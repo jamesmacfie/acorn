@@ -257,6 +257,16 @@ try {
           } else if (fixture === 'delegation-checks') {
             session = await seedDelegationCheckReport(agents.storage.open(), agents.core, taskId)
           } else {
+            // A short second session for the session-revisit flow to step away to. Written first, so the
+            // long one changed last and still opens by default.
+            if (fixture === 'large-surfaces') {
+              await seedLargeSession(agents.storage.open(), agents.core, {
+                taskId,
+                profile: 'small',
+                seed,
+                title: 'Small session',
+              })
+            }
             session = await seedLargeSession(agents.storage.open(), agents.core, { taskId, profile, seed })
           }
         } finally {

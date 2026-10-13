@@ -184,6 +184,46 @@ describe('the conversation in a pane region', () => {
     expect(host.textContent).not.toContain('second conversation')
   })
 
+  it('comes back to a long session on its newest page, with the same hidden count', async () => {
+    const long = { ...session, id: 'long', title: 'Long session' }
+    snapshotsById[long.id] = {
+      ...snapshot,
+      session: long,
+      events: Array.from({ length: 250 }, (_, index) => ({
+        ...snapshot.events[0],
+        id: `long-${index + 1}`,
+        sessionId: long.id,
+        seq: index + 1,
+        event: { type: 'assistant_message', text: `long ${index + 1}`, messageId: `long-m${index + 1}` },
+      })),
+    } as AgentSessionSnapshot
+    listedSessions = [session, long]
+    managedAgentStore.upsertSession(session)
+    managedAgentStore.upsertSession(long)
+    const [selected, setSelected] = createSignal(long.id)
+    ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => <AgentConversation sessionId={selected()} viewKeyPrefix="test" />, host)
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
+    const page = () => {
+      const rows = host.querySelectorAll('.ui-timeline-turn')
+      const earlier = [...host.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Show'))
+      return { rows: rows.length, first: rows[0]?.textContent, earlier: earlier?.textContent }
+    }
+
+    await managedAgentStore.loadSnapshot(long.id)
+    const first = page()
+    expect(first).toEqual({ rows: 200, first: 'long 51', earlier: 'Show earlier (50)' })
+    setSelected(SESSION)
+    await vi.waitFor(() => expect(host.textContent).toContain('hello'))
+    setSelected(long.id)
+    expect(page()).toEqual(first)
+  })
+
   it('changes conversations when a workflow pane selects another step', async () => {
     const first = { ...session, config: { workflowStepId: 'step-1' } }
     const second = { ...session, id: 's2', config: { workflowStepId: 'step-2' } }

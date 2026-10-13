@@ -21,5 +21,6 @@ test('replay options bind telemetry mode to the generated fixture', () => {
   const options = parseAgentSessionOptions(['--session', 'replay', '--fixture', 'streaming-replay', '--telemetry', 'off', '--prepared'])
   expect(options).toMatchObject({ fixture: 'streaming-replay', telemetry: 'off', prepared: true })
   expect(() => parseAgentSessionOptions(['--telemetry', 'on'])).toThrow('--telemetry is only')
+  expect(parseAgentSessionOptions(['--fixture', 'large-surfaces', '--telemetry', 'on'])).toMatchObject({ telemetry: 'on' })
   expect(() => parseAgentSessionOptions(['--fixture', 'streaming-replay', '--telemetry', 'other'])).toThrow('--telemetry must be')
 })
