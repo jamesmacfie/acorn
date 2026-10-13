@@ -1,6 +1,8 @@
 import type { NodeAttachment } from '../../device/node.ts'
 
 export const prefsRoute = '/v1/core/prefs'
+// The same map narrowed to one key, which is how plugin state is read: the whole map leaves it out.
+export const prefValueRoute = (key: string) => `${prefsRoute}?key=${encodeURIComponent(key)}`
 
 // Every client paired with a node, and the revoke for one of them. Device-only, like the plugin list:
 // this is node administration.

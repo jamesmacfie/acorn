@@ -479,6 +479,9 @@ export type AgentSession = {
   archivedAt: number | null
   createdAt: number
   updatedAt: number
+  /** Set on a row from a session list or search, which leaves out what only an open session reads
+   *  (`sessionListRow`). The session's own read and its socket frames carry the full row. */
+  listRow?: true
 }
 
 export type AgentTurn = {

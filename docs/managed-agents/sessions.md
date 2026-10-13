@@ -81,6 +81,15 @@ Pages read live rows, not one snapshot across requests. For unchanged rows, tupl
 match once. An edit between pages can move a row across the cursor, so refresh the roster to see
 edits.
 
+A list or search row carries `listRow: true` and leaves out what only an open session reads: the
+slash commands and skills the provider advertised, the standing context, and every config option
+value but the chosen one. That keeps a 50-session page under 100 KB, where whole rows run to megabytes.
+`sessionListRow` in `plugins/agents/src/shared/sessionList.ts` makes the row. The session's own read,
+`GET /sessions/:id`, and its `agent:session` socket frames carry the full row. When a list row is the
+newer of two, the client keeps the detail the full row brought (`newestManagedSession`). Settings and
+the inline diff card read each provider's choices from the providers answer, which the Node fills from
+the newest session that advertised them.
+
 ## Titles
 
 A session starts as `New agent session`. Its first accepted turn replaces that with a label from the

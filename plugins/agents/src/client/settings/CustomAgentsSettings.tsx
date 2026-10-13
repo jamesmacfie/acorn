@@ -55,11 +55,10 @@ const sameDraft = (left: CustomAgentInput, right: CustomAgentInput) => {
 
 export default function CustomAgentsSettings() {
   const agents = createQuery(() => customAgentsOptions())
-  // Both only fill in the editor's choices, so a node that does not answer leaves them empty rather
+  // It only fills in the editor's choices, so a node that does not answer leaves them empty rather
   // than taking the page and its list of agents down with it.
   const [providers] = createResource(() => managedAgentApi.providers().catch(() => undefined))
-  const [recent] = createResource(() => managedAgentApi.sessions({}).catch(() => undefined))
-  const advertised = createMemo(() => advertisedOptionsByProvider(recent()?.sessions ?? []))
+  const advertised = createMemo(() => advertisedOptionsByProvider(providers() ?? []))
   const [editing, setEditing] = createSignal<Editing | null>(null)
 
   const providerFor = (id: string): AgentProviderDescriptor | undefined =>

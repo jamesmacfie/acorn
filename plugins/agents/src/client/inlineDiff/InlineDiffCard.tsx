@@ -2,7 +2,7 @@ import { createEffect, createMemo, createResource, createSignal, Index, onCleanu
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { Alert, Button, Card, Inline, SegmentedControl, Select, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
 import { ModelPickerPopover } from '@acorn/plugin-api/ui/host'
-import type { AgentConfigOption, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
+import type { AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import { sameInlineLine, type InlineDiffOrigin } from '../../contract/inlineDiff.ts'
 import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults.ts'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from '../settings/sessionDefaultsClient.ts'
@@ -69,10 +69,6 @@ export default function InlineDiffCard(props: Props) {
     () => (session() ? undefined : 'new'),
     () => managedAgentApi.providers(),
   )
-  const [recent] = createResource(
-    () => (session() ? undefined : 'new'),
-    () => managedAgentApi.sessions({}),
-  )
   const snapshot = createMemo(() => (session() ? managedAgentStore.snapshots()[session()!.id] : undefined))
   const requestsById = createMemo(
     () => new Map((snapshot()?.requests ?? []).map((request) => [request.providerRequestId, request])),
@@ -104,13 +100,7 @@ export default function InlineDiffCard(props: Props) {
     const id = providerOverride() ?? record().inline.providerId
     return installed().find((candidate) => candidate.id === id) ?? installed()[0]
   })
-  const advertised = createMemo(() => {
-    const id = provider()?.id
-    const candidate = recent()?.sessions.find(
-      (item) => item.providerId === id && Array.isArray(item.config.configOptions),
-    )
-    return candidate?.config.configOptions as AgentConfigOption[] | undefined
-  })
+  const advertised = createMemo(() => provider()?.configOptions)
   const modelOption = createMemo(() => advertised()?.find((option) => option.category === 'model'))
   const model = createMemo(
     () => modelOverride() ?? record().inline.pinned[provider()?.id ?? '']?.[modelOption()?.id ?? 'model'] ?? '',

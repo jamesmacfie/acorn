@@ -49,7 +49,7 @@ const services = (over: Partial<FrameServices> = {}): FrameServices => ({
     filename: 'a.png',
   })),
   subscribe: vi.fn(() => vi.fn()),
-  stateGet: vi.fn(() => undefined),
+  stateGet: vi.fn(async () => undefined),
   stateSet: vi.fn(async () => {}),
   toast: vi.fn(),
   copy: vi.fn(),

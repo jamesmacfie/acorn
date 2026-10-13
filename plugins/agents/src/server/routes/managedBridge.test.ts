@@ -195,6 +195,59 @@ describe('the snapshot a client reads', () => {
       },
     ])
   })
+
+  // Shaped like a running Claude Code session's config: about 80 advertised slash commands, a few
+  // dozen skills, the standing context, and the mode, model and effort pickers.
+  const describedValues = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({ value: `value-${i}`, label: `Value ${i}`, description: 'x'.repeat(60) }))
+  const heavyConfig = () => ({
+    account: 'work',
+    commands: Array.from({ length: 80 }, (_, i) => ({ name: `command-${i}`, description: 'x'.repeat(330) })),
+    skills: Array.from({ length: 30 }, (_, i) => ({ name: `skill-${i}`, description: 'x'.repeat(150) })),
+    standingContext: 'x'.repeat(11_000),
+    configOptions: [
+      { id: 'mode', label: 'Mode', category: 'mode', currentValue: 'value-0', values: describedValues(6) },
+      { id: 'model', label: 'Model', category: 'model', currentValue: 'value-1', values: describedValues(14) },
+      { id: 'effort', label: 'Effort', category: 'reasoning', currentValue: 'value-2', values: describedValues(5) },
+    ],
+  })
+
+  it('lists a page of sessions without the detail only an open session reads', async () => {
+    const taskId = randomUUID()
+    const sessions = []
+    for (let i = 0; i < 50; i += 1)
+      sessions.push(
+        await store.createSession(
+          { taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: heavyConfig() },
+          PROVIDER,
+        ),
+      )
+    const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value))
+
+    const whole = await store.listSessions({ taskId, limit: 50 })
+    const listed = await bridge().listSessions({ taskId, limit: 50 })
+    expect(listed.sessions).toHaveLength(50)
+    expect(bytes(whole)).toBeGreaterThan(2_000_000)
+    expect(bytes(listed)).toBeLessThan(100_000)
+
+    const row = listed.sessions[0]!
+    expect(row.listRow).toBe(true)
+    expect(row.config).not.toHaveProperty('commands')
+    expect(row.config).not.toHaveProperty('skills')
+    expect(row.config).not.toHaveProperty('standingContext')
+    expect(row.config.account).toBe('work')
+    expect(row.config.configOptions).toContainEqual({
+      id: 'model',
+      label: 'Model',
+      category: 'model',
+      currentValue: 'value-1',
+      values: [{ value: 'value-1', label: 'Value 1', description: 'x'.repeat(60) }],
+    })
+
+    const opened = await bridge().snapshot(sessions[0]!.id, 0, 10, false)
+    expect(opened.session.listRow).toBeUndefined()
+    expect(opened.session.config).toMatchObject({ commands: heavyConfig().commands, skills: heavyConfig().skills })
+  })
 })
 
 it('answers a session for an unknown provider as a bad request', async () => {

@@ -55,7 +55,7 @@ function host(target: FrameBinding['target'] = 'pane', authorize?: () => boolean
       return bytes.promise
     }),
     subscribe: () => () => {},
-    stateGet: () => null,
+    stateGet: async () => null,
     stateSet: vi.fn(() => native.promise),
     toast: vi.fn(),
     copy: vi.fn(),

@@ -1,6 +1,7 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { isPluginStateKey } from '@acorn/protocol/plugin/state.ts'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
@@ -13,12 +14,19 @@ import { PreferenceWriteError, writePreference } from '../core/prefs'
 const prefBody = z.object({ key: z.string().min(1), value: z.string() })
 
 // App-state preferences (theme, diff view mode, …). Source of truth is us, not GitHub.
-// user-scoped, no mirror/TTL. GET returns a key→value map; PUT upserts one key.
+// user-scoped, no mirror/TTL. GET returns a key→value map without plugin state, or with `?key=` just
+// that key, plugin state included; PUT upserts one key.
 export const prefs = new Hono<AppEnv>()
   .get('/', async (c) => {
     const uid = ownerId(c)
-    const rows = await getDb(c.env).select().from(schema.prefs).where(eq(schema.prefs.userId, uid))
-    return c.json(Object.fromEntries(rows.map((r) => [r.key, r.value])))
+    const key = c.req.query('key')
+    const owned = eq(schema.prefs.userId, uid)
+    const rows = await getDb(c.env)
+      .select()
+      .from(schema.prefs)
+      .where(key === undefined ? owned : and(owned, eq(schema.prefs.key, key)))
+    const shown = key === undefined ? rows.filter((r) => !isPluginStateKey(r.key)) : rows
+    return c.json(Object.fromEntries(shown.map((r) => [r.key, r.value])))
   })
   .put('/', async (c) => {
     const uid = ownerId(c)

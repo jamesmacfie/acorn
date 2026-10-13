@@ -44,28 +44,27 @@ vi.mock('@tanstack/solid-query', () => ({
 }))
 vi.mock('../sessions/managedClient', () => ({
   managedAgentApi: {
-    providers: async () => [{ id: 'codex', profileId: 'codex', label: 'Codex', installed: true, diagnostics: [] }],
-    sessions: async () => ({
-      sessions: [
-        {
-          providerId: 'codex',
-          config: {
-            configOptions: [
-              {
-                id: 'reasoning',
-                label: 'Reasoning',
-                category: 'reasoning',
-                currentValue: 'medium',
-                values: [
-                  { value: 'medium', label: 'Medium' },
-                  { value: 'high', label: 'High' },
-                ],
-              },
+    providers: async () => [
+      {
+        id: 'codex',
+        profileId: 'codex',
+        label: 'Codex',
+        installed: true,
+        diagnostics: [],
+        configOptions: [
+          {
+            id: 'reasoning',
+            label: 'Reasoning',
+            category: 'reasoning',
+            currentValue: 'medium',
+            values: [
+              { value: 'medium', label: 'Medium' },
+              { value: 'high', label: 'High' },
             ],
           },
-        },
-      ],
-    }),
+        ],
+      },
+    ],
   },
 }))
 

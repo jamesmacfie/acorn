@@ -6,6 +6,7 @@
 import { BridgeError, isProviderOperationError } from '@acorn/plugin-api/node'
 import type { AgentRuntimeState } from '../../contract/wire.ts'
 import type { RunStatus } from '@acorn/protocol/runs.ts'
+import { sessionListRow } from '../../shared/sessionList'
 import { foldToolEvents } from '../../shared/toolFold'
 import { foldUsageEvents } from '../../shared/usageFold'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
@@ -130,7 +131,8 @@ export function managedAgentsBridge(
     listSessions: (filter) =>
       guarded(async () => {
         const page = await runtime.store.listSessions(filter)
-        return delegation ? delegation.projectSessionList(page) : page
+        const projected = delegation ? await delegation.projectSessionList(page) : page
+        return { ...projected, sessions: projected.sessions.map(sessionListRow) }
       }),
     openRequests: () => guarded(async () => ({ requests: await runtime.store.openRequests(OPEN_REQUESTS_LIMIT) })),
     // Folded here rather than in the store, because this is the one caller whose reader folds anyway.
@@ -181,6 +183,7 @@ export function managedAgentsBridge(
     exportSession: (sessionId, format, variant) => guarded(() => runtime.exportSession(sessionId, format, variant)),
     wait: (sessionId, afterSeq, until, timeoutMs, signal) =>
       guarded(() => runtime.wait(sessionId, afterSeq, until, timeoutMs, signal)),
-    search: (query, filter) => guarded(() => runtime.store.searchSessions(query, filter)),
+    search: (query, filter) =>
+      guarded(async () => (await runtime.store.searchSessions(query, filter)).map(sessionListRow)),
   }
 }

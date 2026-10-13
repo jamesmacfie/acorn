@@ -1,4 +1,4 @@
-import type { AgentConfigOption, AgentSession } from '../../contract/wire.ts'
+import type { AgentConfigOption, AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
 
 const sameValue = (left: AgentConfigOption['values'][number], right: AgentConfigOption['values'][number]): boolean =>
   left.value === right.value && left.label === right.label && left.description === right.description
@@ -59,19 +59,15 @@ export const sessionModelSummary = (session: AgentSession): string | undefined =
 }
 
 /**
- * Which options each provider offers, read off the newest session that advertised them. A provider
- * only reports its models and reasoning levels once a session is running, so there is nowhere else to
- * read them from before one starts.
- *
- * Bounded by whatever sessions the caller passes, which is one page of the most recent. A provider you
- * have not run in that many sessions shows no pickers until you run it again.
+ * Which options each provider offers. A provider only reports its models and reasoning levels once a
+ * session is running, so the Node reads them off the newest of its recent sessions that advertised
+ * them (`ProviderCatalogue`). A provider you have not run in that many sessions shows no pickers until
+ * you run it again.
  */
-export function advertisedOptionsByProvider(sessions: readonly AgentSession[]): Record<string, AgentConfigOption[]> {
+export function advertisedOptionsByProvider(
+  providers: readonly AgentProviderDescriptor[],
+): Record<string, AgentConfigOption[]> {
   const byProvider: Record<string, AgentConfigOption[]> = {}
-  for (const session of sessions) {
-    if (byProvider[session.providerId]) continue
-    const options = session.config.configOptions
-    if (Array.isArray(options) && options.length) byProvider[session.providerId] = options as AgentConfigOption[]
-  }
+  for (const provider of providers) if (provider.configOptions.length) byProvider[provider.id] = provider.configOptions
   return byProvider
 }

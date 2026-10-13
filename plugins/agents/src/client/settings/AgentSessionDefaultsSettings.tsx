@@ -68,21 +68,20 @@ type PageContext = { navigate: (target: string) => void }
 export default function AgentSessionDefaultsSettings(props: { context?: PageContext }) {
   const queryClient = useQueryClient()
   const stored = createQuery(() => agentSessionDefaultsOptions())
-  // Both only fill in choices, so a node that does not answer leaves them empty rather than taking the
+  // It only fills in choices, so a node that does not answer leaves them empty rather than taking the
   // page down with it.
   const [providers] = createResource(() => managedAgentApi.providers().catch(() => undefined))
   const prefs = createQuery(() => prefsOptions(true))
   const modelStatus = createQuery(() => modelBackendsOptions(true))
   const backends = () => modelStatus.data?.backends ?? []
   const generatePick = createMemo(() => effectiveModelPick(backends(), readGeneratePick(prefs.data)))
-  const [recent] = createResource(() => managedAgentApi.sessions({}).catch(() => undefined))
 
   // Over the defaults rather than instead of them: a cached answer from an older node can lack a field
   // added since, and a Select with no value draws blank until the refetch lands.
   const record = (): AgentSessionDefaults => ({ ...defaultAgentSessionDefaults(), ...stored.data })
 
   // Pickers only for what a recent session advertised (`advertisedOptionsByProvider` says why).
-  const advertised = createMemo(() => advertisedOptionsByProvider(recent()?.sessions ?? []))
+  const advertised = createMemo(() => advertisedOptionsByProvider(providers() ?? []))
 
   // Each change is the save, through the shared writer the palette's setting command also uses
   // (`writeAgentSessionDefaults` holds the cache rule). What this page adds is where the failure goes:

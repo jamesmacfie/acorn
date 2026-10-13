@@ -33,7 +33,12 @@ const toast = vi.fn()
 vi.mock('../../features/notifications/toast', () => ({ toast: (...args: unknown[]) => toast(...args) }))
 
 const saveJsonPref = vi.fn(async (..._args: unknown[]) => undefined)
-vi.mock('../../features/settings/savePref', () => ({ saveJsonPref: (...args: unknown[]) => saveJsonPref(...args) }))
+const storedPrefs: Record<string, string> = {}
+const readPref = vi.fn(async (_qc: unknown, key: string, _owner?: string) => storedPrefs[key])
+vi.mock('../../features/settings/savePref', () => ({
+  readPref: (qc: unknown, key: string, owner?: string) => readPref(qc, key, owner),
+  saveJsonPref: (...args: unknown[]) => saveJsonPref(...args),
+}))
 
 const tasks = new Map<string, { id: string }>()
 vi.mock('../../features/tasks/taskLookup', () => ({ taskById: (id: string) => tasks.get(id) }))
@@ -171,17 +176,22 @@ describe('subscribe', () => {
 })
 
 describe('plugin state', () => {
-  it('parses what saveJsonPref wrote', () => {
-    const key = 'plugin.board.filters'
-    expect(build({}, { prefs: { [key]: JSON.stringify({ mine: true }) } }).stateGet(key)).toEqual({ mine: true })
+  afterEach(() => {
+    for (const key of Object.keys(storedPrefs)) delete storedPrefs[key]
   })
 
-  it('reports a value some other writer put there as absent', () => {
+  it('parses what saveJsonPref wrote, read from the node for this plugin', async () => {
+    const key = 'plugin.board.filters'
+    storedPrefs[key] = JSON.stringify({ mine: true })
+    await expect(build().stateGet(key)).resolves.toEqual({ mine: true })
+    expect(readPref).toHaveBeenCalledWith(expect.anything(), key, 'board')
+  })
+
+  it('reports a value some other writer put there as absent', async () => {
     // Not this plugin's state, so it is not handed over as a string either.
-    expect(
-      build({}, { prefs: { 'plugin.board.filters': 'not json' } }).stateGet('plugin.board.filters'),
-    ).toBeUndefined()
-    expect(build().stateGet('plugin.board.filters')).toBeUndefined()
+    storedPrefs['plugin.board.filters'] = 'not json'
+    await expect(build().stateGet('plugin.board.filters')).resolves.toBeUndefined()
+    await expect(build().stateGet('plugin.board.other')).resolves.toBeUndefined()
   })
 
   it('writes through the shared pref writer', async () => {

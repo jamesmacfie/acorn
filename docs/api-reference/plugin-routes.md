@@ -78,7 +78,7 @@ query is never logged. A path in either body is at most 4,096 characters.
 | `/v1/p/agents/providers`, `/session-defaults` | Harness and profile roster, and new-session defaults |
 | `/v1/p/agents/custom-agents[/:id]` | Custom agent definitions |
 | `/v1/p/agents/mcp-servers[/:name][/test]` | The owner's MCP servers. Device-only ([MCP](../mcp.md#your-own-servers)) |
-| `/v1/p/agents/sessions`, `/sessions/search` | Session list and transcript search |
+| `/v1/p/agents/sessions`, `/sessions/search` | Session list and transcript search. Their rows carry `listRow: true` and leave out what only an open session reads ([roster reads](../managed-agents/sessions.md#roster-reads)) |
 | `/v1/p/agents/requests` | Every request still waiting on a person across the Node's unarchived sessions, with each session's task, oldest first, at most 100. Device-only ([request notifications](../browser-extension/notifications.md#where-the-requests-come-from)) |
 | `/v1/p/agents/sessions/:id` | One session, its `events`, `artifacts`, `mcp`, `export`, and `wait`. `export` takes `format` and `variant=original\|redacted`, and answers `409 secret_check_blocked` when the [secret gate](../security/secret-publication.md#agents) refuses. `GET reference-context?taskId=...` is device-only and checks that the source session belongs to the task |
 | `/v1/p/agents/sessions/:id/turns[/:turnId]` | Queue, edit, or remove a turn |

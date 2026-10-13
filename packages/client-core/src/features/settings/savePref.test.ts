@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   pushBackgroundError: vi.fn(),
 }))
 // savePref owns the pref write itself, so stub the transport.
-vi.mock('../../infra/node/apiClient', () => ({ writeJson: mocks.writeJson }))
+vi.mock('../../infra/node/apiClient', () => ({ readJson: vi.fn(), writeJson: mocks.writeJson }))
 vi.mock('../notifications/notifications', () => ({ pushBackgroundError: mocks.pushBackgroundError }))
 
 import { savePref } from './savePref'
@@ -47,6 +47,19 @@ describe('savePref', () => {
     expect(client.getQueryData(prefsKey)).toEqual({ [NODE_PREF]: 'dark' })
     await expect(pending).resolves.toBe(true)
     expect(mocks.pushBackgroundError).not.toHaveBeenCalled()
+  })
+
+  it('writes plugin state without putting it in the cached map', async () => {
+    const client = new QueryClient()
+    client.setQueryData(prefsKey, { [NODE_PREF]: 'light' })
+    mocks.writeJson.mockResolvedValue({})
+    await expect(savePref(client, 'plugin:board:columns', '[1,2]')).resolves.toBe(true)
+    expect(mocks.writeJson).toHaveBeenCalledWith(
+      '/v1/core/prefs',
+      expect.objectContaining({ body: JSON.stringify({ key: 'plugin:board:columns', value: '[1,2]' }) }),
+      expect.any(Function),
+    )
+    expect(client.getQueryData(prefsKey)).toEqual({ [NODE_PREF]: 'light' })
   })
 
   it('rolls back the attempted value and surfaces a notice on failure', async () => {

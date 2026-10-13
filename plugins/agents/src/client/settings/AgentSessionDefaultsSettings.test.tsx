@@ -20,10 +20,19 @@ const mocks = vi.hoisted(() => ({
       executableVersion: '2.1.0',
       authenticated: true,
       diagnostics: [],
+      configOptions: [],
       accounts: [{ name: 'work', authenticated: false, loginCommand: "CLAUDE_CONFIG_DIR='/a/work' claude auth login" }],
       defaultAccount: 'work',
     },
-    { id: 'codex', profileId: 'codex', label: 'Codex', installed: false, authenticated: null, diagnostics: [] },
+    {
+      id: 'codex',
+      profileId: 'codex',
+      label: 'Codex',
+      installed: false,
+      authenticated: null,
+      diagnostics: [],
+      configOptions: [],
+    },
   ],
   saveStartup: vi.fn(async (_client: unknown, _on: boolean) => true),
 }))
@@ -58,7 +67,6 @@ vi.mock('./startupContext', async (importOriginal) => ({
 vi.mock('../sessions/managedClient', () => ({
   managedAgentApi: {
     providers: async () => mocks.providers,
-    sessions: async () => ({ sessions: [] }),
   },
 }))
 

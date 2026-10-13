@@ -85,7 +85,7 @@ export type FrameServices = {
   ): Promise<FrameBytesResult>
   // Attach to one shell event channel; returns the detach.
   subscribe(channel: string, listener: (payload: unknown) => void): () => void
-  stateGet(key: string): unknown
+  stateGet(key: string): Promise<unknown>
   stateSet(key: string, value: unknown): Promise<void>
   toast(title: string, detail?: string): void
   copy(text: string): void
@@ -458,7 +458,11 @@ export function createFrameBridge(input: {
     }
     const scoped = pluginStateKey(binding.pluginId, key)
     if (kind === 'state.get') {
-      reply({ id, ok: true, status: 200, body: services.stateGet(scoped) ?? null })
+      try {
+        reply({ id, ok: true, status: 200, body: (await services.stateGet(scoped)) ?? null })
+      } catch (error) {
+        reply(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
+      }
       return
     }
     const serialized = JSON.stringify(data.value ?? null)

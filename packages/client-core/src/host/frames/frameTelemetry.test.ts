@@ -35,7 +35,7 @@ const services = (): FrameServices => ({
     filename: null,
   })),
   subscribe: vi.fn(() => vi.fn()),
-  stateGet: vi.fn(() => undefined),
+  stateGet: vi.fn(async () => undefined),
   stateSet: vi.fn(async () => {}),
   toast: vi.fn(),
   copy: vi.fn(),

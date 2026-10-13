@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { AgentConfigOption, AgentSession } from '../contract/wire.ts'
 
 export type SessionListFilter = {
   taskId?: string
@@ -54,3 +55,40 @@ export const sessionListQuerySchema = z
       return z.NEVER
     }
   })
+
+// A session list draws each row's title, state, time, and chosen model. What only an open session reads
+// stays out of it: the slash commands and skills the provider advertised, the standing context, and
+// every config option value but the chosen one. Those run to tens of kilobytes a session, so a full
+// page of whole rows is megabytes.
+const DETAIL_CONFIG_KEYS = ['commands', 'skills', 'standingContext'] as const
+
+const configOptionsOf = (config: AgentSession['config']): AgentConfigOption[] | undefined =>
+  Array.isArray(config.configOptions) ? (config.configOptions as AgentConfigOption[]) : undefined
+
+export function sessionListRow(session: AgentSession): AgentSession {
+  const config = { ...session.config }
+  for (const key of DETAIL_CONFIG_KEYS) delete config[key]
+  const options = configOptionsOf(config)
+  if (options)
+    config.configOptions = options.map((option) => ({
+      ...option,
+      values: option.values.filter((value) => value.value === option.currentValue),
+    }))
+  return { ...session, config, listRow: true }
+}
+
+/** A list row with the detail a full row of the same session already brought. The list row's chosen
+ *  values win, since it can be the newer of the two. */
+export function withSessionDetail(row: AgentSession, full: AgentSession): AgentSession {
+  const { listRow: _listRow, ...session } = row
+  const config = { ...row.config }
+  for (const key of DETAIL_CONFIG_KEYS) if (key in full.config) config[key] = full.config[key]
+  const fullOptions = configOptionsOf(full.config)
+  if (fullOptions) {
+    const chosen = new Map(configOptionsOf(row.config)?.map((option) => [option.id, option.currentValue]))
+    config.configOptions = fullOptions.map((option) =>
+      chosen.has(option.id) ? { ...option, currentValue: chosen.get(option.id) ?? null } : option,
+    )
+  }
+  return { ...session, config }
+}

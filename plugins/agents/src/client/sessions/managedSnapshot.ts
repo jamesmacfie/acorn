@@ -5,6 +5,7 @@ import type {
   AgentSessionSnapshot,
   AgentTurn,
 } from '../../contract/wire.ts'
+import { withSessionDetail } from '../../shared/sessionList'
 import { mergeAgentUsage } from '../../shared/usageFold'
 
 const mergeById = <T extends { id: string }>(current: T[], incoming: T[]): T[] => {
@@ -29,12 +30,15 @@ const mergeEvents = (current: AgentEventRecord[], incoming: AgentEventRecord[]):
 }
 
 /** HTTP reads and mutation responses can resolve after a newer WebSocket projection. Sequence is the
- * authority; updatedAt breaks ties for writes such as rename that do not append an event. */
+ * authority; updatedAt breaks ties for writes such as rename that do not append an event. A list row
+ * that wins keeps the detail a full row already brought, so a list refresh can't empty an open
+ * session's composer. */
 export function newestManagedSession(current: AgentSession, incoming: AgentSession): AgentSession {
   const currentIsNewer =
     current.lastEventSeq > incoming.lastEventSeq ||
     (current.lastEventSeq === incoming.lastEventSeq && current.updatedAt > incoming.updatedAt)
-  return currentIsNewer ? current : incoming
+  const [newest, other] = currentIsNewer ? [current, incoming] : [incoming, current]
+  return newest.listRow && !other.listRow ? withSessionDetail(newest, other) : newest
 }
 
 export function mergeManagedSnapshot(

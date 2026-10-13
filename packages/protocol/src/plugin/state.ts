@@ -2,7 +2,14 @@
 // sandboxed frame. Both sides persist through core prefs, so the namespace and quota must not drift.
 export const MAX_PLUGIN_STATE_BYTES = 1024 * 1024
 
-export const pluginStateKey = (pluginId: string, key: string): string => `plugin:${pluginId}:${key}`
+// The whole prefs map (`GET /v1/core/prefs`) leaves plugin state out. One plugin's state can run to
+// megabytes, only its own frame reads it, and every window would otherwise fetch and cache it at launch.
+// A frame reads its state one key at a time instead.
+const PLUGIN_STATE_PREFIX = 'plugin:'
+
+export const pluginStateKey = (pluginId: string, key: string): string => `${PLUGIN_STATE_PREFIX}${pluginId}:${key}`
+
+export const isPluginStateKey = (key: string): boolean => key.startsWith(PLUGIN_STATE_PREFIX)
 
 // ── The live channel ──────────────────────────────────────────────────────────────────────────────
 //

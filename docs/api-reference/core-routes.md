@@ -74,7 +74,7 @@ Device-only, because a schedule is code the Node runs unattended. See [schedules
 
 | Method | Path | Gate | Purpose |
 | --- | --- | --- | --- |
-| `GET`, `PUT` | `/v1/core/prefs` | Device | Read Node preferences, or upsert one |
+| `GET`, `PUT` | `/v1/core/prefs` | Device | Read Node preferences, or upsert one. The map leaves out plugin state, the `plugin:<id>:*` keys. `?key=` answers that one key, plugin state included |
 | `GET` | `/v1/core/integrations` | Provider access | Provider descriptors and connection state |
 | `POST` | `/v1/core/integrations` | Provider access | Create and validate a connection |
 | `PUT` | `/v1/core/integrations/:id` | Provider access | Replace credentials or configuration |

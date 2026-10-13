@@ -8,7 +8,7 @@ import { openTarget } from '../../features/notifications/notifications'
 import { executeCommand } from '../registries/commands/commands'
 import { openInAppUrl } from '../registries/panes/contentLinks'
 import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../registries/commands/keybindings'
-import { saveJsonPref } from '../../features/settings/savePref'
+import { readPref, saveJsonPref } from '../../features/settings/savePref'
 import { activeTaskId } from '../../features/tasks/tasks'
 import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
 import { taskById } from '../../features/tasks/taskLookup'
@@ -139,8 +139,9 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
     // Prefs are a flat string map on the wire, and `saveJsonPref` is what wrote this one, so reading it
     // back means parsing. A value that is not JSON is a value some other writer put there under this key,
     // which is not this plugin's state and is reported as absent rather than handed over as a string.
-    stateGet: (key) => {
-      const raw = qc.getQueryData<Record<string, string>>(prefsKey)?.[key]
+    // Read from the node each time, because the prefs map leaves plugin state out.
+    stateGet: async (key) => {
+      const raw = await readPref(qc, key, props.binding.pluginId)
       if (raw === undefined) return undefined
       try {
         return JSON.parse(raw) as unknown

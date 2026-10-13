@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
-import { writeJson } from '../../infra/node/apiClient'
+import { prefValueRoute, prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
+import { isPluginStateKey } from '@acorn/protocol/plugin/state.ts'
+import { readJson, writeJson } from '../../infra/node/apiClient'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { queryOwner } from '../../infra/node/queryOwnership'
 import { deviceConfigBridge } from '../../infra/platform'
@@ -28,6 +29,19 @@ export const setPref = async (key: string, value: string, nodeId: string | null 
     },
     (res) => `prefs ${res.status}`,
   )
+
+// The node a query client's prefs belong to. A client registered to no node is the active node's.
+const prefsNode = (qc: QueryClient): string | null => {
+  const registered = queryOwner(qc)
+  return registered === undefined ? activeNodeId() : registered
+}
+
+/** One preference, from the node rather than the prefs map. For plugin state, which the map leaves out.
+ *  `owner` names the plugin the read is for in telemetry. */
+export async function readPref(qc: QueryClient, key: string, owner?: string): Promise<string | undefined> {
+  const values = await readJson<Record<string, string>>(prefValueRoute(key), { nodeId: prefsNode(qc), owner })
+  return values[key]
+}
 
 type PrefWriteState = {
   tail: Promise<void>
@@ -111,12 +125,13 @@ export async function savePref(
     return true
   }
 
-  const registered = queryOwner(qc)
-  const nodeId = registered === undefined ? activeNodeId() : registered
+  const nodeId = prefsNode(qc)
   const partitionWrites = writes.get(qc) ?? new Map<string, PrefWriteState>()
   writes.set(qc, partitionWrites)
+  // Plugin state is written in order like any key, but stays out of the cached map, as it does on the node.
+  const cached = !isPluginStateKey(key)
   const previous = qc.getQueryData<Record<string, string>>(prefsKey)
-  qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
+  if (cached) qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
 
   const state = partitionWrites.get(key) ?? {
     tail: Promise.resolve(),
@@ -140,7 +155,7 @@ export async function savePref(
   } catch (error) {
     // Equal values aren't equal attempts: dark -> light -> dark can have three requests in flight. Only
     // the latest attempt owns the optimistic cache value and may roll it back.
-    if (!attempt.aborted) {
+    if (cached && !attempt.aborted) {
       const current = qc.getQueryData<Record<string, string>>(prefsKey)
       qc.setQueryData<Record<string, string>>(prefsKey, () => {
         const next = { ...current }

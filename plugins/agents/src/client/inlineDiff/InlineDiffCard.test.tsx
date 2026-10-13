@@ -7,7 +7,7 @@ import InlineDiffCard from './InlineDiffCard.tsx'
 const store = vi.hoisted(() => ({
   sessions: [] as unknown[],
   snapshots: {} as Record<string, unknown>,
-  recentSessions: [] as unknown[],
+  configOptions: [] as unknown[],
 }))
 vi.mock('../sessions/managedStore.ts', () => ({
   managedAgentStore: {
@@ -20,8 +20,7 @@ vi.mock('../sessions/managedStore.ts', () => ({
 }))
 vi.mock('../sessions/managedClient.ts', () => ({
   managedAgentApi: {
-    providers: async () => [{ id: 'codex', label: 'Codex', installed: true }],
-    sessions: async () => ({ sessions: store.recentSessions }),
+    providers: async () => [{ id: 'codex', label: 'Codex', installed: true, configOptions: store.configOptions }],
   },
 }))
 
@@ -30,7 +29,7 @@ afterEach(() => {
   disposers.splice(0).forEach((dispose) => dispose())
   store.sessions = []
   store.snapshots = {}
-  store.recentSessions = []
+  store.configOptions = []
   for (const surface of document.querySelectorAll('.ui-popover')) surface.remove()
 })
 
@@ -69,16 +68,9 @@ const mount = () => {
 
 describe('inline diff chat', () => {
   it('moves provider, model, and per-chat permissions into the sparkle picker', async () => {
-    store.recentSessions = [
-      {
-        providerId: 'codex',
-        config: {
-          configOptions: [
-            { id: 'model', category: 'model', values: [{ value: 'fast', label: 'Fast' }] },
-            { id: 'sandbox', category: 'permission', values: [{ value: 'read-only', label: 'Read only' }] },
-          ],
-        },
-      },
+    store.configOptions = [
+      { id: 'model', category: 'model', values: [{ value: 'fast', label: 'Fast' }] },
+      { id: 'sandbox', category: 'permission', values: [{ value: 'read-only', label: 'Read only' }] },
     ]
     const host = mount()
     const picker = host.querySelector<HTMLButtonElement>('button[aria-label="Model and permissions"]')

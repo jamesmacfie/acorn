@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentEventRecord, AgentSession, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
+import { sessionListRow } from '../../shared/sessionList'
 import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 
 const session = (lastEventSeq: number): AgentSession => ({
@@ -54,6 +55,31 @@ describe('managed-agent snapshot reconciliation', () => {
 
     expect(newestManagedSession(connected, creationResponse)).toBe(connected)
     expect(newestManagedSession(creationResponse, connected)).toBe(connected)
+  })
+
+  it('keeps an open session’s commands and choices when a newer list row arrives', () => {
+    const model = (currentValue: string) => ({
+      id: 'model',
+      label: 'Model',
+      category: 'model',
+      currentValue,
+      values: [
+        { value: 'fast', label: 'Fast' },
+        { value: 'deep', label: 'Deep' },
+      ],
+    })
+    const commands = [{ name: 'review' }]
+    const open = { ...session(1), config: { commands, standingContext: 'repo rules', configOptions: [model('fast')] } }
+    const listed = sessionListRow({ ...session(2), config: { ...open.config, configOptions: [model('deep')] } })
+
+    const merged = newestManagedSession(open, listed)
+    expect(merged.listRow).toBeUndefined()
+    expect(merged.lastEventSeq).toBe(2)
+    expect(merged.config).toEqual({ commands, standingContext: 'repo rules', configOptions: [model('deep')] })
+    expect(newestManagedSession(listed, open)).toEqual(merged)
+
+    const reopened = { ...session(3), config: { configOptions: [model('fast')] } }
+    expect(newestManagedSession(merged, reopened)).toBe(reopened)
   })
 
   it('does not lose a live event when an older HTTP snapshot resolves later', () => {
