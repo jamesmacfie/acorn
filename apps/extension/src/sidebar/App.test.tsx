@@ -3,6 +3,7 @@ import { render } from 'solid-js/web'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
+import { back, button, openSettings, pick, useNode } from '../test/sidebarUi'
 import { App } from './App'
 
 const FINGERPRINT = 'ab'.repeat(32)
@@ -77,8 +78,7 @@ function mount(known: string[], options: { refuseLateReads?: boolean } = {}) {
   return { fake, held, root }
 }
 
-const button = (root: HTMLElement, text: string) =>
-  [...root.querySelectorAll('button')].find((element) => element.textContent?.trim() === text)!
+const nodeChip = (root: HTMLElement) => root.querySelector('header summary')!.textContent
 const input = (root: HTMLElement, name: string) => root.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
 const type = (element: HTMLInputElement, value: string) => {
   element.value = value
@@ -89,24 +89,46 @@ describe('sidebar', () => {
   it('keeps the selected Node projects when an earlier Node answers late', async () => {
     const { held, root } = mount(['a', 'b'])
     await settle()
-    button(root, 'Use').click()
-    await settle()
+    await useNode(root, 'Node a')
     expect(held.map((read) => read.nodeId)).toEqual(['a'])
     // Switch to b while a's read is still out, then let both answer, b first.
-    button(root, 'Use').click()
-    await settle()
+    await useNode(root, 'Node b')
     held[1]!.release()
     held[0]!.release()
     await settle()
-    expect(root.querySelector('[aria-label="Selected Node"]')!.textContent).toContain('Node b')
+    expect(nodeChip(root)).toContain('Node b')
     const options = [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
     expect(options).toEqual(['Choose a project', 'b project'])
+  })
+
+  it('keeps Nodes off Home, behind the gear, and says when the selected Node is offline', async () => {
+    const { fake, root } = mount(['a'])
+    await settle()
+    await useNode(root, 'Node a')
+    expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+    expect(root.querySelector('[aria-label="Nodes"]')).toBeNull()
+    await openSettings(root)
+    expect(root.querySelector('[aria-label="Home"]')).toBeNull()
+    expect(root.querySelector('[aria-label="Nodes"]')!.textContent).toContain('Node a')
+    await pick(root, 'theme', 'nord')
+    expect(fake.storage.get('appearance')).toEqual({ theme: 'nord', style: 'terminal' })
+    await back(root)
+    expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+
+    expect(root.querySelector('[data-testid="node-status"]')).toBeNull()
+    fake.hosts[0]!.send({ v: 1, event: 'status', status: { nodeId: 'a', state: 'offline' } })
+    await settle()
+    expect(root.querySelector('header .dot')!.getAttribute('data-tone')).toBe('bad')
+    expect(root.querySelector('[data-testid="node-status"]')!.textContent).toBe(
+      'The Node is not answering. Check that it is running and reachable, then retry.',
+    )
   })
 
   it('shows the identity words before asking for a code, then pairs and selects', async () => {
     const { root } = mount([], { refuseLateReads: true })
     await settle()
-    button(root, 'Pair a Node').click()
+    // With no Node paired, the line under the header leads to pairing in Settings.
+    button(root, 'Pair a Node')!.click()
     await settle()
     type(input(root, 'address'), 'https://new.test:7443')
     root.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
@@ -124,7 +146,7 @@ describe('sidebar', () => {
     type(input(root, 'pairing-code'), 'GOOD')
     root.querySelectorAll('form')[1]!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await settle()
-    expect(root.querySelector('[aria-label="Selected Node"]')!.textContent).toContain('Node new')
+    expect(nodeChip(root)).toContain('Node new')
   })
 
   it('tells the person how to install a missing bridge', async () => {
@@ -136,7 +158,8 @@ describe('sidebar', () => {
     dispose = render(() => <App api={fake.api} />, root)
     await settle()
     expect(root.querySelector('[role="alert"]')!.textContent).toContain('Run `acorn browser install`')
-    // The pairings are in the bridge, so the sidebar doesn't claim there are none.
+    // The pairings are in the bridge, so Settings doesn't claim there are none.
+    await openSettings(root)
     expect(root.textContent).not.toContain('No Node is paired')
     expect(root.textContent).toContain('The paired Nodes show once the bridge answers.')
   })

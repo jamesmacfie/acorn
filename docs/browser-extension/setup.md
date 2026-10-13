@@ -1,8 +1,8 @@
 # Set up and troubleshoot the browser extension
 
 This page covers installing the [browser extension](../browser-extension.md) as a development build on
-macOS, pairing it with a Node, keeping its native bridge working, and removing it. It also lists every
-state the sidebar shows. Read it to use the extension, or to help someone whose sidebar says something
+macOS, pairing it with a Node, keeping its native bridge working, and removing it. It also describes
+the panel's views and appearance, and lists every state the sidebar shows. Read it to use the extension, or to help someone whose sidebar says something
 is wrong.
 
 ## What you need
@@ -50,7 +50,8 @@ user-level folder that `acorn browser install` writes. A Chrome started with `--
 
 ## Pair a Node
 
-1. Click the Acorn toolbar button to open the panel, then **Pair a Node**.
+1. Click the Acorn toolbar button to open the panel, then **Pair a Node** in the line under the header.
+   To pair another Node later, open Settings with the gear and click **Pair a Node** under **Nodes**.
 2. Enter the Node's HTTPS address and click **Check identity**.
 3. Compare the six words with the ones the Node shows: the desktop's pairing screen, or a standalone
    Node's banner. Tick **The words match** only if they do.
@@ -63,11 +64,11 @@ advertise its address, or be reached through an SSH tunnel, as
 
 ## Turn on site features
 
-- Click **Allow** beside a site in **Site access** for its buttons, sidebar handoffs, and project
-  suggestions. The browser asks you first.
+- In Settings, click **Allow** beside a site under **Site access** for its buttons, sidebar handoffs,
+  and project suggestions. The browser asks you first.
 - To capture from a site you haven't allowed, click the Acorn toolbar button on that page, then
   capture.
-- Tick **Notify me when an agent waits** for OS notifications. The browser asks you first.
+- In Settings, tick **Notify me when an agent waits** for OS notifications. The browser asks you first.
 - A handoff works only for a plugin running on the selected Node. The desktop's Node has GitHub, Linear,
   and Rollbar. A standalone Node has GitHub, and needs Linear and Rollbar installed as plugins.
 
@@ -76,14 +77,62 @@ advertise its address, or be reached through an SSH tunnel, as
 - **After moving or upgrading the CLI or its Node runtime**, the launcher points at a path that's gone.
   The sidebar says the bridge stopped, and `acorn browser status` names the missing path. Run
   `acorn browser install` from the new copy, then click **Retry**. Pairings stay.
-- **After reinstalling the extension**, its pairings are still in the bridge. Click **Use** on the Node
-  to select it again.
+- **After reinstalling the extension**, its pairings are still in the bridge. Choose the Node from the
+  Node chip's menu in the header, or click **Use** beside it in Settings.
 - **To remove the bridge**, run `acorn browser uninstall`. It removes the registrations and launchers,
   and names each browser's bridge folder, which still holds its pairings and tokens. Delete
   `~/Library/Application Support/acorn/browser-bridge/<browser>/` to remove them.
-- **Forget** in the sidebar deletes one Node's pairing from this browser. Neither forgetting nor
+- **Forget** in Settings deletes one Node's pairing from this browser. Neither forgetting nor
   deleting the folder revokes the browser's device on the Node. Another paired client can revoke it with
   `DELETE /v1/core/devices/:id` ([authentication](../authentication.md)).
+
+## The panel's views
+
+The panel opens on **Home**. The header holds the Acorn mark, the selected Node as a chip with a
+status dot, and the gear. The chip's menu switches Nodes and opens Settings. When the bridge stopped
+or the Node isn't answering, one line under the header says so, with the next step from the table
+below. Nothing else about Nodes or site access shows on Home.
+
+Home lists, top to bottom:
+
+1. **Waiting for you**, only while an agent waits on a request, across every project on the Node.
+   Each request answers in place with the same buttons the conversation uses
+   ([request notifications](./notifications.md#the-waiting-list)).
+2. **This page**: the page's handoff offers and a handoff in progress ([handoffs](./handoffs.md)), and
+   the project its site suggests, with that project's open tasks
+   ([project sites](./project-sites.md#suggestions-in-the-sidebar)). Clicking a task makes it the
+   current task.
+3. **Agents**: every conversation in the current task, with its agent, title, state, and last line.
+   A row opens the conversation. **New chat** starts another.
+4. **Current task**: the task you last used. It stays whatever page shows, and **Find a task** opens
+   the task search in Settings.
+
+A conversation opens over Home, with a back arrow and the task's name above the conversation's own.
+The composer's toolbar holds the three [capture](./page-capture.md) buttons, and each capture shows as
+a chip in the draft.
+
+**Settings** holds the Node list and pairing, a search across every project's open tasks, site
+access, each project's sites, notifications, and appearance. Choosing a task in the search makes it
+current and returns to Home.
+
+A state shows as a coloured dot beside a word, never colour alone: green for working or online, amber
+for waiting, red for failed or unreachable, and an empty ring for idle.
+
+## Appearance
+
+The panel loads the app's own token stylesheets, `tokens-theme.css`, `tokens-style.css`, and the
+style packs, from `packages/client-core/src/infra/styles/`. It picks a theme and a style pack the way
+the app does, with `data-theme` and `data-style` on the page's root element
+(`apps/extension/src/sidebar/appearance.ts`).
+
+The desktop keeps its appearance as a device preference the extension can't read, so the panel has
+its own. By default it follows the system's light or dark setting with the Terminal style. Settings →
+**Appearance** offers the app's 12 themes and 4 style packs. The choice is kept in `storage.local`
+under `appearance` ([browser storage](./conversations.md#browser-storage)), and every open panel
+follows a change made in any of them.
+
+The Modern, Cozy, and Cute packs use the font files in `fonts.css`. A browser fetches a font only when
+a rule uses it, so the Terminal style loads none of them.
 
 ## What the sidebar shows
 
@@ -117,6 +166,6 @@ are paired.
 - In Firefox 151, the first native host the extension starts after Firefox starts can get no process.
   The sidebar says the bridge didn't answer after 10 seconds, and **Retry** connects at once. When a
   Node was already selected, the background retries by itself.
-- A task another client adds doesn't appear until you choose its project again. Projects, conversations,
-  and requests update live.
+- A task another client adds doesn't appear on Home until This page shows its project again, or
+  Settings opens. Projects, conversations, and requests update live.
 - Only macOS is supported, and only as development builds.

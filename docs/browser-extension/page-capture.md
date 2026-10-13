@@ -9,7 +9,7 @@ side is in `apps/cli/src/browser/bridge.ts`.
 
 ## What a capture is
 
-The composer under each conversation has three buttons:
+The composer's toolbar has three icon buttons, named by these labels:
 
 | Button | What it keeps | What the agent receives |
 | --- | --- | --- |
@@ -23,8 +23,9 @@ its content escaped so page text can't close the block and read as the person's 
 read the top frame of the active tab in the sidebar's window, and nothing else: no full page, no
 form contents, no other tabs.
 
-Each capture shows in the draft with its address, its selected text or screenshot, and the
-conversation it will go to. **Remove** drops one. Capturing and reviewing send nothing to the Node.
+Each capture shows as a chip in the draft, with a thumbnail for a screenshot. Opening a chip shows its
+address and its selected text or item context, and **×** removes it. A line under the composer names
+the conversation and task the message goes to. Capturing and reviewing send nothing to the Node.
 
 ## Page access
 

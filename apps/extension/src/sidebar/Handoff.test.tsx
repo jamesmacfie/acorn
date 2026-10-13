@@ -3,6 +3,7 @@ import { render } from 'solid-js/web'
 import type { BridgeAgentSession, BridgeHandoffItem } from '@acorn/protocol/extensionBridge.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
+import { back, button, conversationTitle, currentTask, openChat, openSettings } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -138,10 +139,6 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string } = {}) {
   return { fake, state, root }
 }
 
-const button = (root: HTMLElement, text: string) =>
-  [...root.querySelectorAll('button')].find((element) => element.textContent?.trim() === text)
-const selected = (root: HTMLElement, name: string) =>
-  root.querySelector<HTMLSelectElement>(`select[name="${name}"]`)?.value
 const siteAccess = (root: HTMLElement) =>
   [...root.querySelectorAll('[aria-label="Site access"] li')].map(
     (row) => `${row.querySelector('strong')!.textContent}: ${row.querySelector('.quiet')!.textContent}`,
@@ -169,7 +166,8 @@ describe('a handoff in the sidebar', () => {
     expect(state.requests.find((request) => request.op === 'handoff.resolve')).toMatchObject({ url: PAGE })
     button(root, 'Open')!.click()
     await settle(30)
-    expect([selected(root, 'project'), selected(root, 'task'), selected(root, 'session')]).toEqual(['p1', 't1', 's1'])
+    expect(root.querySelector('[aria-label="Conversation"] .view-head')!.textContent).toContain('Existing work')
+    expect(conversationTitle(root)).toBe('Claude · Chat s1')
     expect(captures(root)).toEqual([expect.stringContaining('Item · Fix the flaky test')])
     expect(root.textContent).toContain('The test waits on a timer.')
     // Nothing went to an agent.
@@ -191,12 +189,12 @@ describe('a handoff in the sidebar', () => {
       projectId: 'p2',
       url: PAGE,
     })
-    expect([selected(root, 'project'), selected(root, 'task')]).toEqual(['p2', 't-new'])
+    expect(currentTask(root)).toBe('Fix the flaky test')
     // No conversation yet: the new-chat picker shows, and the context waits for it.
     expect(root.textContent).toContain('goes into the draft of the conversation you open next')
     button(root, 'Start chat')!.click()
     await settle(30)
-    expect(selected(root, 'session')).toBe('s-new')
+    expect(conversationTitle(root)).toBe('Claude · Chat s-new')
     expect(captures(root)).toEqual([expect.stringContaining('Fix the flaky test')])
   })
 
@@ -206,15 +204,13 @@ describe('a handoff in the sidebar', () => {
     await clickSiteButton(fake)
     button(root, 'Choose another task')!.click()
     await settle(20)
-    expect(selected(root, 'project')).toBe('p1')
-    const task = root.querySelector<HTMLSelectElement>('select[name="task"]')!
-    task.value = 't1'
-    task.dispatchEvent(new Event('change', { bubbles: true }))
-    await settle(20)
-    const conversation = root.querySelector<HTMLSelectElement>('select[name="session"]')!
-    conversation.value = 's1'
-    conversation.dispatchEvent(new Event('change', { bubbles: true }))
+    // Settings opens on its task search, which lists every open task.
+    const found = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Tasks"] .row-button')]
+    expect(found.map((row) => row.textContent)).toEqual(['Existing workWidget'])
+    found[0]!.click()
     await settle(30)
+    expect(currentTask(root)).toBe('Existing work')
+    await openChat(root, 'Chat s1')
     expect(captures(root)).toHaveLength(1)
     expect(state.requests.some((request) => request.op === 'handoff.create')).toBe(false)
   })
@@ -255,20 +251,23 @@ describe('a handoff in the sidebar', () => {
   it('asks for site access from a click, and says when an item has no project here', async () => {
     const { fake, root } = mount({ items: [item({ projects: [] })] })
     await settle(30)
+    await openSettings(root)
     expect(siteAccess(root)).toEqual(['tracker.example: Buttons on its pages · Not allowed'])
     button(root, 'Allow')!.click()
     await settle(20)
     expect(fake.granted.has('https://tracker.example/*')).toBe(true)
     expect(siteAccess(root)).toEqual(['tracker.example: Buttons on its pages · Allowed'])
-    // Removing it, here or in the browser's settings, takes back the sidebar's offer for the page too.
+    // Removing it, here or in the browser's settings, takes back This page's offer too.
     fake.activeTab = { ...fake.activeTab, url: PAGE }
     fake.activate()
-    await settle(20)
+    await back(root)
     expect(button(root, 'Open in Acorn')).toBeDefined()
     fake.activeTab = { ...fake.activeTab, url: undefined }
+    await openSettings(root)
     button(root, 'Remove')!.click()
     await settle(20)
     expect(siteAccess(root)).toEqual(['tracker.example: Buttons on its pages · Not allowed'])
+    await back(root)
     expect(button(root, 'Open in Acorn')).toBeUndefined()
     await clickSiteButton(fake)
     expect(root.textContent).toContain('No project on this Node tracks acme/widget#42.')

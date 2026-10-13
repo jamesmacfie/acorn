@@ -22,7 +22,7 @@ const handoffCapture = (item: BridgeHandoffItem): Extract<PageCapture, { kind: '
 })
 
 // One handoff on one Node: resolve the page, then let the person open a linked task, create one in a
-// project the plugin tied the item to, or pick any task themselves. The item's context goes to the
+// project the plugin tied the item to, or find any task themselves. The item's context goes to the
 // draft of whatever conversation they open next; nothing is sent from here.
 // docs/browser-extension/handoffs.md.
 export function Handoff(props: {
@@ -32,8 +32,8 @@ export function Handoff(props: {
   online: boolean
   // Open this task's newest conversation, or a new chat when it has none, with this context waiting.
   openTask(projectId: string, taskId: string, capture: PageCapture): void
-  // Let the person choose a task with the ordinary pickers, starting in this project if there is one.
-  chooseTask(projectId: string | null, capture: PageCapture): void
+  // Let the person find any task in Settings, with this context waiting.
+  chooseTask(capture: PageCapture): void
   dismiss(): void
 }) {
   const [items, setItems] = createSignal<BridgeHandoffItem[] | null>(null)
@@ -105,8 +105,8 @@ export function Handoff(props: {
   const projectName = (id: string) => item()?.projects.find((project) => project.id === id)?.name
 
   return (
-    <section class="card" aria-label="Handoff">
-      <h2>{props.handoff.label}</h2>
+    <div class="handoff" role="group" aria-label="Handoff">
+      <h3>{props.handoff.label}</h3>
       <p class="quiet">{props.handoff.url}</p>
       <Show when={problem()}>
         {(message) => (
@@ -188,11 +188,7 @@ export function Handoff(props: {
                     </div>
                   </Show>
                   <div class="row">
-                    <button
-                      type="button"
-                      class="quiet"
-                      onClick={() => props.chooseTask(projectId() || null, handoffCapture(current()))}
-                    >
+                    <button type="button" class="quiet" onClick={() => props.chooseTask(handoffCapture(current()))}>
                       Choose another task
                     </button>
                   </div>
@@ -212,6 +208,6 @@ export function Handoff(props: {
           Dismiss
         </button>
       </div>
-    </section>
+    </div>
   )
 }

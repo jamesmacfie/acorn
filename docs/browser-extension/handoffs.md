@@ -1,7 +1,7 @@
 # Handoffs in the browser extension
 
 This page covers how the [browser extension](../browser-extension.md) brings an item from a website
-into an Acorn task: the site buttons, page access, the sidebar's handoff card, and the native
+into an Acorn task: the site buttons, page access, the handoff card on the sidebar's Home view, and the native
 operations behind them. Plugins declare the buttons; [browser handoffs](../plugin-authoring/browser-handoffs.md)
 is their contract. The code is in `apps/extension/src/background/siteButtons.ts`,
 `apps/extension/src/content/siteButtons.ts`, `apps/extension/src/sidebar/Handoff.tsx`, and
@@ -18,7 +18,7 @@ For each tab whose address matches a handoff, the background injects `content.js
 buttons to draw. The browser reports a tab's address only when the extension may read the tab, so a
 tab gets buttons only on:
 
-- **A granted site.** The sidebar's **Site access** card lists each site its handoffs and project
+- **A granted site.** **Site access** in the sidebar's Settings lists each site its handoffs and project
   associations are on, what access is for there (buttons on its pages, handoffs in the sidebar, or
   [project suggestions](./project-sites.md)), and **Allow** or **Remove**. **Allow** calls
   `permissions.request` from the person's click, as the browser requires.
@@ -46,14 +46,15 @@ Chrome opens its side panel from the click. Firefox doesn't: `sidebarAction.open
 action on the extension's own UI, and a message from a page isn't one. In Firefox the handoff waits
 until the person opens the sidebar. A sidebar that is already open gets it at once.
 
-The sidebar also offers each handoff that matches the page beside it, as a button over the Node's
-project list. That is the same action for a site whose layout has no anchor, for a handoff that
+The sidebar also offers each handoff that matches the page beside it, as a button in Home's **This
+page** section. That is the same action for a site whose layout has no anchor, for a handoff that
 declares no anchors, such as Linear's and Rollbar's, and for Firefox. The sidebar reads the page again when the tab
 finishes loading, so the offer goes when the tab moves to a page it may not read.
 
 ## The handoff card
 
-The card resolves the page through `handoff.resolve` and shows what came back:
+The card shows in Home's **This page** section, which a handoff brings forward from Settings or an
+open conversation. It resolves the page through `handoff.resolve` and shows what came back:
 
 1. Several items, such as one per connection, mean a choice. Nothing picks the first.
 2. **Linked tasks** lists the active tasks that already hold the item. **Open** opens that task's
@@ -63,8 +64,8 @@ The card resolves the page through `handoff.resolve` and shows what came back:
    [site associations](./project-sites.md#handoffs) cover the page, unless the item carries a pull
    number. A repeated create, with the same key or after the task
    exists, answers the existing task.
-4. **Choose another task** leaves the choice to the ordinary project, task, and conversation pickers.
-   Choosing a task this way adds no link to it.
+4. **Choose another task** opens the task search in Settings. Choosing a task there makes it the
+   current task, and adds no link to it.
 
 Whichever conversation the person opens next gets the item's context in its draft, as an **Item**
 capture beside any links, selections, and screenshots. The same item handed off twice is one

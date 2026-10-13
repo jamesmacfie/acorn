@@ -48,8 +48,8 @@ export function Pairing(props: { client: BridgeClient; onPaired(node: NodeRecord
   }
 
   return (
-    <section class="card" aria-label="Pair a Node">
-      <h2>Pair a Node</h2>
+    <div class="pairing" role="group" aria-label="Pair a Node">
+      <h3>Pair a Node</h3>
       <form onSubmit={check}>
         <label>
           Node address
@@ -130,6 +130,6 @@ export function Pairing(props: { client: BridgeClient; onPaired(node: NodeRecord
           {error()}
         </p>
       </Show>
-    </section>
+    </div>
   )
 }

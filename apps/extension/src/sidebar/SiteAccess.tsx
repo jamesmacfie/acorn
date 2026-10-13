@@ -2,7 +2,7 @@ import { For, Show, createResource, onCleanup, onMount } from 'solid-js'
 import type { BridgeHandoff } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite } from '@acorn/protocol/siteAssociations.ts'
 import type { BrowserApi } from '../browser'
-import { pageHandoffs, siteAccess, type PageHandoff } from '../handoffs'
+import { siteAccess } from '../handoffs'
 
 type SiteUse = 'buttons' | 'sidebar' | 'projects'
 const USE_LABELS: Record<SiteUse, string> = {
@@ -16,18 +16,13 @@ const USE_LABELS: Record<SiteUse, string> = {
 const associationAccess = (site: ProjectSite): string =>
   `${new URL(site.origin).protocol}//${new URL(site.origin).hostname}/*`
 
-// The sidebar's side of site buttons: the same handoffs for the page showing beside it, which works
-// when a site's layout has no anchor for the button, and the per-site access that lets the extension
-// read a site's pages at all, for buttons, sidebar handoffs, or project suggestions.
-// docs/browser-extension/handoffs.md.
+// The per-site access that lets the extension read a site's pages at all, for buttons, sidebar
+// handoffs, or project suggestions. docs/browser-extension/handoffs.md.
 export function SiteAccess(props: {
   api: BrowserApi
   handoffs: readonly BridgeHandoff[]
   sites: readonly ProjectSite[]
-  pageUrl: string | undefined
-  start(handoff: PageHandoff): void
 }) {
-  const offers = () => pageHandoffs(props.handoffs, props.pageUrl)
   // Each site this Node's handoffs or project associations are on, with what access to it is for.
   const sites = () => {
     const uses = new Map<string, Set<SiteUse>>()
@@ -67,33 +62,13 @@ export function SiteAccess(props: {
 
   return (
     <Show when={sites().length}>
-      <section class="card" aria-label="Site access">
-        <For each={offers()}>
-          {(handoff) => (
-            <div class="row">
-              <button
-                type="button"
-                onClick={() =>
-                  props.start({
-                    pluginId: handoff.pluginId,
-                    handoffId: handoff.id,
-                    label: handoff.label,
-                    url: props.pageUrl!,
-                  })
-                }
-              >
-                {handoff.label}
-              </button>
-              <span class="quiet">this page</span>
-            </div>
-          )}
-        </For>
+      <section aria-label="Site access">
         <h2>Site access</h2>
-        <ul>
+        <ul class="rows">
           <For each={sites()}>
             {(site) => (
               <li>
-                <div>
+                <div class="grow">
                   <strong>{siteName(site.pattern)}</strong>
                   <span class="quiet">
                     {site.uses}

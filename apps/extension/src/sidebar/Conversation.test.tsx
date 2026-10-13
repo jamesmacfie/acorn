@@ -8,6 +8,7 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
+import { back, button, conversationTitle, openChat, pick, useTask } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -122,6 +123,23 @@ function node() {
         const { sessionId: _, ...result } = row
         return { result: { nodeId: 'n1', sessionId: request.sessionId, request: result } }
       }
+      case 'requests.pending':
+        return {
+          result: {
+            nodeId: 'n1',
+            requests: state.agentRequests
+              .filter((row) => row.status === 'pending')
+              .map((row) => ({
+                requestId: row.requestId,
+                sessionId: row.sessionId,
+                taskId: 't1',
+                projectId: 'p1',
+                kind: row.kind,
+                title: row.title,
+                taskTitle: 'Fix it',
+              })),
+          },
+        }
       case 'agents.profiles':
         return {
           result: {
@@ -219,22 +237,20 @@ const type = (root: HTMLElement, value: string) => {
 }
 const send = (root: HTMLElement) =>
   root
-    .querySelector('section[aria-label="Conversation"] form')!
+    .querySelector('[aria-label="Conversation"] form.composer')!
     .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-const button = (root: HTMLElement, text: string) =>
-  [...root.querySelectorAll('button')].find((element) => element.textContent?.trim() === text)
 const transcript = (root: HTMLElement) => [...root.querySelectorAll('.transcript li')].map((item) => item.textContent)
 const draft = (root: HTMLElement) => root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')?.value
 
 async function openSession(root: HTMLElement, sessionId = 's1') {
   await settle()
-  choose(root, 'project', 'p1')
-  await settle()
-  choose(root, 'task', 't1')
-  await settle()
-  choose(root, 'session', sessionId)
-  await settle()
+  await pick(root, 'project', 'p1')
+  await useTask(root, 'Fix it')
+  await openChat(root, `Chat ${sessionId}`)
 }
+// The conversation's own reads, apart from the short ones Home makes for each row's last line.
+const windowReads = (requests: Request[]) =>
+  requests.filter((request) => request.op === 'session.read' && request.limit === 200)
 
 describe('conversation', () => {
   it('shows the conversation, and reads on from its end when a hint names it', async () => {
@@ -242,15 +258,15 @@ describe('conversation', () => {
     subject.say('s1', 'Hello from the desktop', 'user_message')
     subject.say('s1', 'Hi')
     await openSession(subject.root)
-    expect(subject.root.querySelector('[data-testid="destination"]')!.textContent).toContain(
-      'Studio › Acorn › Fix it › Chat s1',
-    )
+    // Where a message goes: the task, then the conversation.
+    expect(subject.root.querySelector('[aria-label="Conversation"] .view-head')!.textContent).toContain('Fix it')
+    expect(conversationTitle(subject.root)).toBe('Claude · Chat s1')
     expect(transcript(subject.root)).toEqual(['YouHello from the desktop', 'AgentHi'])
 
     subject.say('s1', 'A reply another client caused')
     subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1'], tasks: [], missed: false })
     await settle()
-    const reads = subject.state.requests.filter((request) => request.op === 'session.read')
+    const reads = windowReads(subject.state.requests)
     expect(reads.map((request) => request.afterSeq)).toEqual([0, 2])
     expect(transcript(subject.root)).toEqual([
       'YouHello from the desktop',
@@ -266,7 +282,7 @@ describe('conversation', () => {
     await settle()
     const root = subject.reopen()
     await settle(20)
-    expect((root.querySelector('select[name="session"]') as HTMLSelectElement).value).toBe('s1')
+    expect(conversationTitle(root)).toBe('Claude · Chat s1')
     expect(draft(root)).toBe('Half a thought')
   })
 
@@ -275,23 +291,19 @@ describe('conversation', () => {
     subject.say('s1', 'Only in s1')
     await openSession(subject.root)
     type(subject.root, 'For s1')
-    choose(subject.root, 'session', '')
-    await settle()
+    await back(subject.root)
     // Open s1 again, but leave for s2 before its read answers.
     let slow!: () => void
     subject.state.holds.set('session.read', (answer) => (slow = answer))
-    choose(subject.root, 'session', 's1')
-    await settle()
+    await openChat(subject.root, 'Chat s1')
     subject.state.holds.delete('session.read')
-    choose(subject.root, 'session', 's2')
-    await settle()
+    await openChat(subject.root, 'Chat s2')
     slow()
     await settle()
-    expect(subject.root.querySelector('[data-testid="destination"]')!.textContent).toContain('Chat s2')
+    expect(conversationTitle(subject.root)).toBe('Claude · Chat s2')
     expect(transcript(subject.root)).toEqual([])
     expect(draft(subject.root)).toBe('')
-    choose(subject.root, 'session', 's1')
-    await settle()
+    await openChat(subject.root, 'Chat s1')
     expect(transcript(subject.root)).toEqual(['AgentOnly in s1'])
     expect(draft(subject.root)).toBe('For s1')
   })
@@ -331,16 +343,14 @@ describe('conversation', () => {
     send(subject.root)
     await settle()
     subject.state.holds.delete('turn.submit')
-    choose(subject.root, 'session', 's2')
-    await settle()
+    await openChat(subject.root, 'Chat s2')
     type(subject.root, 'Typed in s2')
     release()
     await settle()
     expect(subject.state.requests.find((request) => request.op === 'turn.submit')).toMatchObject({ sessionId: 's1' })
     expect(draft(subject.root)).toBe('Typed in s2')
     expect(subject.fake.storage.get('draft:n1:t1:s1')).toBeUndefined()
-    choose(subject.root, 'session', 's1')
-    await settle()
+    await openChat(subject.root, 'Chat s1')
     expect(draft(subject.root)).toBe('')
     expect(transcript(subject.root)).toEqual(['YouFor s1 only'])
   })
@@ -380,6 +390,7 @@ describe('conversation', () => {
   it('starts a chat with an installed profile and names the ones that cannot start', async () => {
     const subject = mount()
     await openSession(subject.root)
+    await back(subject.root)
     button(subject.root, 'New chat')!.click()
     await settle()
     const options = [...subject.root.querySelectorAll('select[name="profile"] option')] as HTMLOptionElement[]
@@ -400,8 +411,69 @@ describe('conversation', () => {
       ['claude', 'claude-code'],
     ])
     expect(new Set(creates.map((request) => request.key)).size).toBe(1)
-    expect((subject.root.querySelector('select[name="session"]') as HTMLSelectElement).value).toBe('s3')
-    expect(subject.root.querySelector('[data-testid="destination"]')!.textContent).toContain('New chat')
+    expect(conversationTitle(subject.root)).toBe('Claude · New chat')
+  })
+})
+
+describe('home', () => {
+  const rows = (root: HTMLElement) =>
+    [...root.querySelectorAll('[aria-label="Agents"] .row-button')].map((row) =>
+      [...row.querySelectorAll('strong, .state, .quiet')].map((part) => part.textContent),
+    )
+
+  it("lists the current task's conversations with their state and last line, and goes back from one", async () => {
+    const subject = mount()
+    subject.say('s1', 'Line one\nEdited the totals')
+    subject.state.sessions[1]!.runtimeState = 'working'
+    await settle()
+    await pick(subject.root, 'project', 'p1')
+    await useTask(subject.root, 'Fix it')
+    expect(subject.root.querySelector('[aria-label="Current task"]')!.textContent).toContain('Fix it')
+    expect(rows(subject.root)).toEqual([
+      ['Claude · Chat s1', 'Ready', 'Edited the totals'],
+      ['Claude · Chat s2', 'Working'],
+    ])
+
+    await openChat(subject.root, 'Chat s1')
+    expect(subject.root.querySelector('[aria-label="Home"]')).toBeNull()
+    await back(subject.root)
+    expect(subject.root.querySelector('[aria-label="Conversation"]')).toBeNull()
+    expect(subject.fake.storage.get('destination:n1')).toEqual({ projectId: 'p1', taskId: 't1', sessionId: null })
+
+    // A row reads its last line again only once its conversation moves on.
+    const tails = () =>
+      subject.state.requests.filter((request) => request.op === 'session.read' && request.limit === 20)
+    const before = tails().length
+    subject.say('s1', 'Ran the tests')
+    subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1'], tasks: [], missed: false })
+    await settle()
+    expect(tails().length).toBe(before + 1)
+    expect(rows(subject.root)[0]).toEqual(['Claude · Chat s1', 'Ready', 'Ran the tests'])
+  })
+
+  it('answers a waiting request on Home with the buttons the conversation uses', async () => {
+    const subject = mount()
+    // The background reads what waits as the Node is selected.
+    subject.state.agentRequests.push(permission())
+    await settle(20)
+    const waiting = () => subject.root.querySelector<HTMLElement>('[aria-label="Waiting for you"]')
+    expect(waiting()!.textContent).toContain('Run rm -rf build')
+    expect(waiting()!.textContent).toContain('Fix it')
+    button(waiting()!, 'Allow')!.click()
+    await settle(20)
+    expect([...subject.state.resolutions.values()]).toEqual([{ optionId: 'allow_once' }])
+    subject.state.host!.send({
+      v: 1,
+      event: 'agent',
+      nodeId: 'n1',
+      sessions: ['s1'],
+      tasks: [],
+      missed: false,
+      requests: true,
+    })
+    await settle(20)
+    // Nothing waits any more, so the section goes.
+    expect(waiting()).toBeNull()
   })
 })
 
@@ -572,16 +644,14 @@ describe('questions and approvals', () => {
     button(subject.root, 'Allow')!.click()
     await settle()
     subject.state.holds.delete('request.resolve')
-    choose(subject.root, 'session', 's2')
-    await settle()
+    await openChat(subject.root, 'Chat s2')
     release()
     await settle()
     expect(resolves(subject)).toMatchObject([{ sessionId: 's1', requestId: 'r1' }])
     expect(card(subject.root)).toBeNull()
     expect(subject.state.resolutions.size).toBe(1)
     // Back in s1, the request settled while it wasn't shown, so it is history, not a card.
-    choose(subject.root, 'session', 's1')
-    await settle()
+    await openChat(subject.root, 'Chat s1')
     expect(card(subject.root)).toBeNull()
   })
 
@@ -638,13 +708,13 @@ describe('page capture', () => {
     await capture(subject.root, 'Add selected text')
     await capture(subject.root, 'Add screenshot')
     expect(captures(subject.root)).toEqual(['Page · Docs', 'Selected text · Docs', 'Screenshot · Docs'])
-    expect(subject.root.textContent).toContain('Goes with your next message to Studio › Acorn › Fix it › Chat s1')
+    expect(subject.root.textContent).toContain('Goes to Chat s1 in Fix it')
     expect(subject.root.querySelector('[data-testid="capture"] img')!.getAttribute('src')).toMatch(/^data:image\/jpeg/)
     // Capture and preview send nothing to the Node.
     expect(written(subject, 'attachment.upload')).toEqual([])
     expect(written(subject, 'turn.submit')).toEqual([])
 
-    button(subject.root, 'Remove')!.click()
+    button(subject.root, 'Remove Page: Docs')!.click()
     await settle()
     const root = subject.reopen()
     await settle(20)
@@ -766,7 +836,7 @@ describe('page capture', () => {
     subject.state.answers.set('turn.submit', () => ({ error: { code: 'node_error', message: 'Refused.' } }))
     send(subject.root)
     await settle()
-    button(subject.root, 'Remove')!.click()
+    button(subject.root, 'Remove Screenshot: Docs')!.click()
     await settle()
     expect(written(subject, 'attachment.delete')).toMatchObject([{ taskId: 't1', attachmentId: 'att-1' }])
     expect(subject.fake.storage.has('captures:n1:t1:s1')).toBe(false)
@@ -781,8 +851,7 @@ describe('page capture', () => {
     send(subject.root)
     await settle()
     subject.state.holds.delete('attachment.upload')
-    choose(subject.root, 'session', 's2')
-    await settle()
+    await openChat(subject.root, 'Chat s2')
     expect(captures(subject.root)).toEqual([])
     release()
     await settle()
@@ -798,8 +867,7 @@ describe('page capture', () => {
     subject.fake.onCapture = () => new Promise((resolve) => (finish = resolve))
     button(subject.root, 'Add screenshot')!.click()
     await settle()
-    choose(subject.root, 'session', 's2')
-    await settle()
+    await openChat(subject.root, 'Chat s2')
     finish('data:image/jpeg;base64,/9j/4AAQ')
     await settle()
     expect(captures(subject.root)).toEqual([])
@@ -841,8 +909,7 @@ describe('page capture', () => {
     expect(written(subject, 'attachment.read')).toMatchObject([{ taskId: 't1', attachmentId: 'a1' }])
     expect(subject.root.querySelector('.transcript img')!.getAttribute('src')).toBe('blob:shot-1')
     expect(transcript(subject.root)).toEqual(['YouLookAttachment'])
-    choose(subject.root, 'session', 's2')
-    await settle()
+    await openChat(subject.root, 'Chat s2')
     expect(revoked).toEqual(['blob:shot-1'])
   })
 })

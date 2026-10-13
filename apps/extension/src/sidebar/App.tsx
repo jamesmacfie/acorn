@@ -1,4 +1,4 @@
-import { For, Show, createSignal, onMount } from 'solid-js'
+import { Show, createSignal, onMount } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type {
   BridgeAgentHint,
@@ -12,11 +12,11 @@ import type { PageHandoff } from '../handoffs'
 import { CallFailure, type CallError, type HostState, type RequestTarget } from '../messages'
 import { activePageUrl } from './activePage'
 import { bridgeClient } from './bridgeClient'
-import { capturePage } from './capture'
+import { capturePage, type PageCapture } from './capture'
 import { errorGuidance, hostGuidance, statusGuidance } from './guidance'
-import { Destination } from './Destination'
-import { Pairing } from './Pairing'
-import { SiteAccess } from './SiteAccess'
+import { Header } from './Header'
+import { Settings } from './Settings'
+import { Workspace } from './Workspace'
 
 // Online, or online with live updates paused: either way the Node answers requests.
 const connected = (status: NodeStatus | null) => status?.state === 'online' || status?.state === 'degraded'
@@ -48,6 +48,10 @@ export function App(props: { api: BrowserApi }) {
     requests: [],
   })
   const [openRequest, setOpenRequest] = createSignal<RequestTarget | null>(null)
+  // A handed-off item's context, kept here so it outlives a visit to Settings' task search.
+  const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
+  // Settings replaces Home or the open conversation, which restores from storage when it closes.
+  const [settings, setSettings] = createSignal(false)
 
   const showStatus = (next: NodeStatus | null) => {
     const wasUp = connected(status())
@@ -59,7 +63,10 @@ export function App(props: { api: BrowserApi }) {
     // Only the selected Node's status matters, and only while it is still selected.
     status: (next) => next.nodeId === fleet()?.activeNodeId && showStatus(next),
     agents: (next) => next.nodeId === fleet()?.activeNodeId && setHint(next),
-    handoff: setHandoff,
+    handoff: (next) => {
+      setHandoff(next)
+      setSettings(false)
+    },
     handoffsChanged: (nodeId) => nodeId === fleet()?.activeNodeId && void loadHandoffs(nodeId),
     projectsChanged: (nodeId) => {
       if (nodeId !== fleet()?.activeNodeId) return
@@ -68,7 +75,10 @@ export function App(props: { api: BrowserApi }) {
     },
     page: () => setPageChecks((count) => count + 1),
     requests: (nodeId, list) => setRequests({ nodeId, requests: list }),
-    open: setOpenRequest,
+    open: (target) => {
+      setOpenRequest(target)
+      setSettings(false)
+    },
   })
   const selected = () => fleet()?.nodes.find((node) => node.nodeId === fleet()?.activeNodeId) ?? null
   const online = () => host().state === 'connected' && connected(status())
@@ -116,6 +126,7 @@ export function App(props: { api: BrowserApi }) {
     // A handoff belongs to the Node it was asked of, as the page buttons do.
     setHandoffs([])
     setHandoff(null)
+    setWaitingContext(null)
     setSites([])
     if (next.activeNodeId) {
       void loadHandoffs(next.activeNodeId)
@@ -130,122 +141,109 @@ export function App(props: { api: BrowserApi }) {
   onMount(() => void refresh())
   return (
     <main>
-      <header>
-        <h1>Acorn</h1>
-      </header>
+      <Header
+        fleet={fleet()}
+        status={status()}
+        settingsOpen={settings()}
+        select={(nodeId) => void select(nodeId)}
+        toggleSettings={() => setSettings((open) => !open)}
+      />
+      {/* One line for anything wrong with the bridge or the Node, with the next step. */}
       <Show when={hostGuidance(host())}>
         {(guidance) => (
-          <section class="card problem" role="alert">
-            <p>{guidance()}</p>
+          <div class="banner problem row" role="alert">
+            <span class="grow">{guidance()}</span>
             <button type="button" onClick={() => void refresh()}>
               Retry
             </button>
-          </section>
+          </div>
         )}
       </Show>
-      <Show when={host().restoreError}>{(message) => <p class="notice">{message()}</p>}</Show>
+      <Show when={host().restoreError}>{(message) => <p class="banner notice">{message()}</p>}</Show>
       <Show when={problem()}>
         {(error) => (
-          <p class="problem" role="alert">
+          <p class="banner problem" role="alert">
             {errorGuidance(error())}
           </p>
         )}
       </Show>
-
-      <section class="card" aria-label="Nodes">
-        <h2>Nodes</h2>
-        <Show
-          when={fleet()?.nodes.length}
-          fallback={
-            <p class="quiet">
-              {/* Pairings live in the bridge, so until it answers the sidebar can't say there are none. */}
-              {fleet() ? 'No Node is paired with this browser yet.' : 'The paired Nodes show once the bridge answers.'}
-            </p>
-          }
-        >
-          <ul class="nodes">
-            <For each={fleet()?.nodes}>
-              {(node) => (
-                <li classList={{ active: node.nodeId === fleet()?.activeNodeId }}>
-                  <div>
-                    <strong>{node.label}</strong>
-                    <span class="quiet">{node.endpoint}</span>
-                  </div>
-                  <div class="row">
-                    <Show
-                      when={node.nodeId === fleet()?.activeNodeId}
-                      fallback={
-                        <button type="button" onClick={() => void select(node.nodeId)}>
-                          Use
-                        </button>
-                      }
-                    >
-                      <span class="badge">Selected</span>
-                    </Show>
-                    <button type="button" class="quiet" onClick={() => void forget(node.nodeId)}>
-                      Forget
-                    </button>
-                  </div>
-                </li>
-              )}
-            </For>
-          </ul>
-        </Show>
-        <Show when={!pairing()}>
-          <button type="button" onClick={() => setPairing(true)}>
-            Pair a Node
+      <Show when={selected() && statusGuidance(status()).detail}>
+        {(detail) => (
+          <p class="banner problem" data-testid="node-status">
+            {detail()}
+          </p>
+        )}
+      </Show>
+      <Show when={fleet() && !fleet()!.activeNodeId && !settings()}>
+        <div class="banner notice row">
+          <span class="grow">
+            {fleet()!.nodes.length ? 'Choose a Node to work with.' : 'No Node is paired with this browser yet.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setPairing(!fleet()!.nodes.length)
+              setSettings(true)
+            }}
+          >
+            {fleet()!.nodes.length ? 'Choose a Node' : 'Pair a Node'}
           </button>
-        </Show>
-      </section>
+        </div>
+      </Show>
 
-      <Show when={pairing()}>
-        <Pairing
+      <Show
+        when={settings()}
+        fallback={
+          <Show when={fleet()?.activeNodeId} keyed>
+            {(nodeId) => (
+              <Workspace
+                client={client}
+                storage={props.api.storage.local}
+                nodeId={nodeId}
+                online={online()}
+                hint={hint()}
+                reconnects={reconnects()}
+                projectChanges={projectChanges()}
+                capture={(kind) => capturePage(props.api, kind)}
+                pageUrl={pageUrl()}
+                handoffs={handoffs()}
+                sites={sites()}
+                handoff={handoff()}
+                startHandoff={setHandoff}
+                dismissHandoff={() => setHandoff(null)}
+                waitingContext={waitingContext()}
+                setWaitingContext={setWaitingContext}
+                findTask={() => setSettings(true)}
+                requests={requests().nodeId === nodeId ? requests().requests : []}
+                openRequest={openRequest()}
+                openedRequest={() => setOpenRequest(null)}
+              />
+            )}
+          </Show>
+        }
+      >
+        <Settings
+          api={props.api}
           client={client}
-          onCancel={() => setPairing(false)}
-          onPaired={(node) => {
+          fleet={fleet()}
+          online={online()}
+          pairing={pairing()}
+          setPairing={setPairing}
+          paired={(node) => {
             setPairing(false)
             void select(node.nodeId)
           }}
+          select={(nodeId) => void select(nodeId)}
+          forget={(nodeId) => void forget(nodeId)}
+          handoffs={handoffs()}
+          sites={sites()}
+          pageUrl={pageUrl()}
+          sitesChanged={(projectId, changed) => {
+            const nodeId = fleet()?.activeNodeId
+            if (nodeId) sitesChanged(nodeId, projectId, changed)
+          }}
+          close={() => setSettings(false)}
         />
-      </Show>
-
-      <Show when={selected()}>
-        {(node) => (
-          <section class="card" aria-label="Selected Node">
-            <h2>{node().label}</h2>
-            <p class="status" data-testid="node-status">
-              {statusGuidance(status()).label}
-              <Show when={statusGuidance(status()).detail}>{(detail) => <span> · {detail()}</span>}</Show>
-            </p>
-          </section>
-        )}
-      </Show>
-      <Show when={fleet()?.activeNodeId}>
-        <SiteAccess api={props.api} handoffs={handoffs()} sites={sites()} pageUrl={pageUrl()} start={setHandoff} />
-      </Show>
-      <Show when={fleet()?.activeNodeId} keyed>
-        {(nodeId) => (
-          <Destination
-            client={client}
-            storage={props.api.storage.local}
-            nodeId={nodeId}
-            nodeLabel={selected()?.label ?? nodeId}
-            online={online()}
-            hint={hint()}
-            reconnects={reconnects()}
-            projectChanges={projectChanges()}
-            capture={(kind) => capturePage(props.api, kind)}
-            handoff={handoff()}
-            dismissHandoff={() => setHandoff(null)}
-            pageUrl={pageUrl()}
-            sites={sites()}
-            sitesChanged={(projectId, changed) => sitesChanged(nodeId, projectId, changed)}
-            permissions={props.api.permissions}
-            requests={requests().nodeId === nodeId ? requests().requests : []}
-            openRequest={openRequest()}
-            openedRequest={() => setOpenRequest(null)}
-          />
-        )}
       </Show>
     </main>
   )

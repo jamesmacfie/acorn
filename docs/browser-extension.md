@@ -7,7 +7,8 @@ Read it before you change the extension, the bridge, or an operation between the
 Topic pages:
 
 - [Set up and troubleshoot](./browser-extension/setup.md): install the bridge and the development
-  builds, pair, repair or remove them, and what each sidebar state means.
+  builds, pair, repair or remove them, the panel's views and appearance, and what each sidebar state
+  means.
 - [Agent conversations](./browser-extension/conversations.md): the agent operations, change hints,
   the conversation window, send retries, and browser storage.
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
@@ -23,8 +24,10 @@ Topic pages:
 
 Three pieces carry a request from the sidebar to a Node:
 
-1. The extension, `apps/extension/`. Its sidebar page (`src/sidebar/`) draws pairing, the Node list,
-   and a chosen task's agent conversation. Its background (`src/background/`) owns the one native port. Chrome runs the
+1. The extension, `apps/extension/`. Its sidebar page (`src/sidebar/`) has three views: Home, about
+   the page beside it and the current task, a conversation that opens over Home, and Settings, behind
+   the gear, for Nodes, pairing, and site access ([the panel's views](./browser-extension/setup.md#the-panels-views)).
+   Its background (`src/background/`) owns the one native port. Chrome runs the
    background as a module service worker and shows the page in its side panel. Firefox runs it as a
    background script and shows the page in its sidebar. `src/browser.ts` types the slice of the
    extension API both use.
