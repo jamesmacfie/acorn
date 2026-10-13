@@ -287,6 +287,92 @@ describe('plugin reload', () => {
   })
 })
 
+// Installing, uninstalling and toggling a loaded plugin without a restart. The same candidate-then-commit
+// path a reload takes, with no previous instance on the way in and no next one on the way out.
+describe('starting and stopping a loaded plugin without a restart', () => {
+  const row = (host: { roster: readonly { name: string }[] }) => host.roster.find((entry) => entry.name === PLUGIN)
+
+  it('starts a plugin this process never loaded, as an install does', async () => {
+    const host = await initPlugins([], { ...hostOptions(), loaded: new Map() })
+    expect((await request(`/v1/p/${PLUGIN}`)).status).toBe(404)
+
+    expect(await host.reload(PLUGIN, { plugin: acme('installed').plugin, binding })).toEqual({ ok: true })
+
+    expect(await (await request(`/v1/p/${PLUGIN}`)).text()).toBe('installed')
+    expect(toolDescriptions()).toEqual(['installed'])
+    expect(row(host)).toMatchObject({ state: 'active', disabled: false, required: false })
+    await host.dispose()
+  })
+
+  it('reports a first start that throws on a new roster row, and starts once fixed', async () => {
+    const host = await initPlugins([], { ...hostOptions(), loaded: new Map() })
+    const broken = { name: PLUGIN, init: () => Promise.reject(new Error('cannot start')) }
+
+    expect(await host.reload(PLUGIN, { plugin: broken, binding })).toMatchObject({ ok: false, error: 'cannot start' })
+    expect(row(host)).toMatchObject({ state: 'failed', reason: 'cannot start' })
+    expect((await request(`/v1/p/${PLUGIN}`)).status).toBe(404)
+
+    expect(await host.reload(PLUGIN, { plugin: acme('fixed').plugin, binding })).toEqual({ ok: true })
+    expect(row(host)).toMatchObject({ state: 'active' })
+    expect(host.roster.filter((entry) => entry.name === PLUGIN)).toHaveLength(1)
+    await host.dispose()
+  })
+
+  it('stops a removed plugin: routes, tools, context and roster row all go', async () => {
+    const first = acme('v1')
+    const disposed = vi.fn()
+    const host = await initPlugins([{ ...first.plugin, dispose: disposed }], hostOptions())
+
+    expect(await host.unload(PLUGIN, 'removed')).toEqual({ ok: true })
+
+    expect(disposed).toHaveBeenCalledOnce()
+    expect((await request(`/v1/p/${PLUGIN}`)).status).toBe(404)
+    expect(toolDescriptions()).toEqual([])
+    expect(() => first.context().routes.fetch(() => new Response())).toThrow()
+    expect(row(host)).toBeUndefined()
+    // Shutdown must not dispose it a second time.
+    await host.dispose()
+    expect(disposed).toHaveBeenCalledOnce()
+  })
+
+  it('turns a plugin off and back on in place', async () => {
+    const host = await initPlugins([acme('v1').plugin], hostOptions())
+
+    await host.unload(PLUGIN, 'disabled')
+    expect(row(host)).toMatchObject({ state: 'disabled', disabled: true })
+    expect((await request(`/v1/p/${PLUGIN}`)).status).toBe(404)
+
+    expect(await host.reload(PLUGIN, { plugin: acme('v1 again').plugin, binding })).toEqual({ ok: true })
+    expect(row(host)).toMatchObject({ state: 'active', disabled: false })
+    expect(await (await request(`/v1/p/${PLUGIN}`)).text()).toBe('v1 again')
+    await host.dispose()
+  })
+
+  it('starts a plugin that was turned off at boot', async () => {
+    const host = await initPlugins([acme('v1').plugin], { ...hostOptions(), disabled: [PLUGIN] })
+    expect(row(host)).toMatchObject({ state: 'disabled' })
+
+    expect(await host.reload(PLUGIN, { plugin: acme('on').plugin, binding })).toEqual({ ok: true })
+    expect(await (await request(`/v1/p/${PLUGIN}`)).text()).toBe('on')
+    await host.dispose()
+  })
+
+  it('refuses to start a plugin the owner turned off, before loading anything', async () => {
+    const host = { reload: vi.fn(), unload: vi.fn() }
+    const { createPluginReloader } = await import('./reload')
+    const reloader = createPluginReloader({ dataDir: '/nowhere', builtins: [], host, isDisabled: () => true })
+    await expect(reloader.reload(PLUGIN)).rejects.toThrow('turned off')
+    expect(host.reload).not.toHaveBeenCalled()
+  })
+
+  it('leaves a built-in alone, which only a restart can stop', async () => {
+    const host = await initPlugins([acme('v1').plugin], { ...hostOptions(), loaded: new Map() })
+    expect(await host.unload(PLUGIN, 'disabled')).toMatchObject({ ok: false })
+    expect(await (await request(`/v1/p/${PLUGIN}`)).text()).toBe('v1')
+    await host.dispose()
+  })
+})
+
 // Boot and reload must build the same binding. A reload binding with no data sources would make a
 // reloaded derived source vanish from the catalog until the next restart.
 describe('a folder plugin through the loader, the host, and the reloader', () => {
@@ -343,7 +429,7 @@ describe('a folder plugin through the loader, the host, and the reloader', () =>
       )
       const ref = { pluginId: 'folder-fixture', sourceId: 'board' }
       expect(registeredDataSource(ref)).toBeDefined()
-      const reloader = createPluginReloader({ dataDir: root, builtins: [], host })
+      const reloader = createPluginReloader({ dataDir: root, builtins: [], host, isDisabled: () => false })
       expect(await reloader.reload('folder-fixture')).toMatchObject({ state: 'reloaded' })
       expect(registeredDataSources().map((entry) => entry.pluginId)).toContain('folder-fixture')
       await host.dispose()

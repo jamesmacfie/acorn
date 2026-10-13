@@ -11,8 +11,8 @@ export type BreadcrumbInput = {
   projectRoute: (id: string) => string
 }
 
-/** The topbar's trail. Picking a rail source keeps the URL, so a source that ignores the routed
- *  project would otherwise be titled with whatever project and pull request were open before it. */
+/** The topbar's trail. A rail source opens on the project's page when it doesn't own the URL
+ *  (`sourceOpeningPath`), so a source that ignores the routed project would otherwise be titled with it. */
 export function topbarBreadcrumb(input: BreadcrumbInput): Crumb[] {
   // A crumb links only to somewhere else. The one naming the page you are on is plain text.
   const routeUnlessHere = (route: string) => (route === input.pathname ? undefined : route)

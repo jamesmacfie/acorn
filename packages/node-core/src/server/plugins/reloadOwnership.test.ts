@@ -33,7 +33,9 @@ const serving = async () =>
 afterEach(() => clearRegistrations(name))
 
 describe('rejected loaded candidate ownership', () => {
-  it.each(['unknown', 'disabled', 'init', 'replay', 'ready', 'success'] as const)(
+  // No 'disabled' stage: whether the owner turned a plugin off is the reloader's check, made before any
+  // realm exists (reload.test.ts § starting and stopping a loaded plugin without a restart).
+  it.each(['unknown', 'init', 'replay', 'ready', 'success'] as const)(
     'closes the owned realm on %s and disposes the committed realm once',
     async (stage) => {
       const root = mkdtempSync(join(tmpdir(), 'acorn-reload-owner-'))
@@ -58,7 +60,6 @@ describe('rejected loaded candidate ownership', () => {
         core: {} as never,
         dataDir: root,
         loaded: stage === 'unknown' ? new Map() : new Map([[name, binding]]),
-        disabled: stage === 'disabled' ? [name] : [],
       })
       let candidate: NodePlugin | undefined
       try {
@@ -110,7 +111,7 @@ describe('rejected loaded candidate ownership', () => {
             db.close()
           }
         }
-        if (stage !== 'disabled') expect(oldDispose).toHaveBeenCalledTimes(1)
+        expect(oldDispose).toHaveBeenCalledTimes(1)
       } finally {
         await candidate?.dispose?.()
         await host.dispose()

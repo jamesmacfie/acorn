@@ -220,14 +220,20 @@ export type PluginInstallSource =
   | { url: string }
   | { path: string }
 
-// Always restart-required: a plugin's routes, tables and jobs are wired at init, so nothing an install
-// route does makes the plugin live in the running process.
-export type PluginInstallResult = { id: string; version: string; state: 'installed-restart-required' }
+// What the node did with a package once it was on disk (docs/plugins/loaded-plugins.md § Loaded plugins).
+// - `started`: running now, in this process. A client-only package counts, since it has nothing to start.
+// - `start-failed`: on disk, but its first start threw. `reason` says why; a restart runs the same code.
+// - `held`: waiting on the owner, because it's turned off or its review is open. Nothing ran.
+// - `installed-restart-required`: a disk copy of a plugin compiled into this build, which only a restart
+//   can swap in.
+export type PluginStartState = 'started' | 'start-failed' | 'held' | 'installed-restart-required'
+export type PluginInstallResult = { id: string; version: string; state: PluginStartState; reason?: string }
 export type PluginUpdateResult = {
   id: string
   fromVersion: string
   toVersion: string
-  state: 'installed-restart-required'
+  state: PluginStartState
+  reason?: string
 }
 export type PluginUninstallResult = { restartRequired: boolean; dataPurged: boolean }
 

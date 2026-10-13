@@ -1,15 +1,14 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { useNavigate, useParams } from '@solidjs/router'
+import { useLocation, useNavigate, useParams } from '@solidjs/router'
 import { integrationsOptions, prefsOptions } from '../../infra/queries'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { availableSources } from '../../features/tabs/railSources'
 import { createSourceScope } from '../../features/tabs/sourceScope'
 import { hiddenSourcesToOpen } from '../../features/tabs/railVisibility'
 import { setSelectedSource } from '../../features/tasks/tasks'
-import { sourceIsProjectScoped } from '../registries/sources/sources'
+import { sourceIsProjectScoped, sourceOpeningPath } from '../registries/sources/sources'
 import { registerCommands, type ContributedCommand } from '../registries/commands/commands'
-import { projectPath } from '../registries/commands/corePaths'
 
 // "Open <source>" for every plugin source the desktop rail is not drawing (features/tabs/railVisibility.ts).
 //
@@ -23,6 +22,7 @@ import { projectPath } from '../registries/commands/corePaths'
 
 export function registerHiddenSourceOpeners(workspaceId: () => string | null): void {
   const params = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
   const integrations = createQuery(() => integrationsOptions(true))
   const prefs = createQuery(() => prefsOptions(true))
@@ -54,14 +54,15 @@ export function registerHiddenSourceOpeners(workspaceId: () => string | null): v
         category: 'navigation',
         palette: true,
         scope: 'none',
-        // The rail click's rule (features/tabs/TabRail.tsx § selectSource): a routed project stays, and a
-        // task route moves to the task's project, because a browse source scopes itself to the routed one.
+        // The rail click's rule (features/tabs/TabRail.tsx § selectSource), through the same `sourceOpeningPath`.
         run: (context) => {
-          if (sourceIsProjectScoped(source.id) && !params.projectId && !context.projectId) {
+          const projectId = params.projectId ?? context.projectId ?? undefined
+          if (sourceIsProjectScoped(source.id) && !projectId) {
             throw new Error(`${source.label} shows one project at a time. Open a project first.`)
           }
           setSelectedSource(source.id)
-          if (!params.projectId && context.projectId) navigate(projectPath(context.projectId))
+          const path = sourceOpeningPath(source.id, location.pathname, projectId)
+          if (path) navigate(path)
         },
       })),
     )

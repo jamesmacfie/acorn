@@ -3,6 +3,7 @@ import {
   defaultPaneForTask,
   defaultSourceId,
   sourceIsProjectScoped,
+  sourceOpeningPath,
   sourceRegistry,
   sourceRouteContributions,
   taskPathFromSources,
@@ -216,6 +217,29 @@ describe('the pane a task first opens on', () => {
       expect(defaultPaneForTask(withLinks([{ providerId: 'tracker', identifier: 'ENG-42' }]))).toBeUndefined()
     } finally {
       quiet.dispose()
+    }
+  })
+})
+
+describe('where a source opens', () => {
+  it("keeps the source's own address and moves off another source's", () => {
+    const pulls = sourceRegistry.register({
+      ...source('test.open.pulls', 1),
+      routes: [{ id: 'p', path: '/p/:projectId/pulls/:number', order: 1 }],
+    })
+    const history = sourceRegistry.register({
+      ...source('test.open.history', 2),
+      routes: [{ id: 'h', path: '/p/:projectId/x/history', order: 1 }],
+    })
+    try {
+      expect(sourceOpeningPath('test.open.pulls', '/p/acorn/pulls/12', 'acorn')).toBeUndefined()
+      expect(sourceOpeningPath('test.open.history', '/p/acorn/pulls/12', 'acorn')).toBe('/p/acorn')
+      expect(sourceOpeningPath('test.open.history', '/t/task-1', 'acorn')).toBe('/p/acorn')
+      expect(sourceOpeningPath('test.open.history', '/p/acorn', 'acorn')).toBeUndefined()
+      expect(sourceOpeningPath('test.open.history', '/t/task-1', undefined)).toBeUndefined()
+    } finally {
+      history.dispose()
+      pulls.dispose()
     }
   })
 })

@@ -271,7 +271,10 @@ describe('loading rollbar from disk', () => {
           disabled: () => [],
           setDisabled: () => {},
           // Nothing in this case reloads; the bridge only needs a host to hand the reloader.
-          reloadHost: { reload: () => Promise.reject(new Error('not wired in this test')) },
+          reloadHost: {
+            reload: () => Promise.reject(new Error('not wired in this test')),
+            unload: () => Promise.reject(new Error('not wired in this test')),
+          },
         }),
       )
       const row = state.plugins.find((entry) => entry.name === 'rollbar')

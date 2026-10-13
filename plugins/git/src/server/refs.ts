@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { BridgeError, type CompiledCoreServices, type CoreServices } from '@acorn/plugin-api/node'
 import type { GitRef, RefChange, RefChangeResult, RefRoster, WorktreeOwner } from '../shared/api'
-import { repositoryFor } from './history'
+import { REF_LIST_BYTES, repositoryFor } from './history'
 import { canonicalPath, parseRoster } from './worktreeRoster'
 
 type Core = Pick<CoreServices, 'git' | 'projects' | 'tasks'>
@@ -52,7 +52,7 @@ export async function refRoster(core: Core, projectId: string): Promise<RefRoste
         'refs/remotes',
         'refs/tags',
       ],
-      { cwd: repository, maxOutputBytes: 256 * 1024 },
+      { cwd: repository, maxOutputBytes: REF_LIST_BYTES },
     ),
     core.git.git(['worktree', 'list', '--porcelain', '-z'], { cwd: repository, maxOutputBytes: 1 << 20 }),
     branchOwners(core, repository),

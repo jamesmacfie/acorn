@@ -26,7 +26,7 @@ import type { EnqueueAgentTurnInput } from '../../shared/schemas'
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
 import type { SkillReport } from '../drivers/skillIndex'
 import { AgentMcpServerStore } from '../mcpServerStore'
-import { AgentAccounts, agentAccountsRoot, linkSharedSkills } from '../accounts'
+import { AgentAccounts, agentAccountsRoot, linkSharedSettings, linkSharedSkills } from '../accounts'
 import { sessionAccount } from '../../shared/accounts'
 import type { McpReviewManager } from '../mcpReviewManager'
 import { sessionMcpSelection } from '../../shared/mcpServers'
@@ -644,18 +644,23 @@ export class ManagedAgentEngine {
 
   /** The config folder of the account the session is pinned to, or null for the harness's default
    *  login (docs/managed-agents/accounts.md). Every start and terminal handoff reads it, so this is
-   *  also where the person's own skills are linked in. */
+   *  also where the person's own skills and settings are linked in. */
   async accountHome(session: AgentSession): Promise<string | null> {
     const account = sessionAccount(session.config)
     if (!account) return null
     if (!(await this.accounts.has(session.providerId, account)))
       throw new Error(`This session runs on the '${account}' account, which was removed from this Node.`)
     const home = this.accounts.home(session.providerId, account)
-    const skills = this.registry.create(session.providerId)?.accounts?.skills
-    // A session that starts without the person's skills still works, so a failure here doesn't stop it.
+    const { skills, settings } = this.registry.create(session.providerId)?.accounts ?? {}
+    // A session that starts without the person's skills or settings still works, so a failure here
+    // doesn't stop it.
     if (skills)
       await linkSharedSkills(home, skills).catch((error) =>
         log.warn(`could not link shared skills into account '${account}': ${describeError(error).message}`),
+      )
+    if (settings)
+      await linkSharedSettings(home, settings).catch((error) =>
+        log.warn(`could not link shared settings into account '${account}': ${describeError(error).message}`),
       )
     return home
   }

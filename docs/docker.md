@@ -31,6 +31,11 @@ is a run of `Meter`s, and Terminal is a `Rectangle kind="pty"` wrapping the exec
 is the kit's admission that a PTY owns its own pixels: the node owns the box and the way in and out of
 it with the keyboard, and xterm owns everything inside.
 
+Another plugin can send someone to one container. Its surface declares a `destinations` entry with
+`targetKind: "docker-container"` and calls `bridge.ui.openDestination` with the container's short id.
+The task pane opens on that container (`plugins/docker/src/client/index.ts`). The id selects a chip;
+it grants nothing, and a container the pane doesn't list leaves the selection on the first one.
+
 Two extension points sit on these surfaces. `docker:stats-beside` is a `remote` slot on the Stats tab,
 for a plugin with a graph or a cost estimate to put beside the numbers. `docker:container` is an
 `annotation` point keyed by container id, drawn under the rows of the Source list. See

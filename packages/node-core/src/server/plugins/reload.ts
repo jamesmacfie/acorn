@@ -1,4 +1,6 @@
-// Reloading one loaded plugin's node half in a running process (docs/plugins/dev-loop.md § The dev loop).
+// Reloading one loaded plugin's node half in a running process (docs/plugins/dev-loop.md § The dev loop),
+// and, through the same path, starting or stopping one without a restart: after an install or an update
+// of a plugin that isn't running, after an uninstall, and when the owner turns one on or off.
 //
 // The split with server/pluginHost/host.ts matches the boot path. This half does the disk work: re-scan,
 // start a fresh worker realm with a fresh module graph, re-resolve the manifest's migrations chain. The host owns the
@@ -9,23 +11,29 @@
 import { broadcastPluginsChanged } from '../notify'
 import { loadedPluginBinding, loadExternalPlugins, snapshotActivePlugin, type ActivePluginSnapshot } from './loader'
 import { disposeUnstartedPlugin } from './isolation'
-import type { PluginHostResult } from '../pluginHost/host'
+import type { PluginHostResult, PluginUnloadReason } from '../pluginHost/host'
 import type { PluginReloadResult } from '@acorn/protocol/api.ts'
 
 export type PluginReloader = {
   reload(id: string): Promise<PluginReloadResult>
+  /** Stop a running loaded plugin for an uninstall or a turn-off. */
+  unload(id: string, reason: PluginUnloadReason): Promise<{ ok: true } | { ok: false; error: string }>
   // What has been reloaded since boot, at the version running. The roster answers "is a restart
   // pending" by comparing the disk against what this process loaded, and after a reload the boot
   // snapshot is stale: a plugin whose version moved would raise a banner for code already live.
   reloaded(): readonly ActivePluginSnapshot[]
-  /** A replay failure after commit removed the previous service; its old boot snapshot is invalid. */
+  /** No longer running, so its boot snapshot is invalid: a replay failure after commit removed the
+   *  previous service, or an unload stopped it. */
   lost(): readonly string[]
 }
 
 export function createPluginReloader(options: {
   dataDir: string
   builtins: readonly string[]
-  host: Pick<PluginHostResult, 'reload'>
+  host: Pick<PluginHostResult, 'reload' | 'unload'>
+  /** The owner's turned-off list as it is now, not as it was at boot. A turned-off plugin isn't started
+   *  by a reload, so a development-mode watch can't bring it back. */
+  isDisabled: (id: string) => boolean
 }): PluginReloader {
   const committed = new Map<string, ActivePluginSnapshot>()
   const lost = new Set<string>()
@@ -33,6 +41,7 @@ export function createPluginReloader(options: {
     reloaded: () => [...committed.values()],
     lost: () => [...lost],
     reload: async (id) => {
+      if (options.isDisabled(id)) throw new Error(`'${id}' is turned off on this node.`)
       // The whole install directory, not just this package. `loadExternalPlugins` is the one place
       // that reads a manifest, confines a migrations chain, and checks an id against its bundle, so
       // duplicating a quarter of it here would be a second loader to keep in step. Only `id` is
@@ -71,6 +80,15 @@ export function createPluginReloader(options: {
       committed.set(id, snapshot)
       lost.delete(id)
       return { id, version: entry.manifest.version, state: 'reloaded' }
+    },
+    unload: async (id, reason) => {
+      const outcome = await options.host.unload(id, reason)
+      if (outcome.ok) {
+        committed.delete(id)
+        lost.add(id)
+      }
+      broadcastPluginsChanged()
+      return outcome.ok ? { ok: true } : { ok: false, error: outcome.error }
     },
   }
 }

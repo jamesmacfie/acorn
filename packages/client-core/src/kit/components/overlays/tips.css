@@ -17,6 +17,10 @@
   pointer-events: none;
   animation: rail-tip-in 90ms ease-out;
 }
+/* `display: flex` above beats the browser's own [hidden] rule. The shell unmounts its tip, but a
+   frame's copy (frameTips.ts) stays in the page and hides with the attribute, so without this an idle
+   frame shows an empty bubble at the bottom of its page. Same shape as .ui-rect[hidden] in primitives.css. */
+.rail-tip[hidden] { display: none; }
 .rail-tip-title {
   display: flex;
   align-items: center;

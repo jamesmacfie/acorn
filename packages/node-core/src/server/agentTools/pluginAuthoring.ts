@@ -310,7 +310,8 @@ the bridge's \`telemetry\` verb instead, because a frame has no \`ctx\`.
 3. **Call \`plugin_request\` again with identical arguments to collect the answer.** Identical arguments
    are one question, so this does not re-ask. Do not poll in a loop.
 4. \`dev: true\` is what makes iteration cheap: the approving device auto-trusts this plugin's future
-   bundles instead of prompting per save, and a dev-mode approval ends in a RELOAD rather than a restart.
+   bundles instead of prompting per save. Neither an install nor an update needs a restart: the node
+   starts a loaded plugin as soon as it is on disk and approved.
    The owner can see it badged in Settings → Plugins and end it whenever they like.
 5. After editing, ask again with \`{ action: 'update', pluginId: '<id>', dev: true }\`. A local-path
    install is a symlink, so the files you edit are the files that load.
@@ -324,11 +325,8 @@ A reload swaps the node half in the running process, candidate-then-commit: if t
 the previous instance stays registered and serving and the failure lands as \`state: 'failed'\` with a
 reason on the roster row. Four limits worth knowing before they confuse you:
 
-- **Only the ENTRY module is re-evaluated.** Node caches an ES module permanently by resolved URL, so
-  the loader stamps a generation onto the entry's URL. A relative import INSIDE it does not inherit that
-  query and comes back from the cache with the code it had at boot. So a single-file node half is fully
-  covered by reload, and **a multi-file one needs a node restart for any change outside the entry file.**
-  If you are iterating hard, keep the node half in one file, or expect to ask for a restart.
+- **The whole node half is loaded again.** Each load starts a fresh worker with a fresh module graph,
+  so a change in any file of a multi-file node half takes effect without a restart.
 - Registration rollback is not schema rollback: a migration that already ran cannot be un-migrated.
 - Duplicate tool/provider/capability ids are only caught when the buffer is replayed, at commit.
 - Built-ins cannot be reloaded at all — there is no second copy on disk to swap in.

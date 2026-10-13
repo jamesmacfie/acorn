@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, readdir, readlink, rm, stat, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { AgentAccounts, linkSharedSkills } from './accounts'
+import { AgentAccounts, linkSharedSettings, linkSharedSkills } from './accounts'
 
 describe('agent accounts', () => {
   let root: string
@@ -73,5 +73,30 @@ describe('agent accounts', () => {
     const skills = { shared: () => shared, folder: 'skills', own: [] }
     await Promise.all([linkSharedSkills(home, skills), linkSharedSkills(home, skills)])
     expect(await readdir(join(home, 'skills'))).toEqual(['planner'])
+  })
+
+  it("links the person's settings into an account that has none, and drops the link when they go", async () => {
+    const shared = join(root, 'default-settings.json')
+    const settings = { shared: () => shared, file: 'settings.json' }
+    await writeFile(shared, '{"permissions":{"defaultMode":"auto"}}')
+    const home = await accounts.create('claude', 'work')
+
+    await Promise.all([linkSharedSettings(home, settings), linkSharedSettings(home, settings)])
+    expect(await readlink(join(home, 'settings.json'))).toBe(shared)
+
+    await rm(shared)
+    await linkSharedSettings(home, settings)
+    expect(await readdir(home)).toEqual([])
+  })
+
+  it("leaves an account's own settings alone", async () => {
+    const shared = join(root, 'default-settings.json')
+    const settings = { shared: () => shared, file: 'settings.json' }
+    await writeFile(shared, '{}')
+    const home = await accounts.create('claude', 'work')
+    await writeFile(join(home, 'settings.json'), '{"model":"haiku"}')
+
+    await linkSharedSettings(home, settings)
+    expect(await readFile(join(home, 'settings.json'), 'utf8')).toBe('{"model":"haiku"}')
   })
 })

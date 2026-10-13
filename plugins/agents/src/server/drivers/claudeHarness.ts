@@ -17,6 +17,9 @@ const nodeRequire = createRequire(import.meta.url)
 
 const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`
 
+/** The default login's config folder, which an account borrows skills and settings from. */
+const defaultClaudeHome = (): string => process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+
 /** The `hooks` entry for Claude's settings: one command hook per point that has a handler. Claude runs
  *  these beside the person's own hooks, and a deny from any of them refuses the call. */
 export function claudeLoopHookSettings(bridge: AgentDriverLoopHooks): Record<string, unknown> {
@@ -184,10 +187,13 @@ export const claudeHarness: HarnessLaunchSpec = {
     overrides: ['CLAUDE_CODE_OAUTH_TOKEN'],
     // `synced` holds the skills claude.ai syncs for a login, which differ between accounts.
     skills: {
-      shared: () => join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'skills'),
+      shared: () => join(defaultClaudeHome(), 'skills'),
       folder: 'skills',
       own: ['synced'],
     },
+    // The person's permission mode, model, hooks, and plugins live here, and the CLI and the ACP
+    // adapter read it only from the account's folder.
+    settings: { shared: () => join(defaultClaudeHome(), 'settings.json'), file: 'settings.json' },
   },
   probeAuth: async (executable, env) => (await import('./authProbe')).probeClaudeAuthentication(executable, env),
 }

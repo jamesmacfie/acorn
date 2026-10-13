@@ -118,6 +118,9 @@ export type HarnessAccounts = {
    *  holds them. Each one is linked into the account before a start (`linkSharedSkills`). The CLI's
    *  own per-login entries, named in `own`, are never linked. */
   skills?: { shared(): string; folder: string; own: readonly string[] }
+  /** The default login's settings file, and its name inside an account's folder. It's linked into an
+   *  account that has no such file of its own before a start (`linkSharedSettings`). */
+  settings?: { shared(): string; file: string }
 }
 
 export type AgentDriverStartOptions = {

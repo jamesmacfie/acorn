@@ -24,12 +24,12 @@ link and doesn't follow it into your working tree. A folder is the one source ac
 lockfile records no archive hash and no entrypoint digests, because the bytes keep changing by design
 ([installing from a folder](../security/plugin-install.md#installing-from-a-folder)).
 
-Installing writes a lockfile and reports `installed-restart-required`. A loaded plugin's routes,
-tables, and jobs wire at init, so the package isn't live until the Node runs it. Restart the Node.
-Under the desktop, use **Restart node** in **Settings > Plugins > Installed**, which also reloads the
-renderer.
+Installing writes a lockfile and starts the plugin in the running Node, so it reports `started`, or
+`start-failed` with a `reason` when its `init` throws. It reports `held` while the plugin is turned
+off or waiting on a review, and `installed-restart-required` only for a disk copy of a plugin compiled
+into the Node ([starting and stopping without a restart](../plugins/dev-loop.md#starting-and-stopping-without-a-restart)).
 
-To skip the restart while you work, turn on development mode on the plugin's page, under
+To reload on every build while you work, turn on development mode on the plugin's page, under
 **Permissions > Development mode**. The Node reloads the plugin half a second after its built files
 change, keeps its log lines for the **Logs** tab, and lets its derived sources read their inputs
 without asking. A failed reload keeps the previous version running and shows the reason on the

@@ -13,6 +13,7 @@ import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { PluginsBridge } from '@acorn/node-core/server/pluginHost'
 import type { PluginHostResult, PluginRosterEntry } from '@acorn/node-core/server/pluginHost/host.ts'
 import type { PluginLoadFailure } from '@acorn/node-core/server/plugins'
+import type { PluginStartState } from '@acorn/protocol/api.ts'
 import { nodePluginNames } from './composition'
 import {
   approvePluginReview,
@@ -55,9 +56,9 @@ export type PluginStateInput = {
   loadFailures(): readonly PluginLoadFailure[]
   disabled(): readonly string[]
   setDisabled(names: readonly string[]): void
-  // The running plugin host, for the one mutation that does not wait for a restart
+  // The running plugin host, which starts, swaps and stops loaded plugins without a restart
   // (`createPluginReloader` in node-core). Both roots hold the `initPlugins` result already.
-  reloadHost: Pick<PluginHostResult, 'reload'>
+  reloadHost: Pick<PluginHostResult, 'reload' | 'unload'>
 }
 
 /** The bridge, plus the one thing it holds open: development mode's file watches. */
@@ -66,7 +67,13 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
   // Built here, not in each root, so the two cannot drift. The
   // built-in names come from the build (composition.ts), not the assembled graph: they only warn when
   // a disk package shadows a compiled one.
-  const reloader = createPluginReloader({ dataDir, builtins: nodePluginNames(), host: input.reloadHost })
+  const builtins = nodePluginNames()
+  const reloader = createPluginReloader({
+    dataDir,
+    builtins,
+    host: input.reloadHost,
+    isDisabled: (id) => input.disabled().includes(id),
+  })
   // Development mode wraps the reloader, and the route reloads through it too, so a watched save and
   // POST /reload take turns and both update the development state.
   const development = createPluginDevelopment({ dataDir, reload: (id) => reloader.reload(id) })
@@ -93,6 +100,35 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     )
   }
   const installed = () => scanInstalled(dataDir).installed
+
+  // Run what an install, update or approved review just put on disk, in this process, so nobody has to
+  // restart the Node for it. A failed start is reported, not thrown: the package is installed either way,
+  // and its roster row carries the reason.
+  const start = async (id: string): Promise<{ state: PluginStartState; reason?: string }> => {
+    if (input.disabled().includes(id) || hasPendingPluginReview(dataDir, id)) return { state: 'held' }
+    const entry = installed().find((candidate) => candidate.manifest.id === id)
+    // Client-only: nothing on the Node to start, and devices pick it up from the roster.
+    if (!entry?.manifest.node) return { state: 'started' }
+    // A disk copy of a compiled plugin takes over from it only at boot.
+    if (builtins.includes(id)) return { state: 'installed-restart-required' }
+    // Through development mode, which serializes with its file watch and records the outcome when it's on.
+    const result = await development.reload(id).catch((error: unknown) => ({
+      state: 'failed' as const,
+      reason: error instanceof Error ? error.message : String(error),
+    }))
+    return result.state === 'reloaded'
+      ? { state: 'started' }
+      : { state: 'start-failed', ...(result.reason ? { reason: result.reason } : {}) }
+  }
+
+  // Stop a loaded plugin this process holds, running or failed. True when nothing of it is left
+  // running; a built-in needs the restart it always did.
+  const stop = async (id: string, reason: 'removed' | 'disabled'): Promise<boolean> => {
+    if (builtins.includes(id)) return false
+    if (!input.roster().some((row) => row.name === id)) return true
+    return (await reloader.unload(id, reason)).ok
+  }
+
   return {
     roster: input.roster,
     // Re-scanned per call, not the boot snapshot: an install has to show up in the roster before the
@@ -103,17 +139,23 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     // list: the consumer builds a map from it, so the later entry wins and a plugin swapped in place
     // stops claiming a restart is pending for code that is already live.
     booted: () => [...active().values()],
-    loadFailures: input.loadFailures,
+    // A boot-time failure stops being true once a later start of the same package worked.
+    loadFailures: () => {
+      const running = active()
+      return input.loadFailures().filter((failure) => !running.has(failure.id))
+    },
     pendingReview: (id) =>
       readPendingPluginReview(dataDir, id) ?? (hasPendingPluginReview(dataDir, id) ? { corrupt: true } : null),
     pendingReviewIds: () => pendingPluginReviewIds(dataDir),
-    approveReview: (id, reviewId, fingerprint) => {
+    approveReview: async (id, reviewId, fingerprint) => {
       const candidate = installed().find((entry) => entry.manifest.id === id && entry.dir === pluginDir(dataDir, id))
       if (!candidate) throw new Error(`No installed package '${id}' is available for review.`)
       const currentFingerprint = pluginReviewFingerprint(candidate.dir)
       if (currentFingerprint !== fingerprint)
         throw new Error(`'${id}' changed since the review was opened. Reopen its review.`)
-      return approvePluginReview(dataDir, id, reviewId, currentFingerprint)
+      const approved = approvePluginReview(dataDir, id, reviewId, currentFingerprint)
+      await start(id)
+      return approved
     },
     clientBundle: async (id, hash) => {
       const retained = active().get(id)?.bundle
@@ -129,9 +171,26 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
       return bundle?.hash === hash ? bundle : null
     },
     disabled: input.disabled,
-    setDisabled: input.setDisabled,
-    install: (source, options) => installPlugin(dataDir, source, options),
-    update: (id, options) => updatePlugin(dataDir, id, options),
+    // The file first, so a start or stop below sees the owner's new answer. Built-ins still wait for a
+    // restart; the roster's banner says so.
+    setDisabled: async (names) => {
+      const before = new Set(input.disabled())
+      input.setDisabled(names)
+      const after = new Set(names)
+      for (const id of after) if (!before.has(id)) await stop(id, 'disabled')
+      for (const id of before) {
+        if (after.has(id) || builtins.includes(id)) continue
+        if (installed().some((entry) => entry.manifest.id === id)) await start(id)
+      }
+    },
+    install: async (source, options) => {
+      const result = await installPlugin(dataDir, source, options)
+      return { ...result, ...(await start(result.id)) }
+    },
+    update: async (id, options) => {
+      const result = await updatePlugin(dataDir, id, options)
+      return { ...result, ...(await start(id)) }
+    },
     // Two halves, in this order: the package leaves disk, then the core database drops what the plugin
     // owned there. Disk first because a failure after it still leaves the plugin gone, where the reverse
     // leaves a running plugin whose state has been deleted underneath it.
@@ -141,13 +200,17 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     // Dropping them first means a failed uninstall leaves a plugin that asks again, never one that kept a
     // grant.
     // Development mode ends first of all, so its watch doesn't outlive the package.
+    //
+    // The running instance stops after the disk half and before the purge, so its database is closed
+    // before its rows go.
     uninstall: async (id, options) => {
       development.set(id, false)
       inputGrantsStore(dataDir).delete(id)
       skillStateStore(dataDir).forget(id)
       const result = uninstallPlugin(dataDir, id, options)
+      const stopped = await stop(id, 'removed')
       if (options.purgeData) await cascadeDeletePluginData(input.db, id)
-      return result
+      return { ...result, restartRequired: !stopped }
     },
     reload: (id) => development.reload(id),
     inputGrants: () => inputGrantsStore(dataDir),

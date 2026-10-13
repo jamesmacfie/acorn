@@ -30,9 +30,9 @@ import type {
 // The bridge and the reconciliation below answer one question: what is the plugin situation on this
 // node, and does it need a restart. This module is testable with plain objects, no Hono.
 //
-// A plugin's routes, tables, and jobs are wired at init. Toggling, installing, or uninstalling one takes
-// effect at the next start, so those raise `restartRequired`. The one exception is `reload()`, which
-// swaps a single loaded plugin in place.
+// A plugin's routes, tables, and jobs are wired at init. A loaded plugin is started, swapped or stopped
+// in place when it's installed, updated, reloaded, uninstalled or toggled. A built-in is compiled in, so
+// toggling one takes effect at the next start and raises `restartRequired`.
 export type PluginsBridge = {
   roster(): readonly PluginRosterEntry[]
   // Every package on disk right now, including the client-only ones the host never saw. Separate from
@@ -53,14 +53,17 @@ export type PluginsBridge = {
   loadFailures(): readonly PluginLoadFailure[]
   pendingReview(id: string): PendingPluginReview | { corrupt: true } | null
   pendingReviewIds(): readonly string[]
-  approveReview(id: string, reviewId: string, fingerprint: string): PendingPluginReview
+  // Approving starts the package too, so this may be async.
+  approveReview(id: string, reviewId: string, fingerprint: string): PendingPluginReview | Promise<PendingPluginReview>
   // The client bundle's bytes, hashed at read time. Kept on the bridge rather than done in the route
   // because the file lives under the data root, which the server layer has no handle on.
   clientBundle(id: string, hash: string): Promise<{ bytes: Uint8Array<ArrayBuffer>; hash: string } | null>
   // The names the owner currently has turned off, which is not derivable from the roster after a
   // restart-pending write: the roster describes the running process.
   disabled(): readonly string[]
-  setDisabled(names: readonly string[]): void
+  // Writes the owner's list, then starts or stops the loaded plugins it changed. Built-ins still wait for
+  // a restart.
+  setDisabled(names: readonly string[]): void | Promise<void>
   // The installer, reached the same way everything else here is: it needs the data root, which the
   // server layer has no handle on. Each throws a plain Error carrying a sentence for
   // the owner; the handlers turn that into one 400.

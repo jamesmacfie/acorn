@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readdir, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isAccountName } from '../shared/accounts'
 import type { HarnessAccounts } from './drivers/types'
@@ -87,9 +87,38 @@ export async function linkSharedSkills(home: string, skills: NonNullable<Harness
   }
   for (const name of shared) {
     if (present.includes(name)) continue
-    // Two sessions on one account can start at once, and the other may have made the link first.
-    await symlink(join(from, name), join(into, name)).catch((error: NodeJS.ErrnoException) => {
-      if (error.code !== 'EEXIST') throw error
-    })
+    await symlink(join(from, name), join(into, name)).catch(ignoreExisting)
   }
+}
+
+/**
+ * Links the person's settings file into an account that has none of its own, so the account starts
+ * in the same permission mode, with the same model and hooks, as the default login. A file the account
+ * already has, or a link the person pointed elsewhere, stays. The link goes when the default file
+ * does, so the CLI never reads a dangling one. Run before every start, like `linkSharedSkills`.
+ */
+export async function linkSharedSettings(
+  home: string,
+  settings: NonNullable<HarnessAccounts['settings']>,
+): Promise<void> {
+  const from = settings.shared()
+  const into = join(home, settings.file)
+  const shared = await stat(from).then(
+    (entry) => entry.isFile(),
+    () => false,
+  )
+  const present = await lstat(into).then(
+    () => true,
+    () => false,
+  )
+  if (!present) {
+    if (shared) await symlink(from, into).catch(ignoreExisting)
+    return
+  }
+  if (!shared && (await readlink(into).catch(() => null)) === from) await rm(into, { force: true })
+}
+
+// Two sessions on one account can start at once, and the other may have made the link first.
+function ignoreExisting(error: NodeJS.ErrnoException): void {
+  if (error.code !== 'EEXIST') throw error
 }

@@ -76,6 +76,13 @@ onDockerRetired(() => {
   roots.clear()
 })
 
+/** Land this task's pane on one container, whether or not the pane is open. Another plugin asks for
+ *  this through the `docker-container` destination (./index.ts). */
+export function selectTaskContainer(taskId: string, containerId: string): void {
+  rememberDockerSelection(taskId, containerId)
+  roots.get(dockerScopeKey(taskId))?.model.setSelected(containerId)
+}
+
 const chipLabel = (c: DockerContainerSummary): string => c.composeService ?? c.name
 
 export function DockerChips(props: { task: Task }) {

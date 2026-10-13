@@ -58,8 +58,8 @@ loader dropped before it could be listed still gets a row.
 
 `reason` is a loaded plugin's own text on its way to the owner's UI. The Node caps it, and the client
 renders it as text, never as markup. Both fields are optional on the wire, so a client talking to an
-older Node shows a generic sentence. A load failure describes the boot that saw it, so fixing the
-package on disk leaves the row reading `failed` until the restart that reads it again.
+older Node shows a generic sentence. A load failure describes the boot that saw it. Fixing the package
+and then updating or reloading it clears the row once the plugin starts.
 
 ### The context is shaped by the manifest
 

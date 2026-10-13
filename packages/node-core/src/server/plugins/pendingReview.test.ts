@@ -63,8 +63,12 @@ describe('agent-requested plugin quarantine', () => {
     const reloader = createPluginReloader({
       dataDir: root,
       builtins: [],
+      isDisabled: () => false,
       host: {
         reload: async () => {
+          throw new Error('must not call host')
+        },
+        unload: async () => {
           throw new Error('must not call host')
         },
       },

@@ -48,6 +48,7 @@ vi.mock('../tasks/confirmTaskArchive', async (original) => ({
 vi.mock('@solidjs/router', () => ({
   useNavigate: () => navigateMock,
   useParams: () => ({}),
+  useLocation: () => ({ pathname: '/' }),
   A: (props: { children?: unknown }) => props.children,
 }))
 

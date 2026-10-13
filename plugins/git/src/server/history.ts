@@ -7,7 +7,11 @@ type Core = Pick<CoreServices, 'git' | 'projects'>
 const ID = /^[0-9a-f]{40,64}$/
 const PAGE = 100
 const SEARCH_LIMIT = 5_000
-const MAX_REFS = 1_024
+// Long-lived repositories keep thousands of branches and tags. Each listed ref costs about 100 bytes,
+// so the byte budget below holds this many with room for long names.
+const MAX_REFS = 10_000
+/** Room for `for-each-ref` over MAX_REFS refs, shared with the Refs tab's roster (./refs.ts). */
+export const REF_LIST_BYTES = 4 << 20
 const SNAPSHOTS = 32
 const SNAPSHOT_AGE_MS = 10 * 60_000
 const snapshots = new Map<string, { repository: string; tips: string[]; at: number }>()
@@ -77,13 +81,14 @@ async function refSnapshot(
 ): Promise<{ tips: string[]; names: Map<string, string[]>; refs: string[] }> {
   const refs = await core.git.git(
     ['for-each-ref', '--format=%(refname)%00%(objectname)%00%(*objectname)', 'refs/heads', 'refs/remotes', 'refs/tags'],
-    { cwd: repository, maxOutputBytes: 256 * 1024, signal },
+    { cwd: repository, maxOutputBytes: REF_LIST_BYTES, signal },
   )
   signal?.throwIfAborted()
   if (refs.code !== 0) throw new BridgeError(422, 'git_failed', refs.stderr.trim())
   const names = new Map<string, string[]>()
   const lines = refs.stdout.trimEnd().split('\n').filter(Boolean)
-  if (lines.length > MAX_REFS) throw new BridgeError(422, 'too_many_refs', `History supports at most ${MAX_REFS} refs.`)
+  if (refs.truncated || lines.length > MAX_REFS)
+    throw new BridgeError(422, 'too_many_refs', `History supports at most ${MAX_REFS.toLocaleString('en')} refs.`)
   for (const line of lines) {
     const [name, object, peeled] = line.split('\0')
     const id = peeled || object
@@ -133,12 +138,14 @@ export async function history(
     `--format=${FORMAT}`,
     `--max-count=${count}`,
     ...(search ? [] : [`--skip=${offset}`]),
-    ...tips,
+    // Tips go in on stdin. A repository with thousands of refs would overflow the argument list.
+    '--stdin',
   ]
   let result: Awaited<ReturnType<Core['git']['git']>>
   try {
     result = await core.git.git(args, {
       cwd: repository,
+      stdin: `${tips.join('\n')}\n`,
       maxOutputBytes: search ? 16 << 20 : 2 << 20,
       timeoutMs: 30_000,
       signal,

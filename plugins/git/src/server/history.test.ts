@@ -188,6 +188,19 @@ it('includes detached HEAD and names an unborn repository without inventing hist
   expect(detached.commits[0]?.refs).toContain('HEAD')
 })
 
+it('reads history in a repository with thousands of refs', async () => {
+  const root = fixture()
+  write(root, 'one.txt', 'one\n')
+  git(root, 'add', '.')
+  git(root, 'commit', '-qm', 'First')
+  const id = git(root, 'rev-parse', 'HEAD')
+  const refs = Array.from({ length: 3_000 }, (_, index) => `create refs/tags/release-${index} ${id}\n`).join('')
+  execFileSync('git', ['update-ref', '--stdin'], { cwd: root, input: refs })
+  const page = await history(core(root), 'project', filter, null)
+  expect(page.commits.map((commit) => commit.id)).toEqual([id])
+  expect(page.refs).toHaveLength(3_002)
+})
+
 it('serves root, rename, mode, delete, binary and unusual names through topology then lazy rows', async () => {
   const root = fixture()
   write(root, 'old name.txt', 'one\ntwo\n')

@@ -60,7 +60,7 @@ reviewed bytes would need either a staging directory that outlives the request o
 that can resolve to something else.
 
 The client half also gets the per-hash bundle prompt on the next distribution pass. The review screen
-adds the node half, which has no other disclosure before it starts at the next restart.
+adds the node half, which has no other disclosure before it starts on approval.
 
 ## Development mode
 

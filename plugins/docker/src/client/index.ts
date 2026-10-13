@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { openPane, registerNoticeTargetHandler, type ClientPlugin } from '@acorn/plugin-api/client'
 import { dockerAgentContextContribution } from './agentContextContribution'
 import { dockerCommands } from './commands'
 import { dockerPrefsSlice } from './dockerPrefs'
@@ -15,9 +15,18 @@ const DockerProjectSettings = lazy(() => import('./DockerProjectSettings'))
 
 export const dockerClientPlugin: ClientPlugin = {
   name: 'docker',
-  activate: () => () => {
-    retireDockerClient()
-    disposeDockerStore()
+  activate: () => {
+    // Another plugin's pane can send someone here with a container id, through a `destinations`
+    // entry naming this target kind. The pane is lazy, so it loads only when someone asks.
+    const stopTarget = registerNoticeTargetHandler('docker-container', (taskId, target) => {
+      void import('./DockerTaskPane').then(({ selectTaskContainer }) => selectTaskContainer(taskId, target.resourceId))
+      openPane(taskId, 'docker')
+    })
+    return () => {
+      stopTarget()
+      retireDockerClient()
+      disposeDockerStore()
+    }
   },
   init: (ctx) => {
     // The other feeder (docs/ui-design/icons.md § Icons): a loaded plugin declares its mark in the manifest

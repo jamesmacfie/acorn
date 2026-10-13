@@ -53,7 +53,10 @@ describe('plugin state composition', () => {
       loadFailures: () => [],
       disabled: () => [],
       setDisabled: () => {},
-      reloadHost: { reload: async () => ({ ok: false, error: 'not wired in this test' }) },
+      reloadHost: {
+        reload: async () => ({ ok: false, error: 'not wired in this test' }),
+        unload: async () => ({ ok: false, error: 'not wired in this test' }),
+      },
     })
 
     putPackage('2.0.0', newBytes)
@@ -85,7 +88,10 @@ describe('plugin state composition', () => {
       loadFailures: () => [],
       disabled: () => [],
       setDisabled: () => {},
-      reloadHost: { reload: async () => ({ ok: false, error: 'not wired in this test' }) },
+      reloadHost: {
+        reload: async () => ({ ok: false, error: 'not wired in this test' }),
+        unload: async () => ({ ok: false, error: 'not wired in this test' }),
+      },
     })
     bridge.inputGrants().set({
       pluginId: 'widget',

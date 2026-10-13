@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { useNavigate, useParams } from '@solidjs/router'
+import { useLocation, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   integrationsOptions,
@@ -31,7 +31,7 @@ import {
   type SourceId,
 } from '../tasks/tasks'
 import { defaultLayout } from '../tasks/taskLayout'
-import { defaultSourceId } from '../../host/registries/sources/sources'
+import { defaultSourceId, sourceOpeningPath } from '../../host/registries/sources/sources'
 import { schedulePanePrefetch } from '../../host/registries/panes/panes'
 import { projectPath } from '../../host/registries/commands/corePaths'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
@@ -91,6 +91,7 @@ export default function TabRail() {
   const words = createWorkspaceWords()
   const navigate = useNavigate()
   const params = useParams()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const query = createQuery(() => tasksOptions(true))
   const workspaces = createQuery(() => workspacesOptions(true))
@@ -206,12 +207,11 @@ export default function TabRail() {
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)
-    // A task URL is /t/:taskId, which carries no project, and every browse Source scopes itself to
-    // the routed project. Without this the rail swaps to a Source that reports it has nothing to
-    // show.
-    if (params.projectId) return
-    const projectId = query.data?.find((task) => task.id === activeTaskId())?.projectId
-    if (projectId) navigate(projectPath(projectId))
+    // Every browse source scopes itself to the routed project, and a task URL (/t/:taskId) carries
+    // none, so the task's project stands in.
+    const projectId = params.projectId ?? query.data?.find((task) => task.id === activeTaskId())?.projectId
+    const path = sourceOpeningPath(id, location.pathname, projectId)
+    if (path) navigate(path)
   }
   const openSourceMenu = (id: string, at: { x: number; y: number }) => {
     const source = sources().find((candidate) => candidate.id === id)

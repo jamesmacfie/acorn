@@ -28,8 +28,9 @@ because its package exports resolve to generated `dist/` files.
 for every loadable plugin, so a bad declaration fails in `pnpm test` and not at the next boot.
 
 A loaded plugin's routes, tables, and jobs wire at init, so a rebuilt bundle isn't live until the
-Node runs it again. Under `pnpm dev:node`, Node's own `--watch` sees the rewritten bundle and
-restarts. Under the desktop, use **Restart node** in **Settings > Plugins > Installed**. It re-runs
+Node runs it again: reload it, update it, or turn on development mode. A compiled plugin needs a
+restart. Under `pnpm dev:node`, Node's own `--watch` sees a rewritten compiled bundle and restarts.
+Under the desktop, use **Restart node** in **Settings > Plugins > Installed**. It re-runs
 reconciliation and reloads the renderer, because frame contributions resolve once per session.
 
 ### Reloading one plugin without a restart
@@ -46,7 +47,8 @@ holding its database, and the roster row shows `state: 'failed'` with its `reaso
 clear the previous registrations, run its `dispose`, close its database, revoke its context, and
 replay the buffer.
 
-The host owns every candidate. An unknown or disabled owner closes the unstarted realm. An
+The host owns every candidate. A compiled plugin's name closes the unstarted realm. A plugin the
+owner turned off is refused earlier, by the reloader, before any realm exists. An
 initialization, `ready`, or replay failure disposes the candidate, closes its worker storage, ends
 its realm, and revokes its context, and keeps the reported failure if disposal also throws.
 Initialization and `ready` run before commit, so those failures leave the previous instance serving.
@@ -63,6 +65,26 @@ Four properties to know:
 - **An invalid registration fails inside the commit window.** Two tools sharing a name, or a provider
   that fails its shape check, shows up only when the buffer is replayed. The plugin then ends up
   unregistered and marked failed.
+
+### Starting and stopping without a restart
+
+Installing, updating, uninstalling, and turning a loaded plugin on or off all take effect in the
+running Node. The plugin state bridge (`apps/node/src/composition/pluginState.ts`) does the disk half,
+then asks the host:
+
+- **Install, update, and an approved review** start the package through the same reload path. A
+  package this process never ran has no previous instance, so the host adds its roster row first and
+  a failing `init` leaves that row `failed` with its reason. The result says `started`,
+  `start-failed`, `held` (turned off or waiting on a review), or `installed-restart-required`.
+- **Uninstall** calls the host's `unload(id, 'removed')`: it takes back every registration, runs
+  `dispose`, closes the database, revokes the context, and drops the roster row. With `purgeData`,
+  the rows go after the database closes.
+- **Turning off** is `unload(id, 'disabled')`, which keeps the row and marks it `disabled`. **Turning
+  on** starts it like an install.
+
+A compiled plugin keeps the old rule: toggling one takes effect at the next start, and the roster's
+restart banner says so. The owner's turned-off list is read live, so a development-mode watch never
+starts a plugin that was turned off.
 
 The client half needs no extra machinery. The Node broadcasts a content-free `plugins:changed`
 frame, and the shell re-reads that Node's roster and re-runs both contribution passes. Trust isn't

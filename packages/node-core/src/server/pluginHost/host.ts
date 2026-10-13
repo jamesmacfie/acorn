@@ -104,6 +104,9 @@ type PluginFailure = { name: string; error: string; at: number; stage: 'init' | 
 // importing a bundle and confining its migrations chain (server/plugins/reload.ts drives both).
 export type PluginReloadRequest = { plugin: NodePlugin; binding: LoadedPluginBinding }
 type PluginReloadOutcome = { ok: true } | { ok: false; error: string; retained?: boolean }
+// Why a running loaded plugin is being stopped. `removed` drops it from the roster; `disabled` keeps the
+// row, turned off, so the owner can turn it back on.
+export type PluginUnloadReason = 'removed' | 'disabled'
 
 export type PluginHostResult = {
   enabled: readonly string[]
@@ -118,8 +121,14 @@ export type PluginHostResult = {
    * See docs/plugins/dev-loop.md § The dev loop.
    *
    * The candidate's `init` runs against a buffered registration set (server/pluginHost/context.ts §
-   * pending), so a throw leaves the previous instance registered, serving and holding its database. */
+   * pending), so a throw leaves the previous instance registered, serving and holding its database.
+   *
+   * A loaded plugin this process never started, because it was installed or turned back on after boot,
+   * goes through the same path with no previous instance. Only a built-in is refused. */
   reload(name: string, next: PluginReloadRequest): Promise<PluginReloadOutcome>
+  /** Stop one running loaded plugin: dispose it, take back what it registered, close its database. For an
+   * uninstall or a turn-off that shouldn't wait for a restart. A built-in is refused. */
+  unload(name: string, reason: PluginUnloadReason): Promise<PluginReloadOutcome>
   // Release every initialized plugin, newest first, and close the `ctx.storage` database each one
   // opened, before the data root lock drops. Never rejects: one plugin failing to close must not stop
   // the rest.
@@ -147,6 +156,8 @@ export async function initPlugins(
   // instance takes its permissions and migrations chain from the fresh manifest. Membership also
   // answers "may this name be reloaded at all".
   const loadedBindings = new Map(options.loaded ?? [])
+  // Compiled into this binary, so there is no copy on disk to load, swap or drop at runtime.
+  const builtins = new Set(plugins.filter((plugin) => !options.loaded?.has(plugin.name)).map((plugin) => plugin.name))
   // A missing env is a composition-root wiring bug, not a plugin's fault, so it is raised here, before
   // anything starts and there is a graph to unwind.
   const requireEnv = (name: string): Env => {
@@ -446,19 +457,22 @@ export async function initPlugins(
   }
 
   const reload = async (name: string, next: PluginReloadRequest): Promise<PluginReloadOutcome> => {
-    // Loaded plugins only, and this map is the flag that says so. A plugin whose init was contained at
-    // boot is still in it, which makes "write broken code, reload, fix it, reload again" work.
-    if (!loadedBindings.has(name)) {
+    // Loaded plugins only. A plugin whose init was contained at boot is still a loaded plugin, which
+    // makes "write broken code, reload, fix it, reload again" work.
+    if (builtins.has(name)) {
       await disposeUnstartedPlugin(next.plugin)
       return {
         ok: false,
         error: `'${name}' is not a plugin this node loaded from disk, so it cannot be reloaded. Built-ins need a restart.`,
       }
     }
-    if (disabled.has(name)) {
-      await disposeUnstartedPlugin(next.plugin)
-      return { ok: false, error: `'${name}' is turned off on this node.` }
-    }
+    // Whether the owner wants it running is the caller's question: the disabled file can change after
+    // boot, and this set only records what the host itself turned off. A reload is a request to run it.
+    disabled.delete(name)
+    // Installed or turned on since boot. The row goes in first so a failing init has somewhere to say so.
+    const rosterRow = roster.find((entry) => entry.name === name)
+    if (!rosterRow) roster.push({ name, required: false, disabled: false, state: 'active' })
+    else rosterRow.disabled = false
 
     // Everything the candidate registers is buffered rather than written to the registries the previous
     // instance is still in (server/pluginHost/context.ts § pending). Its database is the one thing it opens
@@ -594,10 +608,10 @@ export async function initPlugins(
     if (!enabled.includes(name)) enabled.push(name)
     contexts.set(name, candidateCtx)
     loadedBindings.set(name, next.binding)
-    const rosterRow = roster.find((entry) => entry.name === name)
-    if (rosterRow) {
-      if (next.plugin.emits?.length) rosterRow.emits = next.plugin.emits
-      else delete rosterRow.emits
+    const committedRow = roster.find((entry) => entry.name === name)
+    if (committedRow) {
+      if (next.plugin.emits?.length) committedRow.emits = next.plugin.emits
+      else delete committedRow.emits
     }
     if (candidate.db) opened.set(name, candidate.db)
 
@@ -605,7 +619,52 @@ export async function initPlugins(
     return { ok: true }
   }
 
-  return { enabled, skipped, failed, roster, reload, dispose: () => disposeStarted(started, closeStorage, contexts) }
+  const unload = async (name: string, reason: PluginUnloadReason): Promise<PluginReloadOutcome> => {
+    if (builtins.has(name)) return { ok: false, error: `'${name}' is built in. Turning it off needs a restart.` }
+    // The same order as a reload's commit: stop serving, let it release what it holds, close its database
+    // after that, and revoke its context last so a leaked reference fails loudly.
+    clearRegistrations(name)
+    const instance = started.find((plugin) => plugin.name === name)
+    if (instance) {
+      try {
+        await instance.dispose?.()
+      } catch (error) {
+        pluginLog(name).warn(`dispose during unload failed: ${describeError(error).message}`)
+      }
+    }
+    closeStorage(name)
+    const ctx = contexts.get(name)
+    if (ctx) revokePluginContext(ctx)
+    forget(name)
+
+    const index = roster.findIndex((entry) => entry.name === name)
+    if (reason === 'removed') {
+      loadedBindings.delete(name)
+      disabled.delete(name)
+      if (index >= 0) roster.splice(index, 1)
+    } else {
+      disabled.add(name)
+      const row = roster[index]
+      if (row) {
+        row.disabled = true
+        row.state = 'disabled'
+        delete row.failedAt
+        delete row.reason
+        delete row.stage
+      }
+    }
+    return { ok: true }
+  }
+
+  return {
+    enabled,
+    skipped,
+    failed,
+    roster,
+    reload,
+    unload,
+    dispose: () => disposeStarted(started, closeStorage, contexts),
+  }
 }
 
 // Everything one plugin registered through its context, undone newest first, so a route goes before the

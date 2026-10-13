@@ -340,7 +340,7 @@ export const plugins = new Hono<AppEnv>()
           throw new BridgeError(400, 'bad_request', `${name} is a required plugin and cannot be disabled.`)
       }
       const before = [...bridge.disabled()].sort()
-      bridge.setDisabled(parsed.data.disabled)
+      await bridge.setDisabled(parsed.data.disabled)
       const after = [...parsed.data.disabled].sort()
       // Only on a real change. The client PUTs the whole list on every toggle, and a no-op PUT is not a
       // decision anyone made.
@@ -359,8 +359,9 @@ export const plugins = new Hono<AppEnv>()
   // Install, update, uninstall (docs/plugins/loaded-plugins.md § Loaded plugins). Owner surface, device-gated by
   // mount, never reachable with a task-scoped internal token (docs/security/credentials.md § Credential handling).
   //
-  // Nothing here starts a plugin. Each answers "the disk says this", and the roster above turns that
-  // into the pending state and the restart banner.
+  // Each one changes the disk and then the running process: an install or update starts the plugin, an
+  // uninstall stops it (apps/node/src/composition/pluginState.ts). Only a built-in still waits for a
+  // restart, and the roster above turns that into the banner.
   //
   // Every one of them broadcasts `plugins:changed`. Until 2026-08-28 only `/:id/reload` did
   // (server/plugins/reload.ts), so a second window kept a stale roster and a stale restart banner until

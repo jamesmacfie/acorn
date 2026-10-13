@@ -9,9 +9,9 @@
 // This is also the node's only outbound HTTP consumer (docs/http-client.md says there is no shared
 // client). The fetch usage stays inside this file rather than becoming a general helper.
 //
-// Nothing here loads or executes plugin code. The package is validated, hashed and placed; the loader
-// runs it at the node's next start, which is why every result says `installed-restart-required`
-// rather than pretending the plugin is live.
+// Nothing here loads or executes plugin code. The package is validated, hashed and placed, and every
+// result from here says `installed-restart-required` because that's all this file knows. The plugin
+// state bridge starts it next and replaces that answer (apps/node/src/composition/pluginState.ts).
 import { createHash, randomUUID } from 'node:crypto'
 import {
   createWriteStream,

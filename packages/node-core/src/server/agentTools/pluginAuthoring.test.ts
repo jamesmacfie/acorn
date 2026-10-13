@@ -311,7 +311,7 @@ describe('the two doors', () => {
     // Each of these is a fact the agent gets wrong by default, and wastes a session on.
     expect(guide).toContain('plugin_request')
     expect(guide).toContain('identical arguments to collect the answer')
-    expect(guide).toContain('Only the ENTRY module is re-evaluated')
+    expect(guide).toContain('The whole node half is loaded again')
     expect(guide).toContain('node:')
     expect(guide).toContain('acorn-plugin.json')
     // Every derived list reaches the rendered text. A vocabulary computed and then not printed passes

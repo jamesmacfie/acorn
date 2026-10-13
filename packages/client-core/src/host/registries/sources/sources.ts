@@ -4,6 +4,7 @@ import type { ProviderCapabilityName } from '@acorn/protocol/integrations.ts'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import type { InAppTarget } from '../panes/contentLinks'
 import { Registry } from '../../../kit/lib/state/registry'
+import { projectPath } from '../commands/corePaths'
 
 type SourcePromotionContext = {
   projectId: string
@@ -177,6 +178,16 @@ export function matchRoute(pattern: string, path: string): Record<string, string
 export function sourceIdForPath(path: string): string | undefined {
   const clean = path.split(/[?#]/)[0]
   return sourceRegistry.entries().find((source) => source.routes?.some((route) => matchRoute(route.path, clean)))?.id
+}
+
+/** Where opening a source from `pathname` lands, or undefined to stay put. The address stays when the
+ *  source owns it. Any other address, such as the pull request a task lives at, would keep naming that
+ *  place in the top bar, so the source opens on the project's own page. A task URL carries no project,
+ *  so the caller passes the task's. */
+export function sourceOpeningPath(sourceId: string, pathname: string, projectId: string | undefined) {
+  if (!projectId || sourceIdForPath(pathname) === sourceId) return undefined
+  const path = projectPath(projectId)
+  return path === pathname ? undefined : path
 }
 
 // Ask every source whether it owns this task's URL. Registry order breaks a tie between two sources

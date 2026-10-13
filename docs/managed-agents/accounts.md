@@ -40,6 +40,14 @@ there too. Acorn gives each extra account its own folder and points the CLI at i
   claude.ai syncs for each login separately. It removes a link whose skill is gone and leaves anything
   else in the folder alone. A skill added later shows up from the next start. If the links fail, the
   session still starts without them.
+- **Shared settings.** At the same point, Acorn links the default login's settings file into an
+  account that has none of its own (`linkSharedSettings`). For Claude Code that's
+  `~/.claude/settings.json`, so an account starts in the same permission mode, with the same model,
+  effort, hooks, and plugins. A `settings.json` the account already has wins and stays untouched. Give
+  the account its own file to change any of that for one login. That includes an `apiKeyHelper` or
+  an `env` token, which would otherwise sign every account in the same way. Acorn removes the link if
+  the default file goes. When Claude saves a setting from inside an account session, the change can
+  reach the shared file through the link.
 - **Other readers.** The terminal handoff passes the same variable. A delegated child on its parent's
   harness inherits the parent's account.
 
@@ -84,8 +92,8 @@ a usage limit, the wait reads the quota of the session's own account. For more i
 
 ## Limits
 
-- A new account starts with no settings, MCP servers, or history from the default folder. Only the
-  person's skills are linked in. Linking the rest, as T3 Code does, needs a list of private files per
+- A new account starts with no MCP servers or history from the default folder. Only the person's
+  skills and settings file are linked in. Linking the rest, as T3 Code does, needs a list of private files per
   CLI release. Wait until someone misses them. Acorn's own server isn't one of them either. A session on an account gets it
   when it starts, and again in a terminal handoff ([MCP](../mcp.md#configuration)).
 - A contributed harness can't declare `accounts`. The field would let a plugin choose a variable that
