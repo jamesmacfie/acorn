@@ -23,7 +23,8 @@ let headers: Record<string, string>[] = []
 function installBroker(state: NodeConnectionState): void {
   attempted = []
   headers = []
-  ;(globalThis as { window?: unknown }).window = {
+  // An event target, because the telemetry emitter listens on the window for diagnostic phases.
+  ;(globalThis as { window?: unknown }).window = Object.assign(new EventTarget(), {
     acorn: {
       desktop: true,
       fleetList: () => Promise.resolve({ nodes: [node], statuses: [{ nodeId: 'n1', state }] }),
@@ -44,7 +45,7 @@ function installBroker(state: NodeConnectionState): void {
       },
       nodeAbort: () => {},
     },
-  }
+  })
 }
 
 const ready = async (state: NodeConnectionState) => {
