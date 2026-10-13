@@ -59,6 +59,7 @@ vi.mock('./managedClient', () => ({
 }))
 
 const { managedAgentStore } = await import('./managedStore')
+const { agentTelemetry } = await import('./agentTelemetry')
 const { buildConversationItems, createConversationProjection } = await import('./conversationItems')
 const { foldToolEvents } = await import('../../shared/toolFold')
 const { foldUsageEvents } = await import('../../shared/usageFold')
@@ -497,6 +498,13 @@ describe('which snapshots the store keeps', () => {
         .map((item) => item.id)
         .sort(),
     ).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
+  it('reports the events it keeps, which stop growing at the bound', async () => {
+    const gauge = vi.spyOn(agentTelemetry, 'gauge')
+    await visit('a', 'b', 'c', 'd', 'e')
+    expect(gauge).toHaveBeenLastCalledWith('agents.snapshots.events', 3)
+    gauge.mockRestore()
   })
 
   it('never drops a session something is drawing, and counts letting go as the latest drawing', async () => {

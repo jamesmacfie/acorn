@@ -115,7 +115,10 @@ or offline, cached answers stay visible with freshness badges. A reconnect or se
 stale and fetches again. There's no history cursor and no offline mutation queue.
 
 A query whose options set `meta: { persist: false }` stays in memory only. Provider search answers do,
-so a relaunch never shows an old answer as though it had just arrived.
+so a relaunch never shows an old answer as though it had just arrived. GitHub job logs and dashboard
+panel previews do too, and set a short `gcTime` as well. A job log is a whole CI log with no size cap,
+and a preview gets a new key on every edit, so a day in memory would keep each one long after the
+screen that read it closed.
 
 Two ages bound it (`packages/client-core/src/infra/persistence/queryPersistence.ts`). A snapshot is
 restored if it was written in the last seven days, so the first launch after a weekend draws last-known

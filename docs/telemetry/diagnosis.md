@@ -119,6 +119,7 @@ read against each other. Each keeps its name in Sentry with no suffix.
 | `ui.page.query_entries` | count | the same | the same | Query cache entries for the active Node |
 | `ui.page.diff_cache.rows`, `.bytes` | count, bytes | the same | the same | The active Node's diff segment cache, by its own estimate |
 | `ui.page.workers.tree`, `.highlight`, `.word_diff` | count | the same | the same | Live plugin tree workers, and the highlighter and word-diff workers |
+| `agents.snapshots.events` | count | `owner: agents` | After each transcript load and release | Events in the transcripts the Agent pane keeps: those on screen and the three drawn last |
 | `agent.processes.live`, `.idle` | count | `runtime: node`, `owner: agents` | 60 s | Provider processes, and those the idle rules would stop |
 | `agent.processes.idle_past_limit` | count | the same | 60 s | Processes the idle rules would stop, idle past the time limit by more than one sweep. Above zero means the idle stop missed one |
 | `agent.processes.memory` | bytes | the same | 60 s | Resident bytes over each provider's process tree. Left out when `ps` fails |

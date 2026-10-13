@@ -251,10 +251,14 @@ export const runJobsOptions = (owner: string, repo: string, runId: number, enabl
     readJson<RunJobs>(runJobsRoute(owner, repo, runId), { signal }),
 })
 
+// A whole job log, which GitHub doesn't cap and the Node doesn't trim. Kept in memory only, and only
+// for a few minutes after the checks panel closes, rather than for the default day in every cache save.
 export const jobLogOptions = (owner: string, repo: string, jobId: number, enabled: boolean) => ({
   queryKey: jobLogKey(owner, repo, jobId),
   enabled,
   staleTime: Infinity,
+  gcTime: 5 * 60_000,
+  meta: { persist: false },
   queryFn: async ({ signal }: QueryContext): Promise<JobLog> =>
     readJson<JobLog>(jobLogRoute(owner, repo, jobId), { signal }),
 })

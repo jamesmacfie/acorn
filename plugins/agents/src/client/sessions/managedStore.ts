@@ -126,13 +126,21 @@ function forgetSnapshot(sessionId: string): void {
 function trimSnapshots(): void {
   const idle = [...recent].filter((id) => !holds.has(id) && !snapshotLoads.has(id))
   const dropped = idle.slice(0, -KEEP_RECENT)
-  if (!dropped.length) return
-  for (const id of dropped) forgetSnapshot(id)
-  setSnapshots((current) => {
-    const next = { ...current }
-    for (const id of dropped) delete next[id]
-    return next
-  })
+  if (dropped.length) {
+    for (const id of dropped) forgetSnapshot(id)
+    setSnapshots((current) => {
+      const next = { ...current }
+      for (const id of dropped) delete next[id]
+      return next
+    })
+  }
+  // The store's share of the window's memory, which grows with the events it keeps. A bound that
+  // stops holding shows as this count climbing.
+  const kept = Object.values(untrack(snapshots))
+  agentTelemetry.gauge(
+    'agents.snapshots.events',
+    kept.reduce((total, snapshot) => total + snapshot.events.length, 0),
+  )
 }
 
 const byRecent = (a: AgentSession, b: AgentSession): number => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)

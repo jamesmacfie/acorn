@@ -14,6 +14,7 @@ const { default: PanelStudio } = await import('./PanelStudio')
 const { clientEvents } = await import('../../../host/registries/commands/clientEvents')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../../../host/plugins/distribution')
 const { activeCacheId } = await import('../../../infra/node/activeNode')
+const { shouldPersistQuery } = await import('../../../infra/persistence/queryPersistence')
 
 const tasks: PanelPlan['sources'][number] = {
   id: 'tasks',
@@ -200,6 +201,8 @@ afterEach(() => {
   dispose?.()
   client.clear()
   host.remove()
+  // An edit leaves a recovery copy on the device, which the next test's studio would open.
+  localStorage.clear()
 })
 
 describe('PanelStudio', () => {
@@ -242,6 +245,23 @@ describe('PanelStudio', () => {
     expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain(
       'Each row as a title with a few details under it.',
     )
+  })
+
+  it('keeps only the preview it draws, and never saves one', async () => {
+    opened = filtered
+    mount('d1')
+    await settle(6)
+    row('List')!.click()
+    await settle()
+    row('Table')!.click()
+    await settle(6)
+    // The proposal's preview is there too, idle with no rows until a proposal arrives.
+    const previews = client
+      .getQueryCache()
+      .findAll({ queryKey: ['dashboard-preview'], predicate: (query) => !!query.state.data })
+    expect(requests.mock.calls.filter(([path]) => path.endsWith('/dashboards/run')).length).toBeGreaterThan(1)
+    expect(previews).toHaveLength(1)
+    expect(shouldPersistQuery(previews[0]!)).toBe(false)
   })
 
   it('marks a step that has a problem', async () => {

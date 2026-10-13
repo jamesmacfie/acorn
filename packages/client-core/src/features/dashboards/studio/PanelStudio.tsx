@@ -247,6 +247,10 @@ export default function PanelStudio(props: {
         ),
       enabled: !!content()?.sources.length && panelPlanSchema.safeParse(content()).success,
       staleTime: 0,
+      // Every edit is a new key. Kept for the default day, each keystroke's rows would stay in memory
+      // and in every cache save, so a preview goes as soon as nothing draws it.
+      gcTime: 0,
+      meta: { persist: false },
     }))
   const preview = previewRun(plan)
   const run = createMemo(() => (preview.data ? copy(preview.data) : undefined))
