@@ -1,12 +1,11 @@
 import { createSignal } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import { prefsKey } from '@acorn/protocol/api.ts'
 import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { ConfirmButton } from '../../kit/components/inputs/ConfirmButton'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
-import { setPref } from '../settings/savePref'
+import { patchCachedPrefs, setPref } from '../settings/savePref'
 import { createSettingSave } from '../settings/settingSave'
 
 /** Mounted per Node while grouping is off. The irreversible write must succeed before labels change. */
@@ -21,10 +20,7 @@ export function GroupProjectsSection() {
     try {
       await save.run(async () => {
         await setPref(WORKSPACES_PREF_KEY, 'on', nodeId)
-        client.setQueryData<Record<string, string>>(prefsKey, (previous) => ({
-          ...previous,
-          [WORKSPACES_PREF_KEY]: 'on',
-        }))
+        patchCachedPrefs(client, (prefs) => ({ ...prefs, [WORKSPACES_PREF_KEY]: 'on' }))
       })
     } finally {
       setBusy(false)

@@ -2,7 +2,7 @@ import { createEffect, createRoot, createSignal, getOwner, onCleanup, runWithOwn
 import type { QueryClient } from '@tanstack/solid-query'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { pushBackgroundError } from '../../features/notifications/notifications'
-import { savePref, setPref } from '../../features/settings/savePref'
+import { savePref } from '../../features/settings/savePref'
 import {
   scopeIdFromStorageKey,
   storageKeyFor,
@@ -16,17 +16,6 @@ import { activeNodeId } from '../node/activeNode'
 import { queryOwner } from '../node/queryOwnership'
 
 const log = createLogger('persisted-state')
-
-// TEMP restore trace for the dashboards wipe. Remove before committing.
-const tracePage = Date.now()
-let traceInstances = 0
-const traceEntries: unknown[] = []
-const trace = (entry: Record<string, unknown>) => {
-  try {
-    traceEntries.push({ t: Date.now() - tracePage, ...entry })
-    void setPref(`debug:restore-trace:${tracePage}`, JSON.stringify(traceEntries.slice(-60))).catch(() => {})
-  } catch {}
-}
 
 const PHASES: readonly RestorePhase[] = ['workspace', 'view', 'panes']
 const WRITE_THROTTLE_MS = 500
@@ -85,9 +74,6 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
   const previousScopes = new Map<PersistedStateSlice<unknown>, Set<string>>()
   const activeSlices = new Map<PersistedStateSlice<unknown>, () => void>()
   const inFlight = new Map<string, { raw: string }[]>()
-  const traceInstance = ++traceInstances
-  let traceWrites = 0
-  trace({ ev: 'create', inst: traceInstance, nodeId, active: untrack(activeNodeId) })
 
   const cancelQueued = (key: string) => {
     const timer = timers.get(key)
@@ -126,7 +112,6 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
       else pushBackgroundError('', `Could not save ${slice.id}`, `Persisted value exceeds ${slice.maxBytes} bytes.`)
       return
     }
-    if (traceWrites++ < 20) trace({ ev: 'write', inst: traceInstance, key, raw: raw.slice(0, 80), had: lastStored.has(key) })
     cancelQueued(key)
     queued.set(key, { slice, raw })
     timers.set(
@@ -157,24 +142,6 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
       hydratedSlices.add(slice)
       untrack(() => adoptHydrated(slice))
     }
-    const query = options.queryClient.getQueryState(['prefs'])
-    const dashboardsSlice = slices.find((slice) => slice.id === 'core.dashboards')
-    trace({
-      ev: 'restore',
-      inst: traceInstance,
-      keys: Object.keys(prefs).length,
-      hasDashboards: 'dashboards' in prefs,
-      lastWs: prefs.last_workspace ?? null,
-      history: prefs.workspace_history ?? null,
-      slices: slices.length,
-      dashboardsSlice: !!dashboardsSlice,
-      dashboardsAfter: dashboardsSlice ? untrack(() => stringifyPersistedValue(dashboardsSlice, dashboardsSlice.binding!.values()[''])).slice(0, 60) : null,
-      dataUpdatedAgo: query ? Date.now() - query.dataUpdatedAt : null,
-      errorUpdatedAgo: query?.errorUpdatedAt ? Date.now() - query.errorUpdatedAt : null,
-      status: query?.status,
-      fetchStatus: query?.fetchStatus,
-      cachedKeys: Object.keys((options.queryClient.getQueryData(['prefs']) as object | undefined) ?? {}).length,
-    })
     performance.mark('acorn:restore:end')
     performance.measure('acorn:restore', 'acorn:restore:start', 'acorn:restore:end')
     setRestored(true)
@@ -199,7 +166,6 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
     const prefs = untrack(options.prefs) ?? {}
     const lateSlices = slices.filter((slice) => !hydratedSlices.has(slice))
     if (lateSlices.length) {
-      trace({ ev: 'late', inst: traceInstance, ids: lateSlices.map((slice) => slice.id), keys: Object.keys(prefs).length })
       untrack(() => restorePersistedSlices(lateSlices, prefs, nodeId))
       for (const slice of lateSlices) {
         hydratedSlices.add(slice)

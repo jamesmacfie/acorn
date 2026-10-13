@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { prefsKey, type NodePluginRow, type NodePluginState } from '@acorn/protocol/api.ts'
+import { type NodePluginRow, type NodePluginState } from '@acorn/protocol/api.ts'
 import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
 import { saveDisabledNodePlugins } from '../../../infra/node/nodePlugins'
 import { removePluginFromDevice } from '../../../host/plugins/host'
@@ -11,7 +11,7 @@ import {
   exclusiveSlotChoices,
   withExclusiveSlotChoice,
 } from '../../../host/registries/extensionPoints/exclusiveSlots'
-import { savePref } from '../savePref'
+import { patchCachedPrefs, savePref } from '../savePref'
 import { nextDisabledList } from './pluginToggle'
 
 // The writes more than one place makes: the Installed list, a plugin's own page, and the plugin strip
@@ -57,8 +57,8 @@ export async function removeDevicePlugin(qc: QueryClient, id: string): Promise<v
       JSON.stringify(deviceDisabled().filter((candidate) => candidate !== id)),
     )
   }
-  qc.setQueryData<Record<string, string>>(prefsKey, (previous) =>
-    Object.fromEntries(Object.entries(previous ?? {}).filter(([key]) => !key.startsWith(`plugin:${id}:`))),
+  patchCachedPrefs(qc, (prefs) =>
+    Object.fromEntries(Object.entries(prefs).filter(([key]) => !key.startsWith(`plugin:${id}:`))),
   )
   const stored = readDevicePrefs()[PrefKeys.exclusiveSlots]
   let slots = stored

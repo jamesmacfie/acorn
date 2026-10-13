@@ -76,6 +76,7 @@ describe('rail visibility', () => {
 
   it('goes Home when the source on screen is hidden, and stays put otherwise', async () => {
     const qc = new QueryClient()
+    qc.setQueryData(prefsKey, {})
     setSelectedSource('docker')
     await setShownInRail(qc, 'board-plugin', 'board', false)
     expect(selectedSource()).toBe('docker')

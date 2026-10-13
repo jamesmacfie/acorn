@@ -35,6 +35,8 @@ let qc: QueryClient
 beforeEach(() => {
   localStorage.clear()
   qc = new QueryClient()
+  // A running shell always holds the node's prefs answer, and a write only patches an existing one.
+  qc.setQueryData(prefsKey, {})
 })
 
 afterEach(() => {

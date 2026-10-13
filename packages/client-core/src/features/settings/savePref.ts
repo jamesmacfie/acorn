@@ -43,6 +43,17 @@ export async function readPref(qc: QueryClient, key: string, owner?: string): Pr
   return values[key]
 }
 
+/** Change the cached copy of the node's prefs, if there is one. An empty cache stays empty: a write
+ *  into it would create a map holding only the written keys, stamped as fresh, and the startup restore
+ *  would take that for the node's answer and hydrate every other slice to its default. The node's next
+ *  answer carries the value anyway, and `prefsOptions.select` merges device prefs into it. */
+export function patchCachedPrefs(
+  qc: QueryClient,
+  patch: (prefs: Record<string, string>) => Record<string, string>,
+): void {
+  qc.setQueryData<Record<string, string>>(prefsKey, (prefs) => (prefs ? patch(prefs) : prefs))
+}
+
 type PrefWriteState = {
   tail: Promise<void>
   confirmed: string | undefined
@@ -108,7 +119,7 @@ export async function savePref(
   // notifies nobody, so picking a theme would do nothing until an unrelated pref write re-ran `select`.
   if (isDevicePref(key)) {
     writeDevicePref(key, value)
-    qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
+    patchCachedPrefs(qc, (prefs) => ({ ...prefs, [key]: value }))
     const patch = options.skipConfigWrite ? null : configPatchForPref(key, value)
     if (patch) {
       try {
@@ -131,7 +142,7 @@ export async function savePref(
   // Plugin state is written in order like any key, but stays out of the cached map, as it does on the node.
   const cached = !isPluginStateKey(key)
   const previous = qc.getQueryData<Record<string, string>>(prefsKey)
-  if (cached) qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
+  if (cached) patchCachedPrefs(qc, (prefs) => ({ ...prefs, [key]: value }))
 
   const state = partitionWrites.get(key) ?? {
     tail: Promise.resolve(),
@@ -156,9 +167,8 @@ export async function savePref(
     // Equal values aren't equal attempts: dark -> light -> dark can have three requests in flight. Only
     // the latest attempt owns the optimistic cache value and may roll it back.
     if (cached && !attempt.aborted) {
-      const current = qc.getQueryData<Record<string, string>>(prefsKey)
-      qc.setQueryData<Record<string, string>>(prefsKey, () => {
-        const next = { ...current }
+      patchCachedPrefs(qc, (prefs) => {
+        const next = { ...prefs }
         if (state.hadConfirmedValue) next[key] = state.confirmed as string
         else delete next[key]
         return next

@@ -85,6 +85,20 @@ describe('savePref', () => {
     expect(client.getQueryData(prefsKey)).toEqual({ [NODE_PREF]: 'dark' })
   })
 
+  it('leaves an empty prefs cache empty, so a write cannot pose as the node answer', async () => {
+    // The startup restore takes a freshly stamped prefs map as the node's answer. A map holding only
+    // the keys written before the first fetch landed would hydrate every other slice to its default.
+    await withLocalStorage(async () => {
+      const client = new QueryClient()
+      mocks.writeJson.mockResolvedValue({})
+      await expect(savePref(client, 'theme', 'dark')).resolves.toBe(true)
+      await expect(savePref(client, NODE_PREF, 'on')).resolves.toBe(true)
+      mocks.writeJson.mockRejectedValueOnce(new Error('offline'))
+      await expect(savePref(client, NODE_PREF, 'off')).resolves.toBe(false)
+      expect(client.getQueryState(prefsKey)).toBeUndefined()
+    })
+  })
+
   it('writes a DEVICE pref locally and never reaches a node', async () => {
     // The point of the tier: `theme` is a property of this installation, `localStorage.setItem`
     // cannot fail in a way a retry would fix, and there is no network round trip to roll back. The
