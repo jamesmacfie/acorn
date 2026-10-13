@@ -124,10 +124,6 @@ and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#w
   itself still went through the native host, the Node, and Rollbar's API. The address a signed-in
   item view settles on wasn't seen.
 
-The full results are in [phase 04](../future/extension/04-github-handoff.md#real-browser-results),
-[phase 05](../future/extension/05-linear-handoff.md#real-browser-results), and
-[phase 06](../future/extension/06-rollbar-handoff.md#real-browser-results).
-
 ## Why
 
 Plugins describe a button and a route, and the extension does the rest, so no plugin code runs in a

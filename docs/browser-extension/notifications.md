@@ -116,5 +116,3 @@ the target as it connects.
   `sidebarAction.open` run only inside a person's input. A notification click may not count in either
   browser. If the panel doesn't open, the conversation opens when the person next opens the sidebar.
 - At most 100 waiting requests are read across the Node, oldest first.
-- The real-browser results and their gaps are in
-  [phase 09](../future/extension/09-site-notifications.md#real-browser-results).

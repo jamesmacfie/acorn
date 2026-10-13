@@ -101,8 +101,3 @@ same moment can still lose one change, as with any config field.
 
 The host sends `{ v, event: 'projects', nodeId }` when the selected Node broadcasts `project:changed`,
 and the sidebar reads the list again. A reply for a Node that is no longer selected is dropped.
-
-## Gaps
-
-The real-browser results and their gaps are in
-[phase 07](../future/extension/07-project-site-settings.md#real-browser-results).

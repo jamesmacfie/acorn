@@ -115,8 +115,6 @@ read that answers after that makes none.
   toolbar. Firefox screenshots therefore weren't taken in a browser.
 - A screenshot over 5 MiB wasn't produced in a browser; the largest was 3.7 MB.
 
-The full results are in [phase 03](../future/extension/03-page-capture.md#real-browser-results).
-
 ## Why
 
 Captures stay in the browser until the person sends, so a capture someone removes never reaches the

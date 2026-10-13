@@ -2,8 +2,7 @@
 
 This page covers the Acorn extension for Chrome and Firefox and the native bridge it reaches a Node
 through: who owns what, the native messaging contract, pairing, and the states the sidebar shows.
-Read it before you change the extension, the bridge, or an operation between them. The plan for later
-features is in [the extension programme](./future/extension/README.md).
+Read it before you change the extension, the bridge, or an operation between them.
 
 Topic pages:
 
@@ -171,8 +170,6 @@ connection until it is paired again.
   fresh port, and **Retry** opens one, and either answers at once.
 - The sidebar draws no tool details or subagent streams. It draws the screenshots a turn sent and names any other attachment.
 - Drafts are never expired.
-- Each phase's real-browser results and their gaps are in its page, listed in
-  [phases and dependencies](./future/extension/README.md#phases-and-dependencies).
 
 ## Why
 
