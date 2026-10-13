@@ -2,6 +2,7 @@ import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type {
   BridgeAgentHint,
   BridgeErrorCode,
+  BridgePageTask,
   BridgePendingRequest,
   BridgeRequest,
 } from '@acorn/protocol/extensionBridge.ts'
@@ -36,7 +37,7 @@ export type BackgroundMessage =
   | { type: 'status'; status: NodeStatus }
   | { type: 'agent'; hint: BridgeAgentHint }
   | { type: 'host'; host: HostState }
-  // A site button was clicked. The sidebar resolves it; nothing is sent to an agent.
+  // A task chip was clicked on a page no task holds. The sidebar resolves it; nothing is sent to an agent.
   | { type: 'handoff'; handoff: PageHandoff }
   // The selected Node's plugins changed, so the sidebar reads its handoffs again.
   | { type: 'handoffs'; nodeId: string }
@@ -49,6 +50,10 @@ export type BackgroundMessage =
   | { type: 'requests'; nodeId: string | null; requests: BridgePendingRequest[] }
   // An OS notification was clicked: open that request's conversation.
   | { type: 'open'; target: RequestTarget }
+  // The selected Node's tasks and the page addresses each is known by.
+  | { type: 'taskPages'; nodeId: string | null; tasks: BridgePageTask[] }
+  // A task chip was clicked: show Home on the page's task, with a new chat about the page for `chat`.
+  | { type: 'showTask'; chat: { url: string; title: string } | null }
 
 // Failures after which a write may or may not have reached the Node. The sidebar reads again and
 // leaves any retry to the person.

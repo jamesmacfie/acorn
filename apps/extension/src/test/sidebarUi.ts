@@ -42,6 +42,15 @@ export async function useTask(root: ParentNode, title: string) {
   await settle(20)
 }
 
+// Makes a task current through Settings' task search, the way on a page that matches nothing.
+export async function findTask(root: ParentNode, title: string) {
+  button(root.querySelector('[aria-label="Current task"]')!, 'Find a task')!.click()
+  await settle(20)
+  const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Settings"] [aria-label="Tasks"] .row-button')]
+  rows.find((row) => row.querySelector('strong')?.textContent === title)!.click()
+  await settle(30)
+}
+
 // Opens a conversation from Agents, going back to Home first when one is open.
 export async function openChat(root: ParentNode, title: string) {
   if (root.querySelector('[aria-label="Conversation"]')) await back(root)

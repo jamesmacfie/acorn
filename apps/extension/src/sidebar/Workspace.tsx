@@ -1,5 +1,5 @@
 import { Show, batch, createEffect, createMemo, createSignal, on, onMount } from 'solid-js'
-import type { ProjectSite } from '@acorn/protocol/siteAssociations.ts'
+import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import type {
   BridgeAgentHint,
   BridgeAgentSession,
@@ -12,6 +12,7 @@ import type { BrowserApi } from '../browser'
 import type { PageHandoff } from '../handoffs'
 import { CallFailure, type RequestTarget } from '../messages'
 import { loadSiteChoices, pageScope, saveSiteChoices, type SiteChoices } from '../pageScope'
+import type { PageTask } from '../taskPages'
 import type { BridgeClient } from './bridgeClient'
 import { CaptureFailure, withCapture, type CaptureKind, type PageCapture } from './capture'
 import { Conversation } from './Conversation'
@@ -20,8 +21,9 @@ import { Agents, CurrentTask, ThisPage, lastLines } from './Home'
 import { changeDraft, loadDestination, saveDestination, type Destination } from './localState'
 import { Waiting } from './Waiting'
 
-// The work on one Node: the current task, its conversations, and the page beside the panel. Home
-// shows them; opening a conversation replaces Home until the person goes back. The parent mounts one
+// The work on one Node: the current task, the page beside the panel, and the conversations of the
+// page's task, or of the current task on a page that belongs to none. Home shows them; opening a
+// conversation makes its task current and replaces Home until the person goes back. The parent mounts one
 // per selected Node, and again each time Settings closes, so it restores the current task from
 // storage. Each list read checks on its return that the choice it was made for is still the choice,
 // so a slow reply can't fill the wrong list.
@@ -41,7 +43,13 @@ export function Workspace(props: {
   pageUrl: string | undefined
   handoffs: readonly BridgeHandoff[]
   sites: readonly ProjectSite[]
-  // A handoff the person asked for, from a site button or This page's offer.
+  sitesChanged(projectId: string, sites: SiteAssociation[]): void
+  // The tasks the page belongs to, matched in the browser, and a task chip's click asking to show
+  // the page's task, with a new chat about the page for `chat`.
+  pageTasks: readonly PageTask[]
+  showTask: { chat: { url: string; title: string } | null } | null
+  shownTask(): void
+  // A handoff the person asked for, from a task chip or This page's offer.
   handoff: PageHandoff | null
   startHandoff(handoff: PageHandoff): void
   dismissHandoff(): void
@@ -61,7 +69,8 @@ export function Workspace(props: {
   const [projects, setProjects] = createSignal<BridgeProject[] | null>(null)
   const [taskLists, setTaskLists] = createSignal<Record<string, BridgeTask[]>>({})
   const [current, setCurrent] = createSignal<Destination>({ projectId: null, taskId: null, sessionId: null })
-  const [sessions, setSessions] = createSignal<BridgeAgentSession[] | null>(null)
+  // Each task's conversations, as last read. Keyed by task, so a slow reply fills only its own list.
+  const [sessionLists, setSessionLists] = createSignal<Record<string, BridgeAgentSession[]>>({})
   const [newChat, setNewChat] = createSignal(false)
   // The project This page shows, apart from the current task's.
   const [pageProject, setPageProject] = createSignal<string | null>(null)
@@ -100,25 +109,28 @@ export function Workspace(props: {
     }
   }
 
-  // Reads the current task's conversations, then hands them to `then` if the task is still current.
+  // The task Home's Agents shows: the page's, or the current task on a page that belongs to none.
+  const pageTask = () => props.pageTasks[0] ?? null
+  const agentsTask = () =>
+    pageTask() ? { projectId: pageTask()!.task.projectId, taskId: pageTask()!.task.id } : current()
+
+  // Reads a task's conversations, then hands them to `then` if the task is still current.
   const loadSessions = async (forTask: string, then?: (list: BridgeAgentSession[]) => void) => {
     try {
       const result = await props.client.call({ op: 'sessions.list', nodeId, taskId: forTask })
-      if (current().taskId !== forTask) return
-      setSessions(result.sessions)
-      then?.(result.sessions)
+      setSessionLists((lists) => ({ ...lists, [forTask]: result.sessions }))
+      if (current().taskId === forTask) then?.(result.sessions)
     } catch (error) {
-      if (current().taskId === forTask) report(error)
+      if (current().taskId === forTask || agentsTask().taskId === forTask) report(error)
     }
   }
 
-  // Every change of task clears the conversation in the same batch, so a conversation is never
+  // Every change of task closes the conversation in the same batch, so a conversation is never
   // mounted with a task it doesn't belong to.
   function useTask(projectId: string, taskId: string, then?: (list: BridgeAgentSession[]) => void) {
     chosen++
     batch(() => {
       setCurrent({ projectId, taskId, sessionId: null })
-      setSessions(null)
       setNewChat(false)
     })
     void loadSessions(taskId, then)
@@ -134,9 +146,12 @@ export function Workspace(props: {
 
   const showSession = (id: string) => setCurrent((destination) => ({ ...destination, sessionId: id }))
 
-  // The person opened a conversation. Waiting context joins its stored draft first, through the same
-  // helper a send that finished elsewhere uses, so the composer finds it when it mounts.
-  async function openSession(forTask: string, id: string) {
+  // The person opened a conversation, which makes its task current. Waiting context joins its stored
+  // draft first, through the same helper a send that finished elsewhere uses, so the composer finds it
+  // when it mounts.
+  async function openSession(target: { projectId: string; taskId: string }, id: string) {
+    const forTask = target.taskId
+    const mine = chosen
     const capture = props.waitingContext
     if (capture) {
       try {
@@ -155,8 +170,13 @@ export function Workspace(props: {
         )
       }
     }
-    if (current().taskId !== forTask) return
-    showSession(id)
+    // Another task was chosen meanwhile.
+    if (mine !== chosen) return
+    if (current().taskId !== forTask) {
+      chosen++
+      void loadTasks(target.projectId)
+    }
+    setCurrent({ projectId: target.projectId, taskId: forTask, sessionId: id })
     remember()
   }
 
@@ -169,19 +189,24 @@ export function Workspace(props: {
   const back = () => {
     setCurrent((destination) => ({ ...destination, sessionId: null }))
     remember()
-    if (current().taskId) void loadSessions(current().taskId!)
+    const shown = agentsTask().taskId
+    if (shown) void loadSessions(shown)
   }
 
-  // A handoff's linked or new task: its newest conversation opens, or the new-chat picker when it has none.
-  const openHandoffTask = (projectId: string, taskId: string, capture: PageCapture) => {
-    props.setWaitingContext(capture)
-    props.dismissHandoff()
+  // A task's newest conversation opens, or the new-chat picker when it has none.
+  const chatInTask = (projectId: string, taskId: string) =>
     void restore(projectId, taskId, (list) => {
       remember()
       const newest = list[0]
-      if (newest) void openSession(taskId, newest.id)
+      if (newest) void openSession({ projectId, taskId }, newest.id)
       else setNewChat(true)
     })
+
+  // A handoff's linked or new task, with the item's context waiting for the conversation.
+  const openHandoffTask = (projectId: string, taskId: string, capture: PageCapture) => {
+    props.setWaitingContext(capture)
+    props.dismissHandoff()
+    chatInTask(projectId, taskId)
   }
 
   // Start task made a task and a conversation in it. The draft is stored before the conversation
@@ -227,6 +252,30 @@ export function Workspace(props: {
       props.openedRequest()
       if (target.nodeId === nodeId) openConversation(target)
     }),
+  )
+
+  // A task chip was clicked: Home shows the page's task, and for New chat about this page, the
+  // new-chat picker with the page's link waiting for the conversation it starts.
+  createEffect(
+    on(
+      () => props.showTask,
+      (request) => {
+        if (!request) return
+        props.shownTask()
+        if (current().sessionId) back()
+        if (!request.chat) return
+        const { url, title } = request.chat
+        props.setWaitingContext({ kind: 'link', id: crypto.randomUUID(), url, title, capturedAt: Date.now() })
+        setNewChat(true)
+      },
+    ),
+  )
+  // The page's task changed: read its conversations.
+  createEffect(
+    on(
+      () => pageTask()?.task.id,
+      (taskId) => taskId && void loadSessions(taskId),
+    ),
   )
 
   // A handoff shows on Home, so it closes the conversation.
@@ -289,9 +338,9 @@ export function Workspace(props: {
     on(
       () => props.hint,
       (hint) => {
-        const { taskId, sessionId } = current()
-        if (hint?.nodeId !== nodeId || !taskId || sessionId) return
-        const listed = (id: string) => sessions()?.some((session) => session.id === id)
+        const { taskId } = agentsTask()
+        if (hint?.nodeId !== nodeId || !taskId || current().sessionId) return
+        const listed = (id: string) => sessionLists()[taskId]?.some((session) => session.id === id)
         if (hint.missed || hint.tasks.includes(taskId) || hint.sessions.some(listed)) void loadSessions(taskId)
       },
       { defer: true },
@@ -310,7 +359,7 @@ export function Workspace(props: {
       () => props.reconnects,
       () => {
         if (!projects()) void loadProjects()
-        const forTask = current().taskId
+        const forTask = current().sessionId ? current().taskId : agentsTask().taskId
         if (forTask) void loadSessions(forTask)
       },
       { defer: true },
@@ -318,7 +367,7 @@ export function Workspace(props: {
   )
 
   const task = () => taskLists()[current().projectId ?? '']?.find((row) => row.id === current().taskId) ?? null
-  const session = () => sessions()?.find((row) => row.id === current().sessionId) ?? null
+  const session = () => sessionLists()[current().taskId ?? '']?.find((row) => row.id === current().sessionId) ?? null
   const projectName = (id: string) => projects()?.find((row) => row.id === id)?.name ?? id
   const lines = lastLines((sessionId, afterSeq, limit) =>
     props.client.call({ op: 'session.read', nodeId, sessionId, afterSeq, limit }),
@@ -350,6 +399,9 @@ export function Workspace(props: {
               opensLinks={props.opensLinks}
               pageUrl={props.pageUrl}
               handoffs={props.handoffs}
+              pageTasks={props.pageTasks}
+              projectName={projectName}
+              chat={chatInTask}
               handoff={props.handoff}
               startHandoff={props.startHandoff}
               dismissHandoff={props.dismissHandoff}
@@ -360,6 +412,8 @@ export function Workspace(props: {
               dropWaitingContext={() => props.setWaitingContext(null)}
               projects={projects()}
               suggested={scope().suggested}
+              onSite={scope().suggested.length > 0 || pageProjects().length > 0}
+              sitesChanged={props.sitesChanged}
               several={!pageProject() && pageProjects().length > 1}
               project={pageProject()}
               pickProject={pickProject}
@@ -367,32 +421,41 @@ export function Workspace(props: {
               currentTaskId={current().taskId}
               pickTask={pickTask}
             />
-            <Show when={current().taskId} keyed>
-              {(taskId) => (
-                <Agents
-                  client={props.client}
-                  nodeId={nodeId}
-                  taskId={taskId}
-                  online={props.online}
-                  sessions={sessions()}
-                  requests={props.requests}
-                  lines={lines}
-                  open={(id) => void openSession(taskId, id)}
-                  newChat={newChat()}
-                  setNewChat={setNewChat}
-                  started={(started) => {
-                    setSessions((list) => [started, ...(list ?? []).filter((row) => row.id !== started.id)])
-                    setNewChat(false)
-                    void openSession(taskId, started.id)
-                  }}
-                />
-              )}
+            <Show when={agentsTask().taskId} keyed>
+              {(taskId) => {
+                const target = () => ({ projectId: agentsTask().projectId!, taskId })
+                return (
+                  <Agents
+                    client={props.client}
+                    nodeId={nodeId}
+                    taskId={taskId}
+                    online={props.online}
+                    sessions={sessionLists()[taskId] ?? null}
+                    requests={props.requests}
+                    lines={lines}
+                    open={(id) => void openSession(target(), id)}
+                    newChat={newChat()}
+                    setNewChat={setNewChat}
+                    started={(started) => {
+                      setSessionLists((lists) => ({
+                        ...lists,
+                        [taskId]: [started, ...(lists[taskId] ?? []).filter((row) => row.id !== started.id)],
+                      }))
+                      setNewChat(false)
+                      void openSession(target(), started.id)
+                    }}
+                  />
+                )
+              }}
             </Show>
-            <CurrentTask
-              task={task()}
-              projectName={current().projectId ? projectName(current().projectId!) : null}
-              findTask={props.findTask}
-            />
+            {/* The task the person last used stays pinned when the page is not its own. */}
+            <Show when={!pageTask() || (current().taskId && current().taskId !== pageTask()!.task.id)}>
+              <CurrentTask
+                task={task()}
+                projectName={current().projectId ? projectName(current().projectId!) : null}
+                findTask={props.findTask}
+              />
+            </Show>
           </div>
         }
       >

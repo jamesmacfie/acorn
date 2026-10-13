@@ -25,17 +25,19 @@ left out.
 
 ## Which page a request belongs to
 
-A tab's projects are the ones the project picker in the sidebar's **This page** section would choose for that page
-([project sites](./project-sites.md#suggestions-in-the-sidebar)). `pageScope` in `src/pageScope.ts`
-decides it for both the sidebar and the background:
+A request belongs to a tab when its task is one the page belongs to
+([pages that belong to a task](./task-pages.md#pages-that-belong-to-a-task)), or its project is one of
+the tab's projects. A tab's projects are the ones the project picker in the sidebar's **This page**
+section would choose for that page ([project sites](./project-sites.md#suggestions-in-the-sidebar)).
+`pageScope` in `src/pageScope.ts` decides them for both the sidebar and the background:
 
 - The person's choice for the page's site, kept in `siteChoices:<nodeId>`, wins. A choice of no
   project means the page has none.
 - Otherwise, every visible project whose associations cover the page. Hidden projects don't count.
 - A page that reports no address, because the extension may not read it, has none.
 
-Matching runs in the browser. `requests.pending` names only the Node, so no page address goes to the
-Node for the badge. A project the person explicitly chose for a conversation doesn't move the badge.
+Matching runs in the browser, against lists the Node already sent. `requests.pending` names only the
+Node, so no page address goes to the Node for the badge. A project the person explicitly chose for a conversation doesn't move the badge.
 A conversation stays bound across navigation, and the badge follows the page.
 
 ## The toolbar badge
@@ -59,7 +61,7 @@ The badge reads the requests again when:
 - A hint has `missed` set, or the selected Node's connection returns.
 
 It reads the visible projects and their associations on selection, on reconnect, and on the `projects`
-event. It draws again when a tab navigates, a site grant is added or removed, and the person's site
+event, and draws again whenever the list of task addresses changes. It draws again when a tab navigates, a site grant is added or removed, and the person's site
 choices change in `storage.local`.
 
 The count goes to zero at once when the host stops, the selected Node goes offline, a read fails, or

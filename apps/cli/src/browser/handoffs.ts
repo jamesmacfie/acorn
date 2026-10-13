@@ -1,10 +1,17 @@
-import type { BridgeHandoff, BridgeHandoffItem } from '@acorn/protocol/extensionBridge.ts'
+import type {
+  BridgeHandoff,
+  BridgeHandoffItem,
+  BridgePageTask,
+  BridgeTaskPage,
+} from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserHandoff, BrowserHandoffItem } from '@acorn/protocol/plugin/handoffs.ts'
 import type { Project, Task } from '@acorn/protocol/api.ts'
+import { parseSiteAddress } from '@acorn/protocol/siteAssociations.ts'
 
 // Browser handoffs on the host side (docs/browser-extension/handoffs.md): what discovery shows the
-// browser, and which tasks already hold a resolved item. Both are plain functions over the Node's own
-// answers; `createBridge` makes the calls.
+// browser, which tasks already hold a resolved item, and the page addresses each task is known by
+// (docs/browser-extension/task-pages.md). All are plain functions over the Node's own answers;
+// `createBridge` makes the calls.
 
 // Discovery without the route. The browser never names a route; the host looks it up again for each
 // call, so a stale or forged list can't send a request anywhere the Node didn't declare.
@@ -66,4 +73,32 @@ export function bridgeHandoffItem(
     })),
     context: item.context ?? null,
   }
+}
+
+// The addresses each active task already records, from the Node's task list alone, so finding a
+// page's task costs no provider call. A task's links carry their item's address when the provider
+// stamped one. Core records a pull request as the project's GitHub repository and the task's pull
+// number rather than as a link, so its address is built here, as the GitHub plugin builds it.
+export function taskPages(tasks: readonly Task[]): BridgePageTask[] {
+  return tasks.flatMap((task) => {
+    if (task.status !== 'active') return []
+    const addresses: { url: string | undefined; source: string }[] = [
+      ...(task.github && task.pullNumber
+        ? [
+            {
+              url: `https://github.com/${task.github.owner}/${task.github.name}/pull/${task.pullNumber}`,
+              source: 'github',
+            },
+          ]
+        : []),
+      ...task.links.map((link) => ({ url: link.ref?.url, source: link.providerId })),
+    ]
+    const pages = addresses.flatMap(({ url, source }): BridgeTaskPage[] => {
+      const parsed = url ? parseSiteAddress(url) : null
+      return parsed?.ok ? [{ ...parsed.site, source }] : []
+    })
+    return pages.length
+      ? [{ id: task.id, title: task.title, branch: task.branch, projectId: task.projectId, pages }]
+      : []
+  })
 }

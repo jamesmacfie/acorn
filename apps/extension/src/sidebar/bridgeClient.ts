@@ -2,6 +2,7 @@ import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type {
   BridgeAgentHint,
   BridgeOperation,
+  BridgePageTask,
   BridgePendingRequest,
   BridgeResults,
 } from '@acorn/protocol/extensionBridge.ts'
@@ -27,6 +28,8 @@ export function bridgeClient(
     page(): void
     requests(nodeId: string | null, requests: BridgePendingRequest[]): void
     open(target: RequestTarget): void
+    taskPages(nodeId: string | null, tasks: BridgePageTask[]): void
+    showTask(chat: { url: string; title: string } | null): void
   },
 ): BridgeClient {
   let port: Port | null = null
@@ -48,6 +51,8 @@ export function bridgeClient(
       if (message.type === 'page') return events.page()
       if (message.type === 'requests') return events.requests(message.nodeId, message.requests)
       if (message.type === 'open') return events.open(message.target)
+      if (message.type === 'taskPages') return events.taskPages(message.nodeId, message.tasks)
+      if (message.type === 'showTask') return events.showTask(message.chat)
       const request = pending.get(message.id)
       if (!request) return
       pending.delete(message.id)

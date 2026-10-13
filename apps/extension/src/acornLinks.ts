@@ -1,8 +1,8 @@
-import { Show, createSignal } from 'solid-js'
 import { buildLink, type Place } from '@acorn/client-core/host/registries/commands/addresses'
 
-// `acorn://` links into the desktop app (docs/frontend/acorn-links.md). The Node ID is the bridge's,
-// which is the Node's own ID, the same one the desktop's links name.
+// `acorn://` links into the desktop app (docs/frontend/acorn-links.md), for the sidebar and for the task
+// chip on a web page. The Node ID is the bridge's, which is the Node's own ID, the same one the
+// desktop's links name.
 
 // The desktop pane that shows a handed-off item, by the plugin whose handoff matched the page. A task
 // from a plugin missing here opens on whichever pane it showed last.
@@ -30,36 +30,7 @@ export const itemTaskLink = (nodeId: string, pluginId: string, taskId: string) =
   link(nodeId, task(taskId, ITEM_PANES[pluginId]))
 export const conversationLink = (nodeId: string, taskId: string, sessionId: string) =>
   link(nodeId, task(taskId, AGENT_PANE, sessionId))
+// The project's place in the desktop app, where a task is made with the desktop's own choices.
+export const projectLink = (nodeId: string, projectId: string) => link(nodeId, { kind: 'project', projectId, rest: [] })
 // An outside item with no task: the desktop finds what claims the address.
 export const outsideItemLink = (nodeId: string, url: string) => link(nodeId, { kind: 'open', url })
-
-// Opens the desktop app on `href`, as a plain link, which both browsers hand to the app that
-// registered the scheme. Only a release desktop registers `acorn://`, so a development build copies
-// the link instead.
-export function OpenInAcorn(props: { href: string | null; opensLinks: boolean; class?: string }) {
-  return (
-    <Show when={props.href}>
-      {(href) => (
-        <Show when={props.opensLinks} fallback={<CopyAcornLink href={href()} class={props.class} />}>
-          <a class={`button ${props.class ?? ''}`} href={href()}>
-            Open in Acorn ↗
-          </a>
-        </Show>
-      )}
-    </Show>
-  )
-}
-
-export function CopyAcornLink(props: { href: string; class?: string }) {
-  const [copied, setCopied] = createSignal(false)
-  const copy = async () => {
-    await navigator.clipboard.writeText(props.href)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }
-  return (
-    <button type="button" class={props.class} title={props.href} onClick={() => void copy().catch(() => {})}>
-      {copied() ? 'Copied' : 'Copy Acorn link'}
-    </button>
-  )
-}

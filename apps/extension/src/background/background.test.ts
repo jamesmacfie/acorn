@@ -6,7 +6,12 @@ import { HANDOFFS_KEY } from './siteButtons'
 
 // A scripted host with the real host's selection rules: it knows some Nodes and selects one at a time.
 function scriptedHost(fake: ReturnType<typeof fakeBrowser>, known: string[]) {
-  const state = { active: null as string | null, handoffs: [] as unknown[] }
+  const state = {
+    active: null as string | null,
+    handoffs: [] as unknown[],
+    taskPages: [] as unknown[],
+    sessions: [] as { id: string; runtimeState: string }[],
+  }
   fake.onNativeMessage = (raw, host: FakeHost) => {
     const message = raw as { id: string; op: string; nodeId?: string | null }
     const reply = (result: unknown) => host.send({ v: 1, id: message.id, ok: true, result })
@@ -33,6 +38,13 @@ function scriptedHost(fake: ReturnType<typeof fakeBrowser>, known: string[]) {
         : fail('not_selected')
     if (message.op === 'projects.list')
       return message.nodeId === state.active ? reply({ nodeId: message.nodeId, projects: [] }) : fail('not_selected')
+    if (message.op === 'tasks.pages') return reply({ nodeId: message.nodeId, tasks: state.taskPages })
+    if (message.op === 'sessions.list')
+      return reply({
+        nodeId: message.nodeId,
+        taskId: (message as { taskId?: string }).taskId,
+        sessions: state.sessions,
+      })
   }
   return state
 }
@@ -152,24 +164,37 @@ describe('site buttons', () => {
     match: ['https://tracker.example/items/{id}'],
     anchors: ['.actions'],
   }
-  const buttons = [{ key: 'tracker:item', label: 'Open in Acorn', anchors: ['.actions'] }]
+  const buttons = [{ key: 'tracker:item', label: 'Open in Acorn', anchors: ['.actions'], task: null }]
   const lastButtons = (fake: ReturnType<typeof fakeBrowser>) =>
     (fake.tabMessages.at(-1)?.message as { buttons?: unknown } | undefined)?.buttons
 
-  async function started(options: { url?: string } = {}) {
-    const fake = fakeBrowser()
+  async function started(options: { url?: string; flavor?: 'chrome' | 'firefox'; hostName?: string } = {}) {
+    const fake = fakeBrowser({ flavor: options.flavor })
     fake.activeTab = { id: 7, windowId: 1, url: options.url ?? 'https://tracker.example/items/42', title: 'Item 42' }
     const host = scriptedHost(fake, ['a', 'b'])
     host.handoffs = [handoff]
-    startBackground(fake.api, 'com.acorn.browser_bridge')
+    host.taskPages = [pageTask]
+    startBackground(fake.api, options.hostName ?? 'com.acorn.browser_bridge')
     const panel = sidebar(fake)
     await panel.call({ op: 'node.select', nodeId: 'a' })
+    // The status that lets the background read.
+    fake.hosts[0]!.send({ v: 1, event: 'status', status: { nodeId: 'a', state: 'online' } })
     await settle()
     return { fake, host, panel }
   }
+  // The task item 42 belongs to.
+  const pageTask = {
+    id: 't1',
+    title: 'Fix billing rounding',
+    branch: 'fix/billing',
+    projectId: 'p1',
+    pages: [{ origin: 'https://tracker.example', pathPrefix: '/items/42', source: 'tracker' }],
+  }
+  const lastMessage = (fake: ReturnType<typeof fakeBrowser>) =>
+    fake.tabMessages.at(-1)?.message as { opensLinks: boolean; opensPanel: boolean }
 
   it("draws the selected Node's buttons on a matching page it may read", async () => {
-    const { fake } = await started()
+    const { fake } = await started({ url: 'https://tracker.example/items/43' })
     expect(fake.injected).toContain(7)
     expect(lastButtons(fake)).toEqual(buttons)
     expect(fake.storage.get(HANDOFFS_KEY)).toEqual({ nodeId: 'a', handoffs: [handoff] })
@@ -247,5 +272,59 @@ describe('site buttons', () => {
     await settle()
     expect(fake.injected).toEqual([7])
     expect(lastButtons(fake)).toEqual(buttons)
+  })
+
+  it("draws the task chip on a page that belongs to a task, with its agents' state and link", async () => {
+    const { fake, host, panel } = await started()
+    expect(panel.messages).toContainEqual({ type: 'taskPages', nodeId: 'a', tasks: [pageTask] })
+    expect(lastButtons(fake)).toEqual([
+      { ...buttons[0], task: { title: 'Fix billing rounding', state: null, link: 'acorn://a/t/t1' } },
+    ])
+    expect(lastMessage(fake)).toMatchObject({ opensLinks: true, opensPanel: true })
+
+    // A hint naming the task reads its conversations again.
+    host.sessions = [
+      { id: 's1', runtimeState: 'working' },
+      { id: 's2', runtimeState: 'working' },
+    ]
+    fake.hosts[0]!.send({
+      v: 1,
+      event: 'agent',
+      nodeId: 'a',
+      sessions: [],
+      tasks: ['t1'],
+      missed: false,
+      requests: false,
+    })
+    await settle()
+    expect((lastButtons(fake) as { task: { state: unknown } }[])[0]!.task.state).toEqual({
+      label: '2 working',
+      tone: 'ok',
+    })
+
+    // The task lost its address: the list is read again on the bridge's tasks event, never on a timer.
+    host.taskPages = []
+    fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'a' })
+    await settle()
+    expect(lastButtons(fake)).toEqual(buttons)
+  })
+
+  it('opens the panel on the task for a chip click, with a new chat about the page when asked', async () => {
+    const { fake, panel } = await started()
+    fake.sendFromPage({ type: 'acorn:chip', key: 'tracker:item', action: 'show' })
+    fake.sendFromPage({ type: 'acorn:chip', key: 'tracker:item', action: 'chat' })
+    await settle()
+    expect(fake.panelOpens).toEqual([1, 1])
+    expect(panel.messages.filter((message) => message.type === 'showTask')).toEqual([
+      { type: 'showTask', chat: null },
+      { type: 'showTask', chat: { url: 'https://tracker.example/items/42', title: 'Item 42' } },
+    ])
+  })
+
+  it('tells the page when Acorn links are copied rather than opened, and when it cannot open the panel', async () => {
+    const development = await started({ hostName: 'com.acorn.browser_bridge_dev' })
+    expect(lastMessage(development.fake)).toMatchObject({ opensLinks: false, opensPanel: true })
+    const firefox = await started({ flavor: 'firefox' })
+    expect(lastMessage(firefox.fake)).toMatchObject({ opensLinks: true, opensPanel: false })
   })
 })

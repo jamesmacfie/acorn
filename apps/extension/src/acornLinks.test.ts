@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { conversationLink, itemTaskLink, outsideItemLink } from './acornLinks'
+import { conversationLink, itemTaskLink, outsideItemLink, projectLink } from './acornLinks'
 
 describe('Acorn links', () => {
   it("opens a handed-off item's task on the pane that shows it", () => {
     expect(itemTaskLink('n1', 'github', 't1')).toBe('acorn://n1/t/t1?pane=pr')
     // A plugin with no pane here opens the task as it was.
     expect(itemTaskLink('n1', 'linear', 't1')).toBe('acorn://n1/t/t1')
+  })
+
+  it('opens a project', () => {
+    expect(projectLink('n1', 'p1')).toBe('acorn://n1/p/p1')
   })
 
   it('opens a conversation on the agents pane', () => {

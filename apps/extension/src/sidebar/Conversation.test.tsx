@@ -8,7 +8,7 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
-import { back, button, conversationTitle, openChat, pick, useTask } from '../test/sidebarUi'
+import { back, button, conversationTitle, findTask, openChat } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -244,8 +244,7 @@ const draft = (root: HTMLElement) => root.querySelector<HTMLTextAreaElement>('te
 
 async function openSession(root: HTMLElement, sessionId = 's1') {
   await settle()
-  await pick(root, 'project', 'p1')
-  await useTask(root, 'Fix it')
+  await findTask(root, 'Fix it')
   await openChat(root, `Chat ${sessionId}`)
 }
 // The conversation's own reads, apart from the short ones Home makes for each row's last line.
@@ -426,8 +425,7 @@ describe('home', () => {
     subject.say('s1', 'Line one\nEdited the totals')
     subject.state.sessions[1]!.runtimeState = 'working'
     await settle()
-    await pick(subject.root, 'project', 'p1')
-    await useTask(subject.root, 'Fix it')
+    await findTask(subject.root, 'Fix it')
     expect(subject.root.querySelector('[aria-label="Current task"]')!.textContent).toContain('Fix it')
     expect(rows(subject.root)).toEqual([
       ['Claude · Chat s1', 'Ready', 'Edited the totals'],

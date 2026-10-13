@@ -13,9 +13,11 @@ Topic pages:
   the conversation window, send retries, and browser storage.
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
   page access, sending them, and the attachment operations.
-- [Handoffs](./browser-extension/handoffs.md): the buttons plugins put on websites, the handoff card,
-  the panel's verbs and its `acorn://` links, and the operations that resolve a page and create a
-  linked task.
+- [Handoffs](./browser-extension/handoffs.md): the task chip on websites, the handoff card, the
+  panel's verbs and its `acorn://` links, and the operations that resolve a page and create a linked
+  task.
+- [Pages matched to tasks](./browser-extension/task-pages.md): the `tasks.pages` read, matching the
+  page to its task in the browser, and Home's **This page** section.
 - [Project sites](./browser-extension/project-sites.md): the web addresses tied to a project, the
   sidebar's project suggestions and overrides, and the site operations.
 - [Request notifications](./browser-extension/notifications.md): the toolbar badge, the waiting list,
@@ -44,7 +46,7 @@ connects on its own, so the desktop can stay closed.
 
 The extension declares no content scripts and holds no host access at install. The background
 injects one, `content.js`, into a page it may read that matches a plugin's
-[site button](./browser-extension/handoffs.md#site-buttons). The manifests
+[task chip](./browser-extension/handoffs.md#task-chips). The manifests
 (`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, and `scripting`, plus
 `sidePanel` in Chrome. They list `http://*/*` and `https://*/*` as optional host access, and
 `notifications` as an optional permission, which only the person can grant, and turn off private
@@ -85,6 +87,7 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `node.forget` | `nodeId` | `{ nodes, activeNodeId, status }` |
 | `projects.list` | `nodeId` | `{ nodeId, projects }`, each `{ id, name, path, hidden }` |
 | `tasks.list` | `nodeId`, `projectId` | `{ nodeId, projectId, tasks }`: that project's active tasks, each `{ id, title, branch }` |
+| `tasks.pages` | `nodeId` | `{ nodeId, tasks }`: every active task with a page address, each `{ id, title, branch, projectId, pages }`; see [pages that belong to a task](./browser-extension/task-pages.md#pages-that-belong-to-a-task) |
 | `agents.profiles` | `nodeId` | `{ nodeId, profiles }`: the agents plugin's providers, each with `installed`, `authenticated`, and `diagnostics` |
 | `sessions.list` | `nodeId`, `taskId` | `{ nodeId, taskId, sessions }`: the task's newest 100 unarchived sessions |
 | `session.read` | `nodeId`, `sessionId`, `afterSeq`, `limit` (at most 500) | `{ nodeId, sessionId, session, records, reach, queued }` |
@@ -100,7 +103,8 @@ A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, 
 also sends `{ v, event: 'status', status }` when the selected Node's connection changes, and
 `{ v, event: 'agent', nodeId, sessions, tasks, missed, requests }` as a change hint, and
 `{ v, event: 'handoffs', nodeId }` when the selected Node's plugins change, and
-`{ v, event: 'projects', nodeId }` when one of its projects changes. [Agent conversations](./browser-extension/conversations.md) covers the agent
+`{ v, event: 'projects', nodeId }` when one of its projects changes, and `{ v, event: 'tasks', nodeId }`
+when one of its tasks is created, changed, or archived, or its links change. [Agent conversations](./browser-extension/conversations.md) covers the agent
 operations, hints, and what the sidebar keeps in browser storage. `turn.submit`'s `input` is the
 agents plugin's turn input, limited to the parts [page capture](./browser-extension/page-capture.md)
 sends: at most one `text` part of 60,000 characters, eight `context` parts, and eight `image` parts. A request
@@ -153,7 +157,7 @@ The sidebar also drops a reply whose `nodeId` is no longer selected. A slow read
 Node's list either way.
 
 The host keeps the selection only while it runs. The background stores `selectedNodeId` in
-`storage.local`, beside the selected Node's site buttons and the sidebar's drafts, listed in
+`storage.local`, beside the selected Node's handoffs and the sidebar's drafts, listed in
 [browser storage](./browser-extension/conversations.md#browser-storage). Each time the background starts the host, it
 sends `node.select` with the stored ID before any other call. The background starts the host itself
 as it starts, when an ID is stored, so the [toolbar badge](./browser-extension/notifications.md#the-toolbar-badge)

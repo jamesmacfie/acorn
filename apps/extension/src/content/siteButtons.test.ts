@@ -1,16 +1,39 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ContentMessage } from '../handoffs'
+import type { ChipTask, ContentMessage } from '../handoffs'
 
 // The content script against a real DOM. The browser side is a stub: the message listener the
-// background talks to, and `sendMessage` for a click.
+// background talks to, and `sendMessage` for a click. Each chip draws in a closed shadow root, which
+// the page can't reach, so the test keeps the roots as they are attached.
 type Listener = (message: unknown) => void
 let listener: Listener | undefined
 let sent: unknown[] = []
+const roots = new Map<Element, ShadowRoot>()
+// Every listener the script adds, so a click can be delivered as the person's own: jsdom can only make
+// events a page could make, which the script ignores.
+const listeners = new Map<EventTarget, { type: string; listener: EventListener }[]>()
 
 beforeEach(async () => {
   document.body.innerHTML = '<header class="item"><div class="actions"><button>Edit</button></div></header>'
   sent = []
+  roots.clear()
+  listeners.clear()
+  const attachShadow = Element.prototype.attachShadow
+  vi.spyOn(Element.prototype, 'attachShadow').mockImplementation(function (this: Element, init) {
+    const root = attachShadow.call(this, init)
+    roots.set(this, root)
+    return root
+  })
+  const addEventListener = EventTarget.prototype.addEventListener
+  vi.spyOn(EventTarget.prototype, 'addEventListener').mockImplementation(function (
+    this: EventTarget,
+    type,
+    added,
+    options,
+  ) {
+    listeners.set(this, [...(listeners.get(this) ?? []), { type, listener: added as EventListener }])
+    return addEventListener.call(this, type, added, options)
+  })
   const scope = globalThis as Record<string, unknown>
   delete scope.acornSiteButtons
   scope.chrome = {
@@ -23,52 +46,143 @@ beforeEach(async () => {
   await import('./siteButtons')
 })
 afterEach(() => {
+  vi.restoreAllMocks()
   delete (globalThis as Record<string, unknown>).chrome
 })
 
-const show = (buttons: ContentMessage['buttons']) =>
-  listener?.({ type: 'acorn:buttons', buttons } satisfies ContentMessage)
+type Button = ContentMessage['buttons'][number]
+const show = (buttons: Button[], page: Partial<Omit<ContentMessage, 'type' | 'buttons'>> = {}) =>
+  listener?.({ type: 'acorn:buttons', buttons, opensLinks: true, opensPanel: true, ...page } satisfies ContentMessage)
 const frame = () => new Promise((resolve) => setTimeout(resolve, 40))
 const drawn = () => [...document.querySelectorAll('[data-acorn-handoff]')]
+const chip = (index = 0) => roots.get(drawn()[index]!)!
+const main = () => chip().querySelector<HTMLButtonElement>('.main')!
+const menu = () => chip().querySelector<HTMLElement>('[role="menu"]')
+const items = () => [...(menu()?.children ?? [])].map((item) => item.textContent)
+const item = (name: string) => [...menu()!.children].find((element) => element.textContent === name) as HTMLElement
 
-describe('site buttons in the page', () => {
-  it('draws one button, as text, at the end of the first anchor that matches', () => {
+// The person's own click, delivered through the listeners the script added, bubbling to the chip.
+function press(element: Node) {
+  let stopped = false
+  const event = { type: 'click', isTrusted: true, preventDefault() {}, stopPropagation: () => (stopped = true) }
+  for (let node: Node | null = element; node && !stopped; node = node.parentNode)
+    for (const { type, listener } of listeners.get(node) ?? [])
+      if (type === 'click') listener(event as unknown as Event)
+}
+
+const button = (task: ChipTask | null = null): Button => ({
+  key: 'tracker:item',
+  label: 'Open in Acorn',
+  anchors: ['.actions'],
+  task,
+})
+const task: ChipTask = {
+  title: 'Fix billing rounding',
+  state: { label: '2 working', tone: 'ok' },
+  link: 'acorn://n1/t/t1?pane=pr',
+}
+
+describe('task chips in the page', () => {
+  it('draws one chip at the end of the first anchor that matches, with plugin and task text as text', () => {
     show([
       {
-        key: 'tracker:item',
-        label: '<img src=x onerror=alert(1)>',
+        ...button({ ...task, title: '<img src=x onerror=alert(1)>' }),
+        label: '<b>label</b>',
         anchors: ['.missing', 'not a [selector', '.actions'],
       },
     ])
     expect(drawn()).toHaveLength(1)
-    const button = drawn()[0] as HTMLButtonElement
-    expect(button.parentElement?.className).toBe('actions')
-    expect(button.previousElementSibling?.textContent).toBe('Edit')
-    expect(button.textContent).toBe('<img src=x onerror=alert(1)>')
-    expect(document.querySelector('img')).toBeNull()
+    expect(drawn()[0]!.parentElement?.className).toBe('actions')
+    expect(drawn()[0]!.previousElementSibling?.textContent).toBe('Edit')
+    expect(chip().querySelector('.name')!.textContent).toBe('<img src=x onerror=alert(1)>')
+    expect(main().getAttribute('aria-label')).toBe('<img src=x onerror=alert(1)>2 working (<b>label</b>)')
+    expect(chip().querySelector('img, b')).toBeNull()
+    expect(document.querySelector('img, b')).toBeNull()
   })
 
-  it('keeps one button through a page that redraws its header', async () => {
-    show([{ key: 'tracker:item', label: 'Open in Acorn', anchors: ['.actions'] }])
+  it('keeps one chip through a page that redraws its header', async () => {
+    show([button()])
     document.body.innerHTML = '<header class="item"><div class="actions"></div></header>'
     await frame()
     expect(drawn()).toHaveLength(1)
-    show([{ key: 'tracker:item', label: 'Open in Acorn', anchors: ['.actions'] }])
+    show([button()])
     expect(drawn()).toHaveLength(1)
   })
 
-  it('draws nothing without an anchor, and removes buttons it is no longer given', () => {
-    show([{ key: 'tracker:item', label: 'Open in Acorn', anchors: ['.nowhere'] }])
+  it('draws nothing without an anchor, and removes chips it is no longer given', () => {
+    show([{ ...button(), anchors: ['.nowhere'] }])
     expect(drawn()).toHaveLength(0)
-    show([{ key: 'tracker:item', label: 'Open in Acorn', anchors: ['.actions'] }])
+    show([button()])
     expect(drawn()).toHaveLength(1)
     show([])
     expect(drawn()).toHaveLength(0)
   })
 
-  it('ignores a click the page made rather than the person', () => {
-    show([{ key: 'tracker:item', label: 'Open in Acorn', anchors: ['.actions'] }])
-    ;(drawn()[0] as HTMLButtonElement).click()
+  it("takes the page's theme and its buttons' height", () => {
+    show([button(task)])
+    expect(chip().querySelector<HTMLElement>('.chip')!.dataset.theme).toBe('light')
+    document.querySelector<HTMLElement>('.actions')!.style.color = 'rgb(230, 237, 243)'
+    show([button(task)])
+    expect(chip().querySelector<HTMLElement>('.chip')!.dataset.theme).toBe('dark')
+    // jsdom lays nothing out, so the site's button reads as no height and the chip takes the usual one.
+    expect(chip().querySelector<HTMLElement>('.chip')!.style.getPropertyValue('--height')).toBe('28px')
+  })
+
+  it("shows the task's name and agents, opens the panel on it, and offers the task's verbs", async () => {
+    show([button({ ...task, state: { label: '1 waiting', tone: 'warn' } })])
+    expect(main().textContent).toBe('Fix billing rounding1 waiting')
+    expect(chip().querySelector<HTMLElement>('.state')!.dataset.tone).toBe('warn')
+    press(main())
+    expect(sent).toEqual([{ type: 'acorn:chip', key: 'tracker:item', action: 'show' }])
+
+    expect(menu()!.hidden).toBe(true)
+    press(chip().querySelector('.more')!)
+    expect(menu()!.hidden).toBe(false)
+    expect(items()).toEqual(['Show in side panel', 'Open in Acorn ↗', 'New chat about this page', 'Copy Acorn link'])
+    expect(item('Open in Acorn ↗').getAttribute('href')).toBe('acorn://n1/t/t1?pane=pr')
+    press(item('New chat about this page'))
+    expect(sent.at(-1)).toEqual({ type: 'acorn:chip', key: 'tracker:item', action: 'chat' })
+    expect(menu()!.hidden).toBe(true)
+  })
+
+  it('copies the Acorn link in place of opening it in a development build', () => {
+    show([button(task)], { opensLinks: false })
+    expect(items()).toEqual(['Show in side panel', 'New chat about this page', 'Copy Acorn link'])
+  })
+
+  it('reads Start task with no task, and opens the Start task form from the click', () => {
+    show([button()])
+    expect(main().textContent).toBe('Start task')
+    expect(main().getAttribute('aria-label')).toBe('Start task (Open in Acorn)')
+    expect(menu()).toBeNull()
+    press(main())
+    expect(sent).toEqual([{ type: 'acorn:handoff', key: 'tracker:item' }])
+  })
+
+  it('opens the menu from the chip in Firefox, which opens its panel only from the toolbar', () => {
+    show([button(task)], { opensPanel: false })
+    expect(chip().querySelector('.more')).toBeNull()
+    press(main())
     expect(sent).toEqual([])
+    expect(menu()!.hidden).toBe(false)
+    expect(items()).toEqual([
+      'Open in Acorn ↗',
+      'Copy Acorn link',
+      'To open the panel on this task, click Acorn in the toolbar.',
+    ])
+
+    // With no task the click also hands the page to the background, to wait for the sidebar.
+    show([button()], { opensPanel: false })
+    press(main())
+    expect(sent).toEqual([{ type: 'acorn:handoff', key: 'tracker:item' }])
+    expect(items()).toEqual(['To start the task, click Acorn in the toolbar.'])
+  })
+
+  it('ignores a click the page made rather than the person', () => {
+    show([button(task)])
+    main().click()
+    chip().querySelector<HTMLButtonElement>('.more')!.click()
+    expect(sent).toEqual([])
+    expect(menu()!.hidden).toBe(true)
   })
 })

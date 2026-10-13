@@ -109,7 +109,7 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
   own choices are saved, including a task chosen in Settings' task search.
 - `appearance`: the panel's `{ theme, style }`, with `theme` null to follow the system's light or dark
   ([appearance](./setup.md#appearance)).
-- `handoffs`: the selected Node's [site buttons](./handoffs.md#site-buttons), `{ nodeId, handoffs }`,
+- `handoffs`: the selected Node's [handoffs](./handoffs.md#task-chips), `{ nodeId, handoffs }`,
   kept so pages get their buttons before the native host starts. It goes when no Node is selected.
 
 - `siteChoices:<nodeId>`: the person's [project overrides](./project-sites.md#overrides) for each site.

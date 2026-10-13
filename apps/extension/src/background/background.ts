@@ -1,18 +1,18 @@
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import type { BridgeNodes, BridgeOperation, BridgeResults } from '@acorn/protocol/extensionBridge.ts'
+import {
+  BROWSER_BRIDGE_HOST,
+  type BridgeNodes,
+  type BridgeOperation,
+  type BridgeResults,
+} from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi, Port, Tab } from '../browser'
 import type { PageHandoff } from '../handoffs'
-import {
-  CallFailure,
-  type BackgroundMessage,
-  type BridgeCall,
-  type HostState,
-  type RequestTarget,
-  type SidebarMessage,
-} from '../messages'
+import { CallFailure, type BackgroundMessage, type BridgeCall, type HostState, type SidebarMessage } from '../messages'
+import { pageTasks } from '../taskPages'
 import { nativeBridge } from './nativeBridge'
 import { requestBadge } from './requestBadge'
 import { siteButtons } from './siteButtons'
+import { chipTask, taskPages } from './taskPages'
 
 // The selected Node, remembered by this browser profile. The native host holds the selection only
 // while it runs, so the background selects it again each time the host starts.
@@ -37,17 +37,16 @@ export function startBackground(api: BrowserApi, hostName: string): void {
     broadcast({ type: 'host', host })
   }
 
-  // A button click waiting for a sidebar to take it. A panel opened by the click connects a moment
-  // later, and gets it then.
-  let pendingHandoff: PageHandoff | null = null
-  const offerHandoff = (handoff: PageHandoff): void => {
-    pendingHandoff = sidebars.size ? null : handoff
-    broadcast({ type: 'handoff', handoff })
+  // Clicks waiting for a sidebar to take them, the latest of each kind: a page to hand off, a task to
+  // show, or a notification's conversation. A panel opened by the click connects a moment later, and
+  // gets them then.
+  let waiting: BackgroundMessage[] = []
+  const offer = (message: Extract<BackgroundMessage, { type: 'handoff' | 'showTask' | 'open' }>): void => {
+    waiting = sidebars.size ? [] : [...waiting.filter((other) => other.type !== message.type), message]
+    broadcast(message)
   }
   // Whether the host was started again on its own since the person last used the sidebar.
   let restartedHost = false
-  // A notification's conversation, waiting the same way for a panel to connect.
-  let pendingOpen: RequestTarget | null = null
 
   // Each browser's open call runs inside the person's click, where the gesture counts.
   const openPanel = (tab: Tab): void => {
@@ -55,16 +54,32 @@ export function startBackground(api: BrowserApi, hostName: string): void {
     // Refused outside a gesture the browser counts, as a notification click may be.
     opened?.catch(() => undefined)
   }
-  const buttons = siteButtons(api, { open: openPanel, clicked: offerHandoff })
+  const buttons = siteButtons(api, {
+    open: openPanel,
+    clicked: (handoff: PageHandoff) => offer({ type: 'handoff', handoff }),
+    showTask: (chat) => offer({ type: 'showTask', chat }),
+    chip: (url) => {
+      const [match] = pageTasks(pages.tasks, url)
+      const nodeId = buttons.nodeId
+      if (!match || !nodeId) return null
+      const chip = chipTask(nodeId, match, pages.sessions(match.task.id), badge.current.requests)
+      return { taskId: match.task.id, chip }
+    },
+    follow: (taskIds) => pages.follow(taskIds),
+    // Only a release desktop registers `acorn://`, as in the sidebar.
+    opensLinks: hostName === BROWSER_BRIDGE_HOST,
+  })
 
   const bridge = nativeBridge(api, hostName, {
     status: (status) => {
       broadcast({ type: 'status', status })
       badge.status(status)
+      pages.status(status)
     },
     agents: (hint) => {
       broadcast({ type: 'agent', hint })
       badge.hint(hint)
+      pages.hint(hint)
     },
     handoffs: (nodeId) => {
       broadcast({ type: 'handoffs', nodeId })
@@ -73,12 +88,15 @@ export function startBackground(api: BrowserApi, hostName: string): void {
     projects: (nodeId) => {
       broadcast({ type: 'projects', nodeId })
       badge.projectsChanged(nodeId)
+      pages.changedOn(nodeId)
     },
+    tasks: (nodeId) => pages.changedOn(nodeId),
     host: (state) => {
       const wasConnected = host.state === 'connected'
       setHost(state)
       if (state.state === 'connected') return
       badge.hostDown()
+      pages.hostDown()
       // A host that stopped after working is started once more, so the badge comes back with the
       // sidebar closed. A second stop waits for the person, so a host that keeps failing can't loop.
       if (wasConnected && state.state === 'exited' && !restartedHost) {
@@ -101,8 +119,12 @@ export function startBackground(api: BrowserApi, hostName: string): void {
   // `status` is the Node's connection as the selection reply reported it, which may have changed
   // before the background knew which Node to listen for.
   const selected = async (nodeId: string | null, status: NodeStatus | null = null): Promise<void> => {
-    if (status) badge.status(status)
+    if (status) {
+      badge.status(status)
+      pages.status(status)
+    }
     void badge.select(nodeId)
+    void pages.select(nodeId)
     await buttons.select(nodeId)
     if (nodeId) void refreshHandoffs(nodeId)
   }
@@ -156,15 +178,28 @@ export function startBackground(api: BrowserApi, hostName: string): void {
     return result
   }
 
+  const read = <Op extends BridgeOperation>(operation: Extract<BridgeCall, { op: Op }>) =>
+    call(operation) as Promise<BridgeResults[Op]>
   const badge = requestBadge(api, {
-    read: <Op extends BridgeOperation>(operation: Extract<BridgeCall, { op: Op }>) =>
-      call(operation) as Promise<BridgeResults[Op]>,
-    broadcast,
+    read,
+    // A chip counts the agents waiting on the person too.
+    broadcast: (message) => {
+      broadcast(message)
+      void buttons.redraw()
+    },
     open: (target) => {
-      pendingOpen = sidebars.size ? null : target
-      broadcast({ type: 'open', target })
+      offer({ type: 'open', target })
       void api.tabs.query({ active: true, currentWindow: true }).then(([tab]) => tab && openPanel(tab))
     },
+    pageTaskIds: (url) => pageTasks(pages.tasks, url).map(({ task }) => task.id),
+  })
+  const pages = taskPages({
+    read,
+    broadcast: (message) => {
+      broadcast(message)
+      badge.tasksChanged()
+    },
+    changed: () => void buttons.redraw(),
   })
 
   api.runtime.onConnect.addListener((port) => {
@@ -172,10 +207,9 @@ export function startBackground(api: BrowserApi, hostName: string): void {
     sidebars.add(port)
     port.postMessage({ type: 'host', host } satisfies BackgroundMessage)
     port.postMessage(badge.current)
-    if (pendingHandoff) port.postMessage({ type: 'handoff', handoff: pendingHandoff } satisfies BackgroundMessage)
-    if (pendingOpen) port.postMessage({ type: 'open', target: pendingOpen } satisfies BackgroundMessage)
-    pendingHandoff = null
-    pendingOpen = null
+    port.postMessage(pages.current)
+    for (const message of waiting) port.postMessage(message)
+    waiting = []
     port.onDisconnect.addListener(() => sidebars.delete(port))
     port.onMessage.addListener((raw) => {
       const message = raw as SidebarMessage

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { render } from 'solid-js/web'
-import type { BridgeAgentSession } from '@acorn/protocol/extensionBridge.ts'
+import type { BridgeAgentSession, BridgeHandoff, BridgePageTask } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite } from '@acorn/protocol/siteAssociations.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
@@ -55,6 +55,9 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
     pending: [] as Record<string, unknown>[],
     // Projects another client adds after the sidebar opened.
     addedProjects: [] as { id: string; name: string; path: null; hidden: boolean }[],
+    // Each Node's tasks with their page addresses, and its handoffs.
+    taskPages: [] as BridgePageTask[],
+    handoffs: [] as BridgeHandoff[],
   }
   const nodes = () => ({
     nodes: ['n1', 'n2'].map((nodeId) => ({ nodeId, label: nodeId, endpoint: `https://${nodeId}.test`, local: false })),
@@ -70,7 +73,9 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
         state.active = request.nodeId as string
         return nodes()
       case 'handoffs.list':
-        return { nodeId, handoffs: [] }
+        return { nodeId, handoffs: nodeId === 'n1' ? state.handoffs : [] }
+      case 'tasks.pages':
+        return { nodeId, tasks: nodeId === 'n1' ? state.taskPages : [] }
       case 'sites.list':
         return { nodeId, sites: state.sites[nodeId] }
       case 'site.add':
@@ -145,8 +150,9 @@ describe('project suggestions for a site', () => {
   it('reads the project list again when the Node says a project changed', async () => {
     const { fake, state, root } = mount({ url: 'https://example.com/' })
     await settle(30)
+    // The page matches nothing, so This page offers to tie its site to a project.
     const options = () =>
-      [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
+      [...root.querySelectorAll('select[name="tie-project"] option')].map((option) => option.textContent)
     expect(options()).not.toContain('Admin')
 
     state.addedProjects.push({ id: 'p4', name: 'Admin', path: null, hidden: false })
@@ -184,12 +190,12 @@ describe('project suggestions for a site', () => {
     expect(suggestedOptions(root)).toEqual(['Web', 'Everything'])
     expect(root.textContent).toContain('Several projects match this page. Choose one.')
 
-    // An unmatched page suggests nothing and moves nothing.
+    // An unmatched page suggests nothing, and says so.
     await pick(root, 'project', 'p3')
     fake.navigate('https://elsewhere.example/')
     await settle(20)
-    expect(selected(root, 'project')).toBe('p3')
     expect(suggestedOptions(root)).toEqual([])
+    expect(root.textContent).toContain('Nothing in Acorn matches this page.')
   })
 
   it('remembers an override for the Node and site, until the page suggests other projects', async () => {
@@ -233,10 +239,11 @@ describe('project suggestions for a site', () => {
     // This page follows the page; the current task stays.
     expect(selected(root, 'project')).toBe('p2')
     expect(currentTask(root)).toBe('Fix login')
-    // Another port on localhost is another site, which suggests nothing and moves nothing.
+    // Another port on localhost is another site, which matches nothing and moves nothing.
     fake.navigate('http://localhost:5174/admin')
     await settle(20)
-    expect(selected(root, 'project')).toBe('p2')
+    expect(root.textContent).toContain('Nothing in Acorn matches this page.')
+    expect(currentTask(root)).toBe('Fix login')
     expect(fake.storage.get('draft:n1:t1:s1')).toEqual({ text: 'Half a thought' })
   })
 
@@ -250,7 +257,8 @@ describe('project suggestions for a site', () => {
     state.held.splice(0).forEach((reply) => reply())
     await settle(20)
     expect(state.active).toBe('n2')
-    expect(selected(root, 'project')).toBe('')
+    expect(root.querySelector('select[name="project"]')).toBeNull()
+    expect(root.textContent).toContain('Nothing in Acorn matches this page.')
     await openSettings(root)
     expect(siteAccess(root)).toEqual([])
   })
@@ -375,5 +383,113 @@ describe('requests waiting on the Node', () => {
     notify().dispatchEvent(new Event('change', { bubbles: true }))
     await settle(20)
     expect(notify().checked).toBe(false)
+  })
+})
+
+describe('This page', () => {
+  // The pull request t1 belongs to, and the handoff GitHub declares for pull requests.
+  const pullTask: BridgePageTask = {
+    id: 't1',
+    title: 'Fix login',
+    branch: 'fix/login',
+    projectId: 'p1',
+    pages: [{ origin: 'https://github.com', pathPrefix: '/acme/web/pull/7', source: 'github' }],
+  }
+  const pullHandoff: BridgeHandoff = {
+    pluginId: 'github',
+    id: 'pull',
+    label: 'Open in Acorn',
+    match: ['https://github.com/{owner}/{repo}/pull/{number}'],
+    anchors: [],
+  }
+  const thisPage = (root: HTMLElement) => root.querySelector('[aria-label="This page"]')!
+  const agentRows = (root: HTMLElement) =>
+    [...root.querySelectorAll('[aria-label="Agents"] .row-button strong')].map((row) => row.textContent)
+
+  it("shows the task a page belongs to, its agents, and the task's verbs, matched in the browser", async () => {
+    const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7/files' })
+    state.taskPages = [pullTask]
+    await settle(30)
+    expect(thisPage(root).querySelector('strong')!.textContent).toBe('Fix login')
+    expect(thisPage(root).textContent).toContain('Task in Web · fix/login')
+    // A development build copies the link Open in Acorn would follow, onto the pull request's pane.
+    expect(button(thisPage(root), 'Copy Acorn link')!.title).toBe('acorn://n1/t/t1?pane=pr')
+    expect(agentRows(root)).toEqual(['Claude · Chat s1'])
+    // Nothing is current yet, and the page's task needs no second mention.
+    expect(root.querySelector('[aria-label="Current task"]')).toBeNull()
+    // The list came from the Node; the page's address didn't go to it.
+    expect(state.requests.some((request) => request.op === 'tasks.pages')).toBe(true)
+    expect(JSON.stringify(state.requests)).not.toContain('/pull/7')
+
+    // Chat opens the task's newest conversation, which makes it the current task.
+    button(thisPage(root), 'Chat')!.click()
+    await settle(30)
+    expect(conversationTitle(root)).toBe('Claude · Chat s1')
+    await back(root)
+    // A page that matches nothing keeps the task last used pinned.
+    fake.navigate('https://example.com/')
+    await settle(20)
+    expect(thisPage(root).textContent).toContain('Nothing in Acorn matches this page.')
+    expect(currentTask(root)).toBe('Fix login')
+    expect(agentRows(root)).toEqual(['Claude · Chat s1'])
+  })
+
+  it('reads the list again when the Node says a task changed', async () => {
+    const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
+    await settle(30)
+    expect(thisPage(root).textContent).toContain('Nothing in Acorn matches this page.')
+    state.taskPages = [pullTask]
+    fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'n1' })
+    await settle(20)
+    expect(thisPage(root).querySelector('strong')!.textContent).toBe('Fix login')
+  })
+
+  it('offers the handoff for an item no task holds, and looks it up only on a click', async () => {
+    const { state, root } = mount({ url: 'https://github.com/acme/web/pull/8' })
+    state.taskPages = [pullTask]
+    state.handoffs = [pullHandoff]
+    await settle(30)
+    expect(thisPage(root).textContent).toContain('No task in Acorn for this yet.')
+    expect(button(thisPage(root), 'Look up in Acorn')).toBeDefined()
+    expect(state.requests.some((request) => request.op === 'handoff.resolve')).toBe(false)
+  })
+
+  it("shows a project site's project, its tasks, and New task", async () => {
+    const { root } = mount({ url: 'https://example.com/', sites: [site('p1', 'https://example.com')] })
+    await settle(30)
+    expect(selected(root, 'project')).toBe('p1')
+    expect([...thisPage(root).querySelectorAll('[aria-label="Tasks"] strong')].map((row) => row.textContent)).toEqual([
+      'Fix login',
+    ])
+    // New task opens the project in the desktop app; a development build copies that link.
+    expect(button(thisPage(root), 'Copy Acorn link')!.title).toBe('acorn://n1/p/p1')
+  })
+
+  it("ties a page's site to a project when nothing matches it", async () => {
+    const { state, root } = mount({ url: 'https://elsewhere.example/docs/intro' })
+    await settle(30)
+    expect(thisPage(root).textContent).toContain('Nothing in Acorn matches this page.')
+    await pick(root, 'tie-project', 'p2')
+    button(thisPage(root), 'Tie https://elsewhere.example to it')!.click()
+    await settle(20)
+    expect(state.requests.find((request) => request.op === 'site.add')).toMatchObject({
+      projectId: 'p2',
+      site: { origin: 'https://elsewhere.example', pathPrefix: '/' },
+    })
+    expect(selected(root, 'project')).toBe('p2')
+  })
+
+  it("opens on the page's task from a chip, with a new chat about the page when asked", async () => {
+    const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
+    state.taskPages = [pullTask]
+    state.handoffs = [pullHandoff]
+    await settle(30)
+    await openSettings(root)
+    fake.sendFromPage({ type: 'acorn:chip', key: 'github:pull', action: 'chat' })
+    await settle(30)
+    expect(root.querySelector('.view[aria-label="Settings"]')).toBeNull()
+    expect(thisPage(root).querySelector('strong')!.textContent).toBe('Fix login')
+    expect(root.querySelector('[aria-label="Waiting context"]')!.textContent).toContain('Page goes into the draft')
+    expect(button(root.querySelector('[aria-label="Agents"]')!, 'Cancel')).toBeDefined()
   })
 })

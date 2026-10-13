@@ -114,7 +114,8 @@ describe('sidebar', () => {
     held[0]!.release()
     await settle()
     expect(nodeChip(root)).toContain('Node b')
-    const options = [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
+    // The page matches nothing, so This page offers to tie its site to one of b's projects.
+    const options = [...root.querySelectorAll('select[name="tie-project"] option')].map((option) => option.textContent)
     expect(options).toEqual(['Choose a project', 'b project'])
   })
 

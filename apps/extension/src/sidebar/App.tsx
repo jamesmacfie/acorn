@@ -4,12 +4,14 @@ import type {
   BridgeAgentHint,
   BridgeHandoff,
   BridgeNodes,
+  BridgePageTask,
   BridgePendingRequest,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import type { BrowserApi } from '../browser'
 import type { PageHandoff } from '../handoffs'
 import { CallFailure, type CallError, type HostState, type RequestTarget } from '../messages'
+import { pageTasks } from '../taskPages'
 import { activePageUrl } from './activePage'
 import { bridgeClient } from './bridgeClient'
 import { capturePage, type PageCapture } from './capture'
@@ -54,6 +56,13 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     requests: [],
   })
   const [openRequest, setOpenRequest] = createSignal<RequestTarget | null>(null)
+  // The selected Node's tasks and their page addresses, as the background keeps them, and a task chip's
+  // click asking Home to show the page's task.
+  const [taskPages, setTaskPages] = createSignal<{ nodeId: string | null; tasks: BridgePageTask[] }>({
+    nodeId: null,
+    tasks: [],
+  })
+  const [showTask, setShowTask] = createSignal<{ chat: { url: string; title: string } | null } | null>(null)
   // A handed-off item's context, kept here so it outlives a visit to Settings' task search.
   const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
   // Settings replaces Home or the open conversation, which restores from storage when it closes.
@@ -84,6 +93,12 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     open: (target) => {
       setOpenRequest(target)
       setSettings(false)
+    },
+    taskPages: (nodeId, tasks) => setTaskPages({ nodeId, tasks }),
+    showTask: (chat) => {
+      setShowTask({ chat })
+      setSettings(false)
+      setPairing(false)
     },
   })
   const selected = () => fleet()?.nodes.find((node) => node.nodeId === fleet()?.activeNodeId) ?? null
@@ -254,6 +269,10 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   pageUrl={pageUrl()}
                   handoffs={handoffs()}
                   sites={sites()}
+                  sitesChanged={(projectId, changed) => sitesChanged(nodeId, projectId, changed)}
+                  pageTasks={pageTasks(taskPages().nodeId === nodeId ? taskPages().tasks : [], pageUrl())}
+                  showTask={showTask()}
+                  shownTask={() => setShowTask(null)}
                   handoff={handoff()}
                   startHandoff={setHandoff}
                   dismissHandoff={() => setHandoff(null)}

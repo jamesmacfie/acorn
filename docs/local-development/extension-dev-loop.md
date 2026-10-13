@@ -79,21 +79,29 @@ from it reads the sidebar itself. Capture checks need the real panel beside the 
   button that calls `browser.permissions.request()`. Firefox doesn't take a screenshot on a site
   grant alone, so a Firefox screenshot needs a person's toolbar click.
 
-## Check site buttons
+## Check task chips
 
-[Site buttons](../browser-extension/handoffs.md) need a page the extension may read and a plugin that
-declares one:
+[Task chips](../browser-extension/handoffs.md#task-chips) need a page the extension may read and a
+plugin that declares a handoff for it:
 
 - **Chrome.** Open the page, then run `Extensions.triggerAction` on its `tab` target as above.
-  `Target.getTargets` lists `tab` targets only with `filter: [{}]`. The click grants `activeTab`, the
-  background draws the page's buttons, and CDP's `Input.dispatchMouseEvent` at a button's centre is a
-  trusted click. A driver can't grant a site in Chrome.
+  `Target.getTargets` lists `tab` targets only with `filter: [{}]`. The click grants `activeTab`, and
+  the background draws the page's chip. The chip sits in a closed shadow root, which page scripts
+  can't reach, but CDP's `DOM.getDocument` with `depth: -1` and `pierce: true` lists it, and
+  `DOM.getBoxModel` gives a button's box. `Input.dispatchMouseEvent` at its centre is a trusted click.
+  A driver can't grant a site in Chrome.
+- **A pull request with a task.** Make a scratch git repository outside the checkout with a GitHub
+  remote, such as `git remote add origin https://github.com/cli/cli.git` and one empty commit, add it
+  as a project from a second paired device (`POST /v1/core/projects` with its `path`), then create a
+  task there with `origin: 'github-pr'` and a real `pullNumber`. The project's GitHub facet comes from
+  the remote, so `tasks.pages` lists the pull request's address, and archiving the task
+  (`POST /v1/core/tasks/<id>/archive`) checks the chip's live refresh.
 - **Firefox.** With `extensions.webextOptionalPermissionPrompts` set to `false`, press **Allow** in the
-  sidebar's site list with `input.performActions`, and the buttons appear on open pages. A click on a
-  page's button doesn't open the sidebar in Firefox; open it first with the `sidebarAction.open()`
-  button above.
+  sidebar's site list with `input.performActions`, and the chips appear on open pages. A click on a
+  page's chip opens its menu, not the sidebar, in Firefox; open the sidebar with the
+  `sidebarAction.open()` button above.
 - **GitHub.** The session's Node has no GitHub connection, and connecting one takes a person, so a
-  pull request resolves only to "Connect GitHub". Its buttons, anchors, and client-side navigation can
+  pull request resolves only to "Connect GitHub". Its chips, anchors, and client-side navigation can
   still be checked on any public pull request.
 - **Linear.** Linear ships as a loaded package, so the session's Node doesn't have it until you build
   it into the Node's data root with

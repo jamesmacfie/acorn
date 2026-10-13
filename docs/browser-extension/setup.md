@@ -112,14 +112,14 @@ Home lists, top to bottom:
 1. **Waiting for you**, only while an agent waits on a request, across every project on the Node.
    Each request answers in place with the same buttons the conversation uses
    ([request notifications](./notifications.md#the-waiting-list)).
-2. **This page**: the page's handoff offers and a handoff in progress ([handoffs](./handoffs.md)), and
-   the project its site suggests, with that project's open tasks
-   ([project sites](./project-sites.md#suggestions-in-the-sidebar)). Clicking a task makes it the
-   current task.
-3. **Agents**: every conversation in the current task, with its agent, title, state, and last line.
-   A row opens the conversation. **New chat** starts another.
-4. **Current task**: the task you last used. It stays whatever page shows, and **Find a task** opens
-   the task search in Settings.
+2. **This page**: what Acorn knows about the page, in one of four states: the task it belongs to, an
+   item no task holds with its handoff, the project its site suggests with that project's open tasks,
+   or nothing, with an offer to tie the site to a project ([This page](./task-pages.md#this-page)).
+3. **Agents**: every conversation in the page's task, or in the current task on a page that belongs
+   to none, with its agent, title, state, and last line. A row opens the conversation and makes its
+   task current. **New chat** starts another.
+4. **Current task**: the task you last used, pinned whenever the page isn't its own. **Find a task**
+   opens the task search in Settings.
 
 A conversation opens over Home, with a back arrow and the task's name above the conversation's own,
 and **Open in Acorn** and **Copy Acorn link** for that conversation ([the panel's

@@ -63,7 +63,7 @@ import {
   bridgeSessionRead,
   sessionRoute,
 } from './agents'
-import { bridgeHandoff, bridgeHandoffItem, creatableProjects, linkedTasks, ownsRoute } from './handoffs'
+import { bridgeHandoff, bridgeHandoffItem, creatableProjects, linkedTasks, ownsRoute, taskPages } from './handoffs'
 
 export class BridgeFailure extends Error {
   constructor(
@@ -94,6 +94,8 @@ export function createBridge(options: {
   handoffsChanged?(nodeId: string): void
   // A project on the selected Node changed, so its site associations may have.
   projectsChanged?(nodeId: string): void
+  // A task on the selected Node changed, so its page addresses may have.
+  tasksChanged?(nodeId: string): void
   probe?: typeof probeNode
   pair?: typeof pairWithNode
 }) {
@@ -115,6 +117,7 @@ export function createBridge(options: {
       const channel = (frame as { channel?: unknown } | null)?.channel
       if (channel === 'plugins:changed') options.handoffsChanged?.(nodeId)
       if (channel === 'project:changed') options.projectsChanged?.(nodeId)
+      if (channel === 'tasks:changed') options.tasksChanged?.(nodeId)
     },
     bytes() {},
     status(status) {
@@ -464,6 +467,10 @@ export function createBridge(options: {
         return listProjects(request.nodeId)
       case 'tasks.list':
         return listTasks(request.nodeId, request.projectId)
+      case 'tasks.pages': {
+        const tasks = await readList<Task>(request.nodeId, tasksRoute, (body) => body)
+        return { nodeId: request.nodeId, tasks: taskPages(tasks) }
+      }
       case 'agents.profiles': {
         const rows = await readList<AgentProviderDescriptor>(request.nodeId, `${agentsRoute}/providers`, (b) => b)
         return { nodeId: request.nodeId, profiles: rows.map(bridgeProfile) }

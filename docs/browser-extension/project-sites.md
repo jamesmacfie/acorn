@@ -45,17 +45,24 @@ them, in the browser. No page address goes to the Node for this. The browser rep
 address only for a site the person allowed, or the tab the toolbar button was clicked on.
 
 Every project with an association covering the page is a candidate. Overlapping prefixes and several
-projects are all candidates, and none outranks another:
+projects are all candidates, and none outranks another. A page that belongs to a task, or matches a
+handoff, shows that first ([This page](./task-pages.md#this-page)); otherwise a page with a candidate
+shows the project picker in Home's **This page** section:
 
-- **One candidate** is chosen in the project picker of Home's **This page** section, under
-  **Suggested for this page**.
+- **One candidate** is chosen in the picker, under **Suggested for this page**.
 - **Several candidates** are listed first in the picker. A project they leave out is cleared, and the
   sidebar asks the person to choose one.
-- **No candidate** changes nothing. The picker keeps whatever was chosen.
+- **No candidate** shows no picker. **This page** says nothing matches and offers to tie the page's
+  site to a project: choosing one and pressing **Tie <origin> to it** adds the whole origin to that
+  project's associations with `site.add`, and the page then has that project as its candidate.
 
 Under the picker, **This page** lists the chosen project's open tasks, and clicking one makes it the
-current task. The page never moves the current task by itself: the current task, its conversation, and
-its draft stay put when the page changes, and only **This page** follows it.
+current task. **New task in Acorn** opens the project in the desktop app. A page on a project's site
+never moves the current task by itself: the current task, its conversation, and its draft stay put
+when the page changes, and only **This page** follows it.
+
+Task addresses use the same grammar as associations, an exact origin and a path prefix, and are
+matched the same way ([pages that belong to a task](./task-pages.md#pages-that-belong-to-a-task)).
 
 ## Overrides
 

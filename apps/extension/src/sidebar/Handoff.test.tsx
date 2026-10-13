@@ -146,7 +146,7 @@ const siteAccess = (root: HTMLElement) =>
 const captures = (root: HTMLElement) =>
   [...root.querySelectorAll('[data-testid="capture"]')].map((row) => row.textContent)
 
-// A site button click, as the background reports it once the panel is open.
+// A task chip's Start task click, as the background reports it once the panel is open.
 async function clickSiteButton(fake: ReturnType<typeof fakeBrowser>) {
   fake.activeTab = { ...fake.activeTab, url: PAGE }
   fake.storage.set('handoffs', { nodeId: 'n1', handoffs: [handoff] })

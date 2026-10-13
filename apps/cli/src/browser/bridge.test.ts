@@ -77,8 +77,11 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     // Each project's site associations, as its config holds them, and every config write.
     sites: new Map<string, unknown[]>(),
     configWrites: [] as { projectId: string; patch: unknown }[],
+    // Every path the host asked for, in order.
+    paths: [] as string[],
   }
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
+    state.paths.push(req.url ?? '')
     const reply = (status: number, body: unknown) => {
       res.writeHead(status, { 'content-type': 'application/json' })
       res.end(JSON.stringify(body))
@@ -682,6 +685,81 @@ describe('browser bridge agent operations', () => {
     })
     await call({ op: 'node.select', nodeId: null })
     await expect(call({ op: 'requests.pending', nodeId: 'node-a' })).rejects.toMatchObject({ code: 'not_selected' })
+  })
+
+  it("lists each active task's page addresses from the Node's task list alone", async () => {
+    const { call, node } = await selected()
+    const task = { branch: null, status: 'active', github: null, pullNumber: null, links: [] }
+    node.state.tasks = [
+      // A pull request is the project's repository and the task's number.
+      {
+        ...task,
+        id: 'pr',
+        title: 'Fix rounding',
+        projectId: 'p1',
+        github: { owner: 'acme', name: 'runn' },
+        pullNumber: 482,
+      },
+      {
+        ...task,
+        id: 'issue',
+        title: 'Linear issue',
+        projectId: 'p1',
+        branch: 'eng-42',
+        links: [
+          {
+            connectionId: 'c1',
+            providerId: 'linear',
+            identifier: 'ENG-42',
+            ref: {
+              providerId: 'linear',
+              connectionId: 'c1',
+              displayId: 'ENG-42',
+              url: 'https://linear.app/acme/issue/ENG-42/fix/',
+            },
+          },
+          // A link whose provider stamped no address, and one that isn't a web address.
+          { connectionId: 'c2', providerId: 'rollbar', identifier: '7' },
+          { connectionId: 'c3', providerId: 'other', identifier: 'x', ref: { url: 'mailto:someone@example.com' } },
+        ],
+      },
+      // The project's repository alone names no page, and an archived task is never listed.
+      { ...task, id: 'plain', title: 'No item', projectId: 'p1', github: { owner: 'acme', name: 'runn' } },
+      {
+        ...task,
+        id: 'old',
+        title: 'Old',
+        projectId: 'p1',
+        status: 'archived',
+        github: { owner: 'acme', name: 'runn' },
+        pullNumber: 1,
+      },
+    ]
+    node.state.paths = []
+    expect(await call({ op: 'tasks.pages', nodeId: 'node-a' })).toEqual({
+      nodeId: 'node-a',
+      tasks: [
+        {
+          id: 'pr',
+          title: 'Fix rounding',
+          branch: null,
+          projectId: 'p1',
+          pages: [{ origin: 'https://github.com', pathPrefix: '/acme/runn/pull/482', source: 'github' }],
+        },
+        {
+          id: 'issue',
+          title: 'Linear issue',
+          branch: 'eng-42',
+          projectId: 'p1',
+          pages: [{ origin: 'https://linear.app', pathPrefix: '/acme/issue/ENG-42/fix', source: 'linear' }],
+        },
+      ],
+    })
+    // One read of the Node's active tasks, besides the broker's own connection checks, and nothing
+    // that reaches a provider.
+    expect(node.state.paths.filter((path) => path !== '/v1/node')).toEqual(['/v1/core/tasks'])
+    await call({ op: 'node.select', nodeId: null })
+    await expect(call({ op: 'tasks.pages', nodeId: 'node-a' })).rejects.toMatchObject({ code: 'not_selected' })
   })
 
   it('passes captured context and screenshots to the Node as the turn input', async () => {
