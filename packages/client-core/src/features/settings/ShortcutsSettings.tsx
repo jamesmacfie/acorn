@@ -19,7 +19,7 @@ import {
 import { savePref } from './savePref'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { orphanedPluginOverrideIds, removeOverrideIds, visibleShortcutBindings } from './shortcutSettingsModel'
-import { Alert, Button } from '../../kit/components/primitives'
+import { Alert, Button, Kbd } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Text } from '../../kit/components/content/Text'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
@@ -195,19 +195,19 @@ export default function ShortcutsSettings() {
                       error={refused()?.id === binding.id ? refused()!.message : save.error()}
                       onReset={changed(binding) ? () => void save.run(() => resetBindings([binding])) : undefined}
                     >
-                      {/* A plain read-only input rather than the kit's Input: it captures the next key
-                          press as a chord, and `.help-key` draws it as a keycap. */}
-                      <input
-                        type="text"
-                        class="help-key shortcut-input"
+                      {/* A focusable read-only box rather than an input: it captures the next key
+                          press as a chord, and an input's value can't hold Kbd's per-key caps. */}
+                      <div
+                        role="textbox"
+                        aria-readonly="true"
+                        tabindex="0"
+                        class="shortcut-input"
                         classList={{ 'shortcut-conflict': !!binding.conflict }}
-                        readonly
-                        value={binding.chord ? formatChord(binding.chord) : 'Unbound'}
-                        // Sized to its chord, so a four-key chord is not clipped.
-                        size={Math.max(3, (binding.chord ? formatChord(binding.chord) : 'Unbound').length)}
                         onKeyDown={(event) => captureKey(binding, save, event)}
                         aria-label={`Shortcut for ${binding.description}`}
-                      />
+                      >
+                        <Kbd>{binding.chord ? formatChord(binding.chord) : 'Unbound'}</Kbd>
+                      </div>
                       <IconButton
                         icon="x"
                         label={`Unbind ${binding.description}`}
