@@ -427,7 +427,7 @@ export default function TabRail() {
   // for the browser dev build (docs/workspaces-and-tasks/archive.md § Archive a task).
   async function openArchive(w: Task) {
     setMenuId(null)
-    const decision = await confirmTaskArchive(w)
+    const decision = await confirmTaskArchive(w, query.data ?? [])
     if (decision.confirmed) await archive(w, decision.action, decision.checked)
   }
 

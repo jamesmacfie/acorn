@@ -24,16 +24,22 @@ describe('confirmTaskArchive', () => {
     host.remove()
   })
 
-  it('asks before archiving a task with no reported concerns', async () => {
-    const decision = confirmTaskArchive({
-      id: 'task-1',
-      title: 'Add task search',
-      branch: 'feature',
-      worktreePath: '/tmp/worktrees/feature',
-    })
+  it.each([false, true])('asks before archiving a worktree task with children: %s', async (hasChildren) => {
+    const decision = confirmTaskArchive(
+      {
+        id: 'task-1',
+        title: 'Add task search',
+        branch: 'feature',
+        worktreePath: '/tmp/worktrees/feature',
+      },
+      [{ parentId: hasChildren ? 'task-1' : 'other-task' }],
+    )
 
     await expect.poll(() => dialog()?.textContent).toContain('deletes its worktree')
-    expect(dialog()?.textContent).toContain('All subtasks, including nested subtasks, will also be archived.')
+    expect(dialog()?.textContent?.includes('All subtasks, including nested subtasks, will also be archived.')).toBe(
+      hasChildren,
+    )
+    expect(dialog()?.textContent).toContain('You can restore tasks from Archive.')
     expect(dialog()?.querySelector('.overlay-body')?.firstElementChild?.textContent).toBe('Add task search')
     expect(footer().map((button) => button.textContent)).toEqual(['Cancel', 'Archive task', ''])
 
@@ -41,16 +47,22 @@ describe('confirmTaskArchive', () => {
     await expect(decision).resolves.toEqual({ confirmed: false, checked: [], action: 'archive' })
   })
 
-  it('says the project folder stays when the task has no worktree of its own', async () => {
-    const decision = confirmTaskArchive({
-      id: 'task-2',
-      title: 'Review release notes',
-      branch: null,
-      worktreePath: '/tmp/project',
-    })
+  it.each([false, true])('says the project folder stays with children: %s', async (hasChildren) => {
+    const decision = confirmTaskArchive(
+      {
+        id: 'task-2',
+        title: 'Review release notes',
+        branch: null,
+        worktreePath: '/tmp/project',
+      },
+      hasChildren ? [{ parentId: 'task-2' }] : [],
+    )
 
     await expect.poll(() => dialog()?.textContent).toContain('leaves the project folder as it is')
-    expect(dialog()?.textContent).toContain('All subtasks, including nested subtasks, will also be archived.')
+    expect(dialog()?.textContent?.includes('All subtasks, including nested subtasks, will also be archived.')).toBe(
+      hasChildren,
+    )
+    expect(dialog()?.textContent).toContain('You can restore tasks from Archive.')
     expect(dialog()?.querySelector('.overlay-body')?.firstElementChild?.textContent).toBe('Review release notes')
     expect(dialog()?.textContent).not.toContain('worktree')
 
@@ -59,12 +71,15 @@ describe('confirmTaskArchive', () => {
   })
 
   it('switches the confirm button to Delete task from its menu, with the warning', async () => {
-    const decision = confirmTaskArchive({
-      id: 'task-3',
-      title: 'Old spike',
-      branch: 'spike',
-      worktreePath: '/tmp/worktrees/spike',
-    })
+    const decision = confirmTaskArchive(
+      {
+        id: 'task-3',
+        title: 'Old spike',
+        branch: 'spike',
+        worktreePath: '/tmp/worktrees/spike',
+      },
+      [],
+    )
 
     await expect.poll(() => dialog()?.textContent).toContain('Archive task')
     expect(dialog()?.textContent).not.toContain("You can't restore a deleted task.")

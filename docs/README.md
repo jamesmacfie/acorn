@@ -161,6 +161,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/agents-and-providers.md](./testing/agents-and-providers.md) | Onboarding, model generation, delegation, and harness checks. |
 | [testing/rail-and-annotations.md](./testing/rail-and-annotations.md) | Rail layout, task marker, and appearance checks with dated results. |
 | [testing/performance-baseline-2026-10-09.md](./testing/performance-baseline-2026-10-09.md) | Dated startup timings, startup graph bytes, and installed bytes taken before the October 2026 startup and size work. |
+| [testing/sentry-baseline-2026-10-13.md](./testing/sentry-baseline-2026-10-13.md) | A day of Sentry telemetry from real use: git calls, session-open timing, agent process and renderer memory, and response sizes. The before numbers for UI performance phases 06 to 10. |
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by the October 2026 runtime packaging work. |
 | [testing/production-minification-2026-10-09.md](./testing/production-minification-2026-10-09.md) | Dated startup graph bytes, installed bytes, and boot timings from minifying the Node service and loaded plugins. |
 | [testing/selective-renderer-loading-2026-10-09.md](./testing/selective-renderer-loading-2026-10-09.md) | Dated renderer and terminal startup graph bytes, roster bytes, and real-app checks from loading renderer implementations on first use. |
@@ -396,6 +397,11 @@ Each plugin landing page above has topic pages in a folder of the same name:
 - [Incremental Markdown](./future/ui-performance/03-incremental-markdown.md).
 - [Session revisit](./future/ui-performance/04-session-revisit.md).
 - [Idle cost](./future/ui-performance/05-idle-cost.md).
+- [Git calls in checkout admission](./future/ui-performance/06-checkout-admission-git.md).
+- [Session-open timeouts](./future/ui-performance/07-session-open-timeouts.md).
+- [Agent process memory](./future/ui-performance/08-agent-process-memory.md).
+- [Renderer memory](./future/ui-performance/09-renderer-memory.md).
+- [Response size](./future/ui-performance/10-response-size.md).
 
 ## Steering proposal
 

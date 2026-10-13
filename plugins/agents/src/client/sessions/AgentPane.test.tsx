@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { CommandExecutionContext, ContributedCommand } from '@acorn/plugin-api/client'
 import type { AgentSession } from '../../contract/wire.ts'
+import type { AgentProviderUsage } from '../../shared/usage'
 import type { AgentPaneModel, SessionAction } from './agentPaneModel'
 
 // The header's chip: a session a workflow started says which one, and pressing it opens the run
@@ -17,6 +18,46 @@ const disposeCommands = vi.fn()
 const openManagedParent = vi.fn()
 const cancel = vi.fn(async () => ({ ok: true }))
 const cancelSubagent = vi.fn(async () => ({ ok: true }))
+
+const usageReading = (accountName: string | undefined, percentRemaining: number): AgentProviderUsage => ({
+  provider: 'claude',
+  label: accountName ? `Claude Code · ${accountName}` : 'Claude Code',
+  accountName,
+  availability: 'available',
+  health: 'healthy',
+  plan: null,
+  account: null,
+  quotas: [
+    {
+      id: 'session',
+      label: 'Session',
+      percentRemaining,
+      resetsAt: null,
+      resetText: null,
+      windowSeconds: null,
+      health: 'healthy',
+    },
+  ],
+  cost: null,
+  daily: null,
+  capturedAt: 1,
+  stale: false,
+  error: null,
+})
+
+vi.mock('../usage/usageStore', () => ({
+  agentUsageStore: {
+    init: () => () => {},
+    snapshot: () => ({
+      providers: [usageReading(undefined, 80), usageReading('personal', 70), usageReading('work', 30)],
+      refreshedAt: 1,
+    }),
+    loading: () => false,
+    refreshing: () => false,
+    refreshingProviderId: () => null,
+    error: () => '',
+  },
+}))
 
 vi.mock('./managedClient', () => ({ managedAgentApi: { cancel, cancelSubagent } }))
 
@@ -68,7 +109,7 @@ const modelFor = (current: AgentSession, parent?: AgentSession): AgentPaneModel 
     selectedManagedParent: () => parent,
     openManagedParent,
     sessionActions: () => [],
-    providers: () => [],
+    providers: () => [{ id: 'claude', defaultAccount: 'personal' }],
     providersLoading: () => false,
     choices: () => [],
     creating: () => false,
@@ -79,7 +120,7 @@ const modelFor = (current: AgentSession, parent?: AgentSession): AgentPaneModel 
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
 
-const mount = (current: AgentSession, parent?: AgentSession): void => {
+const mount = (current: AgentSession, parent?: AgentSession, selected?: () => AgentSession): void => {
   host = document.createElement('div')
   document.body.append(host)
   const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
@@ -92,7 +133,10 @@ const mount = (current: AgentSession, parent?: AgentSession): void => {
   dispose = render(
     () => (
       <QueryClientProvider client={queryClient}>
-        <AgentDetailHeader task={{ id: 'task-1' } as never} model={modelFor(current, parent)} />
+        <AgentDetailHeader
+          task={{ id: 'task-1' } as never}
+          model={{ ...modelFor(current, parent), ...(selected ? { selected } : {}) }}
+        />
       </QueryClientProvider>
     ),
     host,
@@ -107,6 +151,43 @@ afterEach(() => {
   dispose?.()
   host?.remove()
   vi.clearAllMocks()
+})
+
+describe('session account usage', () => {
+  const usageButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Agent utilization"]')!
+  const selectedTab = () => document.querySelector('[role="tab"][aria-selected="true"]')?.textContent
+
+  it('uses the selected session account in the header and popover, and follows session changes', async () => {
+    const [selected, setSelected] = createSignal(session({ config: { account: 'work' } }))
+    mount(selected(), undefined, selected)
+    await settle()
+    expect(usageButton().textContent).toContain('Claude Code · work 30%')
+    usageButton().click()
+    await settle()
+    expect(selectedTab()).toBe('work')
+    document.querySelectorAll<HTMLElement>('[role="tab"]')[1]!.click()
+    await settle()
+    expect(selectedTab()).toBe('personal')
+    expect(usageButton().textContent).toContain('Claude Code · work 30%')
+
+    document.querySelectorAll<HTMLElement>('[role="tab"]')[0]!.click()
+    await settle()
+    expect(selectedTab()).toBe('Usual sign-in')
+
+    setSelected(session({ id: 'sess-2', config: { account: 'personal' } }))
+    await settle()
+    expect(usageButton().textContent).toContain('Claude Code · personal 70%')
+    expect(selectedTab()).toBe('personal')
+  })
+
+  it('uses the usual sign-in for a session without a named account', async () => {
+    mount(session({ config: {} }))
+    await settle()
+    expect(usageButton().textContent).toContain('Claude Code 80%')
+    usageButton().click()
+    await settle()
+    expect(selectedTab()).toBe('Usual sign-in')
+  })
 })
 
 describe('stopping the selected agent', () => {

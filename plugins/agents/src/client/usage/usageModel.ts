@@ -106,8 +106,8 @@ export type UsageGroup = { provider: string; label: string; readings: AgentProvi
 export const usageTabId = (reading: AgentProviderUsage): string => reading.accountName ?? 'default'
 export const usageTabLabel = (reading: AgentProviderUsage): string => reading.accountName ?? 'Usual sign-in'
 
-// The node sends a harness's readings together, default first, so grouping keeps its order. The label
-// is the harness's own, which the default reading carries without an account suffix.
+// Account labels carry a suffix, while the group names only the harness. The Node omits the usual
+// sign-in once named accounts exist, so a group cannot rely on that reading for its label.
 export function usageGroups(snapshot: AgentUsageSnapshot | null): UsageGroup[] {
   const groups = new Map<string, UsageGroup>()
   for (const reading of snapshot?.providers ?? []) {
@@ -116,8 +116,10 @@ export function usageGroups(snapshot: AgentUsageSnapshot | null): UsageGroup[] {
     else groups.set(reading.provider, { provider: reading.provider, label: reading.label, readings: [reading] })
   }
   for (const group of groups.values()) {
-    const plain = group.readings.find((reading) => !reading.accountName)
-    if (plain) group.label = plain.label
+    const reading = group.readings.find((candidate) => !candidate.accountName) ?? group.readings[0]!
+    const suffix = ` · ${reading.accountName}`
+    group.label =
+      reading.accountName && reading.label.endsWith(suffix) ? reading.label.slice(0, -suffix.length) : reading.label
   }
   return [...groups.values()]
 }

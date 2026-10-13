@@ -257,6 +257,14 @@ describe('agent usage detail formatting', () => {
 })
 
 describe('usage groups', () => {
+  it('names the harness without favoring an account when only named accounts are collected', () => {
+    const personal = { ...provider('claude', 80), label: 'Claude Code · personal', accountName: 'personal' }
+    const work = { ...provider('claude', 30), label: 'Claude Code · work', accountName: 'work' }
+    const groups = usageGroups({ providers: [personal, work], refreshedAt: 1 })
+    expect(groups[0]?.label).toBe('Claude Code')
+    expect(groups[0]?.readings.map(usageTabLabel)).toEqual(['personal', 'work'])
+  })
+
   it("puts a harness's accounts under its own name, default first, in the node's order", () => {
     const work = { ...provider('claude', 30), label: 'Claude Code · work', accountName: 'work' }
     const groups = usageGroups({ providers: [provider('claude', 80), work, provider('codex', 50)], refreshedAt: 1 })

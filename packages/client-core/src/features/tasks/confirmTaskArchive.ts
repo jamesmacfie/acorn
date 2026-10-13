@@ -24,6 +24,7 @@ const deleteTask: WillAction = {
  * is (`ownsWorktree`). */
 export const confirmTaskArchive = (
   task: Pick<Task, 'id' | 'title' | 'branch' | 'worktreePath'>,
+  tasks: readonly Pick<Task, 'parentId'>[],
 ): Promise<WillDecision> =>
   confirmWillEvent({
     kind: 'task:archive',
@@ -31,10 +32,17 @@ export const confirmTaskArchive = (
     title: 'Archive task',
     subject: task.title,
     actions: [{ id: ARCHIVE_TASK_ACTION, label: 'Archive task' }, deleteTask],
-    message:
+    message: [
       task.branch && task.worktreePath
-        ? "acorn stops this task's sessions and deletes its worktree. All subtasks, including nested subtasks, will also be archived. You can restore tasks from Archive."
-        : "acorn stops this task's sessions and leaves the project folder as it is. All subtasks, including nested subtasks, will also be archived. You can restore tasks from Archive.",
+        ? "acorn stops this task's sessions and deletes its worktree."
+        : "acorn stops this task's sessions and leaves the project folder as it is.",
+      tasks.some((child) => child.parentId === task.id)
+        ? 'All subtasks, including nested subtasks, will also be archived.'
+        : '',
+      'You can restore tasks from Archive.',
+    ]
+      .filter(Boolean)
+      .join(' '),
     alwaysConfirm: true,
   })
 

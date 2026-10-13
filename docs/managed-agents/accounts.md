@@ -81,7 +81,10 @@ folder, and not for the CLI's own login, which starts no new session once accoun
 before. Each reading is its own row, labeled with the account name and carrying `accountName`. The
 plan usage panel groups a harness's readings and draws a tab per account, so the numbers below are
 one account's at a time (`usageGroups` in `client/usage/usageModel.ts`). The button that opens the
-panel shows one figure per harness, the default account's.
+panel shows one figure per harness. For the selected session's harness, it shows that session's
+account and opens the panel on that account's tab. Other harnesses show their default account.
+Switching sessions updates the reading and the initial tab. You can choose another account's tab
+while the panel is open.
 
 `claude auth login` signs a folder in without running Claude Code's first-run setup, so the CLI
 opens an account folder on its theme picker and the probe never reaches `/usage`. Before it reads an
