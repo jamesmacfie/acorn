@@ -35,7 +35,7 @@ type LaunchRow = typeof workflowAgentLaunches.$inferSelect
 export type LaunchState = 'awaiting-caller' | 'started' | 'failed' | 'cancelled'
 
 const ACTIVE_RUN_STATUSES = ['running', 'gated', 'cancelling'] as const
-const BUSY_TURN = new Set(['queued', 'dispatching', 'active'])
+const BUSY_TURN = new Set(['queued', 'steering', 'dispatching', 'active'])
 
 export type WorkflowRunTarget = { kind: 'workflow-run'; resourceId: string; taskId: string }
 export const runTarget = (runId: string, taskId: string): WorkflowRunTarget => ({

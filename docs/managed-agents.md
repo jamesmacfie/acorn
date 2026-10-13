@@ -85,6 +85,8 @@ These pages cover harnesses and the work agents do:
 
 - [Operations](./managed-agents/operations.md): the turn queue, plan limits, process lifecycle, idle
   stop, and shutdown.
+- [Steer a running turn](./managed-agents/steering.md): handing a queued message to the running turn,
+  and what each harness supports.
 - [Archived agent history](./managed-agents/history-retention.md): the retention pass.
 - [Repeated tool calls](./managed-agents/repeated-tool-calls.md): the warning when an agent repeats
   the same tool call.

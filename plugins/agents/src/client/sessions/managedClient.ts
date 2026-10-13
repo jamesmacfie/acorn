@@ -160,6 +160,14 @@ export const managedAgentApi = {
     jsonWrite<AgentTurn>(sessionRoute(sessionId, '/implement-plan'), 'POST', { itemId }),
   patchQueuedTurn: (sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }) =>
     jsonWrite<AgentTurn>(sessionRoute(sessionId, `/turns/${encodeURIComponent(turnId)}`), 'PATCH', patch),
+  steerQueuedTurn: (sessionId: string, turnId: string, options: AgentOrigin = {}) =>
+    jsonWrite<AgentTurn>(
+      sessionRoute(sessionId, `/turns/${encodeURIComponent(turnId)}/steer`),
+      'POST',
+      undefined,
+      false,
+      options,
+    ),
   removeQueuedTurn: (sessionId: string, turnId: string) =>
     jsonWrite<{ ok: true }>(sessionRoute(sessionId, `/turns/${encodeURIComponent(turnId)}`), 'DELETE'),
   cancel: (sessionId: string, turnId?: string) =>

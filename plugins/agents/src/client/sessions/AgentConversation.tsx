@@ -1,5 +1,6 @@
 import { agentTelemetry, claimAgentSelection } from './agentTelemetry'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
+import { createQuery } from '@tanstack/solid-query'
 import { Alert, EmptyState, IconButton, Only, Text, type TimelineControls } from '@acorn/plugin-api/ui'
 import { wsOnReconnect } from '@acorn/plugin-api/client'
 import AgentTranscript from './AgentTranscript'
@@ -20,6 +21,8 @@ import {
 } from './managedSelection'
 import type { AgentConversationProps } from '../../contract/conversation'
 import TerminalConversationShortcuts from './TerminalConversationShortcuts'
+import { agentProvidersOptions } from '../providersClient'
+import { canSteer } from './steering'
 import SessionGoal from './SessionGoal'
 
 // One session's conversation: its transcript, its queue, and the box you answer it in.
@@ -87,6 +90,19 @@ function SessionConversation(input: {
   // same row; `loadSnapshot` upserts what it fetched.
   const session = createMemo(() => stored() ?? snapshot()?.session)
   const previousAutomaticContext = createMemo(() => latestAutomaticTaskContext(snapshot()?.turns ?? []))
+  const providers = createQuery(() => agentProvidersOptions())
+  // `.data` only once there is some, because reading it on an empty cache suspends the conversation.
+  const steerable = createMemo(() => {
+    const current = session()
+    const listed = providers.isPending ? undefined : providers.data
+    return (
+      !!current &&
+      canSteer(
+        current,
+        listed?.find((provider) => provider.id === current.providerId),
+      )
+    )
+  })
 
   // `selectManagedSession` measures whether switching sessions blocked the current JavaScript turn.
   // This second point starts when the chosen snapshot becomes renderable and adds only counts already
@@ -191,6 +207,7 @@ function SessionConversation(input: {
               sessionId={sessionId()}
               runtimeState={narrowed().session.runtimeState}
               turns={narrowed().turns}
+              steerable={steerable()}
               onChanged={reload}
               onError={setError}
             />
@@ -225,6 +242,7 @@ function SessionConversation(input: {
                 props.composerDisabled || current().controller !== 'acorn' || current().runtimeState === 'archived'
               }
               submitDisabled={agentSessionIsStarting(current())}
+              steerable={steerable()}
               autoFocus={props.autoFocus}
               previousAutomaticContext={previousAutomaticContext()}
               // The transcript view controls, on the composer's own top row so they line up with the

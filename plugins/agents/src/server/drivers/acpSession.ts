@@ -37,6 +37,7 @@ import type {
   AgentDriverMcpServer,
   AgentDriverSession,
   AgentDriverStartOptions,
+  AgentDriverSteerOptions,
   AgentDriverTurnOptions,
 } from './types'
 
@@ -270,7 +271,7 @@ export async function startAcpSession(
 ): Promise<AgentDriverSession> {
   // Read the spec here, not through `this` below. The returned literal's methods rebind `this` to
   // the literal.
-  const { id, label, quirks } = spec
+  const { id, label, quirks, promptQueueing } = spec
   // The SDK loads here, not at the top of the file. Building its generated schemas is a startup cost
   // (measureAgentStartup records it), the node loads this module on every boot, and most launches never
   // start an ACP session.
@@ -497,6 +498,27 @@ export async function startAcpSession(
 
   let active = false
   let currentConfig = normalizeAcpConfig(configOptions)
+  // Prompts sent into the running turn, oldest first, for an adapter with `promptQueueing`. The adapter
+  // settles the prompt ahead of each one when Claude Code takes it, so a prompt that settles with one
+  // behind it marks that one taken (docs/testing/claude-steering-spike-2026-10-13.md).
+  const steers: Array<{
+    turnId: string
+    response: Promise<string | undefined>
+    settle(outcome: 'taken' | 'missed'): void
+  }> = []
+  // The ACP SDK answers anything an agent throws as `Internal error` and puts the agent's own message
+  // in `data.details`. The generic message tells the reader nothing, so the details win.
+  const turnFailureMessage = (error: unknown): string => {
+    const details =
+      error instanceof RequestError ? (error.data as { details?: unknown } | undefined)?.details : undefined
+    return typeof details === 'string' && details
+      ? details
+      : error instanceof Error
+        ? error.message
+        : `${label} turn failed.`
+  }
+  const send = async (blocks: ContentBlock[]): Promise<string | undefined> =>
+    (await agent.prompt({ sessionId: providerSessionRef!, prompt: blocks })).stopReason
   // ACP has one call for everything the client sends the agent, so a turn and a compaction request
   // both go through here. It emits nothing itself, because only one of the two is a turn.
   const prompt = async (blocks: ContentBlock[]): Promise<string | undefined> => {
@@ -504,9 +526,37 @@ export async function startAcpSession(
     if (active) throw new Error(`${label} already has an active turn.`)
     active = true
     try {
-      return (await agent.prompt({ sessionId: providerSessionRef, prompt: blocks })).stopReason
+      let response = send(blocks)
+      for (;;) {
+        let stopReason: string | undefined
+        let failure: unknown = null
+        try {
+          stopReason = await response
+        } catch (error) {
+          failure = error
+        }
+        // Nothing awaits between this read and `active` going false below, so a steer either joins
+        // this list in time or finds the turn over.
+        const next = failure && (stopped || connection.signal.aborted) ? undefined : steers.shift()
+        if (!next) {
+          if (failure) throw failure
+          return stopReason
+        }
+        // Claude Code already holds the steered message and runs it after this failure, so the turn
+        // goes on with it, and the failure is told rather than ending the turn.
+        try {
+          if (failure)
+            await options.onEvent({ type: 'diagnostic', level: 'warning', message: turnFailureMessage(failure) })
+          await options.onEvent({ type: 'steer_taken', turnId: next.turnId })
+        } finally {
+          // Settled even when the session is retiring, so the runtime never waits on it.
+          next.settle('taken')
+        }
+        response = next.response
+      }
     } finally {
       active = false
+      for (const steer of steers.splice(0)) steer.settle('missed')
       // Whatever is still parked here is dead. No cancellation signal reaches an elicitation handler,
       // so this is the only place that hears about a question the agent gave up on, and without it
       // the ACP request is never answered and the durable row sits in "Needs you" for good.
@@ -548,24 +598,32 @@ export async function startAcpSession(
         await options.onEvent({ type: 'turn_completed', ...(stopReason ? { stopReason } : {}) })
         return {}
       } catch (error) {
-        // The ACP SDK answers anything an agent throws as `Internal error` and puts the agent's own
-        // message in `data.details`. The generic message tells the reader nothing, so the details win.
-        const details =
-          error instanceof RequestError ? (error.data as { details?: unknown } | undefined)?.details : undefined
         await options.onEvent({
           type: 'error',
           code: `${id}_turn_failed`,
-          message:
-            typeof details === 'string' && details
-              ? details
-              : error instanceof Error
-                ? error.message
-                : `${label} turn failed.`,
+          message: turnFailureMessage(error),
           retryable: false,
         })
         throw error
       }
     },
+    ...(promptQueueing
+      ? {
+          steer: async (steered: AgentDriverSteerOptions): Promise<'taken' | 'missed'> => {
+            if (!active || !providerSessionRef) return 'missed'
+            const blocks = await acpPrompt(
+              steered.input,
+              steered.attachments,
+              initialized.agentCapabilities?.promptCapabilities,
+            )
+            if (!active) return 'missed'
+            const response = send(blocks)
+            // Read by the turn's loop when its turn comes. A rejection before then isn't unhandled.
+            response.catch(() => undefined)
+            return new Promise((settle) => steers.push({ turnId: steered.turn.id, response, settle }))
+          },
+        }
+      : {}),
     // ACP has no compaction call, so the `manualCompaction` quirk means the agent implements a
     // `/compact` command. Without the quirk this stays undefined and the runtime refuses the request
     // rather than sending a prompt the agent answers as prose. No `turn_completed` here: this is not

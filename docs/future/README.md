@@ -32,7 +32,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [opencode.md](./opencode.md) | An external OpenCode harness package: one manifest, a conformance run, and a narrower `envPassthrough` in the authoring example. | Proposed October 9, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
-| [steering.md](./steering.md) | Send a message into a running Claude or Codex turn, with a fallback to the queue when the turn ends first. | Proposed October 13, 2026. Starts with a spike on Claude's adapter. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan
@@ -47,6 +46,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 
 | Removed plan | Owner or remaining handoff |
 | --- | --- |
+| `steering.md`, removed October 13, 2026 | [Steer a running turn](../managed-agents/steering.md). Open acceptance: a real-window Node kill between the harness taking a steer and the Node recording it. |
 | `agent-search-startup.md`, removed October 13, 2026 | [Transcript search](../managed-agents/transcript-search.md). |
 | `editor-line-blame.md`, removed October 13, 2026 | [Line annotations](../editor/line-annotations.md), which lists the open questions. |
 | `spawned-agent-notes.md`, removed October 13, 2026 | [Notes in delegated agents](../notes-and-memory.md#notes-in-delegated-agents). [Managed delegation](../managed-agents/delegation.md#notes-in-delegated-agents) notes the open acceptance. |

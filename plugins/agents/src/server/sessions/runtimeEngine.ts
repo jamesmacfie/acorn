@@ -21,9 +21,15 @@ import {
   describeError,
   recordSkillDelivery,
 } from '@acorn/plugin-api/node'
-import type { AgentEventRecord, AgentNormalizedEvent, AgentSession, AgentTurn } from '../../contract/wire.ts'
+import type {
+  AgentEventRecord,
+  AgentInputPart,
+  AgentNormalizedEvent,
+  AgentSession,
+  AgentTurn,
+} from '../../contract/wire.ts'
 import type { EnqueueAgentTurnInput } from '../../shared/schemas'
-import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
+import type { AgentDriverEvent, AgentDriverMcpServer, AgentDriverTurnOptions } from '../drivers/types'
 import type { SkillReport } from '../drivers/skillIndex'
 import { AgentMcpServerStore } from '../mcpServerStore'
 import { AgentAccounts, agentAccountsRoot, linkSharedSettings, linkSharedSkills } from '../accounts'
@@ -252,6 +258,10 @@ export class ManagedAgentEngine {
   private readonly eventMaterializer: ProviderEventMaterializer
   private readonly shutdown = new AbortController()
   private readonly instructionScans = new Map<string, AbortController>()
+  // The transcript text of each turn being steered, by turn id, read when its driver says the agent
+  // took it. Each steer's driver call runs past the request that started it, so stop() waits on them.
+  private readonly steeredText = new Map<string, string>()
+  private readonly steers = new Set<Promise<void>>()
   private stopped = false
   private stopPromise: Promise<void> | null = null
 
@@ -546,6 +556,9 @@ export class ManagedAgentEngine {
       retirementFailure = error
     }
     await (await this.mcpReviews.built())?.close()
+    // Each harness has stopped, so every steer has settled or is about to, and its row is written
+    // before the database closes.
+    await Promise.all(this.steers)
     await queueDrain
     await this.processes.joinCallbacks()
     await this.providerEvents.flushAll()
@@ -773,6 +786,13 @@ export class ManagedAgentEngine {
     if (!live || live.closing || !this.processes.owns(generation)) return
     this.processes.heard(generation, !['session_state', 'session_metadata', 'diagnostic', 'error'].includes(event.type))
     const turnId = event.acornTurnId === undefined ? live.activeTurnId : event.acornTurnId
+    // Rewritten before anything below awaits, so the message keeps its place among the events around it.
+    if (event.type === 'steer_taken') {
+      const text = this.steeredText.get(event.turnId)
+      this.steeredText.delete(event.turnId)
+      if (text === undefined || !turnId) return
+      event = { type: 'user_message', text, steeredTurnId: event.turnId }
+    }
     if (event.type === 'request' || event.type === 'permission_request' || event.type === 'input_request') {
       const session = await this.store.requireSession(sessionId)
       const turn = turnId ? await this.store.turn(turnId) : null
@@ -981,65 +1001,8 @@ export class ManagedAgentEngine {
         text: agentTurnInputText({ ...turn, input }),
         ...(turn.continuationInput || turn.source === 'goal' ? { automatic: true } : {}),
       })
-      const attachments = Object.fromEntries(
-        await Promise.all(
-          [
-            ...new Set(
-              input.flatMap((part) => (part.type === 'attachment' || part.type === 'image' ? [part.attachmentId] : [])),
-            ),
-          ].map(async (attachmentId) => {
-            const attachment = await this.attachments.resolve(attachmentId)
-            if (!attachment) throw new Error(`Attachment is unavailable: ${attachmentId}`)
-            return [
-              attachmentId,
-              {
-                id: attachment.id,
-                filename: attachment.filename,
-                mediaType: attachment.mediaType,
-                byteSize: attachment.byteSize,
-                localPath: attachment.localPath,
-              },
-            ] as const
-          }),
-        ),
-      )
-      if (!this.processes.owns(generation)) return false
-      // The queue is shared by interactive, resumed, workflow, operation and delegated turns.
-      // Admission belongs immediately before the driver, including retries of a durable turn.
-      const scan = new AbortController()
-      this.instructionScans.set(turn.id, scan)
-      const stopScan = () => scan.abort(this.shutdown.signal.reason)
-      if (this.shutdown.signal.aborted) stopScan()
-      else this.shutdown.signal.addEventListener('abort', stopScan, { once: true })
-      try {
-        await (await this.instructionAdmission.get()).admit(session.taskId, scan.signal)
-      } finally {
-        this.instructionScans.delete(turn.id)
-        this.shutdown.signal.removeEventListener('abort', stopScan)
-      }
-      if (!this.processes.owns(generation)) return false
-      // Attachments leave the machine with this send. With blocking on, their stored bytes pass the
-      // secret gate here, on every turn source, including a retry.
-      if (Object.keys(attachments).length && this.core.secretPublication) {
-        const { admitAttachments } = await import('./secretPublication')
-        await admitAttachments(this.core.secretPublication, {
-          sessionId: session.id,
-          providerId: session.providerId,
-          attachments: Object.values(attachments),
-        })
-        if (!this.processes.owns(generation)) return false
-      }
-      // Copied only once admitted, because the session can read its folder: under the read block,
-      // the store itself is out of its reach.
-      const sent = Object.fromEntries(
-        await Promise.all(
-          Object.entries(attachments).map(
-            async ([id, attachment]) =>
-              [id, { ...attachment, localPath: await this.attachments.copyToSession(session.id, attachment) }] as const,
-          ),
-        ),
-      )
-      if (!this.processes.owns(generation)) return false
+      const sent = await this.prepareSend(session, turn.id, input, generation)
+      if (!sent || !this.processes.owns(generation)) return false
       await this.store.startTurn(turn.id)
       if (!this.processes.owns(generation)) return false
       this.beginTurnSpan(turn.id, session.id, session.providerId, turn.source)
@@ -1102,6 +1065,167 @@ export class ManagedAgentEngine {
       })
     }
     return true
+  }
+
+  /**
+   * What every send owes before its driver call, for a dispatch and a steer alike: the instruction
+   * check, the secret check on attachment bytes, and the attachments copied where the session can
+   * read them. Null when the provider generation was replaced partway, so the caller sends nothing.
+   */
+  private async prepareSend(
+    session: AgentSession,
+    turnId: string,
+    input: AgentInputPart[],
+    generation: ProviderGeneration,
+  ): Promise<AgentDriverTurnOptions['attachments'] | null> {
+    const attachments = Object.fromEntries(
+      await Promise.all(
+        [
+          ...new Set(
+            input.flatMap((part) => (part.type === 'attachment' || part.type === 'image' ? [part.attachmentId] : [])),
+          ),
+        ].map(async (attachmentId) => {
+          const attachment = await this.attachments.resolve(attachmentId)
+          if (!attachment) throw new Error(`Attachment is unavailable: ${attachmentId}`)
+          return [
+            attachmentId,
+            {
+              id: attachment.id,
+              filename: attachment.filename,
+              mediaType: attachment.mediaType,
+              byteSize: attachment.byteSize,
+              localPath: attachment.localPath,
+            },
+          ] as const
+        }),
+      ),
+    )
+    if (!this.processes.owns(generation)) return null
+    // The queue is shared by interactive, resumed, workflow, operation and delegated turns.
+    // Admission belongs immediately before the driver, including retries of a durable turn and a steer.
+    const scan = new AbortController()
+    this.instructionScans.set(turnId, scan)
+    const stopScan = () => scan.abort(this.shutdown.signal.reason)
+    if (this.shutdown.signal.aborted) stopScan()
+    else this.shutdown.signal.addEventListener('abort', stopScan, { once: true })
+    try {
+      await (await this.instructionAdmission.get()).admit(session.taskId, scan.signal)
+    } finally {
+      this.instructionScans.delete(turnId)
+      this.shutdown.signal.removeEventListener('abort', stopScan)
+    }
+    if (!this.processes.owns(generation)) return null
+    // Attachments leave the machine with this send. With blocking on, their stored bytes pass the
+    // secret gate here, on every turn source, including a retry.
+    if (Object.keys(attachments).length && this.core.secretPublication) {
+      const { admitAttachments } = await import('./secretPublication')
+      await admitAttachments(this.core.secretPublication, {
+        sessionId: session.id,
+        providerId: session.providerId,
+        attachments: Object.values(attachments),
+      })
+      if (!this.processes.owns(generation)) return null
+    }
+    // Copied only once admitted, because the session can read its folder: under the read block,
+    // the store itself is out of its reach.
+    return Object.fromEntries(
+      await Promise.all(
+        Object.entries(attachments).map(
+          async ([id, attachment]) =>
+            [id, { ...attachment, localPath: await this.attachments.copyToSession(session.id, attachment) }] as const,
+        ),
+      ),
+    )
+  }
+
+  /**
+   * Hands a queued turn to the session's running turn, for the agent to read at its next step
+   * (docs/managed-agents/steering.md § What a steer does). Returns once the harness has the
+   * message, with the row `steering`. The outcome follows as a turn frame: `steered` when the agent
+   * took it, or `queued` again when the turn ended first. A row returns `queued` and unchanged when no
+   * turn is running, because dispatch sends it next anyway.
+   *
+   * The checks a dispatch runs before its send run here too, and a failed one leaves the row queued.
+   */
+  async steerTurn(sessionId: string, turnId: string): Promise<AgentTurn> {
+    const session = await this.store.requireSession(sessionId)
+    if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
+    if (session.archivedAt) throw new Error('Archived sessions cannot accept turns.')
+    if (session.kind !== 'interactive') throw new Error('Only an interactive session can be steered.')
+    const queued = await this.store.turn(turnId)
+    if (!queued || queued.sessionId !== sessionId) throw new Error('Agent turn not found.')
+    // A repeated request answers what the first one started.
+    if (queued.status === 'steering' || queued.status === 'steered') return queued
+    if (queued.status !== 'queued') throw new Error('Only a queued turn can be steered.')
+    // A workflow, delegation, or plugin waits on its own turn id to settle, and a steered turn never does.
+    if (queued.source !== 'interactive') throw new Error('Only a message you sent can be steered.')
+    const live = this.processes.current(sessionId)
+    const activeTurnId = live?.activeTurnId
+    if (!live || !activeTurnId || session.runtimeState === 'cancelling') return queued
+    const generation = live.generation
+    const steerable = await this.processes.withCurrentHandle(generation, async (handle) => !!handle.steer)
+    if (steerable === null) return queued
+    if (!steerable) throw new Error("This session's harness does not support steering a running turn.")
+
+    const steering = await this.store.beginSteer(turnId)
+    if (!steering) return (await this.store.turn(turnId)) ?? queued
+    await this.emitTurnAndSession(steering)
+    let attachments: AgentDriverTurnOptions['attachments'] | null
+    try {
+      attachments = await this.prepareSend(session, turnId, steering.input, generation)
+    } catch (error) {
+      await this.returnSteer(turnId)
+      // The refusal a dispatch would record, unchanged, so the route answers it the way it answers any.
+      throw error
+    }
+    if (!attachments) return this.returnSteer(turnId)
+    this.steeredText.set(turnId, agentTurnInputText(steering))
+    const options = { turn: steering, input: steering.input, attachments, activeTurnId }
+    const outcome = this.processes
+      .withCurrentHandle(generation, (handle) => handle.steer!(options))
+      .catch((error: unknown) => {
+        log.warn(`steering turn ${turnId} failed: ${describeError(error).message}`)
+        return null
+      })
+    const settled = outcome
+      .then((result) => this.settleSteer(sessionId, turnId, generation, result))
+      .catch((error: unknown) => log.warn(`settling steered turn ${turnId} failed: ${describeError(error).message}`))
+    this.steers.add(settled)
+    void settled.finally(() => this.steers.delete(settled))
+    return steering
+  }
+
+  private async settleSteer(
+    sessionId: string,
+    turnId: string,
+    generation: ProviderGeneration,
+    outcome: 'taken' | 'missed' | null,
+  ): Promise<void> {
+    this.steeredText.delete(turnId)
+    if (outcome === 'taken') {
+      // The `steered` row commits with the message. One still `steering` past this point lost its
+      // message with the harness that held it, which only happens when that harness stopped.
+      await this.providerEvents.flush(sessionId)
+      if ((await this.store.turn(turnId))?.status !== 'steering' || this.processes.owns(generation)) return
+    }
+    await this.returnSteer(turnId)
+  }
+
+  /** Puts a turn the running turn didn't take back in the queue, which dispatch sends next. */
+  private async returnSteer(turnId: string): Promise<AgentTurn> {
+    const turn = await this.store.missSteer(turnId)
+    if (!turn) throw new Error('Agent turn not found.')
+    await this.emitTurnAndSession(turn)
+    void this.pump()
+    return turn
+  }
+
+  // A steer moves a row in or out of the queue without an event, so its turn and the session's queue
+  // count go out here.
+  private async emitTurnAndSession(turn: AgentTurn): Promise<void> {
+    if (this.stopped) return
+    this.frames.emit({ channel: 'agent:turn', turn })
+    this.frames.emit({ channel: 'agent:session', session: await this.store.requireSession(turn.sessionId) })
   }
 
   async record(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<AgentEventRecord> {
@@ -1180,6 +1304,10 @@ export class ManagedAgentEngine {
       const request = await this.store.request(sessionId, event.requestId)
       if (request) this.frames.emit({ channel: 'agent:request', request })
       return
+    }
+    if (event.type === 'user_message' && event.steeredTurnId) {
+      const steered = await this.store.turn(event.steeredTurnId)
+      if (steered) this.frames.emit({ channel: 'agent:turn', turn: steered })
     }
     if (!turnId || (event.type !== 'user_message' && event.type !== 'turn_completed')) return
     const turn = await this.store.turn(turnId)

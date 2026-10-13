@@ -50,6 +50,9 @@ its own path to another Node.
 Without `claude` on `PATH`, the provider reports as not installed with the diagnostic
 `claude is not available on PATH.`, and a launch fails with the same message. Acorn downloads nothing.
 
+Claude Code and Codex both take a message into a running turn. [Steering](./steering.md#harness-support)
+covers how each driver does it.
+
 ### Codex
 
 The native driver lists Default and Plan through `collaborationMode/list`, expands the chosen preset

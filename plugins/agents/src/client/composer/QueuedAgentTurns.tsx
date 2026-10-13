@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { AgentRuntimeState, AgentTurn } from '../../contract/wire.ts'
 import { Button, Card, IconButton, Inline, Section, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
@@ -6,6 +6,7 @@ import { clientEvents, createWorkspaceWords } from '@acorn/plugin-api/client'
 import { agentConcurrencyOptions } from '../settings/concurrencyClient'
 import AgentAttachmentCard from '../sessions/AgentAttachmentCard'
 import { managedAgentApi } from '../sessions/managedClient'
+import { steerableTurn } from '../sessions/steering'
 
 const promptText = (turn: AgentTurn): string =>
   (turn.continuationInput ?? turn.input).find((part) => part.type === 'text')?.text ?? ''
@@ -14,18 +15,43 @@ const attachments = (turn: AgentTurn) =>
   turn.input.filter((part) => part.type === 'attachment' || part.type === 'image')
 
 // Follow-ups typed while the session was busy, in the order they will be sent. Editable and
-// reorderable until the dispatcher takes one (docs/managed-agents/operations.md § The turn queue).
+// reorderable until the dispatcher takes one (docs/managed-agents/operations.md § The turn queue). A row
+// a person sent can be steered into the running turn instead, when `steerable` says the harness can.
 export default function QueuedAgentTurns(props: {
   sessionId: string
   runtimeState: AgentRuntimeState
   turns: AgentTurn[]
+  steerable?: boolean
   onChanged(): void | Promise<unknown>
   onError(message: string): void
 }) {
   const words = createWorkspaceWords()
   const queued = createMemo(() =>
-    props.turns.filter((turn) => turn.status === 'queued').sort((a, b) => a.ordinal - b.ordinal),
+    props.turns
+      .filter((turn) => turn.status === 'queued' || turn.status === 'steering')
+      .sort((a, b) => a.ordinal - b.ordinal),
   )
+  // Rows this view saw steering. One that comes back `queued` missed: its turn ended first. A steered
+  // row leaves the list, because it's part of the running turn's transcript. The seen set is never
+  // drawn, so it's plain state the effect owns.
+  const seenSteering = new Set<string>()
+  const [missed, setMissed] = createSignal<ReadonlySet<string>>(new Set())
+  createEffect(() => {
+    const rows = new Map(queued().map((turn) => [turn.id, turn.status]))
+    const back: string[] = []
+    for (const id of seenSteering) {
+      if (rows.get(id) === 'queued') back.push(id)
+      if (rows.get(id) !== 'steering') seenSteering.delete(id)
+    }
+    for (const [id, status] of rows) if (status === 'steering') seenSteering.add(id)
+    if (back.length) setMissed((current) => new Set([...current, ...back]))
+  })
+  const steer = (turn: AgentTurn) =>
+    run(`${turn.id}:steer`, async () => {
+      setMissed((current) => new Set([...current].filter((id) => id !== turn.id)))
+      const answered = await managedAgentApi.steerQueuedTurn(props.sessionId, turn.id)
+      if (answered.status === 'queued') setMissed((current) => new Set([...current, turn.id]))
+    })
   const scheduled = createMemo(() => queued().find((turn) => turn.notBefore != null && turn.notBefore > Date.now()))
   const [editing, setEditing] = createSignal<string | null>(null)
   const [text, setText] = createSignal('')
@@ -67,32 +93,34 @@ export default function QueuedAgentTurns(props: {
     <Show when={queued().length}>
       <Section label="Queued follow-ups" count={queued().length}>
         <Stack gap="row">
-          <Inline wrap>
-            <Show
-              when={blockedByLimits()}
-              fallback={
-                <Text emphasis="muted" wrap>
-                  {scheduled()
-                    ? `Usage limit reached. Continues automatically at ${new Date(scheduled()!.notBefore!).toLocaleString()}.`
-                    : props.runtimeState === 'working' || props.runtimeState === 'waiting'
-                      ? 'Sends when the current turn finishes.'
-                      : 'Sends when the provider is ready.'}
-                </Text>
-              }
-            >
-              <Text emphasis="muted" wrap>
-                Waiting for a free slot. This Node runs {limits.data?.provider ?? 2} turns at once per provider and{' '}
-                {limits.data?.workspace ?? 3} per {words().singular}.
-              </Text>
-              <Button
-                variant="bare"
-                size="sm"
-                onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-limits#limits' })}
+          <Show when={queued().some((turn) => turn.status === 'queued')}>
+            <Inline wrap>
+              <Show
+                when={blockedByLimits()}
+                fallback={
+                  <Text emphasis="muted" wrap>
+                    {scheduled()
+                      ? `Usage limit reached. Continues automatically at ${new Date(scheduled()!.notBefore!).toLocaleString()}.`
+                      : props.runtimeState === 'working' || props.runtimeState === 'waiting'
+                        ? 'Sends when the current turn finishes.'
+                        : 'Sends when the provider is ready.'}
+                  </Text>
+                }
               >
-                Change
-              </Button>
-            </Show>
-          </Inline>
+                <Text emphasis="muted" wrap>
+                  Waiting for a free slot. This Node runs {limits.data?.provider ?? 2} turns at once per provider and{' '}
+                  {limits.data?.workspace ?? 3} per {words().singular}.
+                </Text>
+                <Button
+                  variant="bare"
+                  size="sm"
+                  onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-limits#limits' })}
+                >
+                  Change
+                </Button>
+              </Show>
+            </Inline>
+          </Show>
           <For each={queued()}>
             {(turn, index) => (
               <Card pad="sm">
@@ -117,75 +145,100 @@ export default function QueuedAgentTurns(props: {
                       </For>
                     </Inline>
                   </Show>
-                  <Inline>
-                    <Show
-                      when={editing() === turn.id}
-                      fallback={
+                  <Show when={turn.status === 'steering'}>
+                    <Text emphasis="muted" wrap>
+                      Steering. The agent reads this after its current step.
+                    </Text>
+                  </Show>
+                  <Show when={turn.status === 'queued' && missed().has(turn.id)}>
+                    <Text emphasis="muted" wrap>
+                      The turn ended first, so this sends as the next turn.
+                    </Text>
+                  </Show>
+                  <Show when={turn.status === 'queued'}>
+                    <Inline>
+                      <Show when={props.steerable && steerableTurn(turn) && editing() !== turn.id}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          busy={pending() === `${turn.id}:steer`}
+                          disabled={pending() != null}
+                          onPress={() => void steer(turn)}
+                        >
+                          Steer now
+                        </Button>
+                      </Show>
+                      <Show
+                        when={editing() === turn.id}
+                        fallback={
+                          <IconButton
+                            icon="pencil"
+                            title="Edit queued prompt"
+                            label="Edit queued prompt"
+                            disabled={pending() != null || turn.continuationInput != null}
+                            onPress={() => {
+                              setEditing(turn.id)
+                              setText(promptText(turn))
+                            }}
+                          />
+                        }
+                      >
                         <IconButton
-                          icon="pencil"
-                          title="Edit queued prompt"
-                          label="Edit queued prompt"
-                          disabled={pending() != null || turn.continuationInput != null}
-                          onPress={() => {
-                            setEditing(turn.id)
-                            setText(promptText(turn))
-                          }}
+                          tone="accent"
+                          icon="check"
+                          title="Save queued prompt"
+                          label="Save queued prompt"
+                          busy={pending() === `${turn.id}:save`}
+                          disabled={!text().trim() || pending() != null}
+                          onPress={() => void save(turn)}
                         />
-                      }
-                    >
+                        <IconButton
+                          icon="x"
+                          title="Cancel editing"
+                          label="Cancel editing"
+                          disabled={pending() != null}
+                          onPress={() => setEditing(null)}
+                        />
+                      </Show>
                       <IconButton
-                        tone="accent"
-                        icon="check"
-                        title="Save queued prompt"
-                        label="Save queued prompt"
-                        busy={pending() === `${turn.id}:save`}
-                        disabled={!text().trim() || pending() != null}
-                        onPress={() => void save(turn)}
+                        icon="arrow-up"
+                        title="Move queued prompt up"
+                        label="Move queued turn up"
+                        busy={pending() === `${turn.id}:up`}
+                        disabled={index() === 0 || pending() != null}
+                        onPress={() =>
+                          void run(`${turn.id}:up`, () =>
+                            managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() - 1 }),
+                          )
+                        }
                       />
                       <IconButton
-                        icon="x"
-                        title="Cancel editing"
-                        label="Cancel editing"
+                        icon="arrow-down"
+                        title="Move queued prompt down"
+                        label="Move queued turn down"
+                        busy={pending() === `${turn.id}:down`}
+                        disabled={index() === queued().length - 1 || pending() != null}
+                        onPress={() =>
+                          void run(`${turn.id}:down`, () =>
+                            managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() + 1 }),
+                          )
+                        }
+                      />
+                      <IconButton
+                        tone="danger"
+                        icon="trash-2"
+                        title="Remove queued prompt"
+                        label="Remove queued prompt"
+                        busy={pending() === `${turn.id}:remove`}
                         disabled={pending() != null}
-                        onPress={() => setEditing(null)}
+                        onPress={() =>
+                          void run(`${turn.id}:remove`, () =>
+                            managedAgentApi.removeQueuedTurn(props.sessionId, turn.id),
+                          )
+                        }
                       />
-                    </Show>
-                    <IconButton
-                      icon="arrow-up"
-                      title="Move queued prompt up"
-                      label="Move queued turn up"
-                      busy={pending() === `${turn.id}:up`}
-                      disabled={index() === 0 || pending() != null}
-                      onPress={() =>
-                        void run(`${turn.id}:up`, () =>
-                          managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() - 1 }),
-                        )
-                      }
-                    />
-                    <IconButton
-                      icon="arrow-down"
-                      title="Move queued prompt down"
-                      label="Move queued turn down"
-                      busy={pending() === `${turn.id}:down`}
-                      disabled={index() === queued().length - 1 || pending() != null}
-                      onPress={() =>
-                        void run(`${turn.id}:down`, () =>
-                          managedAgentApi.patchQueuedTurn(props.sessionId, turn.id, { ordinal: index() + 1 }),
-                        )
-                      }
-                    />
-                    <IconButton
-                      tone="danger"
-                      icon="trash-2"
-                      title="Remove queued prompt"
-                      label="Remove queued prompt"
-                      busy={pending() === `${turn.id}:remove`}
-                      disabled={pending() != null}
-                      onPress={() =>
-                        void run(`${turn.id}:remove`, () => managedAgentApi.removeQueuedTurn(props.sessionId, turn.id))
-                      }
-                    />
-                  </Inline>
+                    </Inline>
+                  </Show>
                 </Stack>
               </Card>
             )}

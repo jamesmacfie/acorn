@@ -3,6 +3,7 @@ import type { AgentEventRecord, AgentRequest } from '../../contract/wire.ts'
 import { foldToolEvents } from '../../shared/toolFold'
 import {
   buildConversationItems,
+  cardTurnId,
   createConversationProjection,
   findSubagentItem,
   isChatItem,
@@ -700,5 +701,29 @@ describe('the projection a streaming transcript keeps', () => {
     expect(grown[0].children?.[0]).toBe(first[0].children?.[0])
     events.push(event(4, { type: 'assistant_message', text: 'done', messageId: 'top' }))
     expect(project(events)[0]).toBe(grown[0])
+  })
+})
+
+describe('a steered message', () => {
+  it('sits between the output it followed and its answer, and draws from its own queued row', () => {
+    const items = visibleConversationItems(
+      buildConversationItems([
+        event(1, { type: 'user_message', text: 'Run the long command' }),
+        event(2, { type: 'assistant_message', text: 'Running it', messageId: 'a', append: true }),
+        event(3, { type: 'tool', tool: { id: 'cmd', title: 'sleep 60', kind: 'execute', status: 'completed' } }),
+        event(4, { type: 'user_message', text: 'Stop and list the files instead', steeredTurnId: 'queued' }),
+        event(5, { type: 'assistant_message', text: 'Listing them', messageId: 'b', append: true }),
+        event(6, { type: 'turn_completed', stopReason: 'end_turn' }),
+      ]),
+    )
+    expect(items.map((item) => (item.event.type === 'user_message' ? item.event.text : item.event.type))).toEqual([
+      'Run the long command',
+      'assistant_message',
+      'tool',
+      'Stop and list the files instead',
+      'assistant_message',
+      'turn_completed',
+    ])
+    expect(items.map(cardTurnId)).toEqual(['turn', 'turn', 'turn', 'queued', 'turn', 'turn'])
   })
 })

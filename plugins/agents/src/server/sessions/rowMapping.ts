@@ -79,6 +79,7 @@ export const mapAgentTurn = (row: typeof schema.agentTurns.$inferSelect): AgentT
   createdAt: row.createdAt,
   startedAt: row.startedAt,
   completedAt: row.completedAt,
+  steeredIntoTurnId: row.steeredIntoTurnId,
 })
 
 export const mapAgentEvent = (row: typeof schema.agentEvents.$inferSelect): AgentEventRecord => ({

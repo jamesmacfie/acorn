@@ -249,6 +249,14 @@ describe('what a projected event costs', () => {
     expect(snapshotCalls).toEqual([])
   })
 
+  it('moves a steered turn out of the turn list, beside the rows the transcript reads', async () => {
+    await seed({ turns: [turn('active'), { ...turn('steering'), id: 'queued', ordinal: 1 }] })
+    push({ channel: 'agent:turn', turn: { ...turn('steered'), id: 'queued', ordinal: 1, steeredIntoTurnId: 'turn1' } })
+    expect(managedAgentStore.snapshots()[SESSION].turns.map((item) => item.id)).toEqual(['turn1'])
+    expect(managedAgentStore.snapshots()[SESSION].steeredTurns?.map((item) => item.id)).toEqual(['queued'])
+    expect(snapshotCalls).toEqual([])
+  })
+
   it('reads no rows for a request or its answer: the node sends the request', async () => {
     await seed()
     push({

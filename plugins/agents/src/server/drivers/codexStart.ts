@@ -14,7 +14,12 @@ import {
 } from './codexNormalizer'
 import { JsonRpcProcess, type JsonRpcServerRequest } from './jsonRpcProcess'
 import { CODEX_ACCOUNTS, withAccountHome } from './accountEnv'
-import type { AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
+import type {
+  AgentDriverSession,
+  AgentDriverStartOptions,
+  AgentDriverSteerOptions,
+  AgentDriverTurnOptions,
+} from './types'
 import { contextBlock } from './contextBlock'
 import { canReplaceMissingCodexSession } from './codexSessionRecovery'
 import { providerStderrNotice } from './diagnostics'
@@ -122,6 +127,10 @@ export async function startCodexSession(
   let configOptions: AgentConfigOption[] = []
   let metadataReady = false
   const pendingRequests = new Map<string, JsonRpcServerRequest>()
+  // Steers Codex accepted into a running turn, by the Acorn turn id sent as `clientUserMessageId`. One
+  // counts as taken when its user item joins the turn, not when `turn/steer` answers: the reply still
+  // streaming ahead of it belongs before it.
+  const acceptedSteers = new Map<string, { providerTurnId: string; settle: (outcome: 'taken' | 'missed') => void }>()
   const childRouter = new CodexChildRouter()
   let rpc!: JsonRpcProcess
   const mcpStartup = new Map<string, { status: string; error: string | null }>()
@@ -178,6 +187,18 @@ export async function startCodexSession(
     rpc.respond(request.id, response)
   }
 
+  const takeSteer = (turnId: string): void => {
+    const steer = acceptedSteers.get(turnId)
+    if (!steer) return
+    acceptedSteers.delete(turnId)
+    emit({ type: 'steer_taken', turnId })
+    steer.settle('taken')
+  }
+  const dropSteers = (): void => {
+    for (const steer of acceptedSteers.values()) steer.settle('missed')
+    acceptedSteers.clear()
+  }
+
   rpc = new JsonRpcProcess({
     command: executable,
     args: ['app-server', '--stdio'],
@@ -213,6 +234,16 @@ export async function startCodexSession(
       }
       const providerTurnId =
         stringValue(notification.params.turnId) ?? stringValue(asObject(notification.params.turn)?.id)
+      if (notification.method === 'item/started' || notification.method === 'item/completed') {
+        const item = asObject(notification.params.item)
+        const clientId = item?.type === 'userMessage' ? stringValue(item.clientId) : null
+        if (clientId) takeSteer(clientId)
+      }
+      // A steer Codex accepted stays in the turn even when the agent never reached a step to read it:
+      // Codex records it in the thread as the turn ends. So it counts as taken, ahead of the turn's end.
+      if (notification.method === 'turn/completed') {
+        for (const [turnId, steer] of acceptedSteers) if (steer.providerTurnId === providerTurnId) takeSteer(turnId)
+      }
       if (notification.method === 'turn/started' && providerTurnId && managedTurnId) {
         managedTurns.set(providerTurnId, managedTurnId)
         if (managedTurns.size > 64) managedTurns.delete(managedTurns.keys().next().value!)
@@ -286,6 +317,7 @@ export async function startCodexSession(
     onClosed: (error) => {
       ready = false
       pendingRequests.clear()
+      dropSteers()
       void Promise.resolve(options.onClosed(error)).catch(() => undefined)
     },
   })
@@ -477,6 +509,29 @@ export async function startCodexSession(
       if (currentTurnId) managedTurns.set(currentTurnId, turnOptions.turn.id)
       return { providerTurnRef: currentTurnId ?? undefined }
     },
+    async steer(steered: AgentDriverSteerOptions) {
+      const expectedTurnId = currentTurnId
+      if (!threadId || !expectedTurnId) return 'missed'
+      const turnId = steered.turn.id
+      // Waiting before the request goes, so an item that beats the response still finds its entry.
+      const taken = new Promise<'taken' | 'missed'>((settle) =>
+        acceptedSteers.set(turnId, { providerTurnId: expectedTurnId, settle }),
+      )
+      try {
+        await rpc.request('turn/steer', {
+          threadId,
+          expectedTurnId,
+          clientUserMessageId: turnId,
+          input: codexInput(steered.input, options.cwd, steered.attachments),
+        })
+      } catch {
+        // Codex refuses when `expectedTurnId` isn't the running turn any more, which is a turn that
+        // ended between the person's click and this request.
+        acceptedSteers.delete(turnId)
+        return 'missed'
+      }
+      return taken
+    },
     async cancel() {
       if (!threadId || !currentTurnId) return
       await rpc.request('turn/interrupt', { threadId, turnId: currentTurnId }).catch(() => undefined)
@@ -552,6 +607,7 @@ export async function startCodexSession(
     async stop() {
       ready = false
       pendingRequests.clear()
+      dropSteers()
       await rpc.stop(async () => {
         if (threadId) await rpc.request('thread/unsubscribe', { threadId }, 1_000)
       })

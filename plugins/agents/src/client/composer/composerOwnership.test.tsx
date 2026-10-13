@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   attachment: vi.fn(),
   uploadAttachment: vi.fn(),
   enqueue: vi.fn(),
+  steerQueuedTurn: vi.fn(),
   removeAttachment: vi.fn(),
 }))
 vi.mock('../sessions/managedClient', () => ({ managedAgentApi: api }))
@@ -298,4 +299,25 @@ it('keeps a held automatic capture with its originating session and discards it 
   await tick()
   expect(composerDraftState('second', 'A').contexts()).toEqual([])
   expect(composerDraftState('second', 'B').contexts()).toEqual([])
+})
+
+it('steers a draft by queuing it and handing the queued turn to the running one', async () => {
+  setActiveNode('A')
+  const draft = composerDraftState('same')
+  draft.setText('Stop and list the files instead')
+  api.enqueue.mockResolvedValue({ id: 'queued' })
+  api.steerQueuedTurn.mockRejectedValue(new Error('The turn has ended.'))
+  const host = document.createElement('div')
+  document.body.append(host)
+  disposals.push(
+    render(() => <AgentComposer session={row('same')} steerable onSent={() => {}} onSessionUpdated={() => {}} />, host),
+  )
+  disposals.push(() => host.remove())
+  await tick()
+  button(host, 'Steer').click()
+  await vi.waitFor(() => expect(api.steerQueuedTurn).toHaveBeenCalledWith('same', 'queued', expect.anything()))
+  expect(api.enqueue.mock.calls[0][1].input).toEqual([{ type: 'text', text: 'Stop and list the files instead' }])
+  // Queued before the steer, so a refused steer leaves it where Enter would have put it.
+  await vi.waitFor(() => expect(draft.error()).toBe('The turn has ended.'))
+  expect(draft.text()).toBe('')
 })

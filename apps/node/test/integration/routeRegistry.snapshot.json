@@ -215,6 +215,8 @@
   "POST /v1/p/agents/sessions/:sessionId/summarize",
   "POST /v1/p/agents/sessions/:sessionId/turns",
   "POST /v1/p/agents/sessions/:sessionId/turns",
+  "POST /v1/p/agents/sessions/:sessionId/turns/:turnId/steer",
+  "POST /v1/p/agents/sessions/:sessionId/turns/:turnId/steer",
   "POST /v1/p/agents/sessions/:sessionId/verify-imported-resume",
   "POST /v1/p/agents/sessions/:sessionId/verify-imported-resume",
   "POST /v1/p/agents/stop-idle",

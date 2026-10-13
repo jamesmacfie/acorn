@@ -65,7 +65,19 @@ type AgentGoal = {
   noProgress: number
   verdict: AgentGoalVerdict | null
 }
-export type AgentTurnStatus = 'queued' | 'dispatching' | 'active' | 'completed' | 'cancelled' | 'failed' | 'interrupted'
+/** `steering` and `steered` belong to a queued turn a person handed to the running turn instead of
+ *  waiting for it to end (docs/managed-agents/steering.md § What a steer does). A `steered` row
+ *  is part of the turn it joined, so a session's turn list leaves it out. */
+export type AgentTurnStatus =
+  | 'queued'
+  | 'dispatching'
+  | 'active'
+  | 'completed'
+  | 'cancelled'
+  | 'failed'
+  | 'interrupted'
+  | 'steering'
+  | 'steered'
 export type AgentRequestKind = 'permission' | 'question' | 'elicitation' | 'workflow_gate'
 export type AgentRequestStatus = 'pending' | 'resolving' | 'resolved' | 'expired'
 export type AgentArtifactKind =
@@ -117,6 +129,8 @@ export type AgentCapability =
   | 'loop_before_tool'
   /** acorn's bridge runs `agents:after-tool` on every finished tool call. */
   | 'loop_after_tool'
+  /** The harness takes a message into the turn it's running (`AgentDriverSession.steer`). */
+  | 'steering'
 
 export type AgentConfigOption = {
   id: string
@@ -368,7 +382,14 @@ export type AgentNormalizedEvent =
     }
   /** `subagentId` means somebody other than the reader wrote this turn: it is the brief a subagent was
    *  handed, so it belongs in that subagent's stream rather than in the session's. */
-  | { type: 'user_message'; text: string; subagentId?: string; automatic?: boolean }
+  | {
+      type: 'user_message'
+      text: string
+      subagentId?: string
+      automatic?: boolean
+      /** The queued turn this message came from, when a person steered it into the running turn. */
+      steeredTurnId?: string
+    }
   | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean; subagentId?: string }
   | { type: 'reasoning'; text: string; messageId?: string; append?: boolean; subagentId?: string }
   | { type: 'tool'; tool: AgentToolCall }
@@ -481,6 +502,8 @@ export type AgentTurn = {
   createdAt: number
   startedAt: number | null
   completedAt: number | null
+  /** For a `steered` turn, the running turn it joined. */
+  steeredIntoTurnId?: string | null
 }
 
 export type AgentEventRecord = {
@@ -518,7 +541,12 @@ export type AgentRequest = {
 
 export type AgentSessionSnapshot = {
   session: AgentSession
+  /** Every turn but a steered one, in queue order. */
   turns: AgentTurn[]
+  /** Queued turns a person steered into a running turn. Apart from `turns` because each is part of the
+   *  turn it joined. The transcript reads one for its message's attachments and context. Absent from a
+   *  Node older than steering. */
+  steeredTurns?: AgentTurn[]
   events: AgentEventRecord[]
   requests: AgentRequest[]
   /** Authoritative wait outcome; ordinary snapshots and older Nodes omit this field.

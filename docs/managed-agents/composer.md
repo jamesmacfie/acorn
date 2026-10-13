@@ -49,6 +49,12 @@ The composer has two cooperative extension points
 - `agents:composer-actions` is room in the action bar beside **Attach** and the two pickers, in
   `stack` mode with a ceiling of four.
 
+## Steer
+
+While a Claude Code or Codex turn runs, **Steer** sits beside **Send**. It queues the draft and hands
+it to the running turn, which reads it after its current step. Enter still queues.
+[Steer a running turn](./steering.md) covers the queue's **Steer now** and what the Node does.
+
 ## Session goal
 
 The **Goal** button below an interactive session's message field opens the completion-condition

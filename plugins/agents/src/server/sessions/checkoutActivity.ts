@@ -4,7 +4,7 @@ export function agentCheckoutActivity(row: {
   runtimeState: string
   status: string | null
 }): Array<{ taskId: string; description: string }> {
-  if (row.status && !['completed', 'failed', 'cancelled', 'interrupted'].includes(row.status)) {
+  if (row.status && !['completed', 'failed', 'cancelled', 'interrupted', 'steered'].includes(row.status)) {
     return [{ taskId: row.taskId, description: `agent turn ${row.status}` }]
   }
   if (!['ready', 'stopped', 'failed', 'archived'].includes(row.runtimeState)) {

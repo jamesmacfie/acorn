@@ -226,6 +226,12 @@ export default function AgentEventCard(props: {
                             ? 'Acorn'
                             : senderLabel(props.turn)}
                     </Text>
+                    {/* A person's message the agent read mid-turn, at its next step. */}
+                    <Show when={message().steeredTurnId}>
+                      <Text emphasis="eyebrow" tone="accent">
+                        Steered
+                      </Text>
+                    </Show>
                     <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>
                       {time().short}
                     </Text>

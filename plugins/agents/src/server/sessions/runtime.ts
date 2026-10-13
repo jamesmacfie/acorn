@@ -137,6 +137,7 @@ export class ManagedAgentRuntime {
         await this.engine.record(session.id, null, { type: 'subagent', subagent: { id, status: 'idle' } })
       }
     }
+    await this.store.requeueSteeringTurns()
     await this.engine.settleCommands()
     // No harness outlives the Node, so a background command still marked running lost the process that
     // would have reported its exit. Its session can be `ready`, which the rule above leaves running.
@@ -616,6 +617,11 @@ export class ManagedAgentRuntime {
     await this.store.expirePendingRequests(sessionId)
     if (live) await this.engine.withCurrentSessionHandle(live.generation, (handle) => handle.cancel())
     await this.store.cancelTurn(target)
+  }
+
+  /** Hands a queued turn to the running turn. See ManagedAgentEngine.steerTurn. */
+  steerTurn(sessionId: string, turnId: string): Promise<AgentTurn> {
+    return this.engine.steerTurn(sessionId, turnId)
   }
 
   async cancelSubagent(sessionId: string, subagentId: string): Promise<void> {

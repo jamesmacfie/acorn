@@ -19,6 +19,10 @@ function bridgeFailure(error: unknown): never {
   // The secret gate's refusal (`SecretPublicationRefused`), matched by
   // shape so this bridge does not load the checker. Its message names rules and positions, never a value.
   if (error instanceof Error && 'refusal' in error) throw new BridgeError(409, 'secret_check_blocked', error.message)
+  // The instruction check's refusal (`InstructionAdmissionError`), whose code says what to review.
+  if (error instanceof Error && error.name === 'InstructionAdmissionError' && 'code' in error) {
+    throw new BridgeError(409, String(error.code), error.message)
+  }
   const message = error instanceof Error ? error.message : 'Managed agent operation failed.'
   if (/before summarizing|empty summary/.test(message)) throw new BridgeError(422, 'agent_summary_unavailable', message)
   // A request naming a provider this Node never registered, as opposed to one that is unavailable now.
@@ -28,7 +32,7 @@ function bridgeFailure(error: unknown): never {
   if (/not available|unavailable|no mapped checkout/i.test(message)) {
     throw new BridgeError(422, 'agent_provider_unavailable', message)
   }
-  if (/active turn|not ready|controlled|archived|pending|support/i.test(message)) {
+  if (/active turn|not ready|controlled|archived|pending|support|steer/i.test(message)) {
     throw new BridgeError(409, 'agent_conflict', message)
   }
   throw error
@@ -148,6 +152,7 @@ export function managedAgentsBridge(
     implementCodexPlan: (sessionId, itemId) => guarded(() => runtime.implementCodexPlan(sessionId, itemId)),
     patchQueuedTurn: (sessionId, turnId, patch) => guarded(() => runtime.patchQueuedTurn(sessionId, turnId, patch)),
     cancelTurn: (sessionId, turnId) => guarded(() => runtime.cancelTurn(sessionId, turnId)),
+    steerTurn: (sessionId, turnId) => guarded(() => runtime.steerTurn(sessionId, turnId)),
     cancelSubagent: (sessionId, subagentId) => guarded(() => runtime.cancelSubagent(sessionId, subagentId)),
     resolveRequest: (sessionId, requestId, resolution, idempotencyKey) =>
       guarded(() => runtime.resolveRequest(sessionId, requestId, resolution, idempotencyKey)),

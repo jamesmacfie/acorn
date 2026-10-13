@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentEventRecord, AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
+import type { AgentEventRecord, AgentSession, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
 import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 
 const session = (lastEventSeq: number): AgentSession => ({
@@ -67,5 +67,38 @@ describe('managed-agent snapshot reconciliation', () => {
       { type: 'assistant_message', text: 'first' },
       { type: 'assistant_message', text: 'live' },
     ])
+  })
+})
+
+describe('steered turns', () => {
+  const queued = (status: AgentTurn['status']): AgentTurn => ({
+    id: 'queued',
+    sessionId: 'session',
+    ordinal: 1,
+    source: 'interactive',
+    status,
+    input: [{ type: 'text', text: 'Stop' }],
+    effectivePolicy: {},
+    providerTurnRef: null,
+    stopReason: null,
+    usage: null,
+    error: null,
+    attempt: 0,
+    createdAt: 1,
+    startedAt: null,
+    completedAt: null,
+  })
+
+  it('drops a held steering row that a later read lists as steered', () => {
+    const held = { ...snapshot(1, []), turns: [queued('steering')] }
+    const read = { ...snapshot(2, []), steeredTurns: [queued('steered')] }
+    const merged = mergeManagedSnapshot(held, read)
+    expect(merged.turns).toEqual([])
+    expect(merged.steeredTurns?.map((turn) => turn.status)).toEqual(['steered'])
+  })
+
+  it('keeps a held queued row a read missed, as for any turn', () => {
+    const merged = mergeManagedSnapshot({ ...snapshot(1, []), turns: [queued('queued')] }, snapshot(2, []))
+    expect(merged.turns.map((turn) => turn.id)).toEqual(['queued'])
   })
 })

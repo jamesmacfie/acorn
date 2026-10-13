@@ -5,6 +5,7 @@ import { activeNodeId, prefsOptions, queryOwner, tasksOptions } from '@acorn/plu
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '../../contract/wire.ts'
 import AgentEventCard from './AgentEventCard'
 import {
+  cardTurnId,
   createConversationProjection,
   findSubagentItem,
   isChatItem,
@@ -76,10 +77,12 @@ export default function AgentTranscript(props: {
   // store replaces one only when a turn or a request changes. Reading each through its own memo means an
   // ordinary event does not rebuild the maps below, or wake every card that reads from them.
   const turns = createMemo(() => props.snapshot.turns)
+  const steeredTurns = createMemo(() => props.snapshot.steeredTurns ?? [])
   const requests = createMemo(() => props.snapshot.requests)
   // One map above the list, not `turns.find` inside it. A find in the row body runs once per row per
   // render, so a streamed event would cost rows times turns, and a long session has thousands of rows.
-  const turnsById = createMemo(() => new Map(turns().map((turn) => [turn.id, turn])))
+  // A steered message's card draws from the row it was queued as, not from the turn it joined.
+  const turnsById = createMemo(() => new Map([...turns(), ...steeredTurns()].map((turn) => [turn.id, turn])))
   // Same reason, keyed the way the sidebar and every notice name a request. A request's card draws from
   // the row rather than from its own event, because whether anybody has answered yet, and what they
   // said, both live on the row and keep changing long after the event is written.
@@ -188,7 +191,7 @@ export default function AgentTranscript(props: {
           taskId={props.taskId}
           sessionId={sessionId()}
           sessionModel={sessionModel()}
-          turn={turnsById().get(item().turnId ?? '')}
+          turn={turnsById().get(cardTurnId(item()) ?? '')}
           menuScope={menuScope()}
           request={
             item().event.type === 'request'

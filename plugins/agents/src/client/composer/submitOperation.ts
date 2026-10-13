@@ -11,9 +11,11 @@ type Submission = {
   policy: Record<string, unknown>
   refreshContext: () => Promise<AgentContextSnapshot[]>
   onSent: () => void
+  /** Hand the queued turn to the running one (docs/managed-agents/steering.md § What a steer does). */
+  steer?: boolean
 }
 
-export async function submitTurn({ origin, paths, policy, refreshContext, onSent }: Submission): Promise<void> {
+export async function submitTurn({ origin, paths, policy, refreshContext, onSent, steer }: Submission): Promise<void> {
   const { state, session } = origin
   const text = state.text().trim()
   const revisions = [...state.revisions()]
@@ -39,7 +41,7 @@ export async function submitTurn({ origin, paths, policy, refreshContext, onSent
       ),
       ...turnContexts,
     ]
-    await managedAgentApi.enqueue(
+    const turn = await managedAgentApi.enqueue(
       session.id,
       { input, source: 'interactive', effectivePolicy: policy },
       undefined,
@@ -47,6 +49,12 @@ export async function submitTurn({ origin, paths, policy, refreshContext, onSent
     )
     state.acknowledge(revisions, submittedAttachments, turnContexts)
     if (origin.visible()) onSent()
+    // Queued first, so a refused steer leaves the message where Enter would have put it.
+    if (steer) {
+      await managedAgentApi.steerQueuedTurn(session.id, turn.id, origin).catch((caught: unknown) => {
+        state.setError(operationError(caught, 'Queued, but unable to steer it into the running turn.'))
+      })
+    }
   } catch (caught) {
     state.setError(operationError(caught, 'Unable to queue this turn.'))
   } finally {

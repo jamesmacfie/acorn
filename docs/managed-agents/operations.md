@@ -22,7 +22,8 @@ Limits and cost and stored in one `prefs` row, `agents:concurrency:v1`:
 The dispatcher reads the row on each scan, so a raise applies to the scan the write triggers. A queued
 start reserves both ceilings before it starts a provider, and pending reservations count beside
 active turns. Lowering a ceiling leaves running turns alone. The composer's queue is reorderable until
-the dispatcher takes a turn (`QueuedAgentTurns.tsx`).
+the dispatcher takes a turn (`QueuedAgentTurns.tsx`). A row you sent can be [steered](./steering.md)
+into the running turn instead.
 
 A turn is accepted once its queue row is written. A later startup failure records an error on that
 turn and leaves it queued. Before it sends input, the pump rereads the queue head, so a cancel,

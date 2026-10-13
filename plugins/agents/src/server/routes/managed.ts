@@ -98,6 +98,7 @@ export type ManagedAgentsBridge = {
     patch: { input?: AgentTurn['input']; ordinal?: number },
   ): Promise<AgentTurn>
   cancelTurn(sessionId: string, turnId?: string): Promise<void>
+  steerTurn(sessionId: string, turnId: string): Promise<AgentTurn>
   cancelSubagent(sessionId: string, subagentId: string): Promise<void>
   resolveRequest(
     sessionId: string,
@@ -225,6 +226,7 @@ export const managedAgents = new Hono<AppEnv>()
       '/sessions',
       '/transcript-imports',
       '/sessions/:sessionId/turns',
+      '/sessions/:sessionId/turns/:turnId/steer',
       '/sessions/:sessionId/implement-plan',
       '/sessions/:sessionId/requests/:requestId/resolve',
       '/sessions/:sessionId/fork',
@@ -465,6 +467,10 @@ export const managedAgents = new Hono<AppEnv>()
       bridge.patchQueuedTurn(c.req.param('sessionId'), c.req.param('turnId'), parsed.data),
     )
   })
+  // Idempotent by the row's own state: a repeat answers the row the first request moved.
+  .post('/sessions/:sessionId/turns/:turnId/steer', (c) =>
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.steerTurn(c.req.param('sessionId'), c.req.param('turnId'))),
+  )
   .delete('/sessions/:sessionId/turns/:turnId', (c) =>
     viaBridge(c, MANAGED_AGENTS, async (bridge) => {
       await bridge.cancelTurn(c.req.param('sessionId'), c.req.param('turnId'))

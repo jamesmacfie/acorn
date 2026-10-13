@@ -45,7 +45,12 @@ export function mergeManagedSnapshot(
   const session = newestManagedSession(current.session, incoming.session)
   return {
     session,
-    turns: mergeById<AgentTurn>(current.turns, incoming.turns).sort((left, right) => left.ordinal - right.ordinal),
+    turns: mergeById<AgentTurn>(
+      // A read lists every turn but a steered one, so a held `steering` row it doesn't list was steered.
+      current.turns.filter((turn) => turn.status !== 'steering' || incoming.turns.some((item) => item.id === turn.id)),
+      incoming.turns,
+    ).sort((left, right) => left.ordinal - right.ordinal),
+    steeredTurns: mergeById<AgentTurn>(current.steeredTurns ?? [], incoming.steeredTurns ?? []),
     // A read that resumed where the held events end usually brings none, and then the held array
     // passes on as it is: rebuilding and sorting a long session's events to add nothing is the cost
     // resuming exists to avoid, and the store skips re-indexing an array it has already indexed.

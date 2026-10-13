@@ -9,6 +9,7 @@ import { makeTestNodeContext } from '@acorn/plugin-api/testkit'
 const wire = vi.hoisted(() => ({
   threadReadResponse: {} as unknown,
   interruptError: undefined as Error | undefined,
+  steerError: undefined as Error | undefined,
   modelsWait: undefined as Promise<void> | undefined,
   requests: [] as Array<{ method: string; params: Record<string, unknown> }>,
   responses: [] as Array<{ id: string | number; result: unknown }>,
@@ -78,6 +79,10 @@ vi.mock('./jsonRpcProcess', () => ({
       if (method === 'turn/start') return { turn: { id: 'turn-provider-1' } }
       if (method === 'thread/read') return wire.threadReadResponse
       if (method === 'turn/interrupt' && wire.interruptError) throw wire.interruptError
+      if (method === 'turn/steer') {
+        if (wire.steerError) throw wire.steerError
+        return { turnId: params.expectedTurnId }
+      }
       return {}
     }
 
@@ -176,7 +181,7 @@ async function start(
     attendanceInstructions,
     onEvent: (event) => {
       driverEvents.push(event)
-      if (event.type !== 'generated_artifact')
+      if (event.type !== 'generated_artifact' && event.type !== 'steer_taken')
         events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
     },
     onClosed: () => {},
@@ -191,6 +196,7 @@ describe('Codex collaboration modes', () => {
   beforeEach(() => {
     wire.threadReadResponse = {}
     wire.interruptError = undefined
+    wire.steerError = undefined
     wire.modelsWait = undefined
     wire.requests.length = 0
     wire.responses.length = 0
@@ -649,5 +655,82 @@ describe('Codex collaboration modes', () => {
     expect(after).not.toBe(before)
     await second.handle.resolveRequest(after!, { answers: { scope: 'All files' } })
     expect(wire.responses).toEqual([{ id: 0, result: { answers: { scope: { answers: ['All files'] } } } }])
+  })
+})
+
+describe('Codex steering', () => {
+  const steered = { ...turn('default'), id: 'steer-1', status: 'steering' as const }
+  const steerOptions = { turn: steered, input: [{ type: 'text' as const, text: 'Stop' }], attachments: {} }
+  const agentText = (text: string) =>
+    wire.onNotification?.({
+      method: 'item/agentMessage/delta',
+      params: { threadId: 'thread-1', turnId: 'turn-provider-1', itemId: 'reply', delta: text },
+    })
+  const order = (events: AgentDriverEvent[]) =>
+    events.flatMap((event) =>
+      event.type === 'steer_taken' ? ['steer'] : event.type === 'turn_completed' ? ['completed'] : [],
+    )
+
+  beforeEach(() => {
+    wire.requests.length = 0
+    wire.steerError = undefined
+  })
+
+  it('sends the message into the running turn and takes it when its user item joins', async () => {
+    const { handle, driverEvents } = await start()
+    await handle.sendTurn({ turn: turn('default'), input: turn('default').input, attachments: {} })
+    const outcome = handle.steer!({ ...steerOptions, activeTurnId: 'turn-1' })
+    await Promise.resolve()
+    expect(wire.requests.findLast((request) => request.method === 'turn/steer')?.params).toEqual({
+      threadId: 'thread-1',
+      expectedTurnId: 'turn-provider-1',
+      clientUserMessageId: 'steer-1',
+      input: [{ type: 'text', text: 'Stop', text_elements: [] }],
+    })
+    agentText('Still streaming')
+    expect(order(driverEvents)).toEqual([])
+    wire.onNotification?.({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-provider-1',
+        item: { id: 'user-2', type: 'userMessage', clientId: 'steer-1', content: [] },
+      },
+    })
+    await expect(outcome).resolves.toBe('taken')
+    expect(driverEvents.filter((event) => event.type === 'steer_taken')).toEqual([
+      { type: 'steer_taken', turnId: 'steer-1' },
+    ])
+  })
+
+  it('takes an accepted steer before the turn ends when its item never came', async () => {
+    const { handle, driverEvents } = await start()
+    await handle.sendTurn({ turn: turn('default'), input: turn('default').input, attachments: {} })
+    const outcome = handle.steer!({ ...steerOptions, activeTurnId: 'turn-1' })
+    await Promise.resolve()
+    wire.onNotification?.({
+      method: 'turn/completed',
+      params: { threadId: 'thread-1', turn: { id: 'turn-provider-1', status: 'interrupted' } },
+    })
+    await expect(outcome).resolves.toBe('taken')
+    expect(order(driverEvents)).toEqual(['steer', 'completed'])
+  })
+
+  it('misses when Codex refuses because the turn already ended', async () => {
+    const { handle, driverEvents } = await start()
+    await handle.sendTurn({ turn: turn('default'), input: turn('default').input, attachments: {} })
+    wire.steerError = new Error('expected active turn id `turn-provider-1` but found `none`')
+    await expect(handle.steer!({ ...steerOptions, activeTurnId: 'turn-1' })).resolves.toBe('missed')
+    wire.onNotification?.({
+      method: 'turn/completed',
+      params: { threadId: 'thread-1', turn: { id: 'turn-provider-1', status: 'completed' } },
+    })
+    expect(order(driverEvents)).toEqual(['completed'])
+  })
+
+  it('misses without a request when no turn is running', async () => {
+    const { handle } = await start()
+    await expect(handle.steer!({ ...steerOptions, activeTurnId: 'turn-1' })).resolves.toBe('missed')
+    expect(wire.requests.some((request) => request.method === 'turn/steer')).toBe(false)
   })
 })

@@ -82,6 +82,8 @@ export default function AgentComposer(props: {
   disabled?: boolean
   /** Startup keeps the draft editable, but cannot accept a turn until metadata and defaults settle. */
   submitDisabled?: boolean
+  /** Draws **Steer** beside **Send**, which queues the draft and hands it to the running turn. */
+  steerable?: boolean
   /** Focus on navigation and answer explicit session selections. Only the Agent pane opts in,
    *  so another composer showing the same session cannot take its caret. */
   autoFocus?: boolean
@@ -272,8 +274,17 @@ export default function AgentComposer(props: {
     )
 
   const nothingToSend = () => !draft().trim() && !attachments().length && !contexts().length
+  const canSubmit = () =>
+    !nothingToSend() &&
+    shared().hydrated() &&
+    !uploading() &&
+    !capturingContext() &&
+    !replacing() &&
+    !contextBudget().overLimit &&
+    !props.disabled &&
+    !props.submitDisabled
 
-  async function send() {
+  async function send(steer = false) {
     const owner = capture()
     const text = owner.state.text().trim()
     if (props.onMcp && /^\/mcp$/.test(text)) {
@@ -301,6 +312,7 @@ export default function AgentComposer(props: {
       policy: effectivePolicy(),
       refreshContext: () => refreshAutomaticContext(owner, automaticKey, previousAutomaticContext, dismissedPayload),
       onSent: props.onSent,
+      steer,
     })
   }
 
@@ -683,22 +695,26 @@ export default function AgentComposer(props: {
         <Text emphasis="muted">
           <Kbd size="xs">{formatChord('shift+enter')}</Kbd> for newline
         </Text>
+        {/* Its own button, never Enter: people type their next request while they wait, and Enter
+            steering would turn that habit into redirecting the agent mid-task. */}
+        <Show when={props.steerable}>
+          <Button
+            variant="outline"
+            size="sm"
+            title="Send this into the running turn. The agent reads it after its current step."
+            disabled={!canSubmit()}
+            onPress={() => void send(true)}
+          >
+            Steer
+          </Button>
+        </Show>
         <Button
           variant="solid"
           tone="accent"
           size="sm"
           busy={sending()}
           title={props.submitDisabled ? 'Wait for the agent to finish connecting.' : undefined}
-          disabled={
-            nothingToSend() ||
-            !shared().hydrated() ||
-            uploading() ||
-            !!capturingContext() ||
-            !!replacing() ||
-            contextBudget().overLimit ||
-            props.disabled ||
-            props.submitDisabled
-          }
+          disabled={!canSubmit()}
           onPress={() => void send()}
         >
           Send

@@ -83,7 +83,7 @@ export const agentTurns = sqliteTable(
     sessionId: text('session_id').notNull(),
     ordinal: integer('ordinal').notNull(),
     source: text('source').notNull(), // interactive | workflow | delegation | delegation_report | automation | import | plugin
-    status: text('status').notNull(), // queued | dispatching | active | completed | cancelled | failed | interrupted
+    status: text('status').notNull(), // queued | dispatching | active | completed | cancelled | failed | interrupted | steering | steered
     inputJson: text('input_json').notNull(),
     continuationInputJson: text('continuation_input_json'),
     notBefore: integer('not_before'),
@@ -97,6 +97,8 @@ export const agentTurns = sqliteTable(
     createdAt: integer('created_at').notNull(),
     startedAt: integer('started_at'),
     completedAt: integer('completed_at'),
+    // For a `steered` row, the running turn it joined.
+    steeredIntoTurnId: text('steered_into_turn_id'),
   },
   (t) => [
     uniqueIndex('agent_turns_session_ordinal_idx').on(t.sessionId, t.ordinal),

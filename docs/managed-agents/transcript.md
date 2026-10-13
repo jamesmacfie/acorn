@@ -104,6 +104,13 @@ An automatic continuation from a session goal is labeled **Goal**. Its prompt an
 remain in the transcript, while the goal row above the composer shows the latest verdict and count.
 The goal check uses the Node event ledger and does not write its evidence into the transcript.
 
+## Steered messages
+
+A message you steered into a running turn draws as your user card, labeled **Steered**, where the agent
+read it. The card draws its attachments and context from the queued row it came from. Its tokens count
+toward the turn it joined, so that turn's usage line and **Turn complete** line cover it.
+[Steer a running turn](./steering.md) covers the rest.
+
 ## Usage lines
 
 Usage folds to one line per turn, on the Node and in the client, by the rule in

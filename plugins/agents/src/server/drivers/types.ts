@@ -50,11 +50,23 @@ export type AgentDriverInputRequest = {
   respond(resolution: unknown): void
 }
 
+/**
+ * The agent read a steered message here, at this point in the stream. Driver-only like the artifact
+ * above: the runtime records it as that turn's `user_message` under the running turn, so it sits
+ * between the output before and after it.
+ */
+type AgentDriverSteerTaken = {
+  type: 'steer_taken'
+  /** The steered turn's id, which the driver was given in `AgentDriverSteerOptions.turn`. */
+  turnId: string
+}
+
 export type AgentDriverEvent = (
   | AgentNormalizedEvent
   | AgentDriverGeneratedArtifact
   | AgentDriverPermissionRequest
   | AgentDriverInputRequest
+  | AgentDriverSteerTaken
 ) & {
   /** Driver-owned attribution. Null explicitly means no managed turn; absent uses the live turn. */
   acornTurnId?: string | null
@@ -172,6 +184,9 @@ export type AgentDriverTurnOptions = {
   >
 }
 
+/** A queued turn for the running one: its input, prepared as a send's would be, and the running turn. */
+export type AgentDriverSteerOptions = AgentDriverTurnOptions & { activeTurnId: string }
+
 export interface AgentDriverSession {
   readonly providerSessionRef: string | null
   readonly ready: boolean
@@ -179,6 +194,10 @@ export interface AgentDriverSession {
    *  servers among them, are found from it. Absent when the harness does not know one. */
   readonly pid?: number
   sendTurn(options: AgentDriverTurnOptions): Promise<{ providerTurnRef?: string }>
+  /** Hands a message to the running turn, for the agent to read at its next step. Resolves `taken`
+   *  once the driver has emitted `steer_taken` for it, and `missed` when the turn ended first, so the
+   *  agent never will. Absent when the harness can't steer (docs/managed-agents/steering.md § Harness support). */
+  steer?(options: AgentDriverSteerOptions): Promise<'taken' | 'missed'>
   cancel(): Promise<void>
   /** Interrupts one provider-native child without cancelling the session's own turn. */
   cancelSubagent?(subagentId: string): Promise<void>

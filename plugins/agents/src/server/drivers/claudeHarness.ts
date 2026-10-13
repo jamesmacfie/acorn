@@ -177,6 +177,9 @@ export const claudeHarness: HarnessLaunchSpec = {
   // on. Compaction is the CLI's `/compact`, but ACP cannot request it, so it stays undeclared until
   // the adapter carries it.
   quirks: { sessionPersistence: true },
+  // claude-agent-acp pushes a second prompt straight into Claude Code's input, and Claude Code reads it
+  // at its next step. docs/testing/claude-steering-spike-2026-10-13.md records the wire.
+  promptQueueing: true,
   // Claude Code 2.1 and later also name their macOS Keychain entry after the folder, so two folders
   // hold two logins there too. CLAUDE_CODE_OAUTH_TOKEN would beat the folder's login, and the
   // passthrough above carries it.

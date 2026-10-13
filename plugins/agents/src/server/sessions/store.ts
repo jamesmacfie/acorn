@@ -280,6 +280,7 @@ export class AgentStore {
     committed.fold?.commit(eventId)
     if (committed.streamClosed) await this.flushSearch(sessionId)
     if (committed.turnChanged && turnId) await this.lifecycle.announceTurn(turnId)
+    if (committed.steeredTurnId) await this.lifecycle.announceTurn(committed.steeredTurnId)
     if (committed.requestChanged && (event.type === 'request' || event.type === 'request_resolved')) {
       await this.lifecycle.announceRequest(sessionId, event.requestId)
     }
@@ -329,7 +330,19 @@ export class AgentStore {
     turnId: string | null,
     event: AgentNormalizedEvent,
     timestamp: number,
-  ): { turnChanged: boolean; requestChanged: boolean } {
+  ): { turnChanged: boolean; requestChanged: boolean; steeredTurnId?: string } {
+    if (event.type === 'user_message' && event.steeredTurnId && turnId) {
+      const steered = tx
+        .update(schema.agentTurns)
+        .set({ status: 'steered', steeredIntoTurnId: turnId, startedAt: timestamp, completedAt: timestamp })
+        .where(and(eq(schema.agentTurns.id, event.steeredTurnId), eq(schema.agentTurns.status, 'steering')))
+        .run()
+      return {
+        turnChanged: false,
+        requestChanged: false,
+        ...(steered.changes > 0 ? { steeredTurnId: event.steeredTurnId } : {}),
+      }
+    }
     if (event.type === 'request') {
       const result = tx
         .insert(schema.agentRequests)
@@ -1159,16 +1172,19 @@ export class AgentStore {
         .orderBy(asc(schema.agentEvents.seq))
       const rows = limit === undefined ? events.all() : events.limit(limit).all()
       const mappedSession = mapAgentSession(session)
-      const turns = tx
+      // A steered row is part of the turn it joined, so `turns.at(-1)` stays the latest turn that ran.
+      const turnRows = tx
         .select()
         .from(schema.agentTurns)
         .where(eq(schema.agentTurns.sessionId, sessionId))
         .orderBy(asc(schema.agentTurns.ordinal))
         .all()
         .map(mapAgentTurn)
+      const turns = turnRows.filter((turn) => turn.status !== 'steered')
       return {
         session: mappedSession,
         turns,
+        steeredTurns: turnRows.filter((turn) => turn.status === 'steered'),
         events: client
           ? commands!.projectCommandEvents(
               rows.map((row) => clientEventRecord(mapAgentEvent(row))),
@@ -1465,14 +1481,16 @@ export class AgentStore {
     return row ? mapAgentTurn(row) : null
   }
 
+  /** The turn dispatch sends next. None while a row ahead of it is being steered: if the running turn
+   *  ends first, that row goes back to the queue and keeps its place. */
   async nextQueuedTurn(sessionId: string): Promise<AgentTurn | null> {
     const [row] = await this.db
       .select()
       .from(schema.agentTurns)
-      .where(and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.status, 'queued')))
+      .where(and(eq(schema.agentTurns.sessionId, sessionId), inArray(schema.agentTurns.status, ['queued', 'steering'])))
       .orderBy(asc(schema.agentTurns.ordinal))
       .limit(1)
-    return row ? mapAgentTurn(row) : null
+    return row?.status === 'queued' ? mapAgentTurn(row) : null
   }
 
   async patchQueuedTurn(
@@ -1613,6 +1631,46 @@ export class AgentStore {
     if (before.status === 'queued') await this.recountQueuedTurns(before.sessionId)
     const after = await this.turn(turnId)
     if (after?.status === 'active') await this.lifecycle.announceTurn(turnId)
+  }
+
+  /** Takes a queued turn out of the queue while the runtime hands it to the running turn. Null when it
+   *  isn't queued any more. */
+  async beginSteer(turnId: string): Promise<AgentTurn | null> {
+    const before = await this.turn(turnId)
+    if (before?.status !== 'queued') return null
+    await this.db
+      .update(schema.agentTurns)
+      .set({ status: 'steering' })
+      .where(and(eq(schema.agentTurns.id, turnId), eq(schema.agentTurns.status, 'queued')))
+    await this.recountQueuedTurns(before.sessionId)
+    const after = await this.turn(turnId)
+    if (after?.status !== 'steering') return null
+    await this.lifecycle.announceTurn(turnId)
+    return after
+  }
+
+  /** Puts a turn the running turn didn't take back in the queue, where dispatch sends it next. */
+  async missSteer(turnId: string): Promise<AgentTurn | null> {
+    const before = await this.turn(turnId)
+    if (before?.status !== 'steering') return before
+    await this.db
+      .update(schema.agentTurns)
+      .set({ status: 'queued' })
+      .where(and(eq(schema.agentTurns.id, turnId), eq(schema.agentTurns.status, 'steering')))
+    await this.recountQueuedTurns(before.sessionId)
+    const after = await this.turn(turnId)
+    if (after?.status === 'queued') await this.lifecycle.announceTurn(turnId)
+    return after
+  }
+
+  /** Startup repair. A turn still `steering` has no message in the ledger, because the event and the
+   *  `steered` status commit together, so the harness that held it died with the last process. */
+  async requeueSteeringTurns(): Promise<void> {
+    const rows = await this.db
+      .select({ id: schema.agentTurns.id })
+      .from(schema.agentTurns)
+      .where(eq(schema.agentTurns.status, 'steering'))
+    for (const row of rows) await this.missSteer(row.id)
   }
 
   async requeueTransientTurn(turnId: string, message: string): Promise<void> {

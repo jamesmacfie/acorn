@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -120,7 +120,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
         mcpServers: [],
         noProviderExecutionHistory: false,
         onEvent: (event) => {
-          if (event.type !== 'generated_artifact')
+          if (event.type !== 'generated_artifact' && event.type !== 'steer_taken')
             events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
         },
         onClosed: () => {},
@@ -177,7 +177,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact')
+        if (event.type !== 'generated_artifact' && event.type !== 'steer_taken')
           events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
       },
       onClosed: () => {},
@@ -216,7 +216,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
         mcpServers: [],
         noProviderExecutionHistory: !history,
         onEvent: (event) => {
-          if (event.type !== 'generated_artifact')
+          if (event.type !== 'generated_artifact' && event.type !== 'steer_taken')
             events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
         },
         onClosed: () => {},
@@ -252,7 +252,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
         mcpServers: [],
         noProviderExecutionHistory: false,
         onEvent: (event) => {
-          if (event.type !== 'generated_artifact')
+          if (event.type !== 'generated_artifact' && event.type !== 'steer_taken')
             events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
         },
         onClosed: () => {},
@@ -303,7 +303,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact')
+        if (event.type !== 'generated_artifact' && event.type !== 'steer_taken')
           events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
       },
       onClosed: () => {},
@@ -489,7 +489,7 @@ describe('a question the agent stopped waiting for is released with the turn', (
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact')
+        if (event.type !== 'generated_artifact' && event.type !== 'steer_taken')
           events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
       },
       onClosed: () => {},
@@ -551,5 +551,91 @@ describe('the generic ACP driver sends attachments inline when the agent takes t
       'resource_link',
       'resource_link',
     ])
+  })
+})
+
+// claude-agent-acp's hand-off, as docs/testing/claude-steering-spike-2026-10-13.md records it, played by
+// a fixture: the running prompt settles when the agent takes the steered one, and the steered one ends
+// the turn.
+describe('steering through an adapter that queues prompts', () => {
+  const queueing = (promptQueueing: boolean) =>
+    new AcpDriver({
+      id: 'stub',
+      profileId: 'stub',
+      label: 'Stub',
+      spawn: { entry: () => fileURLToPath(new URL('./__fixtures__/queueingAcpAgent.mjs', import.meta.url)) },
+      promptQueueing,
+    })
+  const start = async (driver: AcpDriver) => {
+    const events: AgentDriverEvent[] = []
+    const handle = await driver.start({
+      session: { ...sessionWithRef(''), providerSessionRef: null },
+      cwd: process.cwd(),
+      env: {},
+      mcpServers: [],
+      noProviderExecutionHistory: false,
+      onEvent: (event) => {
+        events.push(event)
+      },
+      onClosed: () => {},
+    })
+    return { events, handle }
+  }
+  const text = (value: string) => [{ type: 'text' as const, text: value }]
+  const steered = {
+    turn: { id: 'steer-1' } as never,
+    input: text('change course'),
+    attachments: {},
+    activeTurnId: 'turn-1',
+  }
+  const transcript = (events: AgentDriverEvent[]) =>
+    events.flatMap((event) =>
+      event.type === 'assistant_message'
+        ? [event.text]
+        : event.type === 'steer_taken'
+          ? [`steer_taken:${event.turnId}`]
+          : event.type === 'turn_completed'
+            ? ['turn_completed']
+            : [],
+    )
+
+  it('advertises steering only for an adapter that queues prompts', async () => {
+    expect((await queueing(true).probe()).capabilities).toContain('steering')
+    expect((await queueing(false).probe()).capabilities).not.toContain('steering')
+    const { handle } = await start(queueing(false))
+    try {
+      expect(handle.steer).toBeUndefined()
+    } finally {
+      await handle.stop()
+    }
+  })
+
+  it('takes a steered prompt into the running turn and ends the turn with it', async () => {
+    const { events, handle } = await start(queueing(true))
+    try {
+      const running = handle.sendTurn({ turn: { id: 'turn-1' } as never, input: text('hold'), attachments: {} })
+      await vi.waitFor(() => expect(transcript(events)).toEqual(['working:hold']))
+      await expect(handle.steer!(steered)).resolves.toBe('taken')
+      await running
+      expect(transcript(events)).toEqual([
+        'working:hold',
+        'steer_taken:steer-1',
+        'took:change course',
+        'turn_completed',
+      ])
+    } finally {
+      await handle.stop()
+    }
+  })
+
+  it('misses once the turn has ended', async () => {
+    const { events, handle } = await start(queueing(true))
+    try {
+      await handle.sendTurn({ turn: { id: 'turn-1' } as never, input: text('quick'), attachments: {} })
+      await expect(handle.steer!(steered)).resolves.toBe('missed')
+      expect(transcript(events)).toEqual(['working:quick', 'turn_completed'])
+    } finally {
+      await handle.stop()
+    }
   })
 })

@@ -34,6 +34,8 @@ export class ProviderEventMaterializer {
     attributedEvent: AgentDriverEvent,
   ): Promise<AgentNormalizedEvent[]> {
     const { acornTurnId: _turnId, ...providerEvent } = attributedEvent
+    // ManagedAgentEngine rewrites one it knows as the steered turn's message before this point.
+    if (providerEvent.type === 'steer_taken') return []
     if (providerEvent.type === 'generated_artifact') {
       if (providerEvent.bytes.byteLength === 0 || providerEvent.bytes.byteLength > MAX_GENERATED_ARTIFACT_BYTES) {
         return [

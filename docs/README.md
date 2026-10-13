@@ -157,6 +157,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/editor-delivery-2026-10-08.md](./testing/editor-delivery-2026-10-08.md) | Dated Editor implementation and verification notes from the retired six phase plans. |
 | [testing/editor-phase06-2026-10-08.md](./testing/editor-phase06-2026-10-08.md) | Dated Editor phase 06 fixture and acceptance evidence. |
 | [testing/editor-phase06-follow-up-2026-10-08.md](./testing/editor-phase06-follow-up-2026-10-08.md) | Review fixes, connected desktop/terminal checks, and measured Editor acceptance. |
+| [testing/claude-steering-spike-2026-10-13.md](./testing/claude-steering-spike-2026-10-13.md) | Dated check that Claude Code takes a second prompt into its running turn through the ACP adapter. |
 | [testing/workflows.md](./testing/workflows.md) | Workflow authoring, execution, child runs, schedules, and data-source checks. |
 | [testing/agents-and-providers.md](./testing/agents-and-providers.md) | Onboarding, model generation, delegation, and harness checks. |
 | [testing/rail-and-annotations.md](./testing/rail-and-annotations.md) | Rail layout, task marker, and appearance checks with dated results. |
@@ -263,7 +264,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   defaults](./managed-agents/defaults.md), [Managed delegation](./managed-agents/delegation.md),
   [Harnesses](./managed-agents/harnesses.md), [Harness bridges](./managed-agents/loop-hooks.md), [Keeping agents out of the data
   folder](./managed-agents/read-block.md), [Archived agent
-  history](./managed-agents/history-retention.md), [Operations](./managed-agents/operations.md), [Repeated tool
+  history](./managed-agents/history-retention.md), [Operations](./managed-agents/operations.md), [Steer a running
+  turn](./managed-agents/steering.md), [Repeated tool
   calls](./managed-agents/repeated-tool-calls.md),
   [From the command palette](./managed-agents/palette.md), [Native
   skills](./managed-agents/native-skills.md), [Permission
@@ -396,10 +398,6 @@ Each plugin landing page above has topic pages in a folder of the same name:
 - [Incremental Markdown](./future/ui-performance/03-incremental-markdown.md).
 - [Session revisit](./future/ui-performance/04-session-revisit.md).
 - [Idle cost](./future/ui-performance/05-idle-cost.md).
-
-## Steering proposal
-
-- [Steer a running turn](./future/steering.md).
 
 ## Browser extension proposal
 

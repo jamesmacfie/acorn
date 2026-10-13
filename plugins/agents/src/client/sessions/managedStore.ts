@@ -415,6 +415,12 @@ function upsertTurn(turn: AgentTurn): void {
     const snapshot = current[turn.sessionId]
     if (!snapshot) return current
     const known = snapshot.turns.some((item) => item.id === turn.id)
+    // A steered row is part of the turn it joined, so it moves out of `turns` as the Node's read has it.
+    if (turn.status === 'steered') {
+      const steeredTurns = [...(snapshot.steeredTurns ?? []).filter((item) => item.id !== turn.id), turn]
+      const turns = known ? snapshot.turns.filter((item) => item.id !== turn.id) : snapshot.turns
+      return { ...current, [turn.sessionId]: { ...snapshot, turns, steeredTurns } }
+    }
     const turns = known
       ? snapshot.turns.map((item) => (item.id === turn.id ? turn : item))
       : [...snapshot.turns, turn].sort((left, right) => left.ordinal - right.ordinal)

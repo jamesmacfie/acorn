@@ -66,6 +66,7 @@ export class CodexAgentDriver implements AgentDriver {
         'subagents',
         'attachments',
         'generated_artifacts',
+        'steering',
       ],
       configOptions: [],
       commands: [],

@@ -98,6 +98,7 @@ export class AcpDriver implements AgentDriver {
       capabilities: [
         ...harnessCapabilities(this.spec.quirks),
         ...(this.loopHooks ? (['loop_before_tool', 'loop_after_tool'] as const) : []),
+        ...(this.spec.promptQueueing ? (['steering'] as const) : []),
       ],
       configOptions: [],
       commands: [],

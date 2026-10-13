@@ -93,6 +93,11 @@ export const isChatItem = (item: AgentConversationItem): boolean =>
   item.event.type === 'request' ||
   item.event.type === 'plan_proposal'
 
+/** The turn a card draws from: its own, except a steered message's, which draws from the queued row
+ *  it came from rather than the running turn it joined. */
+export const cardTurnId = (item: AgentConversationItem): string | null =>
+  item.event.type === 'user_message' && item.event.steeredTurnId ? item.event.steeredTurnId : item.turnId
+
 /** The card for one subagent, so a caller can render that subagent's run on its own. */
 export const findSubagentItem = (
   items: AgentConversationItem[],

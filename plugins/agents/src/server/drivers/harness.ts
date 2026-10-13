@@ -81,6 +81,9 @@ export type HarnessLaunchSpec = {
   quirks?: HarnessQuirks
   /** Built-in only. Set when the CLI can run more than one login side by side. */
   accounts?: HarnessAccounts
+  /** Built-in only. The adapter takes a second `session/prompt` into the turn it's running, so the
+   *  driver can steer (docs/managed-agents/steering.md § Harness support). ACP itself has no such call. */
+  promptQueueing?: boolean
   /** Whether the harness's own account is logged in, for the Agent Center's provider-health row.
    *  Absent means the row shows installed-or-not only. `env` points the CLI at an account's folder. */
   probeAuth?: (executable: string, env?: Record<string, string>) => Promise<boolean | null>
