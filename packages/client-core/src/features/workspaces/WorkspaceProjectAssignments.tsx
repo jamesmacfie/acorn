@@ -17,6 +17,7 @@ import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { Stack } from '../../kit/components/layout/Stack'
 import { ProjectTable, type ProjectGroup } from './ProjectTable'
 import { createWorkspacesMode } from './workspacesMode'
+import { createActiveWorkspaceId } from './activeWorkspaceId'
 import { activeCacheId } from '../../infra/node/activeNode'
 import { GroupProjectsSection } from './GroupProjectsSection'
 import './projects.css'
@@ -35,6 +36,9 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
   const workspaces = createQuery(() => workspacesOptions(true))
   const tasks = createQuery(() => tasksOptions(true))
   const mode = createWorkspacesMode()
+  // Settings opens over the page you were on. A folder added here joins that page's workspace, as the
+  // topbar's add does, or it would land in the default workspace and miss the list you are looking at.
+  const activeWorkspaceId = createActiveWorkspaceId()
   const [newWorkspace, setNewWorkspace] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -112,7 +116,7 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
         }
       >
         <Stack>
-          <AddProjectControls />
+          <AddProjectControls workspaceId={mode() === 'on' ? activeWorkspaceId() : undefined} />
           <Show when={error()}>
             <Alert>{error()}</Alert>
           </Show>

@@ -12,8 +12,9 @@ import { latestSignal } from '../../kit/lib/state/latestSignal'
 import Icon from '../../kit/components/content/Icon'
 import './projects.css'
 
-/** Both Settings Overview and the empty Node use the same creation and import lifecycle. */
-export default function AddProjectControls(props: { beginAdd?: () => (id: string) => void }) {
+/** Both Settings Overview and the empty Node use the same creation and import lifecycle. A folder
+ *  joins `workspaceId` when given; without one the Node files it under its default workspace. */
+export default function AddProjectControls(props: { beginAdd?: () => (id: string) => void; workspaceId?: string }) {
   const qc = useQueryClient()
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -53,7 +54,8 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
     setBusy(true)
     setError('')
     try {
-      const { project } = await createProject({ path: folder })
+      const workspaceId = props.workspaceId
+      const { project } = await createProject({ path: folder, ...(workspaceId ? { workspaceId } : {}) })
       if (node() !== nodeId) return
       await refresh()
       if (node() !== nodeId) return

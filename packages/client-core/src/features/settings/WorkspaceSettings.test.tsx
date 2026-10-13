@@ -35,6 +35,7 @@ vi.mock('../workspaces/workspaceMutations', () => ({
   patchProject: vi.fn(),
 }))
 vi.mock('../workspaces/workspacesMode', () => ({ createWorkspacesMode: () => () => 'on' }))
+vi.mock('../workspaces/activeWorkspaceId', () => ({ createActiveWorkspaceId: () => () => undefined }))
 
 import WorkspaceSettings from './WorkspaceSettings'
 import WorkspaceProjectAssignments from '../workspaces/WorkspaceProjectAssignments'

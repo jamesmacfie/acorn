@@ -2,7 +2,11 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Project, Workspace } from '@acorn/protocol/api.ts'
 
-const data = vi.hoisted(() => ({ mode: 'off' as 'on' | 'off' }))
+const data = vi.hoisted(() => ({
+  mode: 'off' as 'on' | 'off',
+  activeWorkspaceId: 'b' as string | undefined,
+  create: vi.fn(async (seed: { path: string }) => ({ project: { id: seed.path } })),
+}))
 const project = (id: string, workspaceId: string): Project => ({
   id,
   name: id,
@@ -39,6 +43,12 @@ vi.mock('../../infra/queries', () => ({
   tasksOptions: () => ({ key: 'tasks' }),
 }))
 vi.mock('./workspacesMode', () => ({ createWorkspacesMode: () => () => data.mode }))
+vi.mock('./activeWorkspaceId', () => ({ createActiveWorkspaceId: () => () => data.activeWorkspaceId }))
+vi.mock('./workspaceMutations', () => ({
+  createProject: data.create,
+  createWorkspace: async () => {},
+  patchProject: async () => {},
+}))
 vi.mock('../../infra/platform', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../infra/platform')>()),
   canPickFolder: () => false,
@@ -52,6 +62,8 @@ let dispose: () => void
 afterEach(() => {
   dispose?.()
   host?.remove()
+  data.activeWorkspaceId = 'b'
+  data.create.mockClear()
 })
 const mount = (mode: 'on' | 'off') => {
   data.mode = mode
@@ -80,5 +92,34 @@ describe('Settings Overview workspace mode', () => {
     expect(host.textContent).not.toContain('Group projects into workspaces')
     host.querySelector<HTMLInputElement>('input[aria-label="Select Alpha"]')!.click()
     expect(host.querySelector('[aria-label="Move to workspace"]')).not.toBeNull()
+  })
+
+  describe('adding a folder', () => {
+    const submitPath = (path: string) => {
+      const form = host.querySelector<HTMLFormElement>('form.project-add-path')!
+      const input = form.querySelector<HTMLInputElement>('input')!
+      input.value = path
+      input.dispatchEvent(new InputEvent('input', { bubbles: true }))
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    }
+
+    it('joins the workspace on screen while on', async () => {
+      mount('on')
+      submitPath('/src/gamma')
+      await vi.waitFor(() => expect(data.create).toHaveBeenCalledWith({ path: '/src/gamma', workspaceId: 'b' }))
+    })
+
+    it('leaves the choice to the Node when no workspace is on screen', async () => {
+      data.activeWorkspaceId = undefined
+      mount('on')
+      submitPath('/src/gamma')
+      await vi.waitFor(() => expect(data.create).toHaveBeenCalledWith({ path: '/src/gamma' }))
+    })
+
+    it('names no workspace while off', async () => {
+      mount('off')
+      submitPath('/src/gamma')
+      await vi.waitFor(() => expect(data.create).toHaveBeenCalledWith({ path: '/src/gamma' }))
+    })
   })
 })
