@@ -1,10 +1,11 @@
 import { createServer, type Server } from 'node:https'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { custody } from '@acorn/custody/local'
 import { ensureCert } from '@acorn/node-core/server/transport'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
@@ -372,6 +373,94 @@ describe('browser bridge pairing', () => {
     const { call } = bridge()
     expect(await call({ op: 'node.probe', endpoint: node.endpoint })).toMatchObject({ compatible: false })
     await expect(call({ op: 'node.pair', code: CODE, label: 'x' })).rejects.toMatchObject({ code: 'incompatible' })
+  })
+})
+
+// A data root as a running Node leaves it: its lock, `node.json` with the port, and `tls/cert.pem`.
+// This test process holds the lock, so it reads as running.
+function dataRoot(
+  files: { nodeId?: string; port?: number; certPem?: string } = {},
+  root = mkdtempSync(join(tmpdir(), 'acorn-bridge-root-')),
+) {
+  mkdirSync(root, { recursive: true })
+  cleanup.push(() => rmSync(root, { recursive: true, force: true }))
+  writeFileSync(join(root, 'node.lock'), `${process.pid}\n`)
+  if (files.port)
+    writeFileSync(
+      join(root, 'node.json'),
+      JSON.stringify({ baseline: ACORN_BASELINE, nodeId: files.nodeId, createdAt: 1, port: files.port }),
+    )
+  mkdirSync(join(root, 'tls'))
+  writeFileSync(join(root, 'tls', 'cert.pem'), files.certPem ?? certA.certPem)
+  return root
+}
+
+describe('browser bridge local discovery', () => {
+  const nodeId = randomUUID()
+  const portOf = (endpoint: string) => Number(new URL(endpoint).port)
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('finds the Node in the data root acorn reads, and pairs it with a code over the file certificate', async () => {
+    const node = await fakeNode(nodeId)
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot({ nodeId, port: portOf(node.endpoint) }))
+    const { call } = bridge()
+    const found = await call({ op: 'node.local' })
+    expect(found).toEqual({
+      nodeId,
+      endpoint: node.endpoint,
+      fingerprint: certA.fingerprint,
+      protocolVersion: NODE_PROTOCOL_VERSION,
+      baseline: ACORN_BASELINE,
+      compatible: true,
+    })
+    await expect(call({ op: 'node.pair', code: 'WRONG', label: 'x' })).rejects.toMatchObject({ code: 'pairing_failed' })
+    expect(await call({ op: 'node.pair', code: CODE, label: 'This computer' })).toMatchObject({
+      nodeId,
+      fingerprint: certA.fingerprint,
+    })
+    await call({ op: 'node.select', nodeId })
+    expect(await call({ op: 'projects.list', nodeId })).toMatchObject({ nodeId })
+  })
+
+  it('finds nothing when no Node holds the data root', async () => {
+    vi.stubEnv('ACORN_DATA_DIR', mkdtempSync(join(tmpdir(), 'acorn-bridge-empty-')))
+    const { call } = bridge()
+    expect(await call({ op: 'node.local' })).toBeNull()
+    await expect(call({ op: 'node.pair', code: CODE, label: 'x' })).rejects.toMatchObject({ code: 'no_probe' })
+  })
+
+  it('refuses a held data root with no node.json, or a certificate it cannot read', async () => {
+    const { call } = bridge()
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot())
+    await expect(call({ op: 'node.local' })).rejects.toMatchObject({ code: 'node_error' })
+    const node = await fakeNode(nodeId)
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot({ nodeId, port: portOf(node.endpoint), certPem: 'not a certificate' }))
+    await expect(call({ op: 'node.local' })).rejects.toMatchObject({ code: 'node_error' })
+  })
+
+  it('refuses a Node whose address presents another certificate than its files, and keeps no probe', async () => {
+    const node = await fakeNode(nodeId)
+    const { call } = bridge()
+    await call({ op: 'node.probe', endpoint: node.endpoint })
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot({ nodeId, port: portOf(node.endpoint), certPem: certB.certPem }))
+    await expect(call({ op: 'node.local' })).rejects.toMatchObject({ code: 'identity_mismatch' })
+    await expect(call({ op: 'node.pair', code: CODE, label: 'x' })).rejects.toMatchObject({ code: 'no_probe' })
+  })
+
+  it("reads only the data root acorn would, never the desktop's when another is set", async () => {
+    const node = await fakeNode(nodeId)
+    // The desktop app's root, under a stand-in home folder, holds a running Node.
+    const home = dataRoot({}, mkdtempSync(join(tmpdir(), 'acorn-bridge-home-')))
+    dataRoot({ nodeId, port: portOf(node.endpoint) }, join(home, 'Library/Application Support/com.acorn.desktop/node'))
+    vi.stubEnv('HOME', home)
+    const { call } = bridge()
+
+    vi.stubEnv('ACORN_DATA_DIR', mkdtempSync(join(tmpdir(), 'acorn-bridge-empty-')))
+    expect(await call({ op: 'node.local' })).toBeNull()
+    vi.stubEnv('ACORN_DATA_DIR', '')
+    expect(await call({ op: 'node.local' })).toMatchObject({ nodeId })
   })
 })
 

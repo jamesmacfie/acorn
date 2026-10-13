@@ -74,7 +74,9 @@ Pairing uses one-time in-memory codes:
 4. The Node creates a device row and returns the device token once.
 
 In the desktop, **Settings → Nodes → Pair another client** calls the start route for that Node and shows
-the code beside its pinned identity words, and **Close pairing** closes the window early. A standalone
+the code beside its pinned identity words, and **Close pairing** closes the window early. **Pair a
+browser** opens the same window and words the code for the [browser extension](./browser-extension.md)'s
+panel. A standalone
 Node prints its code in its terminal and opens a window again on `SIGUSR1`.
 
 Ordinary failures get one `401 pairing_failed` with no detail. The 4 KiB body ceiling returns

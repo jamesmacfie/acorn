@@ -66,6 +66,8 @@ ul { list-style: none; margin: 0; padding: 0; }
 
 /* One line under the header for anything wrong, with the next step. */
 .banner { padding: var(--space-4) var(--space-6); border-bottom: var(--chrome-divider); }
+.banner > :is(.command, p) { flex-basis: 100%; }
+.command code { font-family: var(--font-mono); color: var(--text); }
 
 /* ── Views and sections ─────────────────────────────────────────────────────────────────────── */
 .view-head {
@@ -176,8 +178,10 @@ fieldset { border: var(--surface-border); border-radius: var(--radius-surface); 
 .quiet { color: var(--text-muted); }
 .problem { color: var(--danger); }
 .notice { color: var(--text-muted); }
-.words { font-weight: var(--fw-semibold); font-size: var(--fs-md); }
-.pairing, .handoff, .sites { display: grid; gap: var(--gap-row); }
+/* A short label beside a name, such as the Node on this Mac. */
+.tag { padding: 0 var(--space-2); border: var(--control-border); border-radius: var(--radius-chip); font-size: var(--fs-xs); color: var(--text-muted); }
+ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
+.handoff, .sites { display: grid; gap: var(--gap-row); }
 
 /* ── Waiting for you ────────────────────────────────────────────────────────────────────────── */
 .waiting { display: grid; gap: var(--space-3); }

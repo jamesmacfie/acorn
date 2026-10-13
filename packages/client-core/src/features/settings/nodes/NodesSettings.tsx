@@ -14,7 +14,7 @@ import {
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../../fleet/NodeChip'
-import { createNodePairing, NodePairingButton, NodePairingPanel } from './NodePairingCode'
+import { createNodePairing, NodePairingButtons, NodePairingPanel } from './NodePairingCode'
 import '../../fleet/nodes.css'
 import { Alert, Badge, Button, Card, EmptyState, Field, Input } from '../../../kit/components/primitives'
 import Icon from '../../../kit/components/content/Icon'
@@ -349,7 +349,7 @@ export default function NodesSettings() {
                       >
                         Rename
                       </Button>
-                      <NodePairingButton pairing={pairing} />
+                      <NodePairingButtons pairing={pairing} />
                       {/* Labelled distinctly on purpose (docs/frontend/settings-groups.md § Node management). Confusing the two is
                           how an owner loses access to a remote node: unpair is recoverable with the same
                           pairing code, revoke means the node has torn up this client's credential. */}

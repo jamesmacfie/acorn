@@ -18,8 +18,10 @@ The launcher does these steps:
    `acorn browser install --development`. The host runs this checkout's `apps/cli/dist/native-host.js`
    and keeps its pairings in the session folder.
 2. Seeds a Node with its own data root and this checkout as a project, then starts it from source,
-   as `pnpm dev:agent` does. Its banner, with the pairing code, prints to the terminal. Pass
-   `--node https://HOST:PORT` to use a running Node instead.
+   as `pnpm dev:agent` does. Its banner, with the pairing code, prints to the terminal. The browser
+   starts with `ACORN_DATA_DIR` set to that Node's data, so the sidebar offers it as the Node on this
+   Mac. Pass `--node https://HOST:PORT` to use a running Node instead. The sidebar then offers whatever
+   Node `acorn` would find, such as the desktop's.
 3. Builds the extension in watch mode, pointed at the development host.
 4. Opens the browser through web-ext on the session's profile, with the extension loaded and an
    automation port open. web-ext reloads the extension after each rebuild.
@@ -41,11 +43,10 @@ From a second terminal:
 
 ```sh
 pnpm dev:extension:ui -- --session my-change open
-pnpm dev:extension:ui -- --session my-change click "Pair a Node"
-pnpm dev:extension:ui -- --session my-change fill address https://127.0.0.1:62361
-pnpm dev:extension:ui -- --session my-change check confirm
+pnpm dev:extension:ui -- --session my-change click Continue
 pnpm dev:extension:ui -- --session my-change pairing-code
 pnpm dev:extension:ui -- --session my-change fill pairing-code CODE
+pnpm dev:extension:ui -- --session my-change click Pair
 pnpm dev:extension:ui -- --session my-change text
 pnpm dev:extension:ui -- --session my-change stop
 ```

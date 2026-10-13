@@ -1,12 +1,10 @@
 import { For, Show, createResource, createSignal, onCleanup, onMount } from 'solid-js'
 import type { BridgeHandoff, BridgeNodes, BridgeProject, BridgeTask } from '@acorn/protocol/extensionBridge.ts'
-import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import type { BrowserApi } from '../browser'
 import { STYLES, THEMES, loadAppearance, saveAppearance, type Appearance } from './appearance'
 import type { BridgeClient } from './bridgeClient'
 import { loadDestination, saveDestination } from './localState'
-import { Pairing } from './Pairing'
 import { ProjectSites } from './ProjectSites'
 import { SiteAccess } from './SiteAccess'
 
@@ -17,9 +15,7 @@ export function Settings(props: {
   client: BridgeClient
   fleet: BridgeNodes | null
   online: boolean
-  pairing: boolean
-  setPairing(open: boolean): void
-  paired(node: NodeRecord): void
+  pair(): void
   select(nodeId: string): void
   forget(nodeId: string): void
   handoffs: readonly BridgeHandoff[]
@@ -75,16 +71,9 @@ export function Settings(props: {
             </For>
           </ul>
         </Show>
-        <Show
-          when={props.pairing}
-          fallback={
-            <button type="button" onClick={() => props.setPairing(true)}>
-              Pair a Node
-            </button>
-          }
-        >
-          <Pairing client={props.client} onCancel={() => props.setPairing(false)} onPaired={props.paired} />
-        </Show>
+        <button type="button" onClick={() => props.pair()}>
+          Pair a Node
+        </button>
       </section>
       <Show when={props.fleet?.activeNodeId} keyed>
         {(nodeId) => (
@@ -229,7 +218,7 @@ const NOTIFICATIONS = { permissions: ['notifications'] }
 
 // The opt-in for OS notifications. The browser permission is the setting, so turning it off in the
 // browser's settings turns it off here. docs/browser-extension/notifications.md.
-function Notifications(props: { permissions: BrowserApi['permissions'] }) {
+export function Notifications(props: { permissions: BrowserApi['permissions'] }) {
   const [allowed, { refetch }] = createResource(() => props.permissions.contains(NOTIFICATIONS))
   const onAccess = () => void refetch()
   onMount(() => {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { NodeBroker, toNodeRecord, type FleetStore } from '@acorn/custody/broker'
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
+import { dataRootDir, runningNode } from '@acorn/custody/local'
 import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
 import {
   ATTACHMENT_MAX_BYTES,
@@ -104,7 +105,7 @@ export function createBridge(options: {
   // person pairs it again, and its status says why rather than reading as an ordinary outage.
   let identityChanged: string | null = null
   // The probe is held here rather than returned, so pairing can only complete the endpoint whose
-  // fingerprint the person was shown.
+  // fingerprint the person was shown, or this computer's Node, pinned to the certificate in its files.
   let pending: Probe | null = null
   const hints = agentHints(options.hint ?? (() => {}))
   const broker = new NodeBroker({
@@ -163,6 +164,41 @@ export function createBridge(options: {
     } catch {
       return false
     }
+  }
+
+  // A probe whose failure the sidebar can explain. It sends no token and grants nothing.
+  async function probeEndpoint(endpoint: string): Promise<Probe> {
+    try {
+      return await probe(endpoint)
+    } catch (error) {
+      const message = messageOf(error)
+      if (/baseline|protocol/.test(message)) throw new BridgeFailure('incompatible', message)
+      if (/certificate|fingerprint|intercept/.test(message)) throw new BridgeFailure('identity_mismatch', message)
+      throw new BridgeFailure('node_unreachable', message)
+    }
+  }
+
+  // The Node in the data root `acorn` itself would open, found the way `openCliNode` finds it: the
+  // endpoint from `node.json` and the certificate from `tls/cert.pem`. Only those files are read, never
+  // a token. The address must present that same certificate, and the pin is the file's, so no one on
+  // the network could have chosen it.
+  async function probeLocalNode(): Promise<BridgeResults['node.local']> {
+    let running: ReturnType<typeof runningNode>
+    try {
+      running = runningNode(dataRootDir())
+    } catch (error) {
+      throw new BridgeFailure('node_error', `The Node on this computer could not be read: ${messageOf(error)}`)
+    }
+    if (!running) return null
+    const probed = await probeEndpoint(running.endpoint)
+    if (probed.fingerprint !== running.fingerprint)
+      throw new BridgeFailure(
+        'identity_mismatch',
+        'The Node on this computer presented a certificate other than the one in its data folder.',
+      )
+    pending = { ...probed, certPem: running.certPem }
+    const { certPem: _certPem, ...result } = pending
+    return { ...result, nodeId: running.nodeId }
   }
 
   // Stops at a changed certificate: the Node's connection closes until the person pairs it again.
@@ -377,20 +413,16 @@ export function createBridge(options: {
       }
       case 'node.probe': {
         pending = null
-        try {
-          pending = await probe(request.endpoint)
-        } catch (error) {
-          const message = messageOf(error)
-          if (/baseline|protocol/.test(message)) throw new BridgeFailure('incompatible', message)
-          if (/certificate|fingerprint|intercept/.test(message)) throw new BridgeFailure('identity_mismatch', message)
-          throw new BridgeFailure('node_unreachable', message)
-        }
+        pending = await probeEndpoint(request.endpoint)
         const { certPem: _certPem, ...result } = pending
         return result
       }
+      case 'node.local':
+        pending = null
+        return probeLocalNode()
       case 'node.pair': {
         const confirmed = pending
-        if (!confirmed) throw new BridgeFailure('no_probe', 'Check the Node address and its identity before pairing.')
+        if (!confirmed) throw new BridgeFailure('no_probe', 'Choose a Node and check its identity before pairing.')
         if (!confirmed.compatible)
           throw new BridgeFailure('incompatible', 'That Node speaks a different protocol version.')
         let result: Awaited<ReturnType<typeof pairWithNode>>

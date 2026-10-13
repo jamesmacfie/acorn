@@ -4,12 +4,14 @@ import type { BridgeNodes } from '@acorn/protocol/extensionBridge.ts'
 import { State, nodeState } from './state'
 
 // The Acorn mark, the selected Node as a chip with its status, and the gear. The chip's menu switches
-// Nodes and opens Settings, where pairing and forgetting live.
+// Nodes, pairs another, and forgets the selected one.
 export function Header(props: {
   fleet: BridgeNodes | null
   status: NodeStatus | null
   settingsOpen: boolean
   select(nodeId: string): void
+  pair(): void
+  forget(nodeId: string): void
   toggleSettings(): void
 }) {
   let menu!: HTMLDetailsElement
@@ -41,9 +43,16 @@ export function Header(props: {
               </button>
             )}
           </For>
-          <button type="button" onClick={() => choose(() => !props.settingsOpen && props.toggleSettings())}>
-            Settings
+          <button type="button" onClick={() => choose(props.pair)}>
+            Pair another
           </button>
+          <Show when={selected()}>
+            {(node) => (
+              <button type="button" onClick={() => choose(() => props.forget(node().nodeId))}>
+                Forget {node().label}
+              </button>
+            )}
+          </Show>
         </div>
       </details>
       <button

@@ -78,6 +78,7 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | --- | --- | --- |
 | `nodes.list` | none | `{ nodes, activeNodeId, status }` |
 | `node.probe` | `endpoint` | The probe result: endpoint, fingerprint, protocol, baseline, `compatible` |
+| `node.local` | none | The Node on this computer as a probe result with its `nodeId`, or `null` when none is running |
 | `node.pair` | `code`, `label` | The paired Node's record |
 | `node.select` | `nodeId` or `null` | `{ nodes, activeNodeId, status }` |
 | `node.forget` | `nodeId` | `{ nodes, activeNodeId, status }` |
@@ -123,14 +124,20 @@ repeats an index, or changes its count. When the port closes, it fails every wai
 ## Pairing and custody
 
 Pairing reuses `probeNode` and `pairWithNode` from `@acorn/custody`, the same steps the desktop helper
-takes:
+takes. The host keeps one probe, certificate included, and `node.pair` completes it over a pinned
+connection. `node.pair` takes no endpoint or fingerprint of its own, so it can only pair the Node the
+person just chose. A probe comes from one of two operations:
 
-1. The sidebar sends the address, and the host probes it. The host keeps the probe, certificate
-   included, and returns the fingerprint.
-2. The sidebar shows the fingerprint as words. The code field appears only after the person ticks
-   **The words match**.
-3. `node.pair` completes the kept probe over a pinned connection. It takes no endpoint or fingerprint
-   of its own.
+- **`node.local`** finds the Node on this computer the way `acorn` does
+  ([reaching a node with acorn](./node-distribution.md#reaching-a-node-with-acorn)). It reads the data
+  root `acorn` would open, through the CLI's own `dataRootDir` and `runningNode`: the lock, the endpoint
+  from `node.json`, and the certificate from `tls/cert.pem`. It reads no token, and never the desktop's.
+  It then probes that endpoint and refuses it with `identity_mismatch` unless it presents the same
+  certificate. The kept probe pins the file's certificate. Nobody on the network could have chosen
+  it, so the sidebar shows no words, and pairing still takes a code. With no Node holding the root, it
+  answers `null`. A held root with no `node.json`, or a certificate that doesn't read, is `node_error`.
+- **`node.probe`** probes an address the person typed. The sidebar shows the fingerprint as six words,
+  and asks for the code only after the person ticks **The words match**.
 
 Each browser keeps its own custody, apart from the CLI's and the desktop's: a `FleetStore` and token
 files under `~/Library/Application Support/acorn/browser-bridge/<browser>/`. The folder is mode 0700

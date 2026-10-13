@@ -136,6 +136,10 @@ const handoffTarget = {
 export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('nodes.list') }),
   z.strictObject({ ...envelope, op: z.literal('node.probe'), endpoint: z.string().url().max(2048) }),
+  // The Node this computer's data root holds, the one `acorn` itself attaches to, kept as the probe
+  // `node.pair` completes. Its certificate comes from the Node's own files, so there are no words to
+  // compare, and pairing still takes a code.
+  z.strictObject({ ...envelope, op: z.literal('node.local') }),
   // No endpoint or fingerprint: pairing completes the probe the person just confirmed.
   z.strictObject({
     ...envelope,
@@ -371,6 +375,8 @@ export type BridgeHandoffItem = {
 export type BridgeResults = {
   'nodes.list': BridgeNodes
   'node.probe': NodeProbeResult
+  // Null when no Node holds this computer's data root.
+  'node.local': (NodeProbeResult & { nodeId: string }) | null
   'node.pair': NodeRecord
   'node.select': BridgeNodes
   'node.forget': BridgeNodes

@@ -28,6 +28,10 @@ launcher script, so install it from the copy of the CLI you keep:
 
 [The browser host](../cli/browser-host.md) covers the files these commands write.
 
+If the panel is already open, it shows `acorn browser install` with a **Copy** button while the bridge
+is missing. It checks again every three seconds and carries on by itself once the bridge answers.
+**Retry** checks at once.
+
 ## Build and load the extension
 
 Run `pnpm --filter @acorn/extension build`. It writes `apps/extension/dist/chrome/` and
@@ -50,13 +54,22 @@ user-level folder that `acorn browser install` writes. A Chrome started with `--
 
 ## Pair a Node
 
-1. Click the Acorn toolbar button to open the panel, then **Pair a Node** in the line under the header.
-   To pair another Node later, open Settings with the gear and click **Pair a Node** under **Nodes**.
-2. Enter the Node's HTTPS address and click **Check identity**.
-3. Compare the six words with the ones the Node shows: the desktop's pairing screen, or a standalone
-   Node's banner. Tick **The words match** only if they do.
-4. Enter a pairing code. The desktop shows one in **Settings → Nodes → Pair another client**. A
-   standalone Node prints one at start, and `kill -USR1 <pid>` prints another.
+The panel opens on pairing while no Node is paired. Later, choose **Pair another** from the Node chip's
+menu, or **Pair a Node** under **Nodes** in Settings.
+
+1. **Choose a Node.** The Node running on this Mac is listed first, as **This computer** with an **On
+   this Mac** tag. The bridge found it in the same data folder `acorn` reads. Nodes this browser already
+   paired show as rows with **Use**. For a Node elsewhere, click **Use another address**.
+2. **Identity.** The Node on this Mac needs no check by eye: the bridge pinned the certificate from the
+   Node's own files. For another address, enter its HTTPS address and click **Check identity**. Compare
+   the six words with the ones the Node shows: the code panel in the desktop's **Settings → Nodes**, or
+   a standalone Node's banner. Tick **The words match** only if they do, then click **Continue**.
+3. **Code.** Paste a pairing code. The desktop shows one in **Settings → Nodes → Pair a browser**. A
+   standalone Node prints one at start, and `kill -USR1 <pid>` prints another. The name fills in as
+   **This computer** for the Node on this Mac, or the address for another. Click **Pair**.
+4. **Done.** The panel names the Node it paired with. It offers **Allow** for each site where the Node's
+   plugins put buttons, such as `github.com`, and a box for notifications. Both are optional, and both
+   stay in Settings.
 
 Each browser pairs on its own, so pair Chrome and Firefox separately. A Node on another computer must
 advertise its address, or be reached through an SSH tunnel, as
@@ -82,14 +95,15 @@ advertise its address, or be reached through an SSH tunnel, as
 - **To remove the bridge**, run `acorn browser uninstall`. It removes the registrations and launchers,
   and names each browser's bridge folder, which still holds its pairings and tokens. Delete
   `~/Library/Application Support/acorn/browser-bridge/<browser>/` to remove them.
-- **Forget** in Settings deletes one Node's pairing from this browser. Neither forgetting nor
-  deleting the folder revokes the browser's device on the Node. Another paired client can revoke it with
-  `DELETE /v1/core/devices/:id` ([authentication](../authentication.md)).
+- **Forget** in Settings or the Node chip's menu deletes one Node's pairing from this browser. Neither
+  forgetting nor deleting the folder revokes the browser's device on the Node. Another paired client
+  can revoke it with `DELETE /v1/core/devices/:id` ([authentication](../authentication.md)).
 
 ## The panel's views
 
 The panel opens on **Home**. The header holds the Acorn mark, the selected Node as a chip with a
-status dot, and the gear. The chip's menu switches Nodes and opens Settings. When the bridge stopped
+status dot, and the gear. The chip's menu switches Nodes, opens **Pair another**, and forgets the
+selected Node. When the bridge stopped
 or the Node isn't answering, one line under the header says so, with the next step from the table
 below. Nothing else about Nodes or site access shows on Home.
 
@@ -140,9 +154,10 @@ Each failure has a next step, written in `apps/extension/src/sidebar/guidance.ts
 
 | State | How it is detected | Next step shown |
 | --- | --- | --- |
-| Host missing | The port closes with "not found" (Chrome) or "No such native application" (Firefox) | Run `acorn browser install` |
+| Host missing | The port closes with "not found" (Chrome) or "No such native application" (Firefox) | Run `acorn browser install`, with **Copy**; the panel checks again every three seconds |
 | Host stopped | Any other close, or no reply within 10 seconds. A launcher whose runtime or entry moved exits at once | Retry, or run `acorn browser status` |
 | Bad code | The Node refuses the pairing | Check the code and try again |
+| Node on this Mac unreadable | `node.local` fails: the data folder is held but its `node.json` or certificate doesn't read, or the Node presents another certificate | The reason, under the Node list; **Use another address** still works |
 | Incompatible | The probe reports another protocol, or the broker marks the Node `incompatible` | Update whichever side is older |
 | Offline | The broker reports `offline`, or a read fails | Check that the Node is running |
 | Revoked | The Node answers 401 `unauthenticated` | Forget the Node and pair again |
