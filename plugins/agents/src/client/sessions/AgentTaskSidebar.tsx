@@ -462,6 +462,11 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                       title={session().title}
                       tip={lastActive(session().updatedAt)}
                       tipAt={session().updatedAt}
+                      collapsed={
+                        collapsed() ? (
+                          <RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />
+                        ) : undefined
+                      }
                       leading={<RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />}
                       trailing={
                         <Show when={!['none', 'unread'].includes(session().attention)}>
