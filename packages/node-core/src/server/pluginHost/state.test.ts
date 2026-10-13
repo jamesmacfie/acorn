@@ -46,6 +46,7 @@ const NO_CONTRIBUTIONS = {
   contextSections: [],
   cliCommands: [],
   documentServices: [],
+  browserHandoffs: [],
 }
 const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({
   id,

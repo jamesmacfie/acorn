@@ -900,6 +900,7 @@ describe('declared frame contributions', () => {
       agentTools: [],
       contextSections: [],
       documentServices: [],
+      browserHandoffs: [],
     })
   })
 

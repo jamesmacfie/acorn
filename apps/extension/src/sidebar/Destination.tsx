@@ -9,10 +9,12 @@ import type {
 import type { BrowserApi } from '../browser'
 import { CallFailure } from '../messages'
 import type { BridgeClient } from './bridgeClient'
-import type { CaptureKind, PageCapture } from './capture'
+import { CaptureFailure, withCapture, type CaptureKind, type PageCapture } from './capture'
 import { Conversation } from './Conversation'
 import { errorGuidance } from './guidance'
-import { loadDestination, saveDestination, type Destination as Remembered } from './localState'
+import { Handoff } from './Handoff'
+import type { PageHandoff } from '../handoffs'
+import { changeDraft, loadDestination, saveDestination, type Destination as Remembered } from './localState'
 
 const UNCERTAIN = new Set(['ambiguous_mutation', 'host_unavailable', 'node_unreachable'])
 
@@ -35,6 +37,9 @@ export function Destination(props: {
   hint: BridgeAgentHint | null
   reconnects: number
   capture(kind: CaptureKind): Promise<PageCapture>
+  // A handoff the person asked for, from a site button or the sidebar's own offer.
+  handoff: PageHandoff | null
+  dismissHandoff(): void
 }) {
   const nodeId = props.nodeId
   const [projects, setProjects] = createSignal<BridgeProject[] | null>(null)
@@ -50,6 +55,12 @@ export function Destination(props: {
   // An unconfirmed start keeps its key, so starting the same chat again can't make a second one.
   const [pendingStart, setPendingStart] = createSignal<{ key: string; taskId: string; choice: string } | null>(null)
   let remembered: Remembered = { projectId: null, taskId: null, sessionId: null }
+  // A handed-off item's context, waiting for the person to open a conversation. It goes into that
+  // conversation's draft for review, never straight to an agent.
+  const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
+  // A task a handoff opened. When its conversations load, the newest opens, or the new-chat picker
+  // shows when it has none.
+  let openingTask: string | null = null
 
   const report = (error: unknown) => {
     // A reply refused because the Node changed under it is expected, and a missing bridge has its banner.
@@ -87,6 +98,13 @@ export function Destination(props: {
       const result = await props.client.call({ op: 'sessions.list', nodeId, taskId: forTask })
       if (taskId() !== forTask) return
       setSessions(result.sessions)
+      if (openingTask === forTask) {
+        openingTask = null
+        const newest = result.sessions[0]
+        if (newest) void openSession(forTask, newest.id)
+        else void loadProfiles()
+        return
+      }
       if (!sessionId() && result.sessions.some((session) => session.id === remembered.sessionId))
         chooseSession(remembered.sessionId)
     } catch (error) {
@@ -132,6 +150,44 @@ export function Destination(props: {
     void saveDestination(props.storage, nodeId, { projectId: projectId(), taskId: taskId(), sessionId: sessionId() })
   }
 
+  // The person opened a conversation. Waiting context joins its stored draft first, through the same
+  // helper a send that finished elsewhere uses, so the composer finds it when it mounts.
+  async function openSession(forTask: string, id: string) {
+    const capture = waitingContext()
+    if (capture) {
+      try {
+        await changeDraft(props.storage, { nodeId, taskId: forTask, sessionId: id }, (draft) => {
+          const captures = draft.captures ?? []
+          // The same item handed off twice is one capture.
+          if (captures.some((other) => other.kind === 'context' && other.url === capture.url)) return draft
+          return { ...draft, captures: withCapture(captures, capture) }
+        })
+        setWaitingContext(null)
+      } catch (error) {
+        setProblem(
+          error instanceof CaptureFailure
+            ? error.message
+            : 'Browser storage is full, so the item was not added to the draft.',
+        )
+      }
+    }
+    if (taskId() === forTask) choose(() => chooseSession(id))
+  }
+
+  const openHandoffTask = (forProject: string, forTask: string, capture: PageCapture) => {
+    setWaitingContext(capture)
+    remembered = { projectId: forProject, taskId: forTask, sessionId: null }
+    openingTask = forTask
+    props.dismissHandoff()
+    choose(() => chooseProject(forProject))
+  }
+
+  const chooseHandoffTask = (forProject: string | null, capture: PageCapture) => {
+    setWaitingContext(capture)
+    props.dismissHandoff()
+    if (forProject) choose(() => chooseProject(forProject))
+  }
+
   const start = async () => {
     const forTask = taskId()
     const profile = profiles()?.find((candidate) => candidate.providerId === choice())
@@ -157,7 +213,7 @@ export function Destination(props: {
       setProfiles(null)
       if (taskId() !== forTask) return
       setSessions((current) => [session, ...(current ?? []).filter((row) => row.id !== session.id)])
-      choose(() => chooseSession(session.id))
+      await openSession(forTask, session.id)
     } catch (error) {
       if (error instanceof CallFailure && UNCERTAIN.has(error.code))
         setProblem("The Node didn't confirm the new chat. Start it again to retry; the Node won't make a second one.")
@@ -203,6 +259,29 @@ export function Destination(props: {
 
   return (
     <>
+      <Show when={props.handoff} keyed>
+        {(handoff) => (
+          <Handoff
+            client={props.client}
+            nodeId={nodeId}
+            handoff={handoff}
+            online={props.online}
+            openTask={openHandoffTask}
+            chooseTask={chooseHandoffTask}
+            dismiss={props.dismissHandoff}
+          />
+        )}
+      </Show>
+      <Show when={waitingContext()}>
+        {(capture) => (
+          <section class="card notice" aria-label="Waiting context">
+            <p>{capture().title} goes into the draft of the conversation you open next.</p>
+            <button type="button" class="quiet" onClick={() => setWaitingContext(null)}>
+              Leave it out
+            </button>
+          </section>
+        )}
+      </Show>
       <section class="card" aria-label="Destination">
         <Show when={problem()}>
           <p class="problem" role="alert">
@@ -267,7 +346,11 @@ export function Destination(props: {
                   Conversation
                   <select
                     name="session"
-                    onChange={(event) => choose(() => chooseSession(event.currentTarget.value || null))}
+                    onChange={(event) => {
+                      const id = event.currentTarget.value
+                      if (id) void openSession(taskId()!, id)
+                      else choose(() => chooseSession(null))
+                    }}
                   >
                     <option value="" selected={!sessionId()}>
                       Choose a conversation

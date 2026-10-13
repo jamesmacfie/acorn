@@ -185,6 +185,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [browser-extension.md](./browser-extension.md) | The Chrome and Firefox extension, its native bridge, the native messaging contract, pairing, and sidebar states. |
 | [browser-extension/conversations.md](./browser-extension/conversations.md) | The extension's agent operations, change hints, conversation window, send retries, and browser storage. |
 | [browser-extension/page-capture.md](./browser-extension/page-capture.md) | The extension's link, selection, and screenshot captures, page access, sending them, and the attachment operations. |
+| [browser-extension/handoffs.md](./browser-extension/handoffs.md) | The buttons plugins put on websites, the extension's handoff card, and the operations that resolve a page and create a linked task. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 
@@ -375,7 +376,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
   annotations](./plugins/rows-and-annotations.md), [Search providers](./plugins/search-providers.md),
   [Task checks](./plugins/task-checks.md), [Toolbar actions](./plugins/toolbar-actions.md), [The tree
   contract](./plugins/tree-contract.md), [Choosing how a plugin draws](./plugins/ui-tiers.md).
-- [plugin-authoring.md](./plugin-authoring.md): [CLI command
+- [plugin-authoring.md](./plugin-authoring.md): [Browser
+  handoffs](./plugin-authoring/browser-handoffs.md), [CLI command
   authoring](./plugin-authoring/cli-commands.md), [A complete
   example](./plugin-authoring/complete-example.md), [Contributions](./plugin-authoring/contributions.md),
   [Custom agents](./plugin-authoring/custom-agents.md), [Derived

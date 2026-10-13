@@ -9,17 +9,19 @@ function subject(flavor: 'chrome' | 'firefox' = 'chrome', firstReplyMs?: number)
   const hostStates: Pick<HostState, 'state' | 'message'>[] = []
   const statuses: unknown[] = []
   const hints: unknown[] = []
+  const handoffChanges: string[] = []
   const bridge = nativeBridge(
     fake.api,
     'com.acorn.browser_bridge',
     {
       status: (status) => statuses.push(status),
       agents: (hint) => hints.push(hint),
+      handoffs: (nodeId) => handoffChanges.push(nodeId),
       host: (state) => hostStates.push(state),
     },
     { firstReplyMs },
   )
-  return { fake, bridge, hostStates, statuses, hints }
+  return { fake, bridge, hostStates, statuses, hints, handoffChanges }
 }
 
 const idOf = (message: unknown) => (message as { id: string }).id

@@ -11,6 +11,8 @@ Topic pages:
   the conversation window, send retries, and browser storage.
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
   page access, sending them, and the attachment operations.
+- [Handoffs](./browser-extension/handoffs.md): the buttons plugins put on websites, the handoff card,
+  and the operations that resolve a page and create a linked task.
 
 ## What runs where
 
@@ -31,7 +33,9 @@ Data flows sidebar → background → native host → pinned Node connection →
 extension never hold a token or certificate. The desktop app takes no part: the bridge pairs and
 connects on its own, so the desktop can stay closed.
 
-The extension has no content scripts and holds no host access at install. The manifests
+The extension declares no content scripts and holds no host access at install. The background
+injects one, `content.js`, into a page it may read that matches a plugin's
+[site button](./browser-extension/handoffs.md#site-buttons). The manifests
 (`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, and `scripting`, plus
 `sidePanel` in Chrome. They list `http://*/*` and `https://*/*` as optional host access, which only
 the person can grant, and turn off private windows.
@@ -76,10 +80,12 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `session.create` | `nodeId`, `taskId`, `providerId`, `profileId`, `key` | `{ nodeId, session }` |
 | `turn.submit` | `nodeId`, `sessionId`, `input`, `key` | `{ nodeId, sessionId, turnId }` |
 | `attachment.upload`, `attachment.read`, `attachment.delete` | `nodeId`, `taskId`, and the attachment | See [page capture](./browser-extension/page-capture.md#attachment-operations) |
+| `handoffs.list`, `handoff.resolve`, `handoff.create` | `nodeId`, and the handoff and page | See [handoffs](./browser-extension/handoffs.md#native-operations) |
 
 A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, message } }`. The host
 also sends `{ v, event: 'status', status }` when the selected Node's connection changes, and
-`{ v, event: 'agent', nodeId, sessions, tasks, missed }` as a change hint. [Agent conversations](./browser-extension/conversations.md) covers the agent
+`{ v, event: 'agent', nodeId, sessions, tasks, missed }` as a change hint, and
+`{ v, event: 'handoffs', nodeId }` when the selected Node's plugins change. [Agent conversations](./browser-extension/conversations.md) covers the agent
 operations, hints, and what the sidebar keeps in browser storage. `turn.submit`'s `input` is the
 agents plugin's turn input, limited to the parts [page capture](./browser-extension/page-capture.md)
 sends: at most one `text` part of 60,000 characters, eight `context` parts, and eight `image` parts. A request
@@ -126,7 +132,7 @@ The sidebar also drops a reply whose `nodeId` is no longer selected. A slow read
 Node's list either way.
 
 The host keeps the selection only while it runs. The background stores `selectedNodeId` in
-`storage.local`. The sidebar's drafts are the only other thing stored, in
+`storage.local`, beside the selected Node's site buttons and the sidebar's drafts, listed in
 [browser storage](./browser-extension/conversations.md#browser-storage). Each time the background starts the host, it
 sends `node.select` with the stored ID before any other call. If that fails, the sidebar shows why,
 and pairing and forgetting still work. An unknown Node's ID is removed from storage.
@@ -151,6 +157,8 @@ Each failure has a next step, written in `src/sidebar/guidance.ts`:
 | Agent waiting | The session's `attention` is `permission` or `question` | Answer it in the Acorn app for now |
 | No page access | The active tab has no readable address, or the browser refuses the capture | Click the Acorn toolbar button on the page, then capture again |
 | Page changed | The active tab or its address changed while a capture ran | Capture again |
+| Handoff refused | The plugin's route answered an error, such as no connected account | The plugin's own message, with **Try again** |
+| Nothing to hand off | The page resolved to no items | None; the page isn't an item this Node can open |
 
 A regenerated certificate fails the pinned TLS chain before the fingerprint comparison runs, so the
 broker reports it as unreachable. The host probes after a failed read to tell the two apart, as
@@ -168,8 +176,9 @@ broker reports it as unreachable. The host probes after a failed read to tell th
 - Drafts are never expired.
 - The real-browser results and their gaps are in
   [phase 01](./future/extension/01-native-pairing.md#real-browser-results),
-  [phase 02](./future/extension/02-agent-conversation.md#real-browser-results), and
-  [phase 03](./future/extension/03-page-capture.md#real-browser-results).
+  [phase 02](./future/extension/02-agent-conversation.md#real-browser-results),
+  [phase 03](./future/extension/03-page-capture.md#real-browser-results), and
+  [phase 04](./future/extension/04-github-handoff.md#real-browser-results).
 
 ## Why
 

@@ -644,7 +644,10 @@ describe('architecture boundaries', () => {
 
   it('libraries publish only enumerated, existing source entrypoints', () => {
     const limits: Record<string, number> = {
-      '@acorn/protocol': 84, // Includes the static dependency policy capability, the secret check contracts, and the plugin_authoring point list.
+      // Includes the static dependency policy capability, the secret check contracts, the plugin_authoring
+      // point list, and the browser handoff contract, which the extension and its native host read
+      // without the whole manifest contract.
+      '@acorn/protocol': 85,
       // client-core publishes narrow entrypoints where a consumer can't take a barrel that pulls in
       // renderer-only modules. Pure leaves the terminal, logic tests or remote trees need: model-provider
       // error guidance, `kit/lib/savedSignal`, `kit/lib/formatChord`, `kit/lib/ansi`, and the address

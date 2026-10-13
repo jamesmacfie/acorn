@@ -1,13 +1,15 @@
 import { For, Show, createSignal, onMount } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import type { BridgeAgentHint, BridgeNodes } from '@acorn/protocol/extensionBridge.ts'
+import type { BridgeAgentHint, BridgeHandoff, BridgeNodes } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
+import type { PageHandoff } from '../handoffs'
 import { CallFailure, type CallError, type HostState } from '../messages'
 import { bridgeClient } from './bridgeClient'
 import { capturePage } from './capture'
 import { errorGuidance, hostGuidance, statusGuidance } from './guidance'
 import { Destination } from './Destination'
 import { Pairing } from './Pairing'
+import { SiteHandoffs } from './SiteHandoffs'
 
 // Online, or online with live updates paused: either way the Node answers requests.
 const connected = (status: NodeStatus | null) => status?.state === 'online' || status?.state === 'degraded'
@@ -22,6 +24,11 @@ export function App(props: { api: BrowserApi }) {
   // Counts each return of the selected Node's connection. What the sidebar shows may have changed
   // while it was away, and frames missed in a gap are never replayed, so a return means read again.
   const [reconnects, setReconnects] = createSignal(0)
+  // The selected Node's handoffs, and the one the person asked for, if any.
+  const [handoffs, setHandoffs] = createSignal<BridgeHandoff[]>([])
+  const [handoff, setHandoff] = createSignal<PageHandoff | null>(null)
+  // Counts toolbar clicks, after which the active page may be readable where it wasn't.
+  const [pageChecks, setPageChecks] = createSignal(0)
 
   const showStatus = (next: NodeStatus | null) => {
     const wasUp = connected(status())
@@ -33,6 +40,9 @@ export function App(props: { api: BrowserApi }) {
     // Only the selected Node's status matters, and only while it is still selected.
     status: (next) => next.nodeId === fleet()?.activeNodeId && showStatus(next),
     agents: (next) => next.nodeId === fleet()?.activeNodeId && setHint(next),
+    handoff: setHandoff,
+    handoffsChanged: (nodeId) => nodeId === fleet()?.activeNodeId && void loadHandoffs(nodeId),
+    page: () => setPageChecks((count) => count + 1),
   })
   const selected = () => fleet()?.nodes.find((node) => node.nodeId === fleet()?.activeNodeId) ?? null
   const online = () => host().state === 'connected' && connected(status())
@@ -47,9 +57,24 @@ export function App(props: { api: BrowserApi }) {
       setProblem(error instanceof CallFailure ? error : { code: 'node_error', message: String(error) })
     }
   }
+  // Read through the background, which keeps the pages' buttons in step with what the sidebar shows.
+  const loadHandoffs = async (nodeId: string) => {
+    try {
+      const result = await client.call({ op: 'handoffs.list', nodeId })
+      if (result.nodeId === fleet()?.activeNodeId) setHandoffs(result.handoffs)
+    } catch {
+      // Without the list the sidebar offers no handoff; pairing and conversations still work.
+    }
+  }
   const showFleet = (next: BridgeNodes) => {
+    const switched = next.activeNodeId !== fleet()?.activeNodeId
     setFleet(next)
     showStatus(next.status)
+    if (!switched) return
+    // A handoff belongs to the Node it was asked of, as the page buttons do.
+    setHandoffs([])
+    setHandoff(null)
+    if (next.activeNodeId) void loadHandoffs(next.activeNodeId)
   }
   const refresh = () => attempt(async () => showFleet(await client.call({ op: 'nodes.list' })))
   const select = (nodeId: string | null) =>
@@ -142,6 +167,9 @@ export function App(props: { api: BrowserApi }) {
           </section>
         )}
       </Show>
+      <Show when={fleet()?.activeNodeId}>
+        <SiteHandoffs api={props.api} handoffs={handoffs()} start={setHandoff} pageChecks={pageChecks()} />
+      </Show>
       <Show when={fleet()?.activeNodeId} keyed>
         {(nodeId) => (
           <Destination
@@ -153,6 +181,8 @@ export function App(props: { api: BrowserApi }) {
             hint={hint()}
             reconnects={reconnects()}
             capture={(kind) => capturePage(props.api, kind)}
+            handoff={handoff()}
+            dismissHandoff={() => setHandoff(null)}
           />
         )}
       </Show>

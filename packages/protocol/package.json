@@ -58,6 +58,7 @@
     "./plugin/apiVersion.ts": "./src/plugin/apiVersion.ts",
     "./plugin/bridge.ts": "./src/plugin/bridge.ts",
     "./plugin/bundles.ts": "./src/plugin/bundles.ts",
+    "./plugin/handoffs.ts": "./src/plugin/handoffs.ts",
     "./plugin/cliCommands.ts": "./src/plugin/cliCommands.ts",
     "./plugin/contract.ts": "./src/plugin/contract.ts",
     "./plugin/declaration.ts": "./src/plugin/declaration.ts",

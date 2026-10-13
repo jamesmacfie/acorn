@@ -16,6 +16,13 @@ const CAPTURE_LABELS: Record<CaptureKind, string> = {
   screenshot: 'Add screenshot',
 }
 
+const CAPTURE_NAMES: Record<PageCapture['kind'], string> = {
+  link: 'Page',
+  selection: 'Selected text',
+  screenshot: 'Screenshot',
+  context: 'Item',
+}
+
 const sameIds = (left: readonly string[] | undefined, right: readonly string[]) =>
   (left ?? []).length === right.length && right.every((id, index) => left?.[index] === id)
 
@@ -195,13 +202,16 @@ export function Composer(props: {
                 <li class="capture" data-testid="capture">
                   <div>
                     <strong>
-                      {capture.kind === 'link' ? 'Page' : capture.kind === 'selection' ? 'Selected text' : 'Screenshot'}
+                      {CAPTURE_NAMES[capture.kind]}
                       {' · '}
                       {capture.title}
                     </strong>
                     <span class="quiet">{capture.url}</span>
                     <Show when={capture.kind === 'selection' && capture.text}>
                       {(selected) => <blockquote>{selected()}</blockquote>}
+                    </Show>
+                    <Show when={capture.kind === 'context' && capture.content}>
+                      {(content) => <pre class="context">{content()}</pre>}
                     </Show>
                     <Show when={capture.kind === 'screenshot' && capture.dataUrl}>
                       {(source) => <img src={source()} alt={`Screenshot of ${capture.title}`} />}

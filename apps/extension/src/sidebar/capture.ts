@@ -12,6 +12,8 @@ type CaptureSource = { id: string; url: string; title: string; capturedAt: numbe
 export type PageCapture =
   | (CaptureSource & { kind: 'link' })
   | (CaptureSource & { kind: 'selection'; text: string })
+  // What a plugin proposed for the agent to read about an item the person handed off.
+  | (CaptureSource & { kind: 'context'; label: string; content: string })
   // `attachmentId` is set once the Node holds the screenshot, so a retried send doesn't upload it again.
   | (CaptureSource & {
       kind: 'screenshot'
@@ -114,7 +116,21 @@ export const screenshotData = (capture: Extract<PageCapture, { kind: 'screenshot
 
 const base64Bytes = (data: string): number => Math.floor((data.length * 3) / 4) - (data.match(/=*$/)?.[0].length ?? 0)
 
-// The context part a link or selection becomes. The Node hands it to the agent in a block marked as
+const contextLabel = (capture: Exclude<PageCapture, { kind: 'screenshot' }>): string =>
+  capture.kind === 'link'
+    ? `Page: ${capture.title}`
+    : capture.kind === 'selection'
+      ? `Selected text from ${capture.title}`
+      : capture.label
+
+const contextContent = (capture: Exclude<PageCapture, { kind: 'screenshot' }>): string =>
+  capture.kind === 'link'
+    ? `${capture.title}\n${capture.url}`
+    : capture.kind === 'selection'
+      ? `From ${capture.url}:\n\n${capture.text}`
+      : capture.content
+
+// The context part a link, selection, or handed-off item becomes. The Node hands it to the agent in a block marked as
 // captured material, so page text can't pass for the person's own message.
 function contextPart(
   capture: Exclude<PageCapture, { kind: 'screenshot' }>,
@@ -122,8 +138,8 @@ function contextPart(
   return {
     type: 'context',
     contextId: capture.id,
-    label: (capture.kind === 'link' ? `Page: ${capture.title}` : `Selected text from ${capture.title}`).slice(0, 500),
-    content: capture.kind === 'link' ? `${capture.title}\n${capture.url}` : `From ${capture.url}:\n\n${capture.text}`,
+    label: contextLabel(capture).slice(0, 500),
+    content: contextContent(capture),
     source: 'browser-extension',
     ...(capture.url.length <= 1_000 ? { resourceId: capture.url } : {}),
     capturedAt: capture.capturedAt,

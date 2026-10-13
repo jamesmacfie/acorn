@@ -1,9 +1,10 @@
-import type { BrowserApi, Port, Tab } from '../browser'
+import type { BrowserApi, MessageSender, Port, Tab } from '../browser'
 
 // The one fake of the extension API, shared by background and sidebar tests. It models what those
 // tests depend on: asynchronous port delivery, both browsers' ways of reporting a closed port,
-// profile storage, a native host the test scripts, and the active tab page capture reads. Native messaging itself, permissions,
-// gestures, and real selectors are checked in a browser through `pnpm dev:extension`.
+// profile storage, a native host the test scripts, the active tab page capture reads, messages to and
+// from a page's content script, and optional host access. Native messaging itself, the browser's
+// permission prompt, gestures, and real selectors are checked in a browser through `pnpm dev:extension`.
 
 type Listener = (...args: never[]) => void
 function listeners<L extends Listener>() {
@@ -58,9 +59,16 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
   const storage = new Map<string, unknown>()
   const onConnect = listeners<(port: Port) => void>()
   const onClicked = listeners<(tab: Tab) => void>()
+  const onMessage = listeners<(message: unknown, sender: MessageSender) => void>()
+  const onUpdated = listeners<(tabId: number, change: { url?: string; status?: string }, tab: Tab) => void>()
+  const onActivated = listeners<(info: { tabId: number; windowId: number }) => void>()
+  const onAdded = listeners<(permissions: { origins?: string[] }) => void>()
+  const onRemoved = listeners<(permissions: { origins?: string[] }) => void>()
   const runtime: BrowserApi['runtime'] = {
     lastError: null,
     onConnect,
+    onMessage,
+    sendMessage: async (message) => void onMessage.emit(structuredClone(message), {}),
     connect({ name }) {
       const close = (end: FakePort) => {
         for (const side of [end, end.peer!]) side.closed = true
@@ -114,6 +122,25 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     // The tab beside the sidebar. Without `url` the extension may not read it, as without activeTab.
     activeTab: { id: 1, windowId: 1, url: 'https://example.test/docs', title: 'Docs' } as Tab,
     selection: '',
+    // Messages the background sent to a page's content script, and the tabs it injected one into.
+    tabMessages: [] as { tabId: number; message: unknown }[],
+    injected: [] as number[],
+    // A message from the content script in the active tab, as the browser delivers it.
+    sendFromPage: (message: unknown): void =>
+      onMessage.emit(structuredClone(message), { tab: { ...fake.activeTab }, url: fake.activeTab.url, frameId: 0 }),
+    // The active tab navigated, as `tabs.onUpdated` reports it.
+    navigate: (url: string | undefined): void => {
+      fake.activeTab = { ...fake.activeTab, url }
+      onUpdated.emit(fake.activeTab.id!, { url, status: 'complete' }, { ...fake.activeTab })
+    },
+    activate: (): void => onActivated.emit({ tabId: fake.activeTab.id!, windowId: fake.activeTab.windowId }),
+    // Optional host access the person granted. `answerRequest` is the person's answer to the prompt.
+    granted: new Set<string>(),
+    answerRequest: true,
+    revoke: (origin: string): void => {
+      fake.granted.delete(origin)
+      onRemoved.emit({ origins: [origin] })
+    },
     // Replaced by a test to script a screenshot. By default a small JPEG.
     onCapture: async (_windowId: number): Promise<string> => 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
     api: {
@@ -130,12 +157,36 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
       tabs: {
         query: async (): Promise<Tab[]> => [{ ...fake.activeTab }],
         captureVisibleTab: (windowId: number): Promise<string> => fake.onCapture(windowId),
+        sendMessage: async (tabId: number, message: unknown) =>
+          void fake.tabMessages.push({ tabId, message: structuredClone(message) }),
+        onUpdated,
+        onActivated,
       },
       scripting: {
-        executeScript: async <Result>(_injection: { target: { tabId: number } }): Promise<{ result?: Result }[]> => {
+        executeScript: (async (injection: { target: { tabId: number }; files?: string[] }) => {
           if (fake.activeTab.url === undefined) throw new Error('Missing host permission for the tab')
-          return [{ result: fake.selection as Result }]
+          if (injection.files) {
+            fake.injected.push(injection.target.tabId)
+            return [{}]
+          }
+          return [{ result: fake.selection }]
+        }) as BrowserApi['scripting']['executeScript'],
+      },
+      permissions: {
+        contains: async ({ origins }: { origins: string[] }): Promise<boolean> =>
+          origins.every((origin) => fake.granted.has(origin)),
+        request: async ({ origins }: { origins: string[] }): Promise<boolean> => {
+          if (!fake.answerRequest) return false
+          for (const origin of origins) fake.granted.add(origin)
+          onAdded.emit({ origins })
+          return true
         },
+        remove: async ({ origins }: { origins: string[] }): Promise<boolean> => {
+          for (const origin of origins) fake.revoke(origin)
+          return true
+        },
+        onAdded,
+        onRemoved,
       },
       ...(flavor === 'chrome'
         ? {

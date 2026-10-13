@@ -18,6 +18,12 @@ describe('content-link patterns', () => {
     expect(pattern.match('https://tracker.example/issues/ENG-42%2Fcomments')).toBeNull()
   })
 
+  it('accepts one trailing slash and no more', () => {
+    const pattern = compileContentLinkPattern('https://tracker.example/item/{id}')
+    expect(pattern.match('https://tracker.example/item/42/')).toEqual({ id: '42' })
+    expect(pattern.match('https://tracker.example/item/42//')).toBeNull()
+  })
+
   it('rejects non-https, overlong patterns and too many captures without evaluating regex-like literals', () => {
     expect(() => compileContentLinkPattern('http://tracker.example/issues/{key}')).toThrow('https')
     expect(() => compileContentLinkPattern('https://tracker.example/issues/(a+)+')).not.toThrow()

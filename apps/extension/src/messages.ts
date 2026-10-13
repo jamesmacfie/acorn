@@ -1,5 +1,6 @@
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type { BridgeAgentHint, BridgeErrorCode, BridgeRequest } from '@acorn/protocol/extensionBridge.ts'
+import type { PageHandoff } from './handoffs'
 
 // Between the sidebar and the background. The background owns the one native connection, so the
 // sidebar names an operation and the background adds the protocol envelope.
@@ -27,6 +28,12 @@ export type BackgroundMessage =
   | { type: 'status'; status: NodeStatus }
   | { type: 'agent'; hint: BridgeAgentHint }
   | { type: 'host'; host: HostState }
+  // A site button was clicked. The sidebar resolves it; nothing is sent to an agent.
+  | { type: 'handoff'; handoff: PageHandoff }
+  // The selected Node's plugins changed, so the sidebar reads its handoffs again.
+  | { type: 'handoffs'; nodeId: string }
+  // The toolbar button was clicked, which can let the sidebar read the active page it couldn't before.
+  | { type: 'page' }
 
 export class CallFailure extends Error {
   constructor(

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { MAX_AGENT_CONTEXT_BYTES } from '../agents/agentContext.ts'
+import type { BrowserHandoff } from '../plugin/handoffs.ts'
 import type { NodeProbeResult, NodeRecord, NodeStatus } from './broker.ts'
 
 // The browser extension's native messaging contract: the identities a host registration allows, the
@@ -107,6 +108,12 @@ const turnInputSchema = z
     'Too many attachments.',
   )
 
+const handoffTarget = {
+  pluginId: z.string().min(1).max(64),
+  handoffId: z.string().min(1).max(64),
+  url: z.string().url().max(2048),
+}
+
 export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('nodes.list') }),
   z.strictObject({ ...envelope, op: z.literal('node.probe'), endpoint: z.string().url().max(2048) }),
@@ -167,6 +174,23 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('attachment.read'), nodeId, taskId: rowId, attachmentId: rowId }),
   // The Node deletes only an attachment no turn has sent, and answers `removed: false` for one a turn has.
   z.strictObject({ ...envelope, op: z.literal('attachment.delete'), nodeId, taskId: rowId, attachmentId: rowId }),
+  // Browser handoffs (docs/browser-extension/handoffs.md). The page address is the only thing the
+  // browser supplies; the host matches it against the handoff's own patterns and calls only the route
+  // the Node declared for that handoff.
+  z.strictObject({ ...envelope, op: z.literal('handoffs.list'), nodeId }),
+  z.strictObject({ ...envelope, op: z.literal('handoff.resolve'), nodeId, ...handoffTarget }),
+  // Resolves the page again and creates from that answer, so the task seed never comes from the browser.
+  // `identifier` and `connectionId` name which of the resolved items the person chose.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('handoff.create'),
+    nodeId,
+    ...handoffTarget,
+    identifier: z.string().min(1).max(300),
+    connectionId: rowId,
+    projectId: rowId,
+    key: operationKey,
+  }),
 ])
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
 export type BridgeOperation = BridgeRequest['op']
@@ -242,6 +266,22 @@ export type BridgeSessionRead = {
 // The agents plugin's attachment row.
 export type BridgeAttachment = { id: string; taskId: string; filename: string; mediaType: string; byteSize: number }
 
+// A plugin's site button, as discovery advertises it, without the route behind it: only the host calls
+// that, and only for this handoff.
+export type BridgeHandoff = Omit<BrowserHandoff, 'resolve'>
+
+// One item a handoff resolved, with what the sidebar needs to place it: its projects by name, and the
+// active tasks already linked to it. The task seed stays in the host.
+export type BridgeHandoffItem = {
+  identifier: string
+  url: string
+  title: string
+  connection: { id: string; label: string }
+  projects: { id: string; name: string }[]
+  linkedTasks: { id: string; title: string; projectId: string }[]
+  context: { label: string; content: string } | null
+}
+
 export type BridgeResults = {
   'nodes.list': BridgeNodes
   'node.probe': NodeProbeResult
@@ -259,6 +299,10 @@ export type BridgeResults = {
   // `data` is the content as base64, or null when it isn't an image or passes ATTACHMENT_MAX_BYTES.
   'attachment.read': { nodeId: string; taskId: string; attachment: BridgeAttachment; data: string | null }
   'attachment.delete': { nodeId: string; taskId: string; attachmentId: string; removed: boolean }
+  'handoffs.list': { nodeId: string; handoffs: BridgeHandoff[] }
+  'handoff.resolve': { nodeId: string; url: string; items: BridgeHandoffItem[] }
+  // `created` is false when an active task in that project was already linked, which is answered instead.
+  'handoff.create': { nodeId: string; task: BridgeTask & { projectId: string }; created: boolean }
 }
 
 // Which sessions and tasks changed on the selected Node since the last hint. Nothing more: the
@@ -291,3 +335,5 @@ export type BridgeHostMessage =
   | { v: 1; id: string; chunk: { index: number; count: number; data: string } }
   | { v: 1; event: 'status'; status: NodeStatus }
   | ({ v: 1; event: 'agent' } & BridgeAgentHint)
+  // The selected Node's plugin set changed, so its handoffs may have too.
+  | { v: 1; event: 'handoffs'; nodeId: string }

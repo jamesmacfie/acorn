@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { BackgroundMessage } from '../messages'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
 import { SELECTED_NODE_KEY, startBackground } from './background'
+import { HANDOFFS_KEY } from './siteButtons'
 
 // A scripted host with the real host's selection rules: it knows some Nodes and selects one at a time.
 function scriptedHost(fake: ReturnType<typeof fakeBrowser>, known: string[]) {
-  const state = { active: null as string | null }
+  const state = { active: null as string | null, handoffs: [] as unknown[] }
   fake.onNativeMessage = (raw, host: FakeHost) => {
     const message = raw as { id: string; op: string; nodeId?: string | null }
     const reply = (result: unknown) => host.send({ v: 1, id: message.id, ok: true, result })
@@ -26,6 +27,10 @@ function scriptedHost(fake: ReturnType<typeof fakeBrowser>, known: string[]) {
       if (state.active === message.nodeId) state.active = null
       return reply(nodes())
     }
+    if (message.op === 'handoffs.list')
+      return message.nodeId === state.active
+        ? reply({ nodeId: message.nodeId, handoffs: state.handoffs })
+        : fail('not_selected')
     if (message.op === 'projects.list')
       return message.nodeId === state.active ? reply({ nodeId: message.nodeId, projects: [] }) : fail('not_selected')
   }
@@ -92,13 +97,16 @@ describe('background', () => {
     expect(await panel.call({ op: 'node.forget', nodeId: 'a' })).toMatchObject({ ok: true })
   })
 
-  it('keeps nothing but the selected Node ID in browser storage', async () => {
+  it('keeps nothing but the selected Node ID and its handoffs in browser storage', async () => {
     const fake = fakeBrowser()
     scriptedHost(fake, ['a'])
     startBackground(fake.api, 'com.acorn.browser_bridge')
     const panel = sidebar(fake)
     await panel.call({ op: 'node.select', nodeId: 'a' })
-    expect([...fake.storage.entries()]).toEqual([[SELECTED_NODE_KEY, 'a']])
+    expect([...fake.storage.entries()]).toEqual([
+      [SELECTED_NODE_KEY, 'a'],
+      [HANDOFFS_KEY, { nodeId: 'a', handoffs: [] }],
+    ])
     await panel.call({ op: 'node.forget', nodeId: 'a' })
     expect(fake.storage.size).toBe(0)
   })
@@ -129,5 +137,111 @@ describe('background', () => {
     firefox.clickAction()
     await settle()
     expect(firefox.panelOpens).toEqual([null])
+  })
+})
+
+describe('site buttons', () => {
+  const handoff = {
+    pluginId: 'tracker',
+    id: 'item',
+    label: 'Open in Acorn',
+    match: ['https://tracker.example/items/{id}'],
+    anchors: ['.actions'],
+  }
+  const buttons = [{ key: 'tracker:item', label: 'Open in Acorn', anchors: ['.actions'] }]
+  const lastButtons = (fake: ReturnType<typeof fakeBrowser>) =>
+    (fake.tabMessages.at(-1)?.message as { buttons?: unknown } | undefined)?.buttons
+
+  async function started(options: { url?: string } = {}) {
+    const fake = fakeBrowser()
+    fake.activeTab = { id: 7, windowId: 1, url: options.url ?? 'https://tracker.example/items/42', title: 'Item 42' }
+    const host = scriptedHost(fake, ['a', 'b'])
+    host.handoffs = [handoff]
+    startBackground(fake.api, 'com.acorn.browser_bridge')
+    const panel = sidebar(fake)
+    await panel.call({ op: 'node.select', nodeId: 'a' })
+    await settle()
+    return { fake, host, panel }
+  }
+
+  it("draws the selected Node's buttons on a matching page it may read", async () => {
+    const { fake } = await started()
+    expect(fake.injected).toContain(7)
+    expect(lastButtons(fake)).toEqual(buttons)
+    expect(fake.storage.get(HANDOFFS_KEY)).toEqual({ nodeId: 'a', handoffs: [handoff] })
+  })
+
+  it('takes the buttons away after navigation, lost access, or a Node switch', async () => {
+    const { fake, host, panel } = await started()
+    fake.navigate('https://tracker.example/boards/1')
+    await settle()
+    expect(lastButtons(fake)).toEqual([])
+
+    fake.navigate('https://tracker.example/items/43')
+    await settle()
+    expect(lastButtons(fake)).toEqual(buttons)
+    // Access removed: the browser stops reporting the address, and the page is told to draw nothing.
+    fake.activeTab = { ...fake.activeTab, url: undefined }
+    fake.revoke('https://tracker.example/*')
+    await settle()
+    expect(lastButtons(fake)).toEqual([])
+
+    fake.activeTab = { ...fake.activeTab, url: 'https://tracker.example/items/43' }
+    fake.navigate('https://tracker.example/items/43')
+    await settle()
+    expect(lastButtons(fake)).toEqual(buttons)
+    host.handoffs = []
+    await panel.call({ op: 'node.select', nodeId: 'b' })
+    await settle()
+    expect(lastButtons(fake)).toEqual([])
+    expect(fake.storage.get(HANDOFFS_KEY)).toEqual({ nodeId: 'b', handoffs: [] })
+  })
+
+  it("reads the list again when the Node's plugins change", async () => {
+    const { fake, host } = await started({ url: 'https://tracker.example/boards/1' })
+    host.handoffs = [{ ...handoff, match: ['https://tracker.example/boards/{id}'] }]
+    fake.hosts[0]!.send({ v: 1, event: 'handoffs', nodeId: 'a' })
+    await settle()
+    expect(lastButtons(fake)).toEqual(buttons)
+  })
+
+  it('opens the panel for a click and hands the page to the sidebar, even one that connects later', async () => {
+    const fake = fakeBrowser()
+    fake.activeTab = { id: 7, windowId: 3, url: 'https://tracker.example/items/42', title: 'Item 42' }
+    scriptedHost(fake, ['a']).handoffs = [handoff]
+    fake.storage.set(HANDOFFS_KEY, { nodeId: 'a', handoffs: [handoff] })
+    startBackground(fake.api, 'com.acorn.browser_bridge')
+    await settle()
+    // Drawn from the stored list before the host has started.
+    expect(fake.hosts).toEqual([])
+    expect(lastButtons(fake)).toEqual(buttons)
+
+    fake.sendFromPage({ type: 'acorn:handoff', key: 'tracker:other' })
+    fake.sendFromPage({ type: 'acorn:handoff', key: 'tracker:item' })
+    expect(fake.panelOpens).toEqual([3])
+    const panel = sidebar(fake)
+    await settle()
+    const handed = {
+      pluginId: 'tracker',
+      handoffId: 'item',
+      label: 'Open in Acorn',
+      url: 'https://tracker.example/items/42',
+    }
+    expect(panel.messages).toContainEqual({ type: 'handoff', handoff: handed })
+
+    // Taken once: a second sidebar doesn't get it again.
+    const second = sidebar(fake)
+    await settle()
+    expect(second.messages.some((message) => message.type === 'handoff')).toBe(false)
+  })
+
+  it('gives the tab the toolbar button was clicked on its buttons', async () => {
+    const { fake } = await started({ url: 'https://tracker.example/boards/1' })
+    fake.injected.length = 0
+    fake.activeTab = { ...fake.activeTab, url: 'https://tracker.example/items/9' }
+    fake.clickAction()
+    await settle()
+    expect(fake.injected).toEqual([7])
+    expect(lastButtons(fake)).toEqual(buttons)
   })
 })

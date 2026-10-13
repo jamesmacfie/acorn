@@ -75,6 +75,7 @@ export function runNativeHost(argv: string[]): void {
     deviceName: `Acorn for ${args.browser === 'chrome' ? 'Chrome' : 'Firefox'} on ${hostname()}`,
     status: (status) => send({ v: BROWSER_BRIDGE_PROTOCOL_VERSION, event: 'status', status }),
     hint: (hint) => send({ v: BROWSER_BRIDGE_PROTOCOL_VERSION, event: 'agent', ...hint }),
+    handoffsChanged: (nodeId) => send({ v: BROWSER_BRIDGE_PROTOCOL_VERSION, event: 'handoffs', nodeId }),
   })
   const close = (code: number): void => {
     bridge.dispose()

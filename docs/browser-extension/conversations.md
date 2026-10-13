@@ -55,7 +55,7 @@ so a slow reply can't land in another conversation.
 
 ## Browser storage
 
-Besides `selectedNodeId`, the sidebar keeps two kinds of key in `storage.local`:
+Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
 
 - `draft:<nodeId>:<taskId>:<sessionId>`: the unsent text, and an unconfirmed send's
   `{ key, text, captures }`, where `captures` lists the IDs of the captures it carried. A draft
@@ -66,5 +66,7 @@ Besides `selectedNodeId`, the sidebar keeps two kinds of key in `storage.local`:
   saved on each keystroke and a screenshot can be megabytes.
 - `destination:<nodeId>`: the project, task, and session last chosen on that Node, restored when the
   sidebar opens. Only the person's own choices are saved.
+- `handoffs`: the selected Node's [site buttons](./handoffs.md#site-buttons), `{ nodeId, handoffs }`,
+  kept so pages get their buttons before the native host starts. It goes when no Node is selected.
 
 Nothing else is stored, and no draft leaves the browser until the person sends it.

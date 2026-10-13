@@ -78,11 +78,36 @@ from it reads the sidebar itself. Capture checks need the real panel beside the 
   button that calls `browser.permissions.request()`. Firefox doesn't take a screenshot on a site
   grant alone, so a Firefox screenshot needs a person's toolbar click.
 
+## Check site buttons
+
+[Site buttons](../browser-extension/handoffs.md) need a page the extension may read and a plugin that
+declares one:
+
+- **Chrome.** Open the page, then run `Extensions.triggerAction` on its `tab` target as above.
+  `Target.getTargets` lists `tab` targets only with `filter: [{}]`. The click grants `activeTab`, the
+  background draws the page's buttons, and CDP's `Input.dispatchMouseEvent` at a button's centre is a
+  trusted click. A driver can't grant a site in Chrome.
+- **Firefox.** With `extensions.webextOptionalPermissionPrompts` set to `false`, press **Allow** in the
+  sidebar's site list with `input.performActions`, and the buttons appear on open pages. A click on a
+  page's button doesn't open the sidebar in Firefox; open it first with the `sidebarAction.open()`
+  button above.
+- **GitHub.** The session's Node has no GitHub connection, and connecting one takes a person, so a
+  pull request resolves only to "Connect GitHub". Its buttons, anchors, and client-side navigation can
+  still be checked on any public pull request.
+- **The whole flow without a provider.** Install a loaded package with no client bundle into the
+  session's Node with `POST /v1/core/plugins/install { "source": { "path": DIR } }` from a second paired
+  device, then stop the session and start it with `--reuse`. Declare a page such as
+  `https://example.com/items/{id}`, which draws for any path, and suggest only a plain-folder project
+  you add with `POST /v1/core/projects`, because a task in a git project makes a branch in the
+  repository. `packages/node-core/src/server/plugins/__fixtures__/handoffPlugin.mjs` is a starting
+  point.
+
 ## Tests without a browser
 
 `apps/extension/src/test/fakeBrowser.ts` is the one fake of the extension API. Background and sidebar
 tests share it. It models asynchronous ports, both browsers' ways of reporting a closed port, profile
-storage, and a scripted native host. Run `pnpm --filter @acorn/extension test`. The loop covers what the
+storage, a scripted native host, messages to and from a page's content script, and optional site
+access. The content script's own test runs it against jsdom with a small stub. Run `pnpm --filter @acorn/extension test`. The loop covers what the
 fake can't: native messaging, permissions, gestures, and real selectors.
 
 ## Browser behavior the loop depends on

@@ -25,6 +25,7 @@ import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { NodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
+import type { BrowserHandoffDescriptor } from '@acorn/protocol/plugin/handoffs.ts'
 import type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
 import type { PluginTelemetry } from '../telemetry/collector'
 import type { Logger } from '../telemetry/logger'
@@ -540,6 +541,10 @@ export type NodePlugin = {
   // `plugin:<id>:<verb>` verbs another plugin may subscribe to, with a sentence each for the settings
   // page. A loaded plugin declares the same thing in its manifest and this field is ignored for it.
   emits?: readonly PluginEmit[]
+  // The compiled tier's browser handoffs (docs/plugin-authoring/browser-handoffs.md): buttons the
+  // browser extension draws on a website, each resolved by a route this plugin serves. A loaded plugin
+  // declares them in its manifest and this field is ignored for it.
+  browserHandoffs?: readonly BrowserHandoffDescriptor[]
   // Awaited before the listener binds. Init may open plugin storage, migrate rows, or prepare route
   // state that must be complete before requests are served.
   init(ctx: CompiledNodePluginContext): void | Promise<void>

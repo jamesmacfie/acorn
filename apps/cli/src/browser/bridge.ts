@@ -12,7 +12,17 @@ import {
   type BridgeRequest,
   type BridgeResults,
 } from '@acorn/protocol/extensionBridge.ts'
-import { projectsRoute, tasksRoute, type ProjectsResponse, type Task } from '@acorn/protocol/api.ts'
+import { projectsRoute, tasksRoute, type Project, type ProjectsResponse, type Task } from '@acorn/protocol/api.ts'
+import {
+  BROWSER_HANDOFF_RESOLUTION_MAX_BYTES,
+  browserHandoffResolution,
+  browserHandoffsRoute,
+  matchHandoffPage,
+  type BrowserHandoff,
+  type BrowserHandoffResolution,
+  type BrowserHandoffResolveRequest,
+  type BrowserHandoffsResponse,
+} from '@acorn/protocol/plugin/handoffs.ts'
 import type {
   AgentAttachment,
   AgentInputPart,
@@ -32,6 +42,7 @@ import {
   bridgeSessionRead,
   sessionRoute,
 } from './agents'
+import { bridgeHandoff, bridgeHandoffItem, linkedTasks, ownsRoute } from './handoffs'
 
 export class BridgeFailure extends Error {
   constructor(
@@ -54,6 +65,8 @@ export function createBridge(options: {
   deviceName: string
   status(status: NodeStatus): void
   hint?(hint: BridgeAgentHint): void
+  // The selected Node's plugin set changed, so its browser handoffs may have.
+  handoffsChanged?(nodeId: string): void
   probe?: typeof probeNode
   pair?: typeof pairWithNode
 }) {
@@ -70,7 +83,9 @@ export function createBridge(options: {
   const hints = agentHints(options.hint ?? (() => {}))
   const broker = new NodeBroker({
     frame(nodeId, frame) {
-      if (nodeId === activeNodeId) hints.note(nodeId, frame)
+      if (nodeId !== activeNodeId) return
+      hints.note(nodeId, frame)
+      if ((frame as { channel?: unknown } | null)?.channel === 'plugins:changed') options.handoffsChanged?.(nodeId)
     },
     bytes() {},
     status(status) {
@@ -133,10 +148,13 @@ export function createBridge(options: {
       form?: Extract<NodeFetchBody, { kind: 'form' }>
       key?: string
       maxResponseBytes?: number
+      // A POST that changes nothing, such as a handoff resolution, is a read: refused if the selection
+      // moved while it was out, and never reported as an uncertain change.
+      read?: boolean
     },
   ): Promise<NodeFetchResponse> {
     requireSelected(nodeId)
-    const write = request.method !== 'GET'
+    const write = request.method !== 'GET' && !request.read
     let response: NodeFetchResponse
     try {
       response = await broker.fetch(nodeId, {
@@ -224,6 +242,40 @@ export function createBridge(options: {
       .filter((task) => task.projectId === projectId)
       .map((task) => ({ id: task.id, title: task.title, branch: task.branch }))
     return { nodeId, projectId, tasks }
+  }
+
+  // The handoff the Node declares now, looked up for every call rather than trusted from the browser.
+  async function declaredHandoff(nodeId: string, pluginId: string, handoffId: string): Promise<BrowserHandoff> {
+    const body = (await nodeRequest(nodeId, { method: 'GET', path: browserHandoffsRoute })) as BrowserHandoffsResponse
+    const handoff = body?.handoffs?.find((entry) => entry.pluginId === pluginId && entry.id === handoffId)
+    if (!handoff || !ownsRoute(handoff))
+      throw new BridgeFailure('not_found', 'The Node no longer offers that handoff. Reload the page and try again.')
+    return handoff
+  }
+
+  // Matches the page against the handoff's own patterns, calls its declared route, and holds the answer
+  // to the shared schema before anything is built from it.
+  async function resolveHandoff(
+    nodeId: string,
+    target: { pluginId: string; handoffId: string; url: string },
+  ): Promise<BrowserHandoffResolution> {
+    const handoff = await declaredHandoff(nodeId, target.pluginId, target.handoffId)
+    const captures = matchHandoffPage(handoff, target.url)
+    if (!captures) throw new BridgeFailure('bad_request', `“${handoff.label}” doesn't work on that page.`)
+    const answer = await nodeRequest(nodeId, {
+      method: 'POST',
+      path: handoff.resolve,
+      body: { url: target.url, captures } satisfies BrowserHandoffResolveRequest,
+      read: true,
+      maxResponseBytes: BROWSER_HANDOFF_RESOLUTION_MAX_BYTES,
+    })
+    const parsed = browserHandoffResolution.safeParse(answer)
+    if (!parsed.success)
+      throw new BridgeFailure(
+        'node_error',
+        `The ${handoff.pluginId} plugin answered with something the extension can't use.`,
+      )
+    return parsed.data
   }
 
   async function handle(request: BridgeRequest): Promise<BridgeResults[BridgeRequest['op']]> {
@@ -363,6 +415,59 @@ export function createBridge(options: {
         })
         const data = Buffer.from(content.body).toString('base64')
         return { nodeId: request.nodeId, taskId: request.taskId, attachment, data }
+      }
+      case 'handoffs.list': {
+        const body = (await nodeRequest(request.nodeId, {
+          method: 'GET',
+          path: browserHandoffsRoute,
+        })) as BrowserHandoffsResponse | null
+        if (!Array.isArray(body?.handoffs))
+          throw new BridgeFailure('node_error', 'The Node returned an unreadable list of handoffs.')
+        return { nodeId: request.nodeId, handoffs: body.handoffs.filter(ownsRoute).map(bridgeHandoff) }
+      }
+      case 'handoff.resolve': {
+        const resolution = await resolveHandoff(request.nodeId, request)
+        const projects = await readList<Project>(
+          request.nodeId,
+          projectsRoute,
+          (b) => (b as ProjectsResponse)?.projects,
+        )
+        const tasks = await readList<Task>(request.nodeId, tasksRoute, (body) => body)
+        return {
+          nodeId: request.nodeId,
+          url: request.url,
+          items: resolution.items.map((item) => bridgeHandoffItem(item, projects, tasks)),
+        }
+      }
+      case 'handoff.create': {
+        // The browser names the item and the project; the seed comes from the provider's fresh answer.
+        const resolution = await resolveHandoff(request.nodeId, request)
+        const item = resolution.items.find(
+          (candidate) =>
+            candidate.identifier === request.identifier && candidate.connection.id === request.connectionId,
+        )
+        if (!item) throw new BridgeFailure('not_found', 'The page no longer resolves to that item. Open it again.')
+        if (!item.projects.includes(request.projectId))
+          throw new BridgeFailure(
+            'bad_request',
+            `That project doesn't track ${item.identifier}, so no task was made in it.`,
+          )
+        // A repeated create, or one made elsewhere since the person looked, answers the linked task.
+        const tasks = await readList<Task>(request.nodeId, tasksRoute, (body) => body)
+        const existing = linkedTasks(item, tasks).find((task) => task.projectId === request.projectId)
+        const task =
+          existing ??
+          ((await nodeRequest(request.nodeId, {
+            method: 'POST',
+            path: tasksRoute,
+            key: request.key,
+            body: { ...item.seed, projectId: request.projectId },
+          })) as Task)
+        return {
+          nodeId: request.nodeId,
+          task: { id: task.id, title: task.title, branch: task.branch, projectId: task.projectId },
+          created: !existing,
+        }
       }
       case 'attachment.delete': {
         await taskAttachment(request.nodeId, request.taskId, request.attachmentId)

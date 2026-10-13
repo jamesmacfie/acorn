@@ -1,6 +1,7 @@
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type { BridgeAgentHint, BridgeOperation, BridgeResults } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi, Port } from '../browser'
+import type { PageHandoff } from '../handoffs'
 import { CallFailure, type BackgroundMessage, type BridgeCall, type HostState } from '../messages'
 
 export type BridgeClient = {
@@ -11,7 +12,14 @@ export type BridgeClient = {
 // the next call opens a new one, and calls caught by the close fail rather than wait forever.
 export function bridgeClient(
   api: BrowserApi,
-  events: { host(host: HostState): void; status(status: NodeStatus): void; agents(hint: BridgeAgentHint): void },
+  events: {
+    host(host: HostState): void
+    status(status: NodeStatus): void
+    agents(hint: BridgeAgentHint): void
+    handoff(handoff: PageHandoff): void
+    handoffsChanged(nodeId: string): void
+    page(): void
+  },
 ): BridgeClient {
   let port: Port | null = null
   let next = 0
@@ -26,6 +34,9 @@ export function bridgeClient(
       if (message.type === 'host') return events.host(message.host)
       if (message.type === 'status') return events.status(message.status)
       if (message.type === 'agent') return events.agents(message.hint)
+      if (message.type === 'handoff') return events.handoff(message.handoff)
+      if (message.type === 'handoffs') return events.handoffsChanged(message.nodeId)
+      if (message.type === 'page') return events.page()
       const request = pending.get(message.id)
       if (!request) return
       pending.delete(message.id)

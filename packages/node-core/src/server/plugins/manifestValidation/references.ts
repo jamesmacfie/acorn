@@ -116,6 +116,7 @@ export function validateContributionIds(refs: ManifestReferences): void {
     agentTools,
     contextSections,
     documentServices,
+    browserHandoffs,
   } = manifest.contributions
   // The client uses ids for query keys and disposal across contribution registries.
   const seen = new Set<string>()
@@ -140,6 +141,7 @@ export function validateContributionIds(refs: ManifestReferences): void {
     ...agentTools,
     ...contextSections,
     ...documentServices,
+    ...browserHandoffs,
   ]) {
     if (seen.has(entry.id))
       issues.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })

@@ -1,7 +1,9 @@
-import type { BridgeNodes } from '@acorn/protocol/extensionBridge.ts'
-import type { BrowserApi, Port } from '../browser'
+import type { BridgeNodes, BridgeResults } from '@acorn/protocol/extensionBridge.ts'
+import type { BrowserApi, Port, Tab } from '../browser'
+import type { PageHandoff } from '../handoffs'
 import { CallFailure, type BackgroundMessage, type BridgeCall, type HostState, type SidebarMessage } from '../messages'
 import { nativeBridge } from './nativeBridge'
+import { siteButtons } from './siteButtons'
 
 // The selected Node, remembered by this browser profile. The native host holds the selection only
 // while it runs, so the background selects it again each time the host starts.
@@ -23,11 +25,45 @@ export function startBackground(api: BrowserApi, hostName: string): void {
     broadcast({ type: 'host', host })
   }
 
+  // A button click waiting for a sidebar to take it. A panel opened by the click connects a moment
+  // later, and gets it then.
+  let pendingHandoff: PageHandoff | null = null
+  const offerHandoff = (handoff: PageHandoff): void => {
+    pendingHandoff = sidebars.size ? null : handoff
+    broadcast({ type: 'handoff', handoff })
+  }
+
+  // Each browser's open call runs inside the person's click, where the gesture counts.
+  const openPanel = (tab: Tab): void => {
+    if (api.sidePanel) void api.sidePanel.open({ windowId: tab.windowId })
+    else void api.sidebarAction?.open()
+  }
+  const buttons = siteButtons(api, { open: openPanel, clicked: offerHandoff })
+
   const bridge = nativeBridge(api, hostName, {
     status: (status) => broadcast({ type: 'status', status }),
     agents: (hint) => broadcast({ type: 'agent', hint }),
+    handoffs: (nodeId) => {
+      broadcast({ type: 'handoffs', nodeId })
+      void refreshHandoffs(nodeId)
+    },
     host: (state) => setHost(state),
   })
+
+  // The selected Node's handoffs, read again after a selection, a restore, or a plugin change. A list
+  // for a Node that is no longer selected is dropped.
+  const refreshHandoffs = async (nodeId: string): Promise<void> => {
+    try {
+      const result = await bridge.request({ op: 'handoffs.list', nodeId })
+      if (buttons.nodeId === nodeId) await buttons.update({ nodeId, handoffs: result.handoffs })
+    } catch {
+      // The buttons stay as they were; the next selection or plugin change reads again.
+    }
+  }
+  const selected = async (nodeId: string | null): Promise<void> => {
+    await buttons.select(nodeId)
+    if (nodeId) void refreshHandoffs(nodeId)
+  }
 
   // A failed restore is reported, not thrown: pairing and forgetting must still work when the
   // remembered Node was forgotten elsewhere or lost its credential.
@@ -38,11 +74,15 @@ export function startBackground(api: BrowserApi, hostName: string): void {
     for (let attempt = 1; ; attempt++) {
       try {
         await bridge.request({ op: 'node.select', nodeId: stored })
+        void selected(stored)
         return setHost({ restoreError: null })
       } catch (error) {
         const failure = error instanceof CallFailure ? error : new CallFailure('node_error', String(error))
         if (failure.code === 'host_unavailable' && attempt < 2) continue
-        if (failure.code === 'unknown_node') await api.storage.local.remove([SELECTED_NODE_KEY])
+        if (failure.code === 'unknown_node') {
+          await api.storage.local.remove([SELECTED_NODE_KEY])
+          void selected(null)
+        }
         if (failure.code !== 'host_unavailable')
           setHost({ restoreError: `Could not reselect the last Node: ${failure.message}` })
         return
@@ -60,6 +100,12 @@ export function startBackground(api: BrowserApi, hostName: string): void {
       if (activeNodeId) await api.storage.local.set({ [SELECTED_NODE_KEY]: activeNodeId })
       else await api.storage.local.remove([SELECTED_NODE_KEY])
       setHost({ restoreError: null })
+      void selected(activeNodeId)
+    } else if (operation.op === 'nodes.list') void selected((result as BridgeNodes).activeNodeId)
+    // The sidebar's own read keeps the pages' buttons current too.
+    if (operation.op === 'handoffs.list') {
+      const { nodeId, handoffs } = result as BridgeResults['handoffs.list']
+      if (buttons.nodeId === nodeId) await buttons.update({ nodeId, handoffs })
     }
     return result
   }
@@ -68,6 +114,8 @@ export function startBackground(api: BrowserApi, hostName: string): void {
     if (port.name !== 'sidebar') return
     sidebars.add(port)
     port.postMessage({ type: 'host', host } satisfies BackgroundMessage)
+    if (pendingHandoff) port.postMessage({ type: 'handoff', handoff: pendingHandoff } satisfies BackgroundMessage)
+    pendingHandoff = null
     port.onDisconnect.addListener(() => sidebars.delete(port))
     port.onMessage.addListener((raw) => {
       const message = raw as SidebarMessage
@@ -93,7 +141,9 @@ export function startBackground(api: BrowserApi, hostName: string): void {
   // Opening rather than toggling keeps the panel up when the person clicks again to capture a page.
   if (api.sidePanel) void api.sidePanel.setPanelBehavior({ openPanelOnActionClick: false })
   api.action.onClicked.addListener((tab) => {
-    if (api.sidePanel) void api.sidePanel.open({ windowId: tab.windowId })
-    else void api.sidebarAction?.open()
+    openPanel(tab)
+    // The click grants this tab's access, so a matching page gets its buttons without a site grant.
+    if (tab.id !== undefined) void buttons.syncTab(tab.id, tab.url)
+    broadcast({ type: 'page' })
   })
 }

@@ -91,6 +91,7 @@ The Node runs these, with or without a client attached.
 | Node actions | Both | Host seam / a `commands` entry whose verb is `runNodeAction` | Work a plugin does when a user schedule asks |
 | Agent tools | Both | `ctx.tools` / `contributions.agentTools` | The MCP, harness HTTP, and renderer projections. The host qualifies a loaded tool as `<pluginId>_<localId>` and applies authority, permissions, risk, and limits before dispatch |
 | Context sections | Both | `ctx.contextSections` / `contributions.contextSections` | The assembled task-context prompt |
+| Browser handoffs | Both | `NodePlugin.browserHandoffs` / `contributions.browserHandoffs` | Buttons the browser extension draws on websites, each resolved by the plugin's own route ([browser handoffs](./plugin-authoring/browser-handoffs.md)) |
 | CLI commands | Loaded | `contributions.cliCommands` | Headless `acorn plugin` commands, dispatched to the plugin's `/cli/<name>` route ([CLI command authoring](./plugin-authoring/cli-commands.md)). **Direction: stays loaded-only**, because the host validates static manifest metadata before activation |
 | Providers | Both | `ctx.providers` | Connection, integration, model-provider, and Node registries. A model adapter's `generateText` crosses the worker as data, and `providers.integration` takes a fetch handler for routes ([Node providers](./plugins/node-providers.md)) |
 | Capabilities | Both | `ctx.capabilities` | Cross-plugin typed functions. A loaded plugin provides only ids in its own `<pluginId>.` namespace |

@@ -50,3 +50,4 @@ button:disabled { opacity: 0.6; cursor: default; }
 .capture img, .attachments img { display: block; max-width: 100%; max-height: 160px; object-fit: contain; border: 1px solid var(--line); border-radius: 5px; }
 .capture blockquote { margin: 4px 0 0; padding-left: 8px; border-left: 2px solid var(--line); white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
 .attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.capture pre.context { margin: 4px 0 0; padding-left: 8px; border-left: 2px solid var(--line); font: inherit; white-space: pre-wrap; max-height: 8.5em; overflow: auto; }

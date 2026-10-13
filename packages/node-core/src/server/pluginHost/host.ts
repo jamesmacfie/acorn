@@ -13,6 +13,7 @@ import { buildPluginContext, revokePluginContext, type LoadedPluginBinding } fro
 import { disposeUnstartedPlugin } from '../plugins/isolation'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import { declareEmits } from './emits'
+import { declareBrowserHandoffs } from './browserHandoffs'
 import type { HostPluginContext, NodePlugin, PluginStorage } from './types'
 import { createLogger, describeError } from '../telemetry/logger'
 import { registerManifestRuntimeContributions } from './runtimeContributions'
@@ -196,14 +197,19 @@ export async function initPlugins(
     }
   }
 
-  // The host owns this undo alongside context registrations; declarations follow the binding
-  // generation and are removed with that instance.
-  const registerEmits = (
+  // What a plugin declares rather than registers: its `emits` and its browser handoffs. A loaded
+  // plugin's come from its binding, a built-in's from its own fields. The host owns these undos
+  // alongside context registrations; declarations follow the binding generation and are removed with
+  // that instance.
+  const registerDeclarations = (
     plugin: NodePlugin,
     binding: LoadedPluginBinding | undefined,
     onUndo: (undo: () => void) => void,
   ): void => {
     onUndo(declareEmits(plugin.name, binding ? (binding.emits ?? []) : (plugin.emits ?? [])))
+    onUndo(
+      declareBrowserHandoffs(plugin.name, binding ? (binding.browserHandoffs ?? []) : (plugin.browserHandoffs ?? [])),
+    )
   }
 
   // Roll a contained plugin back to its pre-init state: undo everything it registered, let it release
@@ -270,7 +276,7 @@ export async function initPlugins(
       // descriptor registered, and the catch below must take that partial manifest back.
       running.push({ plugin, ctx, loaded })
       try {
-        registerEmits(plugin, loaded, (undo) => recordRegistrationUndo(plugin.name, undo))
+        registerDeclarations(plugin, loaded, (undo) => recordRegistrationUndo(plugin.name, undo))
         registerManifestSchedules(ctx, plugin.name, loaded, requireEnv)
         registerManifestTaskChecks(ctx, plugin.name, loaded, requireEnv)
         registerManifestHooks(ctx, plugin.name, loaded, requireEnv)
@@ -536,7 +542,7 @@ export async function initPlugins(
     // database only after (agents flushes, workflows aborts and database drains through that handle),
     // and revoke its context last so a leaked reference fails loudly.
     clearRegistrations(name)
-    registerEmits(next.plugin, next.binding, (undo) => void candidateUndos.push(undo))
+    registerDeclarations(next.plugin, next.binding, (undo) => void candidateUndos.push(undo))
     const previous = started.find((plugin) => plugin.name === name)
     if (previous) {
       try {

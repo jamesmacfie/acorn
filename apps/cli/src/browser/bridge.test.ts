@@ -49,6 +49,24 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       ['a3', { id: 'a3', taskId: 't1', filename: 'notes.txt', mediaType: 'text/plain', byteSize: 4, createdAt: 1 }],
     ]),
     deleted: [] as string[],
+    tasks: [
+      { id: 't1', title: 'Fix it', projectId: 'p1', branch: 'fix', status: 'active', pullNumber: null, links: [] },
+      { id: 't2', title: 'Elsewhere', projectId: 'p2', branch: null, status: 'active', pullNumber: 12, links: [] },
+    ] as Record<string, unknown>[],
+    // What discovery declares and what the tracker plugin's resolve route answers.
+    handoffs: [
+      {
+        pluginId: 'tracker',
+        id: 'item',
+        label: 'Open in Acorn',
+        match: ['https://tracker.example/{repo}/items/{number}'],
+        anchors: ['.actions'],
+        resolve: '/v1/p/tracker/handoff',
+      },
+    ] as Record<string, unknown>[],
+    resolution: null as unknown,
+    resolveRequests: [] as unknown[],
+    createdTasks: [] as { key: string; body: Record<string, unknown> }[],
   }
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown) => {
@@ -79,11 +97,24 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         return reply(401, { error: { code: 'unauthenticated', message: 'Unauthenticated.' } })
     }
     const url = new URL(req.url ?? '/', 'https://node.test')
-    if (url.pathname === '/v1/core/tasks')
-      return reply(200, [
-        { id: 't1', title: 'Fix it', projectId: 'p1', branch: 'fix', status: 'active' },
-        { id: 't2', title: 'Elsewhere', projectId: 'p2', branch: null, status: 'active' },
-      ])
+    if (url.pathname === '/v1/core/tasks' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      const key = String(req.headers['idempotency-key'])
+      const seed = JSON.parse(body) as Record<string, unknown>
+      const replayed = state.createdTasks.findIndex((created) => created.key === key)
+      if (replayed < 0) state.createdTasks.push({ key, body: seed })
+      const task = { id: `new-${state.createdTasks.length}`, branch: seed.branch ?? null, links: [], ...seed }
+      return reply(200, task)
+    }
+    if (url.pathname === '/v1/core/tasks') return reply(200, state.tasks)
+    if (url.pathname === '/v1/core/browser-handoffs') return reply(200, { handoffs: state.handoffs })
+    if (url.pathname === '/v1/p/tracker/handoff') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      state.resolveRequests.push(JSON.parse(body))
+      return reply(200, state.resolution)
+    }
     if (url.pathname === '/v1/p/agents/providers')
       return reply(200, [
         {
@@ -495,5 +526,138 @@ describe('browser bridge attachments', () => {
     expect(await call({ op: 'attachment.delete', nodeId: 'node-a', taskId: 't1', attachmentId: 'a1' })).toMatchObject({
       removed: false,
     })
+  })
+})
+
+describe('browser bridge handoffs', () => {
+  const item = (over: Record<string, unknown> = {}) => ({
+    identifier: 'acme/widget#12',
+    url: 'https://tracker.example/acme/items/12',
+    title: 'Fix the flaky test',
+    connection: { id: 'conn-1', label: 'Tracker' },
+    projects: ['p1'],
+    seed: { origin: 'tracker', title: 'Fix the flaky test', branch: 'fix-flaky', pullNumber: 12 },
+    context: { label: 'Item acme/widget#12', content: 'What to read.' },
+    ...over,
+  })
+  const target = { pluginId: 'tracker', handoffId: 'item', url: 'https://tracker.example/acme/items/12' }
+
+  async function selected() {
+    const subject = await paired()
+    await subject.call({ op: 'node.select', nodeId: 'node-a' })
+    return subject
+  }
+
+  it('lists the declared handoffs without their routes', async () => {
+    const { call, node } = await selected()
+    node.state.handoffs.push({ ...node.state.handoffs[0], id: 'stray', resolve: '/v1/p/agents/sessions' })
+    expect(await call({ op: 'handoffs.list', nodeId: 'node-a' })).toEqual({
+      nodeId: 'node-a',
+      handoffs: [
+        {
+          pluginId: 'tracker',
+          id: 'item',
+          label: 'Open in Acorn',
+          match: ['https://tracker.example/{repo}/items/{number}'],
+          anchors: ['.actions'],
+        },
+      ],
+    })
+  })
+
+  it('resolves through the declared route with captures the host matched, and names linked tasks', async () => {
+    const { call, node } = await selected()
+    node.state.resolution = { items: [item({ projects: ['p1', 'p2'] })] }
+    node.state.tasks.push({
+      id: 't3',
+      title: 'Linked',
+      projectId: 'p9',
+      branch: null,
+      status: 'active',
+      pullNumber: 12,
+      links: [],
+    })
+    const result = await call({ op: 'handoff.resolve', nodeId: 'node-a', ...target })
+    expect(node.state.resolveRequests).toEqual([{ url: target.url, captures: { repo: 'acme', number: '12' } }])
+    expect(result.items).toEqual([
+      {
+        identifier: 'acme/widget#12',
+        url: 'https://tracker.example/acme/items/12',
+        title: 'Fix the flaky test',
+        connection: { id: 'conn-1', label: 'Tracker' },
+        // p2 isn't a project the Node lists any more, so it can't be offered.
+        projects: [{ id: 'p1', name: 'node-a project' }],
+        // t2 holds pull 12 in a project tied to the item; t3 holds a pull 12 of somewhere else.
+        linkedTasks: [{ id: 't2', title: 'Elsewhere', projectId: 'p2' }],
+        context: { label: 'Item acme/widget#12', content: 'What to read.' },
+      },
+    ])
+  })
+
+  it('finds a connection-stamped link in any project', async () => {
+    const { call, node } = await selected()
+    node.state.resolution = {
+      items: [item({ seed: { origin: 'tracker', links: [{ connectionId: 'conn-1', identifier: 'TRK-1' }] } })],
+    }
+    node.state.tasks.push({
+      id: 't4',
+      title: 'Has the link',
+      projectId: 'p7',
+      branch: null,
+      status: 'active',
+      pullNumber: null,
+      links: [{ connectionId: 'conn-1', providerId: 'tracker', identifier: 'TRK-1' }],
+    })
+    const result = await call({ op: 'handoff.resolve', nodeId: 'node-a', ...target })
+    expect(result.items[0].linkedTasks).toEqual([{ id: 't4', title: 'Has the link', projectId: 'p7' }])
+  })
+
+  it('refuses a page the handoff does not match, a handoff the Node dropped, and an unreadable answer', async () => {
+    const { call, node } = await selected()
+    await expect(
+      call({ op: 'handoff.resolve', nodeId: 'node-a', ...target, url: 'https://tracker.example/acme/boards/12' }),
+    ).rejects.toMatchObject({ code: 'bad_request' })
+    await expect(call({ op: 'handoff.resolve', nodeId: 'node-a', ...target, handoffId: 'gone' })).rejects.toMatchObject(
+      { code: 'not_found' },
+    )
+    node.state.resolution = { items: [item({ context: { label: 'x', content: 'y'.repeat(16_001) } })] }
+    await expect(call({ op: 'handoff.resolve', nodeId: 'node-a', ...target })).rejects.toMatchObject({
+      code: 'node_error',
+    })
+    expect(node.state.createdTasks).toEqual([])
+  })
+
+  it('creates from the fresh resolution, only in a project tied to the item, and once per key', async () => {
+    const { call, node } = await selected()
+    node.state.resolution = { items: [item()] }
+    const create = {
+      op: 'handoff.create',
+      nodeId: 'node-a',
+      ...target,
+      identifier: 'acme/widget#12',
+      connectionId: 'conn-1',
+    }
+    const key = '0b5c1d3e-4f60-4a1b-9c2d-3e4f5a6b7c8d'
+    await expect(call({ ...create, projectId: 'p2', key })).rejects.toMatchObject({ code: 'bad_request' })
+    await expect(call({ ...create, connectionId: 'other', projectId: 'p1', key })).rejects.toMatchObject({
+      code: 'not_found',
+    })
+    expect(node.state.createdTasks).toEqual([])
+
+    const made = await call({ ...create, projectId: 'p1', key })
+    expect(made).toMatchObject({ created: true, task: { projectId: 'p1', branch: 'fix-flaky' } })
+    expect(node.state.createdTasks).toEqual([
+      {
+        key,
+        body: { origin: 'tracker', title: 'Fix the flaky test', branch: 'fix-flaky', pullNumber: 12, projectId: 'p1' },
+      },
+    ])
+    // Once the Node lists it, asking again answers the linked task rather than making another.
+    node.state.tasks.push({ ...made.task, status: 'active', pullNumber: 12, links: [] })
+    expect(await call({ ...create, projectId: 'p1', key: crypto.randomUUID() })).toMatchObject({
+      created: false,
+      task: { id: made.task.id },
+    })
+    expect(node.state.createdTasks).toHaveLength(1)
   })
 })
