@@ -2,7 +2,7 @@
 
 These numbers come from one day of normal use of the desktop dev app, the 24 hours before about
 4:40 PM on October 13, 2026 (03:40 UTC). They're the "before" numbers for phases 06 to 10 of
-[UI performance](../future/ui-performance/README.md). The data is in Sentry org `acorn-u3`, project
+UI performance. The [checks still to run](./ui-performance-open-checks-2026-10-14.md) list what to compare. The data is in Sentry org `acorn-u3`, project
 `acorn-development`.
 
 Read [the sampling rules](../telemetry/diagnosis.md) before comparing. Node `http.request` spans

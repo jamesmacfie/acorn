@@ -169,6 +169,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/session-revisit-2026-10-13.md](./testing/session-revisit-2026-10-13.md) | Dated cost of returning to a long agent session, measured in jsdom, and the real-window numbers still to take. |
 | [testing/idle-cost-2026-10-13.md](./testing/idle-cost-2026-10-13.md) | Dated count of the work an idle desktop window asks for, measured in tests, and the real-window idle numbers still to take. |
 | [testing/sentry-baseline-2026-10-13.md](./testing/sentry-baseline-2026-10-13.md) | A day of Sentry telemetry from real use: git calls, session-open timing, agent process and renderer memory, and response sizes. The before numbers for UI performance phases 06 to 10. |
+| [testing/ui-performance-open-checks-2026-10-14.md](./testing/ui-performance-open-checks-2026-10-14.md) | The real-window and Sentry checks still to run for all ten UI performance phases. |
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by the October 2026 runtime packaging work. |
 | [testing/production-minification-2026-10-09.md](./testing/production-minification-2026-10-09.md) | Dated startup graph bytes, installed bytes, and boot timings from minifying the Node service and loaded plugins. |
 | [testing/selective-renderer-loading-2026-10-09.md](./testing/selective-renderer-loading-2026-10-09.md) | Dated renderer and terminal startup graph bytes, roster bytes, and real-app checks from loading renderer implementations on first use. |
@@ -405,15 +406,6 @@ Each plugin landing page above has topic pages in a folder of the same name:
 - [first-party-plugins.md](./first-party-plugins.md): [Plugins to
   copy](./first-party-plugins/examples.md), [First-party plugins in the
   terminal](./first-party-plugins/terminal.md).
-
-## UI performance proposal
-
-- [UI performance](./future/ui-performance/README.md).
-- [Git calls in checkout admission](./future/ui-performance/06-checkout-admission-git.md).
-- [Session-open timeouts](./future/ui-performance/07-session-open-timeouts.md).
-- [Agent process memory](./future/ui-performance/08-agent-process-memory.md).
-- [Renderer memory](./future/ui-performance/09-renderer-memory.md).
-- [Response size](./future/ui-performance/10-response-size.md).
 
 ## Plugin rail and artwork proposal
 

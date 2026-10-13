@@ -17,7 +17,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
-| [ui-performance/](./ui-performance/README.md) | Phases 06 to 10 fix what a day of Sentry data showed: `git` calls in checkout admission, session-open timeouts, agent process and renderer memory, and oversized responses. | Phases 01 to 05 landed October 13, 2026, and their plans are removed. Phases 06 to 10 proposed. |
 
 ## The single files
 
@@ -46,7 +45,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 
 | Removed plan | Owner or remaining handoff |
 | --- | --- |
-| Five UI performance phase plans, 01 to 05, removed October 13, 2026 | [Streaming replay](../local-development/streaming-replay.md), [Markdown renders block by block](../ui-design/kit-internals.md#markdown-renders-block-by-block), and the dated checks for the [replay](../testing/streaming-replay-2026-10-13.md), [Markdown parsing](../testing/incremental-markdown-parse-2026-10-13.md), [session revisit](../testing/session-revisit-2026-10-13.md), and [idle cost](../testing/idle-cost-2026-10-13.md). Open acceptance: the real-window numbers each check lists. |
+| `ui-performance/`, phases 01 to 05 removed October 13, 2026, and the rest October 14, 2026 | [Streaming replay](../local-development/streaming-replay.md), [Markdown renders block by block](../ui-design/kit-internals.md#markdown-renders-block-by-block), [idle stop](../managed-agents/operations.md#idle-stop), and [diagnosis](../telemetry/diagnosis.md). Open acceptance: the [checks still to run](../testing/ui-performance-open-checks-2026-10-14.md). |
 | `steering.md`, removed October 13, 2026 | [Steer a running turn](../managed-agents/steering.md). Open acceptance: a real-window Node kill between the harness taking a steer and the Node recording it. |
 | `agent-search-startup.md`, removed October 13, 2026 | [Transcript search](../managed-agents/transcript-search.md). |
 | `editor-line-blame.md`, removed October 13, 2026 | [Line annotations](../editor/line-annotations.md), which lists the open questions. |
