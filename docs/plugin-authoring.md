@@ -61,6 +61,8 @@ for an exact record reference before a Node action runs.
 - [Harnesses](./plugin-authoring/harnesses.md) and [custom
   agents](./plugin-authoring/custom-agents.md): adding a managed agent with no code.
 - [CLI command authoring](./plugin-authoring/cli-commands.md): headless commands.
+- [Browser handoffs](./plugin-authoring/browser-handoffs.md): a button on a website that brings its
+  item into an Acorn task.
 
 ## The two halves
 

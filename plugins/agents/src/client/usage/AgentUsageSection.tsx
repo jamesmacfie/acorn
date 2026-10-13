@@ -20,12 +20,14 @@ import { usageMeterTone, usageTone } from '../sessions/stateTone'
 // names each, with its health dot and whose account it is, then its numbers. A harness with extra
 // accounts gets a tab per login in that row, and the numbers below are the chosen one's. It is drawn
 // inside a popover, which is why it carries no pane chrome.
-export default function AgentUsageSection(props: { showHeader?: boolean }) {
+export default function AgentUsageSection(props: {
+  showHeader?: boolean
+  defaultAccounts?: Readonly<Record<string, string | undefined>>
+}) {
   onMount(() => onCleanup(agentUsageStore.init()))
 
   const groups = () => usageGroups(agentUsageStore.snapshot())
-  // The chosen tab per harness, for as long as the panel is open.
-  const [picked, setPicked] = createSignal<Record<string, string>>({})
+  const [picked, setPicked] = createSignal<Record<string, { tab: string; defaultTab: string }>>({})
 
   return (
     <Stack gap="section">
@@ -43,9 +45,12 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
       <DescriptionList size="sm" layout="columns">
         <For each={groups()}>
           {(group) => {
-            const reading = () =>
-              group.readings.find((candidate) => usageTabId(candidate) === picked()[group.provider]) ??
-              group.readings[0]!
+            const defaultTab = () => props.defaultAccounts?.[group.provider] ?? 'default'
+            const reading = () => {
+              const choice = picked()[group.provider]
+              const tab = choice?.defaultTab === defaultTab() ? choice.tab : defaultTab()
+              return group.readings.find((candidate) => usageTabId(candidate) === tab) ?? group.readings[0]!
+            }
             return (
               <>
                 <DescriptionList.Item
@@ -72,7 +77,9 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
                           label: usageTabLabel(candidate),
                         }))}
                         active={usageTabId(reading())}
-                        onChange={(id) => setPicked({ ...picked(), [group.provider]: id })}
+                        onChange={(tab) =>
+                          setPicked({ ...picked(), [group.provider]: { tab, defaultTab: defaultTab() } })
+                        }
                       />
                     </Show>
                     <Inline>

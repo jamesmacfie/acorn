@@ -24,6 +24,7 @@ import {
   type Viewer,
   linearData,
   linearError,
+  linearRateLimited,
   linearFetch,
   linearUploadTarget,
 } from './'
@@ -269,10 +270,9 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
       if (error)
         return {
           ok: false,
-          failure: {
-            error: error.status === 401 ? 'provider_needs_auth' : 'provider_unavailable',
-            status: error.status,
-          },
+          failure: (await linearRateLimited(response))
+            ? { error: 'provider_rate_limited', status: 429 }
+            : { error: error.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', status: error.status },
         }
       const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(response)
       const node = issues.nodes[0]

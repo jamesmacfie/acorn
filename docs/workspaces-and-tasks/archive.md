@@ -10,9 +10,9 @@ back, and how delete removes it for good. `archiveTask` and `restoreTask` in
 
 Archive opens a confirmation dialog with the task title above the confirmation text. The dialog asks
 every plugin what it has to say about the task, such as running containers, uncommitted files, or
-live sessions, and offers each cleanup the plugin declared. It also warns that all subtasks, including
-nested subtasks, will be archived. With nothing to report, the dialog still
-appears as the explicit barrier. A plugin reaches that dialog only through a
+live sessions, and offers each cleanup the plugin declared. If the task has active child tasks, it
+also warns that all subtasks, including nested subtasks, will be archived. With nothing to report,
+the dialog still appears as the explicit barrier. A plugin reaches that dialog only through a
 [task check](../plugins/task-checks.md#task-checks). A cleanup that fails names
 its plugin, and the task is archived anyway.
 

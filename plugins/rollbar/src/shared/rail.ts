@@ -21,6 +21,24 @@ const rollbarSeverity = (level: string): RollbarSeverity => {
   return { icon: 'info', severity: 'info' }
 }
 
+// What a task promoted from an item starts with, from the rail's +Task and from the browser
+// extension's handoff alike: a title, and the item as a connection-stamped link. No branch, because
+// Rollbar suggests none; the rail's task modal asks the person for one.
+// `origin: 'rollbar'` must stay: `ownsTaskOrigin` matches the exact plugin id.
+export const rollbarTaskFields = (item: RollbarItemSummary) => ({
+  origin: 'rollbar',
+  title: item.title.slice(0, 120),
+  link: {
+    connectionId: item.integrationId,
+    identifier: item.identifier,
+    ref: {
+      displayId: item.identifier,
+      ...(item.itemId ? { externalId: item.itemId } : {}),
+      ...(item.url ? { url: item.url } : {}),
+    },
+  },
+})
+
 export function rollbarRailItem(item: RollbarItemSummary): PluginRailItem {
   return {
     id: rollbarRailItemId(item),
@@ -32,8 +50,7 @@ export function rollbarRailItem(item: RollbarItemSummary): PluginRailItem {
     short: `#${item.identifier}`,
     ...rollbarSeverity(item.level),
     task: {
-      origin: 'rollbar',
-      title: item.title.slice(0, 120),
+      ...rollbarTaskFields(item),
       // What a workflow started from this row is told about it (docs/workflows/starting-runs.md § Starting a run).
       // Rollbar's list route carries no prose — an item's body is its stack trace, which is a second
       // call per row — so this is the facts the row already has, which is what an investigating agent
@@ -45,15 +62,6 @@ export function rollbarRailItem(item: RollbarItemSummary): PluginRailItem {
         ...(item.framework ? [`Framework: ${item.framework}`] : []),
         ...(item.url ? [item.url] : []),
       ].join('\n'),
-      link: {
-        connectionId: item.integrationId,
-        identifier: item.identifier,
-        ref: {
-          displayId: item.identifier,
-          ...(item.itemId ? { externalId: item.itemId } : {}),
-          ...(item.url ? { url: item.url } : {}),
-        },
-      },
     },
   }
 }

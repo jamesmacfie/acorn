@@ -66,3 +66,26 @@ GitHub's promotion contract. If an active task already tracks that pull request,
 the task. Otherwise the confirmation dialog prepares the same Linear references as the PR list's
 task action and writes the task only when you confirm. An untracked repository offers **Add project**,
 which opens **Settings > Workspaces and projects > Overview > Projects**.
+
+## Browser handoff
+
+GitHub declares the pull request button the [browser extension](../browser-extension/handoffs.md)
+draws on github.com, as `browserHandoffs` on its compiled plugin (`plugins/github/src/node/index.ts`).
+The route loads on the first handoff, from `plugins/github/src/server/browserHandoff.ts`. It matches a pull request's conversation and its
+tabs, `github.com/<owner>/<repo>/pull/<n>` and `…/pull/<n>/<tab>`. The button goes in the header's
+action row in a wide window, and in the state line under the title when GitHub hides that row in a
+narrower one.
+
+`POST /v1/p/github/browser/pull-request` reads the pull request through the same composite read as
+the PR pane, once for each connected GitHub account, with that account's credential. Each account
+that can see it is one item, named `owner/repo#n` in GitHub's own spelling. Its projects are every
+project whose GitHub facet names the repository, compared case-insensitively, so two clones of one
+repository are a choice. The seed is the one the PR list promotes a pull request with: origin
+`github-pr`, the title, the head branch, and the pull number. A pull request is recorded on the task
+row, not as a link, so a linked task is an active task in one of those projects with that number. The
+proposed context is the title, address, state, author, branches, and up to 8,000 bytes of the
+description.
+
+With no connected account the route answers 403 and asks the person to connect GitHub. An account
+that can't see the pull request answers 404 with GitHub's reason.
+

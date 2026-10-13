@@ -4,7 +4,7 @@ import { AGENT_REQUEST_CARD_POINT, type AgentRequestCardProps } from '@acorn/pro
 import { Alert, Button, Card, Checkbox, Field, Heading, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { managedAgentApi } from './managedClient'
-import { appApprovalOf, approvalScopeNote, approvalTarget } from './appApproval'
+import { appApprovalOf, approvalScopeNote, approvalTarget } from '../../contract/appApproval.ts'
 
 // A question the harness is blocked on: a permission, a choice, a form. Drawn in the transcript at the
 // point the agent asked, by the card for its own `request` event (`AgentEventCard`), so that

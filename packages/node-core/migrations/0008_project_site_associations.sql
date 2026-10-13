@@ -1,0 +1,1 @@
+ALTER TABLE `projects` ADD `site_associations` text;

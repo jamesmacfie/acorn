@@ -804,12 +804,19 @@ const CASES: Case[] = [
   },
   {
     node: 'Meter',
-    draws: '████░░░░ 62%',
-    render: () => <Meter value={0.5} label="Disk" />,
+    draws: '████░░░░ 62%, or one quarter-circle cell for shape="pie"',
+    render: () => (
+      <box flexDirection="column">
+        <Meter value={0.5} label="Disk" />
+        <Meter shape="pie" value={0.75} label="Time left" />
+      </box>
+    ),
     check: (frame) => {
       const line = lineWith(frame, '50%')
       expect(line).toContain('████')
       expect(line).toContain('░')
+      // The pie prints no percentage of its own.
+      expect(lineWith(frame, '◕').trim()).toBe('◕')
     },
   },
   {

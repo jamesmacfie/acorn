@@ -63,6 +63,14 @@ import { sessionAccount } from '../../shared/accounts'
 export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   const pricing = createQuery(() => agentPricingOptions())
+  const usageAccounts = createMemo(() => {
+    const accounts: Record<string, string | undefined> = Object.fromEntries(
+      model.providers().map((provider) => [provider.id, provider.defaultAccount]),
+    )
+    const session = model.selected()
+    if (session) accounts[session.providerId] = sessionAccount(session.config) ?? undefined
+    return accounts
+  })
   // A session a workflow started says so, and the chip opens the run that started it
   // (docs/managed-agents/sessions.md § Sessions).
   //
@@ -215,11 +223,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           )
         }}
       </Show>
-      <AgentUsageIndicator
-        defaultAccounts={Object.fromEntries(
-          model.providers().map((provider) => [provider.id, provider.defaultAccount]),
-        )}
-      />
+      <AgentUsageIndicator defaultAccounts={usageAccounts()} />
       {/* An archived task has no worktree to start a session in (docs/panes/contributions.md § Contributions). */}
       <Show when={props.task.status === 'active'}>
         <Picker<NewSessionChoice>

@@ -282,3 +282,29 @@ describe('linear agent hooks', () => {
     ).resolves.toEqual({ mimeType: 'video/mp4', data: '' })
   })
 })
+
+// The detail resource's refresh is what every issue read goes through, the browser handoff's included.
+describe('linear issue resource refresh', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  const refresh = () =>
+    linearProvider.resources[0]!.refresh(
+      { secret: 'lin_api_test', connection: { id: 'connection-1' }, now: 1, limits: {}, items: {} } as never,
+      { kind: 'detail', identifier: 'ENG-42' },
+    )
+  const respond = (body: unknown, status: number) =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))),
+    )
+
+  // Linear answers 400 with the code in the body rather than a 429.
+  it('reports a rate limit as one, not as Linear being down', async () => {
+    respond({ errors: [{ message: 'Rate limit exceeded', extensions: { code: 'RATELIMITED' } }] }, 400)
+    await expect(refresh()).resolves.toEqual({ ok: false, failure: { error: 'provider_rate_limited', status: 429 } })
+    respond({ errors: [{ message: 'Bad query', extensions: { code: 'GRAPHQL_VALIDATION_FAILED' } }] }, 400)
+    await expect(refresh()).resolves.toEqual({ ok: false, failure: { error: 'provider_unavailable', status: 502 } })
+    respond({}, 401)
+    await expect(refresh()).resolves.toEqual({ ok: false, failure: { error: 'provider_needs_auth', status: 401 } })
+  })
+})

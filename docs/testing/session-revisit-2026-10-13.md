@@ -1,6 +1,6 @@
 # Session revisit check, October 13, 2026
 
-This page records the measurements behind [session revisit](../future/ui-performance/04-session-revisit.md).
+This page records the measurements behind UI performance phase 04, session revisit.
 Every number here comes from jsdom, not from the real window. An agent-launched desktop window is
 always hidden, so the `session-revisit` flow wasn't run. jsdom builds the same DOM and runs the same
 JavaScript in V8, but it doesn't lay out or paint, and the desktop runs WebKit's JavaScriptCore. Read

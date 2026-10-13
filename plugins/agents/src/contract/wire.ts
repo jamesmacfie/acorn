@@ -539,6 +539,13 @@ export type AgentRequest = {
   resolvedAt: number | null
 }
 
+/** A request still waiting on a person, with the task its session belongs to, from the Node-wide read of
+ *  open requests. A session's `attention` can't stand in for this: a subagent's event moves it to
+ *  `unread`, and settling one of two requests moves it to `none`, while a request is still open. */
+export type AgentOpenRequest = AgentRequest & { taskId: string }
+
+export type AgentOpenRequestList = { requests: AgentOpenRequest[] }
+
 export type AgentSessionSnapshot = {
   session: AgentSession
   /** Every turn but a steered one, in queue order. */

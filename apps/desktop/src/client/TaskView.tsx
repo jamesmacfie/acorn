@@ -109,7 +109,7 @@ export default function TaskView(props: {
   async function openClose() {
     setCloseError('')
     setTeardownFailed(false)
-    const decision = await confirmTaskArchive(props.task)
+    const decision = await confirmTaskArchive(props.task, tasksQuery.data ?? [])
     if (!decision.confirmed) return
     // Held rather than passed straight through, because the teardown-failed path re-invokes the
     // archive from a button and the cleanups the owner ticked are still the cleanups they ticked.

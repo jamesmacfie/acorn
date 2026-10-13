@@ -1,7 +1,7 @@
 # Markdown parse cost check, October 13, 2026
 
 This page records the measurement that decided
-[incremental Markdown](../future/ui-performance/03-incremental-markdown.md). The gate is a 95th
+UI performance phase 03, incremental Markdown. The gate is a 95th
 percentile under 2 ms for `renderBlocks` at the end of a 50 KB streamed reply. In plain Node, the
 95th percentile was 0.94 to 1.46 ms, so the stateful renderer was not built.
 
@@ -80,5 +80,17 @@ From the `streaming` phase of each report, record these numbers:
 
 The phase report pools every update in the reply, from the first character to 71 KB. Its `p95`
 therefore sits near the cost at about 67 KB, which is above the 50 KB gate point. If that `p95`
-stays under 2 ms, the gate holds in the real window too. If it goes over, build the change the
-phase doc describes.
+stays under 2 ms, the gate holds in the real window too. If it goes over, build the change below.
+
+## The change, if the real window shows the cost
+
+Add a stateful renderer beside `renderBlocks`, such as `createBlockRenderer()`. It keeps the last
+call's blocks and the line each one started on. When the new source starts with the previous source,
+it keeps every block before the last one and parses again from the last block's first line.
+Otherwise, as after an edit, it parses from the top. `Markdown.tsx` holds one renderer per instance.
+`renderBlocks` and `renderMarkdown` stay as they are for callers that render once.
+
+This works because the parser is line-based. It has no reference-style link definitions and no
+setext headings, so a later line can't change an earlier block. Recheck that if the parser gains a
+construct that reaches backward. Add a property test: for every prefix of a Markdown corpus, the
+stateful renderer's output equals `renderBlocks` on the same text.

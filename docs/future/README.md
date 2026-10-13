@@ -15,10 +15,10 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
 | [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
-| [extension/](./extension/README.md) | Ten phases for Chrome and Firefox, an independent native bridge, task handoff, capture, chat, approvals, and site notifications. | Proposed October 10, 2026. Implementation not started. |
+| [extension/](./extension/README.md) | Ten phases for Chrome and Firefox, an independent native bridge, task handoff, capture, chat, approvals, and site notifications. | Proposed October 10, 2026. All ten phases implemented by October 13, 2026, and the developer release checked by an agent from a clean build. Acceptance that needs a person is open in the [phase 10 checklist](./extension/10-person-checklist.md). [Browser extension](../browser-extension.md) owns the shipped contract. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
-| [ui-performance/](./ui-performance/README.md) | A streaming replay harness, then cheaper streaming code blocks, Markdown parsing, session revisits, and idle cost. | Built October 13, 2026. Real-window measurements remain open. |
+| [ui-performance/](./ui-performance/README.md) | Phases 06 to 10 fix what a day of Sentry data showed: `git` calls in checkout admission, session-open timeouts, agent process and renderer memory, and oversized responses. | Phases 01 to 05 landed October 13, 2026, and their plans are removed. Phases 06 to 10 proposed. |
 
 ## The single files
 
@@ -30,6 +30,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
 | [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
 | [opencode.md](./opencode.md) | An external OpenCode harness package: one manifest, a conformance run, and a narrower `envPassthrough` in the authoring example. | Proposed October 9, 2026. Implementation not started. |
+| [plugin-rail-artwork.md](./plugin-rail-artwork.md) | Dynamic artwork and tooltips on plugin rail buttons, plus a shared artwork component for compiled UI and remote trees. | Proposed October 13, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
@@ -46,6 +47,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 
 | Removed plan | Owner or remaining handoff |
 | --- | --- |
+| Five UI performance phase plans, 01 to 05, removed October 13, 2026 | [Streaming replay](../local-development/streaming-replay.md), [Markdown renders block by block](../ui-design/kit-internals.md#markdown-renders-block-by-block), and the dated checks for the [replay](../testing/streaming-replay-2026-10-13.md), [Markdown parsing](../testing/incremental-markdown-parse-2026-10-13.md), [session revisit](../testing/session-revisit-2026-10-13.md), and [idle cost](../testing/idle-cost-2026-10-13.md). Open acceptance: the real-window numbers each check lists. |
 | `steering.md`, removed October 13, 2026 | [Steer a running turn](../managed-agents/steering.md). Open acceptance: a real-window Node kill between the harness taking a steer and the Node recording it. |
 | `agent-search-startup.md`, removed October 13, 2026 | [Transcript search](../managed-agents/transcript-search.md). |
 | `editor-line-blame.md`, removed October 13, 2026 | [Line annotations](../editor/line-annotations.md), which lists the open questions. |

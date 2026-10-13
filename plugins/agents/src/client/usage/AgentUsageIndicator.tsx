@@ -1,5 +1,5 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
-import { Button, Icon, Inline, Popover, StatusDot, Text } from '@acorn/plugin-api/ui'
+import { Button, Icon, Inline, Meter, Popover, StatusDot, Text } from '@acorn/plugin-api/ui'
 import AgentUsageSection from './AgentUsageSection'
 import { usageSummaryEntries } from './usageModel'
 import { usageTone } from '../sessions/stateTone'
@@ -9,8 +9,8 @@ import { agentUsageStore } from './usageStore'
 //
 // A Popover, not a hover tooltip: the panel it holds has a refresh button and several lines of
 // numbers in it, so it has to be reachable from the keyboard and stay open while it is read.
-// `defaultAccounts` names, by harness id, the account new sessions start on, which is the one the
-// button reads for a harness with extra accounts (docs/managed-agents/accounts.md).
+// `defaultAccounts` names the account to show for each harness. The selected session's account
+// takes precedence over the account used for new sessions (docs/managed-agents/accounts.md § Plan usage).
 export default function AgentUsageIndicator(props: { defaultAccounts?: Readonly<Record<string, string | undefined>> }) {
   // The button is the always-mounted reader, so it starts the load itself. A Popover does not render
   // its content until it opens, so with the panel as the only caller the button would sit on "reading
@@ -40,6 +40,11 @@ export default function AgentUsageIndicator(props: { defaultAccounts?: Readonly<
               <For each={entries()}>
                 {(entry) => (
                   <Inline>
+                    {/* How much of the window is still to run, as a pie that empties toward the
+                        reset. Muted, because time passing is not a warning; the dot says that. */}
+                    <Show when={entry.timeLeft != null}>
+                      <Meter shape="pie" tone="muted" value={entry.timeLeft!} label={entry.timeLeftLabel} />
+                    </Show>
                     <StatusDot tone={usageTone(entry.health)} size="sm" />
                     <Text emphasis="muted">
                       {entry.label} {entry.value}
@@ -52,7 +57,7 @@ export default function AgentUsageIndicator(props: { defaultAccounts?: Readonly<
         </Button>
       )}
     >
-      <AgentUsageSection />
+      <AgentUsageSection defaultAccounts={props.defaultAccounts} />
     </Popover>
   )
 }

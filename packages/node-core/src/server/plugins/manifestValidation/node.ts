@@ -26,8 +26,9 @@ export function validateDependencies(manifest: ManifestInput, ctx: IssueSink): v
 
 export function validateNodeDeclarations(refs: ManifestReferences): void {
   const { manifest, issues: ctx, route } = refs
-  const { agentTools, contextSections, cliCommands } = manifest.contributions
+  const { agentTools, contextSections, cliCommands, browserHandoffs } = manifest.contributions
   agentTools.forEach((entry, i) => route(entry.handler, ['contributions', 'agentTools', i, 'handler']))
+  browserHandoffs.forEach((entry, i) => route(entry.resolve, ['contributions', 'browserHandoffs', i, 'resolve']))
   contextSections.forEach((entry, i) => route(entry.read, ['contributions', 'contextSections', i, 'read']))
   const cliNames = new Set<string>()
   cliCommands.forEach((entry, i) => {
@@ -79,6 +80,13 @@ export function validateNodeDeclarations(refs: ManifestReferences): void {
         code: 'custom',
         path: ['contributions', 'contextSections', i],
         message: 'a context section calls a node route; declare `node` in the manifest',
+      }),
+    )
+    browserHandoffs.forEach((_entry, i) =>
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'browserHandoffs', i],
+        message: 'a browser handoff calls a node route; declare `node` in the manifest',
       }),
     )
   }

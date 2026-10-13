@@ -6,6 +6,7 @@ import { z } from 'zod'
 import type { Project, ProjectMcpFile, ProjectsResponse } from '@acorn/protocol/api.ts'
 import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON } from '@acorn/protocol/mcp.ts'
 import { isValidProjectColor } from '@acorn/protocol/projectColor.ts'
+import { siteAssociationsSchema } from '@acorn/protocol/siteAssociations.ts'
 import {
   createProject,
   detectProject,
@@ -54,6 +55,7 @@ const configBody = z.object({
     previewMode: z.enum(['url', 'port', 'script']).or(z.literal('')).optional(),
     previewValue: z.string().optional(),
     branchPrefix: z.string().max(60).optional(),
+    siteAssociations: siteAssociationsSchema.optional(),
   }),
 })
 const runTargetsBody = z.object({ runTargets: z.string() })

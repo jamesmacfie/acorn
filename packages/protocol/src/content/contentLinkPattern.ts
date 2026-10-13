@@ -78,7 +78,9 @@ export function compileContentLinkPattern(pattern: string): CompiledContentLinkP
       if (url.protocol !== 'https:' || url.username || url.password || url.port) return null
       const hostname = url.hostname.toLowerCase()
       if (wildcard ? hostname === host || !hostname.endsWith(`.${host}`) : hostname !== host) return null
-      const candidate = url.pathname === '/' ? [] : url.pathname.slice(1).split('/')
+      // One trailing slash names the same item: some providers spell their canonical address with one.
+      const path = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname
+      const candidate = path === '/' ? [] : path.slice(1).split('/')
       if (candidate.length !== segments.length || candidate.some((segment) => !segment)) return null
       const result: Record<string, string> = {}
       for (let index = 0; index < segments.length; index++) {

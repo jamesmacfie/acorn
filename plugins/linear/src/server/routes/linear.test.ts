@@ -64,6 +64,7 @@ function stubLinear(
 
 const mappingFor = (rows: { connectionId: string; externalId: string; projectId: string }[]) => ({
   byId: async (id: string) => ({ id, workspaceId: 'workspace-1' }) as never,
+  checkouts: async () => [{ id: 'project-1', path: '/src/project-1' }],
   externalProjects: async () => rows,
 })
 
@@ -108,7 +109,11 @@ describe('Linear palette search', () => {
   })
 
   it('answers nothing, and asks Linear nothing, where the routed project maps no workspace', async () => {
-    const fetchRoutes = createLinearFetch({ byId: async () => null, externalProjects: async () => [] })
+    const fetchRoutes = createLinearFetch({
+      byId: async () => null,
+      checkouts: async () => [],
+      externalProjects: async () => [],
+    })
     const context = await contextFor([connection('linear-a', 'Acme')])
     const sent = stubLinear(() => ({ nodes: [node('ENG-1')] }))
 
@@ -303,11 +308,57 @@ describe('Linear rail search', () => {
   })
 
   it('answers no rows, and asks Linear nothing, where the project maps nothing', async () => {
-    const fetchRoutes = createLinearFetch({ byId: async () => null, externalProjects: async () => [] })
+    const fetchRoutes = createLinearFetch({
+      byId: async () => null,
+      checkouts: async () => [],
+      externalProjects: async () => [],
+    })
     const context = await contextFor([connection('linear-a', 'Acme')])
     const sent = stubLinear(() => ({ nodes: [node('ENG-1')] }))
 
     expect(await (await fetchRoutes(railSearch('login'), context)).json()).toEqual({ items: [], incomplete: false })
     expect(sent).toHaveLength(0)
+  })
+})
+
+// The browser extension's issue button. This router answers every path under /v1/p/linear over HTTP,
+// so the handoff has to be one of its routes; a mount of its own would never be reached.
+describe('Linear browser handoff route', () => {
+  it('is served by the provider router, with the mapped projects and the issue as a resource read', async () => {
+    const fetchRoutes = createLinearFetch(
+      mappingFor([{ connectionId: 'linear-a', externalId: 'team:team-eng', projectId: '' }]),
+    )
+    const context = await makeTestRequestContext({
+      plugin: 'linear',
+      principal: { kind: 'device', userId: 'user-1', deviceId: 'device-1' },
+      providers: {
+        connections: (async () => [{ ...connection('linear-a', 'Acme'), status: 'connected' }]) as never,
+        resource: (async () => ({
+          ok: true,
+          value: {
+            ...node('ENG-42'),
+            team: { id: 'team-eng', key: 'ENG', name: 'Engineering' },
+            description: null,
+            comments: [],
+            activity: [],
+          },
+        })) as never,
+      },
+    })
+
+    const response = await fetchRoutes(
+      new Request('http://linear.test/browser/issue', {
+        method: 'POST',
+        body: JSON.stringify({
+          url: 'https://linear.app/acme/issue/ENG-42',
+          captures: { workspace: 'acme', identifier: 'ENG-42' },
+        }),
+      }),
+      context,
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      items: [{ identifier: 'ENG-42', connection: { id: 'linear-a' }, projects: ['project-1'] }],
+    })
   })
 })

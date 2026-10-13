@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ensureCert } from '@acorn/node-core/server/transport'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { NodeResponseTooLargeError } from './nodeRequest'
 import { MAX_NODE_PROBE_BYTES, pairWithNode, probeNode } from './nodePairing'
@@ -34,6 +35,24 @@ async function start(handler: RequestListener): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   return `https://127.0.0.1:${(server.address() as AddressInfo).port}`
 }
+
+it('reads the certificate on every probe of the same address', async () => {
+  const endpoint = await start((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(
+      JSON.stringify({
+        baseline: ACORN_BASELINE,
+        protocolVersion: NODE_PROTOCOL_VERSION,
+        fingerprint: cert.fingerprint,
+      }),
+    )
+  })
+  for (let probe = 0; probe < 3; probe++) {
+    expect((await probeNode(endpoint)).fingerprint).toBe(cert.fingerprint)
+    // The next probe needs a new connection, which is when a cached TLS session would be resumed.
+    servers[0]!.closeAllConnections()
+  }
+})
 
 it('limits the unverified probe before parsing a declared oversized body', async () => {
   const endpoint = await start((_req, res) => {

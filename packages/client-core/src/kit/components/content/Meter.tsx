@@ -9,19 +9,24 @@ import type { Size, Tone } from '../../tokens/tokens'
 
    `mark` is a second ratio on the same scale, drawn as a small triangle under the track: where the
    fill would sit if whatever the bar measures moved at a steady rate. It is decoration on top of the
-   number the bar already announces, so it carries no separate label. */
+   number the bar already announces, so it carries no separate label.
+
+   `shape="pie"` draws the same ratio as a small disc filled clockwise from the top, for a reading
+   that sits inline with text, where a bar would need a width the line does not have. A pie has no
+   `mark`. `muted` is for a ratio that is information rather than a warning, such as time passing. */
 const METER_WARN = 0.8
 const METER_DANGER = 0.95
 
 export function Meter(props: {
   value: number
-  tone?: Extract<Tone, 'accent' | 'ok' | 'warn' | 'danger'> | 'auto'
+  tone?: Extract<Tone, 'accent' | 'ok' | 'warn' | 'danger' | 'muted'> | 'auto'
   label: string
   size?: Extract<Size, 'sm' | 'md'>
   mark?: number
+  shape?: 'bar' | 'pie'
 }) {
   const ratio = () => Math.min(1, Math.max(0, props.value))
-  const mark = () => (props.mark == null ? null : Math.min(1, Math.max(0, props.mark)))
+  const mark = () => (props.mark == null || props.shape === 'pie' ? null : Math.min(1, Math.max(0, props.mark)))
   const tone = () => {
     if (props.tone !== 'auto') return props.tone ?? 'accent'
     return ratio() >= METER_DANGER ? 'danger' : ratio() >= METER_WARN ? 'warn' : 'accent'
@@ -31,6 +36,7 @@ export function Meter(props: {
       class="ui-meter"
       data-tone={tone()}
       data-size={props.size ?? 'sm'}
+      data-shape={props.shape === 'pie' ? 'pie' : undefined}
       data-marked={mark() == null ? undefined : ''}
       role="progressbar"
       aria-label={props.label}

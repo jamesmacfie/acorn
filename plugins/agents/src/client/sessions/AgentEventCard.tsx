@@ -44,7 +44,7 @@ import {
 import type { AgentMessageTarget } from '@acorn/plugin-api/client'
 import AgentRequestCard from './AgentRequestCard'
 import { askedQuestions } from './requestAnswers'
-import { appApprovalOf, approvalSentNote, approvalTarget, sentOptionId } from './appApproval'
+import { appApprovalOf, approvalSentNote, approvalTarget, sentOptionId } from '../../contract/appApproval.ts'
 import AgentArtifactCard from './AgentArtifactCard'
 import AgentAttachmentCard from './AgentAttachmentCard'
 import AgentErrorCard from './AgentErrorCard'

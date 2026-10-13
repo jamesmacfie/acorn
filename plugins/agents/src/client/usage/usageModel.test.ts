@@ -58,8 +58,8 @@ describe('agent usage health and tooltip', () => {
   it('summarizes every harness the node reported, in the order it reported them', () => {
     const snapshot: AgentUsageSnapshot = { providers: [provider('codex', 34), provider('claude', 82)], refreshedAt: 1 }
     expect(usageSummaryEntries(snapshot)).toEqual([
-      { health: 'warning', label: 'Codex', value: '34%' },
-      { health: 'healthy', label: 'Claude Code', value: '82%' },
+      { health: 'warning', label: 'Codex', value: '34%', timeLeft: null, timeLeftLabel: 'Codex Session' },
+      { health: 'healthy', label: 'Claude Code', value: '82%', timeLeft: null, timeLeftLabel: 'Claude Code Session' },
     ])
   })
 
@@ -67,8 +67,40 @@ describe('agent usage health and tooltip', () => {
     expect(usageSummaryEntries(null)).toEqual([])
     expect(usageSummaryEntries({ providers: [], refreshedAt: 1 })).toEqual([])
     expect(usageSummaryEntries({ providers: [provider('codex', 0)], refreshedAt: 1 })).toEqual([
-      { health: 'depleted', label: 'Codex', value: '0%' },
+      { health: 'depleted', label: 'Codex', value: '0%', timeLeft: null, timeLeftLabel: 'Codex Session' },
     ])
+  })
+
+  describe('the time-left pie', () => {
+    const now = 1_700_000_000_000
+    const hour = 3_600_000
+    const window = (id: string, label: string, hoursLeft: number, windowHours: number): AgentUsageQuota => ({
+      id,
+      label,
+      percentRemaining: 60,
+      resetsAt: now + hoursLeft * hour,
+      resetText: null,
+      windowSeconds: windowHours * 3_600,
+      health: 'healthy',
+    })
+    const entry = (quotas: AgentUsageQuota[]) =>
+      usageSummaryEntries({ providers: [{ ...provider('codex', 60), quotas }], refreshedAt: 1 }, {}, now)[0]!
+
+    it('reads the five-hour session when there is one', () => {
+      const summary = entry([window('session', 'Session (5h)', 2.5, 5), window('weekly', 'Weekly', 24, 168)])
+      expect(summary.timeLeft).toBeCloseTo(0.5)
+      expect(summary.timeLeftLabel).toBe('Codex Session (5h), resets in 2h 30m')
+    })
+
+    it('reads the week on a plan with no session limit, percentage and all', () => {
+      const summary = entry([{ ...window('weekly', 'Weekly', 42, 168), percentRemaining: 75 }])
+      expect(summary.value).toBe('75%')
+      expect(summary.timeLeft).toBeCloseTo(0.25)
+    })
+
+    it('draws nothing when the window is unknown', () => {
+      expect(entry([{ ...window('session', 'Session', 1, 5), windowSeconds: null }]).timeLeft).toBeNull()
+    })
   })
 })
 
@@ -225,6 +257,14 @@ describe('agent usage detail formatting', () => {
 })
 
 describe('usage groups', () => {
+  it('names the harness without favoring an account when only named accounts are collected', () => {
+    const personal = { ...provider('claude', 80), label: 'Claude Code · personal', accountName: 'personal' }
+    const work = { ...provider('claude', 30), label: 'Claude Code · work', accountName: 'work' }
+    const groups = usageGroups({ providers: [personal, work], refreshedAt: 1 })
+    expect(groups[0]?.label).toBe('Claude Code')
+    expect(groups[0]?.readings.map(usageTabLabel)).toEqual(['personal', 'work'])
+  })
+
   it("puts a harness's accounts under its own name, default first, in the node's order", () => {
     const work = { ...provider('claude', 30), label: 'Claude Code · work', accountName: 'work' }
     const groups = usageGroups({ providers: [provider('claude', 80), work, provider('codex', 50)], refreshedAt: 1 })

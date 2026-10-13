@@ -72,6 +72,7 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
     contextSections: [],
     cliCommands: [],
     documentServices: [],
+    browserHandoffs: [],
   },
   client: { hash: 'a'.repeat(64), bytes: 12 },
   hasNode: true,
@@ -603,6 +604,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
         contextSections: [],
         cliCommands: [],
         documentServices: [],
+        browserHandoffs: [],
       },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })

@@ -135,6 +135,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [local-development.md](./local-development.md) | Getting the app running, the dev loops, the environment, and the database commands. |
 | [local-development/agent-drivers.md](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client, native control, and the large-surface flow. |
 | [local-development/streaming-replay.md](./local-development/streaming-replay.md) | Generated ACP replies, per-process desktop sampling, and alternating renderer comparisons. |
+| [local-development/extension-dev-loop.md](./local-development/extension-dev-loop.md) | `pnpm dev:extension`: an isolated browser with the extension loaded and reloading, its native host and Node, and the sidebar driver. |
 | [local-development/profiling.md](./local-development/profiling.md) | Timing a cold start and a task switch. |
 | [local-development/packaged-stacks.md](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
 | [local-development/formatting.md](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, the `git blame` ignore file, and carrying a branch across a formatting commit. |
@@ -167,6 +168,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/incremental-markdown-parse-2026-10-13.md](./testing/incremental-markdown-parse-2026-10-13.md) | Dated Markdown parse cost at the end of a 50 KB streamed reply, measured in Node, and the real-window numbers still to take. |
 | [testing/session-revisit-2026-10-13.md](./testing/session-revisit-2026-10-13.md) | Dated cost of returning to a long agent session, measured in jsdom, and the real-window numbers still to take. |
 | [testing/idle-cost-2026-10-13.md](./testing/idle-cost-2026-10-13.md) | Dated count of the work an idle desktop window asks for, measured in tests, and the real-window idle numbers still to take. |
+| [testing/sentry-baseline-2026-10-13.md](./testing/sentry-baseline-2026-10-13.md) | A day of Sentry telemetry from real use: git calls, session-open timing, agent process and renderer memory, and response sizes. The before numbers for UI performance phases 06 to 10. |
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by the October 2026 runtime packaging work. |
 | [testing/production-minification-2026-10-09.md](./testing/production-minification-2026-10-09.md) | Dated startup graph bytes, installed bytes, and boot timings from minifying the Node service and loaded plugins. |
 | [testing/selective-renderer-loading-2026-10-09.md](./testing/selective-renderer-loading-2026-10-09.md) | Dated renderer and terminal startup graph bytes, roster bytes, and real-app checks from loading renderer implementations on first use. |
@@ -186,6 +188,14 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [cli/agents-and-workflows.md](./cli/agents-and-workflows.md) | CLI agent sessions, workflow runs, and the run list. |
 | [cli/plugin-commands.md](./cli/plugin-commands.md) | Discovering and running a plugin's CLI commands. |
 | [cli/local-service.md](./cli/local-service.md) | The CLI-owned background Node: start, status, and stop. |
+| [cli/browser-host.md](./cli/browser-host.md) | `acorn browser install`, `status`, and `uninstall`: registering the extension's native host. |
+| [browser-extension.md](./browser-extension.md) | The Chrome and Firefox extension, its native bridge, the native messaging contract, pairing, and sidebar states. |
+| [browser-extension/setup.md](./browser-extension/setup.md) | Installing the extension's development builds and native bridge on macOS, pairing, repair and removal, and every sidebar state with its next step. |
+| [browser-extension/conversations.md](./browser-extension/conversations.md) | The extension's agent operations, change hints, conversation window, send retries, and browser storage. |
+| [browser-extension/page-capture.md](./browser-extension/page-capture.md) | The extension's link, selection, and screenshot captures, page access, sending them, and the attachment operations. |
+| [browser-extension/handoffs.md](./browser-extension/handoffs.md) | The buttons plugins put on websites, the extension's handoff card, and the operations that resolve a page and create a linked task. |
+| [browser-extension/project-sites.md](./browser-extension/project-sites.md) | Web addresses tied to a project on the Node, the extension's project suggestions and overrides, and the site operations. |
+| [browser-extension/notifications.md](./browser-extension/notifications.md) | The extension's toolbar badge, waiting list, and opt-in OS notifications for requests agents are waiting on, and the `requests.pending` operation. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 
@@ -370,7 +380,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
   annotations](./plugins/rows-and-annotations.md), [Search providers](./plugins/search-providers.md),
   [Task checks](./plugins/task-checks.md), [Toolbar actions](./plugins/toolbar-actions.md), [The tree
   contract](./plugins/tree-contract.md), [Choosing how a plugin draws](./plugins/ui-tiers.md).
-- [plugin-authoring.md](./plugin-authoring.md): [CLI command
+- [plugin-authoring.md](./plugin-authoring.md): [Browser
+  handoffs](./plugin-authoring/browser-handoffs.md), [CLI command
   authoring](./plugin-authoring/cli-commands.md), [A complete
   example](./plugin-authoring/complete-example.md), [Contributions](./plugin-authoring/contributions.md),
   [Custom agents](./plugin-authoring/custom-agents.md), [Derived
@@ -398,11 +409,15 @@ Each plugin landing page above has topic pages in a folder of the same name:
 ## UI performance proposal
 
 - [UI performance](./future/ui-performance/README.md).
-- [Streaming replay](./future/ui-performance/01-streaming-replay.md).
-- [Open-fence highlighting](./future/ui-performance/02-open-fence-highlighting.md).
-- [Incremental Markdown](./future/ui-performance/03-incremental-markdown.md).
-- [Session revisit](./future/ui-performance/04-session-revisit.md).
-- [Idle cost](./future/ui-performance/05-idle-cost.md).
+- [Git calls in checkout admission](./future/ui-performance/06-checkout-admission-git.md).
+- [Session-open timeouts](./future/ui-performance/07-session-open-timeouts.md).
+- [Agent process memory](./future/ui-performance/08-agent-process-memory.md).
+- [Renderer memory](./future/ui-performance/09-renderer-memory.md).
+- [Response size](./future/ui-performance/10-response-size.md).
+
+## Plugin rail and artwork proposal
+
+- [Dynamic plugin rail presentation and artwork](./future/plugin-rail-artwork.md).
 
 ## Browser extension proposal
 

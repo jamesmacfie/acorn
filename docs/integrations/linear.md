@@ -2,7 +2,7 @@
 
 The Linear plugin is a loaded plugin that reads Linear issues into a rail, a task pane, a project pane,
 and a reference panel. This page covers connections, teams and projects, the rail, the ticket view,
-rail search, and palette search. The plugin is in `plugins/linear/`.
+rail search, palette search, and the browser handoff. The plugin is in `plugins/linear/`.
 
 ## Linear
 
@@ -79,3 +79,48 @@ hundred active issues per keystroke would cost the same requests and miss the hu
 `searchableContent` isn't used, because it searches descriptions too and is the field most likely to
 vary by plan. [From the command palette](../integrations.md#from-the-command-palette) has the shared
 rules.
+
+## Browser handoff
+
+Linear declares an issue handoff for the [browser extension](../browser-extension/handoffs.md) in its
+manifest's `browserHandoffs`. It matches the short and the slug address, `linear.app/<workspace>/issue/<key>`
+and `…/issue/<key>/<slug>`. It has no anchors, so the extension offers it in the sidebar beside the
+page rather than as a button in the page. Linear's issue page needs a signed-in session and its class
+names are generated, and no selector has been checked against it.
+
+`POST /v1/p/linear/browser/issue`, in `plugins/linear/src/server/browserHandoff.ts`, reads the issue
+through the `linear.issues` resource, the same read as the ticket view. The provider router in
+`plugins/linear/src/server/routes/linear.ts` serves it, because that router answers every path under
+`/v1/p/linear` over HTTP. It asks every connection that
+isn't disabled, with a fresh read, so a deleted issue or a rejected key isn't hidden by the cache. Two
+workspaces can both have an `ENG-42`, so a connection's answer counts only when Linear's own address
+for the issue is in the page's workspace. Each connection that passes is one item, and the person
+picks one. The bare-identifier routes take the first workspace that answers; this one doesn't.
+
+An item's projects come from the workspace mappings in [teams and projects](#teams-and-projects): a
+mapping on that connection of the issue's Linear project or its team, covering the whole Acorn
+workspace or naming the project. That is the rail's rule read the other way. Nothing is guessed from
+the workspace in the address. A project with no folder on disk isn't offered, as with GitHub's
+handoff. An issue in no mapped project or team has no projects, and the person can still pick a task
+with **Choose another task**.
+
+The seed is the one the rail's **+Task** uses (`linearTaskFields` in `plugins/linear/src/shared/rail.ts`):
+origin `linear`, `<key> <title>`, and Linear's suggested branch. It adds the issue as one
+connection-stamped link, which is how the extension finds a task that already holds it, in any
+project. The proposed context is the key, title, address, state, assignee, priority, team, project,
+labels, and up to 8,000 bytes of the description.
+
+The route's errors:
+
+| Case | Answer |
+| --- | --- |
+| No connection, or only disabled ones | 403, asks the person to connect Linear |
+| No workspace has the issue in the page's workspace | 404, says it may be deleted or in a workspace Acorn isn't connected to |
+| A key Linear rejects, or a connection that needs reauthentication | 403, names the connection and asks for a reconnect |
+| Linear rate limiting | 429, asks the person to try again in a minute |
+| Linear unreachable | 502 |
+
+A workspace that answered wins over one that failed, as on the rail. Linear reports a rate limit as
+HTTP 400 with `RATELIMITED` in the body, so `linearRateLimited` reads the body, and the `linear.issues`
+resource reports it as `provider_rate_limited`.
+

@@ -83,6 +83,8 @@
   "GET /v1/p/agents/pricing",
   "GET /v1/p/agents/providers",
   "GET /v1/p/agents/providers",
+  "GET /v1/p/agents/requests",
+  "GET /v1/p/agents/requests",
   "GET /v1/p/agents/runs",
   "GET /v1/p/agents/security-diagnostics",
   "GET /v1/p/agents/security-diagnostics",

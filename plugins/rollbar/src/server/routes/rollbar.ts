@@ -35,6 +35,7 @@ import {
 } from '../occurrenceResources'
 import { rollbarRailItem } from '../../shared/rail'
 import { rollbarSearchItems } from '../paletteSearch'
+import { createBrowserHandoffHandler, projectsMappingConnection } from '../browserHandoff'
 
 const PROVIDER = 'rollbar'
 const RESOURCE = ROLLBAR_ITEMS_RESOURCE
@@ -54,7 +55,7 @@ const rollbarResource = <TInput, TOutput>(
 
 const connectionIdFrom = (c: { req: { query(name: string): string | undefined } }) => c.req.query('integration')
 
-type RollbarProjectScope = Pick<CoreServices['projects'], 'byId' | 'externalProjects'>
+type RollbarProjectScope = Pick<CoreServices['projects'], 'byId' | 'checkouts' | 'externalProjects'>
 
 async function listItems(
   c: Context<AppEnv>,
@@ -142,6 +143,14 @@ async function searchItems(c: Context<AppEnv>, connectionIds: Set<string>, query
 
 const createRollbarRoutes = (projects?: RollbarProjectScope) =>
   new Hono<AppEnv>()
+    // The browser extension's item handoff, declared in the manifest's `browserHandoffs`. Served here,
+    // not from its own `ctx.routes.fetch` mount, because this provider router answers every path under
+    // /v1/p/rollbar over HTTP, so a separate mount would never be reached.
+    .post('/browser/item', (c) =>
+      createBrowserHandoffHandler({
+        projectsFor: async (connectionId) => (projects ? projectsMappingConnection(projects, connectionId) : []),
+      })(c.req.raw, requestContext(c)),
+    )
     .get('/items', async (c) => {
       const available = await rollbarConnections(c, PROVIDER)
       const requested = new Set(

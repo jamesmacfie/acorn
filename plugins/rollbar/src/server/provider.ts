@@ -49,7 +49,12 @@ export const ROLLBAR_ITEMS_RESOURCE = 'rollbar.items'
 
 type RollbarValidated = { project: RollbarProject; secret: string }
 type RollbarCached = CachedExternalItem<RollbarItemSummary, RollbarItemMetadata>
-export type RollbarResourceInput = { kind: 'list' } | { kind: 'detail'; identifier: string }
+// `detail` reads an item by its project counter, as links and the rail name it. `item` reads it by
+// Rollbar's system-wide id, the number in its permalink, for a caller that has no counter yet.
+export type RollbarResourceInput =
+  | { kind: 'list' }
+  | { kind: 'detail'; identifier: string }
+  | { kind: 'item'; itemId: string }
 export type RollbarListResult = { items: RollbarItemSummary[]; capped: boolean }
 type RollbarResourceOutput = RollbarListResult | RollbarItemMetadata
 
@@ -129,7 +134,7 @@ const rollbarCodec: CachedItemCodec<RollbarItemSummary, RollbarItemMetadata, Rol
 }
 
 const resourceKey = (connectionId: string, input: RollbarResourceInput) =>
-  `provider:rollbar:${connectionId}:items:${input.kind === 'list' ? 'list' : input.identifier}`
+  `provider:rollbar:${connectionId}:items:${input.kind === 'list' ? 'list' : input.kind === 'item' ? `id:${input.itemId}` : input.identifier}`
 
 type RefreshCtx = ProviderResourceRefreshContext
 
@@ -177,6 +182,18 @@ async function persistDetail(context: RefreshCtx, detail: RollbarItemMetadata): 
   await upsertIssue(context, summary, { ...base, listFetchedAt: parsed?.ok ? parsed.value.listFetchedAt : undefined })
 }
 
+// Only a real detail read counts as cached; its freshness is detailFetchedAt (never the list's).
+function cachedDetail(row: { integrationId: string; identifier: string; data: string }) {
+  const parsed = parseCached(rollbarCodec, row.data, {
+    providerId: 'rollbar',
+    connectionId: row.integrationId,
+    displayId: row.identifier,
+  })
+  return parsed.ok && parsed.value.detail && parsed.value.detailFetchedAt != null
+    ? { data: parsed.value.detail, fetchedAt: parsed.value.detailFetchedAt }
+    : null
+}
+
 const failFor = (response: Response): RouteFailure | null => {
   if (response.status === 401 || response.status === 403) return { error: 'provider_needs_auth', status: 401 }
   if (response.status === 429) return { error: 'provider_rate_limited', status: 429 }
@@ -193,16 +210,17 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
   async read(context, input) {
     if (input.kind === 'detail') {
       const row = await context.items.read(context.connection.id, input.identifier)
-      if (!row) return null
-      const parsed = parseCached(rollbarCodec, row.data, {
-        providerId: 'rollbar',
-        connectionId: context.connection.id,
-        displayId: input.identifier,
-      })
-      // Only a real detail read counts as cached; its freshness is detailFetchedAt (never the list's).
-      return parsed.ok && parsed.value.detail && parsed.value.detailFetchedAt != null
-        ? { data: parsed.value.detail, fetchedAt: parsed.value.detailFetchedAt }
-        : null
+      return row ? cachedDetail(row) : null
+    }
+    if (input.kind === 'item') {
+      // Rows are keyed by counter, so the system id is found inside them. A connection caches at most
+      // its mirrored list plus the items someone opened.
+      const rows = await context.items.listForConnection(context.connection.id)
+      for (const row of rows) {
+        const cached = cachedDetail(row)
+        if (cached?.data.itemId === input.itemId) return cached
+      }
+      return null
     }
 
     const key = resourceKey(context.connection.id, input)
@@ -227,22 +245,10 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
   async refresh(context, input) {
     const label = context.connection.label
     try {
-      if (input.kind === 'detail') {
-        const row = await context.items.read(context.connection.id, input.identifier)
-        const cachedItemId = row
-          ? (() => {
-              const p = parseCached(rollbarCodec, row.data, {
-                providerId: 'rollbar',
-                connectionId: context.connection.id,
-                displayId: input.identifier,
-              })
-              return p.ok && p.value.summary.itemId ? p.value.summary.itemId : null
-            })()
-          : null
-        // Prefer the known system id; fall back to counter resolution for legacy links.
+      if (input.kind !== 'list') {
         const itemRes = await rollbarFetch(
           context.secret,
-          cachedItemId ? itemByIdPath(cachedItemId) : itemByCounterPath(input.identifier),
+          input.kind === 'item' ? itemByIdPath(input.itemId) : await counterPath(context, input.identifier),
         )
         const failure = failFor(itemRes)
         if (failure) return { ok: false, failure }
@@ -285,6 +291,12 @@ async function cachedItemId(context: ProviderResourceContext, identifier: string
     displayId: identifier,
   })
   return parsed.ok && parsed.value.summary.itemId ? parsed.value.summary.itemId : null
+}
+
+// Prefer the known system id; fall back to counter resolution for legacy links.
+async function counterPath(context: ProviderResourceContext, identifier: string): Promise<string> {
+  const itemId = await cachedItemId(context, identifier)
+  return itemId ? itemByIdPath(itemId) : itemByCounterPath(identifier)
 }
 
 const occurrenceResources = createRollbarOccurrenceResources({
