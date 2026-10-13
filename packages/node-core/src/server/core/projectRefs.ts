@@ -11,7 +11,7 @@ import {
   type ProjectRef,
   type ProjectUpdateRefInput,
 } from '../projects/projects'
-import type { ProjectConfigResponse } from '@acorn/protocol/api.ts'
+import type { ProjectConfig, ProjectConfigResponse } from '@acorn/protocol/api.ts'
 import { getProjectConfig } from '../projects/projectConfig'
 import { assertProjectRepoConfigTrusted, assertRepoConfigTrusted } from '../projects/repoConfigTrust'
 import { projectSetup, type SetupTrigger } from '../worktrees/taskWorktree'
@@ -42,10 +42,16 @@ export type ProjectService = {
   ): Promise<Array<{ connectionId: string; externalId: string; projectId: string }>>
   create(input: ProjectCreateRefInput): Promise<ProjectRef>
   update(id: string, patch: ProjectUpdateRefInput): Promise<ProjectRef | null>
-  config(id: string): Promise<ProjectConfigResponse | null>
+  // Without site associations: they only steer the browser extension's suggestions, so they stay out of
+  // the plugin contract.
+  config(id: string): Promise<PluginProjectConfigResponse | null>
   /** An expected hash binds execution to the selected configuration snapshot; drift is refused. */
   assertConfigTrusted(taskId: string, expectedHash?: string): Promise<void>
   setup(id: string): Promise<{ script: string | null; trigger: SetupTrigger }>
+}
+
+type PluginProjectConfigResponse = Omit<ProjectConfigResponse, 'config'> & {
+  config: Omit<ProjectConfig, 'siteAssociations'>
 }
 
 export type CompiledProjectService = ProjectService & {
@@ -98,7 +104,12 @@ export function createProjectService(db: AppDatabase, activeIdentity: ActiveIden
     },
     create: (input) => createProjectRef(db, input, activeIdentity.get() ?? ''),
     update: (id, patch) => updateProjectRef(db, id, patch),
-    config: (id) => getProjectConfig(db, id),
+    config: async (id) => {
+      const response = await getProjectConfig(db, id)
+      if (!response) return null
+      const { siteAssociations: _siteAssociations, ...config } = response.config
+      return { ...response, config }
+    },
     assertConfigTrusted: (taskId, expectedHash) => assertRepoConfigTrusted(db, taskId, expectedHash),
     assertProjectConfigTrusted: (projectId) => assertProjectRepoConfigTrusted(db, projectId),
     setup: (id) => projectSetup(db, id),

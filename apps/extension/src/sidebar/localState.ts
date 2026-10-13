@@ -77,3 +77,21 @@ export async function loadDestination(storage: Storage, nodeId: string): Promise
 
 export const saveDestination = (storage: Storage, nodeId: string, destination: Destination): Promise<void> =>
   storage.set({ [destinationKey(nodeId)]: destination })
+
+// The project the person chose on a site over what it suggested, per Node: `''` when they chose none.
+// Keyed by the page's origin and the projects it suggested, so a page on the same site that suggests
+// other projects keeps its own suggestion. docs/browser-extension/project-sites.md.
+export type SiteChoices = Record<string, string>
+
+export const siteChoiceKey = (origin: string, suggested: readonly string[]): string =>
+  [origin, ...[...suggested].sort()].join(' ')
+
+const siteChoicesKey = (nodeId: string) => `siteChoices:${nodeId}`
+
+export async function loadSiteChoices(storage: Storage, nodeId: string): Promise<SiteChoices> {
+  const stored = (await storage.get([siteChoicesKey(nodeId)]))[siteChoicesKey(nodeId)]
+  return stored && typeof stored === 'object' ? (stored as SiteChoices) : {}
+}
+
+export const saveSiteChoices = (storage: Storage, nodeId: string, choices: SiteChoices): Promise<void> =>
+  storage.set({ [siteChoicesKey(nodeId)]: choices })

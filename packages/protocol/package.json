@@ -79,6 +79,7 @@
     "./settingsPages.ts": "./src/chrome/settingsPages.ts",
     "./sessionActivity.ts": "./src/agents/sessionActivity.ts",
     "./styleValues.ts": "./src/appearance/styleValues.ts",
+    "./siteAssociations.ts": "./src/projects/siteAssociations.ts",
     "./task.ts": "./src/projects/task.ts",
     "./telemetry.ts": "./src/runtime/telemetry.ts",
     "./themeTokens.ts": "./src/appearance/themeTokens.ts",

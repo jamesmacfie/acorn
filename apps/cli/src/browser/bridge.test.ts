@@ -67,6 +67,10 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     resolution: null as unknown,
     resolveRequests: [] as unknown[],
     createdTasks: [] as { key: string; body: Record<string, unknown> }[],
+    projects: [{ id: 'p1', name: `${nodeId} project`, path: '/src/p1', workspaceId: 'w', sort: 0, hidden: false }],
+    // Each project's site associations, as its config holds them, and every config write.
+    sites: new Map<string, unknown[]>(),
+    configWrites: [] as { projectId: string; patch: unknown }[],
   }
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
     const reply = (status: number, body: unknown) => {
@@ -202,9 +206,19 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     }
     if (req.url === '/v1/core/projects') {
       await state.projectsDelay
-      return reply(200, {
-        projects: [{ id: 'p1', name: `${nodeId} project`, path: '/src/p1', workspaceId: 'w', sort: 0, hidden: false }],
-      })
+      return reply(200, { projects: state.projects })
+    }
+    const config = /^\/v1\/core\/projects\/([^/]+)\/config$/.exec(url.pathname)
+    if (config && state.projects.some((project) => project.id === config[1])) {
+      const projectId = config[1]!
+      if (req.method === 'PUT') {
+        let body = ''
+        for await (const chunk of req) body += chunk
+        const { patch } = JSON.parse(body) as { patch: { siteAssociations: unknown[] } }
+        state.configWrites.push({ projectId, patch })
+        state.sites.set(projectId, patch.siteAssociations)
+      }
+      return reply(200, { projectId, config: { siteAssociations: state.sites.get(projectId) ?? [] } })
     }
     reply(404, { error: { code: 'not_found', message: 'Not found.' } })
   }
@@ -659,5 +673,113 @@ describe('browser bridge handoffs', () => {
       task: { id: made.task.id },
     })
     expect(node.state.createdTasks).toHaveLength(1)
+  })
+})
+
+describe('browser bridge site associations', () => {
+  const app = { origin: 'https://example.com', pathPrefix: '/app' }
+  const local = { origin: 'http://localhost:5173', pathPrefix: '/' }
+
+  async function selected() {
+    const subject = await paired()
+    await subject.call({ op: 'node.select', nodeId: 'node-a' })
+    subject.node.state.projects.push({ ...subject.node.state.projects[0]!, id: 'p2', name: 'Second' })
+    return subject
+  }
+
+  it('lists every project associations, with the project each belongs to', async () => {
+    const { call, node } = await selected()
+    node.state.sites.set('p1', [app])
+    node.state.sites.set('p2', [local, { origin: 'https://example.com', pathPrefix: '/docs' }])
+    // A list that doesn't parse reads as none, rather than failing the whole read.
+    node.state.projects.push({ ...node.state.projects[0]!, id: 'p3', name: 'Damaged' })
+    node.state.sites.set('p3', [{ origin: 'ftp://example.com', pathPrefix: '/' }])
+    expect(await call({ op: 'sites.list', nodeId: 'node-a' })).toEqual({
+      nodeId: 'node-a',
+      sites: [
+        { projectId: 'p1', ...app },
+        { projectId: 'p2', ...local },
+        { projectId: 'p2', origin: 'https://example.com', pathPrefix: '/docs' },
+      ],
+    })
+    await expect(call({ op: 'sites.list', nodeId: 'node-b' })).rejects.toMatchObject({ code: 'not_selected' })
+  })
+
+  it('adds and removes one association over the fresh list, and writes nothing for no change', async () => {
+    const { call, node } = await selected()
+    node.state.sites.set('p1', [app])
+    expect(await call({ op: 'site.add', nodeId: 'node-a', projectId: 'p1', site: local })).toEqual({
+      nodeId: 'node-a',
+      projectId: 'p1',
+      sites: [app, local],
+    })
+    // Another client added one since; the next change keeps it.
+    const other = { origin: 'https://other.example', pathPrefix: '/' }
+    node.state.sites.set('p1', [app, local, other])
+    await call({ op: 'site.remove', nodeId: 'node-a', projectId: 'p1', site: app })
+    expect(node.state.sites.get('p1')).toEqual([local, other])
+
+    const writes = node.state.configWrites.length
+    await call({ op: 'site.add', nodeId: 'node-a', projectId: 'p1', site: local })
+    await call({ op: 'site.remove', nodeId: 'node-a', projectId: 'p1', site: app })
+    expect(node.state.configWrites).toHaveLength(writes)
+    // Every write names only the list, so the project's other settings stay as they are.
+    expect(node.state.configWrites.map((write) => Object.keys(write.patch as object))).toEqual([
+      ['siteAssociations'],
+      ['siteAssociations'],
+    ])
+  })
+
+  it('refuses a full list', async () => {
+    const { call, node } = await selected()
+    node.state.sites.set(
+      'p1',
+      Array.from({ length: 32 }, (_, index) => ({ origin: 'https://example.com', pathPrefix: `/p${index}` })),
+    )
+    await expect(call({ op: 'site.add', nodeId: 'node-a', projectId: 'p1', site: local })).rejects.toMatchObject({
+      code: 'bad_request',
+    })
+  })
+
+  describe('in a handoff', () => {
+    const target = { pluginId: 'tracker', handoffId: 'item', url: 'https://tracker.example/acme/items/12' }
+    const issue = {
+      identifier: 'ENG-42',
+      url: 'https://tracker.example/acme/items/12',
+      title: 'Fix the flaky test',
+      connection: { id: 'conn-1', label: 'Tracker' },
+      projects: [],
+      seed: { origin: 'tracker', links: [{ connectionId: 'conn-1', identifier: 'ENG-42' }] },
+    }
+    const create = {
+      op: 'handoff.create',
+      nodeId: 'node-a',
+      ...target,
+      identifier: 'ENG-42',
+      connectionId: 'conn-1',
+      key: '0b5c1d3e-4f60-4a1b-9c2d-3e4f5a6b7c8d',
+    }
+
+    it('offers and creates in a project whose association covers the page', async () => {
+      const { call, node } = await selected()
+      node.state.resolution = { items: [issue] }
+      node.state.sites.set('p2', [{ origin: 'https://tracker.example', pathPrefix: '/acme' }])
+      node.state.sites.set('p1', [{ origin: 'https://tracker.example', pathPrefix: '/other' }])
+      const resolved = await call({ op: 'handoff.resolve', nodeId: 'node-a', ...target })
+      expect(resolved.items[0].projects).toEqual([{ id: 'p2', name: 'Second' }])
+
+      await expect(call({ ...create, projectId: 'p1' })).rejects.toMatchObject({ code: 'bad_request' })
+      expect(await call({ ...create, projectId: 'p2' })).toMatchObject({ created: true, task: { projectId: 'p2' } })
+    })
+
+    it('keeps an item with a pull number to the projects the provider named', async () => {
+      const { call, node } = await selected()
+      node.state.resolution = { items: [{ ...issue, seed: { origin: 'tracker', pullNumber: 12 } }] }
+      node.state.sites.set('p2', [{ origin: 'https://tracker.example', pathPrefix: '/' }])
+      const resolved = await call({ op: 'handoff.resolve', nodeId: 'node-a', ...target })
+      expect(resolved.items[0].projects).toEqual([])
+      await expect(call({ ...create, projectId: 'p2' })).rejects.toMatchObject({ code: 'bad_request' })
+      expect(node.state.createdTasks).toEqual([])
+    })
   })
 })

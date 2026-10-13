@@ -47,6 +47,7 @@ export function startBackground(api: BrowserApi, hostName: string): void {
       broadcast({ type: 'handoffs', nodeId })
       void refreshHandoffs(nodeId)
     },
+    projects: (nodeId) => broadcast({ type: 'projects', nodeId }),
     host: (state) => setHost(state),
   })
 

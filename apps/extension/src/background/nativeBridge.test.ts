@@ -10,6 +10,7 @@ function subject(flavor: 'chrome' | 'firefox' = 'chrome', firstReplyMs?: number)
   const statuses: unknown[] = []
   const hints: unknown[] = []
   const handoffChanges: string[] = []
+  const projectChanges: string[] = []
   const bridge = nativeBridge(
     fake.api,
     'com.acorn.browser_bridge',
@@ -17,16 +18,29 @@ function subject(flavor: 'chrome' | 'firefox' = 'chrome', firstReplyMs?: number)
       status: (status) => statuses.push(status),
       agents: (hint) => hints.push(hint),
       handoffs: (nodeId) => handoffChanges.push(nodeId),
+      projects: (nodeId) => projectChanges.push(nodeId),
       host: (state) => hostStates.push(state),
     },
     { firstReplyMs },
   )
-  return { fake, bridge, hostStates, statuses, hints, handoffChanges }
+  return { fake, bridge, hostStates, statuses, hints, handoffChanges, projectChanges }
 }
 
 const idOf = (message: unknown) => (message as { id: string }).id
 
 describe('native bridge', () => {
+  it('passes on the Node change events', async () => {
+    const { fake, bridge, handoffChanges, projectChanges } = subject()
+    fake.onNativeMessage = (message, host) => {
+      host.send({ v: 1, event: 'handoffs', nodeId: 'n1' })
+      host.send({ v: 1, event: 'projects', nodeId: 'n1' })
+      host.send({ v: 1, id: idOf(message), ok: true, result: { nodes: [], activeNodeId: null, status: null } })
+    }
+    await bridge.request({ op: 'nodes.list' })
+    expect(handoffChanges).toEqual(['n1'])
+    expect(projectChanges).toEqual(['n1'])
+  })
+
   it('sends the protocol envelope and resolves the matching reply', async () => {
     const { fake, bridge, hostStates } = subject()
     fake.onNativeMessage = (message, host) =>

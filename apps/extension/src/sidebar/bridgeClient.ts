@@ -18,6 +18,7 @@ export function bridgeClient(
     agents(hint: BridgeAgentHint): void
     handoff(handoff: PageHandoff): void
     handoffsChanged(nodeId: string): void
+    projectsChanged(nodeId: string): void
     page(): void
   },
 ): BridgeClient {
@@ -36,6 +37,7 @@ export function bridgeClient(
       if (message.type === 'agent') return events.agents(message.hint)
       if (message.type === 'handoff') return events.handoff(message.handoff)
       if (message.type === 'handoffs') return events.handoffsChanged(message.nodeId)
+      if (message.type === 'projects') return events.projectsChanged(message.nodeId)
       if (message.type === 'page') return events.page()
       const request = pending.get(message.id)
       if (!request) return

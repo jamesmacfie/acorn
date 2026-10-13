@@ -57,6 +57,7 @@ const CONFIG: ProjectConfigResponse['config'] = {
   previewMode: null,
   previewValue: null,
   branchPrefix: null,
+  siteAssociations: [],
 }
 const context: SettingsPageContext = {
   scope: { nodeId: 'node-a', project: PROJECT },

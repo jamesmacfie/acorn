@@ -134,6 +134,10 @@ const button = (root: HTMLElement, text: string) =>
   [...root.querySelectorAll('button')].find((element) => element.textContent?.trim() === text)
 const selected = (root: HTMLElement, name: string) =>
   root.querySelector<HTMLSelectElement>(`select[name="${name}"]`)?.value
+const siteAccess = (root: HTMLElement) =>
+  [...root.querySelectorAll('[aria-label="Site access"] li')].map(
+    (row) => `${row.querySelector('strong')!.textContent}: ${row.querySelector('.quiet')!.textContent}`,
+  )
 const captures = (root: HTMLElement) =>
   [...root.querySelectorAll('[data-testid="capture"]')].map((row) => row.textContent)
 
@@ -228,8 +232,10 @@ describe('a handoff in the sidebar', () => {
 
   it('offers the handoff once a toolbar click lets it read the page', async () => {
     const { fake, root } = mount({ url: PAGE })
-    fake.activeTab = { ...fake.activeTab, url: undefined }
     await settle(30)
+    fake.activeTab = { ...fake.activeTab, url: undefined }
+    fake.activate()
+    await settle(20)
     expect(button(root, 'Open in Acorn')).toBeUndefined()
     // The click grants access to the tab without any tab event the sidebar hears.
     fake.activeTab = { ...fake.activeTab, url: PAGE }
@@ -241,11 +247,11 @@ describe('a handoff in the sidebar', () => {
   it('asks for site access from a click, and says when an item has no project here', async () => {
     const { fake, root } = mount({ items: [item({ projects: [] })] })
     await settle(30)
-    expect(root.textContent).toContain('No buttons on tracker.example')
+    expect(siteAccess(root)).toEqual(['tracker.example: Buttons on its pages · Not allowed'])
     button(root, 'Allow')!.click()
     await settle(20)
     expect(fake.granted.has('https://tracker.example/*')).toBe(true)
-    expect(root.textContent).toContain('Buttons show on tracker.example')
+    expect(siteAccess(root)).toEqual(['tracker.example: Buttons on its pages · Allowed'])
     // Removing it, here or in the browser's settings, takes back the sidebar's offer for the page too.
     fake.activeTab = { ...fake.activeTab, url: PAGE }
     fake.activate()
@@ -254,7 +260,7 @@ describe('a handoff in the sidebar', () => {
     fake.activeTab = { ...fake.activeTab, url: undefined }
     button(root, 'Remove')!.click()
     await settle(20)
-    expect(root.textContent).toContain('No buttons on tracker.example')
+    expect(siteAccess(root)).toEqual(['tracker.example: Buttons on its pages · Not allowed'])
     expect(button(root, 'Open in Acorn')).toBeUndefined()
     await clickSiteButton(fake)
     expect(root.textContent).toContain('No project on this Node tracks acme/widget#42.')

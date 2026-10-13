@@ -65,7 +65,7 @@ Answer with `{ items }`, at most 8, each with these fields:
 | `url` | The item's `https://` address. |
 | `title` | What the sidebar shows, at most 300 characters. |
 | `connection` | `{ id, label }` of the connection that resolved it. Two connections that can both see the item are two items, and the person picks one. |
-| `projects` | Up to 16 project IDs the provider can tie the item to. A task is created only in one of these. Empty means none; the person can still choose any task themselves. |
+| `projects` | Up to 16 project IDs the provider can tie the item to. A task is created only in one of these, or in a project whose [site associations](../browser-extension/project-sites.md) cover the page when the seed has no `pullNumber`. Empty means none from the provider; the person can still choose any task themselves. |
 | `seed` | The core task seed without `projectId`: `origin`, and optionally `title`, `branch`, `pullNumber`, and up to 8 connection-stamped `links` (`{ connectionId, identifier, ref? }`). |
 | `context` | Optional `{ label, content }` for the agent to read, at most 16,000 characters of content. It goes into the person's draft for review. |
 
@@ -99,9 +99,12 @@ The extension never sees the route or the seed. The host:
 - Finds the item's linked tasks among the Node's active tasks. A task that holds one of the seed's
   `links` is linked in any project. A task with the seed's `pullNumber` is linked only in one of the
   item's `projects`, because a number alone names another item in any other repository.
-- Shows the projects by name, dropping any the Node no longer has.
+- Shows the projects by name, dropping any the Node no longer has. When the seed has no `pullNumber`,
+  it adds every project whose site associations cover the page. A pull number names a pull request
+  only in its own repository, so an item with one keeps to your `projects`.
 - On **Create linked task**, resolves the page again, finds the chosen item by `identifier` and
-  connection, refuses a project not in its `projects`, and answers an already-linked task in that
+  connection, refuses a project that is neither in its `projects` nor covered by that project's site
+  associations, and answers an already-linked task in that
   project instead of creating another. Otherwise it sends `POST /v1/core/tasks` with the seed, the
   project, and the sidebar's idempotency key.
 

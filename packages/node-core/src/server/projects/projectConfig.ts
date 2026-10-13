@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { normalizeBranchPrefix } from '@acorn/protocol/branch.ts'
+import { sameSite, siteAssociationsSchema, type SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import type {
   DbSchemaMode,
   PreviewMode,
@@ -27,6 +28,18 @@ const runTargetWireSchema = z
   })
   .refine((target) => !(target.url && target.urlCommand), { message: 'url and urlCommand are mutually exclusive' })
 
+// A row written by this module always parses. Anything else reads as no associations rather than
+// failing the whole config read.
+function siteAssociationsFromRow(value: string | null): SiteAssociation[] {
+  if (!value) return []
+  try {
+    const parsed = siteAssociationsSchema.safeParse(JSON.parse(value))
+    return parsed.success ? parsed.data : []
+  } catch {
+    return []
+  }
+}
+
 function projectConfigFromRow(row: typeof schema.projects.$inferSelect): ProjectConfigResponse {
   return {
     projectId: row.id,
@@ -45,6 +58,7 @@ function projectConfigFromRow(row: typeof schema.projects.$inferSelect): Project
       previewMode: (row.previewMode as PreviewMode | null) ?? null,
       previewValue: row.previewValue,
       branchPrefix: row.branchPrefix,
+      siteAssociations: siteAssociationsFromRow(row.siteAssociations),
     },
   }
 }
@@ -110,6 +124,14 @@ export async function setProjectConfig(
   }
 
   if (patch.branchPrefix !== undefined) set.branchPrefix = normalizeBranchPrefix(patch.branchPrefix) || null
+  if (patch.siteAssociations !== undefined) {
+    const parsed = siteAssociationsSchema.safeParse(patch.siteAssociations)
+    if (!parsed.success) return { ok: false, reason: 'Invalid site associations.' }
+    const unique = parsed.data.filter(
+      (site, index) => parsed.data.findIndex((other) => sameSite(site, other)) === index,
+    )
+    set.siteAssociations = unique.length ? JSON.stringify(unique) : null
+  }
   if (Object.keys(set).length) {
     await db
       .update(schema.projects)

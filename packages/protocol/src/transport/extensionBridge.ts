@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { MAX_AGENT_CONTEXT_BYTES } from '../agents/agentContext.ts'
 import type { BrowserHandoff } from '../plugin/handoffs.ts'
+import { siteAssociationSchema, type ProjectSite, type SiteAssociation } from '../projects/siteAssociations.ts'
 import type { NodeProbeResult, NodeRecord, NodeStatus } from './broker.ts'
 
 // The browser extension's native messaging contract: the identities a host registration allows, the
@@ -191,6 +192,12 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     projectId: rowId,
     key: operationKey,
   }),
+  // Project site associations (docs/browser-extension/project-sites.md). The list is read whole, so the
+  // sidebar matches pages itself and sends no address for it. Adding or removing one association reads
+  // the project's list fresh and writes it back, so another client's change since isn't lost.
+  z.strictObject({ ...envelope, op: z.literal('sites.list'), nodeId }),
+  z.strictObject({ ...envelope, op: z.literal('site.add'), nodeId, projectId: rowId, site: siteAssociationSchema }),
+  z.strictObject({ ...envelope, op: z.literal('site.remove'), nodeId, projectId: rowId, site: siteAssociationSchema }),
 ])
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
 export type BridgeOperation = BridgeRequest['op']
@@ -303,6 +310,9 @@ export type BridgeResults = {
   'handoff.resolve': { nodeId: string; url: string; items: BridgeHandoffItem[] }
   // `created` is false when an active task in that project was already linked, which is answered instead.
   'handoff.create': { nodeId: string; task: BridgeTask & { projectId: string }; created: boolean }
+  'sites.list': { nodeId: string; sites: ProjectSite[] }
+  'site.add': { nodeId: string; projectId: string; sites: SiteAssociation[] }
+  'site.remove': { nodeId: string; projectId: string; sites: SiteAssociation[] }
 }
 
 // Which sessions and tasks changed on the selected Node since the last hint. Nothing more: the
@@ -337,3 +347,5 @@ export type BridgeHostMessage =
   | ({ v: 1; event: 'agent' } & BridgeAgentHint)
   // The selected Node's plugin set changed, so its handoffs may have too.
   | { v: 1; event: 'handoffs'; nodeId: string }
+  // A project on the selected Node changed, so its site associations may have too.
+  | { v: 1; event: 'projects'; nodeId: string }

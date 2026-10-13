@@ -1,4 +1,10 @@
-import { For, Show, batch, createEffect, createSignal, on, onMount } from 'solid-js'
+import { For, Show, batch, createEffect, createMemo, createSignal, on, onMount } from 'solid-js'
+import {
+  matchingSiteProjects,
+  parseSiteAddress,
+  type ProjectSite,
+  type SiteAssociation,
+} from '@acorn/protocol/siteAssociations.ts'
 import type {
   BridgeAgentHint,
   BridgeAgentProfile,
@@ -14,7 +20,17 @@ import { Conversation } from './Conversation'
 import { errorGuidance } from './guidance'
 import { Handoff } from './Handoff'
 import type { PageHandoff } from '../handoffs'
-import { changeDraft, loadDestination, saveDestination, type Destination as Remembered } from './localState'
+import {
+  changeDraft,
+  loadDestination,
+  loadSiteChoices,
+  saveDestination,
+  saveSiteChoices,
+  siteChoiceKey,
+  type Destination as Remembered,
+  type SiteChoices,
+} from './localState'
+import { ProjectSites } from './ProjectSites'
 
 const UNCERTAIN = new Set(['ambiguous_mutation', 'host_unavailable', 'node_unreachable'])
 
@@ -40,6 +56,10 @@ export function Destination(props: {
   // A handoff the person asked for, from a site button or the sidebar's own offer.
   handoff: PageHandoff | null
   dismissHandoff(): void
+  // The page beside the sidebar, when it may be read, and the Node's site associations to match it with.
+  pageUrl: string | undefined
+  sites: readonly ProjectSite[]
+  sitesChanged(projectId: string, sites: SiteAssociation[]): void
 }) {
   const nodeId = props.nodeId
   const [projects, setProjects] = createSignal<BridgeProject[] | null>(null)
@@ -55,6 +75,9 @@ export function Destination(props: {
   // An unconfirmed start keeps its key, so starting the same chat again can't make a second one.
   const [pendingStart, setPendingStart] = createSignal<{ key: string; taskId: string; choice: string } | null>(null)
   let remembered: Remembered = { projectId: null, taskId: null, sessionId: null }
+  // A remembered or handed-off task is on its way, so the page's suggestion mustn't move the project.
+  const [restoringTask, setRestoringTask] = createSignal(false)
+  const [siteChoices, setSiteChoices] = createSignal<SiteChoices>({})
   // A handed-off item's context, waiting for the person to open a conversation. It goes into that
   // conversation's draft for review, never straight to an agent.
   const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
@@ -76,6 +99,7 @@ export function Destination(props: {
       setProjects(visible)
       if (!projectId() && visible.some((project) => project.id === remembered.projectId))
         chooseProject(remembered.projectId)
+      else if (!projectId()) setRestoringTask(false)
     } catch (error) {
       setProjects(null)
       report(error)
@@ -88,8 +112,11 @@ export function Destination(props: {
       if (projectId() !== forProject) return
       setTasks(result.tasks)
       if (!taskId() && result.tasks.some((task) => task.id === remembered.taskId)) chooseTask(remembered.taskId)
+      setRestoringTask(false)
     } catch (error) {
-      if (projectId() === forProject) report(error)
+      if (projectId() !== forProject) return
+      setRestoringTask(false)
+      report(error)
     }
   }
 
@@ -177,6 +204,7 @@ export function Destination(props: {
   const openHandoffTask = (forProject: string, forTask: string, capture: PageCapture) => {
     setWaitingContext(capture)
     remembered = { projectId: forProject, taskId: forTask, sessionId: null }
+    setRestoringTask(true)
     openingTask = forTask
     props.dismissHandoff()
     choose(() => chooseProject(forProject))
@@ -223,8 +251,59 @@ export function Destination(props: {
     }
   }
 
+  // Projects for the page beside the sidebar (docs/browser-extension/project-sites.md). Every project
+  // with an association covering the page is a candidate. The person's choice on this site, if any,
+  // replaces them; otherwise a single candidate is the suggestion and several are left to the picker.
+  const visible = () => new Set((projects() ?? []).map((project) => project.id))
+  const suggested = () => matchingSiteProjects(props.sites, props.pageUrl).filter((id) => visible().has(id))
+  const choiceKey = () => {
+    const page = props.pageUrl ? parseSiteAddress(props.pageUrl) : null
+    return page?.ok ? siteChoiceKey(page.site.origin, suggested()) : null
+  }
+  const pageProjects = createMemo(
+    (): string[] => {
+      const key = choiceKey()
+      const choice = key === null ? undefined : siteChoices()[key]
+      if (choice === '') return []
+      if (choice !== undefined && visible().has(choice)) return [choice]
+      return suggested()
+    },
+    [],
+    { equals: (a, b) => a.join() === b.join() },
+  )
+  // Follows the page only while no task is chosen: one candidate is chosen, and a project the page's
+  // candidates leave out is cleared so the person picks one. An unmatched page changes nothing. A
+  // chosen task, with its conversation and draft, stays put; the notice below says what the page
+  // suggests instead.
+  createEffect(
+    on([pageProjects, restoringTask], ([ids, restoring]) => {
+      if (restoring || taskId() !== null) return
+      const current = projectId()
+      if (ids.length === 1 && ids[0] !== current) chooseProject(ids[0]!)
+      else if (ids.length > 1 && current && !ids.includes(current)) chooseProject(null)
+    }),
+  )
+  const mismatch = () => (taskId() && !pageProjects().includes(projectId()!) ? pageProjects() : [])
+
+  // The person picked a project. When it differs from what this site suggests, it is remembered for
+  // the site, so coming back here shows it again.
+  const pickProject = (id: string | null) => {
+    setRestoringTask(false)
+    choose(() => chooseProject(id))
+    const key = choiceKey()
+    if (key === null) return
+    const plain = suggested().length === 1 ? suggested()[0]! : null
+    const next = { ...siteChoices() }
+    if (id === plain) delete next[key]
+    else next[key] = id ?? ''
+    setSiteChoices(next)
+    void saveSiteChoices(props.storage, nodeId, next)
+  }
+
   onMount(async () => {
     remembered = await loadDestination(props.storage, nodeId)
+    setRestoringTask(remembered.taskId !== null)
+    setSiteChoices(await loadSiteChoices(props.storage, nodeId))
     await loadProjects()
   })
 
@@ -254,6 +333,7 @@ export function Destination(props: {
   )
 
   const project = () => projects()?.find((row) => row.id === projectId()) ?? null
+  const projectName = (id: string) => projects()?.find((row) => row.id === id)?.name ?? id
   const task = () => tasks()?.find((row) => row.id === taskId()) ?? null
   const session = () => sessions()?.find((row) => row.id === sessionId()) ?? null
 
@@ -296,23 +376,63 @@ export function Destination(props: {
             <Show when={loaded().length} fallback={<p class="quiet">No projects.</p>}>
               <label>
                 Project
-                <select
-                  name="project"
-                  onChange={(event) => choose(() => chooseProject(event.currentTarget.value || null))}
-                >
+                <select name="project" onChange={(event) => pickProject(event.currentTarget.value || null)}>
                   <option value="" selected={!projectId()}>
                     Choose a project
                   </option>
-                  <For each={loaded()}>
-                    {(row) => (
-                      <option value={row.id} selected={row.id === projectId()}>
-                        {row.name}
-                      </option>
-                    )}
-                  </For>
+                  <Show
+                    when={suggested().length}
+                    fallback={<ProjectOptions projects={loaded()} selected={projectId()} />}
+                  >
+                    <optgroup label="Suggested for this page">
+                      <ProjectOptions
+                        projects={loaded().filter((row) => suggested().includes(row.id))}
+                        selected={projectId()}
+                      />
+                    </optgroup>
+                    <optgroup label="Other projects">
+                      <ProjectOptions
+                        projects={loaded().filter((row) => !suggested().includes(row.id))}
+                        selected={projectId()}
+                      />
+                    </optgroup>
+                  </Show>
                 </select>
               </label>
             </Show>
+          )}
+        </Show>
+        <Show when={!projectId() && pageProjects().length > 1}>
+          <p class="notice">Several projects match this page. Choose one.</p>
+        </Show>
+        <Show when={mismatch().length}>
+          <div class="notice" data-testid="page-mismatch">
+            <p>
+              This page suggests {mismatch().map(projectName).join(' or ')}. The conversation stays in {project()?.name}
+              .
+            </p>
+            <For each={mismatch()}>
+              {(id) => (
+                <button type="button" class="quiet" onClick={() => pickProject(id)}>
+                  Switch to {projectName(id)}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <Show when={projectId()} keyed>
+          {(chosen) => (
+            <ProjectSites
+              client={props.client}
+              nodeId={nodeId}
+              projectId={chosen}
+              sites={props.sites
+                .filter((site) => site.projectId === chosen)
+                .map(({ origin, pathPrefix }) => ({ origin, pathPrefix }))}
+              pageUrl={props.pageUrl}
+              online={props.online}
+              changed={props.sitesChanged}
+            />
           )}
         </Show>
         <Show when={projectId()}>
@@ -434,5 +554,17 @@ export function Destination(props: {
         )}
       </Show>
     </>
+  )
+}
+
+function ProjectOptions(props: { projects: readonly BridgeProject[]; selected: string | null }) {
+  return (
+    <For each={props.projects}>
+      {(row) => (
+        <option value={row.id} selected={row.id === props.selected}>
+          {row.name}
+        </option>
+      )}
+    </For>
   )
 }

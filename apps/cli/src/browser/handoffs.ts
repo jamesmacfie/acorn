@@ -37,10 +37,17 @@ export function linkedTasks(item: BrowserHandoffItem, tasks: readonly Task[]): T
   )
 }
 
+// The projects a linked task may be created in: the ones the provider tied the item to, then any whose
+// site associations cover the page. A pull number names a pull request only in its own repository, so
+// an item carrying one stays with the provider's projects.
+export const creatableProjects = (item: BrowserHandoffItem, siteProjects: readonly string[]): string[] =>
+  item.seed.pullNumber === undefined ? [...new Set([...item.projects, ...siteProjects])] : item.projects
+
 export function bridgeHandoffItem(
   item: BrowserHandoffItem,
   projects: readonly Project[],
   tasks: readonly Task[],
+  siteProjects: readonly string[],
 ): BridgeHandoffItem {
   const names = new Map(projects.map((project) => [project.id, project.name]))
   return {
@@ -49,7 +56,9 @@ export function bridgeHandoffItem(
     title: item.title,
     connection: item.connection,
     // A project the Node no longer has drops out, rather than offering a create that would fail.
-    projects: item.projects.flatMap((id) => (names.has(id) ? [{ id, name: names.get(id)! }] : [])),
+    projects: creatableProjects(item, siteProjects).flatMap((id) =>
+      names.has(id) ? [{ id, name: names.get(id)! }] : [],
+    ),
     linkedTasks: linkedTasks(item, tasks).map((task) => ({
       id: task.id,
       title: task.title,

@@ -32,6 +32,8 @@ export type BackgroundMessage =
   | { type: 'handoff'; handoff: PageHandoff }
   // The selected Node's plugins changed, so the sidebar reads its handoffs again.
   | { type: 'handoffs'; nodeId: string }
+  // A project on the selected Node changed, so the sidebar reads its site associations again.
+  | { type: 'projects'; nodeId: string }
   // The toolbar button was clicked, which can let the sidebar read the active page it couldn't before.
   | { type: 'page' }
 

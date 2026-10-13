@@ -1,15 +1,17 @@
 import { For, Show, createSignal, onMount } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type { BridgeAgentHint, BridgeHandoff, BridgeNodes } from '@acorn/protocol/extensionBridge.ts'
+import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import type { BrowserApi } from '../browser'
 import type { PageHandoff } from '../handoffs'
 import { CallFailure, type CallError, type HostState } from '../messages'
+import { activePageUrl } from './activePage'
 import { bridgeClient } from './bridgeClient'
 import { capturePage } from './capture'
 import { errorGuidance, hostGuidance, statusGuidance } from './guidance'
 import { Destination } from './Destination'
 import { Pairing } from './Pairing'
-import { SiteHandoffs } from './SiteHandoffs'
+import { SiteAccess } from './SiteAccess'
 
 // Online, or online with live updates paused: either way the Node answers requests.
 const connected = (status: NodeStatus | null) => status?.state === 'online' || status?.state === 'degraded'
@@ -29,6 +31,9 @@ export function App(props: { api: BrowserApi }) {
   const [handoff, setHandoff] = createSignal<PageHandoff | null>(null)
   // Counts toolbar clicks, after which the active page may be readable where it wasn't.
   const [pageChecks, setPageChecks] = createSignal(0)
+  const pageUrl = activePageUrl(props.api, pageChecks)
+  // The selected Node's project site associations, matched against the page here in the browser.
+  const [sites, setSites] = createSignal<ProjectSite[]>([])
 
   const showStatus = (next: NodeStatus | null) => {
     const wasUp = connected(status())
@@ -42,6 +47,7 @@ export function App(props: { api: BrowserApi }) {
     agents: (next) => next.nodeId === fleet()?.activeNodeId && setHint(next),
     handoff: setHandoff,
     handoffsChanged: (nodeId) => nodeId === fleet()?.activeNodeId && void loadHandoffs(nodeId),
+    projectsChanged: (nodeId) => nodeId === fleet()?.activeNodeId && void loadSites(nodeId),
     page: () => setPageChecks((count) => count + 1),
   })
   const selected = () => fleet()?.nodes.find((node) => node.nodeId === fleet()?.activeNodeId) ?? null
@@ -66,6 +72,22 @@ export function App(props: { api: BrowserApi }) {
       // Without the list the sidebar offers no handoff; pairing and conversations still work.
     }
   }
+  const loadSites = async (nodeId: string) => {
+    try {
+      const result = await client.call({ op: 'sites.list', nodeId })
+      if (result.nodeId === fleet()?.activeNodeId) setSites(result.sites)
+    } catch {
+      // Without them the sidebar suggests no project; every other choice still works.
+    }
+  }
+  // A change the sidebar made itself, answered with the Node's list for that project.
+  const sitesChanged = (nodeId: string, projectId: string, changed: SiteAssociation[]) => {
+    if (nodeId !== fleet()?.activeNodeId) return
+    setSites((current) => [
+      ...current.filter((site) => site.projectId !== projectId),
+      ...changed.map((site) => ({ projectId, ...site })),
+    ])
+  }
   const showFleet = (next: BridgeNodes) => {
     const switched = next.activeNodeId !== fleet()?.activeNodeId
     setFleet(next)
@@ -74,7 +96,11 @@ export function App(props: { api: BrowserApi }) {
     // A handoff belongs to the Node it was asked of, as the page buttons do.
     setHandoffs([])
     setHandoff(null)
-    if (next.activeNodeId) void loadHandoffs(next.activeNodeId)
+    setSites([])
+    if (next.activeNodeId) {
+      void loadHandoffs(next.activeNodeId)
+      void loadSites(next.activeNodeId)
+    }
   }
   const refresh = () => attempt(async () => showFleet(await client.call({ op: 'nodes.list' })))
   const select = (nodeId: string | null) =>
@@ -82,7 +108,6 @@ export function App(props: { api: BrowserApi }) {
   const forget = (nodeId: string) => attempt(async () => showFleet(await client.call({ op: 'node.forget', nodeId })))
 
   onMount(() => void refresh())
-
   return (
     <main>
       <header>
@@ -168,7 +193,7 @@ export function App(props: { api: BrowserApi }) {
         )}
       </Show>
       <Show when={fleet()?.activeNodeId}>
-        <SiteHandoffs api={props.api} handoffs={handoffs()} start={setHandoff} pageChecks={pageChecks()} />
+        <SiteAccess api={props.api} handoffs={handoffs()} sites={sites()} pageUrl={pageUrl()} start={setHandoff} />
       </Show>
       <Show when={fleet()?.activeNodeId} keyed>
         {(nodeId) => (
@@ -183,6 +208,9 @@ export function App(props: { api: BrowserApi }) {
             capture={(kind) => capturePage(props.api, kind)}
             handoff={handoff()}
             dismissHandoff={() => setHandoff(null)}
+            pageUrl={pageUrl()}
+            sites={sites()}
+            sitesChanged={(projectId, changed) => sitesChanged(nodeId, projectId, changed)}
           />
         )}
       </Show>

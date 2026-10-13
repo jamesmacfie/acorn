@@ -12,7 +12,24 @@ import {
   type BridgeRequest,
   type BridgeResults,
 } from '@acorn/protocol/extensionBridge.ts'
-import { projectsRoute, tasksRoute, type Project, type ProjectsResponse, type Task } from '@acorn/protocol/api.ts'
+import {
+  projectConfigRoute,
+  projectsRoute,
+  tasksRoute,
+  type Project,
+  type ProjectConfigResponse,
+  type ProjectsResponse,
+  type Task,
+} from '@acorn/protocol/api.ts'
+import {
+  SITE_ASSOCIATIONS_MAX,
+  matchingSiteProjects,
+  sameSite,
+  siteAssociationsSchema,
+  siteMatches,
+  type ProjectSite,
+  type SiteAssociation,
+} from '@acorn/protocol/siteAssociations.ts'
 import {
   BROWSER_HANDOFF_RESOLUTION_MAX_BYTES,
   browserHandoffResolution,
@@ -42,7 +59,7 @@ import {
   bridgeSessionRead,
   sessionRoute,
 } from './agents'
-import { bridgeHandoff, bridgeHandoffItem, linkedTasks, ownsRoute } from './handoffs'
+import { bridgeHandoff, bridgeHandoffItem, creatableProjects, linkedTasks, ownsRoute } from './handoffs'
 
 export class BridgeFailure extends Error {
   constructor(
@@ -67,6 +84,8 @@ export function createBridge(options: {
   hint?(hint: BridgeAgentHint): void
   // The selected Node's plugin set changed, so its browser handoffs may have.
   handoffsChanged?(nodeId: string): void
+  // A project on the selected Node changed, so its site associations may have.
+  projectsChanged?(nodeId: string): void
   probe?: typeof probeNode
   pair?: typeof pairWithNode
 }) {
@@ -85,7 +104,9 @@ export function createBridge(options: {
     frame(nodeId, frame) {
       if (nodeId !== activeNodeId) return
       hints.note(nodeId, frame)
-      if ((frame as { channel?: unknown } | null)?.channel === 'plugins:changed') options.handoffsChanged?.(nodeId)
+      const channel = (frame as { channel?: unknown } | null)?.channel
+      if (channel === 'plugins:changed') options.handoffsChanged?.(nodeId)
+      if (channel === 'project:changed') options.projectsChanged?.(nodeId)
     },
     bytes() {},
     status(status) {
@@ -142,7 +163,7 @@ export function createBridge(options: {
   async function nodeResponse(
     nodeId: string,
     request: {
-      method: 'GET' | 'POST' | 'DELETE'
+      method: 'GET' | 'POST' | 'PUT' | 'DELETE'
       path: string
       body?: unknown
       form?: Extract<NodeFetchBody, { kind: 'form' }>
@@ -220,12 +241,12 @@ export function createBridge(options: {
     return list as Row[]
   }
 
+  async function listProjectRows(nodeId: string): Promise<Project[]> {
+    return readList<Project>(nodeId, projectsRoute, (body) => (body as ProjectsResponse | null)?.projects)
+  }
+
   async function listProjects(nodeId: string): Promise<BridgeResults['projects.list']> {
-    const rows = await readList<ProjectsResponse['projects'][number]>(
-      nodeId,
-      projectsRoute,
-      (body) => (body as ProjectsResponse | null)?.projects,
-    )
+    const rows = await listProjectRows(nodeId)
     const projects: BridgeProject[] = rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -242,6 +263,57 @@ export function createBridge(options: {
       .filter((task) => task.projectId === projectId)
       .map((task) => ({ id: task.id, title: task.title, branch: task.branch }))
     return { nodeId, projectId, tasks }
+  }
+
+  // One project's associations, read fresh from its config. A list that doesn't parse reads as none.
+  async function projectSites(nodeId: string, projectId: string): Promise<SiteAssociation[]> {
+    const body = (await nodeRequest(nodeId, {
+      method: 'GET',
+      path: projectConfigRoute(projectId),
+    })) as ProjectConfigResponse | null
+    const parsed = siteAssociationsSchema.safeParse(body?.config?.siteAssociations ?? [])
+    return parsed.success ? parsed.data : []
+  }
+
+  // A project the Node no longer has has no associations.
+  async function sitesOrNone(nodeId: string, projectId: string): Promise<SiteAssociation[]> {
+    try {
+      return await projectSites(nodeId, projectId)
+    } catch (error) {
+      if (error instanceof BridgeFailure && error.code === 'not_found') return []
+      throw error
+    }
+  }
+
+  // Every project's associations. The Node keeps them in each project's config and has no list across
+  // projects, so this reads each one.
+  async function allSites(nodeId: string, projects: readonly Project[]): Promise<ProjectSite[]> {
+    const lists = await Promise.all(
+      projects.map(async (project) =>
+        (await sitesOrNone(nodeId, project.id)).map((site) => ({ projectId: project.id, ...site })),
+      ),
+    )
+    return lists.flat()
+  }
+
+  // Reads the project's list, changes it, and writes it back whole, which is how the config route
+  // takes it. Nothing is written when the change leaves the list as it was.
+  async function changeSites(
+    nodeId: string,
+    projectId: string,
+    change: (sites: SiteAssociation[]) => SiteAssociation[],
+  ): Promise<BridgeResults['site.add']> {
+    const current = await projectSites(nodeId, projectId)
+    const next = change(current)
+    if (next === current) return { nodeId, projectId, sites: current }
+    if (next.length > SITE_ASSOCIATIONS_MAX)
+      throw new BridgeFailure('bad_request', `A project can have at most ${SITE_ASSOCIATIONS_MAX} sites.`)
+    const body = (await nodeRequest(nodeId, {
+      method: 'PUT',
+      path: projectConfigRoute(projectId),
+      body: { patch: { siteAssociations: next } },
+    })) as ProjectConfigResponse | null
+    return { nodeId, projectId, sites: body?.config?.siteAssociations ?? next }
   }
 
   // The handoff the Node declares now, looked up for every call rather than trusted from the browser.
@@ -427,16 +499,13 @@ export function createBridge(options: {
       }
       case 'handoff.resolve': {
         const resolution = await resolveHandoff(request.nodeId, request)
-        const projects = await readList<Project>(
-          request.nodeId,
-          projectsRoute,
-          (b) => (b as ProjectsResponse)?.projects,
-        )
+        const projects = await listProjectRows(request.nodeId)
         const tasks = await readList<Task>(request.nodeId, tasksRoute, (body) => body)
+        const siteProjects = matchingSiteProjects(await allSites(request.nodeId, projects), request.url)
         return {
           nodeId: request.nodeId,
           url: request.url,
-          items: resolution.items.map((item) => bridgeHandoffItem(item, projects, tasks)),
+          items: resolution.items.map((item) => bridgeHandoffItem(item, projects, tasks, siteProjects)),
         }
       }
       case 'handoff.create': {
@@ -447,7 +516,10 @@ export function createBridge(options: {
             candidate.identifier === request.identifier && candidate.connection.id === request.connectionId,
         )
         if (!item) throw new BridgeFailure('not_found', 'The page no longer resolves to that item. Open it again.')
-        if (!item.projects.includes(request.projectId))
+        const siteProject = (await sitesOrNone(request.nodeId, request.projectId)).some((site) =>
+          siteMatches(site, request.url),
+        )
+        if (!creatableProjects(item, siteProject ? [request.projectId] : []).includes(request.projectId))
           throw new BridgeFailure(
             'bad_request',
             `That project doesn't track ${item.identifier}, so no task was made in it.`,
@@ -469,6 +541,20 @@ export function createBridge(options: {
           created: !existing,
         }
       }
+      case 'sites.list': {
+        const projects = await listProjectRows(request.nodeId)
+        return { nodeId: request.nodeId, sites: await allSites(request.nodeId, projects) }
+      }
+      case 'site.add':
+        return changeSites(request.nodeId, request.projectId, (sites) =>
+          sites.some((site) => sameSite(site, request.site)) ? sites : [...sites, request.site],
+        )
+      case 'site.remove':
+        return changeSites(request.nodeId, request.projectId, (sites) =>
+          sites.some((site) => sameSite(site, request.site))
+            ? sites.filter((site) => !sameSite(site, request.site))
+            : sites,
+        )
       case 'attachment.delete': {
         await taskAttachment(request.nodeId, request.taskId, request.attachmentId)
         const result = (await nodeRequest(request.nodeId, {

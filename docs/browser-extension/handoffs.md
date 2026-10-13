@@ -18,8 +18,10 @@ For each tab whose address matches a handoff, the background injects `content.js
 buttons to draw. The browser reports a tab's address only when the extension may read the tab, so a
 tab gets buttons only on:
 
-- **A granted site.** The sidebar lists each site its handoffs are on, with **Allow** or **Remove**.
-  **Allow** calls `permissions.request` from the person's click, as the browser requires.
+- **A granted site.** The sidebar's **Site access** card lists each site its handoffs and project
+  associations are on, what access is for there (buttons on its pages, handoffs in the sidebar, or
+  [project suggestions](./project-sites.md)), and **Allow** or **Remove**. **Allow** calls
+  `permissions.request` from the person's click, as the browser requires.
 - **The tab the toolbar button was clicked on.** The click grants `activeTab` for that tab, which
   lasts until the tab leaves the site.
 
@@ -57,7 +59,9 @@ The card resolves the page through `handoff.resolve` and shows what came back:
 2. **Linked tasks** lists the active tasks that already hold the item. **Open** opens that task's
    newest conversation, or the new-chat picker when it has none.
 3. **Create linked task** creates a task in one of the item's projects, chosen from a list when there
-   are several, and opens it the same way. A repeated create, with the same key or after the task
+   are several, and opens it the same way. The projects are the plugin's, plus any whose
+   [site associations](./project-sites.md#handoffs) cover the page, unless the item carries a pull
+   number. A repeated create, with the same key or after the task
    exists, answers the existing task.
 4. **Choose another task** leaves the choice to the ordinary project, task, and conversation pickers.
    Choosing a task this way adds no link to it.
@@ -113,8 +117,6 @@ and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#w
   fake Linear key, which Linear rejects, so the handoff showed Linear's "reconnect" answer. Unit tests
   and the Node's parity tests cover a resolution, two workspaces with the same key, and the projects.
 - Linear has no in-page button, so there is no button to check. Its handoff is offered in the sidebar.
-- The sidebar's site list says "Buttons show on linear.app" after a grant, though Linear draws no
-  button. The grant still lets the sidebar read the page. Rollbar's grant reads the same way.
 - A Rollbar resolution against Rollbar's API wasn't checked in a browser. Fake tokens reached Rollbar
   and came back as "reconnect". Unit tests and the Node's parity tests cover a resolution.
 - Signed out, Rollbar redirects an item's permalink to its login page. The browser checks therefore

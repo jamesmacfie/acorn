@@ -9,7 +9,9 @@ does the merge.
 
 The `projects` row holds the machine-local values: setup, dev, dev restart, teardown, and database
 scripts, the setup trigger, preview mode and value, run targets, and the branch
-prefix. The project's settings page edits them.
+prefix. The project's settings page edits them. It also holds `siteAssociations`, the web pages the
+browser extension suggests the project on. Only the extension edits those, and neither
+`.acorn/config.toml` file can set them ([project sites](../browser-extension/project-sites.md)).
 
 `GET /v1/core/projects/:id/config` returns the row as `config`. When the project folder has a
 `.acorn/config.toml`, the response also carries `repoConfig`: what that file sets for run targets,
