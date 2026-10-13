@@ -3,7 +3,8 @@
 Status: proposed implementation programme, October 10, 2026. Development loop added October 13,
 2026. Phase 01 implemented October 13, 2026. Phase 02 implemented October 13, 2026. Phase 03
 implemented October 13, 2026. Phase 04 implemented October 13, 2026. Phase 05 implemented October 13, 2026.
-Phase 06 implemented October 13, 2026. Phase 07 implemented October 13, 2026.
+Phase 06 implemented October 13, 2026. Phase 07 implemented October 13, 2026. Phase 08 code
+implemented October 13, 2026, with its real-browser checks still to run.
 Baseline: `f643f1f117261e1b67a21595ef787070731b1103`.
 
 This document holds the decisions and architectural context for the browser extension.

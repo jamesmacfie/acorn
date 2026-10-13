@@ -88,7 +88,7 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
       case 'sessions.list':
         return { nodeId, taskId: request.taskId, sessions: request.taskId === 't1' ? [session] : [] }
       case 'session.read':
-        return { nodeId, sessionId: request.sessionId, session, records: [], reach: 0, queued: [] }
+        return { nodeId, sessionId: request.sessionId, session, records: [], reach: 0, queued: [], requests: [] }
     }
     return undefined
   }

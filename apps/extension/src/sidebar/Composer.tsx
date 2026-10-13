@@ -1,14 +1,11 @@
 import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
 import { TURN_TEXT_MAX_CHARS } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
-import { CallFailure } from '../messages'
+import { CallFailure, isUncertain } from '../messages'
 import type { BridgeClient } from './bridgeClient'
 import { CaptureFailure, screenshotData, turnInput, withCapture, type CaptureKind, type PageCapture } from './capture'
 import { errorGuidance } from './guidance'
 import { acknowledged, changeDraft, loadDraft, saveDraft, type Draft, type DraftTarget } from './localState'
-
-// Failures after which a write may or may not have reached the Node.
-const UNCERTAIN = new Set(['ambiguous_mutation', 'host_unavailable', 'node_unreachable'])
 
 const CAPTURE_LABELS: Record<CaptureKind, string> = {
   link: 'Add page link',
@@ -177,7 +174,7 @@ export function Composer(props: {
     } catch (error) {
       if (!mounted) return
       const failure = error instanceof CallFailure ? error : new CallFailure('node_error', String(error))
-      if (UNCERTAIN.has(failure.code))
+      if (isUncertain(failure.code))
         setNote(
           stage === 'upload'
             ? "The Node didn't confirm a screenshot upload. Retry sends it again, and the Node keeps one copy."

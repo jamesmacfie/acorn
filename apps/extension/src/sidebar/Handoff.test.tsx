@@ -94,7 +94,15 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string } = {}) {
         const row = Object.values(state.sessions)
           .flat()
           .find((candidate) => candidate.id === request.sessionId)
-        return { nodeId: 'n1', sessionId: request.sessionId, session: row, records: [], reach: 0, queued: [] }
+        return {
+          nodeId: 'n1',
+          sessionId: request.sessionId,
+          session: row,
+          records: [],
+          reach: 0,
+          queued: [],
+          requests: [],
+        }
       }
       case 'agents.profiles':
         return {

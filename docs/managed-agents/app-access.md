@@ -3,7 +3,7 @@
 When a Codex agent asks Computer Use to operate an app, acorn shows a consent card with the scopes
 Computer Use allows. This page covers the request shape, who keeps the grant, and the checks on an
 answer. `plugins/agents/src/server/drivers/codexAppApproval.ts` reads the request, and
-`plugins/agents/src/client/sessions/appApproval.ts` holds the card's words.
+`plugins/agents/src/contract/appApproval.ts` holds the card's words, which the browser extension uses too.
 
 ## The request
 

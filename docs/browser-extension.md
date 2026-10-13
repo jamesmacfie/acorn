@@ -81,6 +81,7 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `session.read` | `nodeId`, `sessionId`, `afterSeq`, `limit` (at most 500) | `{ nodeId, sessionId, session, records, reach, queued }` |
 | `session.create` | `nodeId`, `taskId`, `providerId`, `profileId`, `key` | `{ nodeId, session }` |
 | `turn.submit` | `nodeId`, `sessionId`, `input`, `key` | `{ nodeId, sessionId, turnId }` |
+| `request.resolve` | `nodeId`, `sessionId`, `requestId`, `resolution`, `key` | `{ nodeId, sessionId, request }`; see [answering the agent](./browser-extension/conversations.md#answering-the-agent) |
 | `attachment.upload`, `attachment.read`, `attachment.delete` | `nodeId`, `taskId`, and the attachment | See [page capture](./browser-extension/page-capture.md#attachment-operations) |
 | `handoffs.list`, `handoff.resolve`, `handoff.create` | `nodeId`, and the handoff and page | See [handoffs](./browser-extension/handoffs.md#native-operations) |
 | `sites.list`, `site.add`, `site.remove` | `nodeId`, and the project and association | See [project sites](./browser-extension/project-sites.md#native-operations) |
@@ -158,7 +159,8 @@ Each failure has a next step, written in `src/sidebar/guidance.ts`:
 | Conversation gone | `session.read` answers `not_found` | The draft is kept; choose another conversation |
 | Conversation archived | The session row has `archivedAt` | The draft is kept; sending is off |
 | Node away | The selected Node's status is neither online nor degraded | The draft is kept; sending is off until it returns |
-| Agent waiting | The session's `attention` is `permission` or `question` | Answer it in the Acorn app for now |
+| Request it can't answer | The host marks a request `unsupported`: a kind it doesn't answer, choices that don't read, or app access with no readable scope | The request in full, and answer it in the Acorn app |
+| Answer unconfirmed | `request.resolve` fails as uncertain | The request is read again; pressing the same answer reuses its key |
 | No page access | The active tab has no readable address, or the browser refuses the capture | Click the Acorn toolbar button on the page, then capture again |
 | Page changed | The active tab or its address changed while a capture ran | Capture again |
 | Handoff refused | The plugin's route answered an error, such as no connected account | The plugin's own message, with **Try again** |
@@ -175,8 +177,7 @@ broker reports it as unreachable. The host probes after a failed read to tell th
 - In Firefox 151, the background's first native port after the browser starts has been seen to get no
   host process and no close. The 10-second deadline above recovers from it, and the selection restore
   retries once on a fresh port. A port opened from the sidebar page at the same moment answers.
-- The sidebar can't answer an agent's question or permission request yet, and draws no tool details or
-  subagent streams. It draws the screenshots a turn sent and names any other attachment.
+- The sidebar draws no tool details or subagent streams. It draws the screenshots a turn sent and names any other attachment.
 - Drafts are never expired.
 - The real-browser results and their gaps are in
   [phase 01](./future/extension/01-native-pairing.md#real-browser-results),
@@ -184,8 +185,9 @@ broker reports it as unreachable. The host probes after a failed read to tell th
   [phase 03](./future/extension/03-page-capture.md#real-browser-results),
   [phase 04](./future/extension/04-github-handoff.md#real-browser-results),
   [phase 05](./future/extension/05-linear-handoff.md#real-browser-results),
-  [phase 06](./future/extension/06-rollbar-handoff.md#real-browser-results), and
-  [phase 07](./future/extension/07-project-site-settings.md#real-browser-results).
+  [phase 06](./future/extension/06-rollbar-handoff.md#real-browser-results),
+  [phase 07](./future/extension/07-project-site-settings.md#real-browser-results), and
+  [phase 08](./future/extension/08-questions-and-approvals.md#real-browser-results).
 
 ## Why
 

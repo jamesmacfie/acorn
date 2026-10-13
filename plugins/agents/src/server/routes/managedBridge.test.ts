@@ -237,3 +237,17 @@ it('answers a secret gate refusal as a conflict that keeps its reason', async ()
     message: expect.stringContaining('npm-token at markdown export:4'),
   })
 })
+
+it.each(['Agent request resolution is already in progress.', 'That choice was not offered for this request.'])(
+  'answers a resolution the request refuses as a conflict: %s',
+  async (message) => {
+    const runtime = {
+      resolveRequest: async () => {
+        throw new Error(message)
+      },
+    } as unknown as ManagedAgentRuntime
+    await expect(
+      managedAgentsBridge(runtime).resolveRequest('s1', 'r1', { optionId: 'x' }, 'key-12345'),
+    ).rejects.toMatchObject({ status: 409, code: 'agent_conflict', message })
+  },
+)

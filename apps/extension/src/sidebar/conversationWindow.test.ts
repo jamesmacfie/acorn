@@ -65,6 +65,7 @@ function ledger(last: number) {
       records,
       reach: records.at(-1)?.seq ?? afterSeq,
       queued: [],
+      requests: [],
     }
   }
   return { state, read }

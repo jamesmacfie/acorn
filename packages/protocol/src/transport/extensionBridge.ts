@@ -109,6 +109,24 @@ const turnInputSchema = z
     'Too many attachments.',
   )
 
+// The answer to an agent's request, in the agents plugin's two shapes. A button sends the option's
+// `id`. A form sends each question's answer by option label, or the typed text, because labels are
+// what both harnesses record as what the person said. The Node checks a button against the options it
+// offered, and caps the whole answer at 256 KiB.
+const REQUEST_ANSWER_MAX_CHARS = 60_000
+const requestResolutionSchema = z.union([
+  z.strictObject({ optionId: z.string().min(1).max(200) }),
+  z.strictObject({
+    answers: z
+      .record(
+        z.string().min(1).max(200),
+        z.union([z.string().max(REQUEST_ANSWER_MAX_CHARS), z.array(z.string().min(1).max(1_000)).max(100)]),
+      )
+      .refine((answers) => Object.keys(answers).length <= 50, 'Too many answers.'),
+  }),
+])
+export type BridgeRequestResolution = z.infer<typeof requestResolutionSchema>
+
 const handoffTarget = {
   pluginId: z.string().min(1).max(64),
   handoffId: z.string().min(1).max(64),
@@ -158,6 +176,18 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     nodeId,
     sessionId: rowId,
     input: turnInputSchema,
+    key: operationKey,
+  }),
+  // Answers one request the agent is waiting on. `requestId` is the agents plugin's provider request
+  // ID. The key is kept by the sidebar for that request and answer only, never stored, so an answer is
+  // sent again only when the person presses it again.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('request.resolve'),
+    nodeId,
+    sessionId: rowId,
+    requestId: z.string().min(1).max(200),
+    resolution: requestResolutionSchema,
     key: operationKey,
   }),
   // Draft attachments are the agents plugin's, scoped to a task. Each operation names that task, and
@@ -258,6 +288,36 @@ export type BridgeConversationRecord = {
   event: BridgeConversationEvent
 }
 
+// A request the agent is waiting on, or one that recently settled, narrowed from the agents plugin's
+// request row (`AgentRequest`) to what a person needs to answer it.
+export type BridgeAgentRequest = {
+  // The provider's request ID, which the resolve route takes.
+  requestId: string
+  kind: string
+  status: 'pending' | 'resolving' | 'resolved' | 'expired'
+  title: string
+  detail: string | null
+  // Buttons. `reject` marks a refusal.
+  options: { id: string; label: string; reject: boolean }[]
+  // A form. A question with no options takes typed text.
+  questions: {
+    id: string
+    header: string | null
+    prompt: string
+    options: { label: string; description: string | null }[]
+    multiple: boolean
+    secret: boolean
+  }[]
+  // App access, in the agents plugin's own words: the app, what each scope means, and any warning.
+  approval: { target: string; scopeNote: string; warning: string | null } | null
+  // Once settled by a button, that button's label. A form's answers stay on the Node: some are secret.
+  answer: string | null
+  // What happened after the answer, when the provider keeps a grant Acorn can't see.
+  sentNote: string | null
+  // Why the sidebar can't answer this request, or null when it can.
+  unsupported: string | null
+}
+
 export type BridgeSessionRead = {
   nodeId: string
   sessionId: string
@@ -268,6 +328,9 @@ export type BridgeSessionRead = {
   reach: number
   // Turns accepted but not yet sent to the agent. Their message joins the conversation at dispatch.
   queued: { id: string; text: string; attachments: BridgeAttachmentRef[] }[]
+  // Every request still waiting, oldest first, then the few that settled most recently, so a request
+  // answered elsewhere reads as settled rather than vanishing.
+  requests: BridgeAgentRequest[]
 }
 
 // The agents plugin's attachment row.
@@ -302,6 +365,8 @@ export type BridgeResults = {
   'session.read': BridgeSessionRead
   'session.create': { nodeId: string; session: BridgeAgentSession }
   'turn.submit': { nodeId: string; sessionId: string; turnId: string }
+  // The request as the Node holds it after the answer. One already settled comes back unchanged.
+  'request.resolve': { nodeId: string; sessionId: string; request: BridgeAgentRequest }
   'attachment.upload': { nodeId: string; taskId: string; attachment: BridgeAttachment }
   // `data` is the content as base64, or null when it isn't an image or passes ATTACHMENT_MAX_BYTES.
   'attachment.read': { nodeId: string; taskId: string; attachment: BridgeAttachment; data: string | null }

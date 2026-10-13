@@ -28,7 +28,9 @@ function bridgeFailure(error: unknown): never {
   if (/not available|unavailable|no mapped checkout/i.test(message)) {
     throw new BridgeError(422, 'agent_provider_unavailable', message)
   }
-  if (/active turn|not ready|controlled|archived|pending|support/i.test(message)) {
+  // A request another answer is already settling, or a button the request never offered, is the
+  // caller's conflict with the request's state, not a fault in the Node.
+  if (/active turn|not ready|controlled|archived|pending|support|in progress|not offered/i.test(message)) {
     throw new BridgeError(409, 'agent_conflict', message)
   }
   throw error

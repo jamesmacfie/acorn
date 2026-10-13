@@ -44,6 +44,7 @@ import type {
   AgentAttachment,
   AgentInputPart,
   AgentProviderDescriptor,
+  AgentRequest,
   AgentSession,
   AgentSessionList,
   AgentSessionSnapshot,
@@ -55,6 +56,7 @@ import {
   attachmentRoute,
   bridgeAttachment,
   bridgeProfile,
+  bridgeRequest,
   bridgeSession,
   bridgeSessionRead,
   sessionRoute,
@@ -460,6 +462,17 @@ export function createBridge(options: {
           body: { input, source: 'interactive', effectivePolicy: {} },
         })) as AgentTurn
         return { nodeId: request.nodeId, sessionId: request.sessionId, turnId: turn.id }
+      }
+      case 'request.resolve': {
+        // The Node settles a request once. An answer to one already settled, from here or another
+        // client, comes back as that settled row and reaches no agent.
+        const row = (await nodeRequest(request.nodeId, {
+          method: 'POST',
+          path: `${sessionRoute(request.sessionId)}/requests/${encodeURIComponent(request.requestId)}/resolve`,
+          key: request.key,
+          body: { resolution: request.resolution },
+        })) as AgentRequest
+        return { nodeId: request.nodeId, sessionId: request.sessionId, request: bridgeRequest(row) }
       }
       case 'attachment.upload': {
         const bytes = Buffer.from(request.data, 'base64')

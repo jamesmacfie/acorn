@@ -51,3 +51,12 @@ button:disabled { opacity: 0.6; cursor: default; }
 .capture blockquote { margin: 4px 0 0; padding-left: 8px; border-left: 2px solid var(--line); white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
 .attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .capture pre.context { margin: 4px 0 0; padding-left: 8px; border-left: 2px solid var(--line); font: inherit; white-space: pre-wrap; max-height: 8.5em; overflow: auto; }
+.request { display: grid; gap: 6px; border-color: var(--accent); }
+.request[data-status="resolved"], .request[data-status="expired"] { border-color: var(--line); }
+.request p { margin: 0; }
+.request pre.detail { margin: 0; font: 12px/1.4 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
+.request fieldset { border: 1px solid var(--line); border-radius: 5px; margin: 0; padding: 6px 8px; display: grid; gap: 4px; }
+.request select { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--page); color: inherit; }
+.request .row { flex-wrap: wrap; }
+.request ul.asked { list-style: disc; padding-left: 18px; display: block; }
+.request ul.asked li { display: list-item; }

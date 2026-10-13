@@ -9,6 +9,7 @@ import { Composer } from './Composer'
 import { conversationItems, conversationReader, type ConversationWindow } from './conversationWindow'
 import { errorGuidance } from './guidance'
 import type { DraftTarget } from './localState'
+import { Requests } from './Requests'
 
 const STATE_LABELS: Record<string, string> = {
   creating: 'Starting',
@@ -104,9 +105,6 @@ export function Conversation(props: {
           {errorGuidance(readError()!)}
         </p>
       </Show>
-      <Show when={session()?.attention === 'permission' || session()?.attention === 'question'}>
-        <p class="notice">The agent is waiting for an answer. Answer it in the Acorn app for now.</p>
-      </Show>
       <Show when={(view()?.from ?? 0) > 0}>
         <button type="button" class="quiet" onClick={() => void reader.earlier()}>
           Earlier messages
@@ -149,6 +147,13 @@ export function Conversation(props: {
           </ol>
         </Show>
       </Show>
+      <Requests
+        client={props.client}
+        target={target}
+        requests={view()?.requests ?? []}
+        online={props.online && !gone()}
+        settled={() => void reader.refresh()}
+      />
       <Composer
         client={props.client}
         storage={props.storage}

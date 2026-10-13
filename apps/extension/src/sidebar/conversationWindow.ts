@@ -70,6 +70,8 @@ export type ConversationWindow = {
   from: number
   reach: number
   queued: BridgeSessionRead['queued']
+  // The Node's requests as of the last read. Their state is read whole each time, not folded.
+  requests: BridgeSessionRead['requests']
 }
 
 const bySeq = (records: BridgeConversationRecord[]) => {
@@ -89,7 +91,7 @@ export function conversationReader(options: {
   failed(error: unknown): void
 }) {
   const start = Math.max(0, options.lastEventSeq - CONVERSATION_PAGE)
-  let window: ConversationWindow = { session: null, records: [], from: start, reach: start, queued: [] }
+  let window: ConversationWindow = { session: null, records: [], from: start, reach: start, queued: [], requests: [] }
   let disposed = false
   let reading = false
   let again = false
@@ -108,7 +110,14 @@ export function conversationReader(options: {
       // Far behind, say after a long disconnect: start again at the end rather than walk every page.
       if (end - page.reach > CONVERSATION_PAGE) {
         const tail = end - CONVERSATION_PAGE
-        apply({ session: page.session, records: [], from: tail, reach: tail, queued: page.queued })
+        apply({
+          session: page.session,
+          records: [],
+          from: tail,
+          reach: tail,
+          queued: page.queued,
+          requests: page.requests,
+        })
         continue
       }
       const progressed = page.reach > window.reach
@@ -118,6 +127,7 @@ export function conversationReader(options: {
         from: window.from,
         reach: Math.max(window.reach, page.reach),
         queued: page.queued,
+        requests: page.requests,
       })
       if (!progressed || window.reach >= end) return
     }

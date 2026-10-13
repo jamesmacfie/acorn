@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentEventRecord, AgentInputPart, AgentSessionSnapshot } from '@acorn/plugin-agents/contract/wire.ts'
+import type {
+  AgentEventRecord,
+  AgentInputPart,
+  AgentRequest,
+  AgentSessionSnapshot,
+} from '@acorn/plugin-agents/contract/wire.ts'
 import type { BridgeAgentHint } from '@acorn/protocol/extensionBridge.ts'
-import { agentHints, bridgeSessionRead } from './agents'
+import { agentHints, bridgeRequest, bridgeSessionRead } from './agents'
 
 const record = (seq: number, event: AgentEventRecord['event'], extra: Partial<AgentEventRecord> = {}) =>
   ({
@@ -140,5 +145,179 @@ describe('agent hints', () => {
     hints.note('n1', { channel: 'ws:shed' })
     vi.advanceTimersByTime(100)
     expect(sent).toEqual([{ nodeId: 'n1', sessions: [], tasks: [], missed: true }])
+  })
+})
+
+const request = (extra: Partial<AgentRequest> = {}): AgentRequest => ({
+  id: 'row',
+  sessionId: 's1',
+  turnId: 't1',
+  providerRequestId: 'r1',
+  kind: 'permission',
+  status: 'pending',
+  title: 'Run make',
+  detail: 'make clean',
+  payload: {
+    options: [
+      { id: 'allow_once', label: 'Allow', kind: 'allow_once' },
+      { id: 'reject_once', label: 'Reject', kind: 'reject_once' },
+    ],
+    questions: [],
+  },
+  resolution: null,
+  expiresAt: null,
+  createdAt: 1,
+  resolvedAt: null,
+  ...extra,
+})
+
+describe('requests for the sidebar', () => {
+  it('keeps the option ids a button sends, and marks a refusal', () => {
+    expect(bridgeRequest(request())).toEqual({
+      requestId: 'r1',
+      kind: 'permission',
+      status: 'pending',
+      title: 'Run make',
+      detail: 'make clean',
+      options: [
+        { id: 'allow_once', label: 'Allow', reject: false },
+        { id: 'reject_once', label: 'Reject', reject: true },
+      ],
+      questions: [],
+      approval: null,
+      answer: null,
+      sentNote: null,
+      unsupported: null,
+    })
+  })
+
+  it('keeps a form, with option labels, multiple choice, and secret fields', () => {
+    const narrowed = bridgeRequest(
+      request({
+        kind: 'question',
+        payload: {
+          options: [{ id: 'decline', label: 'Skip', kind: 'reject_once' }],
+          questions: [
+            { id: 'colour', header: 'Colour', prompt: 'Which one?', options: [{ id: '0', label: 'Blue' }] },
+            {
+              id: 'parts',
+              prompt: 'Which parts?',
+              multiple: true,
+              options: [{ id: 'a', label: 'A', description: 'First' }],
+            },
+            { id: 'token', prompt: 'API token', secret: true },
+          ],
+        },
+      }),
+    )
+    expect(narrowed.questions).toEqual([
+      {
+        id: 'colour',
+        header: 'Colour',
+        prompt: 'Which one?',
+        options: [{ label: 'Blue', description: null }],
+        multiple: false,
+        secret: false,
+      },
+      {
+        id: 'parts',
+        header: null,
+        prompt: 'Which parts?',
+        options: [{ label: 'A', description: 'First' }],
+        multiple: true,
+        secret: false,
+      },
+      { id: 'token', header: null, prompt: 'API token', options: [], multiple: false, secret: true },
+    ])
+    expect(narrowed.unsupported).toBeNull()
+  })
+
+  it('names the button a settled request was answered with, and never a form answer', () => {
+    expect(bridgeRequest(request({ status: 'resolved', resolution: { optionId: 'reject_once' } })).answer).toBe(
+      'Reject',
+    )
+    const answered = bridgeRequest(
+      request({
+        kind: 'question',
+        status: 'resolved',
+        payload: { options: [], questions: [{ id: 'token', prompt: 'API token', secret: true }] },
+        resolution: { answers: { token: 'hunter2' } },
+      }),
+    )
+    expect(answered.answer).toBeNull()
+    expect(JSON.stringify(answered)).not.toContain('hunter2')
+  })
+
+  it('describes app access in the agents plugin words, with its warning', () => {
+    const narrowed = bridgeRequest(
+      request({
+        payload: {
+          options: [
+            { id: 'accept', label: 'Allow for this session', kind: 'allow_once' },
+            { id: 'acceptAlways', label: 'Always allow', kind: 'allow_always' },
+            { id: 'decline', label: 'Decline', kind: 'reject_once' },
+          ],
+          questions: [],
+          approval: {
+            connector: 'Computer Use',
+            app: { name: 'Notes', id: 'com.apple.Notes' },
+            scopes: ['session', 'always'],
+            warning: 'Notes can read your notes.',
+          },
+        },
+        status: 'resolved',
+        resolution: { optionId: 'acceptAlways' },
+      }),
+    )
+    expect(narrowed.approval).toEqual({
+      target: 'Notes (com.apple.Notes)',
+      scopeNote: expect.stringContaining('Always allow lets Computer Use use any app with this identifier'),
+      warning: 'Notes can read your notes.',
+    })
+    expect(narrowed.answer).toBe('Always allow')
+    expect(narrowed.sentNote).toContain('saves the grant itself')
+  })
+
+  it.each([
+    ['a kind the extension does not answer', { kind: 'workflow_gate' as const }, 'workflow gate'],
+    ['an option it cannot read', { payload: { options: [{ id: 'allow' }], questions: [] } }, "choices don't read"],
+    [
+      'app access without a scope',
+      {
+        payload: {
+          options: [{ id: 'accept', label: 'Allow' }],
+          approval: { connector: 'X', app: { id: 'a', name: 'A' }, scopes: [] },
+        },
+      },
+      "app access doesn't read",
+    ],
+    ['nothing to send', { payload: { options: [], questions: [] } }, 'no answer'],
+  ])('shows %s with a reason instead of an answer', (_name, extra, reason) => {
+    const narrowed = bridgeRequest(request(extra as Partial<AgentRequest>))
+    expect(narrowed.unsupported).toContain(reason)
+    expect(narrowed.title).toBe('Run make')
+  })
+
+  it('reads every open request, then only the most recently settled', () => {
+    const settled = Array.from({ length: 12 }, (_, index) =>
+      request({ providerRequestId: `old-${index}`, status: 'resolved', resolvedAt: index }),
+    )
+    const read = bridgeSessionRead(
+      'n1',
+      {
+        ...snapshot([]),
+        requests: [
+          ...settled,
+          request({ providerRequestId: 'open-1' }),
+          request({ providerRequestId: 'open-2', status: 'resolving' }),
+        ],
+      },
+      0,
+    )
+    expect(read.requests.map((row) => row.requestId)).toEqual([
+      'open-1',
+      'open-2',
+      ...Array.from({ length: 10 }, (_, index) => `old-${11 - index}`),
+    ])
   })
 })

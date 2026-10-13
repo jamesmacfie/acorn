@@ -49,6 +49,11 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       ['a3', { id: 'a3', taskId: 't1', filename: 'notes.txt', mediaType: 'text/plain', byteSize: 4, createdAt: 1 }],
     ]),
     deleted: [] as string[],
+    // The session's requests as the agents plugin holds them, and the key each was settled with.
+    agentRequests: new Map<string, Record<string, unknown>>([['r1', agentRequest('r1')]]),
+    resolutionKeys: new Map<string, string>(),
+    // Settle the next request, then drop the connection before answering.
+    dropResolveReply: false,
     tasks: [
       { id: 't1', title: 'Fix it', projectId: 'p1', branch: 'fix', status: 'active', pullNumber: null, links: [] },
       { id: 't2', title: 'Elsewhere', projectId: 'p2', branch: null, status: 'active', pullNumber: 12, links: [] },
@@ -172,6 +177,24 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       }
       return reply(200, { id: turn.id, sessionId: 's1', status: 'queued' })
     }
+    const resolveRoute = /^\/v1\/p\/agents\/sessions\/s1\/requests\/([^/]+)\/resolve$/.exec(url.pathname)
+    if (resolveRoute) {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      const row = state.agentRequests.get(decodeURIComponent(resolveRoute[1]!))
+      if (!row) return reply(404, { error: { code: 'agent_not_found', message: 'Agent request not found.' } })
+      // As the agents runtime does: a settled request answers as it is, whatever the key.
+      if (row.status === 'pending') {
+        row.status = 'resolved'
+        row.resolution = JSON.parse(body).resolution
+        state.resolutionKeys.set(row.providerRequestId as string, String(req.headers['idempotency-key']))
+      }
+      if (state.dropResolveReply) {
+        state.dropResolveReply = false
+        return req.socket.destroy()
+      }
+      return reply(200, row)
+    }
     if (url.pathname === '/v1/p/agents/attachments' && req.method === 'POST') {
       let body = ''
       for await (const chunk of req) body += chunk
@@ -238,6 +261,30 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       server.setSecureContext({ key: certB.keyPem, cert: certB.certPem })
       server.closeAllConnections()
     },
+  }
+}
+
+function agentRequest(providerRequestId: string) {
+  return {
+    id: `row-${providerRequestId}`,
+    sessionId: 's1',
+    turnId: 'turn-1',
+    providerRequestId,
+    kind: 'permission',
+    status: 'pending',
+    title: 'Run rm -rf build',
+    detail: 'In /src/p1',
+    payload: {
+      options: [
+        { id: 'allow', label: 'Allow', kind: 'allow_once' },
+        { id: 'deny', label: 'Deny', kind: 'reject_once' },
+      ],
+      questions: [],
+    },
+    resolution: null as unknown,
+    expiresAt: null,
+    createdAt: 1,
+    resolvedAt: null,
   }
 }
 
@@ -459,6 +506,53 @@ describe('browser bridge agent operations', () => {
       }),
     ).rejects.toMatchObject({ code: 'not_selected' })
     expect(node.state.turns.size).toBe(0)
+  })
+
+  describe('request.resolve', () => {
+    const answer = (resolution: unknown, key = 'answer-key-1', requestId = 'r1') => ({
+      op: 'request.resolve',
+      nodeId: 'node-a',
+      sessionId: 's1',
+      requestId,
+      resolution,
+      key,
+    })
+
+    it('answers through the agents route with the key, and reads the settled row back', async () => {
+      const { call, node } = await selected()
+      const result = await call(answer({ optionId: 'allow' }))
+      expect(result).toMatchObject({
+        nodeId: 'node-a',
+        sessionId: 's1',
+        request: { requestId: 'r1', status: 'resolved', answer: 'Allow', unsupported: null },
+      })
+      expect(node.state.agentRequests.get('r1')!.resolution).toEqual({ optionId: 'allow' })
+      expect(node.state.resolutionKeys.get('r1')).toBe('answer-key-1')
+    })
+
+    it('reports an unanswered answer as uncertain, and one already settled comes back unchanged', async () => {
+      const { call, node } = await selected()
+      node.state.dropResolveReply = true
+      await expect(call(answer({ optionId: 'allow' }))).rejects.toMatchObject({ code: 'ambiguous_mutation' })
+      // Another client, or a second press here, can't change the outcome the Node already holds.
+      const again = await call(answer({ optionId: 'deny' }, 'answer-key-2'))
+      expect(again.request).toMatchObject({ status: 'resolved', answer: 'Allow' })
+      expect(node.state.agentRequests.get('r1')!.resolution).toEqual({ optionId: 'allow' })
+    })
+
+    it('refuses an answer for a Node that is no longer selected before sending it', async () => {
+      const { call, node } = await selected()
+      await call({ op: 'node.select', nodeId: null })
+      await expect(call(answer({ optionId: 'allow' }))).rejects.toMatchObject({ code: 'not_selected' })
+      expect(node.state.agentRequests.get('r1')!.status).toBe('pending')
+    })
+
+    it('reports a request the Node does not have as not found', async () => {
+      const { call } = await selected()
+      await expect(call(answer({ optionId: 'allow' }, 'answer-key-1', 'gone'))).rejects.toMatchObject({
+        code: 'not_found',
+      })
+    })
   })
 
   it('passes captured context and screenshots to the Node as the turn input', async () => {

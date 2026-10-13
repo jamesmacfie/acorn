@@ -2,7 +2,8 @@
 
 This page covers how the [browser extension](../browser-extension.md) continues an agent conversation:
 the agent operations on the native bridge, the change hints, how the sidebar pages and folds a
-conversation, how a send survives a lost answer, and what it keeps in browser storage. The sidebar code
+conversation, how a send survives a lost answer, how it answers the agent's questions and permission
+requests, and what it keeps in browser storage. The sidebar code
 is in `apps/extension/src/sidebar/`, and the host side in `apps/cli/src/browser/agents.ts`.
 
 ## The agent operations
@@ -22,6 +23,8 @@ carries none of its code. It narrows each answer to what the sidebar draws:
   `reach` is the furthest seq the page covered, counting the records left out, and the next read
   starts there. `queued` lists turns accepted but not yet sent to the agent, whose message joins the
   conversation only at dispatch.
+- `session.read` also carries `requests`: every request the agent is still waiting on, oldest first,
+  then the 10 that settled most recently. See [answering the agent](#answering-the-agent).
 - `session.create` sends `kind: 'interactive'` and an empty `config`, so the Node applies the same
   defaults any other client gets. The sidebar offers one choice per provider, on its default
   account, and names any that can't start.
@@ -34,6 +37,40 @@ write and never after, because once sent it may have happened. A write that gets
 uncertain result: it keeps the draft with the key, reads the conversation again, and shows **Retry**.
 Sending the same text and captures again reuses the key, so the Node answers with the turn it already
 made. Other text or captures get a new key. A missing session reads as `not_found`.
+
+## Answering the agent
+
+The agents plugin keeps each question or permission request as a row with a status: `pending`,
+`resolving` once an answer is claimed, then `resolved` or `expired`. The Node settles a row once. An
+answer to a settled row comes back as that row and reaches no agent.
+
+The host narrows each row in `bridgeRequest` (`apps/cli/src/browser/agents.ts`):
+
+- `options` are buttons. A button sends `{ optionId }`, the option's ID.
+- `questions` are a form. A form sends `{ answers }`, keyed by question ID. A choice answers with the
+  option's label, and several choices with a list of labels, because labels are what both harnesses
+  record as the person's words. A question with no options takes typed text. A `secret` question uses
+  a password field.
+- `approval` is app access, described with the agents plugin's own words from
+  `plugins/agents/src/contract/appApproval.ts`: the app, what each scope lasts for, and any warning.
+- `answer` names the button a settled request was answered with. A form's answers stay on the Node,
+  because some are secret.
+- `unsupported` says why the sidebar can't answer a request: a kind other than `permission`,
+  `question`, or `elicitation`; an option or question that doesn't read; app access with no readable
+  scope; or nothing to send. The sidebar shows the request in full, with no buttons, and sends the
+  person to the Acorn app. It never makes up an answer.
+
+`request.resolve` posts to the agents plugin's resolve route with the `key` as its idempotency key. The
+sidebar (`src/sidebar/Requests.tsx`) keeps answers in the card's memory only, never in browser
+storage, and clears them once the Node takes them. Every answer, sent or not, reads the conversation
+again. An uncertain failure, as in [writes and retries](#writes-and-retries), keeps the key in memory:
+pressing the same answer again reuses it, so the Node settles the request once. Nothing resends an
+answer on its own, on reconnect or otherwise.
+
+A request shown open stays on screen after it settles, here or in another client, with its outcome
+and no buttons. One that settled before the conversation showed it is history and isn't drawn. The
+Node answers a second answer while one is settling, or a button it never offered, with 409
+`agent_conflict`.
 
 ## Change hints
 

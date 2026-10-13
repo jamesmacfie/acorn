@@ -81,7 +81,7 @@ query is never logged. A path in either body is at most 4,096 characters.
 | `/v1/p/agents/sessions`, `/sessions/search` | Session list and transcript search |
 | `/v1/p/agents/sessions/:id` | One session, its `events`, `artifacts`, `mcp`, `export`, and `wait`. `export` takes `format` and `variant=original\|redacted`, and answers `409 secret_check_blocked` when the [secret gate](../security/secret-publication.md#agents) refuses. `GET reference-context?taskId=...` is device-only and checks that the source session belongs to the task |
 | `/v1/p/agents/sessions/:id/turns[/:turnId]` | Queue, edit, or remove a turn |
-| `/v1/p/agents/sessions/:id/requests/:requestId/resolve` | Answer a permission or question request |
+| `/v1/p/agents/sessions/:id/requests/:requestId/resolve` | Answer a permission or question request. A settled request answers as it is; a second answer while one is settling, or a button the request never offered, is 409 `agent_conflict` |
 | `/v1/p/agents/sessions/:id/{cancel,fork,compact}` | Session controls |
 | `/v1/p/agents/sessions/:id/subagents/:subagentId/cancel` | Stop a Codex child through its parent session ([subagents](../managed-agents/subagents.md#stop-a-codex-child)) |
 | `/v1/p/agents/sessions/:id/goal[/resume]` | Device-only interactive goal set, clear, and resume ([operations](../managed-agents/operations.md#session-goals)) |

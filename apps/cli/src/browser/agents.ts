@@ -2,13 +2,23 @@ import type {
   AgentAttachment,
   AgentEventRecord,
   AgentProviderDescriptor,
+  AgentRequest,
+  AgentRequestKind,
   AgentSession,
   AgentSessionSnapshot,
   AgentTurn,
 } from '@acorn/plugin-agents/contract/wire.ts'
+import {
+  appApprovalOf,
+  approvalScopeNote,
+  approvalSentNote,
+  approvalTarget,
+  sentOptionId,
+} from '@acorn/plugin-agents/contract/appApproval.ts'
 import type {
   BridgeAgentHint,
   BridgeAgentProfile,
+  BridgeAgentRequest,
   BridgeAttachment,
   BridgeAttachmentRef,
   BridgeAgentSession,
@@ -18,7 +28,8 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 
 // The agents plugin's route bodies, narrowed to what the sidebar draws. The types are that plugin's
-// contract, imported for types only, so the CLI bundle carries none of its code.
+// contract. The only code the CLI bundle takes from it is the app-access wording in its contract, so
+// the sidebar describes a grant in the same words as the desktop.
 
 export const agentsRoute = '/v1/p/agents'
 export const sessionRoute = (sessionId: string) => `${agentsRoute}/sessions/${encodeURIComponent(sessionId)}`
@@ -107,6 +118,98 @@ function conversationEvent(record: AgentEventRecord, turn: AgentTurn | undefined
   }
 }
 
+// The kinds whose answer is a button or a form. A workflow gate, or a kind a newer Node adds, may mean
+// something else, so the sidebar shows it without offering an answer.
+const ANSWERABLE_KINDS: ReadonlySet<string> = new Set<AgentRequestKind>(['permission', 'question', 'elicitation'])
+
+// How many settled requests a read carries besides the open ones: enough for a request answered
+// elsewhere to read as settled, without sending a long session's whole history on every read.
+const SETTLED_REQUESTS = 10
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+const text = (value: unknown): string | null => (typeof value === 'string' && value ? value : null)
+
+type Parsed<T> = { rows: T[]; malformed: boolean }
+
+function parseRows<T>(value: unknown, row: (entry: Record<string, unknown>) => T | null): Parsed<T> {
+  if (value === undefined) return { rows: [], malformed: false }
+  if (!Array.isArray(value)) return { rows: [], malformed: true }
+  const rows = value.flatMap((entry) => {
+    const parsed = isRecord(entry) ? row(entry) : null
+    return parsed ? [parsed] : []
+  })
+  return { rows, malformed: rows.length !== value.length }
+}
+
+const parseOption = (entry: Record<string, unknown>): BridgeAgentRequest['options'][number] | null => {
+  const id = text(entry.id)
+  const label = text(entry.label)
+  return id && label ? { id, label, reject: typeof entry.kind === 'string' && entry.kind.startsWith('reject') } : null
+}
+
+const parseQuestion = (entry: Record<string, unknown>): BridgeAgentRequest['questions'][number] | null => {
+  const id = text(entry.id)
+  const prompt = text(entry.prompt)
+  const options = parseRows(entry.options, (option) => {
+    const label = text(option.label)
+    return label ? { label, description: text(option.description) } : null
+  })
+  if (!id || !prompt || options.malformed) return null
+  return {
+    id,
+    header: text(entry.header),
+    prompt,
+    options: options.rows,
+    multiple: entry.multiple === true,
+    secret: entry.secret === true,
+  }
+}
+
+// A request row as the sidebar draws it. The payload is checked here, once, at the edge of the Node's
+// answer: a request whose choices don't read, or whose app access has no readable scope, is shown with
+// a reason instead of a guessed answer. A form's answers never leave the Node, because some are secret.
+export function bridgeRequest(request: AgentRequest): BridgeAgentRequest {
+  const options = parseRows(request.payload.options, parseOption)
+  const questions = parseRows(request.payload.questions, parseQuestion)
+  const approval = request.payload.approval === undefined ? null : appApprovalOf(request.payload.approval)
+  const optionId = sentOptionId(request)
+  const unsupported = !ANSWERABLE_KINDS.has(request.kind)
+    ? `The extension can't answer a ${request.kind.replace('_', ' ')} request yet. Answer it in the Acorn app.`
+    : options.malformed || questions.malformed
+      ? "Some of this request's choices don't read, so the extension won't guess an answer. Answer it in the Acorn app."
+      : request.payload.approval !== undefined && !approval
+        ? "This request's app access doesn't read, so the extension can't show what it grants. Answer it in the Acorn app."
+        : !options.rows.length && !questions.rows.length
+          ? 'This request offers no answer the extension can send. Answer it in the Acorn app.'
+          : null
+  return {
+    requestId: request.providerRequestId,
+    kind: request.kind,
+    status: request.status,
+    title: request.title,
+    detail: request.detail,
+    options: options.rows,
+    questions: questions.rows,
+    approval: approval
+      ? { target: approvalTarget(approval), scopeNote: approvalScopeNote(approval), warning: approval.warning ?? null }
+      : null,
+    answer: options.rows.find((option) => option.id === optionId)?.label ?? null,
+    sentNote: approval ? approvalSentNote(approval, optionId) : null,
+    unsupported,
+  }
+}
+
+// Every open request, oldest first, then the most recently settled. A request settled long ago is in
+// the conversation's history, not something to act on.
+function sessionRequests(requests: readonly AgentRequest[]): BridgeAgentRequest[] {
+  const open = requests.filter((request) => request.status === 'pending' || request.status === 'resolving')
+  const settled = requests
+    .filter((request) => request.status === 'resolved' || request.status === 'expired')
+    .sort((left, right) => (right.resolvedAt ?? 0) - (left.resolvedAt ?? 0))
+    .slice(0, SETTLED_REQUESTS)
+  return [...open, ...settled].map(bridgeRequest)
+}
+
 // One page of a session, read with `fold=1` so each tool call arrives as one record. `reach` counts
 // the records left out, so the next read starts past them rather than reading them again.
 export function bridgeSessionRead(nodeId: string, snapshot: AgentSessionSnapshot, afterSeq: number): BridgeSessionRead {
@@ -139,6 +242,7 @@ export function bridgeSessionRead(nodeId: string, snapshot: AgentSessionSnapshot
         text: turn.input.flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('\n'),
         attachments: turnAttachments(turn),
       })),
+    requests: sessionRequests(snapshot.requests ?? []),
   }
 }
 

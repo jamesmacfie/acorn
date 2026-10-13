@@ -10,6 +10,16 @@ const context = (content: string) => ({
   source: 'browser-extension',
   capturedAt: 1,
 })
+const resolve = (resolution: unknown) => ({
+  v: 1,
+  id: 'a',
+  op: 'request.resolve',
+  nodeId: 'n1',
+  sessionId: 's1',
+  requestId: 'r1',
+  resolution,
+  key: 'k'.repeat(36),
+})
 const submit = (input: unknown[]) => ({
   v: 1,
   id: 'a',
@@ -65,6 +75,8 @@ describe('browser bridge requests', () => {
       },
       { v: 1, id: 'a', op: 'attachment.read', nodeId: 'n1', taskId: 't1', attachmentId: 'a1' },
       { v: 1, id: 'a', op: 'attachment.delete', nodeId: 'n1', taskId: 't1', attachmentId: 'a1' },
+      resolve({ optionId: 'allow_once' }),
+      resolve({ answers: { pick: 'Blue', many: ['A', 'B'], typed: '', token: 'hunter2' } }),
     ])
       expect(bridgeRequestSchema.safeParse(request).success).toBe(true)
   })
@@ -88,6 +100,13 @@ describe('browser bridge requests', () => {
       submit([context('x'.repeat(300_000)), context('x'.repeat(300_000))]),
       submit(Array.from({ length: 9 }, (_, index) => ({ type: 'image', attachmentId: `a${index}` }))),
       { ...submit([text('hi')]), source: 'plugin' },
+      // A request is answered with a button or a form, never both, and never with a provider payload.
+      resolve({ optionId: 'a', answers: {} }),
+      resolve({ decision: 'accept' }),
+      resolve({ optionId: '' }),
+      resolve({ answers: { pick: 3 } }),
+      resolve({ answers: Object.fromEntries(Array.from({ length: 51 }, (_, index) => [`q${index}`, 'x'])) }),
+      { ...resolve({ optionId: 'a' }), key: 'short' },
       {
         v: 1,
         id: 'a',

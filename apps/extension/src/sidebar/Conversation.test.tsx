@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { render } from 'solid-js/web'
-import type { BridgeAgentSession, BridgeConversationRecord, BridgeInputPart } from '@acorn/protocol/extensionBridge.ts'
+import type {
+  BridgeAgentRequest,
+  BridgeAgentSession,
+  BridgeConversationRecord,
+  BridgeInputPart,
+} from '@acorn/protocol/extensionBridge.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
 import { App } from './App'
@@ -39,6 +44,9 @@ function node() {
       ['s2', []],
     ]),
     requests: [] as Request[],
+    // The agent's requests as the Node holds them, and each answer the Node took, by key.
+    agentRequests: [] as (BridgeAgentRequest & { sessionId: string })[],
+    resolutions: new Map<string, unknown>(),
     turns: new Map<string, string>(),
     inputs: new Map<string, BridgeInputPart[]>(),
     // Uploads keyed by content, as the Node keeps one attachment per task and content.
@@ -84,6 +92,7 @@ function node() {
             records,
             reach: records.at(-1)?.seq ?? request.afterSeq,
             queued: [],
+            requests: state.agentRequests.filter((row) => row.sessionId === id).map(({ sessionId: _, ...row }) => row),
           },
         }
       }
@@ -97,6 +106,21 @@ function node() {
           say(request.sessionId as string, text, 'user_message')
         }
         return { result: { nodeId: 'n1', sessionId: request.sessionId, turnId: `turn-${key}` } }
+      }
+      case 'request.resolve': {
+        // As the agents runtime does: one answer settles a request, and a settled one answers as it is.
+        const row = state.agentRequests.find(
+          (candidate) => candidate.sessionId === request.sessionId && candidate.requestId === request.requestId,
+        )
+        if (!row) return { error: { code: 'not_found', message: 'Agent request not found.' } }
+        if (row.status === 'pending') {
+          const resolution = request.resolution as { optionId?: string }
+          row.status = 'resolved'
+          row.answer = row.options.find((option) => option.id === resolution.optionId)?.label ?? null
+          state.resolutions.set(request.key as string, request.resolution)
+        }
+        const { sessionId: _, ...result } = row
+        return { result: { nodeId: 'n1', sessionId: request.sessionId, request: result } }
       }
       case 'agents.profiles':
         return {
@@ -378,6 +402,221 @@ describe('conversation', () => {
     expect(new Set(creates.map((request) => request.key)).size).toBe(1)
     expect((subject.root.querySelector('select[name="session"]') as HTMLSelectElement).value).toBe('s3')
     expect(subject.root.querySelector('[data-testid="destination"]')!.textContent).toContain('New chat')
+  })
+})
+
+const permission = (extra: Partial<BridgeAgentRequest> = {}): BridgeAgentRequest & { sessionId: string } => ({
+  sessionId: 's1',
+  requestId: 'r1',
+  kind: 'permission',
+  status: 'pending',
+  title: 'Run rm -rf build',
+  detail: 'rm -rf build\nIn /src/acorn',
+  options: [
+    { id: 'allow_once', label: 'Allow', reject: false },
+    { id: 'reject_once', label: 'Reject', reject: true },
+  ],
+  questions: [],
+  approval: null,
+  answer: null,
+  sentNote: null,
+  unsupported: null,
+  ...extra,
+})
+
+describe('questions and approvals', () => {
+  const card = (root: HTMLElement) => root.querySelector<HTMLElement>('article.request')
+  const status = (root: HTMLElement) => card(root)?.querySelector('[data-testid="request-status"]')?.textContent
+  const resolves = (subject: ReturnType<typeof mount>) =>
+    subject.state.requests.filter((request) => request.op === 'request.resolve')
+  const hint = (subject: ReturnType<typeof mount>) =>
+    subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1'], tasks: [], missed: false })
+
+  it('shows a permission request in full and answers with the option id', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(permission())
+    await openSession(subject.root)
+    expect(card(subject.root)!.textContent).toContain('Run rm -rf build')
+    expect(card(subject.root)!.textContent).toContain('In /src/acorn')
+    expect(status(subject.root)).toBe('Waiting for an answer')
+
+    button(subject.root, 'Reject')!.click()
+    await settle()
+    expect(resolves(subject)).toMatchObject([
+      { nodeId: 'n1', sessionId: 's1', requestId: 'r1', resolution: { optionId: 'reject_once' } },
+    ])
+    expect(status(subject.root)).toBe('Answered: Reject')
+    expect(button(subject.root, 'Allow')).toBeUndefined()
+  })
+
+  it('answers a form with labels, several choices, typed text, and a secret it never stores', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(
+      permission({
+        kind: 'question',
+        title: 'A few details',
+        detail: null,
+        options: [{ id: 'decline', label: 'Skip', reject: true }],
+        questions: [
+          {
+            id: 'colour',
+            header: 'Colour',
+            prompt: 'Which one?',
+            options: [
+              { label: 'Blue', description: null },
+              { label: 'Green', description: null },
+            ],
+            multiple: false,
+            secret: false,
+          },
+          {
+            id: 'parts',
+            header: null,
+            prompt: 'Which parts?',
+            options: [
+              { label: 'Front', description: 'The page' },
+              { label: 'Back', description: null },
+            ],
+            multiple: true,
+            secret: false,
+          },
+          { id: 'why', header: null, prompt: 'Why?', options: [], multiple: false, secret: false },
+          { id: 'token', header: null, prompt: 'API token', options: [], multiple: false, secret: true },
+        ],
+      }),
+    )
+    await openSession(subject.root)
+    const field = (name: string) => card(subject.root)!.querySelector<HTMLInputElement>(`[name="${name}"]`)!
+    expect(field('answer:token').type).toBe('password')
+    expect(field('answer:why').type).toBe('text')
+    choose(subject.root, 'answer:colour', 'Green')
+    for (const name of ['answer:parts:Front', 'answer:parts:Back']) {
+      field(name).checked = true
+      field(name).dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    for (const [name, value] of [
+      ['answer:why', 'Because'],
+      ['answer:token', 'hunter2'],
+    ]) {
+      field(name).value = value!
+      field(name).dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    await settle()
+    card(subject.root)!
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await settle()
+    expect(resolves(subject)[0]!.resolution).toEqual({
+      answers: { colour: 'Green', parts: ['Front', 'Back'], why: 'Because', token: 'hunter2' },
+    })
+    expect(status(subject.root)).toBe('Answered')
+    expect(card(subject.root)!.querySelector('input')).toBeNull()
+    expect(JSON.stringify([...subject.fake.storage.values()])).not.toContain('hunter2')
+  })
+
+  it('settles a request another client answered first, with no second answer', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(permission())
+    await openSession(subject.root)
+    // Another client answers while this sidebar still shows the buttons.
+    Object.assign(subject.state.agentRequests[0]!, { status: 'resolved', answer: 'Allow' })
+    button(subject.root, 'Reject')!.click()
+    await settle()
+    expect(status(subject.root)).toBe('Answered: Allow')
+    expect(subject.state.resolutions.size).toBe(0)
+    expect(button(subject.root, 'Reject')).toBeUndefined()
+
+    // A hint alone is enough when nobody presses anything here.
+    subject.state.agentRequests.push(permission({ requestId: 'r2', title: 'Second' }))
+    hint(subject)
+    await settle()
+    expect(button(subject.root, 'Allow')).toBeTruthy()
+    Object.assign(subject.state.agentRequests[1]!, { status: 'expired' })
+    hint(subject)
+    await settle()
+    expect(card(subject.root)!.nextElementSibling!.textContent).toContain('Expired')
+    expect(button(subject.root, 'Allow')).toBeUndefined()
+  })
+
+  it('reads again after an unconfirmed answer, never resends it, and reuses its key when pressed again', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(permission())
+    await openSession(subject.root)
+    // The answer never reaches the Node, and the reply is lost.
+    subject.state.answers.set('request.resolve', () => ({
+      error: { code: 'ambiguous_mutation', message: 'The Node did not confirm the change.' },
+    }))
+    button(subject.root, 'Allow')!.click()
+    await settle()
+    expect(card(subject.root)!.textContent).toContain("didn't confirm this answer")
+    const reads = subject.state.requests.filter((request) => request.op === 'session.read').length
+    expect(reads).toBeGreaterThan(1)
+    subject.state.host!.send({ v: 1, event: 'status', status: { nodeId: 'n1', state: 'offline' } })
+    subject.state.host!.send({ v: 1, event: 'status', status: { nodeId: 'n1', state: 'online' } })
+    await settle()
+    expect(resolves(subject)).toHaveLength(1)
+
+    subject.state.answers.delete('request.resolve')
+    button(subject.root, 'Allow')!.click()
+    await settle()
+    expect(new Set(resolves(subject).map((request) => request.key)).size).toBe(1)
+    expect(status(subject.root)).toBe('Answered: Allow')
+  })
+
+  it('binds an answer to its conversation when the person switches away before it returns', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(permission())
+    await openSession(subject.root)
+    let release!: () => void
+    subject.state.holds.set('request.resolve', (answer) => (release = answer))
+    button(subject.root, 'Allow')!.click()
+    await settle()
+    subject.state.holds.delete('request.resolve')
+    choose(subject.root, 'session', 's2')
+    await settle()
+    release()
+    await settle()
+    expect(resolves(subject)).toMatchObject([{ sessionId: 's1', requestId: 'r1' }])
+    expect(card(subject.root)).toBeNull()
+    expect(subject.state.resolutions.size).toBe(1)
+    // Back in s1, the request settled while it wasn't shown, so it is history, not a card.
+    choose(subject.root, 'session', 's1')
+    await settle()
+    expect(card(subject.root)).toBeNull()
+  })
+
+  it('holds answers while the Node is away', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(permission())
+    await openSession(subject.root)
+    subject.state.host!.send({ v: 1, event: 'status', status: { nodeId: 'n1', state: 'offline' } })
+    await settle()
+    expect(button(subject.root, 'Allow')!.hasAttribute('disabled')).toBe(true)
+    expect(card(subject.root)!.textContent).toContain('Answer once it is')
+  })
+
+  it('shows app access in full, and a request it cannot answer with its reason and no buttons', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(
+      permission({
+        approval: { target: 'Notes (com.apple.Notes)', scopeNote: 'Always allow lasts.', warning: 'Reads notes.' },
+      }),
+      permission({
+        requestId: 'r2',
+        kind: 'workflow_gate',
+        title: 'Continue the workflow?',
+        unsupported: "The extension can't answer a workflow gate request yet. Answer it in the Acorn app.",
+      }),
+    )
+    await openSession(subject.root)
+    const [approval, gate] = [...subject.root.querySelectorAll<HTMLElement>('article.request')]
+    expect(approval!.textContent).toContain('App: Notes (com.apple.Notes)')
+    expect(approval!.textContent).toContain('Always allow lasts.')
+    expect(approval!.textContent).toContain('Reads notes.')
+    expect(gate!.textContent).toContain('Continue the workflow?')
+    expect(gate!.textContent).toContain('Choices: Allow, Reject')
+    expect(gate!.textContent).toContain('Answer it in the Acorn app')
+    expect(gate!.querySelector('button')).toBeNull()
   })
 })
 

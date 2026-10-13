@@ -37,6 +37,11 @@ export type BackgroundMessage =
   // The toolbar button was clicked, which can let the sidebar read the active page it couldn't before.
   | { type: 'page' }
 
+// Failures after which a write may or may not have reached the Node. The sidebar reads again and
+// leaves any retry to the person.
+const UNCERTAIN: ReadonlySet<CallErrorCode> = new Set(['ambiguous_mutation', 'host_unavailable', 'node_unreachable'])
+export const isUncertain = (code: CallErrorCode): boolean => UNCERTAIN.has(code)
+
 export class CallFailure extends Error {
   constructor(
     readonly code: CallErrorCode,
