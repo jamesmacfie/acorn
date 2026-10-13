@@ -215,7 +215,12 @@ export const agentsClientPlugin: ClientPlugin = {
           keywords: ['subscription', 'second account', 'work account', 'sign in', 'login'],
         },
         { id: 'usage', label: 'Usage limits', rows: ['Continue when usage resets'] },
-        { id: 'idle', label: 'Idle agents', rows: ['Stop idle agents after'], keywords: ['memory', 'stop'] },
+        {
+          id: 'idle',
+          label: 'Idle agents',
+          rows: ['Stop idle agents after', 'Stop idle agents above'],
+          keywords: ['memory', 'stop'],
+        },
         {
           id: 'repeated-calls',
           label: 'Stuck agents',

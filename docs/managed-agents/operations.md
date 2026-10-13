@@ -141,32 +141,33 @@ as sessions start.
 ## Idle stop
 
 A provider process runs until the session is archived or deleted, its MCP servers change, it moves to
-a terminal, its task is archived, it sits idle past your limit, or the Node exits. Each one holds an
-agent CLI and its MCP servers, about 450 MB.
+a terminal, its task is archived, the idle stop takes it, or the Node exits. Each one holds an agent
+CLI and its MCP servers, about 450 MB.
 
-Archiving a task runs core's `core:task-archiving` hook
-([hooks](../plugins/hooks.md#hooks)) before the worktree is removed.
-`stopTaskSessions` in `processUpkeep.ts` stops each of the task's processes, marks an active turn
-`interrupted`, expires pending requests, and records `stopped` with a note to restore the task and send
-a prompt. The sessions aren't archived. After a restore, the next prompt resumes them.
+Archiving a task runs core's `core:task-archiving` hook ([hooks](../plugins/hooks.md#hooks)) before
+the worktree goes. `stopTaskSessions` in `processUpkeep.ts` stops the task's processes, marks an active
+turn `interrupted`, expires pending requests, and records `stopped` with a note to restore the task and
+send a prompt. The sessions stay, and after a restore the next prompt resumes them.
 
-**Stop idle agents after** is 30 minutes unless you pick 15 minutes, 2 hours, or never.
-`stopIdleSessions` in `processUpkeep.ts` runs every five minutes and reads the limit each time. It
-stops a process only when all of these hold:
+**Stop idle agents after** is 30 minutes unless you pick 15 minutes, 2 hours, or never. **Stop idle
+agents above** is 4 GB unless you pick 2 GB, 8 GB, or no limit. `stopIdleSessions` in
+`processUpkeep.ts` reads both each time it runs: every five minutes and after each provider start, one
+sweep at a time. First it stops each process that heard nothing from its provider, and had no turn
+dispatched or settled, for the whole time limit. Then, while the process trees, measured as in
+[Storage and memory](#storage-and-memory), hold more than the memory limit together, it stops idle
+processes, longest idle first. It never stops a process while any of these hold:
 
-- The process has started and isn't being set up, stopped, or reconnected.
-- No turn is running or queued.
-- No request is waiting on you.
-- No background subagent is running.
-- Nothing has come from the provider, and no turn dispatched or settled, for the whole limit.
+- The process is being set up, stopped, or reconnected.
+- A turn is running, queued, or being handed to the process.
+- A request is waiting on you.
+- A background subagent is running.
 
 A `ready` session records `stopped` with the limit that applied, which the client shows as resumable.
 The next prompt resumes the conversation, Claude Code through `session/load` and Codex through
 `thread/resume`. A `failed` session's process stops too, and nothing is recorded. Delegated and
 workflow sessions get no exception: `enqueueTurn` resumes a stopped session, and a workflow gate is a
-pending request, so it keeps its session. The sweep is a timer the lifecycle owner holds, not a schedule
-([schedules](../schedules.md#limits)), because it sweeps a map that
-exists only in this process.
+pending request, so it keeps its session. The sweep is a timer the lifecycle owner holds, not a
+[schedule](../schedules.md#limits), because it sweeps a map that exists only in this process.
 
 ## Storage and memory
 

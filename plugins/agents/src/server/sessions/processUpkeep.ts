@@ -1,15 +1,21 @@
 import type { CompiledCoreServices, PluginTelemetry } from '@acorn/plugin-api/node'
 import type { AgentNormalizedEvent, AgentSession } from '../../contract/wire.ts'
-import { AGENT_IDLE_STOP_CHOICES, defaultAgentSessionDefaults } from '../../shared/sessionDefaults'
+import {
+  AGENT_IDLE_MEMORY_CHOICES,
+  AGENT_IDLE_STOP_CHOICES,
+  defaultAgentSessionDefaults,
+  type AgentSessionDefaults,
+} from '../../shared/sessionDefaults'
 import { awaitWithSignal } from '../processes/startCancellation'
 import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 import type { ProcessRow } from './footprint'
-import type { ProviderGeneration, ProviderSessionLifecycle } from './providerSessionLifecycle'
+import type { ProviderFacts, ProviderGeneration, ProviderSessionLifecycle } from './providerSessionLifecycle'
 import { isActiveSubagent } from './stateMachine'
 import type { AgentStore } from './store'
 
 // How long a measured folder size is reused. See diskFootprint().
 const DISK_FOOTPRINT_MS = 30_000
+const GIGABYTE = 1024 ** 3
 
 type ProcessUpkeepDeps = {
   processes: ProviderSessionLifecycle
@@ -22,6 +28,8 @@ type ProcessUpkeepDeps = {
   core: Pick<CompiledCoreServices, 'prefs' | 'proc'>
   currentUserId(): string | null
   telemetry?: PluginTelemetry
+  // How often the idle sweep runs, which is how far past the limit a process can get before it's stopped.
+  idleSweepMs: number
   // The engine's shutdown. Once it aborts, nothing is stopped or measured.
   shutdown: AbortSignal
   record(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<unknown>
@@ -71,27 +79,27 @@ export class ProcessUpkeep {
   }
 
   /**
-   * Stops each provider process that has been idle past the owner's limit, and returns the sessions
-   * it stopped. Read per sweep, so a change in Settings applies to the next one.
+   * Stops each provider process that has been idle past the owner's time limit, then idle ones, longest
+   * idle first, while every process together holds more than the owner's memory limit. Returns the
+   * sessions it stopped. Read per sweep, so a change in Settings applies to the next one. `list` is a
+   * parameter so a test can hand it a fake process table.
    */
-  async stopIdleSessions(now = Date.now()): Promise<string[]> {
-    const { shutdown } = this.deps
-    if (shutdown.aborted || !this.deps.processes.ids().length) return []
-    const userId = this.deps.currentUserId()
-    const { stopIdleAfterMinutes: minutes } = userId
-      ? await this.readWhileRunning(() => readAgentSessionDefaults(this.deps.core.prefs, userId)).catch(
-          (error: unknown) => {
-            if (shutdown.aborted) return defaultAgentSessionDefaults()
-            throw error
-          },
-        )
-      : defaultAgentSessionDefaults()
-    if (shutdown.aborted || !minutes) return []
-    const label = AGENT_IDLE_STOP_CHOICES.find((choice) => choice.minutes === minutes)?.label ?? `${minutes} minutes`
-    return this.stopIdle(
-      now - minutes * 60_000,
-      `The provider process stopped after ${label} idle to free memory. Send a prompt to resume.`,
-    )
+  async stopIdleSessions(now = Date.now(), list = () => this.listProcesses()): Promise<string[]> {
+    if (this.deps.shutdown.aborted || !this.deps.processes.ids().length) return []
+    const { stopIdleAfterMinutes: minutes, stopIdleAboveGigabytes: gigabytes } = await this.ownerDefaults()
+    if (this.deps.shutdown.aborted) return []
+    const stopped: string[] = []
+    if (minutes) {
+      const label = AGENT_IDLE_STOP_CHOICES.find((choice) => choice.minutes === minutes)?.label ?? `${minutes} minutes`
+      stopped.push(
+        ...(await this.stopIdle(
+          now - minutes * 60_000,
+          `The provider process stopped after ${label} idle to free memory. Send a prompt to resume.`,
+        )),
+      )
+    }
+    if (gigabytes) stopped.push(...(await this.stopIdleOverMemory(gigabytes, now, list)))
+    return stopped
   }
 
   /** Stop idle agents now, in Settings > Storage and memory: the sweep's rules with no time limit.
@@ -109,8 +117,7 @@ export class ProcessUpkeep {
    * trees. `list` is a parameter so a test can hand it a fake table.
    */
   async processFootprint(
-    list: () => Promise<ProcessRow[] | null> = async () =>
-      (await import('./footprint')).listProcesses(this.deps.core.proc),
+    list: () => Promise<ProcessRow[] | null> = () => this.listProcesses(),
   ): Promise<{ live: number; idle: number; memoryBytes: number | null }> {
     const running = this.deps.processes.occupancy().filter((live) => !live.stopping)
     const now = Date.now()
@@ -129,19 +136,38 @@ export class ProcessUpkeep {
   }
 
   /**
-   * Report processFootprint() as three gauges owned by this plugin (docs/telemetry/diagnosis.md § Diagnosing
-   * an unresponsive view). Skipped whole while nothing is collecting, because the count runs `ps`
-   * through the process broker. Memory is left out when the table could not be read, rather than
-   * reported as zero.
+   * Report processFootprint() and idlePastLimit() as four gauges owned by this plugin
+   * (docs/telemetry/diagnosis.md § Diagnosing an unresponsive view). Skipped whole while nothing is
+   * collecting, because the count runs `ps` through the process broker. Memory is left out when the
+   * table could not be read, rather than reported as zero.
    */
   async sampleProcessFootprint(): Promise<void> {
     const telemetry = this.deps.telemetry
     if (!telemetry?.enabled()) return
     const { live, idle, memoryBytes } = await this.processFootprint()
+    const idlePastLimit = await this.idlePastLimit()
     if (this.deps.shutdown.aborted) return
     telemetry.gauge('agent.processes.live', live)
     telemetry.gauge('agent.processes.idle', idle)
+    telemetry.gauge('agent.processes.idle_past_limit', idlePastLimit)
     if (memoryBytes !== null) telemetry.gauge('agent.processes.memory', memoryBytes)
+  }
+
+  /**
+   * How many processes the idle rules would stop that have sat past the owner's time limit for longer
+   * than a sweep interval. A working sweep has stopped every one of those, so anything above zero means
+   * it missed one. Without the interval's grace, a process that crossed the limit a minute ago and is
+   * waiting for the next sweep would count.
+   */
+  async idlePastLimit(now = Date.now()): Promise<number> {
+    const { stopIdleAfterMinutes: minutes } = await this.ownerDefaults()
+    if (!minutes) return 0
+    const before = now - minutes * 60_000 - this.deps.idleSweepMs
+    let count = 0
+    for (const live of this.deps.processes.occupancy()) {
+      if (await this.stoppableIdle(live.generation.sessionId, live.generation, before)) count++
+    }
+    return count
   }
 
   /** The size of the attachment and artifact folders. Walking them stats every file, so the answer is
@@ -157,6 +183,21 @@ export class ProcessUpkeep {
     })
     this.diskMeasure = { at: now, bytes }
     return bytes
+  }
+
+  private async ownerDefaults(): Promise<AgentSessionDefaults> {
+    const userId = this.deps.currentUserId()
+    if (!userId) return defaultAgentSessionDefaults()
+    return this.readWhileRunning(() => readAgentSessionDefaults(this.deps.core.prefs, userId)).catch(
+      (error: unknown) => {
+        if (this.deps.shutdown.aborted) return defaultAgentSessionDefaults()
+        throw error
+      },
+    )
+  }
+
+  private async listProcesses(): Promise<ProcessRow[] | null> {
+    return (await import('./footprint')).listProcesses(this.deps.core.proc)
   }
 
   private readWhileRunning<T>(query: () => Promise<T>): Promise<T> {
@@ -196,30 +237,60 @@ export class ProcessUpkeep {
     return session
   }
 
-  // The sweep and the Settings button, which differ only in `before` and in what the transcript says.
+  // The time limit and the Settings button, which differ only in `before` and in what the transcript says.
   private async stopIdle(before: number, detail: string): Promise<string[]> {
-    const { processes } = this.deps
     const stopped: string[] = []
-    for (const live of processes.occupancy()) {
-      const sessionId = live.generation.sessionId
+    for (const live of this.deps.processes.occupancy()) {
       if (this.deps.shutdown.aborted) break
-      const session = await this.stoppableIdle(sessionId, live.generation, before)
-      if (!session) continue
-      // Again, because a prompt could have arrived during the reads.
-      if (!processes.idleCandidate(sessionId, live.generation, before)) continue
-      // Marked before the record, so the dispatcher leaves this process alone while it is written.
-      // Recorded before the stop, so a prompt that lands in between sees `stopped` and takes the resume
-      // path rather than queueing behind a process that is about to exit. A failed session's state is
-      // left as it is, so the failure still shows.
-      if (!processes.markStopping(live.generation)) continue
-      if (session.runtimeState === 'ready') {
-        await this.deps.record(sessionId, null, { type: 'session_state', state: 'stopped', detail })
-      }
-      if (processes.current(sessionId)?.generation === live.generation) await processes.stop(sessionId)
-      stopped.push(sessionId)
+      if (await this.stopIfIdle(live, before, detail)) stopped.push(live.generation.sessionId)
     }
     // A prompt that queued behind a stopping process has nothing else to wake it.
     if (stopped.length) this.deps.pump()
     return stopped
+  }
+
+  // Each process tree is measured once, and the total drops by a tree as it stops, so the sweep stops
+  // only as many as it takes. A busy process keeps running, even when the busy ones alone are over.
+  private async stopIdleOverMemory(
+    gigabytes: number,
+    now: number,
+    list: () => Promise<ProcessRow[] | null>,
+  ): Promise<string[]> {
+    const rows = await list()
+    if (!rows || this.deps.shutdown.aborted) return []
+    const running = this.deps.processes.occupancy().filter((live) => !live.stopping)
+    let { total, trees } = (await import('./footprint')).longestIdleTrees(rows, running)
+    const limit = gigabytes * GIGABYTE
+    const label = AGENT_IDLE_MEMORY_CHOICES.find((choice) => choice.gigabytes === gigabytes)?.label ?? `${gigabytes} GB`
+    const detail = `The provider process stopped to free memory, because agents held more than ${label}. Send a prompt to resume.`
+    const stopped: string[] = []
+    for (const { live, bytes } of trees) {
+      if (total <= limit || this.deps.shutdown.aborted) break
+      if (!(await this.stopIfIdle(live, now, detail))) continue
+      stopped.push(live.generation.sessionId)
+      total -= bytes
+    }
+    if (stopped.length) this.deps.pump()
+    return stopped
+  }
+
+  // Stops the process if the idle rules allow it, and says whether it did.
+  private async stopIfIdle(live: ProviderFacts, before: number, detail: string): Promise<boolean> {
+    const { processes } = this.deps
+    const sessionId = live.generation.sessionId
+    const session = await this.stoppableIdle(sessionId, live.generation, before)
+    if (!session) return false
+    // Again, because a prompt could have arrived during the reads.
+    if (!processes.idleCandidate(sessionId, live.generation, before)) return false
+    // Marked before the record, so the dispatcher leaves this process alone while it is written.
+    // Recorded before the stop, so a prompt that lands in between sees `stopped` and takes the resume
+    // path rather than queueing behind a process that is about to exit. A failed session's state is
+    // left as it is, so the failure still shows.
+    if (!processes.markStopping(live.generation)) return false
+    if (session.runtimeState === 'ready') {
+      await this.deps.record(sessionId, null, { type: 'session_state', state: 'stopped', detail })
+    }
+    if (processes.current(sessionId)?.generation === live.generation) await processes.stop(sessionId)
+    return true
   }
 }

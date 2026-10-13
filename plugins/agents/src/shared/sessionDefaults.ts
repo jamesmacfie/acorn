@@ -37,6 +37,18 @@ export const AGENT_IDLE_STOP_CHOICES = [
 ] as const
 
 /**
+ * "Stop idle agents above", in gigabytes held by every provider process together, where 0 is No limit.
+ * Past it, the idle sweep stops idle processes, longest idle first, until the total is back under it
+ * (docs/managed-agents/operations.md § Idle stop).
+ */
+export const AGENT_IDLE_MEMORY_CHOICES = [
+  { gigabytes: 2, label: '2 GB' },
+  { gigabytes: 4, label: '4 GB' },
+  { gigabytes: 8, label: '8 GB' },
+  { gigabytes: 0, label: 'No limit' },
+] as const
+
+/**
  * "Keep agent history for archived tasks", in days, where 0 is Forever. Past the limit, a daily
  * schedule removes the transcripts of that task's sessions for good
  * (docs/data-layer/backup-and-retention.md § Retention).
@@ -65,6 +77,8 @@ export type AgentSessionDefaults = {
   continueAfterUsageLimit: boolean
   /** Minutes an idle provider process is kept before the runtime stops it. 0 keeps it until the node exits. */
   stopIdleAfterMinutes: number
+  /** Gigabytes every provider process may hold together before the runtime stops idle ones. 0 is no limit. */
+  stopIdleAboveGigabytes: number
   /** Identical tool calls in a row before the transcript warns that the agent may be stuck. 0 is off. */
   warnRepeatedToolCallsAfter: number
   /** Days an archived task keeps its agent history before the node removes it. 0 keeps it forever. */
@@ -97,6 +111,7 @@ export type AgentSessionDefaults = {
 export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   continueAfterUsageLimit: true,
   stopIdleAfterMinutes: 30,
+  stopIdleAboveGigabytes: 4,
   warnRepeatedToolCallsAfter: 3,
   // Forever, because removing history cannot be undone and has to be the owner's choice.
   keepArchivedHistoryDays: 0,
@@ -189,6 +204,14 @@ export function validateAgentSessionDefaults(
     )
   }
   if (
+    record.stopIdleAboveGigabytes != null &&
+    !AGENT_IDLE_MEMORY_CHOICES.some((choice) => choice.gigabytes === record.stopIdleAboveGigabytes)
+  ) {
+    errors.push(
+      `stopIdleAboveGigabytes must be one of ${AGENT_IDLE_MEMORY_CHOICES.map((choice) => choice.gigabytes).join(', ')}.`,
+    )
+  }
+  if (
     record.warnRepeatedToolCallsAfter != null &&
     !AGENT_REPEATED_TOOL_CALL_CHOICES.some((choice) => choice.calls === record.warnRepeatedToolCallsAfter)
   ) {
@@ -262,6 +285,9 @@ export function validateAgentSessionDefaults(
         ? { continueAfterUsageLimit: record.continueAfterUsageLimit }
         : {}),
       ...(typeof record.stopIdleAfterMinutes === 'number' ? { stopIdleAfterMinutes: record.stopIdleAfterMinutes } : {}),
+      ...(typeof record.stopIdleAboveGigabytes === 'number'
+        ? { stopIdleAboveGigabytes: record.stopIdleAboveGigabytes }
+        : {}),
       ...(typeof record.warnRepeatedToolCallsAfter === 'number'
         ? { warnRepeatedToolCallsAfter: record.warnRepeatedToolCallsAfter }
         : {}),

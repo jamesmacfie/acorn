@@ -454,6 +454,7 @@ export class ManagedAgentEngine {
       core: this.core,
       currentUserId: this.currentUserId,
       telemetry: this.telemetry,
+      idleSweepMs: options.idleSweepMs ?? IDLE_SWEEP_MS,
       shutdown: this.shutdown.signal,
       record: (sessionId, turnId, event) => this.record(sessionId, turnId, event),
       endTurnSpan: (turnId, outcome) => this.endTurnSpan(turnId, outcome),

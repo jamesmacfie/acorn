@@ -23,6 +23,7 @@ import {
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import {
   AGENT_ARCHIVED_HISTORY_CHOICES,
+  AGENT_IDLE_MEMORY_CHOICES,
   AGENT_IDLE_STOP_CHOICES,
   AGENT_REPEATED_TOOL_CALL_CHOICES,
   defaultAgentSessionDefaults,
@@ -95,6 +96,7 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
   }
   const continueAfterLimit = createSettingSave()
   const idleStop = createSettingSave()
+  const idleMemory = createSettingSave()
   const repeatedCalls = createSettingSave()
   const archivedHistory = createSettingSave()
   const followLast = createSettingSave()
@@ -192,6 +194,21 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
             value={String(record().stopIdleAfterMinutes)}
             options={AGENT_IDLE_STOP_CHOICES.map((choice) => ({ value: String(choice.minutes), label: choice.label }))}
             onChange={(value) => void idleStop.run(() => save({ stopIdleAfterMinutes: Number(value) }))}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Stop idle agents above"
+          help="When running agents together hold more memory than this, acorn stops the ones idle longest until they're back under it. An agent that's working keeps running."
+          error={idleMemory.error()}
+        >
+          <Select
+            label="Stop idle agents above"
+            value={String(record().stopIdleAboveGigabytes)}
+            options={AGENT_IDLE_MEMORY_CHOICES.map((choice) => ({
+              value: String(choice.gigabytes),
+              label: choice.label,
+            }))}
+            onChange={(value) => void idleMemory.run(() => save({ stopIdleAboveGigabytes: Number(value) }))}
           />
         </SettingRow>
       </SettingsSection>

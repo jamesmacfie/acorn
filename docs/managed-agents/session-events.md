@@ -154,8 +154,12 @@ enqueue, because a turn can wait minutes behind the concurrency limit. It closes
 an error, a provider that closed, or a retry that puts the turn back in the queue. A turn whose
 process died reports nothing.
 
-Every 60 seconds while telemetry is on, `processUpkeep.ts` reports three gauges: `agent.processes.live`,
-`agent.processes.idle` (those the idle rules would stop now), and `agent.processes.memory` (summed
-resident bytes of their process trees). They come from `processFootprint()`, the same numbers
-Settings > Storage and memory draws. Counting memory runs `ps` through the process broker, so the
+Every 60 seconds while telemetry is on, `processUpkeep.ts` reports four gauges: `agent.processes.live`,
+`agent.processes.idle` (those the idle rules would stop now), `agent.processes.idle_past_limit`, and
+`agent.processes.memory` (summed resident bytes of their process trees). All but `idle_past_limit` come
+from `processFootprint()`, the same numbers Settings > Storage and memory draws.
+`agent.processes.idle_past_limit` counts the processes the idle rules would stop that have been idle
+past your time limit for more than one five-minute sweep. A working sweep has stopped all of those, so
+any value above zero means the [idle stop](./operations.md#idle-stop) missed one. It's zero while the
+limit is Never. Counting memory runs `ps` through the process broker, so the
 sample is skipped while telemetry is off, and the memory gauge is left out when `ps` fails.

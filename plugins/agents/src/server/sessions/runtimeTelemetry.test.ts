@@ -257,14 +257,16 @@ describe('what a session reports', () => {
           : [],
       )
 
-    it('reports live, idle and summed memory as gauges this plugin owns', async () => {
+    it('reports live, idle, idle past the limit and summed memory as gauges this plugin owns', async () => {
       runtime = build(new AgentDriverRegistry(), ctx.telemetry, 20)
       vi.spyOn(runtime.upkeep, 'processFootprint').mockResolvedValue({ live: 2, idle: 1, memoryBytes: 331 })
+      vi.spyOn(runtime.upkeep, 'idlePastLimit').mockResolvedValue(1)
       // The timer keeps running while this waits, so only the first sample is compared.
       await vi.waitFor(() =>
-        expect(gauges().slice(0, 3)).toEqual([
+        expect(gauges().slice(0, 4)).toEqual([
           ['agent.processes.live', 2, 'agents'],
           ['agent.processes.idle', 1, 'agents'],
+          ['agent.processes.idle_past_limit', 1, 'agents'],
           ['agent.processes.memory', 331, 'agents'],
         ]),
       )

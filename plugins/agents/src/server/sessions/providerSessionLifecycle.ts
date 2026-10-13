@@ -119,6 +119,7 @@ export class ProviderSessionLifecycle {
   private readonly quietTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private readonly callbacks = new Set<Promise<void>>()
   private idleSweepTimer: ReturnType<typeof setInterval> | null = null
+  private idleSweepRunning = false
   private footprintTimer: ReturnType<typeof setInterval> | null = null
   private nextGeneration = 0
 
@@ -191,6 +192,7 @@ export class ProviderSessionLifecycle {
       !live.startPromise &&
       !live.stopping &&
       !live.activeTurnId &&
+      !live.admissionTurnId &&
       !this.readinessHolds.has(sessionId) &&
       live.lastActivityAt <= before
     )
@@ -296,6 +298,8 @@ export class ProviderSessionLifecycle {
     live.startPromise = Promise.resolve().then(() => this.start(session, live))
     await live.startPromise
     if (!this.owns(live.generation)) throw new Error('The managed agent session is stopping.')
+    // A start is when the total memory climbs, so the sweep doesn't wait for its timer.
+    this.sweepIdle()
     return live.generation
   }
 
@@ -536,11 +540,22 @@ export class ProviderSessionLifecycle {
   }
   private armIdleSweep(): void {
     if (this.idleSweepTimer || this.ports.shuttingDown()) return
-    this.idleSweepTimer = setInterval(() => {
-      if (this.ports.shuttingDown()) return
-      this.track(this.ports.idleSweep().catch((error) => this.ports.callbackError('idle', error)))
-    }, this.idleSweepMs)
+    this.idleSweepTimer = setInterval(() => this.sweepIdle(), this.idleSweepMs)
     this.idleSweepTimer.unref?.()
+  }
+  // One sweep at a time, so two can't both stop a process to get under the same memory limit. A start
+  // that lands during a sweep is covered by the next one.
+  private sweepIdle(): void {
+    if (this.idleSweepRunning || this.ports.shuttingDown()) return
+    this.idleSweepRunning = true
+    this.track(
+      this.ports
+        .idleSweep()
+        .catch((error) => this.ports.callbackError('idle', error))
+        .finally(() => {
+          this.idleSweepRunning = false
+        }),
+    )
   }
   armFootprintSample(everyMs: number): void {
     if (this.footprintTimer) return

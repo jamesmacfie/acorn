@@ -63,6 +63,18 @@ export function processTreeBytes(rows: readonly ProcessRow[], roots: readonly nu
   return total
 }
 
+/** The processes, longest idle first, each with the memory of its tree, and the total of those trees.
+ *  Trees never overlap, so the total is their sum. The memory limit's sweep stops from the front. */
+export function longestIdleTrees<T extends { pid: number | null; lastActivityAt: number }>(
+  rows: readonly ProcessRow[],
+  processes: readonly T[],
+): { total: number; trees: { live: T; bytes: number }[] } {
+  const trees = processes
+    .toSorted((a, b) => a.lastActivityAt - b.lastActivityAt)
+    .map((live) => ({ live, bytes: live.pid ? processTreeBytes(rows, [live.pid]) : 0 }))
+  return { total: trees.reduce((sum, tree) => sum + tree.bytes, 0), trees }
+}
+
 /** The bytes of every file under `path`, or 0 when it does not exist. */
 export async function directoryBytes(path: string): Promise<number> {
   let entries

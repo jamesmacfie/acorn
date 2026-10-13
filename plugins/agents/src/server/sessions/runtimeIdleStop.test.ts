@@ -15,6 +15,7 @@ import { ManagedAgentRuntime } from './runtime'
 // clock past the limit rather than waiting for its timer, except the one that checks the timer itself.
 
 const MINUTE = 60_000
+const GIGABYTE = 1024 ** 3
 const OWNER = 'owner'
 
 type TurnPlan = 'complete' | 'hold' | 'background' | 'fail'
@@ -56,8 +57,9 @@ class IdleDriver implements AgentDriver {
     let release: ((error: Error) => void) | null = null
     await options.onEvent({ type: 'session_metadata', providerSessionRef })
     await options.onEvent({ type: 'session_state', state: 'ready' })
-    // A process id per start, which the footprint case walks a fake process table from.
-    const pid = 1000 + this.starts.length
+    // A process id per start, which the footprint cases walk a fake process table from. Past any real
+    // pid, so the sweep each start runs against the machine's own table finds none of them.
+    const pid = 9_000_000 + this.starts.length
     this.pids.set(options.session.id, pid)
     return {
       providerSessionRef,
@@ -371,5 +373,91 @@ describe('stopping idle provider processes', () => {
     expect(await runtime.upkeep.processFootprint(async () => table)).toEqual({ live: 2, idle: 1, memoryBytes: 331 })
     // Where the node cannot list processes, the counts stand and memory is unknown.
     expect(await runtime.upkeep.processFootprint(async () => null)).toEqual({ live: 2, idle: 1, memoryBytes: null })
+  })
+
+  describe('the memory limit', () => {
+    // Each session is idle a minute longer than the next, oldest first.
+    const idleSessionsInOrder = async (count: number) => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      const sessions = []
+      for (let index = 0; index < count; index++) {
+        sessions.push(await idleSession())
+        vi.setSystemTime(later(1))
+      }
+      return sessions
+    }
+    const limitTo = (stopIdleAboveGigabytes: number) =>
+      writeAgentSessionDefaults(ctx.core.prefs, OWNER, { ...defaultAgentSessionDefaults(), stopIdleAboveGigabytes })
+    const tableOf = (bytesBySession: [string, number][]) => async () =>
+      bytesBySession.map(([sessionId, rssBytes]) => ({ pid: driver.pids.get(sessionId)!, ppid: 1, rssBytes }))
+
+    it('stops the longest idle first, and only as many as it takes to get under', async () => {
+      const [oldest, middle, newest] = await idleSessionsInOrder(3)
+      await limitTo(2)
+      const table = tableOf([
+        [newest.id, GIGABYTE],
+        [oldest.id, GIGABYTE],
+        [middle.id, GIGABYTE],
+      ])
+
+      // Under the time limit, so only memory stops anything: 3 GB against 2 GB.
+      expect(await runtime.upkeep.stopIdleSessions(Date.now(), table)).toEqual([oldest.id])
+      expect(driver.stopped).toEqual([oldest.id])
+      expect((await runtime.store.snapshot(oldest.id)).events.at(-1)?.event).toEqual({
+        type: 'session_state',
+        state: 'stopped',
+        detail:
+          'The provider process stopped to free memory, because agents held more than 2 GB. Send a prompt to resume.',
+      })
+      // Back under the limit, so the next sweep leaves the rest.
+      expect(await runtime.upkeep.stopIdleSessions(Date.now(), table)).toEqual([])
+    })
+
+    it('never stops a process with a request the owner has not answered', async () => {
+      const [asking, idle] = await idleSessionsInOrder(2)
+      await driver.push(asking.id, {
+        type: 'request',
+        requestId: 'permission-1',
+        kind: 'permission',
+        title: 'Run the test command?',
+        options: [{ id: 'allow-once', label: 'Allow once', kind: 'allow_once' }],
+      })
+      await vi.waitFor(async () => expect(await runtime.store.pendingRequests(asking.id)).toHaveLength(1))
+      await limitTo(2)
+      const table = tableOf([
+        [asking.id, 3 * GIGABYTE],
+        [idle.id, GIGABYTE],
+      ])
+
+      // Still over the limit once the idle one stops, and the asking session keeps its process anyway.
+      expect(await runtime.upkeep.stopIdleSessions(Date.now(), table)).toEqual([idle.id])
+      expect(await runtime.upkeep.stopIdleSessions(Date.now(), table)).toEqual([])
+      expect(driver.stopped).toEqual([idle.id])
+    })
+
+    it('leaves every process running when the limit is off', async () => {
+      const [session] = await idleSessionsInOrder(1)
+      await limitTo(0)
+      expect(await runtime.upkeep.stopIdleSessions(Date.now(), tableOf([[session.id, 64 * GIGABYTE]]))).toEqual([])
+    })
+  })
+
+  it('sweeps as soon as a provider starts, without waiting for the timer', async () => {
+    const sweep = vi.spyOn(runtime.upkeep, 'stopIdleSessions').mockResolvedValue([])
+    await idleSession()
+    await vi.waitFor(() => expect(sweep).toHaveBeenCalledTimes(1))
+  })
+
+  it('counts a process as idle past the limit only once a sweep should have stopped it', async () => {
+    await idleSession()
+    // The limit is 30 minutes and the sweep runs every five.
+    expect(await runtime.upkeep.idlePastLimit(later(34))).toBe(0)
+    expect(await runtime.upkeep.idlePastLimit(later(36))).toBe(1)
+
+    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, {
+      ...defaultAgentSessionDefaults(),
+      stopIdleAfterMinutes: 0,
+    })
+    expect(await runtime.upkeep.idlePastLimit(later(24 * 60))).toBe(0)
   })
 })

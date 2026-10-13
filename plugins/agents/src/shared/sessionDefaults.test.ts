@@ -85,6 +85,11 @@ describe('stored defaults', () => {
       ok: true,
       value: { stopIdleAfterMinutes: 0 },
     })
+    expect(validateAgentSessionDefaults({ stopIdleAboveGigabytes: 3 }).ok).toBe(false)
+    expect(validateAgentSessionDefaults({ stopIdleAboveGigabytes: 0 })).toEqual({
+      ok: true,
+      value: { stopIdleAboveGigabytes: 0 },
+    })
     expect(validateAgentSessionDefaults({ warnRepeatedToolCallsAfter: 4 }).ok).toBe(false)
     expect(validateAgentSessionDefaults({ warnRepeatedToolCallsAfter: 0 })).toEqual({
       ok: true,

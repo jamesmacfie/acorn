@@ -22,6 +22,7 @@ One `prefs` row, `agents:session-defaults:v1`, holds these fields:
 | `spawned` | Inherit | Defaults for agents made by `agent_spawn` |
 | `continueAfterUsageLimit` | On | Resumes after a plan limit resets ([operations](./operations.md#plan-usage-limits)) |
 | `stopIdleAfterMinutes` | 30 | **Stop idle agents after**: 15, 30, 120, or 0 for never ([idle stop](./operations.md#idle-stop)) |
+| `stopIdleAboveGigabytes` | 4 | **Stop idle agents above**: 2, 4, 8, or 0 for no limit ([idle stop](./operations.md#idle-stop)) |
 | `warnRepeatedToolCallsAfter` | 3 | **Warn when an agent repeats a tool call**: 3, 5, 10, or 0 for never ([repeated tool calls](./repeated-tool-calls.md)) |
 | `keepArchivedHistoryDays` | 0 | **Keep agent history for archived tasks**: 30, 90, 365, or 0 for forever ([history retention](./history-retention.md)) |
 | `checkInstructionFiles` | Off | Stops a turn containing hidden characters ([instruction checks](../security.md#instruction-file-checks-and-review)) |
