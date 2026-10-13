@@ -1,6 +1,23 @@
 # Phase 03: incremental Markdown
 
-Status: planned, October 13, 2026.
+Completion note, October 13, 2026: The measurement passed the gate, so no code changed. Only the
+dated [Markdown parse cost check](../../testing/incremental-markdown-parse-2026-10-13.md) landed.
+`renderBlocks` and `Markdown` are unchanged.
+
+An agent-launched window is always hidden, so this phase didn't run the phase 01 replay. Instead,
+it streamed the generated `prose` reply into `renderBlocks` in plain Node, one chunk per frame.
+Updates from 45 KB to 50 KB had a 95th percentile of 0.94 to 1.46 ms over five runs on a busy
+M2 Pro, under the 2 ms gate. Node runs V8, while the window runs WebKit's JavaScriptCore, so this is
+a proxy. jsdom would add nothing, because the parse touches no DOM.
+
+A person still needs to run `pnpm dev:agent:ui -- replay prose` twice in a visible window with
+telemetry on. From each report's `streaming` phase, record the `markdown.parse` `p95`, `p50`,
+`max`, `count`, and `sum`, the `markdown.parse.characters` `max`, and the `markdown.render` `p95`.
+That pooled `p95` reflects the cost near 67 KB, so a value under 2 ms confirms the gate. If it's
+over 2 ms, build the change below as written. Nothing in it has gone stale. Phases 04 and 05 can
+treat the per-frame parse as a small, linear cost, about 16 microseconds per KB in Node.
+
+Status: not built; parse cost under the gate in a Node proxy, October 13, 2026.
 
 Read the [programme page](./README.md) first. This phase starts by measuring with phase 01 and may end
 there.
