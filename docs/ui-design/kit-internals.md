@@ -88,6 +88,10 @@ Appending to a message changes one key, the last. Callers depend on this:
   `packages/client-core/src/infra/highlight/shiki.ts` keeps a small cache of fence HTML keyed by text
   and language.
 
+An open code fence stays plain while its text changes. After 300 ms without a change, the component
+highlights it once, so a finished message with an unclosed fence still gains color. Closing a fence
+highlights it without that delay. Replacing or removing a block cancels its pending highlight.
+
 The `images` option decides what an image becomes, and it's part of the block key:
 
 - `inline` renders an `<img>`, for text a person wrote.

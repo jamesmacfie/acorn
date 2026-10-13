@@ -1,6 +1,18 @@
 # Phase 02: open-fence highlighting
 
-Status: planned, October 13, 2026.
+Completion note, October 13, 2026: `Markdown` now waits 300 ms after the last change before
+highlighting an open fence. It cancels the timer when the block changes or disappears, while closed
+fences keep their immediate highlight. This stays in the shared Markdown component so transcript,
+plugin, and other callers get the same rule. Tests cover 50 growing updates, closure, an unfinished
+final fence, and selection preservation. The kit reference documents the rule.
+
+The phase 01 replay was unavailable during this phase. Run its `code` fixture in a visible window,
+alternating base, candidate, candidate, base. Record whether the highlighter runs at most twice per
+fence during streaming, the change in `highlight.html.render` time, and the `highlight.html.cache` hit
+rate. This phase adds no measuring tool. The quiet period is a visible trade-off: an open fence stays
+plain until it settles, then gains color once.
+
+Status: implemented, October 13, 2026.
 
 Read the [programme page](./README.md) first. This phase doesn't need phase 01 to start, but its
 acceptance numbers come from 01's `code` fixture once that exists.

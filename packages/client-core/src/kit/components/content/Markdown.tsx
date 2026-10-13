@@ -32,7 +32,16 @@ const grammarFor = (hint: string): string | null => {
 // generation: a block that survives three updates while its grammar loads must still get its colour.
 // `diagrams` are its mermaid fences, kept so a theme change can redraw them.
 type Diagram = { wrap: Element; source: string; block: Block }
-type Block = { key: string; el: Element; dispose?: () => void; live: boolean; diagrams?: Diagram[] }
+type Block = {
+  key: string
+  el: Element
+  dispose?: () => void
+  live: boolean
+  diagrams?: Diagram[]
+  highlightTimer?: ReturnType<typeof setTimeout>
+}
+type Fence = { code: HTMLElement; grammar: string; wrap: Element; block: Block }
+const OPEN_FENCE_QUIET_MS = 300
 
 // Drawn one at a time, because mermaid queues its renders anyway. A diagram that will not parse stays
 // on screen as its source, the way a fence whose grammar will not load stays plain.
@@ -89,6 +98,7 @@ export default function Markdown(props: {
 
   const drop = (block: Block) => {
     block.live = false
+    clearTimeout(block.highlightTimer)
     block.dispose?.()
   }
   onCleanup(() => {
@@ -96,6 +106,33 @@ export default function Markdown(props: {
     for (const block of blocks) drop(block)
     blocks = []
   })
+
+  const highlightFences = (fences: Fence[]) => {
+    // Grammars load on demand (highlight/langs.ts), so each fence has to ask for its own before the
+    // highlighter can route to it. The import is dynamic so a plugin frame that renders a ticket
+    // description does not carry the engine for one it never shows.
+    void (async () => {
+      const { highlightToHtml } = await import('../../../infra/highlight/shiki')
+      // Started together, applied in order: three fences in three languages are three grammar loads,
+      // and awaiting them one at a time would make the last one wait for the first two.
+      // Caught per fence: a grammar that fails to load leaves that block plain rather than taking the
+      // rest of the message's colour with it, and an unhandled rejection here reaches the host.
+      const pending = fences.map((fence) =>
+        fence.block.live
+          ? highlightToHtml(fence.code.textContent ?? '', fence.grammar, () => fence.block.live).catch(() => null)
+          : Promise.resolve(null),
+      )
+      for (const [at, { wrap, block }] of fences.entries()) {
+        const html = await pending[at]
+        if (!html || !block.live) continue
+        const holder = document.createElement('div')
+        holder.innerHTML = html
+        const highlighted = holder.firstElementChild
+        // Into the wrapper, so the copy button mounted above survives and stays positioned.
+        if (highlighted) wrap.querySelector('pre')?.replaceWith(highlighted)
+      }
+    })()
+  }
 
   createEffect(() =>
     measureWork('markdown.render', () => {
@@ -119,7 +156,7 @@ export default function Markdown(props: {
         else spare.set(block.key, [block])
       }
 
-      const fences: { code: HTMLElement; grammar: string; wrap: Element; block: Block }[] = []
+      const fences: Fence[] = []
       const diagrams: Diagram[] = []
       const placed: Block[] = []
       for (const { key, html, fence } of next) {
@@ -203,30 +240,17 @@ export default function Markdown(props: {
         void drawDiagrams(diagrams)
       }
       if (!fences.length) return
-      // Grammars load on demand (highlight/langs.ts), so each fence has to ask for its own before the
-      // highlighter can route to it. The import is dynamic so a plugin frame that renders a ticket
-      // description does not carry the engine for one it never shows.
-      void (async () => {
-        const { highlightToHtml } = await import('../../../infra/highlight/shiki')
-        // Started together, applied in order: three fences in three languages are three grammar loads,
-        // and awaiting them one at a time would make the last one wait for the first two.
-        // Caught per fence: a grammar that fails to load leaves that block plain rather than taking the
-        // rest of the message's colour with it, and an unhandled rejection here reaches the host.
-        const pending = fences.map((fence) =>
-          fence.block.live
-            ? highlightToHtml(fence.code.textContent ?? '', fence.grammar, () => fence.block.live).catch(() => null)
-            : Promise.resolve(null),
-        )
-        for (const [at, { wrap, block }] of fences.entries()) {
-          const html = await pending[at]
-          if (!html || !block.live) continue
-          const holder = document.createElement('div')
-          holder.innerHTML = html
-          const highlighted = holder.firstElementChild
-          // Into the wrapper, so the copy button mounted above survives and stays positioned.
-          if (highlighted) wrap.querySelector('pre')?.replaceWith(highlighted)
+      const closed: Fence[] = []
+      for (const fence of fences) {
+        if (!fence.code.hasAttribute('data-open')) {
+          closed.push(fence)
+          continue
         }
-      })()
+        fence.block.highlightTimer = setTimeout(() => {
+          if (fence.block.live) highlightFences([fence])
+        }, OPEN_FENCE_QUIET_MS)
+      }
+      if (closed.length) highlightFences(closed)
     }),
   )
 

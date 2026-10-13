@@ -3,6 +3,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Markdown from './Markdown'
 import type { MarkdownFence, MarkdownFenceAdapter } from '../../lib/rendering/markdown'
+import * as shiki from '../../../infra/highlight/shiki'
 
 // What a streaming message costs to redraw.
 //
@@ -11,10 +12,7 @@ import type { MarkdownFence, MarkdownFenceAdapter } from '../../lib/rendering/ma
 // fence, and lose any text the reader had selected. So the assertions here are about identity: which
 // elements survive an update, and how many times the highlighter is asked.
 
-const highlighted = vi.fn(async (code: string, _lang: string) => `<pre class="hl">${code}</pre>`)
-vi.mock('../../../infra/highlight/shiki', () => ({
-  highlightToHtml: (code: string, lang: string) => highlighted(code, lang),
-}))
+const highlighted = vi.spyOn(shiki, 'highlightToHtml')
 const diagrammed = vi.fn(async (source: string) => {
   if (source.includes('broken')) throw new Error('Parse error')
   const figure = document.createDocumentFragment()
@@ -30,6 +28,7 @@ let host: HTMLElement
 
 beforeEach(() => {
   highlighted.mockClear()
+  shiki.resetHighlightHtmlCache()
   diagrammed.mockClear()
   host = document.createElement('div')
   document.body.append(host)
@@ -38,8 +37,9 @@ afterEach(async () => {
   dispose?.()
   dispose = undefined
   host.remove()
-  // A fence starts loading the highlighter even when its test ends synchronously. A load still running
-  // at teardown misses the mock above and pulls in the real module.
+  vi.useRealTimers()
+  // A fence can still be loading the highlighter after a synchronous test ends. Let that import
+  // settle before the next test resets the shared cache.
   await vi.dynamicImportSettled()
 })
 
@@ -83,7 +83,7 @@ describe('a streaming markdown message', () => {
   it('highlights a closed fence once across ten updates', async () => {
     const fence = '```ts\nconst a = 1\n```'
     const { root, setText } = mount(`${fence}\n\nProse`)
-    await vi.waitFor(() => expect(root.querySelector('pre.hl')).not.toBeNull())
+    await vi.waitFor(() => expect(root.querySelector('pre.shiki')).not.toBeNull())
     expect(highlighted).toHaveBeenCalledTimes(1)
 
     const fenceEl = blocks(root)[0]
@@ -93,7 +93,43 @@ describe('a streaming markdown message', () => {
     // The fence's source never moved, so its element never moved and it was never re-tokenized.
     expect(highlighted).toHaveBeenCalledTimes(1)
     expect(blocks(root)[0]).toBe(fenceEl)
-    expect(fenceEl.querySelector('pre.hl')).not.toBeNull()
+    expect(fenceEl.querySelector('pre.shiki')).not.toBeNull()
+  })
+
+  it('keeps a growing open fence plain until it has been quiet for 300 ms', async () => {
+    vi.useFakeTimers()
+    const { root, setText } = mount('```ts\nconst line0 = 0')
+    for (let at = 1; at <= 50; at++) {
+      await vi.advanceTimersByTimeAsync(40)
+      setText(`\`\`\`ts\n${Array.from({ length: at + 1 }, (_, line) => `const line${line} = ${line}`).join('\n')}`)
+    }
+    expect(root.querySelector('code[data-open]')).not.toBeNull()
+    expect(highlighted).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(299)
+    expect(highlighted).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(highlighted).toHaveBeenCalledTimes(1)
+    expect(root.querySelector('pre.shiki')).not.toBeNull()
+  })
+
+  it('highlights a fence as soon as it closes', async () => {
+    vi.useFakeTimers()
+    const { root, setText } = mount('```ts\nconst value = 1')
+    setText('```ts\nconst value = 1\n```')
+    await vi.dynamicImportSettled()
+    expect(highlighted).toHaveBeenCalledTimes(1)
+    expect(root.querySelector('pre.shiki')).not.toBeNull()
+  })
+
+  it('highlights an unfinished fence after the text stops changing', async () => {
+    vi.useFakeTimers()
+    const { root } = mount('```ts\nconst unfinished = true')
+    await vi.advanceTimersByTimeAsync(299)
+    expect(root.querySelector('pre.shiki')).toBeNull()
+    expect(highlighted).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(highlighted).toHaveBeenCalledTimes(1)
+    expect(root.querySelector('pre.shiki')).not.toBeNull()
   })
 
   it('mounts one copy button per fence and leaves it alone', async () => {
