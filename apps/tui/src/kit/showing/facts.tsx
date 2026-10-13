@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { For, type JSX } from 'solid-js'
+import { For, Show, type JSX } from 'solid-js'
 import type { Size, Tone } from '@acorn/client-core/kit/tokens'
 import { Line, pad, slot } from '../cells'
 
@@ -35,17 +35,23 @@ DescriptionList.Item = (props: { label: JSX.Element; mono?: boolean; children: J
   </box>
 )
 
+const PIE_QUARTERS = ['○', '◔', '◑', '◕', '●']
+
 /** `████░░░░ 62%`. Eight cells, because a meter that spends a whole row on a ratio is a chart.
  *
  *  `mark` takes the cell it falls in rather than a row of its own: a second line under every meter
  *  would double the height of docker's stream of them, and the bar is only eight cells wide, so the
- *  mark is never more than a cell away from where the pixels would put it. */
+ *  mark is never more than a cell away from where the pixels would put it.
+ *
+ *  `shape="pie"` is one cell, the nearest quarter of a circle. It sits inline with text, as on the
+ *  DOM, so it drops the percentage the bar prints beside itself. */
 export function Meter(props: {
   value: number
-  tone?: Extract<Tone, 'accent' | 'ok' | 'warn' | 'danger'> | 'auto'
+  tone?: Extract<Tone, 'accent' | 'ok' | 'warn' | 'danger' | 'muted'> | 'auto'
   label: string
   size?: Extract<Size, 'sm' | 'md'>
   mark?: number
+  shape?: 'bar' | 'pie'
 }) {
   const CELLS = 8
   const ratio = () => Math.min(1, Math.max(0, props.value))
@@ -61,9 +67,11 @@ export function Meter(props: {
     return cells.slice(0, at) + '▲' + cells.slice(at + 1)
   }
   return (
-    <box flexDirection="row" gap={1}>
-      <Line tone={tone()}>{bar()}</Line>
-      <Line role="muted">{`${Math.round(ratio() * 100)}%`}</Line>
-    </box>
+    <Show when={props.shape !== 'pie'} fallback={<Line tone={tone()}>{PIE_QUARTERS[Math.round(ratio() * 4)]}</Line>}>
+      <box flexDirection="row" gap={1}>
+        <Line tone={tone()}>{bar()}</Line>
+        <Line role="muted">{`${Math.round(ratio() * 100)}%`}</Line>
+      </box>
+    </Show>
   )
 }

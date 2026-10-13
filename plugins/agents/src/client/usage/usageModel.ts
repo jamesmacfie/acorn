@@ -1,11 +1,19 @@
 import type { AgentProviderUsage, AgentUsageHealth, AgentUsageQuota, AgentUsageSnapshot } from '../../shared/usage'
-import { clampRemaining, sessionQuota } from '../../shared/usage'
+import { clampRemaining, summaryQuota } from '../../shared/usage'
 
 /** The bar under a quota row: how much is left, and where a steady spend would have left it by now.
  *  Both are 0-1 on the same scale, so the mark reads against the fill. */
 type UsageMeter = { fill: number; pace: number | null; health: AgentUsageHealth }
 export type UsageDetailRow = { label: string; value: string; meter?: UsageMeter }
-export type UsageSummaryEntry = { health: AgentUsageHealth; label: string; value: string }
+/** One harness on the header button. `timeLeft` is the share of its window still to run, 0-1, or null
+ *  when the window's length or reset time is unknown. */
+export type UsageSummaryEntry = {
+  health: AgentUsageHealth
+  label: string
+  value: string
+  timeLeft: number | null
+  timeLeftLabel: string
+}
 
 function formatPercent(percent: number): string {
   return `${Math.round(percent)}%`
@@ -121,16 +129,20 @@ export function usageGroups(snapshot: AgentUsageSnapshot | null): UsageGroup[] {
 export function usageSummaryEntries(
   snapshot: AgentUsageSnapshot | null,
   defaultAccounts: Readonly<Record<string, string | undefined>> = {},
+  now = Date.now(),
 ): UsageSummaryEntry[] {
   return usageGroups(snapshot).map((group) => {
     const reading =
       group.readings.find((candidate) => candidate.accountName === defaultAccounts[group.provider]) ??
       group.readings[0]!
-    const quota = sessionQuota(reading)
+    const quota = summaryQuota(reading)
+    const reset = quota && formatReset(quota.resetsAt, quota.resetText, now)
     return {
       health: quota?.health ?? 'unknown',
       label: reading.label,
       value: quota ? formatPercent(quota.percentRemaining) : '—',
+      timeLeft: quota ? quotaPace(quota, now) : null,
+      timeLeftLabel: `${reading.label} ${quota?.label ?? 'window'}${reset ? `, ${reset}` : ''}`,
     }
   })
 }

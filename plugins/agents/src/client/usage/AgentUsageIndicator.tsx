@@ -1,5 +1,5 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
-import { Button, Icon, Inline, Popover, StatusDot, Text } from '@acorn/plugin-api/ui'
+import { Button, Icon, Inline, Meter, Popover, StatusDot, Text } from '@acorn/plugin-api/ui'
 import AgentUsageSection from './AgentUsageSection'
 import { usageSummaryEntries } from './usageModel'
 import { usageTone } from '../sessions/stateTone'
@@ -40,6 +40,11 @@ export default function AgentUsageIndicator(props: { defaultAccounts?: Readonly<
               <For each={entries()}>
                 {(entry) => (
                   <Inline>
+                    {/* How much of the window is still to run, as a pie that empties toward the
+                        reset. Muted, because time passing is not a warning; the dot says that. */}
+                    <Show when={entry.timeLeft != null}>
+                      <Meter shape="pie" tone="muted" value={entry.timeLeft!} label={entry.timeLeftLabel} />
+                    </Show>
                     <StatusDot tone={usageTone(entry.health)} size="sm" />
                     <Text emphasis="muted">
                       {entry.label} {entry.value}

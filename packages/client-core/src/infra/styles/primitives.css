@@ -1136,7 +1136,19 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-meter[data-tone='ok'] .ui-meter-fill { background: var(--state-ok); }
 .ui-meter[data-tone='warn'] .ui-meter-fill { background: var(--state-warn); }
 .ui-meter[data-tone='danger'] .ui-meter-fill { background: var(--state-bad); }
+.ui-meter[data-tone='muted'] .ui-meter-fill { background: var(--text-muted); }
 @media (prefers-reduced-motion: reduce) { .ui-meter-fill { transition: none; } }
+/* A pie is a disc the size of a StatusDot, one step up at sm so a slice is still visible. The fill
+   covers the whole disc and a conic mask cuts it to the ratio, so the tone rules above paint it
+   unchanged. */
+.ui-meter[data-shape='pie'] { width: var(--space-5); height: var(--space-5); border-radius: var(--radius-circle); }
+.ui-meter[data-shape='pie'][data-size='md'] { width: var(--space-6); height: var(--space-6); }
+.ui-meter[data-shape='pie'] .ui-meter-fill {
+  width: 100%;
+  border-radius: 0;
+  mask-image: conic-gradient(black calc(var(--meter-value, 0) * 1turn), transparent 0);
+  transition: none;
+}
 /* The pace triangle sits under the track, so a marked meter stops clipping its own children and
    reserves the row the mark hangs in. The fill carries the same pill radius as the track, which is
    what keeps its ends rounded once the track has stopped clipping them. */

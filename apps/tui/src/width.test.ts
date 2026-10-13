@@ -59,9 +59,10 @@ describe('the width measure', () => {
   })
 
   it('counts the box and block characters the kit draws every frame at one cell', () => {
-    // The eleven characters a `single` border draws, and the two `Meter` fills. If any of these ever
-    // measured two, every bordered panel in the app would be a cell narrower than its frame.
-    for (const glyph of [...'─│┌┐└┘├┤┬┴┼', ...'█░']) expect(stringWidth(glyph), glyph).toBe(1)
+    // The eleven characters a `single` border draws, the two `Meter` fills, and the five pie
+    // quarters. If any of these ever measured two, every bordered panel in the app would be a cell
+    // narrower than its frame.
+    for (const glyph of [...'─│┌┐└┘├┤┬┴┼', ...'█░', ...'○◔◑◕●']) expect(stringWidth(glyph), glyph).toBe(1)
   })
 
   it('gives a wide base two cells and slices before it rather than through it', () => {

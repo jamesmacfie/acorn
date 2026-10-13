@@ -137,8 +137,12 @@ export function worstUsageHealth(quotas: readonly AgentUsageQuota[]): AgentUsage
   )
 }
 
-export function sessionQuota(provider: AgentProviderUsage): AgentUsageQuota | undefined {
-  return provider.quotas.find((quota) => quota.id === 'session')
+// The window a one-line summary reads: the five-hour session, or the week on a plan with no session
+// limit, as some Codex plans have.
+export function summaryQuota(provider: AgentProviderUsage): AgentUsageQuota | undefined {
+  return (
+    provider.quotas.find((quota) => quota.id === 'session') ?? provider.quotas.find((quota) => quota.id === 'weekly')
+  )
 }
 
 export function emptyProviderUsage(
