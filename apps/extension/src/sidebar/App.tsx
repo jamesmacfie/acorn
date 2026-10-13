@@ -1,10 +1,15 @@
 import { For, Show, createSignal, onMount } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import type { BridgeAgentHint, BridgeHandoff, BridgeNodes } from '@acorn/protocol/extensionBridge.ts'
+import type {
+  BridgeAgentHint,
+  BridgeHandoff,
+  BridgeNodes,
+  BridgePendingRequest,
+} from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import type { BrowserApi } from '../browser'
 import type { PageHandoff } from '../handoffs'
-import { CallFailure, type CallError, type HostState } from '../messages'
+import { CallFailure, type CallError, type HostState, type RequestTarget } from '../messages'
 import { activePageUrl } from './activePage'
 import { bridgeClient } from './bridgeClient'
 import { capturePage } from './capture'
@@ -34,6 +39,13 @@ export function App(props: { api: BrowserApi }) {
   const pageUrl = activePageUrl(props.api, pageChecks)
   // The selected Node's project site associations, matched against the page here in the browser.
   const [sites, setSites] = createSignal<ProjectSite[]>([])
+  // What the selected Node's agents are waiting on, as the background reads it for the badge, and a
+  // conversation an OS notification asked to open.
+  const [requests, setRequests] = createSignal<{ nodeId: string | null; requests: BridgePendingRequest[] }>({
+    nodeId: null,
+    requests: [],
+  })
+  const [openRequest, setOpenRequest] = createSignal<RequestTarget | null>(null)
 
   const showStatus = (next: NodeStatus | null) => {
     const wasUp = connected(status())
@@ -49,6 +61,8 @@ export function App(props: { api: BrowserApi }) {
     handoffsChanged: (nodeId) => nodeId === fleet()?.activeNodeId && void loadHandoffs(nodeId),
     projectsChanged: (nodeId) => nodeId === fleet()?.activeNodeId && void loadSites(nodeId),
     page: () => setPageChecks((count) => count + 1),
+    requests: (nodeId, list) => setRequests({ nodeId, requests: list }),
+    open: setOpenRequest,
   })
   const selected = () => fleet()?.nodes.find((node) => node.nodeId === fleet()?.activeNodeId) ?? null
   const online = () => host().state === 'connected' && connected(status())
@@ -211,6 +225,10 @@ export function App(props: { api: BrowserApi }) {
             pageUrl={pageUrl()}
             sites={sites()}
             sitesChanged={(projectId, changed) => sitesChanged(nodeId, projectId, changed)}
+            permissions={props.api.permissions}
+            requests={requests().nodeId === nodeId ? requests().requests : []}
+            openRequest={openRequest()}
+            openedRequest={() => setOpenRequest(null)}
           />
         )}
       </Show>

@@ -3,9 +3,11 @@
 This page covers project site associations: web addresses a person ties to a project, so the
 [browser extension](../browser-extension.md) suggests that project on those pages. It covers how they
 are stored on the Node, how the sidebar matches and suggests, the override it remembers, and the
-native operations. The shared rules are in `packages/protocol/src/projects/siteAssociations.ts`. The
-sidebar's side is in `apps/extension/src/sidebar/Destination.tsx` and `ProjectSites.tsx`, and the
-host's in `apps/cli/src/browser/bridge.ts`.
+native operations. The shared rules are in `packages/protocol/src/projects/siteAssociations.ts`. Which projects a page
+belongs to, overrides included, is `pageScope` in `apps/extension/src/pageScope.ts`, which the sidebar
+and the [toolbar badge](./notifications.md) both use. The sidebar's side is in
+`apps/extension/src/sidebar/Destination.tsx` and `ProjectSites.tsx`, and the host's in
+`apps/cli/src/browser/bridge.ts`.
 
 ## What an association is
 

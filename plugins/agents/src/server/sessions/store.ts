@@ -23,6 +23,7 @@ import type {
   AgentEventPage,
   AgentEventRecord,
   AgentNormalizedEvent,
+  AgentOpenRequest,
   AgentProviderDescriptor,
   AgentRequest,
   AgentSession,
@@ -863,6 +864,21 @@ export class AgentStore {
       .where(and(eq(schema.agentRequests.sessionId, sessionId), eq(schema.agentRequests.status, 'pending')))
       .orderBy(asc(schema.agentRequests.createdAt))
     return rows.map(mapAgentRequest)
+  }
+
+  /** Requests still waiting on a person across the Node's unarchived sessions, oldest first, at most
+   *  `limit`. One indexed read for a client that shows what is waiting without opening each session. */
+  async openRequests(limit: number): Promise<AgentOpenRequest[]> {
+    const rows = await this.db
+      .select({ request: schema.agentRequests, taskId: schema.agentSessions.taskId })
+      .from(schema.agentRequests)
+      .innerJoin(schema.agentSessions, eq(schema.agentRequests.sessionId, schema.agentSessions.id))
+      .where(
+        and(inArray(schema.agentRequests.status, ['pending', 'resolving']), isNull(schema.agentSessions.archivedAt)),
+      )
+      .orderBy(asc(schema.agentRequests.createdAt))
+      .limit(limit)
+    return rows.map(({ request, taskId }) => ({ ...mapAgentRequest(request), taskId }))
   }
 
   lifecycleTurns(filter: { taskId: string; sessionId?: string }) {

@@ -34,11 +34,14 @@ describe('extension manifests', () => {
     expect(manifest).not.toHaveProperty('key')
   })
 
-  it('holds no host access at install, only sites the person may grant, and sets no page policy', () => {
+  it('holds no host access or notifications at install, only what the person may grant, and sets no page policy', () => {
     for (const browser of ['chrome', 'firefox'] as const) {
       const manifest = extensionManifest(browser, '1.0.0')
       expect(manifest).not.toHaveProperty('host_permissions')
       expect(manifest.optional_host_permissions).toEqual(['https://*/*', 'http://*/*'])
+      // Notifications are opt-in too, never granted at install.
+      expect(manifest.optional_permissions).toEqual(['notifications'])
+      expect(manifest.permissions).not.toContain('notifications')
       expect(manifest).not.toHaveProperty('content_security_policy')
       expect(manifest).not.toHaveProperty('content_scripts')
     }

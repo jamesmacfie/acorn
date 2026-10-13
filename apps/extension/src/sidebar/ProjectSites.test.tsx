@@ -39,6 +39,8 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
     holdSites: false,
     held: [] as (() => void)[],
     requests: [] as Request[],
+    // What the Node's agents are waiting on, as `requests.pending` answers.
+    pending: [] as Record<string, unknown>[],
   }
   const nodes = () => ({
     nodes: ['n1', 'n2'].map((nodeId) => ({ nodeId, label: nodeId, endpoint: `https://${nodeId}.test`, local: false })),
@@ -87,6 +89,8 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
         }
       case 'sessions.list':
         return { nodeId, taskId: request.taskId, sessions: request.taskId === 't1' ? [session] : [] }
+      case 'requests.pending':
+        return { nodeId, requests: state.pending }
       case 'session.read':
         return { nodeId, sessionId: request.sessionId, session, records: [], reach: 0, queued: [], requests: [] }
     }
@@ -227,7 +231,8 @@ describe('project suggestions for a site', () => {
     const { state, root } = mount({ url: 'https://example.com/', sites: [site('p1', 'https://example.com')] })
     state.holdSites = true
     await settle(30)
-    expect(state.held).toHaveLength(1)
+    // The sidebar's read, and the background's for the toolbar badge.
+    expect(state.held).toHaveLength(2)
     button(root, 'Use')!.click()
     await settle(20)
     state.held.splice(0).forEach((reply) => reply())
@@ -287,5 +292,81 @@ describe('the project site editor', () => {
     await settle(20)
     expect(fake.granted.has('http://localhost/*')).toBe(true)
     expect(siteAccess(root)).toEqual(['http://localhost: Project suggestions · Allowed'])
+  })
+})
+
+describe('requests waiting for the page', () => {
+  const waiting = (requestId: string, projectId: string, taskId: string, sessionId: string) => ({
+    requestId,
+    sessionId,
+    taskId,
+    projectId,
+    kind: 'question',
+    title: `Question ${requestId}`,
+    taskTitle: 'Fix login',
+  })
+  const listed = (root: HTMLElement) =>
+    [...root.querySelectorAll('[aria-label="Waiting for you"] li strong')].map((row) => row.textContent)
+  const pathSites = [site('p1', 'https://example.com', '/app'), site('p2', 'https://example.com', '/docs')]
+
+  it("lists the page's projects' requests and opens the one chosen in its conversation", async () => {
+    const { fake, state, root } = mount({ url: 'https://example.com/app/login', sites: pathSites })
+    state.pending = [waiting('r1', 'p1', 't1', 's1'), waiting('r2', 'p2', 't2', 's2')]
+    await settle(40)
+    expect(listed(root)).toEqual(['Question r1'])
+    expect(fake.badges.get(7)).toBe('1')
+
+    button(root.querySelector('[aria-label="Waiting for you"]')!, 'Open')!.click()
+    await settle(40)
+    expect(selected(root, 'task')).toBe('t1')
+    expect(selected(root, 'session')).toBe('s1')
+
+    // The conversation stays put; the list follows the page.
+    fake.navigate('https://example.com/docs/intro')
+    await settle(20)
+    expect(listed(root)).toEqual(['Question r2'])
+    expect(selected(root, 'session')).toBe('s1')
+  })
+
+  it('lists the chosen project when the page gives none', async () => {
+    const { state, root } = mount({ sites: pathSites })
+    state.pending = [waiting('r1', 'p1', 't1', 's1')]
+    await settle(40)
+    expect(listed(root)).toEqual([])
+    expect(root.querySelector('[aria-label="Waiting for you"] p')!.textContent).toBe(
+      'No agent is waiting on this page.',
+    )
+    await pick(root, 'project', 'p1')
+    expect(listed(root)).toEqual(['Question r1'])
+  })
+
+  it("asks for notifications only from the person's click, and opens a clicked notification's conversation", async () => {
+    const { fake, state, root } = mount({ url: 'https://example.com/app/login', sites: pathSites })
+    state.pending = [waiting('r1', 'p1', 't1', 's1')]
+    await settle(40)
+    expect(fake.notified).toEqual([])
+    const notify = root.querySelector<HTMLInputElement>('input[name="notify"]')!
+    notify.checked = true
+    notify.dispatchEvent(new Event('change', { bubbles: true }))
+    await settle(40)
+    expect(fake.granted.has('notifications')).toBe(true)
+    expect(notify.checked).toBe(true)
+    expect(fake.notified).toEqual(['acorn-request:s1:r1'])
+
+    fake.clickNotification('acorn-request:s1:r1')
+    await settle(40)
+    expect(selected(root, 'session')).toBe('s1')
+
+    notify.checked = false
+    notify.dispatchEvent(new Event('change', { bubbles: true }))
+    await settle(20)
+    expect(fake.granted.has('notifications')).toBe(false)
+
+    // The person declines the browser's prompt: the box goes back to unticked.
+    fake.answerRequest = false
+    notify.checked = true
+    notify.dispatchEvent(new Event('change', { bubbles: true }))
+    await settle(20)
+    expect(notify.checked).toBe(false)
   })
 })

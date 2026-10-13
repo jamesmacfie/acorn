@@ -1,8 +1,13 @@
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import type { BridgeAgentHint, BridgeOperation, BridgeResults } from '@acorn/protocol/extensionBridge.ts'
+import type {
+  BridgeAgentHint,
+  BridgeOperation,
+  BridgePendingRequest,
+  BridgeResults,
+} from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi, Port } from '../browser'
 import type { PageHandoff } from '../handoffs'
-import { CallFailure, type BackgroundMessage, type BridgeCall, type HostState } from '../messages'
+import { CallFailure, type BackgroundMessage, type BridgeCall, type HostState, type RequestTarget } from '../messages'
 
 export type BridgeClient = {
   call<Op extends BridgeOperation>(call: Extract<BridgeCall, { op: Op }>): Promise<BridgeResults[Op]>
@@ -20,6 +25,8 @@ export function bridgeClient(
     handoffsChanged(nodeId: string): void
     projectsChanged(nodeId: string): void
     page(): void
+    requests(nodeId: string | null, requests: BridgePendingRequest[]): void
+    open(target: RequestTarget): void
   },
 ): BridgeClient {
   let port: Port | null = null
@@ -39,6 +46,8 @@ export function bridgeClient(
       if (message.type === 'handoffs') return events.handoffsChanged(message.nodeId)
       if (message.type === 'projects') return events.projectsChanged(message.nodeId)
       if (message.type === 'page') return events.page()
+      if (message.type === 'requests') return events.requests(message.nodeId, message.requests)
+      if (message.type === 'open') return events.open(message.target)
       const request = pending.get(message.id)
       if (!request) return
       pending.delete(message.id)

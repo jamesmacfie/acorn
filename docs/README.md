@@ -187,6 +187,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [browser-extension/page-capture.md](./browser-extension/page-capture.md) | The extension's link, selection, and screenshot captures, page access, sending them, and the attachment operations. |
 | [browser-extension/handoffs.md](./browser-extension/handoffs.md) | The buttons plugins put on websites, the extension's handoff card, and the operations that resolve a page and create a linked task. |
 | [browser-extension/project-sites.md](./browser-extension/project-sites.md) | Web addresses tied to a project on the Node, the extension's project suggestions and overrides, and the site operations. |
+| [browser-extension/notifications.md](./browser-extension/notifications.md) | The extension's toolbar badge, waiting list, and opt-in OS notifications for requests agents are waiting on, and the `requests.pending` operation. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 

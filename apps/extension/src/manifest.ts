@@ -15,6 +15,8 @@ export function extensionManifest(browser: BridgeBrowser, version: string) {
     // Page capture reads the tab the toolbar button was clicked on (`activeTab`), or a site the person
     // has granted. Nothing is granted at install.
     optional_host_permissions: ['https://*/*', 'http://*/*'],
+    // OS notifications of waiting requests are the person's opt-in, asked for from the sidebar.
+    optional_permissions: ['notifications'],
   }
   if (browser === 'chrome')
     return {

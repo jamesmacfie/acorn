@@ -62,11 +62,15 @@ describe('background', () => {
 
     fake.hosts[0]!.close('Native host has exited.')
     await settle()
+    // Started again on its own once. A second stop waits for the next call.
+    expect(fake.hosts[1]!.received[0]).toMatchObject({ op: 'node.select', nodeId: 'b' })
+    fake.hosts[1]!.close('Native host has exited.')
+    await settle()
     host.active = null
     // The first call after a restart reselects before it runs, so a project read finds its Node.
     expect(await first.call({ op: 'projects.list', nodeId: 'b' })).toMatchObject({ ok: true })
-    expect(fake.hosts).toHaveLength(2)
-    expect(fake.hosts[1]!.received[0]).toMatchObject({ op: 'node.select', nodeId: 'b' })
+    expect(fake.hosts).toHaveLength(3)
+    expect(fake.hosts[2]!.received[0]).toMatchObject({ op: 'node.select', nodeId: 'b' })
   })
 
   it('restores on a fresh port when the first one closes during the restore', async () => {

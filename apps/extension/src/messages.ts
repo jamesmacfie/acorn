@@ -1,5 +1,10 @@
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
-import type { BridgeAgentHint, BridgeErrorCode, BridgeRequest } from '@acorn/protocol/extensionBridge.ts'
+import type {
+  BridgeAgentHint,
+  BridgeErrorCode,
+  BridgePendingRequest,
+  BridgeRequest,
+} from '@acorn/protocol/extensionBridge.ts'
 import type { PageHandoff } from './handoffs'
 
 // Between the sidebar and the background. The background owns the one native connection, so the
@@ -22,6 +27,9 @@ export type HostState = {
   restoreError: string | null
 }
 
+// One conversation a waiting request belongs to, which the sidebar opens.
+export type RequestTarget = { nodeId: string; projectId: string; taskId: string; sessionId: string }
+
 export type BackgroundMessage =
   | { type: 'reply'; id: string; ok: true; result: unknown }
   | { type: 'reply'; id: string; ok: false; error: CallError }
@@ -36,6 +44,11 @@ export type BackgroundMessage =
   | { type: 'projects'; nodeId: string }
   // The toolbar button was clicked, which can let the sidebar read the active page it couldn't before.
   | { type: 'page' }
+  // Every request the selected Node's agents are waiting on, as the badge counts them. The sidebar shows
+  // those for its own page or project.
+  | { type: 'requests'; nodeId: string | null; requests: BridgePendingRequest[] }
+  // An OS notification was clicked: open that request's conversation.
+  | { type: 'open'; target: RequestTarget }
 
 // Failures after which a write may or may not have reached the Node. The sidebar reads again and
 // leaves any retry to the person.

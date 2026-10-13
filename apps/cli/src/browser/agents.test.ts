@@ -135,7 +135,24 @@ describe('agent hints', () => {
     hints.note('n1', { channel: 'term:status', sessionId: 'other' })
     expect(sent).toEqual([])
     vi.advanceTimersByTime(100)
-    expect(sent).toEqual([{ nodeId: 'n1', sessions: ['s1', 's2'], tasks: ['t1'], missed: false }])
+    expect(sent).toEqual([{ nodeId: 'n1', sessions: ['s1', 's2'], tasks: ['t1'], missed: false, requests: false }])
+  })
+
+  it('says a request changed, from the lifecycle frame that also reports expiry', () => {
+    vi.useFakeTimers()
+    const sent: BridgeAgentHint[] = []
+    const hints = agentHints((hint) => sent.push(hint), 100)
+    hints.note('n1', {
+      channel: 'plugin:agents:request-changed',
+      taskId: 't1',
+      sessionId: 's1',
+      requestId: 'r1',
+      kind: 'question',
+      status: 'expired',
+    })
+    hints.note('n1', { channel: 'plugin:agents:turn-changed', taskId: 't2', sessionId: 's2' })
+    vi.advanceTimersByTime(100)
+    expect(sent).toEqual([{ nodeId: 'n1', sessions: ['s1'], tasks: ['t1'], missed: false, requests: true }])
   })
 
   it('says frames were missed when the Node shed them', () => {
@@ -144,7 +161,7 @@ describe('agent hints', () => {
     const hints = agentHints((hint) => sent.push(hint), 100)
     hints.note('n1', { channel: 'ws:shed' })
     vi.advanceTimersByTime(100)
-    expect(sent).toEqual([{ nodeId: 'n1', sessions: [], tasks: [], missed: true }])
+    expect(sent).toEqual([{ nodeId: 'n1', sessions: [], tasks: [], missed: true, requests: false }])
   })
 })
 

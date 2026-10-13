@@ -15,6 +15,8 @@ Topic pages:
   and the operations that resolve a page and create a linked task.
 - [Project sites](./browser-extension/project-sites.md): the web addresses tied to a project, the
   sidebar's project suggestions and overrides, and the site operations.
+- [Request notifications](./browser-extension/notifications.md): the toolbar badge, the waiting list,
+  and opt-in OS notifications for requests agents are waiting on.
 
 ## What runs where
 
@@ -39,8 +41,9 @@ The extension declares no content scripts and holds no host access at install. T
 injects one, `content.js`, into a page it may read that matches a plugin's
 [site button](./browser-extension/handoffs.md#site-buttons). The manifests
 (`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, and `scripting`, plus
-`sidePanel` in Chrome. They list `http://*/*` and `https://*/*` as optional host access, which only
-the person can grant, and turn off private windows.
+`sidePanel` in Chrome. They list `http://*/*` and `https://*/*` as optional host access, and
+`notifications` as an optional permission, which only the person can grant, and turn off private
+windows.
 
 The toolbar button opens the sidebar and lets [page capture](./browser-extension/page-capture.md#page-access)
 read the tab it was clicked on. The background handles the click and opens the panel itself, in both
@@ -85,10 +88,11 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `attachment.upload`, `attachment.read`, `attachment.delete` | `nodeId`, `taskId`, and the attachment | See [page capture](./browser-extension/page-capture.md#attachment-operations) |
 | `handoffs.list`, `handoff.resolve`, `handoff.create` | `nodeId`, and the handoff and page | See [handoffs](./browser-extension/handoffs.md#native-operations) |
 | `sites.list`, `site.add`, `site.remove` | `nodeId`, and the project and association | See [project sites](./browser-extension/project-sites.md#native-operations) |
+| `requests.pending` | `nodeId` | `{ nodeId, requests }`; see [request notifications](./browser-extension/notifications.md#native-operation) |
 
 A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, message } }`. The host
 also sends `{ v, event: 'status', status }` when the selected Node's connection changes, and
-`{ v, event: 'agent', nodeId, sessions, tasks, missed }` as a change hint, and
+`{ v, event: 'agent', nodeId, sessions, tasks, missed, requests }` as a change hint, and
 `{ v, event: 'handoffs', nodeId }` when the selected Node's plugins change, and
 `{ v, event: 'projects', nodeId }` when one of its projects changes. [Agent conversations](./browser-extension/conversations.md) covers the agent
 operations, hints, and what the sidebar keeps in browser storage. `turn.submit`'s `input` is the
@@ -139,8 +143,10 @@ Node's list either way.
 The host keeps the selection only while it runs. The background stores `selectedNodeId` in
 `storage.local`, beside the selected Node's site buttons and the sidebar's drafts, listed in
 [browser storage](./browser-extension/conversations.md#browser-storage). Each time the background starts the host, it
-sends `node.select` with the stored ID before any other call. If that fails, the sidebar shows why,
-and pairing and forgetting still work. An unknown Node's ID is removed from storage.
+sends `node.select` with the stored ID before any other call. The background starts the host itself
+as it starts, when an ID is stored, so the [toolbar badge](./browser-extension/notifications.md#the-toolbar-badge)
+works with the sidebar closed. If the restore fails, the sidebar shows why, and pairing and
+forgetting still work. An unknown Node's ID is removed from storage.
 
 ## What the sidebar shows
 
@@ -179,15 +185,8 @@ broker reports it as unreachable. The host probes after a failed read to tell th
   retries once on a fresh port. A port opened from the sidebar page at the same moment answers.
 - The sidebar draws no tool details or subagent streams. It draws the screenshots a turn sent and names any other attachment.
 - Drafts are never expired.
-- The real-browser results and their gaps are in
-  [phase 01](./future/extension/01-native-pairing.md#real-browser-results),
-  [phase 02](./future/extension/02-agent-conversation.md#real-browser-results),
-  [phase 03](./future/extension/03-page-capture.md#real-browser-results),
-  [phase 04](./future/extension/04-github-handoff.md#real-browser-results),
-  [phase 05](./future/extension/05-linear-handoff.md#real-browser-results),
-  [phase 06](./future/extension/06-rollbar-handoff.md#real-browser-results),
-  [phase 07](./future/extension/07-project-site-settings.md#real-browser-results), and
-  [phase 08](./future/extension/08-questions-and-approvals.md#real-browser-results).
+- Each phase's real-browser results and their gaps are in its page, listed in
+  [phases and dependencies](./future/extension/README.md#phases-and-dependencies).
 
 ## Why
 

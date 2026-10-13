@@ -79,7 +79,9 @@ The host listens to the agents plugin's WebSocket frames on the selected Node an
 for a slow reader, sets `missed`. The sidebar reads on from its window's end when a hint names its
 session, and reads the task's session list when a hint names its task. It reads both again when the
 selected Node's status returns to online. A real sequence gap closes the broker's socket, so it
-arrives as that same return.
+arrives as that same return. The host also sets `requests` when the agents plugin reports a request
+raised, claimed, settled, or expired, which the
+[toolbar badge](./notifications.md#the-toolbar-badge) reads.
 
 ## The conversation window
 
@@ -105,5 +107,8 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
   sidebar opens. Only the person's own choices are saved.
 - `handoffs`: the selected Node's [site buttons](./handoffs.md#site-buttons), `{ nodeId, handoffs }`,
   kept so pages get their buttons before the native host starts. It goes when no Node is selected.
+
+- `siteChoices:<nodeId>`: the person's [project overrides](./project-sites.md#overrides) for each site.
+- `notifiedRequests`: the requests already sent as [OS notifications](./notifications.md#browser-storage).
 
 Nothing else is stored, and no draft leaves the browser until the person sends it.

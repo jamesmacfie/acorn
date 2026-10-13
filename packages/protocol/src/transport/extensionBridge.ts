@@ -190,6 +190,10 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     resolution: requestResolutionSchema,
     key: operationKey,
   }),
+  // Every request an agent is waiting on across the Node, for the toolbar badge. The browser matches
+  // them to the page's projects itself, so no page address goes with it
+  // (docs/browser-extension/notifications.md).
+  z.strictObject({ ...envelope, op: z.literal('requests.pending'), nodeId }),
   // Draft attachments are the agents plugin's, scoped to a task. Each operation names that task, and
   // the host refuses an attachment that belongs to another. The upload carries no key: the Node keeps
   // one row per task and content, so sending the same bytes again answers with the same attachment.
@@ -318,6 +322,18 @@ export type BridgeAgentRequest = {
   unsupported: string | null
 }
 
+// A request an agent is waiting on, placed in its project and task. The badge counts these and the
+// sidebar lists them; neither needs the request's choices until its conversation opens.
+export type BridgePendingRequest = {
+  requestId: string
+  sessionId: string
+  taskId: string
+  projectId: string
+  kind: string
+  title: string
+  taskTitle: string
+}
+
 export type BridgeSessionRead = {
   nodeId: string
   sessionId: string
@@ -367,6 +383,8 @@ export type BridgeResults = {
   'turn.submit': { nodeId: string; sessionId: string; turnId: string }
   // The request as the Node holds it after the answer. One already settled comes back unchanged.
   'request.resolve': { nodeId: string; sessionId: string; request: BridgeAgentRequest }
+  // Oldest first. Only active tasks' requests: an archived task has no conversation to open.
+  'requests.pending': { nodeId: string; requests: BridgePendingRequest[] }
   'attachment.upload': { nodeId: string; taskId: string; attachment: BridgeAttachment }
   // `data` is the content as base64, or null when it isn't an image or passes ATTACHMENT_MAX_BYTES.
   'attachment.read': { nodeId: string; taskId: string; attachment: BridgeAttachment; data: string | null }
@@ -382,8 +400,15 @@ export type BridgeResults = {
 
 // Which sessions and tasks changed on the selected Node since the last hint. Nothing more: the
 // sidebar reads the durable state again rather than trusting a pushed copy. `missed` means the Node
-// dropped frames for this reader, so anything may have changed.
-export type BridgeAgentHint = { nodeId: string; sessions: string[]; tasks: string[]; missed: boolean }
+// dropped frames for this reader, so anything may have changed. `requests` means a request was raised,
+// claimed, settled, or expired, so the badge reads the open requests again.
+export type BridgeAgentHint = {
+  nodeId: string
+  sessions: string[]
+  tasks: string[]
+  missed: boolean
+  requests: boolean
+}
 
 export type BridgeErrorCode =
   | 'bad_request'

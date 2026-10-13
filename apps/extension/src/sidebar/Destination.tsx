@@ -1,36 +1,25 @@
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onMount } from 'solid-js'
-import {
-  matchingSiteProjects,
-  parseSiteAddress,
-  type ProjectSite,
-  type SiteAssociation,
-} from '@acorn/protocol/siteAssociations.ts'
+import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import type {
   BridgeAgentHint,
   BridgeAgentProfile,
   BridgeAgentSession,
+  BridgePendingRequest,
   BridgeProject,
   BridgeTask,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
-import { CallFailure } from '../messages'
+import { CallFailure, type RequestTarget } from '../messages'
 import type { BridgeClient } from './bridgeClient'
 import { CaptureFailure, withCapture, type CaptureKind, type PageCapture } from './capture'
 import { Conversation } from './Conversation'
 import { errorGuidance } from './guidance'
 import { Handoff } from './Handoff'
 import type { PageHandoff } from '../handoffs'
-import {
-  changeDraft,
-  loadDestination,
-  loadSiteChoices,
-  saveDestination,
-  saveSiteChoices,
-  siteChoiceKey,
-  type Destination as Remembered,
-  type SiteChoices,
-} from './localState'
+import { changeDraft, loadDestination, saveDestination, type Destination as Remembered } from './localState'
+import { loadSiteChoices, pageScope, saveSiteChoices, type SiteChoices } from '../pageScope'
 import { ProjectSites } from './ProjectSites'
+import { Waiting } from './Waiting'
 
 const UNCERTAIN = new Set(['ambiguous_mutation', 'host_unavailable', 'node_unreachable'])
 
@@ -60,6 +49,12 @@ export function Destination(props: {
   pageUrl: string | undefined
   sites: readonly ProjectSite[]
   sitesChanged(projectId: string, sites: SiteAssociation[]): void
+  // Every request the Node's agents are waiting on, and one whose conversation the person asked to
+  // open from an OS notification.
+  permissions: BrowserApi['permissions']
+  requests: readonly BridgePendingRequest[]
+  openRequest: RequestTarget | null
+  openedRequest(): void
 }) {
   const nodeId = props.nodeId
   const [projects, setProjects] = createSignal<BridgeProject[] | null>(null)
@@ -251,26 +246,15 @@ export function Destination(props: {
     }
   }
 
-  // Projects for the page beside the sidebar (docs/browser-extension/project-sites.md). Every project
-  // with an association covering the page is a candidate. The person's choice on this site, if any,
-  // replaces them; otherwise a single candidate is the suggestion and several are left to the picker.
-  const visible = () => new Set((projects() ?? []).map((project) => project.id))
-  const suggested = () => matchingSiteProjects(props.sites, props.pageUrl).filter((id) => visible().has(id))
-  const choiceKey = () => {
-    const page = props.pageUrl ? parseSiteAddress(props.pageUrl) : null
-    return page?.ok ? siteChoiceKey(page.site.origin, suggested()) : null
-  }
-  const pageProjects = createMemo(
-    (): string[] => {
-      const key = choiceKey()
-      const choice = key === null ? undefined : siteChoices()[key]
-      if (choice === '') return []
-      if (choice !== undefined && visible().has(choice)) return [choice]
-      return suggested()
-    },
-    [],
-    { equals: (a, b) => a.join() === b.join() },
+  // Projects for the page beside the sidebar. Every project with an association covering the page is a
+  // candidate. The person's choice on this site, if any, replaces them; otherwise a single candidate is
+  // the suggestion and several are left to the picker.
+  const scope = createMemo(() =>
+    pageScope(props.sites, new Set((projects() ?? []).map((project) => project.id)), siteChoices(), props.pageUrl),
   )
+  const suggested = () => scope().suggested
+  const choiceKey = () => scope().choiceKey
+  const pageProjects = createMemo((): string[] => scope().projects, [], { equals: (a, b) => a.join() === b.join() })
   // Follows the page only while no task is chosen: one candidate is chosen, and a project the page's
   // candidates leave out is cleared so the person picks one. An unmatched page changes nothing. A
   // chosen task, with its conversation and draft, stays put; the notice below says what the page
@@ -283,6 +267,35 @@ export function Destination(props: {
       else if (ids.length > 1 && current && !ids.includes(current)) chooseProject(null)
     }),
   )
+  // The waiting requests the sidebar lists: the page's projects, as the badge counts them, or the
+  // project chosen in the picker when the page suggests none.
+  const waitingScope = (): string[] => {
+    if (pageProjects().length) return pageProjects()
+    const chosen = projectId()
+    return chosen ? [chosen] : []
+  }
+  const waiting = () => props.requests.filter((request) => waitingScope().includes(request.projectId))
+  const waitingOn = () => {
+    const names = waitingScope().map((id) => projectName(id))
+    return names.length ? names.join(' or ') : 'this page'
+  }
+
+  // Opens a request's conversation the way a remembered destination is restored: project, then task,
+  // then conversation, each once its list has loaded.
+  const openConversation = (target: Pick<RequestTarget, 'projectId' | 'taskId' | 'sessionId'>) => {
+    remembered = { projectId: target.projectId, taskId: target.taskId, sessionId: target.sessionId }
+    setRestoringTask(true)
+    chooseProject(target.projectId)
+    void saveDestination(props.storage, nodeId, remembered)
+  }
+  createEffect(
+    on([() => props.openRequest, projects], ([target, loaded]) => {
+      if (!target || !loaded) return
+      props.openedRequest()
+      if (target.nodeId === nodeId) openConversation(target)
+    }),
+  )
+
   const mismatch = () => (taskId() && !pageProjects().includes(projectId()!) ? pageProjects() : [])
 
   // The person picked a project. When it differs from what this site suggests, it is remembered for
@@ -362,6 +375,12 @@ export function Destination(props: {
           </section>
         )}
       </Show>
+      <Waiting
+        permissions={props.permissions}
+        requests={waiting()}
+        scope={waitingOn()}
+        open={(request) => openConversation(request)}
+      />
       <section class="card" aria-label="Destination">
         <Show when={problem()}>
           <p class="problem" role="alert">

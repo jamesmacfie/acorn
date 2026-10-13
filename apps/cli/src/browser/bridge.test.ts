@@ -136,6 +136,14 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
           configOptions: [],
         },
       ])
+    // The open requests across the Node: one in a task the list has, one in a task it doesn't.
+    if (url.pathname === '/v1/p/agents/requests')
+      return reply(200, {
+        requests: [
+          { ...agentRequest('r1'), taskId: 't1' },
+          { ...agentRequest('r9'), sessionId: 's9', taskId: 'archived-task' },
+        ],
+      })
     if (url.pathname === '/v1/p/agents/sessions' && req.method === 'GET') {
       state.lastQuery = url.search
       return reply(200, { sessions: [agentSession('s1')], delegations: [], nextCursor: null })
@@ -553,6 +561,26 @@ describe('browser bridge agent operations', () => {
         code: 'not_found',
       })
     })
+  })
+
+  it("lists the Node's open requests with their project and task, leaving out tasks that aren't active", async () => {
+    const { call } = await selected()
+    expect(await call({ op: 'requests.pending', nodeId: 'node-a' })).toEqual({
+      nodeId: 'node-a',
+      requests: [
+        {
+          requestId: 'r1',
+          sessionId: 's1',
+          taskId: 't1',
+          projectId: 'p1',
+          kind: agentRequest('r1').kind,
+          title: agentRequest('r1').title,
+          taskTitle: 'Fix it',
+        },
+      ],
+    })
+    await call({ op: 'node.select', nodeId: null })
+    await expect(call({ op: 'requests.pending', nodeId: 'node-a' })).rejects.toMatchObject({ code: 'not_selected' })
   })
 
   it('passes captured context and screenshots to the Node as the turn input', async () => {

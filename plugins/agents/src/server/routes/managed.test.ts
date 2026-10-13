@@ -50,6 +50,7 @@ const METHODS = [
   'importTranscript',
   'verifyImportedResume',
   'listSessions',
+  'openRequests',
   'snapshot',
   'events',
   'enqueueTurn',
@@ -542,5 +543,18 @@ describe('Settings > Storage and memory', () => {
       expect((await app.fetch(req('/api/footprint'), {} as Env)).status).toBe(403)
       expect((await app.fetch(req('/api/stop-idle', 'POST'), {} as Env)).status).toBe(403)
     }
+  })
+})
+
+describe('open requests', () => {
+  afterEach(() => setManagedAgentsBridge(null))
+
+  it('answers a device and refuses an agent, because the list spans every task', async () => {
+    setManagedAgentsBridge(fake({ openRequests: async () => ({ requests: [] }) }))
+    const read = await authed().fetch(req('/api/requests'), {} as Env)
+    expect(read.status).toBe(200)
+    expect(await read.json()).toEqual({ requests: [] })
+    for (const app of [asTask1(), asService()])
+      expect((await app.fetch(req('/api/requests'), {} as Env)).status).toBe(403)
   })
 })

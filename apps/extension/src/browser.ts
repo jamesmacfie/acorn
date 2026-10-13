@@ -14,18 +14,21 @@ export type Port = {
   error?: { message?: string } | null
 }
 
-export type Tab = { id?: number; windowId: number; url?: string; title?: string }
+export type Tab = { id?: number; windowId: number; active?: boolean; url?: string; title?: string }
 
 // Who sent a one-off message: for a content script, its tab and the frame's address as the browser
 // knows it, which the page can't change.
 export type MessageSender = { tab?: Tab; url?: string; frameId?: number }
 
-type Origins = { origins: string[] }
+// Optional access: hosts by match pattern, or a named API permission such as `notifications`.
+type Permissions = { origins?: string[]; permissions?: string[] }
 
 export type BrowserApi = {
   runtime: {
     connectNative(application: string): Port
     connect(info: { name: string }): Port
+    // The address of a file packaged with the extension.
+    getURL(path: string): string
     onConnect: Listeners<(port: Port) => void>
     lastError?: { message?: string } | null
     // One-off messages between a page's content script and the background.
@@ -38,8 +41,15 @@ export type BrowserApi = {
       set(items: Record<string, unknown>): Promise<void>
       remove(keys: string[]): Promise<void>
     }
+    // Every write, from any page of the extension, with the area it was made in.
+    onChanged: Listeners<(changes: Record<string, { newValue?: unknown; oldValue?: unknown }>, area: string) => void>
   }
-  action: { onClicked: Listeners<(tab: Tab) => void> }
+  // A badge set for a tab shows only while that tab is active, and goes when the tab closes.
+  action: {
+    onClicked: Listeners<(tab: Tab) => void>
+    setBadgeText(details: { tabId?: number; text: string }): Promise<void>
+    setBadgeBackgroundColor(details: { color: string }): Promise<void>
+  }
   // `url` and `title` are present only for a tab this extension may read: the one the toolbar button
   // was just clicked on (`activeTab`), or a site the person granted.
   tabs: {
@@ -54,13 +64,19 @@ export type BrowserApi = {
     executeScript<Result>(injection: { target: { tabId: number }; func: () => Result }): Promise<{ result?: Result }[]>
     executeScript(injection: { target: { tabId: number }; files: string[] }): Promise<unknown[]>
   }
-  // Optional host access, which only a person's click can grant.
+  // Optional access, which only a person's click can grant.
   permissions: {
-    contains(permissions: Origins): Promise<boolean>
-    request(permissions: Origins): Promise<boolean>
-    remove(permissions: Origins): Promise<boolean>
-    onAdded: Listeners<(permissions: Partial<Origins>) => void>
-    onRemoved: Listeners<(permissions: Partial<Origins>) => void>
+    contains(permissions: Permissions): Promise<boolean>
+    request(permissions: Permissions): Promise<boolean>
+    remove(permissions: Permissions): Promise<boolean>
+    onAdded: Listeners<(permissions: Permissions) => void>
+    onRemoved: Listeners<(permissions: Permissions) => void>
+  }
+  // Present once the person grants the optional `notifications` permission.
+  notifications?: {
+    create(id: string, options: { type: 'basic'; iconUrl: string; title: string; message: string }): Promise<string>
+    clear(id: string): Promise<boolean>
+    onClicked: Listeners<(id: string) => void>
   }
   // Chrome only.
   sidePanel?: {

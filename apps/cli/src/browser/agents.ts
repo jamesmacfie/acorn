@@ -15,6 +15,7 @@ import {
   approvalTarget,
   sentOptionId,
 } from '@acorn/plugin-agents/contract/appApproval.ts'
+import type { AgentLifecycleFrame } from '@acorn/plugin-agents/contract/lifecycle.ts'
 import type {
   BridgeAgentHint,
   BridgeAgentProfile,
@@ -249,11 +250,14 @@ export function bridgeSessionRead(nodeId: string, snapshot: AgentSessionSnapshot
 // How long agent frames gather before one hint goes out. A working agent sends dozens a second; the
 // sidebar needs to hear once that something changed.
 const HINT_DELAY_MS = 250
+const REQUEST_CHANGED: AgentLifecycleFrame['channel'] = 'plugin:agents:request-changed'
 
 // The agents plugin's frames reduced to which sessions and tasks they touched, gathered for a short
 // while and sent as one hint. A frame names its session in one of these places depending on its
 // channel, as the CLI's own `waitForHint` reads them. `ws:shed` is the Node saying it dropped frames
-// for a slow reader, so the hint says anything may have changed.
+// for a slow reader, so the hint says anything may have changed. The plugin's lifecycle frame
+// `plugin:agents:request-changed` is the one sign of every request change, expiry included, which no
+// `agent:` frame reports.
 export function agentHints(send: (hint: BridgeAgentHint) => void, delayMs = HINT_DELAY_MS) {
   let pending: BridgeAgentHint | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -274,12 +278,19 @@ export function agentHints(send: (hint: BridgeAgentHint) => void, delayMs = HINT
         event?: { sessionId?: string }
         turn?: { sessionId?: string }
         request?: { sessionId?: string }
+        taskId?: string
       } | null
       const channel = value?.channel
-      if (typeof channel !== 'string' || !(channel.startsWith('agent:') || channel === 'ws:shed')) return
+      const requestChanged = channel === REQUEST_CHANGED
+      if (typeof channel !== 'string' || !(channel.startsWith('agent:') || channel === 'ws:shed' || requestChanged))
+        return
       if (pending && pending.nodeId !== nodeId) flush()
-      pending ??= { nodeId, sessions: [], tasks: [], missed: false }
+      pending ??= { nodeId, sessions: [], tasks: [], missed: false, requests: false }
       if (channel === 'ws:shed') pending.missed = true
+      if (requestChanged) {
+        pending.requests = true
+        if (typeof value?.taskId === 'string') pending.tasks.push(value.taskId)
+      }
       const sessionId =
         value?.sessionId ??
         value?.session?.id ??

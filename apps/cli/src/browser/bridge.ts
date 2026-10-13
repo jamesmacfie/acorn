@@ -43,6 +43,7 @@ import {
 import type {
   AgentAttachment,
   AgentInputPart,
+  AgentOpenRequestList,
   AgentProviderDescriptor,
   AgentRequest,
   AgentSession,
@@ -473,6 +474,38 @@ export function createBridge(options: {
           body: { resolution: request.resolution },
         })) as AgentRequest
         return { nodeId: request.nodeId, sessionId: request.sessionId, request: bridgeRequest(row) }
+      }
+      case 'requests.pending': {
+        // One read of the Node's open requests, placed in a project through the active task list. A
+        // request whose task isn't active has no conversation to open, so it isn't counted.
+        const body = (await nodeRequest(request.nodeId, {
+          method: 'GET',
+          path: `${agentsRoute}/requests`,
+        })) as AgentOpenRequestList | null
+        if (!Array.isArray(body?.requests))
+          throw new BridgeFailure('node_error', 'The Node returned an unreadable list of requests.')
+        const tasks = new Map(
+          (await readList<Task>(request.nodeId, tasksRoute, (rows) => rows)).map((task) => [task.id, task]),
+        )
+        return {
+          nodeId: request.nodeId,
+          requests: body.requests.flatMap((row) => {
+            const task = tasks.get(row.taskId)
+            return task
+              ? [
+                  {
+                    requestId: row.providerRequestId,
+                    sessionId: row.sessionId,
+                    taskId: row.taskId,
+                    projectId: task.projectId,
+                    kind: row.kind,
+                    title: row.title,
+                    taskTitle: task.title,
+                  },
+                ]
+              : []
+          }),
+        }
       }
       case 'attachment.upload': {
         const bytes = Buffer.from(request.data, 'base64')

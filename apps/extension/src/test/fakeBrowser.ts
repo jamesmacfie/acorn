@@ -62,10 +62,13 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
   const onMessage = listeners<(message: unknown, sender: MessageSender) => void>()
   const onUpdated = listeners<(tabId: number, change: { url?: string; status?: string }, tab: Tab) => void>()
   const onActivated = listeners<(info: { tabId: number; windowId: number }) => void>()
-  const onAdded = listeners<(permissions: { origins?: string[] }) => void>()
-  const onRemoved = listeners<(permissions: { origins?: string[] }) => void>()
+  const onAdded = listeners<(permissions: { origins?: string[]; permissions?: string[] }) => void>()
+  const onRemoved = listeners<(permissions: { origins?: string[]; permissions?: string[] }) => void>()
+  const onStorageChanged = listeners<(changes: Record<string, { newValue?: unknown }>, area: string) => void>()
+  const onNotificationClicked = listeners<(id: string) => void>()
   const runtime: BrowserApi['runtime'] = {
     lastError: null,
+    getURL: (path) => `chrome-extension://fake/${path}`,
     onConnect,
     onMessage,
     sendMessage: async (message) => void onMessage.emit(structuredClone(message), {}),
@@ -121,6 +124,14 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     clickAction: () => onClicked.emit({ ...fake.activeTab }),
     // The tab beside the sidebar. Without `url` the extension may not read it, as without activeTab.
     activeTab: { id: 1, windowId: 1, url: 'https://example.test/docs', title: 'Docs' } as Tab,
+    // Tabs in the background of the window, which `tabs.query({})` lists after the active one.
+    otherTabs: [] as Tab[],
+    // The toolbar badge text for each tab, as last set.
+    badges: new Map<number, string>(),
+    // OS notifications on screen, by ID, and every one ever created, in order.
+    notifications: new Map<string, { title: string; message: string }>(),
+    notified: [] as string[],
+    clickNotification: (id: string): void => onNotificationClicked.emit(id),
     selection: '',
     // Messages the background sent to a page's content script, and the tabs it injected one into.
     tabMessages: [] as { tabId: number; message: unknown }[],
@@ -131,7 +142,7 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     // The active tab navigated, as `tabs.onUpdated` reports it.
     navigate: (url: string | undefined): void => {
       fake.activeTab = { ...fake.activeTab, url }
-      onUpdated.emit(fake.activeTab.id!, { url, status: 'complete' }, { ...fake.activeTab })
+      onUpdated.emit(fake.activeTab.id!, { url, status: 'complete' }, { ...fake.activeTab, active: true })
     },
     activate: (): void => onActivated.emit({ tabId: fake.activeTab.id!, windowId: fake.activeTab.windowId }),
     // Optional host access the person granted. `answerRequest` is the person's answer to the prompt.
@@ -141,6 +152,15 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
       fake.granted.delete(origin)
       onRemoved.emit({ origins: [origin] })
     },
+    // An API permission, such as `notifications`, granted or taken away outside the extension.
+    grantPermission: (name: string): void => {
+      fake.granted.add(name)
+      onAdded.emit({ permissions: [name] })
+    },
+    revokePermission: (name: string): void => {
+      fake.granted.delete(name)
+      onRemoved.emit({ permissions: [name] })
+    },
     // Replaced by a test to script a screenshot. By default a small JPEG.
     onCapture: async (_windowId: number): Promise<string> => 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
     api: {
@@ -149,13 +169,31 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
         local: {
           get: async (keys) =>
             Object.fromEntries(keys.filter((key) => storage.has(key)).map((key) => [key, storage.get(key)])),
-          set: async (items) => void Object.entries(items).forEach(([key, value]) => storage.set(key, value)),
-          remove: async (keys) => void keys.forEach((key) => storage.delete(key)),
+          set: async (items) => {
+            for (const [key, value] of Object.entries(items)) storage.set(key, structuredClone(value))
+            onStorageChanged.emit(
+              Object.fromEntries(Object.entries(items).map(([key, value]) => [key, { newValue: value }])),
+              'local',
+            )
+          },
+          remove: async (keys) => {
+            for (const key of keys) storage.delete(key)
+            onStorageChanged.emit(Object.fromEntries(keys.map((key) => [key, {}])), 'local')
+          },
         },
+        onChanged: onStorageChanged,
       },
-      action: { onClicked },
+      action: {
+        onClicked,
+        setBadgeText: async ({ tabId, text }: { tabId?: number; text: string }) =>
+          void fake.badges.set(tabId ?? -1, text),
+        setBadgeBackgroundColor: async () => undefined,
+      },
       tabs: {
-        query: async (): Promise<Tab[]> => [{ ...fake.activeTab }],
+        query: async (query: { active?: true }): Promise<Tab[]> => [
+          { ...fake.activeTab, active: true },
+          ...(query.active ? [] : fake.otherTabs.map((tab) => ({ ...tab, active: false }))),
+        ],
         captureVisibleTab: (windowId: number): Promise<string> => fake.onCapture(windowId),
         sendMessage: async (tabId: number, message: unknown) =>
           void fake.tabMessages.push({ tabId, message: structuredClone(message) }),
@@ -172,21 +210,36 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
           return [{ result: fake.selection }]
         }) as BrowserApi['scripting']['executeScript'],
       },
+      // Host patterns and API permission names share one set of grants.
       permissions: {
-        contains: async ({ origins }: { origins: string[] }): Promise<boolean> =>
-          origins.every((origin) => fake.granted.has(origin)),
-        request: async ({ origins }: { origins: string[] }): Promise<boolean> => {
+        contains: async ({ origins = [], permissions = [] }): Promise<boolean> =>
+          [...origins, ...permissions].every((name) => fake.granted.has(name)),
+        request: async ({ origins = [], permissions = [] }): Promise<boolean> => {
           if (!fake.answerRequest) return false
-          for (const origin of origins) fake.granted.add(origin)
-          onAdded.emit({ origins })
+          for (const name of [...origins, ...permissions]) fake.granted.add(name)
+          onAdded.emit({ origins, permissions })
           return true
         },
-        remove: async ({ origins }: { origins: string[] }): Promise<boolean> => {
+        remove: async ({ origins = [], permissions = [] }): Promise<boolean> => {
           for (const origin of origins) fake.revoke(origin)
+          for (const name of permissions) fake.revokePermission(name)
           return true
         },
         onAdded,
         onRemoved,
+      },
+      // As in a browser, the API is there only while its permission is granted.
+      get notifications(): BrowserApi['notifications'] {
+        if (!fake.granted.has('notifications')) return undefined
+        return {
+          create: async (id: string, options: { title: string; message: string }) => {
+            fake.notifications.set(id, { title: options.title, message: options.message })
+            fake.notified.push(id)
+            return id
+          },
+          clear: async (id: string) => fake.notifications.delete(id),
+          onClicked: onNotificationClicked,
+        }
       },
       ...(flavor === 'chrome'
         ? {
