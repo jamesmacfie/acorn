@@ -116,6 +116,23 @@ declares one:
   repository. `packages/node-core/src/server/plugins/__fixtures__/handoffPlugin.mjs` is a starting
   point.
 
+## Check an installed build
+
+The loop's own profile and development host can hide an installation fault, so a release check uses
+the built bundles and the host `acorn browser install` registers:
+
+- **Chrome.** Register into a fresh profile with
+  `acorn browser install --browser chrome --registry-dir <profile>/NativeMessagingHosts`. Start Chrome
+  with `--user-data-dir=<profile> --remote-debugging-port=PORT --enable-unsafe-extension-debugging`,
+  then send the browser-level CDP command `Extensions.loadUnpacked` with `apps/extension/dist/chrome`.
+  An extension loaded this way leaves when Chrome quits, and `chrome.runtime.reload()` disables it.
+  Send `Extensions.loadUnpacked` again to reload it in place with its storage.
+- **Firefox.** `acorn browser install --browser firefox` writes the user-level registration Firefox
+  reads. Start Firefox with `open -na` as in [Limits](#limits), and install `apps/extension/dist/firefox`
+  with WebDriver BiDi `webExtension.install`.
+
+Run `acorn browser uninstall` afterwards, and delete the bridge folders you created.
+
 ## Tests without a browser
 
 `apps/extension/src/test/fakeBrowser.ts` is the one fake of the extension API. Background and sidebar
@@ -139,7 +156,8 @@ Measured October 13, 2026, with Chrome 154.0.8037.99, Firefox 151.0.3, and web-e
 
 ## Limits
 
-- The Firefox launch needs a person's terminal. From a sandboxed agent session it fails twice over:
+- The Firefox launch hasn't been checked from a person's terminal. From a sandboxed agent session it
+  fails twice over:
   web-ext checks `~/Library/Application Support/Firefox/profiles.ini` before it uses a kept profile,
   and the sandbox denies that read. A Firefox started as a child process also can't start its content
   processes.

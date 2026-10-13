@@ -421,6 +421,18 @@ describe('browser bridge selection', () => {
     expect(await call({ op: 'projects.list', nodeId: 'node-a' })).toMatchObject({ nodeId: 'node-a' })
   })
 
+  it('names a changed certificate when the sidebar lists Nodes, before any read', async () => {
+    const { call, node, statuses } = await paired()
+    await call({ op: 'node.select', nodeId: 'node-a' })
+    // This fake Node has no WebSocket, so the broker already reports it offline.
+    expect((await call({ op: 'nodes.list' })).status).toMatchObject({ nodeId: 'node-a', state: 'offline' })
+    node.replaceCertificate()
+    // The reply itself names it: a sidebar that has just opened ignores status events until then.
+    const changed = { nodeId: 'node-a', state: 'offline', error: { code: 'identity_mismatch' } }
+    expect((await call({ op: 'nodes.list' })).status).toEqual(changed)
+    expect(statuses.at(-1)).toEqual(changed)
+  })
+
   it('forgets a selected Node and clears the selection', async () => {
     const { call } = await paired()
     await call({ op: 'node.select', nodeId: 'node-a' })

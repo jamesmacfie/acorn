@@ -7,6 +7,8 @@ features is in [the extension programme](./future/extension/README.md).
 
 Topic pages:
 
+- [Set up and troubleshoot](./browser-extension/setup.md): install the bridge and the development
+  builds, pair, repair or remove them, and what each sidebar state means.
 - [Agent conversations](./browser-extension/conversations.md): the agent operations, change hints,
   the conversation window, send retries, and browser storage.
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
@@ -150,39 +152,23 @@ forgetting still work. An unknown Node's ID is removed from storage.
 
 ## What the sidebar shows
 
-Each failure has a next step, written in `src/sidebar/guidance.ts`:
-
-| State | How it is detected | Next step shown |
-| --- | --- | --- |
-| Host missing | The port closes with "not found" (Chrome) or "No such native application" (Firefox) | Run `acorn browser install` |
-| Host stopped | Any other close, or no reply within 10 seconds | Retry, or run `acorn browser status` |
-| Bad code | The Node refuses the pairing | Check the code and try again |
-| Incompatible | The probe reports another protocol, or the broker marks the Node `incompatible` | Update whichever side is older |
-| Offline | The broker reports `offline`, or a read fails | Check that the Node is running |
-| Revoked | The Node answers 401 `unauthenticated` | Forget the Node and pair again |
-| Identity changed | A failed read, then a probe whose fingerprint differs from the pin | Check with the Node's owner, then pair again |
-| No agent can start | Every profile is uninstalled or signed out | The profile's own diagnostic |
-| Conversation gone | `session.read` answers `not_found` | The draft is kept; choose another conversation |
-| Conversation archived | The session row has `archivedAt` | The draft is kept; sending is off |
-| Node away | The selected Node's status is neither online nor degraded | The draft is kept; sending is off until it returns |
-| Request it can't answer | The host marks a request `unsupported`: a kind it doesn't answer, choices that don't read, or app access with no readable scope | The request in full, and answer it in the Acorn app |
-| Answer unconfirmed | `request.resolve` fails as uncertain | The request is read again; pressing the same answer reuses its key |
-| No page access | The active tab has no readable address, or the browser refuses the capture | Click the Acorn toolbar button on the page, then capture again |
-| Page changed | The active tab or its address changed while a capture ran | Capture again |
-| Handoff refused | The plugin's route answered an error, such as no connected account | The plugin's own message, with **Try again** |
-| Nothing to hand off | The page resolved to no items | None; the page isn't an item this Node can open |
+Each failure has a next step, written in `src/sidebar/guidance.ts`. [Set up and troubleshoot](./browser-extension/setup.md#what-the-sidebar-shows)
+lists every state, how the sidebar detects it, and what it tells the person.
 
 A regenerated certificate fails the pinned TLS chain before the fingerprint comparison runs, so the
-broker reports it as unreachable. The host probes after a failed read to tell the two apart, as
-`openCliNode` does, then closes that Node's connection until it is paired again.
+broker reports it as unreachable and keeps retrying. The host probes the selected Node to tell the two
+apart, as `openCliNode` does: after a failed read, and on each `nodes.list` while the Node is offline,
+which the sidebar sends each time it opens. `nodes.list` waits at most two seconds for that probe, so a
+Node that is asleep holds up the list no longer than that. A changed certificate closes that Node's
+connection until it is paired again.
 
 ## Limits
 
 - macOS only. `acorn browser install` refuses other platforms.
 - Firefox loads the extension only as a temporary add-on, which leaves when Firefox quits.
-- In Firefox 151, the background's first native port after the browser starts has been seen to get no
-  host process and no close. The 10-second deadline above recovers from it, and the selection restore
-  retries once on a fresh port. A port opened from the sidebar page at the same moment answers.
+- In Firefox 151, the first native host the extension starts after Firefox starts can get no process
+  and no close. The 10-second deadline above ends that port. The selection restore retries once on a
+  fresh port, and **Retry** opens one, and either answers at once.
 - The sidebar draws no tool details or subagent streams. It draws the screenshots a turn sent and names any other attachment.
 - Drafts are never expired.
 - Each phase's real-browser results and their gaps are in its page, listed in

@@ -150,5 +150,5 @@ These checks are open:
 Unit tests cover each of these against the bridge fake, the host against a fake Node over TLS, and the
 Node's conflict mapping. They don't prove browser behavior.
 
-Phase 10's acceptance pass runs these checks with a person present.
+Phase 10's [person checklist](./10-person-checklist.md) holds these checks, rows 18 to 23.
 

@@ -41,6 +41,7 @@ export function Destination(props: {
   online: boolean
   hint: BridgeAgentHint | null
   reconnects: number
+  projectChanges: number
   capture(kind: CaptureKind): Promise<PageCapture>
   // A handoff the person asked for, from a site button or the sidebar's own offer.
   handoff: PageHandoff | null
@@ -330,6 +331,14 @@ export function Destination(props: {
         if (hint?.nodeId === nodeId && forTask && (hint.missed || hint.tasks.includes(forTask)))
           void loadSessions(forTask)
       },
+      { defer: true },
+    ),
+  )
+  // A project was added, renamed, hidden, or removed, here or by another client.
+  createEffect(
+    on(
+      () => props.projectChanges,
+      () => void loadProjects(),
       { defer: true },
     ),
   )

@@ -118,6 +118,23 @@ device-only. A package waiting for review or a restart isn't listed until it run
 failed plugin isn't listed, and a reload replaces the list with the new version's. The host
 broadcasts `plugins:changed` on each of these, and the extension reads the list again.
 
+## Ship a handoff
+
+A handoff reaches a person only through a Node that runs your plugin and a browser paired with that
+Node:
+
+1. Declare the descriptor and serve `resolve` from your Node half, then test the route as below.
+2. Get the plugin running on the Node. A compiled plugin ships with every Node. The desktop also
+   bundles some loaded packages, Linear and Rollbar among them, but a standalone Node runs a loaded
+   package only after it is installed there.
+3. Check discovery: `GET /v1/core/browser-handoffs` from a paired client lists your descriptor.
+4. Check the page in a browser with [the development loop](../local-development/extension-dev-loop.md#check-site-buttons),
+   including the sidebar's offer when no anchor matches.
+
+Choose anchors you have seen on the live site, signed in, at more than one window width. Sites hide
+rows at some widths, and a page that needs a sign-in can't be checked without one. With no anchor you
+can trust, leave `anchors` empty, and the sidebar offers the handoff instead.
+
 ## Test a handoff
 
 - Parse the route's answer with `browserHandoffResolution` from

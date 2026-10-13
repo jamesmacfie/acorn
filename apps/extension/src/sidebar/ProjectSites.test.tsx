@@ -41,6 +41,8 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
     requests: [] as Request[],
     // What the Node's agents are waiting on, as `requests.pending` answers.
     pending: [] as Record<string, unknown>[],
+    // Projects another client adds after the sidebar opened.
+    addedProjects: [] as { id: string; name: string; path: null; hidden: boolean }[],
   }
   const nodes = () => ({
     nodes: ['n1', 'n2'].map((nodeId) => ({ nodeId, label: nodeId, endpoint: `https://${nodeId}.test`, local: false })),
@@ -79,6 +81,7 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
             { id: 'p1', name: 'Web', path: null, hidden: false },
             { id: 'p2', name: 'Docs', path: null, hidden: false },
             { id: 'p3', name: 'Everything', path: null, hidden: false },
+            ...state.addedProjects,
           ],
         }
       case 'tasks.list':
@@ -137,6 +140,19 @@ const siteAccess = (root: HTMLElement) =>
 const site = (projectId: string, origin: string, pathPrefix = '/'): ProjectSite => ({ projectId, origin, pathPrefix })
 
 describe('project suggestions for a site', () => {
+  it('reads the project list again when the Node says a project changed', async () => {
+    const { fake, state, root } = mount({ url: 'https://example.com/' })
+    await settle(30)
+    const options = () =>
+      [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
+    expect(options()).not.toContain('Admin')
+
+    state.addedProjects.push({ id: 'p4', name: 'Admin', path: null, hidden: false })
+    fake.hosts[0]!.send({ v: 1, event: 'projects', nodeId: 'n1' })
+    await settle(20)
+    expect(options()).toContain('Admin')
+  })
+
   it('chooses the project of each path, and leaves overlapping matches to the picker', async () => {
     const { fake, state, root } = mount({
       url: 'https://example.com/app/login',

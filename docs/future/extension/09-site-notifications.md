@@ -202,4 +202,4 @@ These gaps remain:
 - Firefox's first native port after start didn't stall in this session.
 - Firefox reload on save and session stop through `pnpm dev:extension`, for the sandbox reason above.
 
-Phase 10's acceptance pass runs the gaps with a person present.
+Phase 10's [person checklist](./10-person-checklist.md) holds these gaps, rows 15 to 17.

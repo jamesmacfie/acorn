@@ -31,6 +31,8 @@ export function App(props: { api: BrowserApi }) {
   // Counts each return of the selected Node's connection. What the sidebar shows may have changed
   // while it was away, and frames missed in a gap are never replayed, so a return means read again.
   const [reconnects, setReconnects] = createSignal(0)
+  // Counts changes to the selected Node's projects, made here or by another client.
+  const [projectChanges, setProjectChanges] = createSignal(0)
   // The selected Node's handoffs, and the one the person asked for, if any.
   const [handoffs, setHandoffs] = createSignal<BridgeHandoff[]>([])
   const [handoff, setHandoff] = createSignal<PageHandoff | null>(null)
@@ -59,7 +61,11 @@ export function App(props: { api: BrowserApi }) {
     agents: (next) => next.nodeId === fleet()?.activeNodeId && setHint(next),
     handoff: setHandoff,
     handoffsChanged: (nodeId) => nodeId === fleet()?.activeNodeId && void loadHandoffs(nodeId),
-    projectsChanged: (nodeId) => nodeId === fleet()?.activeNodeId && void loadSites(nodeId),
+    projectsChanged: (nodeId) => {
+      if (nodeId !== fleet()?.activeNodeId) return
+      setProjectChanges((count) => count + 1)
+      void loadSites(nodeId)
+    },
     page: () => setPageChecks((count) => count + 1),
     requests: (nodeId, list) => setRequests({ nodeId, requests: list }),
     open: setOpenRequest,
@@ -148,7 +154,15 @@ export function App(props: { api: BrowserApi }) {
 
       <section class="card" aria-label="Nodes">
         <h2>Nodes</h2>
-        <Show when={fleet()?.nodes.length} fallback={<p class="quiet">No Node is paired with this browser yet.</p>}>
+        <Show
+          when={fleet()?.nodes.length}
+          fallback={
+            <p class="quiet">
+              {/* Pairings live in the bridge, so until it answers the sidebar can't say there are none. */}
+              {fleet() ? 'No Node is paired with this browser yet.' : 'The paired Nodes show once the bridge answers.'}
+            </p>
+          }
+        >
           <ul class="nodes">
             <For each={fleet()?.nodes}>
               {(node) => (
@@ -219,6 +233,7 @@ export function App(props: { api: BrowserApi }) {
             online={online()}
             hint={hint()}
             reconnects={reconnects()}
+            projectChanges={projectChanges()}
             capture={(kind) => capturePage(props.api, kind)}
             handoff={handoff()}
             dismissHandoff={() => setHandoff(null)}

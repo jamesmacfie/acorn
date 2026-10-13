@@ -75,6 +75,10 @@ export class BridgeFailure extends Error {
 
 type Probe = Awaited<ReturnType<typeof probeNode>>
 
+// How long `nodes.list` waits to learn whether an offline Node changed its certificate. A refused
+// connection answers at once; a Node that accepts and then hangs costs at most this.
+const LIST_PROBE_TIMEOUT_MS = 2_000
+
 // The native host's operations, over this browser's own custody. The certificate, the token, and the
 // broker stay in this process; replies carry node records, probe results, and project rows only.
 //
@@ -150,15 +154,26 @@ export function createBridge(options: {
 
   // A regenerated certificate fails the pinned chain check before the fingerprint comparison runs, so
   // the broker reports it as unreachable. Probing says which it was, as `openCliNode` does.
-  async function presentsAnotherCertificate(nodeId: string): Promise<boolean> {
+  async function presentsAnotherCertificate(nodeId: string, timeoutMs?: number): Promise<boolean> {
     const node = fleet.get(nodeId)
     if (!node?.fingerprint) return false
     try {
       // Both sides come from `probeNode`, which normalizes the fingerprint.
-      return (await probe(node.endpoint)).fingerprint !== node.fingerprint
+      return (await probe(node.endpoint, { timeoutMs })).fingerprint !== node.fingerprint
     } catch {
       return false
     }
+  }
+
+  // Stops at a changed certificate: the Node's connection closes until the person pairs it again.
+  async function noticeChangedIdentity(nodeId: string, timeoutMs?: number): Promise<boolean> {
+    if (identityChanged === nodeId) return true
+    if (activeNodeId !== nodeId || !(await presentsAnotherCertificate(nodeId, timeoutMs)) || activeNodeId !== nodeId)
+      return false
+    identityChanged = nodeId
+    broker.remove(nodeId)
+    options.status(changedIdentityStatus(nodeId))
+    return true
   }
 
   // One Node route for the selected node. A read is refused if the selection moved while it was out;
@@ -198,12 +213,8 @@ export function createBridge(options: {
       })
     } catch (error) {
       if (!write) requireSelected(nodeId)
-      if (activeNodeId === nodeId && (await presentsAnotherCertificate(nodeId)) && activeNodeId === nodeId) {
-        identityChanged = nodeId
-        broker.remove(nodeId)
-        options.status(changedIdentityStatus(nodeId))
+      if (await noticeChangedIdentity(nodeId))
         throw new BridgeFailure('identity_mismatch', 'The Node presented a different certificate. Pair it again.')
-      }
       if (write)
         throw new BridgeFailure(
           'ambiguous_mutation',
@@ -355,8 +366,15 @@ export function createBridge(options: {
 
   async function handle(request: BridgeRequest): Promise<BridgeResults[BridgeRequest['op']]> {
     switch (request.op) {
-      case 'nodes.list':
+      case 'nodes.list': {
+        // The broker reports a regenerated certificate as offline and keeps retrying quietly, so an
+        // offline Node is probed whenever the sidebar asks, which it does each time it opens. The answer
+        // goes in this reply: a sidebar that has just opened ignores status events until it has the
+        // list. The short timeout bounds the wait on a Node that is asleep rather than changed.
+        if (activeNodeId && nodes().status?.state === 'offline')
+          await noticeChangedIdentity(activeNodeId, LIST_PROBE_TIMEOUT_MS)
         return nodes()
+      }
       case 'node.probe': {
         pending = null
         try {

@@ -223,7 +223,7 @@ export function Composer(props: {
           </ul>
         </div>
       </Show>
-      <div class="row">
+      <div class="row capture-actions">
         <For each={['link', 'selection', 'screenshot'] as const}>
           {(kind) => (
             <button

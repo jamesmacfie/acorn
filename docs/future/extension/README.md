@@ -5,7 +5,14 @@ Status: proposed implementation programme, October 10, 2026. Development loop ad
 implemented October 13, 2026. Phase 04 implemented October 13, 2026. Phase 05 implemented October 13, 2026.
 Phase 06 implemented October 13, 2026. Phase 07 implemented October 13, 2026. Phase 08 code
 implemented October 13, 2026, with its real-browser checks still to run. Phase 09 implemented
-October 13, 2026.
+October 13, 2026. Phase 10 checked by an agent October 13, 2026: a clean build, the standalone CLI's
+install, repair, and uninstall, and the release journeys an agent can drive, in both browsers, with the
+results and gaps in [its page](./10-developer-release.md#real-browser-results).
+
+The programme isn't complete. The acceptance that needs a person is open in the
+[phase 10 checklist](./10-person-checklist.md): browser prompts, notification clicks, real provider
+handoffs, real permission requests and approval races, a Node on another computer, and the desktop
+closed.
 Baseline: `f643f1f117261e1b67a21595ef787070731b1103`.
 
 This document holds the decisions and architectural context for the browser extension.

@@ -136,5 +136,8 @@ describe('sidebar', () => {
     dispose = render(() => <App api={fake.api} />, root)
     await settle()
     expect(root.querySelector('[role="alert"]')!.textContent).toContain('Run `acorn browser install`')
+    // The pairings are in the bridge, so the sidebar doesn't claim there are none.
+    expect(root.textContent).not.toContain('No Node is paired')
+    expect(root.textContent).toContain('The paired Nodes show once the bridge answers.')
   })
 })

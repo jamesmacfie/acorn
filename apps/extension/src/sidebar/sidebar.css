@@ -46,10 +46,17 @@ button:disabled { opacity: 0.6; cursor: default; }
 .words { font-weight: 600; font-size: 14px; }
 .identity { margin-bottom: 8px; }
 .captures { display: grid; gap: 6px; }
+/* In a narrow panel the buttons move to a second line whole rather than breaking their labels. */
+.capture-actions { flex-wrap: wrap; }
+.capture-actions button { white-space: nowrap; }
 .capture { align-items: flex-start; }
 .capture img, .attachments img { display: block; max-width: 100%; max-height: 160px; object-fit: contain; border: 1px solid var(--line); border-radius: 5px; }
 .capture blockquote { margin: 4px 0 0; padding-left: 8px; border-left: 2px solid var(--line); white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
 .attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+/* Messages read top to bottom: the speaker, then the text as written, unlike the two-column list rows above. */
+.transcript { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 8px; }
+.transcript li { display: block; }
+.transcript p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .capture pre.context { margin: 4px 0 0; padding-left: 8px; border-left: 2px solid var(--line); font: inherit; white-space: pre-wrap; max-height: 8.5em; overflow: auto; }
 .request { display: grid; gap: 6px; border-color: var(--accent); }
 .request[data-status="resolved"], .request[data-status="expired"] { border-color: var(--line); }
