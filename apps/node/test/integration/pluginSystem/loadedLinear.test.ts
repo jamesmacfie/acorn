@@ -36,6 +36,10 @@ describe('loading production plugin bundles from disk', () => {
     const linear = loaded.find((entry) => entry.manifest.id === 'linear')
     expect(linear?.plugin.name).toBe('linear')
     expect(linear?.manifest.permissions.node.net).toEqual(['api.linear.app', 'uploads.linear.app'])
+    // The issue button survives the build and the loader's route-ownership check.
+    expect(linear?.manifest.contributions.browserHandoffs?.map((handoff) => handoff.resolve)).toEqual([
+      '/v1/p/linear/browser/issue',
+    ])
     dispose = async () => {
       for (const entry of loaded) await entry.plugin.dispose?.()
     }

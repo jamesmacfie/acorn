@@ -545,6 +545,31 @@ describe('managed-agent lifecycle events and read models', () => {
     }
   }
 
+  it('reads open requests across tasks, oldest first, leaving out settled ones and archived sessions', async () => {
+    const first = await createSession()
+    const second = await createSession(otherTaskId)
+    const archived = await createSession(otherTaskId)
+    // A millisecond apart, so creation order is the order the read must keep.
+    const raise = async (sessionId: string, requestId: string) => {
+      await new Promise((resolve) => setTimeout(resolve, 2))
+      await store.recordEvent(sessionId, null, { type: 'request', requestId, kind: 'question', title: requestId })
+    }
+    await raise(first.id, 'settled')
+    await raise(second.id, 'claimed')
+    await raise(first.id, 'waiting')
+    await raise(archived.id, 'hidden')
+    await store.recordEvent(first.id, null, { type: 'request_resolved', requestId: 'settled', resolution: {} })
+    await store.claimRequestResolution(second.id, 'claimed', { optionId: 'yes' }, 'claim-one')
+    await store.patchSession(archived.id, { archived: true })
+
+    const open = await store.openRequests(10)
+    expect(open.map((request) => [request.taskId, request.providerRequestId, request.status])).toEqual([
+      [otherTaskId, 'claimed', 'resolving'],
+      [taskId, 'waiting', 'pending'],
+    ])
+    expect((await store.openRequests(1)).map((request) => request.providerRequestId)).toEqual(['claimed'])
+  })
+
   it('publishes tool, subagent, and context edges that rebuild to the same state, with no command or output', async () => {
     const session = await createSession()
     const turn = (

@@ -28,7 +28,9 @@ function bridgeFailure(error: unknown): never {
   if (/not available|unavailable|no mapped checkout/i.test(message)) {
     throw new BridgeError(422, 'agent_provider_unavailable', message)
   }
-  if (/active turn|not ready|controlled|archived|pending|support/i.test(message)) {
+  // A request another answer is already settling, or a button the request never offered, is the
+  // caller's conflict with the request's state, not a fault in the Node.
+  if (/active turn|not ready|controlled|archived|pending|support|in progress|not offered/i.test(message)) {
     throw new BridgeError(409, 'agent_conflict', message)
   }
   throw error
@@ -45,6 +47,8 @@ const guarded = async <T>(operation: () => Promise<T>): Promise<T> => {
 // How many sessions this plugin offers the merged list. Same reasoning as the workflows half: it is a
 // "what is happening now" surface, not an archive.
 const RUN_LIST_LIMIT = 100
+// Open requests are rare, usually one per waiting session, so this is a bound, not a page.
+const OPEN_REQUESTS_LIMIT = 100
 
 const TERMINAL_AGENT_STATES = new Set<AgentRuntimeState>(['stopped', 'failed', 'archived'])
 
@@ -124,6 +128,7 @@ export function managedAgentsBridge(
         const page = await runtime.store.listSessions(filter)
         return delegation ? delegation.projectSessionList(page) : page
       }),
+    openRequests: () => guarded(async () => ({ requests: await runtime.store.openRequests(OPEN_REQUESTS_LIMIT) })),
     // Folded here rather than in the store, because this is the one caller whose reader folds anyway.
     // `store.snapshot` still answers workflow execution and the wait route with every row
     // (`foldUsageEvents` says why). Usage folds for every reader, since applying a usage row twice

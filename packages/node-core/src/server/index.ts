@@ -8,6 +8,7 @@ import { onServerError, requestIdMiddleware } from './respond'
 import { CORE_NAMESPACE, PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from './routes/registry'
 import { audit } from './routes/security/audit'
 import { runs } from './routes/runs'
+import { browserHandoffsRoute } from './routes/browserHandoffs'
 import { search } from './routes/search'
 import { backup } from './routes/security/backup'
 import { security } from './routes/security/security'
@@ -158,6 +159,11 @@ export function createApp() {
     // (docs/telemetry/runtimes.md § Other runtimes).
     .use(`${CORE_NAMESPACE}/telemetry`, requireDevice)
     .use(`${CORE_NAMESPACE}/telemetry/*`, requireDevice)
+    // Which buttons the running plugins put on websites, and the routes behind them. Device-only, like
+    // the plugin roster it is a slice of: it enumerates the plugin surface, and only the browser
+    // extension's device reads it.
+    .use(`${CORE_NAMESPACE}/browser-handoffs`, requireDevice)
+    .use(`${CORE_NAMESPACE}/browser-handoffs/*`, requireDevice)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices: owner-only device administration
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/dashboards`, dashboards) // Typed panel drafts/publication plus /history measure series.
@@ -172,6 +178,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/schedules`, schedules) // Settings → Schedules: periodic work owned by the node (docs/schedules.md)
     .route(`${CORE_NAMESPACE}/data-sources`, dataSources)
     .route(`${CORE_NAMESPACE}/queries`, queries)
+    .route(`${CORE_NAMESPACE}/browser-handoffs`, browserHandoffsRoute) // the browser extension's site buttons (docs/plugin-authoring/browser-handoffs.md)
     .route(`${CORE_NAMESPACE}/runs`, runs) // Settings → Run history: every plugin's runs, merged (@acorn/protocol/runs.ts)
     .route(`${CORE_NAMESPACE}/search`, search) // core and plugin search providers, grouped (docs/plugins/search-providers.md § Search providers)
     .route(`${CORE_NAMESPACE}/backup`, backup) // docs/data-layer/backup-and-retention.md § Backup and import: core + plugin databases, minus credentials

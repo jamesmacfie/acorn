@@ -28,6 +28,7 @@ import type {
   AgentProviderDescriptor,
   AgentRequest,
   AgentSession,
+  AgentOpenRequestList,
   AgentSessionList,
   AgentSessionSnapshot,
   AgentTurn,
@@ -80,6 +81,8 @@ export type ManagedAgentsBridge = {
   importTranscript(input: ImportAgentTranscriptInput): Promise<AgentSession>
   verifyImportedResume(sessionId: string): Promise<AgentSession>
   listSessions(filter: SessionListFilter): Promise<AgentSessionList>
+  // Every request still waiting on a person, Node-wide, oldest first and bounded.
+  openRequests(): Promise<AgentOpenRequestList>
   snapshot(
     sessionId: string,
     afterSeq?: number,
@@ -284,6 +287,9 @@ export const managedAgents = new Hono<AppEnv>()
   // Settings > Storage and memory (docs/managed-agents/operations.md § Operations and failure). Device only: the
   // numbers cover every task's agents, and the stop reaches every task's processes, so neither is
   // something a task-scoped agent may ask for.
+  // Node-wide, so a task's agent may not read it; the browser extension's badge reads it with a device
+  // credential (docs/browser-extension/notifications.md).
+  .get('/requests', requireDevice, (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.openRequests()))
   .get('/footprint', requireDevice, (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.footprint()))
   .post('/stop-idle', requireDevice, (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.stopIdleNow()))
   .post('/attachments', async (c) => {

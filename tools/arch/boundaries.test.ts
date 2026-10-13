@@ -644,7 +644,11 @@ describe('architecture boundaries', () => {
 
   it('libraries publish only enumerated, existing source entrypoints', () => {
     const limits: Record<string, number> = {
-      '@acorn/protocol': 84, // Includes the static dependency policy capability, the secret check contracts, and the plugin_authoring point list.
+      // Includes the static dependency policy capability, the secret check contracts, the plugin_authoring
+      // point list, the browser handoff contract, which the extension and its native host read
+      // without the whole manifest contract, and the project site association rules, which the Node,
+      // the native host, and the extension share without the `api.ts` facade.
+      '@acorn/protocol': 86,
       // client-core publishes narrow entrypoints where a consumer can't take a barrel that pulls in
       // renderer-only modules. Pure leaves the terminal, logic tests or remote trees need: model-provider
       // error guidance, `kit/lib/savedSignal`, `kit/lib/formatChord`, `kit/lib/ansi`, and the address
@@ -845,6 +849,7 @@ describe('architecture boundaries', () => {
       ['packages/protocol/src/plugin/manifest/commandDescriptors.ts', "the 'terminal' command category"],
       // `terminal` an agent controller and a driver kind; `context` an agent input part.
       ['packages/protocol/src/agents/agentContext.ts', "'context' the agent input part"],
+      ['packages/protocol/src/transport/extensionBridge.ts', "'context' the agent input part the sidebar sends"],
       ['packages/client-core/src/features/agent/contextSnapshot.ts', "'context' the agent input part"],
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
       ['packages/node-core/src/server/plugins/coreFacets.ts', "'context' the core facet name"],

@@ -2,6 +2,7 @@ import type { ExternalRef } from '../../integrations/providers.ts'
 import type { McpServerSummary } from '../../integrations/mcp.ts'
 import { z } from 'zod'
 import type { WorkspaceAppearance } from '../../appearance/workspaceAppearance.ts'
+import type { SiteAssociation } from '../../projects/siteAssociations.ts'
 
 // Workspaces group projects and are the top-level unit (docs/workspaces-and-tasks.md).
 // When the worktree setup script runs: 'off' never, 'created' when the task is created, 'terminal'
@@ -75,6 +76,9 @@ export type ProjectConfig = {
   previewMode: PreviewMode | null
   previewValue: string | null
   branchPrefix: string | null
+  // Web pages the browser extension suggests this project on (docs/browser-extension/project-sites.md).
+  // Empty when none are set. Only on the row: a committed `.acorn/config.toml` can't set them.
+  siteAssociations: SiteAssociation[]
 }
 export type ProjectConfigPatch = Partial<{
   setupScript: string
@@ -89,6 +93,8 @@ export type ProjectConfigPatch = Partial<{
   previewMode: PreviewMode | ''
   previewValue: string
   branchPrefix: string
+  // Replaces the whole list.
+  siteAssociations: SiteAssociation[]
 }>
 // What the project checkout's committed `.acorn/config.toml` sets, which wins over the matching
 // machine-local value in `config` (docs/workspaces-and-tasks/project-config.md § The project row). A key is

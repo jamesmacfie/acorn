@@ -111,7 +111,10 @@ segment to one of three destinations:
 - The plugin's own route, for a compiled recognizer that declares a `path` resolver.
 
 A link must have a pane or a panel, or the manifest is rejected. The grammar is exact-arity, with no
-trailing wildcard, so a URL shape with an optional last segment needs one entry per arity.
+trailing wildcard, so a URL shape with an optional last segment needs one entry per arity. One
+trailing slash on the address is ignored, because some providers spell their canonical addresses with
+one. [Browser handoffs](../plugin-authoring/browser-handoffs.md) use the same grammar for the pages
+their buttons appear on.
 
 The clicking surface picks the destination: a pull-request conversation asks for the panel, a note
 takes the pane, a dashboard row asks for the route. Each is a preference, and the host falls through

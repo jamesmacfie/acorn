@@ -134,6 +134,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | --- | --- |
 | [local-development.md](./local-development.md) | Getting the app running, the dev loops, the environment, and the database commands. |
 | [local-development/agent-drivers.md](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client, native control, and the large-surface flow. |
+| [local-development/extension-dev-loop.md](./local-development/extension-dev-loop.md) | `pnpm dev:extension`: an isolated browser with the extension loaded and reloading, its native host and Node, and the sidebar driver. |
 | [local-development/profiling.md](./local-development/profiling.md) | Timing a cold start and a task switch. |
 | [local-development/packaged-stacks.md](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
 | [local-development/formatting.md](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, the `git blame` ignore file, and carrying a branch across a formatting commit. |
@@ -181,6 +182,14 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [cli/agents-and-workflows.md](./cli/agents-and-workflows.md) | CLI agent sessions, workflow runs, and the run list. |
 | [cli/plugin-commands.md](./cli/plugin-commands.md) | Discovering and running a plugin's CLI commands. |
 | [cli/local-service.md](./cli/local-service.md) | The CLI-owned background Node: start, status, and stop. |
+| [cli/browser-host.md](./cli/browser-host.md) | `acorn browser install`, `status`, and `uninstall`: registering the extension's native host. |
+| [browser-extension.md](./browser-extension.md) | The Chrome and Firefox extension, its native bridge, the native messaging contract, pairing, and sidebar states. |
+| [browser-extension/setup.md](./browser-extension/setup.md) | Installing the extension's development builds and native bridge on macOS, pairing, repair and removal, and every sidebar state with its next step. |
+| [browser-extension/conversations.md](./browser-extension/conversations.md) | The extension's agent operations, change hints, conversation window, send retries, and browser storage. |
+| [browser-extension/page-capture.md](./browser-extension/page-capture.md) | The extension's link, selection, and screenshot captures, page access, sending them, and the attachment operations. |
+| [browser-extension/handoffs.md](./browser-extension/handoffs.md) | The buttons plugins put on websites, the extension's handoff card, and the operations that resolve a page and create a linked task. |
+| [browser-extension/project-sites.md](./browser-extension/project-sites.md) | Web addresses tied to a project on the Node, the extension's project suggestions and overrides, and the site operations. |
+| [browser-extension/notifications.md](./browser-extension/notifications.md) | The extension's toolbar badge, waiting list, and opt-in OS notifications for requests agents are waiting on, and the `requests.pending` operation. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 
@@ -364,7 +373,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
   annotations](./plugins/rows-and-annotations.md), [Search providers](./plugins/search-providers.md),
   [Task checks](./plugins/task-checks.md), [Toolbar actions](./plugins/toolbar-actions.md), [The tree
   contract](./plugins/tree-contract.md), [Choosing how a plugin draws](./plugins/ui-tiers.md).
-- [plugin-authoring.md](./plugin-authoring.md): [CLI command
+- [plugin-authoring.md](./plugin-authoring.md): [Browser
+  handoffs](./plugin-authoring/browser-handoffs.md), [CLI command
   authoring](./plugin-authoring/cli-commands.md), [A complete
   example](./plugin-authoring/complete-example.md), [Contributions](./plugin-authoring/contributions.md),
   [Custom agents](./plugin-authoring/custom-agents.md), [Derived

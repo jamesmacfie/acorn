@@ -33,6 +33,19 @@ export const linearError = (res: Response): { error: string; status: 401 | 502 }
       ? { error: 'linear_reauth', status: 401 }
       : { error: 'linear_unavailable', status: 502 }
 
+// Linear refuses a call over its rate limit with HTTP 400 and `RATELIMITED` in the body's errors, not a
+// 429, so telling it from a malformed query means reading the body. A copy is read, so a caller that
+// learns it wasn't a rate limit can still read the original.
+export async function linearRateLimited(res: Response): Promise<boolean> {
+  if (res.status === 429) return true
+  if (res.status !== 400) return false
+  const body = (await res
+    .clone()
+    .json()
+    .catch(() => null)) as { errors?: { extensions?: { code?: unknown } }[] } | null
+  return body?.errors?.some((error) => error.extensions?.code === 'RATELIMITED') ?? false
+}
+
 // Parse a GraphQL body, throwing on transport/GraphQL errors so the route's catch maps to 502.
 export async function linearData<T>(res: Response): Promise<T> {
   const body = (await res.json()) as GraphQLResponse<T>
@@ -196,7 +209,7 @@ export type LinearNode = {
   state: { name: string; type: string; color: string } | null
   assignee: { name: string } | null
   creator?: { name: string } | null
-  team?: { key: string; name: string } | null
+  team?: { id: string; key: string; name: string } | null
   project?: { id: string; name: string } | null
   cycle?: { number: number; endsAt: string | null } | null
   labels?: { nodes: { id: string; name: string; color: string }[] }
@@ -235,7 +248,7 @@ export const ISSUE_DETAIL_QUERY = `query($filter: IssueFilter) {
     nodes {
       id identifier title url description branchName priority priorityLabel estimate dueDate createdAt updatedAt
       state { name type color } assignee { name } creator { name }
-      team { key name }
+      team { id key name }
       project { id name }
       cycle { number endsAt }
       labels { nodes { id name color } }

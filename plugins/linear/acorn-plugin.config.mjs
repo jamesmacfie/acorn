@@ -137,6 +137,23 @@ export default {
       { id: 'linear.issue', match: 'https://linear.app/{workspace}/issue/{identifier}', openPane: 'linear', item: 'identifier' },
       { id: 'linear.issue-slug', match: 'https://linear.app/{workspace}/issue/{identifier}/{slug}', openPane: 'linear', item: 'identifier' },
     ],
+    // The browser extension's "Open in Acorn" on an issue page (docs/integrations/linear.md § Browser
+    // handoff), on the same two addresses as the content links above. The route checks the address's
+    // workspace against Linear's own answer, so `{workspace}` is never trusted on its own.
+    //
+    // No anchors: Linear's issue page is signed in, its class names are generated, and no selector
+    // has been checked against it, so the extension offers the handoff in its sidebar instead of
+    // guessing where a button goes.
+    browserHandoffs: [{
+      id: 'issue',
+      label: 'Open in Acorn',
+      match: [
+        'https://linear.app/{workspace}/issue/{identifier}',
+        'https://linear.app/{workspace}/issue/{identifier}/{slug}',
+      ],
+      anchors: [],
+      resolve: '/v1/p/linear/browser/issue',
+    }],
     // The enrichment half of the same relationship.
     // Resolves a set of identifiers across every connected workspace, with a ten-minute cache.
     refResolvers: [{ id: 'linear-refs', kind: 'linear.issue', resolve: '/v1/p/linear/issues' }],

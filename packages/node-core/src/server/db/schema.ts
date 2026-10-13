@@ -143,6 +143,7 @@ export const projects = sqliteTable(
     previewMode: text('preview_mode'),
     previewValue: text('preview_value'),
     branchPrefix: text('branch_prefix'),
+    siteAssociations: text('site_associations'), // JSON SiteAssociation[]; null = none
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

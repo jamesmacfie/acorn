@@ -1,7 +1,8 @@
 # Rollbar
 
 The Rollbar plugin is a loaded, read-focused provider. This page covers what it shows, how it scopes
-to a workspace, the limits on an occurrence, rail search, and palette search. The plugin is in `plugins/rollbar/`.
+to a workspace, the limits on an occurrence, rail search, palette search, and the browser handoff. The plugin is in
+`plugins/rollbar/`.
 
 ## Rollbar
 
@@ -59,3 +60,62 @@ Find a Rollbar item filters a list the Node already has. The route reuses the ra
 fresh on a two-minute TTL ([provider mirrors](../caching.md#provider-mirrors)), so typing spends no
 provider budget. One connection failing keeps the rows another returned, and only a total failure is
 an error. [From the command palette](../integrations.md#from-the-command-palette) has the shared rules.
+
+## Browser handoff
+
+Rollbar declares an item handoff for the [browser extension](../browser-extension/handoffs.md) in its
+manifest's `browserHandoffs`. It matches only Rollbar's permalink, `rollbar.com/item/<id>/`, with or
+without the trailing slash. That address names the item by Rollbar's system-wide id, the same
+address the plugin gives every item. The number isn't the project counter (`#142`) that the rail and
+task links use. The two differ, and the route never treats one as the other. The handoff has no
+anchors, so the extension offers it in the sidebar beside the page. Rollbar's item view needs a
+signed-in session, and no selector has been checked against it.
+
+Signed out, Rollbar redirects the permalink to its login page, so the tab never stays on the item.
+Signed in, the permalink probably moves to an account address like
+`app.rollbar.com/a/<account>/fix/item/<project>/<counter>`. That form names a project slug and a
+counter, which the plugin can't map to a connection, so it isn't matched. Adding it needs a
+fixture-backed way to resolve the slug, not a guess.
+
+`POST /v1/p/rollbar/browser/item`, in `plugins/rollbar/src/server/browserHandoff.ts`, reads the item
+through the `rollbar.items` resource with `{ kind: 'item', itemId }`, which asks Rollbar's
+`/item/<id>`. The provider router in `plugins/rollbar/src/server/routes/rollbar.ts` serves it, because
+that router answers every path under `/v1/p/rollbar` over HTTP. A connection is one project, so the
+route asks every connection that isn't disabled, with a fresh read. A deleted item or a rejected token
+then isn't hidden by the cache. A connection counts only when Rollbar's id for the answer is the
+page's. Each connection that counts is one item, and the person picks one. The read stores the item
+under the counter Rollbar answered with, in the one item cache, so the occurrence reads that follow
+find its id there.
+
+An item's projects are the checkouts whose workspace maps that connection, the rail's
+[scoping](#scoping) read the other way. A mapping that names one Acorn project covers only that
+project, and a project with no folder on disk isn't offered.
+
+The seed is what the rail's **+Task** uses (`rollbarTaskFields` in `plugins/rollbar/src/shared/rail.ts`):
+origin `rollbar`, the title, and the item as one connection-stamped link on its counter, with the
+system id and permalink in the reference. The seed has no branch, because Rollbar suggests none. The
+rail's task dialog asks for one, and the handoff card has no branch field, so the task starts without
+a branch.
+
+The proposed context is the item's counter, title, permalink, level, environment, status, occurrence
+count, first and last time seen, framework, and resolved version. It adds the newest occurrence:
+exception and message, environment, code version, server branch and host, platform, the request's
+method and address without its query string, and the stack trace with source lines for the frame that
+raised. It leaves out the person, headers, cookies, bodies, custom data, and crash reports. Most of
+these the [normalizer](#occurrence-limits) drops already, and the person is dropped here. The context
+stops at 12,000 bytes. An item whose occurrences can't be read is still handed over without them.
+
+The route's errors:
+
+| Case | Answer |
+| --- | --- |
+| No connection, or only disabled ones | 403, asks the person to connect Rollbar |
+| No connection's project has the item | 404, says it may be deleted or in a project Acorn isn't connected to |
+| A token Rollbar rejects, or a connection that needs reauthentication | 403, names the connection and asks for a reconnect |
+| Rollbar rate limiting | 429, asks the person to try again in a minute |
+| Rollbar unreachable | 502 |
+
+A project that answered wins over a connection that failed, as on the rail. The resource reads
+Rollbar's 403 as a token to reconnect, as every Rollbar read does. If Rollbar answers 403 rather than
+404 for another project's item, the handoff would ask for a reconnect where "not found" is right. No
+real token was available to check which one it sends.

@@ -22,6 +22,7 @@ describe('Rollbar loaded routes', () => {
   it('intersects the active workspace mapping with provider-owned connections', async () => {
     const fetch = createRollbarFetch({
       byId: async (id) => (id === 'project-1' ? ({ id, workspaceId: 'workspace-1' } as never) : null),
+      checkouts: async () => [],
       externalProjects: async () => [{ connectionId: 'rollbar-b', externalId: 'project-b', projectId: '' }],
     })
     // The host's request context, with canned answers only for the two provider calls that would
@@ -53,6 +54,7 @@ describe('Rollbar loaded routes', () => {
   it('keeps only the links the routed project is in scope for', async () => {
     const fetch = createRollbarFetch({
       byId: async (id) => ({ id, workspaceId: 'workspace-1' }) as never,
+      checkouts: async () => [],
       externalProjects: async () => [
         { connectionId: 'rollbar-a', externalId: 'project-a', projectId: 'project-1' },
         { connectionId: 'rollbar-b', externalId: 'project-b', projectId: '' },
@@ -88,6 +90,7 @@ describe('Rollbar loaded routes', () => {
   it('returns no rail rows without a project scope', async () => {
     const fetch = createRollbarFetch({
       byId: async () => null,
+      checkouts: async () => [],
       externalProjects: async () => [],
     })
     const context = await makeTestRequestContext({
@@ -114,6 +117,7 @@ describe('Rollbar loaded routes', () => {
 describe('Rollbar palette search', () => {
   const mappingFor = (rows: { connectionId: string; externalId: string; projectId: string }[]) => ({
     byId: async (id: string) => ({ id, workspaceId: 'workspace-1' }) as never,
+    checkouts: async () => [],
     externalProjects: async () => rows,
   })
 
@@ -164,7 +168,11 @@ describe('Rollbar palette search', () => {
   // route that answered every connection would be reading another project's rows before any client
   // filter ran.
   it('answers nothing without a project scope, and asks Rollbar nothing', async () => {
-    const fetch = createRollbarFetch({ byId: async () => null, externalProjects: async () => [] })
+    const fetch = createRollbarFetch({
+      byId: async () => null,
+      checkouts: async () => [],
+      externalProjects: async () => [],
+    })
     const context = await contextWith(() => {
       throw new Error('the route asked for items it has no scope for')
     })
@@ -282,6 +290,7 @@ describe('Rollbar rail search', () => {
     const connections = [{ id: 'rollbar-a', label: 'A' } as never, { id: 'rollbar-b', label: 'B' } as never]
     const fetchRoutes = createRollbarFetch({
       byId: async (id) => ({ id, workspaceId: 'workspace-1' }) as never,
+      checkouts: async () => [],
       externalProjects: async () => [
         { connectionId: 'rollbar-a', externalId: 'a', projectId: '' },
         { connectionId: 'rollbar-c', externalId: 'c', projectId: '' },
@@ -326,5 +335,48 @@ describe('Rollbar rail search', () => {
   it('reports a total failure', async () => {
     const { search } = await setup(() => ({ status: 500 }))
     expect((await search('error')).status).toBe(502)
+  })
+})
+
+// The browser extension's item handoff. This router answers every path under /v1/p/rollbar over HTTP, so
+// the handoff has to be one of its routes; a mount of its own would never be reached.
+describe('Rollbar browser handoff route', () => {
+  it('is served by the provider router, with the mapped projects and the item read by its system id', async () => {
+    const fetchRoutes = createRollbarFetch({
+      byId: async (id) => ({ id, workspaceId: 'workspace-1' }) as never,
+      checkouts: async () => [{ id: 'project-1' }] as never,
+      externalProjects: async () => [{ connectionId: 'rollbar-a', externalId: '7', projectId: '' }],
+    })
+    const asked: unknown[] = []
+    const context = await makeTestRequestContext({
+      plugin: 'rollbar',
+      principal: { kind: 'device', userId: 'user-1', deviceId: 'device-1' },
+      providers: {
+        connections: (async () => [{ id: 'rollbar-a', label: 'Rollbar · web', status: 'connected' }]) as never,
+        resource: (async (request: { resourceId: string; input: unknown }) => {
+          asked.push(request.input)
+          return request.resourceId === 'rollbar.items'
+            ? {
+                ok: true,
+                value: { ...item('rollbar-a', { identifier: '142', itemId: '999' }), resolvedInVersion: null },
+              }
+            : { ok: false, failure: { error: 'provider_resource_not_found', status: 404 } }
+        }) as never,
+      },
+    })
+
+    const response = await fetchRoutes(
+      new Request('http://rollbar.test/browser/item', {
+        method: 'POST',
+        body: JSON.stringify({ url: 'https://rollbar.com/item/999/', captures: { itemId: '999' } }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      items: [{ identifier: '#142', connection: { id: 'rollbar-a' }, projects: ['project-1'] }],
+    })
+    expect(asked[0]).toEqual({ kind: 'item', itemId: '999' })
   })
 })

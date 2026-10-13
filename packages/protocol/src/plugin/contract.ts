@@ -6,6 +6,7 @@ import { ACORN_BASELINE } from '../baseline.ts'
 import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../data/dataSourceContributions.ts'
 import { PLUGIN_API_RANGE_RE } from './apiVersion.ts'
 import { pluginCliCommandDescriptorSchema } from './cliCommands.ts'
+import { browserHandoffDescriptor } from './handoffs.ts'
 import {
   chromeAction,
   contextFreeAction,
@@ -128,6 +129,9 @@ const contributionsShape = z.looseObject({
   agentTools: z.array(pluginAgentToolDescriptorSchema).max(16).default([]),
   contextSections: z.array(pluginContextSectionDescriptorSchema).max(8).default([]),
   cliCommands: z.array(pluginCliCommandDescriptorSchema).max(16).default([]),
+  // Buttons the browser extension draws on a website, each resolved by a route on this plugin's node
+  // half (./handoffs.ts). Compiled plugins declare the same thing on `NodePlugin.browserHandoffs`.
+  browserHandoffs: z.array(browserHandoffDescriptor).max(4).default([]),
 })
 
 // Every contribution kind a manifest may declare, as a runtime list.
@@ -467,4 +471,5 @@ export type PluginContributions = {
   agentTools?: import('./runtimeContributions.ts').PluginAgentToolDescriptor[]
   contextSections?: import('./runtimeContributions.ts').PluginContextSectionDescriptor[]
   cliCommands?: import('./cliCommands.ts').PluginCliCommandDescriptor[]
+  browserHandoffs?: Omit<import('./handoffs.ts').BrowserHandoff, 'pluginId'>[]
 } & Record<string, unknown>

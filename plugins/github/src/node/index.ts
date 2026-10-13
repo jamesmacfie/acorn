@@ -38,6 +38,24 @@ export const githubPlugin = (): NodePlugin => {
     // This module's own URL, so the host can walk from here for the migration chain
     // (docs/plugins/data-ownership.md § Data ownership).
     migrationsModule: import.meta.url,
+    // The pull request button on github.com
+    // (docs/github-integration/tasks-and-references.md § Browser handoff). Its route below loads on
+    // the first handoff.
+    browserHandoffs: [
+      {
+        id: 'pull-request',
+        label: 'Open in Acorn',
+        // The conversation and its tabs (`files`, `commits`, `checks`).
+        match: [
+          'https://github.com/{owner}/{repo}/pull/{number}',
+          'https://github.com/{owner}/{repo}/pull/{number}/{tab}',
+        ],
+        // The header's action row in a wide window, the state line under the title in a narrow one
+        // (GitHub hides the action row there), and the action row of the older layout.
+        anchors: ['[data-component="PH_Actions"]', '[data-component="PageHeader.Description"]', '.gh-header-actions'],
+        resolve: '/v1/p/github/browser/pull-request',
+      },
+    ],
     init: async (ctx) => {
       // Opens and migrates before init returns; every router below closes over this handle rather
       // than reading one off the request environment (docs/data-layer/plugin-databases.md § Plugin databases).
@@ -101,6 +119,17 @@ export const githubPlugin = (): NodePlugin => {
         prefix: '',
         note: 'POST /import — import mirrored repositories into core projects',
       })
+
+      ctx.routes.fetch(
+        lazyFetch(async () => {
+          const handoff = await import('../server/browserHandoff')
+          return handoff.createBrowserHandoffHandler({
+            readPull: handoff.mirroredPullReader(store, emit),
+            projectsForRepo: (owner, name) => handoff.projectsTrackingRepo(ctx.core.projects, owner, name),
+          })
+        }),
+        { prefix: '/browser' },
+      )
 
       for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status(), emit))
         ctx.tools.register(tool)

@@ -56,6 +56,7 @@ import { MAX_COMMAND_SEARCH_QUERY } from '@acorn/protocol/commands.ts'
 import { linearRailItem } from '../../shared/rail'
 import { sortLinearIssues } from '../../shared/triage'
 import { linearSearchItems } from '../paletteSearch'
+import { createBrowserHandoffHandler, projectsMappingIssue } from '../browserHandoff'
 
 // TTL policy: docs/caching.md § Provider mirrors. Linear's reads fan out across every connected
 // integration with per-item freshness, so they skip the serve-then-revalidate wrapper; this file owns
@@ -139,7 +140,7 @@ const triageRow = (row: StoredConnection, node: LinearNode): LinearProjectIssue 
   }
 }
 
-type LinearProjectScope = Pick<CoreServices['projects'], 'byId' | 'externalProjects'>
+type LinearProjectScope = Pick<CoreServices['projects'], 'byId' | 'checkouts' | 'externalProjects'>
 
 /**
  * Which Linear scopes this rail should show, keyed by connection. A scope is a Linear project, or a
@@ -253,6 +254,15 @@ const createLinearRoutes = (
   emit: (frame: { channel: string } & Record<string, unknown>) => void = () => {},
 ) =>
   new Hono<AppEnv>()
+    // The browser extension's issue button, declared in the manifest's `browserHandoffs`. Served here,
+    // not from its own `ctx.routes.fetch` mount, because this provider router answers every path under
+    // /v1/p/linear over HTTP, so a separate mount would never be reached.
+    .post('/browser/issue', (c) =>
+      createBrowserHandoffHandler({
+        projectsFor: async (connectionId, scopeIds) =>
+          projects ? projectsMappingIssue(projects, connectionId, scopeIds) : [],
+      })(c.req.raw, requestContext(c)),
+    )
     // Active issues for the given mapped ids within one connection (?integration=<id>&ids=). The rail
     // builds its mapped rows from the same query; this is the single-connection form, and the one place
     // a test covers the active-only filter and the branch-suggestion passthrough.

@@ -36,6 +36,7 @@ import { AGENTS_HARNESS_REGISTRY, qualifiedHarnessId } from './harnesses'
 import { AGENTS_CUSTOM_AGENT_REGISTRY } from './customAgents'
 import { registerSkill } from './skills'
 import type { PackageSkill } from '../plugins/skills'
+import type { BrowserHandoffDescriptor } from '@acorn/protocol/plugin/handoffs.ts'
 import { registerTaskCheck } from './taskChecks'
 import { registerSearchProvider } from './search'
 import { declareAuditAction, qualifiedAuditAction, recordAudit } from '../audit'
@@ -115,6 +116,8 @@ export type LoadedPluginBinding = {
   skills?: readonly PackageSkill[]
   agentTools?: readonly PluginAgentToolDescriptor[]
   contextSections?: readonly PluginContextSectionDescriptor[]
+  // Buttons the browser extension draws, replayed into the handoff registry (./browserHandoffs.ts).
+  browserHandoffs?: readonly BrowserHandoffDescriptor[]
   destinations?: readonly NonNullable<PluginFrameSurface['destinations']>[number][]
   // The plugin's installed package directory, for resolving a manifest path the host hands on as an
   // absolute one. Host-side only: this is a path on the node's filesystem and must never reach a route

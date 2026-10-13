@@ -57,6 +57,13 @@
       "when": 1791744718896,
       "tag": "0007_chubby_solo",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791857812528,
+      "tag": "0008_project_site_associations",
+      "breakpoints": true
     }
   ]
 }
