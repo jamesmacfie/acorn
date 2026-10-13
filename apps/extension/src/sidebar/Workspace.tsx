@@ -14,11 +14,11 @@ import { CallFailure, type RequestTarget } from '../messages'
 import { loadSiteChoices, pageScope, saveSiteChoices, type SiteChoices } from '../pageScope'
 import type { PageTask } from '../taskPages'
 import type { BridgeClient } from './bridgeClient'
-import { CaptureFailure, withCapture, type CaptureKind, type PageCapture } from './capture'
+import { CaptureFailure, withCapture, type CaptureKind, type PageCapture } from '../capture'
 import { Conversation } from './Conversation'
 import { errorGuidance } from './guidance'
 import { Agents, CurrentTask, ThisPage, lastLines } from './Home'
-import { changeDraft, loadDestination, saveDestination, type Destination } from './localState'
+import { changeDraft, loadDestination, saveDestination, type Destination } from '../localState'
 import { Waiting } from './Waiting'
 
 // The work on one Node: the current task, the page beside the panel, and the conversations of the
@@ -47,6 +47,9 @@ export function Workspace(props: {
   // The tasks the page belongs to, matched in the browser, and a task chip's click asking to show
   // the page's task, with a new chat about the page for `chat`.
   pageTasks: readonly PageTask[]
+  // Whether the person hid the branch marker on an origin, and showing it there again.
+  markerHidden(origin: string): boolean
+  showMarker(origin: string): void
   showTask: { chat: { url: string; title: string } | null } | null
   shownTask(): void
   // A handoff the person asked for, from a task chip or This page's offer.
@@ -400,6 +403,8 @@ export function Workspace(props: {
               pageUrl={props.pageUrl}
               handoffs={props.handoffs}
               pageTasks={props.pageTasks}
+              markerHidden={props.markerHidden}
+              showMarker={props.showMarker}
               projectName={projectName}
               chat={chatInTask}
               handoff={props.handoff}

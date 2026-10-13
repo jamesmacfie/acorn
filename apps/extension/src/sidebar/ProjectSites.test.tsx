@@ -492,4 +492,43 @@ describe('This page', () => {
     expect(root.querySelector('[aria-label="Waiting context"]')!.textContent).toContain('Page goes into the draft')
     expect(button(root.querySelector('[aria-label="Agents"]')!, 'Cancel')).toBeDefined()
   })
+
+  it("shows a local app's branch, task, and stack, links to the plugin's pane, and asks for its site", async () => {
+    const app = 'https://runn-05ea41.runn.localhost:5104'
+    const { fake, state, root } = mount({ url: `${app}/planner` })
+    state.taskPages = [
+      {
+        ...pullTask,
+        pages: [
+          ...pullTask.pages,
+          {
+            origin: app,
+            pathPrefix: '/',
+            source: 'runn',
+            status: { label: 'Runn stack', state: 'running', tone: 'ok' },
+          },
+        ],
+      },
+    ]
+    await settle(30)
+    expect(thisPage(root).querySelector('strong')!.textContent).toBe('fix/login')
+    expect(thisPage(root).textContent).toContain('Task: Fix login · Web')
+    expect(thisPage(root).querySelector('.state')!.textContent).toBe('Runn stack running')
+    expect(thisPage(root).querySelector('.dot')!.getAttribute('data-tone')).toBe('ok')
+    // Logs in Acorn goes to the Runn pane; a development build copies the link.
+    expect(button(thisPage(root), 'Copy Acorn link')!.title).toBe('acorn://n1/t/t1?pane=runn')
+    expect(JSON.stringify(state.requests)).not.toContain('/planner')
+
+    // The marker was hidden on this site from its own menu: This page offers it back.
+    expect(button(thisPage(root), 'Show the branch marker on this site')).toBeUndefined()
+    await fake.api.storage.local.set({ hiddenMarkers: [app] })
+    await settle(10)
+    button(thisPage(root), 'Show the branch marker on this site')!.click()
+    await settle(10)
+    expect(fake.storage.get('hiddenMarkers')).toEqual([])
+    expect(button(thisPage(root), 'Show the branch marker on this site')).toBeUndefined()
+
+    await openSettings(root)
+    expect(siteAccess(root)).toEqual(['runn-05ea41.runn.localhost: Branch marker on its pages · Not allowed'])
+  })
 })

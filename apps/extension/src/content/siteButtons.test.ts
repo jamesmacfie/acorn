@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ChipTask, ContentMessage } from '../handoffs'
+import type { AppMarker, ChipTask, ContentMessage } from '../handoffs'
 
 // The content script against a real DOM. The browser side is a stub: the message listener the
 // background talks to, and `sendMessage` for a click. Each chip draws in a closed shadow root, which
@@ -46,13 +46,23 @@ beforeEach(async () => {
   await import('./siteButtons')
 })
 afterEach(() => {
+  // Each test imports its own copy of the script. Telling it to draw nothing stops its observer, and
+  // takes away the marker, which sits outside the body the next test resets.
+  listener?.({ type: 'acorn:buttons', buttons: [], marker: null, opensLinks: true, opensPanel: true })
   vi.restoreAllMocks()
   delete (globalThis as Record<string, unknown>).chrome
 })
 
 type Button = ContentMessage['buttons'][number]
 const show = (buttons: Button[], page: Partial<Omit<ContentMessage, 'type' | 'buttons'>> = {}) =>
-  listener?.({ type: 'acorn:buttons', buttons, opensLinks: true, opensPanel: true, ...page } satisfies ContentMessage)
+  listener?.({
+    type: 'acorn:buttons',
+    buttons,
+    marker: null,
+    opensLinks: true,
+    opensPanel: true,
+    ...page,
+  } satisfies ContentMessage)
 const frame = () => new Promise((resolve) => setTimeout(resolve, 40))
 const drawn = () => [...document.querySelectorAll('[data-acorn-handoff]')]
 const chip = (index = 0) => roots.get(drawn()[index]!)!
@@ -184,5 +194,66 @@ describe('task chips in the page', () => {
     chip().querySelector<HTMLButtonElement>('.more')!.click()
     expect(sent).toEqual([])
     expect(menu()!.hidden).toBe(true)
+  })
+})
+
+describe('the branch marker on a local app', () => {
+  const marker: AppMarker = {
+    branch: 'fix/billing-rounding',
+    state: { label: 'running', tone: 'ok' },
+    link: 'acorn://n1/t/t1?pane=runn',
+  }
+  const markers = () => [...document.querySelectorAll('[data-acorn-marker]')]
+  const pill = () => roots.get(markers()[0]!)!
+  const pillMain = () => pill().querySelector<HTMLButtonElement>('.main')!
+  const pillItems = () => [...(pill().querySelector('[role="menu"]')?.children ?? [])].map((item) => item.textContent)
+  const pillItem = (name: string) =>
+    [...pill().querySelector('[role="menu"]')!.children].find((element) => element.textContent === name) as HTMLElement
+
+  it("draws the task's branch and the plugin's state in the page's corner, as text", () => {
+    show([], { marker: { ...marker, branch: '<img src=x onerror=alert(1)>' } })
+    expect(markers()).toHaveLength(1)
+    expect(markers()[0]!.parentElement).toBe(document.documentElement)
+    expect((markers()[0] as HTMLElement).style.position).toBe('fixed')
+    expect(pill().querySelector('.name')!.textContent).toBe('<img src=x onerror=alert(1)>')
+    expect(pill().querySelector<HTMLElement>('.state')!.dataset.tone).toBe('ok')
+    expect(pill().querySelector('img')).toBeNull()
+    expect(document.querySelector('img')).toBeNull()
+  })
+
+  it('opens the panel on the task, and its menu hides it on this site', () => {
+    show([], { marker })
+    expect(pillMain().getAttribute('aria-label')).toBe('fix/billing-rounding, running (Acorn)')
+    press(pillMain())
+    expect(sent).toEqual([{ type: 'acorn:marker', action: 'show' }])
+    press(pill().querySelector('.more')!)
+    expect(pillItems()).toEqual(['Show in side panel', 'Open in Acorn ↗', 'Copy Acorn link', 'Hide on this site'])
+    expect(pillItem('Open in Acorn ↗').getAttribute('href')).toBe('acorn://n1/t/t1?pane=runn')
+    press(pillItem('Hide on this site'))
+    expect(sent.at(-1)).toEqual({ type: 'acorn:marker', action: 'hide' })
+  })
+
+  it('opens its menu from the click in Firefox', () => {
+    show([], { marker, opensPanel: false })
+    expect(pill().querySelector('.more')).toBeNull()
+    press(pillMain())
+    expect(sent).toEqual([])
+    expect(pillItems()).toEqual([
+      'Open in Acorn ↗',
+      'Copy Acorn link',
+      'Hide on this site',
+      'To open the panel on this task, click Acorn in the toolbar.',
+    ])
+  })
+
+  it('comes back after the page redraws itself, and goes when it is no longer given', async () => {
+    show([button(task)], { marker })
+    expect(drawn()).toHaveLength(1)
+    markers()[0]!.remove()
+    await frame()
+    expect(markers()).toHaveLength(1)
+    show([button(task)])
+    expect(markers()).toHaveLength(0)
+    expect(drawn()).toHaveLength(1)
   })
 })

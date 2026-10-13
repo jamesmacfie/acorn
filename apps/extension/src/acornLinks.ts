@@ -4,9 +4,10 @@ import { buildLink, type Place } from '@acorn/client-core/host/registries/comman
 // chip on a web page. The Node ID is the bridge's, which is the Node's own ID, the same one the
 // desktop's links name.
 
-// The desktop pane that shows a handed-off item, by the plugin whose handoff matched the page. A task
-// from a plugin missing here opens on whichever pane it showed last.
-const ITEM_PANES: Record<string, string> = { github: 'pr' }
+// The desktop pane that shows a page's item, by the plugin that knows the page's address: a handoff's,
+// or one a plugin published for the task, such as Runn's stack, whose pane has its logs. A task from a
+// plugin missing here opens on whichever pane it showed last.
+const ITEM_PANES: Record<string, string> = { github: 'pr', runn: 'runn' }
 // The agents plugin's pane, which selects the conversation a link names as its item.
 const AGENT_PANE = 'agents'
 

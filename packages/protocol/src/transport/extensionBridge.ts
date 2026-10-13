@@ -251,7 +251,11 @@ export type BridgeTask = { id: string; title: string; branch: string | null }
 // An address a task is known by, in the project sites' grammar: an exact origin and a path prefix
 // matched by whole segments, so a pull request's address covers its tabs and one at `/` covers the
 // origin. `source` is the plugin or provider that knows the address, such as `github` or `linear`.
-export type BridgeTaskPage = SiteAssociation & { source: string }
+// `status` is set on an address a plugin published for the task, such as its local stack's app.
+export type BridgeTaskPage = SiteAssociation & { source: string; status?: BridgePageStatus }
+// What a plugin says answers at an address it published, and its state, read together as one line
+// ("Runn stack running"), with the state's tone.
+type BridgePageStatus = { label: string; state: string; tone: 'ok' | 'warn' | 'bad' }
 // An active task with the addresses it is known by. Tasks with none are left out.
 export type BridgePageTask = BridgeTask & { projectId: string; pages: BridgeTaskPage[] }
 

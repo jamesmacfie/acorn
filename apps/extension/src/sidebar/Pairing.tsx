@@ -91,6 +91,7 @@ export function Pairing(props: {
                 api={props.api}
                 handoffs={props.handoffs.filter((handoff) => handoff.anchors.length)}
                 sites={[]}
+                apps={[]}
               />
               <Notifications permissions={props.api.permissions} />
               <section>

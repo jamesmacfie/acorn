@@ -8,11 +8,11 @@ import {
 import type { BrowserApi, Port, Tab } from '../browser'
 import type { PageHandoff } from '../handoffs'
 import { CallFailure, type BackgroundMessage, type BridgeCall, type HostState, type SidebarMessage } from '../messages'
-import { pageTasks } from '../taskPages'
+import { appTask, pageTasks } from '../taskPages'
 import { nativeBridge } from './nativeBridge'
 import { requestBadge } from './requestBadge'
 import { siteButtons } from './siteButtons'
-import { chipTask, taskPages } from './taskPages'
+import { appMarker, chipTask, taskPages } from './taskPages'
 
 // The selected Node, remembered by this browser profile. The native host holds the selection only
 // while it runs, so the background selects it again each time the host starts.
@@ -64,6 +64,11 @@ export function startBackground(api: BrowserApi, hostName: string): void {
       if (!match || !nodeId) return null
       const chip = chipTask(nodeId, match, pages.sessions(match.task.id), badge.current.requests)
       return { taskId: match.task.id, chip }
+    },
+    marker: (url) => {
+      const match = appTask(pages.tasks, url)
+      const nodeId = buttons.nodeId
+      return match && nodeId ? appMarker(nodeId, match) : null
     },
     follow: (taskIds) => pages.follow(taskIds),
     // Only a release desktop registers `acorn://`, as in the sidebar.

@@ -125,6 +125,25 @@ plugin that declares a handoff for it:
   repository. `packages/node-core/src/server/plugins/__fixtures__/handoffPlugin.mjs` is a starting
   point.
 
+## Check the branch marker
+
+The [branch marker](../browser-extension/task-pages.md#the-branch-marker) needs a plugin that
+publishes a task address, and a page served at that origin:
+
+1. Serve any page on a free port, such as `python3 -m http.server 5199` in a scratch folder.
+2. Write a loaded package with no client bundle whose manifest declares
+   `"taskAddresses": "/v1/p/<id>/task-addresses"` and `"permissions": { "node": { "core": ["tasks"] } }`,
+   and whose route answers each active task you choose with `origin: 'http://localhost:5199'`.
+   Install it from a second paired device with `POST /v1/core/plugins/install`. It starts without a
+   restart.
+3. Add a plain-folder project with `POST /v1/core/projects` and a task in it.
+4. In Chrome, open `http://localhost:5199/` and run `Extensions.triggerAction` on its `tab` target,
+   as for task chips. The marker draws in the page's corner, and **This page** shows the task with
+   the plugin's state line.
+5. Read the marker with `DOM.getDocument` and `pierce: true`, and press its menu items with
+   `Input.dispatchMouseEvent`. **Hide on this site** writes `hiddenMarkers`, and **This page** offers
+   it back. Archiving the task takes the marker off.
+
 ## Check an installed build
 
 The loop's own profile and development host can hide an installation fault, so a release check uses

@@ -8,7 +8,7 @@ import type {
   BridgeResults,
 } from '@acorn/protocol/extensionBridge.ts'
 import { itemTaskLink } from '../acornLinks'
-import type { ChipTask } from '../handoffs'
+import type { AppMarker, ChipTask } from '../handoffs'
 import type { BackgroundMessage, BridgeCall } from '../messages'
 import type { PageTask } from '../taskPages'
 
@@ -17,7 +17,7 @@ import type { PageTask } from '../taskPages'
 // request from it, as the sidebar counts it.
 export function chipTask(
   nodeId: string,
-  { task, source }: PageTask,
+  { task, page }: PageTask,
   sessions: readonly BridgeAgentSession[] | undefined,
   requests: readonly BridgePendingRequest[],
 ): ChipTask {
@@ -32,9 +32,20 @@ export function chipTask(
       : working
         ? { label: `${working} working`, tone: 'ok' }
         : null,
-    link: itemTaskLink(nodeId, source, task.id),
+    link: itemTaskLink(nodeId, page.source, task.id),
   }
 }
+
+// What the branch marker on a plugin's app shows: the task's branch, or its name for a task on the
+// project's own checkout, the state the plugin gave, and a link to the plugin's pane on the task.
+export const appMarker = (nodeId: string, { task, page }: PageTask): AppMarker | null =>
+  page.status
+    ? {
+        branch: task.branch ?? task.title,
+        state: { label: page.status.state, tone: page.status.tone },
+        link: itemTaskLink(nodeId, page.source, task.id),
+      }
+    : null
 
 // The selected Node's tasks and the page addresses each is known by, the one copy the extension
 // keeps (docs/browser-extension/task-pages.md). The sidebar and the task chips match pages against it in

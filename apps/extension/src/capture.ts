@@ -1,6 +1,6 @@
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 import { TURN_MAX_ATTACHMENTS, TURN_MAX_CONTEXTS, type BridgeInputPart } from '@acorn/protocol/extensionBridge.ts'
-import type { BrowserApi, Tab } from '../browser'
+import type { BrowserApi, Tab } from './browser'
 
 // Page capture: the link, the selected text, or a screenshot of the tab showing beside the sidebar.
 // A capture stays in the draft, in this browser, until the person sends it. Nothing here talks to the

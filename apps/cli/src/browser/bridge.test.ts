@@ -72,6 +72,9 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     ] as Record<string, unknown>[],
     resolution: null as unknown,
     resolveRequests: [] as unknown[],
+    // The task address routes discovery declares, and what each answers.
+    taskAddresses: [] as { pluginId: string; route: string }[],
+    addressAnswers: new Map<string, unknown>(),
     createdTasks: [] as { key: string; body: Record<string, unknown> }[],
     projects: [{ id: 'p1', name: `${nodeId} project`, path: '/src/p1', workspaceId: 'w', sort: 0, hidden: false }],
     // Each project's site associations, as its config holds them, and every config write.
@@ -121,7 +124,12 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       return reply(200, task)
     }
     if (url.pathname === '/v1/core/tasks') return reply(200, state.tasks)
-    if (url.pathname === '/v1/core/browser-handoffs') return reply(200, { handoffs: state.handoffs })
+    if (url.pathname === '/v1/core/browser-handoffs')
+      return reply(200, { handoffs: state.handoffs, taskAddresses: state.taskAddresses })
+    if (state.addressAnswers.has(url.pathname)) {
+      const answer = state.addressAnswers.get(url.pathname)
+      return answer instanceof Error ? reply(500, { error: { message: answer.message } }) : reply(200, answer)
+    }
     if (url.pathname === '/v1/p/tracker/handoff') {
       let body = ''
       for await (const chunk of req) body += chunk
@@ -755,11 +763,67 @@ describe('browser bridge agent operations', () => {
         },
       ],
     })
-    // One read of the Node's active tasks, besides the broker's own connection checks, and nothing
-    // that reaches a provider.
-    expect(node.state.paths.filter((path) => path !== '/v1/node')).toEqual(['/v1/core/tasks'])
+    // One read of the Node's active tasks and one of its plugins' declarations, besides the broker's own
+    // connection checks, and nothing that reaches a provider.
+    expect(node.state.paths.filter((path) => !['/v1/node', '/v1/events'].includes(path)).sort()).toEqual([
+      '/v1/core/browser-handoffs',
+      '/v1/core/tasks',
+    ])
     await call({ op: 'node.select', nodeId: null })
     await expect(call({ op: 'tasks.pages', nodeId: 'node-a' })).rejects.toMatchObject({ code: 'not_selected' })
+  })
+
+  it('adds the exact origins plugins publish for active tasks, and skips a plugin that fails', async () => {
+    const { call, node } = await selected()
+    const task = { branch: null, status: 'active', github: null, pullNumber: null, links: [], projectId: 'p1' }
+    node.state.tasks = [
+      { ...task, id: 'stack', title: 'Fix rounding', branch: 'fix/rounding' },
+      { ...task, id: 'old', title: 'Old', status: 'archived' },
+    ]
+    const address = { label: 'Runn stack', state: 'running', severity: 'info' }
+    node.state.taskAddresses = [
+      { pluginId: 'runn', route: '/v1/p/runn/task-addresses' },
+      { pluginId: 'broken', route: '/v1/p/broken/addresses' },
+      { pluginId: 'odd', route: '/v1/p/odd/addresses' },
+      // A route outside the plugin's own namespace is never called.
+      { pluginId: 'sneaky', route: '/v1/core/tasks' },
+    ]
+    node.state.addressAnswers.set('/v1/p/runn/task-addresses', {
+      addresses: [
+        { ...address, taskId: 'stack', origin: 'https://runn-05ea41.runn.localhost:5104' },
+        { ...address, taskId: 'old', origin: 'https://runn-0ld.runn.localhost:5104' },
+        { ...address, taskId: 'gone', origin: 'https://runn-g0ne.runn.localhost:5104' },
+      ],
+    })
+    node.state.addressAnswers.set('/v1/p/broken/addresses', new Error('boom'))
+    // Another site's host isn't a task's app, so the whole answer is refused.
+    node.state.addressAnswers.set('/v1/p/odd/addresses', {
+      addresses: [
+        { ...address, taskId: 'stack', origin: 'https://runn-0dd.runn.localhost:5104' },
+        { ...address, taskId: 'stack', origin: 'https://github.com' },
+      ],
+    })
+    node.state.paths = []
+    expect(await call({ op: 'tasks.pages', nodeId: 'node-a' })).toEqual({
+      nodeId: 'node-a',
+      tasks: [
+        {
+          id: 'stack',
+          title: 'Fix rounding',
+          branch: 'fix/rounding',
+          projectId: 'p1',
+          pages: [
+            {
+              origin: 'https://runn-05ea41.runn.localhost:5104',
+              pathPrefix: '/',
+              source: 'runn',
+              status: { label: 'Runn stack', state: 'running', tone: 'ok' },
+            },
+          ],
+        },
+      ],
+    })
+    expect(node.state.paths.filter((path) => path === '/v1/core/tasks')).toHaveLength(1)
   })
 
   it('passes captured context and screenshots to the Node as the turn input', async () => {

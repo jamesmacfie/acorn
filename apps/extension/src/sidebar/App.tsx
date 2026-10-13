@@ -9,12 +9,12 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import type { BrowserApi } from '../browser'
-import type { PageHandoff } from '../handoffs'
+import { HIDDEN_MARKERS_KEY, type PageHandoff } from '../handoffs'
 import { CallFailure, type CallError, type HostState, type RequestTarget } from '../messages'
 import { pageTasks } from '../taskPages'
 import { activePageUrl } from './activePage'
 import { bridgeClient } from './bridgeClient'
-import { capturePage, type PageCapture } from './capture'
+import { capturePage, type PageCapture } from '../capture'
 import { INSTALL_COMMAND, errorGuidance, hostGuidance, installFixes, statusGuidance } from './guidance'
 import { Header } from './Header'
 import { Pairing } from './Pairing'
@@ -67,6 +67,20 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
   // Settings replaces Home or the open conversation, which restores from storage when it closes.
   const [settings, setSettings] = createSignal(false)
+  // The origins the branch marker is hidden on. Its own menu hides it, and This page shows it again.
+  const [hiddenMarkers, setHiddenMarkers] = createSignal<string[]>([])
+  const readHiddenMarkers = (value: unknown) =>
+    setHiddenMarkers(Array.isArray(value) ? value.filter((origin) => typeof origin === 'string') : [])
+  const onStorage = (changes: Record<string, { newValue?: unknown }>, area: string) => {
+    if (area === 'local' && HIDDEN_MARKERS_KEY in changes) readHiddenMarkers(changes[HIDDEN_MARKERS_KEY]?.newValue)
+  }
+  onMount(() => {
+    void props.api.storage.local
+      .get([HIDDEN_MARKERS_KEY])
+      .then((stored) => readHiddenMarkers(stored[HIDDEN_MARKERS_KEY]))
+    props.api.storage.onChanged.addListener(onStorage)
+  })
+  onCleanup(() => props.api.storage.onChanged.removeListener(onStorage))
 
   const showStatus = (next: NodeStatus | null) => {
     const wasUp = connected(status())
@@ -271,6 +285,12 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   sites={sites()}
                   sitesChanged={(projectId, changed) => sitesChanged(nodeId, projectId, changed)}
                   pageTasks={pageTasks(taskPages().nodeId === nodeId ? taskPages().tasks : [], pageUrl())}
+                  markerHidden={(origin) => hiddenMarkers().includes(origin)}
+                  showMarker={(origin) =>
+                    void props.api.storage.local.set({
+                      [HIDDEN_MARKERS_KEY]: hiddenMarkers().filter((hidden) => hidden !== origin),
+                    })
+                  }
                   showTask={showTask()}
                   shownTask={() => setShowTask(null)}
                   handoff={handoff()}
@@ -297,6 +317,11 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
             forget={(nodeId) => void forget(nodeId)}
             handoffs={handoffs()}
             sites={sites()}
+            apps={
+              taskPages().nodeId === fleet()?.activeNodeId
+                ? taskPages().tasks.flatMap((task) => task.pages.filter((page) => page.status))
+                : []
+            }
             pageUrl={pageUrl()}
             sitesChanged={(projectId, changed) => {
               const nodeId = fleet()?.activeNodeId

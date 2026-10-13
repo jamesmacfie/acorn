@@ -24,15 +24,23 @@ export const siteAccess = (handoff: Pick<BridgeHandoff, 'match'>): string[] => [
 // gets; the content script only draws them and reports a click. A button on a page that belongs to a
 // task is the task chip: the task's name, its agents' state, and an `acorn://` link to it.
 export type ChipTask = { title: string; state: { label: string; tone: 'ok' | 'warn' } | null; link: string | null }
+// The branch marker on an app a plugin published for a task: the task's branch, the state the plugin
+// gives, and an `acorn://` link to the plugin's pane on the task.
+export type AppMarker = { branch: string; state: { label: string; tone: 'ok' | 'warn' | 'bad' }; link: string | null }
+// The origins the person hid the branch marker on, from its own menu, in `storage.local`.
+export const HIDDEN_MARKERS_KEY = 'hiddenMarkers'
 export type ContentMessage = {
   type: 'acorn:buttons'
   buttons: { key: string; label: string; anchors: string[]; task: ChipTask | null }[]
+  marker: AppMarker | null
   // Whether `acorn://` links open the desktop app, or are copied, as in the sidebar.
   opensLinks: boolean
   // Firefox opens its sidebar only from the extension's own controls, never from a page.
   opensPanel: boolean
 }
-// `show` opens the panel on the page's task, and `chat` opens it on a new chat about the page.
+// `show` opens the panel on the page's task, and `chat` opens it on a new chat about the page. The
+// marker's `hide` hides it on the page's origin.
 export type ButtonClick =
   | { type: 'acorn:handoff'; key: string }
   | { type: 'acorn:chip'; key: string; action: 'show' | 'chat' }
+  | { type: 'acorn:marker'; action: 'show' | 'hide' }

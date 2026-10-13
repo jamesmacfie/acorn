@@ -3,9 +3,9 @@ import { TURN_TEXT_MAX_CHARS } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
 import { CallFailure, isUncertain } from '../messages'
 import type { BridgeClient } from './bridgeClient'
-import { CaptureFailure, screenshotData, turnInput, withCapture, type CaptureKind, type PageCapture } from './capture'
+import { CaptureFailure, screenshotData, turnInput, withCapture, type CaptureKind, type PageCapture } from '../capture'
 import { errorGuidance } from './guidance'
-import { acknowledged, changeDraft, loadDraft, saveDraft, type Draft, type DraftTarget } from './localState'
+import { acknowledged, changeDraft, loadDraft, saveDraft, type Draft, type DraftTarget } from '../localState'
 
 const CAPTURE_LABELS: Record<CaptureKind, string> = {
   link: 'Add page link to chat',

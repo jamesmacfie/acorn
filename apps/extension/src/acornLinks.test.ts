@@ -4,6 +4,7 @@ import { conversationLink, itemTaskLink, outsideItemLink, projectLink } from './
 describe('Acorn links', () => {
   it("opens a handed-off item's task on the pane that shows it", () => {
     expect(itemTaskLink('n1', 'github', 't1')).toBe('acorn://n1/t/t1?pane=pr')
+    expect(itemTaskLink('n1', 'runn', 't1')).toBe('acorn://n1/t/t1?pane=runn')
     // A plugin with no pane here opens the task as it was.
     expect(itemTaskLink('n1', 'linear', 't1')).toBe('acorn://n1/t/t1')
   })

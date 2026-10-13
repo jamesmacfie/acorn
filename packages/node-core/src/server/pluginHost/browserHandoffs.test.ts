@@ -4,7 +4,7 @@ import { memoryIdentityStore } from '../activeIdentity'
 import { createCoreServices, SecretService } from '../core'
 import { makeTestDb, testCoreSeams } from '../../testkit/db'
 import { browserHandoffsRoute } from '../routes/browserHandoffs'
-import { browserHandoffs } from './browserHandoffs'
+import { browserHandoffs, taskAddressRoutes } from './browserHandoffs'
 import { CapabilityRegistry } from './capabilities'
 import { clearRegistrations, initPlugins, type LoadedPluginBinding } from './host'
 import type { NodePlugin } from './types'
@@ -17,7 +17,7 @@ const handoff = (pluginId: string, over: Partial<BrowserHandoffDescriptor> = {})
   ...over,
 })
 
-const binding = (handoffs: BrowserHandoffDescriptor[]): LoadedPluginBinding => ({
+const binding = (handoffs: BrowserHandoffDescriptor[], taskAddresses?: string): LoadedPluginBinding => ({
   permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
   storage: {
     open: () => {
@@ -25,6 +25,7 @@ const binding = (handoffs: BrowserHandoffDescriptor[]): LoadedPluginBinding => (
     },
   },
   browserHandoffs: handoffs,
+  taskAddresses,
 })
 
 describe('browser handoff declarations', () => {
@@ -62,13 +63,18 @@ describe('browser handoff declarations', () => {
         { name: 'tracker', browserHandoffs: [handoff('tracker')], init: () => {} },
         { name: 'board', init: () => {} },
       ],
-      { loaded: { board: binding([handoff('board', { id: 'card', anchors: ['.card > header'] })]) } },
+      {
+        loaded: {
+          board: binding([handoff('board', { id: 'card', anchors: ['.card > header'] })], '/v1/p/board/addresses'),
+        },
+      },
     )
     const response = (await (await browserHandoffsRoute.request('/')).json()) as BrowserHandoffsResponse
     expect(response.handoffs).toEqual([
       { pluginId: 'board', ...handoff('board', { id: 'card', anchors: ['.card > header'] }) },
       { pluginId: 'tracker', ...handoff('tracker'), anchors: [] },
     ])
+    expect(response.taskAddresses).toEqual([{ pluginId: 'board', route: '/v1/p/board/addresses' }])
   })
 
   it('advertises nothing for a disabled plugin, or one whose init failed', async () => {
@@ -83,9 +89,10 @@ describe('browser handoff declarations', () => {
           },
         },
       ],
-      { disabled: ['off'], loaded: { broken: binding([handoff('broken')]) } },
+      { disabled: ['off'], loaded: { broken: binding([handoff('broken')], '/v1/p/broken/addresses') } },
     )
     expect(browserHandoffs()).toEqual([])
+    expect(taskAddressRoutes()).toEqual([])
   })
 
   it('swaps a reloaded plugin to the declarations of its new binding', async () => {

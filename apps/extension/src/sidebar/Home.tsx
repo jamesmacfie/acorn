@@ -14,7 +14,7 @@ import { CallFailure } from '../messages'
 import type { PageTask } from '../taskPages'
 import { AgentSelect, agentChoice } from './agentChoice'
 import type { BridgeClient } from './bridgeClient'
-import type { PageCapture } from './capture'
+import type { PageCapture } from '../capture'
 import { conversationItems } from './conversationWindow'
 import { errorGuidance } from './guidance'
 import { Handoff } from './Handoff'
@@ -35,6 +35,8 @@ export function ThisPage(props: {
   handoffs: readonly BridgeHandoff[]
   // The tasks the page belongs to, matched in the browser.
   pageTasks: readonly PageTask[]
+  markerHidden(origin: string): boolean
+  showMarker(origin: string): void
   projectName(id: string): string
   // Opens a task's newest conversation, or the new-chat picker when it has none.
   chat(projectId: string, taskId: string): void
@@ -95,16 +97,44 @@ export function ThisPage(props: {
         <Match when={props.pageTasks.length}>
           <ul class="rows" aria-label="Page tasks">
             <For each={props.pageTasks}>
-              {({ task, source }) => (
+              {({ task, page }) => (
                 <li>
-                  <div class="grow">
-                    <strong>{task.title}</strong>
-                    <span class="quiet">
-                      Task in {props.projectName(task.projectId)}
-                      {task.branch ? ` · ${task.branch}` : ''}
-                    </span>
-                  </div>
-                  <OpenInAcorn href={itemTaskLink(props.nodeId, source, task.id)} opensLinks={props.opensLinks} />
+                  {/* An app a plugin published for the task is named by its branch, with the
+                      plugin's state, and its link goes to the plugin's pane, which has the logs. */}
+                  <Show
+                    when={page.status}
+                    fallback={
+                      <div class="grow">
+                        <strong>{task.title}</strong>
+                        <span class="quiet">
+                          Task in {props.projectName(task.projectId)}
+                          {task.branch ? ` · ${task.branch}` : ''}
+                        </span>
+                      </div>
+                    }
+                  >
+                    {(status) => (
+                      <div class="grow">
+                        <strong>{task.branch ?? task.title}</strong>
+                        <span class="quiet">
+                          Task: {task.title} · {props.projectName(task.projectId)}
+                        </span>
+                        <State tone={status().tone}>
+                          {status().label} {status().state}
+                        </State>
+                        <Show when={props.markerHidden(page.origin)}>
+                          <button type="button" class="link" onClick={() => props.showMarker(page.origin)}>
+                            Show the branch marker on this site
+                          </button>
+                        </Show>
+                      </div>
+                    )}
+                  </Show>
+                  <OpenInAcorn
+                    href={itemTaskLink(props.nodeId, page.source, task.id)}
+                    opensLinks={props.opensLinks}
+                    label={page.status ? 'Logs in Acorn' : undefined}
+                  />
                   <button type="button" class="quiet" onClick={() => props.chat(task.projectId, task.id)}>
                     Chat
                   </button>

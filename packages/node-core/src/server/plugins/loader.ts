@@ -73,6 +73,7 @@ export const loadedPluginBinding = (entry: LoadedPlugin): LoadedPluginBinding =>
   agentTools: entry.manifest.contributions.agentTools,
   contextSections: entry.manifest.contributions.contextSections,
   browserHandoffs: entry.manifest.contributions.browserHandoffs,
+  taskAddresses: entry.manifest.contributions.taskAddresses,
   // Hook points this package opens and the route-backed handlers it adds to other plugins' hooks
   // (../pluginHost/manifestWork.ts § registerManifestHooks). Without these a manifest hook handler
   // installs, shows its grant, and never runs.

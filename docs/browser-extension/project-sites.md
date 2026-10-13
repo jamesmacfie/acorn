@@ -81,7 +81,8 @@ under it takes an address, such as `https://example.com/app`, and **Add** stores
 typed wrong before anything goes to the Node.
 
 Site access is listed apart, under **Site access** in Settings. Each site there says what access is for:
-buttons on its pages, handoffs in the sidebar, or project suggestions. Browsers grant access by host
+buttons on its pages, handoffs in the sidebar, project suggestions, or the
+[branch marker](./task-pages.md#the-branch-marker) on a task's app. Browsers grant access by host
 and not by port, so a `http://localhost:5173` association asks for all of `http://localhost`.
 Removing access stops the sidebar reading the page, so its suggestions go at once.
 

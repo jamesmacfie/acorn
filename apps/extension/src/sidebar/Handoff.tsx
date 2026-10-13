@@ -7,7 +7,7 @@ import { itemTaskLink, outsideItemLink } from '../acornLinks'
 import { OpenInAcorn } from './OpenInAcorn'
 import { AgentSelect, agentChoice } from './agentChoice'
 import type { BridgeClient } from './bridgeClient'
-import type { PageCapture } from './capture'
+import type { PageCapture } from '../capture'
 import { errorGuidance } from './guidance'
 
 // What the item's context becomes in a draft: the plugin's proposal, or the item's title and address

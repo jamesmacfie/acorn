@@ -40,6 +40,8 @@ import {
   type BrowserHandoffResolution,
   type BrowserHandoffResolveRequest,
   type BrowserHandoffsResponse,
+  TASK_ADDRESSES_MAX_BYTES,
+  taskAddressList,
 } from '@acorn/protocol/plugin/handoffs.ts'
 import type {
   AgentAttachment,
@@ -63,7 +65,15 @@ import {
   bridgeSessionRead,
   sessionRoute,
 } from './agents'
-import { bridgeHandoff, bridgeHandoffItem, creatableProjects, linkedTasks, ownsRoute, taskPages } from './handoffs'
+import {
+  bridgeHandoff,
+  bridgeHandoffItem,
+  creatableProjects,
+  linkedTasks,
+  ownsRoute,
+  taskPages,
+  type PublishedAddresses,
+} from './handoffs'
 
 export class BridgeFailure extends Error {
   constructor(
@@ -109,6 +119,8 @@ export function createBridge(options: {
   // The probe is held here rather than returned, so pairing can only complete the endpoint whose
   // fingerprint the person was shown, or this computer's Node, pinned to the certificate in its files.
   let pending: Probe | null = null
+  // The plugins whose task addresses the last `tasks.pages` read asked for.
+  let addressPlugins = new Set<string>()
   const hints = agentHints(options.hint ?? (() => {}))
   const broker = new NodeBroker({
     frame(nodeId, frame) {
@@ -118,6 +130,11 @@ export function createBridge(options: {
       if (channel === 'plugins:changed') options.handoffsChanged?.(nodeId)
       if (channel === 'project:changed') options.projectsChanged?.(nodeId)
       if (channel === 'tasks:changed') options.tasksChanged?.(nodeId)
+      // A plugin that publishes task addresses asks clients to read its status again when its state
+      // changes, such as a stack coming up, so its addresses may have changed too.
+      const pluginId = (frame as { pluginId?: unknown }).pluginId
+      if (channel === 'term:status' && typeof pluginId === 'string' && addressPlugins.has(pluginId))
+        options.tasksChanged?.(nodeId)
     },
     bytes() {},
     status(status) {
@@ -373,7 +390,7 @@ export function createBridge(options: {
   async function declaredHandoff(nodeId: string, pluginId: string, handoffId: string): Promise<BrowserHandoff> {
     const body = (await nodeRequest(nodeId, { method: 'GET', path: browserHandoffsRoute })) as BrowserHandoffsResponse
     const handoff = body?.handoffs?.find((entry) => entry.pluginId === pluginId && entry.id === handoffId)
-    if (!handoff || !ownsRoute(handoff))
+    if (!handoff || !ownsRoute(handoff.pluginId, handoff.resolve))
       throw new BridgeFailure('not_found', 'The Node no longer offers that handoff. Reload the page and try again.')
     return handoff
   }
@@ -401,6 +418,31 @@ export function createBridge(options: {
         `The ${handoff.pluginId} plugin answered with something the extension can't use.`,
       )
     return parsed.data
+  }
+
+  // Where each plugin that publishes task addresses says its tasks' apps answer now. A plugin whose
+  // route fails or answers something unusable adds nothing, so one broken plugin can't take every
+  // task's pages with it; the task list read beside this reports a Node that is gone.
+  async function publishedAddresses(nodeId: string): Promise<PublishedAddresses[]> {
+    const body = (await nodeRequest(nodeId, { method: 'GET', path: browserHandoffsRoute })) as BrowserHandoffsResponse
+    const routes = (body?.taskAddresses ?? []).filter(({ pluginId, route }) => ownsRoute(pluginId, route))
+    addressPlugins = new Set(routes.map((route) => route.pluginId))
+    const answers = await Promise.all(
+      routes.map(async ({ pluginId, route }): Promise<PublishedAddresses[]> => {
+        try {
+          const answer = await nodeRequest(nodeId, {
+            method: 'GET',
+            path: route,
+            maxResponseBytes: TASK_ADDRESSES_MAX_BYTES,
+          })
+          const parsed = taskAddressList.safeParse(answer)
+          return parsed.success ? [{ pluginId, addresses: parsed.data.addresses }] : []
+        } catch {
+          return []
+        }
+      }),
+    )
+    return answers.flat()
   }
 
   async function handle(request: BridgeRequest): Promise<BridgeResults[BridgeRequest['op']]> {
@@ -468,8 +510,11 @@ export function createBridge(options: {
       case 'tasks.list':
         return listTasks(request.nodeId, request.projectId)
       case 'tasks.pages': {
-        const tasks = await readList<Task>(request.nodeId, tasksRoute, (body) => body)
-        return { nodeId: request.nodeId, tasks: taskPages(tasks) }
+        const [tasks, published] = await Promise.all([
+          readList<Task>(request.nodeId, tasksRoute, (body) => body),
+          publishedAddresses(request.nodeId),
+        ])
+        return { nodeId: request.nodeId, tasks: taskPages(tasks, published) }
       }
       case 'agents.profiles': {
         const rows = await readList<AgentProviderDescriptor>(request.nodeId, `${agentsRoute}/providers`, (b) => b)
@@ -598,7 +643,10 @@ export function createBridge(options: {
         })) as BrowserHandoffsResponse | null
         if (!Array.isArray(body?.handoffs))
           throw new BridgeFailure('node_error', 'The Node returned an unreadable list of handoffs.')
-        return { nodeId: request.nodeId, handoffs: body.handoffs.filter(ownsRoute).map(bridgeHandoff) }
+        return {
+          nodeId: request.nodeId,
+          handoffs: body.handoffs.filter((handoff) => ownsRoute(handoff.pluginId, handoff.resolve)).map(bridgeHandoff),
+        }
       }
       case 'handoff.resolve': {
         const resolution = await resolveHandoff(request.nodeId, request)

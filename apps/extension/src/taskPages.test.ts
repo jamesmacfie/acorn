@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BridgePageTask } from '@acorn/protocol/extensionBridge.ts'
-import { pageTasks } from './taskPages'
+import { appTask, pageTasks } from './taskPages'
 
 const pr: BridgePageTask = {
   id: 't1',
@@ -17,7 +17,7 @@ const issue: BridgePageTask = {
   pages: [{ origin: 'https://linear.app', pathPrefix: '/acme/issue/ENG-42/fix-it', source: 'linear' }],
 }
 const tasks = [pr, issue]
-const matched = (url: string | undefined) => pageTasks(tasks, url).map(({ task, source }) => `${task.id}:${source}`)
+const matched = (url: string | undefined) => pageTasks(tasks, url).map(({ task, page }) => `${task.id}:${page.source}`)
 
 describe('pages matched to tasks', () => {
   it("matches a task's exact address, with a trailing slash, a query, or a fragment", () => {
@@ -33,6 +33,13 @@ describe('pages matched to tasks', () => {
     expect(matched('https://github.com/acme/runn/pull/4821')).toEqual([])
     expect(matched('https://github.com/acme/runn/pull/48')).toEqual([])
     expect(matched('https://github.com/acme/runn/pulls')).toEqual([])
+  })
+
+  it("matches a pull request under another capitalisation of its repository, and only GitHub's", () => {
+    expect(matched('https://github.com/Acme/Runn/pull/482')).toEqual(['t1:github'])
+    expect(matched('https://github.com/ACME/runn/pull/482/files')).toEqual(['t1:github'])
+    expect(matched('https://github.com/Acme/Runn/pull/4821')).toEqual([])
+    expect(matched('https://linear.app/ACME/issue/ENG-42/fix-it')).toEqual([])
   })
 
   it('needs the exact origin', () => {
@@ -51,5 +58,32 @@ describe('pages matched to tasks', () => {
       't1',
       't3',
     ])
+  })
+})
+
+describe('the app a plugin published for a task', () => {
+  const stack: BridgePageTask = {
+    id: 't4',
+    title: 'Fix billing rounding',
+    branch: 'fix/billing-rounding',
+    projectId: 'p1',
+    pages: [
+      {
+        origin: 'https://runn-05ea41.runn.localhost:5104',
+        pathPrefix: '/',
+        source: 'runn',
+        status: { label: 'Runn stack', state: 'running', tone: 'ok' },
+      },
+    ],
+  }
+
+  it('covers every page on its exact origin, port included', () => {
+    expect(appTask([pr, stack], 'https://runn-05ea41.runn.localhost:5104/planner?x=1')?.task.id).toBe('t4')
+    expect(appTask([pr, stack], 'https://runn-05ea41.runn.localhost:5105/')).toBeNull()
+    expect(appTask([pr, stack], 'http://runn-05ea41.runn.localhost:5104/')).toBeNull()
+  })
+
+  it("isn't an item page, which only the panel and the chip show", () => {
+    expect(appTask([pr, stack], 'https://github.com/acme/runn/pull/482')).toBeNull()
   })
 })

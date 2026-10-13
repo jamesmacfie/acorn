@@ -1,4 +1,4 @@
-import type { BrowserApi } from '../browser'
+import type { BrowserApi } from './browser'
 import type { PageCapture } from './capture'
 
 // What the sidebar keeps in this browser profile's storage: unsent drafts, and the destination it

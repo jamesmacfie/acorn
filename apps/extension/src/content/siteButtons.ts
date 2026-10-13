@@ -1,33 +1,37 @@
 import type { BrowserApi } from '../browser'
-import type { ButtonClick, ContentMessage } from '../handoffs'
+import type { AppMarker, ButtonClick, ContentMessage } from '../handoffs'
 
-// The task chips on a website page. The background injects this into a page it may read and says
-// which chips the page gets; this script only draws them, keeps one of each through the page's own
+// The task chips and the branch marker on a website page. The background injects this into a page it
+// may read and says what the page gets; this script only draws it, keeps it through the page's own
 // rerenders and client-side navigation, and reports a click. It imports types only, because the
 // background injects it as one classic script file.
 //
-// Plugin data reaches the page as text and as selectors, never as markup or styles: the label and the
-// task name are `textContent`, an anchor goes to `querySelector`, and the look is this file's own. Each
-// chip draws inside a closed shadow root, so the page's CSS can't restyle it and none of its own leaks
-// out.
+// Plugin data reaches the page as text and as selectors, never as markup or styles: the label, the
+// task name, and the branch are `textContent`, an anchor goes to `querySelector`, and the look is this
+// file's own. Each pill draws inside a closed shadow root, so the page's CSS can't restyle it and none
+// of its own leaks out.
 
 type Button = ContentMessage['buttons'][number]
-type Page = Omit<ContentMessage, 'type' | 'buttons'>
+type Page = Omit<ContentMessage, 'type' | 'buttons' | 'marker'>
 
 const ATTRIBUTE = 'data-acorn-handoff'
+const MARKER_ATTRIBUTE = 'data-acorn-marker'
 // The host element sits in the page's own DOM, so its few styles are inline, where page rules can't win.
 const HOST_STYLE = 'all:initial;display:inline-flex;vertical-align:middle;margin-left:8px;'
-// Fixed here, so no page or plugin value reaches a style. The chip takes the page's light or dark
-// theme and its buttons' height, and borrows only Acorn's mark, a monospaced task name, and the
-// state dot's colours from Acorn's tokens.
+// The branch marker sits in the bottom-right corner, above the page.
+const MARKER_HOST_STYLE = 'all:initial;position:fixed;right:16px;bottom:16px;z-index:2147483647;display:flex;'
+// Fixed here, so no page or plugin value reaches a style. A pill takes the page's light or dark theme,
+// the chip its buttons' height, and both borrow only Acorn's mark, a monospaced name, and the state
+// dot's colours from Acorn's tokens.
 const CSS = `
 .chip { position: relative; display: inline-flex; height: var(--height); box-sizing: border-box;
   border: 1px solid var(--line); border-radius: 6px; background: var(--fill); color: var(--text);
   font: 500 12px/1 system-ui, sans-serif; }
 .chip[data-theme='light'] { --text: #242424; --fill: #f6f8fa; --line: #d0d7de; --menu: #ffffff;
-  --ok: #1a7f37; --warn: #9a6700; }
+  --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; }
 .chip[data-theme='dark'] { --text: #dddddd; --fill: #21262d; --line: #3d444d; --menu: #161b22;
-  --ok: #3fb950; --warn: #d29922; }
+  --ok: #3fb950; --warn: #d29922; --bad: #f85149; }
+.marker { --height: 28px; border-radius: 14px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); }
 button, a { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center;
   gap: 6px; padding: 0 10px; color: inherit; font: inherit; }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
@@ -37,11 +41,14 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--text); outline-
   text-overflow: ellipsis; white-space: nowrap; }
 .state { display: inline-flex; align-items: center; gap: 4px; }
 .state[data-tone='warn'] { color: var(--warn); font-weight: 600; }
+.state[data-tone='bad'] { color: var(--bad); font-weight: 600; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
 .state[data-tone='warn'] .dot { background: var(--warn); }
+.state[data-tone='bad'] .dot { background: var(--bad); }
 .menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 2147483647; min-width: 220px;
   display: flex; flex-direction: column; padding: 4px 0; border: 1px solid var(--line); border-radius: 6px;
   background: var(--menu); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
+.marker .menu { top: auto; bottom: calc(100% + 4px); }
 .menu[hidden] { display: none; }
 .menu > button, .menu > a { height: 32px; white-space: nowrap; }
 .menu > button:hover, .menu > a:hover { background: var(--fill); }
@@ -59,13 +66,16 @@ const api = scope.browser ?? scope.chrome
 if (api && !scope.acornSiteButtons) {
   scope.acornSiteButtons = true
   let buttons: Button[] = []
+  let marker: AppMarker | null = null
   let page: Page = { opensLinks: false, opensPanel: true }
   let scheduled = false
-  // The chip whose menu is open, and how to close it. One menu is open at a time.
+  // The pill whose menu is open, and how to close it. One menu is open at a time.
   let openMenu: { host: Element; close(): void } | null = null
-  // The button each chip was drawn for. A new message brings new objects, so a chip is drawn again
-  // when what it shows may have changed, and kept through the page's own redraws otherwise.
+  // The button each chip was drawn for, and the marker drawn. A new message brings new objects, so a
+  // pill is drawn again when what it shows may have changed, and kept through the page's own redraws
+  // otherwise.
   const drawnFor = new WeakMap<Element, Button>()
+  let drawnMarker: { host: HTMLElement; marker: AppMarker } | null = null
 
   const drawn = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>(`[${ATTRIBUTE}]`)]
 
@@ -83,8 +93,8 @@ if (api && !scope.acornSiteButtons) {
   }
 
   // Light text means a dark page.
-  const darkPage = (anchor: Element): boolean => {
-    const [red, green, blue] = (getComputedStyle(anchor).color.match(/[\d.]+/g) ?? []).map(Number)
+  const darkPage = (element: Element): boolean => {
+    const [red, green, blue] = (getComputedStyle(element).color.match(/[\d.]+/g) ?? []).map(Number)
     return red !== undefined && 0.299 * red + 0.587 * (green ?? 0) + 0.114 * (blue ?? 0) > 128
   }
   // The height of the site's own buttons beside the chip, or a common toolbar height.
@@ -93,113 +103,151 @@ if (api && !scope.acornSiteButtons) {
 
   const report = (message: ButtonClick) => void api.runtime.sendMessage(message)
 
-  const create = (button: Button, anchor: Element): HTMLElement => {
-    const host = document.createElement('span')
-    host.setAttribute(ATTRIBUTE, button.key)
-    host.style.cssText = HOST_STYLE
+  // Only the person's own click. A page can call `click()` on any element, and that mustn't open the
+  // sidebar on its behalf. The click stays with the pill, so the page's own handlers don't see it.
+  const trusted = (event: Event): boolean => {
+    event.preventDefault()
+    event.stopPropagation()
+    return event.isTrusted
+  }
+
+  // A pill in a closed shadow root: Acorn's mark, a monospaced name, and a state dot. Constant markup
+  // only; everything a plugin or the Node supplied goes in as text.
+  const pill = (
+    host: HTMLElement,
+    theme: Element,
+    name: string,
+    state: { label: string; tone: string } | null,
+  ): { root: ShadowRoot; chip: HTMLElement; main: HTMLButtonElement } => {
     const root = host.attachShadow({ mode: 'closed' })
-    // Constant markup only; everything a plugin or the Node supplied goes in as text below.
     root.innerHTML = `<style>${CSS}</style><div class="chip"><button type="button" class="main">${MARK}<span class="name"></span></button></div>`
     const chip = root.querySelector<HTMLElement>('.chip')!
-    chip.dataset.theme = darkPage(anchor) ? 'dark' : 'light'
-    chip.style.setProperty('--height', `${buttonHeight(anchor)}px`)
+    chip.dataset.theme = darkPage(theme) ? 'dark' : 'light'
     const main = root.querySelector<HTMLButtonElement>('.main')!
-    const name = root.querySelector<HTMLElement>('.name')!
-    const task = button.task
-    name.textContent = task ? task.title : 'Start task'
-    if (task?.state) {
-      const state = document.createElement('span')
-      state.className = 'state'
-      state.dataset.tone = task.state.tone
-      state.innerHTML = '<span class="dot"></span>'
-      state.append(task.state.label)
-      main.append(state)
+    root.querySelector<HTMLElement>('.name')!.textContent = name
+    if (state) {
+      const element = document.createElement('span')
+      element.className = 'state'
+      element.dataset.tone = state.tone
+      element.innerHTML = '<span class="dot"></span>'
+      element.append(state.label)
+      main.append(element)
     }
-    // The plugin's label stays in the accessible name, beside what the chip shows.
-    main.setAttribute('aria-label', `${main.textContent} (${button.label})`)
+    return { root, chip, main }
+  }
 
-    // The menu: the task's verbs, and in Firefox, where a page can't open the sidebar, how to open it.
+  // A pill's menu items. `close` is bound once the menu exists, so items made before it can close it.
+  const menuItems = () => {
     const items: HTMLElement[] = []
+    let close = () => {}
     // An item closes the menu, unless it says what it did in place.
-    const item = (text: string, action: (element: HTMLElement) => void, keepOpen = false): void => {
+    const add = (text: string, action: (element: HTMLElement) => void, keepOpen = false): void => {
       const element = document.createElement('button')
       element.type = 'button'
       element.textContent = text
       element.addEventListener('click', (event) => {
         if (!trusted(event)) return
-        if (!keepOpen) setOpen(false)
+        if (!keepOpen) close()
         action(element)
       })
       items.push(element)
     }
-    const chipClick = (action: 'show' | 'chat') => report({ type: 'acorn:chip', key: button.key, action })
-    if (task && page.opensPanel) item('Show in side panel', () => chipClick('show'))
-    if (task?.link && page.opensLinks) {
-      const open = document.createElement('a')
-      open.href = task.link
-      open.textContent = 'Open in Acorn ↗'
+    return {
+      items,
+      add,
       // A plain link, which the browser hands to the desktop app.
-      open.addEventListener('click', () => setOpen(false))
-      items.push(open)
+      link(href: string): void {
+        const open = document.createElement('a')
+        open.href = href
+        open.textContent = 'Open in Acorn ↗'
+        open.addEventListener('click', () => close())
+        items.push(open)
+      },
+      copy(href: string): void {
+        add(
+          'Copy Acorn link',
+          (element) => {
+            void navigator.clipboard.writeText(href).then(
+              () => (element.textContent = 'Copied'),
+              () => undefined,
+            )
+          },
+          true,
+        )
+      },
+      note(text: string): void {
+        const note = document.createElement('p')
+        note.className = 'note'
+        note.textContent = text
+        items.push(note)
+      },
+      bind(closeMenu: () => void): void {
+        close = closeMenu
+      },
     }
-    if (task && page.opensPanel) item('New chat about this page', () => chipClick('chat'))
-    if (task?.link) {
-      const link = task.link
-      item(
-        'Copy Acorn link',
-        (element) => {
-          void navigator.clipboard.writeText(link).then(
-            () => (element.textContent = 'Copied'),
-            () => undefined,
-          )
-        },
-        true,
-      )
-    }
-    if (!page.opensPanel) {
-      const note = document.createElement('p')
-      note.className = 'note'
-      note.textContent = task
-        ? 'To open the panel on this task, click Acorn in the toolbar.'
-        : 'To start the task, click Acorn in the toolbar.'
-      items.push(note)
-    }
+  }
+
+  // The menu under a pill. In Chrome a ▾ beside the main button opens it; in Firefox, which opens its
+  // panel only from the extension's own controls, the main button does. Returns how to open it.
+  const attachMenu = (host: Element, root: ShadowRoot, chip: HTMLElement, main: HTMLElement, items: HTMLElement[]) => {
     for (const element of items) element.setAttribute('role', element.tagName === 'P' ? 'note' : 'menuitem')
+    const menu = document.createElement('div')
+    menu.className = 'menu'
+    menu.setAttribute('role', 'menu')
+    menu.append(...items)
+    let toggle = main
+    if (page.opensPanel) {
+      toggle = document.createElement('button')
+      toggle.setAttribute('type', 'button')
+      toggle.className = 'more'
+      toggle.textContent = '▾'
+      toggle.setAttribute('aria-label', 'More Acorn actions')
+      toggle.addEventListener('click', (event) => trusted(event) && setOpen(menu.hidden === true))
+      chip.append(toggle)
+    }
+    toggle.setAttribute('aria-haspopup', 'menu')
+    const setOpen = (open: boolean): void => {
+      if (open) openMenu?.close()
+      menu.hidden = !open
+      toggle.setAttribute('aria-expanded', String(open))
+      openMenu = open ? { host, close: () => setOpen(false) } : openMenu?.host === host ? null : openMenu
+    }
+    setOpen(false)
+    chip.append(menu)
+    root.addEventListener('keydown', (event) => (event as KeyboardEvent).key === 'Escape' && setOpen(false))
+    return setOpen
+  }
+
+  const createChip = (button: Button, anchor: Element): HTMLElement => {
+    const host = document.createElement('span')
+    host.setAttribute(ATTRIBUTE, button.key)
+    host.style.cssText = HOST_STYLE
+    const task = button.task
+    const { root, chip, main } = pill(host, anchor, task ? task.title : 'Start task', task?.state ?? null)
+    chip.style.setProperty('--height', `${buttonHeight(anchor)}px`)
+    // The plugin's label stays in the accessible name, beside what the chip shows.
+    main.setAttribute('aria-label', `${main.textContent} (${button.label})`)
+
+    // The menu: the task's verbs, and in Firefox, where a page can't open the sidebar, how to open it.
+    const menu = menuItems()
+    const chipClick = (action: 'show' | 'chat') => report({ type: 'acorn:chip', key: button.key, action })
+    if (task && page.opensPanel) menu.add('Show in side panel', () => chipClick('show'))
+    if (task?.link && page.opensLinks) menu.link(task.link)
+    if (task && page.opensPanel) menu.add('New chat about this page', () => chipClick('chat'))
+    if (task?.link) menu.copy(task.link)
+    if (!page.opensPanel)
+      menu.note(
+        task
+          ? 'To open the panel on this task, click Acorn in the toolbar.'
+          : 'To start the task, click Acorn in the toolbar.',
+      )
 
     // Chrome opens the panel from the chip itself: on the task, or on Start task's form. Firefox opens
     // the menu, and a Start task click waits for the sidebar.
-    const hasMenu = !page.opensPanel || (task !== null && items.length > 0)
     let setOpen = (_open: boolean) => {}
-    if (hasMenu) {
-      const menu = document.createElement('div')
-      menu.className = 'menu'
-      menu.setAttribute('role', 'menu')
-      menu.hidden = true
-      menu.append(...items)
-      const toggles: HTMLElement[] = []
-      setOpen = (open) => {
-        if (open) openMenu?.close()
-        menu.hidden = !open
-        for (const toggle of toggles) toggle.setAttribute('aria-expanded', String(open))
-        openMenu = open ? { host, close: () => setOpen(false) } : openMenu?.host === host ? null : openMenu
-      }
-      if (page.opensPanel) {
-        const more = document.createElement('button')
-        more.type = 'button'
-        more.className = 'more'
-        more.textContent = '▾'
-        more.setAttribute('aria-label', 'More Acorn actions')
-        more.setAttribute('aria-haspopup', 'menu')
-        more.addEventListener('click', (event) => trusted(event) && setOpen(menu.hidden === true))
-        toggles.push(more)
-        chip.append(more)
-      } else {
-        main.setAttribute('aria-haspopup', 'menu')
-        toggles.push(main)
-      }
-      setOpen(false)
-      chip.append(menu)
-      root.addEventListener('keydown', (event) => (event as KeyboardEvent).key === 'Escape' && setOpen(false))
+    if (!page.opensPanel || (task !== null && menu.items.length > 0)) {
+      setOpen = attachMenu(host, root, chip, main, menu.items)
+      menu.bind(() => setOpen(false))
     }
     main.addEventListener('click', (event) => {
       if (!trusted(event)) return
@@ -212,16 +260,35 @@ if (api && !scope.acornSiteButtons) {
     return host
   }
 
-  // Only the person's own click. A page can call `click()` on any element, and that mustn't open the
-  // sidebar on its behalf. The click stays with the chip, so the page's own handlers don't see it.
-  const trusted = (event: Event): boolean => {
-    event.preventDefault()
-    event.stopPropagation()
-    return event.isTrusted
+  // The branch marker: which task's app this page is, and its state, in the page's corner. A click
+  // opens the panel on the task; its menu also hides it on this site.
+  const createMarker = (shown: AppMarker): HTMLElement => {
+    const host = document.createElement('div')
+    host.setAttribute(MARKER_ATTRIBUTE, '')
+    host.style.cssText = MARKER_HOST_STYLE
+    const { root, chip, main } = pill(host, document.body ?? document.documentElement, shown.branch, shown.state)
+    chip.classList.add('marker')
+    main.setAttribute('aria-label', `${shown.branch}, ${shown.state.label} (Acorn)`)
+
+    const menu = menuItems()
+    const markerClick = (action: 'show' | 'hide') => report({ type: 'acorn:marker', action })
+    if (page.opensPanel) menu.add('Show in side panel', () => markerClick('show'))
+    if (shown.link && page.opensLinks) menu.link(shown.link)
+    if (shown.link) menu.copy(shown.link)
+    menu.add('Hide on this site', () => markerClick('hide'))
+    if (!page.opensPanel) menu.note('To open the panel on this task, click Acorn in the toolbar.')
+    const setOpen = attachMenu(host, root, chip, main, menu.items)
+    menu.bind(() => setOpen(false))
+    main.addEventListener('click', (event) => {
+      if (!trusted(event)) return
+      if (page.opensPanel) markerClick('show')
+      else setOpen(true)
+    })
+    return host
   }
 
-  // One chip per handoff, inside the first anchor that matches. A chip whose handoff went away is
-  // removed; a page that redrew its header gets the chip back.
+  // One chip per handoff, inside the first anchor that matches, and the marker in the corner. A pill
+  // that went away is removed; a page that redrew its header, or itself, gets it back.
   const reconcile = (): void => {
     scheduled = false
     for (const element of drawn()) if (!buttons.includes(drawnFor.get(element)!)) element.remove()
@@ -230,7 +297,15 @@ if (api && !scope.acornSiteButtons) {
       const existing = drawn().find((element) => drawnFor.get(element) === button)
       if (existing && anchor?.contains(existing)) continue
       existing?.remove()
-      if (anchor) anchor.append(create(button, anchor))
+      if (anchor) anchor.append(createChip(button, anchor))
+    }
+    if (drawnMarker && (drawnMarker.marker !== marker || !drawnMarker.host.isConnected)) {
+      drawnMarker.host.remove()
+      drawnMarker = null
+    }
+    if (marker && !drawnMarker) {
+      drawnMarker = { host: createMarker(marker), marker }
+      document.documentElement.append(drawnMarker.host)
     }
   }
 
@@ -252,8 +327,9 @@ if (api && !scope.acornSiteButtons) {
     const message = raw as ContentMessage | null
     if (message?.type !== 'acorn:buttons' || !Array.isArray(message.buttons)) return
     buttons = message.buttons
+    marker = message.marker ?? null
     page = { opensLinks: message.opensLinks === true, opensPanel: message.opensPanel !== false }
-    if (buttons.length) observer.observe(document.documentElement, { childList: true, subtree: true })
+    if (buttons.length || marker) observer.observe(document.documentElement, { childList: true, subtree: true })
     else observer.disconnect()
     reconcile()
   })

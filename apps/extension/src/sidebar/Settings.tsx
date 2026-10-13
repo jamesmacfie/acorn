@@ -4,7 +4,7 @@ import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociati
 import type { BrowserApi } from '../browser'
 import { STYLES, THEMES, loadAppearance, saveAppearance, type Appearance } from './appearance'
 import type { BridgeClient } from './bridgeClient'
-import { loadDestination, saveDestination } from './localState'
+import { loadDestination, saveDestination } from '../localState'
 import { ProjectSites } from './ProjectSites'
 import { SiteAccess } from './SiteAccess'
 
@@ -20,6 +20,8 @@ export function Settings(props: {
   forget(nodeId: string): void
   handoffs: readonly BridgeHandoff[]
   sites: readonly ProjectSite[]
+  // The apps plugins published for the selected Node's tasks, whose sites can be allowed.
+  apps: readonly SiteAssociation[]
   pageUrl: string | undefined
   sitesChanged(projectId: string, sites: SiteAssociation[]): void
   close(): void
@@ -89,7 +91,7 @@ export function Settings(props: {
           />
         )}
       </Show>
-      <SiteAccess api={props.api} handoffs={props.handoffs} sites={props.sites} />
+      <SiteAccess api={props.api} handoffs={props.handoffs} sites={props.sites} apps={props.apps} />
       <Notifications permissions={props.api.permissions} />
       <AppearanceSettings storage={props.api.storage.local} />
     </div>

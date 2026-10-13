@@ -111,7 +111,9 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
   ([appearance](./setup.md#appearance)).
 - `handoffs`: the selected Node's [handoffs](./handoffs.md#task-chips), `{ nodeId, handoffs }`,
   kept so pages get their buttons before the native host starts. It goes when no Node is selected.
-
+- `hiddenMarkers`: the origins the person hid the [branch marker](./task-pages.md#the-branch-marker)
+  on, as a list such as `["https://runn-05ea41.runn.localhost:5104"]`. The marker's **Hide on this
+  site** adds one, and **This page** removes it again. It holds for every Node.
 - `siteChoices:<nodeId>`: the person's [project overrides](./project-sites.md#overrides) for each site.
 - `notifiedRequests`: the requests already sent as [OS notifications](./notifications.md#browser-storage).
 

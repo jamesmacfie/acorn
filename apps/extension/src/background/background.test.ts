@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { BackgroundMessage } from '../messages'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
 import { SELECTED_NODE_KEY, startBackground } from './background'
+import { HIDDEN_MARKERS_KEY } from '../handoffs'
 import { HANDOFFS_KEY } from './siteButtons'
 
 // A scripted host with the real host's selection rules: it knows some Nodes and selects one at a time.
@@ -319,6 +320,48 @@ describe('site buttons', () => {
       { type: 'showTask', chat: null },
       { type: 'showTask', chat: { url: 'https://tracker.example/items/42', title: 'Item 42' } },
     ])
+  })
+
+  it('draws the branch marker on an app a plugin published for a task, and hides it on that origin', async () => {
+    const app = 'https://runn-05ea41.runn.localhost:5104'
+    const { fake, host, panel } = await started({ url: `${app}/planner` })
+    expect(lastButtons(fake)).toBeUndefined()
+    host.taskPages = [
+      pageTask,
+      {
+        ...pageTask,
+        id: 't2',
+        pages: [
+          {
+            origin: app,
+            pathPrefix: '/',
+            source: 'runn',
+            status: { label: 'Runn stack', state: 'running', tone: 'ok' },
+          },
+        ],
+      },
+    ]
+    fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'a' })
+    await settle()
+    const marker = { branch: 'fix/billing', state: { label: 'running', tone: 'ok' }, link: 'acorn://a/t/t2?pane=runn' }
+    expect(fake.injected).toContain(7)
+    expect(lastMessage(fake)).toMatchObject({ buttons: [], marker })
+
+    fake.sendFromPage({ type: 'acorn:marker', action: 'show' })
+    await settle()
+    expect(fake.panelOpens).toEqual([1])
+    expect(panel.messages).toContainEqual({ type: 'showTask', chat: null })
+
+    fake.sendFromPage({ type: 'acorn:marker', action: 'hide' })
+    await settle()
+    expect(fake.storage.get(HIDDEN_MARKERS_KEY)).toEqual([app])
+    expect(lastMessage(fake)).toMatchObject({ buttons: [], marker: null })
+    // Hidden, it opens nothing. The sidebar shows it again through the same key.
+    fake.sendFromPage({ type: 'acorn:marker', action: 'show' })
+    await fake.api.storage.local.set({ [HIDDEN_MARKERS_KEY]: [] })
+    await settle()
+    expect(fake.panelOpens).toEqual([1])
+    expect(lastMessage(fake)).toMatchObject({ marker })
   })
 
   it('tells the page when Acorn links are copied rather than opened, and when it cannot open the panel', async () => {
