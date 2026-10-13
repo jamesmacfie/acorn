@@ -1,12 +1,15 @@
 import { gitOrThrow, gitText } from '../core/git'
 import { ProcessError } from '../core/proc'
-import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, statSync } from 'node:fs'
+import { rename, rm } from 'node:fs/promises'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { isValidBranch } from '@acorn/protocol/branch.ts'
-import type { WorktreeResult } from '@acorn/protocol/task.ts'
 import { isContainedPath, worktreeBranchDirName } from './pathGuards'
 import { resolveInRoot } from '../core/fs'
 import { invalidateWorktreeStatus, worktreeStatus, type WorktreeStatus } from './worktreeStatus'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('worktrees')
 
 // Workspace worktrees. docs/workspaces-and-tasks/worktrees.md § Worktrees and setup owns why they exist and
 // how their paths are derived and revalidated.
@@ -225,7 +228,7 @@ export function copyWorktreeFiles(checkout: string, worktree: string, entries: s
 
 // Does this worktree have uncommitted changes?
 //
-// `fresh: true`, always. This is what `removeWorktree` below decides on, and a cached "clean" would
+// `fresh: true`, always. This is what `setWorktreeAside` below decides on, and a cached "clean" would
 // let a destructive deletion past the guard and lose somebody's uncommitted work. The cache in
 // ./worktreeStatus.ts serves reads and never a refusal, and this is the refusal
 // (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup).
@@ -240,29 +243,72 @@ export async function worktreePorcelain(path: string): Promise<WorktreeStatus> {
   return worktreeStatus(path)
 }
 
-// Remove a worktree through the main checkout. Refuses a dirty worktree unless force is set, which
-// discards uncommitted changes. The UI surfaces that, so removal is never quietly destructive.
-export async function removeWorktree(
-  checkout: string,
+// Archive renames a worktree to a sibling with this suffix and deletes it after the task is archived.
+// The timestamp lets a task archived, restored, and archived again set aside a second folder while
+// the first is still being deleted.
+const ASIDE_SUFFIX = /-\d+-acorn-archive$/
+
+/** The folder an aside came from, or null for a name archive didn't make. */
+export const asideOriginal = (aside: string): string | null =>
+  ASIDE_SUFFIX.test(aside) ? aside.replace(ASIDE_SUFFIX, '') : null
+
+// Move a worktree aside for archive. Refuses a dirty worktree unless force is set, which discards
+// uncommitted changes. The UI surfaces that, so removal is never quietly destructive.
+//
+// Nothing is deleted here. `git worktree remove` deleted in place, and a big folder ran past git's
+// time limit and was left half deleted on an active task. A rename is instant. The caller marks the
+// task archived and then calls `discardWorktree`, or renames the folder back if it couldn't. A folder
+// still set aside at boot is finished or put back by `reconcileWorktrees`.
+//
+// `aside` is null when there is nothing to move: a folder that is already gone, or one git no longer
+// tracks that sits outside the worktrees folder and so belongs to the user.
+export async function setWorktreeAside(
   path: string,
   force = false,
   worktreesRoot?: string,
-): Promise<WorktreeResult> {
-  if (isUnlinkedWorktree(path)) return removeUnlinkedWorktree(checkout, path, force, worktreesRoot)
-  if (!force && (await worktreeDirty(path))) {
+): Promise<{ ok: true; aside: string | null } | { ok: false; reason: string }> {
+  if (!existsSync(path)) return { ok: true, aside: null }
+  if (isUnlinkedWorktree(path)) {
+    if (!force) return { ok: false, reason: 'The worktree folder is no longer linked to git. Confirm to delete it.' }
+    if (!worktreesRoot || !isContainedPath(worktreesRoot, path) || resolve(path) === resolve(worktreesRoot)) {
+      return { ok: true, aside: null }
+    }
+  } else if (!force && (await worktreeDirty(path))) {
     return { ok: false, reason: 'Worktree has uncommitted changes. Confirm to discard.' }
   }
-  const args = ['worktree', 'remove', ...(force ? ['--force'] : []), path]
+  const aside = `${path}-${Date.now()}-acorn-archive`
   try {
-    await gitOrThrow(args, { cwd: checkout, timeoutMs: 30_000 })
+    await rename(path, aside)
   } catch {
     return { ok: false, reason: 'Could not remove the worktree.' }
   }
-  // The directory is gone, so whatever we remembered about it is a lie about a path that may be
-  // recreated on the same name by the next `ensureWorktree`.
   invalidateWorktreeStatus(path)
-  return { ok: true, path }
+  return { ok: true, aside }
 }
+
+// After the task is archived: drop git's record of the folder, so restoring the task can check its
+// branch out again, then delete the folder in the background.
+export async function discardWorktree(checkout: string, aside: string | null): Promise<void> {
+  try {
+    await gitOrThrow(['worktree', 'prune'], { cwd: checkout, timeoutMs: 30_000 })
+  } catch {
+    // The record outlives a failed prune. Restoring the task then fails until a later prune clears it.
+  }
+  if (aside) deleteAside(aside)
+}
+
+const deleting = new Set<string>()
+
+/** Delete a set-aside folder in the background. Boot's sweep and an archive can both ask for one. */
+export function deleteAside(aside: string): void {
+  if (deleting.has(aside)) return
+  deleting.add(aside)
+  void rm(aside, { recursive: true, force: true })
+    .catch((error) => log.warn(`could not delete ${aside}: ${describeError(error).message}`))
+    .finally(() => deleting.delete(aside))
+}
+
+export const isDeletingAside = (aside: string): boolean => deleting.has(aside)
 
 // A task folder that git no longer tracks: its `.git` link file is missing, or points at an entry
 // `git worktree prune` already removed. A `.git` folder is a full repository, not ours to delete, so
@@ -273,29 +319,4 @@ function isUnlinkedWorktree(dir: string): boolean {
   if (!link.isFile()) return false
   const pointer = readFileSync(join(dir, '.git'), 'utf8').trim()
   return pointer.startsWith('gitdir:') && !existsSync(resolve(dir, pointer.slice('gitdir:'.length).trim()))
-}
-
-// `git worktree remove` refuses a folder git no longer tracks, so a task left with one could never be
-// archived. Prune git's record instead, and delete the leftover folder when it sits inside the
-// worktrees folder Acorn manages. A folder anywhere else belongs to the user, so it stays.
-async function removeUnlinkedWorktree(
-  checkout: string,
-  path: string,
-  force: boolean,
-  worktreesRoot: string | undefined,
-): Promise<WorktreeResult> {
-  if (existsSync(path)) {
-    if (!force) return { ok: false, reason: 'The worktree folder is no longer linked to git. Confirm to delete it.' }
-    if (worktreesRoot && isContainedPath(worktreesRoot, path) && resolve(path) !== resolve(worktreesRoot)) {
-      rmSync(path, { recursive: true, force: true })
-    }
-  }
-  try {
-    await gitOrThrow(['worktree', 'prune'], { cwd: checkout, timeoutMs: 30_000 })
-  } catch {
-    // The folder is already gone or never was a worktree. A record git keeps after a failed prune
-    // only matters if the task is restored, and restore names the branch that is still checked out.
-  }
-  invalidateWorktreeStatus(path)
-  return { ok: true, path }
 }

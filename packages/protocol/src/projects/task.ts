@@ -1,5 +1,4 @@
 // Core task, worktree and archive wire contracts.
-export type WorktreeResult = { ok: true; path: string } | { ok: false; reason: string }
 
 // Result of archiving a task (docs/workspaces-and-tasks.md). `reason` carries the guard refusal
 // (running sessions / dirty worktree) for the UI to surface. A failed teardown script sets

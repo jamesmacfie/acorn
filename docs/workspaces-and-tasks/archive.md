@@ -40,11 +40,23 @@ The Node then runs these steps in order:
 4. Run core's `core:task-archiving` hook, where the agents plugin stops the provider process behind
    each of the task's agent sessions ([operations](../managed-agents/operations.md)).
 5. Run the plugin cleanups you ticked in the dialog.
-6. Remove the worktree. `removeWorktree` refuses a dirty tree unless forced. A folder that git no
-   longer tracks, because its `.git` link is gone, can't go through `git worktree remove`. The Node
-   prunes git's record instead and, when forced, deletes the folder if it sits inside the worktrees
-   folder. A folder outside it stays on disk.
-7. Drop the terminal plugin's saved sessions, and mark the task archived.
+6. Set the worktree aside. `setWorktreeAside` refuses a dirty tree unless forced, then renames the
+   folder to a sibling ending in `-<timestamp>-acorn-archive`. A folder that git no longer tracks,
+   because its `.git` link is gone, is set aside only when forced and only if it sits inside the
+   worktrees folder. A folder outside it stays on disk.
+7. Drop the terminal plugin's saved sessions, and mark the task archived. If either step throws, the
+   folder is renamed back and the task stays active.
+8. Run `git worktree prune`, so restoring the task can check its branch out again, then delete the
+   set-aside folder in the background.
+
+The rename is what makes archive safe on a big project. `git worktree remove` deleted in place, so a
+folder with about 150,000 files ran past git's 30-second limit and was left half deleted on
+a task that was still active. A rename takes no time, and the slow delete happens after the task is
+archived.
+
+At boot, `reconcileWorktrees` looks for set-aside folders in the worktrees folder. If the task that
+owned one is still active and its folder is missing, the Node stopped before the archive finished, so
+the folder goes back where it was. Any other set-aside folder is deleted.
 
 The teardown, the stops, and the cleanups sit before removal, so anything that needs the worktree
 still has it, and nothing is writing into it when it goes.

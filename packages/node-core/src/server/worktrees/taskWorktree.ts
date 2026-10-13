@@ -2,9 +2,10 @@ import { taskScripts } from '../taskScripts/service'
 // Task-to-checkout/worktree resolution shared by every privileged node surface. The task
 // ID, never a renderer-supplied absolute path, is the capability; paths are re-derived from the
 // database on every call.
-import { realpathSync, statSync } from 'node:fs'
+import { existsSync, realpathSync, statSync } from 'node:fs'
+import { readdir, rename } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { isAbsolute, resolve } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import { and, eq, isNotNull } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
@@ -17,8 +18,11 @@ import { gitText } from '../core/git'
 import { getProjectConfig } from '../projects/projectConfig'
 import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../projects/repoConfigSnapshot'
 import {
+  asideOriginal,
   copyWorktreeFiles,
+  deleteAside,
   ensureWorktree,
+  isDeletingAside,
   listWorktrees,
   staleWorktreeReason,
   worktreeBranch,
@@ -228,9 +232,11 @@ export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: strin
   return results
 }
 
-// Startup reconciliation (docs/workspaces-and-tasks.md): flag any persisted worktree whose directory is gone
-// (manual rm) as needing repair. The rail/footer surface `missing` live; this just logs at boot.
+// Startup reconciliation (docs/workspaces-and-tasks.md): finish or undo archives the last run left
+// set aside, then flag any persisted worktree whose directory is gone (manual rm) as needing repair.
+// The rail/footer surface `missing` live; this just logs at boot.
 export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
+  await sweepAsideWorktrees(db)
   try {
     const missing = (await computeTaskStatuses(db)).filter((s) => s.missing)
     if (missing.length)
@@ -239,6 +245,51 @@ export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
       )
   } catch {
     // best-effort: never block startup on status
+  }
+}
+
+// A folder archive set aside (`setWorktreeAside`) whose task is still active was never archived: the
+// Node stopped between the rename and the database write. It goes back where it was. Any other is
+// left from an archive that finished, and is deleted.
+//
+// shortcut: a Node that stopped between archiving and `git worktree prune` leaves git's record, and
+// restoring that task fails until a prune runs. Prune each project here if that ever shows up.
+async function sweepAsideWorktrees(db: AppDatabase): Promise<void> {
+  if (!worktreesRoot) return
+  let names: string[]
+  try {
+    names = await readdir(worktreesRoot)
+  } catch {
+    return // No worktrees folder yet.
+  }
+  const active = new Map(
+    db
+      .select({ id: schema.tasks.id, worktreePath: schema.tasks.worktreePath })
+      .from(schema.tasks)
+      .where(and(eq(schema.tasks.status, 'active'), isNotNull(schema.tasks.worktreePath)))
+      .all()
+      .map((row) => [resolve(row.worktreePath!), row.id]),
+  )
+  for (const name of names) {
+    const aside = join(worktreesRoot, name)
+    const original = asideOriginal(aside)
+    if (!original || isDeletingAside(aside)) continue
+    const owner = active.get(resolve(original))
+    if (!owner) {
+      deleteAside(aside)
+      continue
+    }
+    if (isTaskArchiving(owner)) continue
+    if (existsSync(original)) {
+      log.warn(`kept ${aside}: its task is active and ${original} exists, so it can't go back`)
+      continue
+    }
+    try {
+      await rename(aside, original)
+      log.info(`put ${original} back: its task was never archived`)
+    } catch (error) {
+      log.warn(`could not put ${original} back: ${describeError(error).message}`)
+    }
   }
 }
 

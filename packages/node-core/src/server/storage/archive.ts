@@ -6,6 +6,7 @@ import { taskScripts } from '../taskScripts/service'
 // Kept apart from the route handler so it runs under plain Node against a temp git repo, with the
 // PTY concerns injected: the live session map and drawer streaming.
 import { execFile } from 'node:child_process'
+import { rename } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { and, eq } from 'drizzle-orm'
@@ -23,7 +24,7 @@ import {
   waitForTaskWorktreeCreation,
 } from '../worktrees/taskWorktree'
 import { buildSessionEnv } from '../taskEnv'
-import { branchExists, removeWorktree } from '../worktrees/worktrees'
+import { branchExists, discardWorktree, setWorktreeAside } from '../worktrees/worktrees'
 import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 import { broadcastTasksChanged } from '../notify'
 import { admitCheckout, checkoutAdmissionFor } from '../core/checkoutAdmission'
@@ -250,17 +251,26 @@ async function archiveClaimedTask(
     ? ((await deps.applyTaskChecks?.({ id: t.id, worktreePath: t.worktreePath }, opts.applyChecks)) ?? [])
     : []
 
+  // With no mapped checkout there is nothing to git-remove, so archive anyway and drop the orphaned
+  // reference.
+  let setAside: { checkout: string; aside: string | null } | null = null
   if (deleteWorktree && ownsWorktree && t.worktreePath && project?.path && project.vcs === 'git') {
-    const res = await removeWorktree(project.path, t.worktreePath, force, getWorktreesRoot()) // force discards a dirty tree
+    const res = await setWorktreeAside(t.worktreePath, force, getWorktreesRoot()) // force discards a dirty tree
     if (!res.ok) return res
-    // With no mapped checkout there is nothing to git-remove, so archive anyway and drop the
-    // orphaned reference.
+    setAside = { checkout: project.path, aside: res.aside }
   }
-  await deps.dropTaskSessions(id)
-  await db
-    .update(schema.tasks)
-    .set({ status: 'archived', archivedAt: Date.now(), worktreePath: null, updatedAt: Date.now() })
-    .where(eq(schema.tasks.id, id))
+  try {
+    await deps.dropTaskSessions(id)
+    await db
+      .update(schema.tasks)
+      .set({ status: 'archived', archivedAt: Date.now(), worktreePath: null, updatedAt: Date.now() })
+      .where(eq(schema.tasks.id, id))
+  } catch (error) {
+    // Still active, so the task keeps its folder.
+    if (setAside?.aside) await rename(setAside.aside, t.worktreePath!)
+    throw error
+  }
+  if (setAside) await discardWorktree(setAside.checkout, setAside.aside)
   broadcastTasksChanged({ taskId: id })
   // Archived, but say what did not happen. `ok` stays true, because the task is archived, and
   // reporting a failure would have the caller offer a retry for work already done.

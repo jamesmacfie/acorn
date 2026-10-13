@@ -10,8 +10,8 @@
 //
 // ── The one rule ──────────────────────────────────────────────────────────────────────────────────
 //
-// **This cache serves reads. It never serves a refusal.** `removeWorktree` in ./worktrees.ts refuses
-// to delete a worktree with uncommitted changes, and a stale "clean" would let that deletion past the
+// **This cache serves reads. It never serves a refusal.** `setWorktreeAside` in ./worktrees.ts refuses
+// to remove a worktree with uncommitted changes, and a stale "clean" would let that deletion past the
 // guard and lose somebody's work. So `worktreeDirty` and every other path that decides whether to
 // refuse passes `fresh: true`, which skips the in-flight promise and the time-to-live and runs git.
 // `worktreeStatus.test.ts` holds the test that says so: a file written 100 ms ago still blocks a

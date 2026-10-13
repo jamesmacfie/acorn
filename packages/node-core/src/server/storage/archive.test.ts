@@ -4,8 +4,10 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -21,7 +23,7 @@ import { createTaskService } from '../core/tasks'
 import { registerCheckoutAdmission, type CheckoutAdmission } from '../core/checkoutAdmission'
 import { worktreeBranchDirName } from '../worktrees/pathGuards'
 import { archiveTask, restoreTask, runTeardownProcess, type ArchiveDeps } from './archive'
-import { computeTaskStatuses, setWorktreesRoot, taskRoot } from '../worktrees/taskWorktree'
+import { computeTaskStatuses, reconcileWorktrees, setWorktreesRoot, taskRoot } from '../worktrees/taskWorktree'
 
 // Real git subprocesses plus a teardown script per test: the 5s default is too tight under a fully
 // parallel run. Matches the other git-backed suites.
@@ -496,6 +498,45 @@ describe('archiveTask teardown ordering', () => {
     const [row] = await t.db.select().from(schema.tasks)
     expect(row.status).toBe('archived')
     expect(row.worktreePath).toBeNull()
+  })
+
+  // A rename rather than a delete in place, so a big folder can't run out of time half deleted.
+  it('sets the worktree aside, deletes it after archiving, and frees the branch', async () => {
+    expect(await archiveTask(t.db, 'task1', {}, deps())).toEqual({ ok: true })
+    expect(existsSync(worktree)).toBe(false)
+    await vi.waitFor(() => expect(readdirSync(dir).filter((name) => name.endsWith('-acorn-archive'))).toEqual([]))
+    git(checkout, 'worktree', 'add', '-q', worktree, 'feat/x')
+  })
+
+  it('puts the folder back when the task could not be marked archived', async () => {
+    const failing: ArchiveDeps = {
+      ...deps(),
+      dropTaskSessions: async () => {
+        throw new Error('sessions held')
+      },
+    }
+    await expect(archiveTask(t.db, 'task1', {}, failing)).rejects.toThrow('sessions held')
+    expect(git(worktree, 'branch', '--show-current').toString().trim()).toBe('feat/x')
+    expect(readdirSync(dir).filter((name) => name.endsWith('-acorn-archive'))).toEqual([])
+    expect((await t.db.select().from(schema.tasks))[0]?.status).toBe('active')
+  })
+
+  // The Node stopped between the rename and the database write, or after archiving but before the
+  // delete finished.
+  it("puts back an active task's set-aside folder at boot and deletes any other", async () => {
+    setWorktreesRoot(dir)
+    try {
+      const aside = `${worktree}-1-acorn-archive`
+      renameSync(worktree, aside)
+      const leftover = join(dir, 'archived-task-2-acorn-archive')
+      mkdirSync(join(leftover, 'node_modules'), { recursive: true })
+      await reconcileWorktrees(t.db)
+      expect(git(worktree, 'branch', '--show-current').toString().trim()).toBe('feat/x')
+      expect(existsSync(aside)).toBe(false)
+      await vi.waitFor(() => expect(existsSync(leftover)).toBe(false))
+    } finally {
+      setWorktreesRoot('')
+    }
   })
 
   describe('restoreTask', () => {

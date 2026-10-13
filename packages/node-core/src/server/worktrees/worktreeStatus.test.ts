@@ -11,7 +11,7 @@ import {
   worktreeGitText,
   worktreeStatus,
 } from './worktreeStatus'
-import { removeWorktree } from './worktrees'
+import { discardWorktree, setWorktreeAside } from './worktrees'
 
 // Real git subprocesses, because what is being counted is real git subprocesses.
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
@@ -146,7 +146,7 @@ describe('the coalesced worktree status read', () => {
   })
 
   // The one rule this file exists to protect (./worktreeStatus.ts § The one rule). A cached
-  // "clean" reaching `removeWorktree` would delete somebody's uncommitted work, so the guard reads
+  // "clean" reaching `setWorktreeAside` would delete somebody's uncommitted work, so the guard reads
   // fresh and this is the test that says it does.
   it('still refuses to remove a worktree whose only change was written 100 ms ago', async () => {
     // Warm the cache with the truth as it was: clean.
@@ -155,13 +155,17 @@ describe('the coalesced worktree status read', () => {
     writeFileSync(join(worktree, 'unsaved-work.txt'), 'a person typed this\n')
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    const refused = await removeWorktree(checkout, worktree)
+    const refused = await setWorktreeAside(worktree)
     expect(refused).toEqual({ ok: false, reason: 'Worktree has uncommitted changes. Confirm to discard.' })
     // And the read half is still coalesced: the refusal ran git rather than joining the warm entry.
     expect((await worktreeStatus(worktree, { fresh: true })).dirty).toBe(true)
 
     // Forced still goes through, which is the affordance the dialog offers.
-    expect(await removeWorktree(checkout, worktree, true)).toEqual({ ok: true, path: worktree })
+    expect(await setWorktreeAside(worktree, true)).toEqual({
+      ok: true,
+      aside: expect.stringMatching(/-acorn-archive$/),
+    })
+    expect(existsSync(worktree)).toBe(false)
   })
 
   // A task folder that lost its `.git` link, inside a worktrees folder that itself sits in a repository,
@@ -178,26 +182,29 @@ describe('the coalesced worktree status read', () => {
     expect((await worktreeStatus(worktree, { fresh: true })).branch).toBe('feat-x')
   })
 
-  // `git worktree remove` refuses a folder git no longer tracks, which would leave such a task impossible to archive.
+  // A folder git no longer tracks must still archive, and its branch must come free.
   it('removes a worktree folder whose .git link is gone and frees its branch', async () => {
     rmSync(join(worktree, '.git'))
     writeFileSync(join(worktree, 'leftover.txt'), 'copied config\n')
 
-    expect(await removeWorktree(checkout, worktree, false, dir)).toEqual({
+    expect(await setWorktreeAside(worktree, false, dir)).toEqual({
       ok: false,
       reason: 'The worktree folder is no longer linked to git. Confirm to delete it.',
     })
     expect(existsSync(worktree)).toBe(true)
 
-    expect(await removeWorktree(checkout, worktree, true, dir)).toEqual({ ok: true, path: worktree })
+    const res = await setWorktreeAside(worktree, true, dir)
+    expect(res).toEqual({ ok: true, aside: expect.stringMatching(/-acorn-archive$/) })
     expect(existsSync(worktree)).toBe(false)
+    await discardWorktree(checkout, res.ok ? res.aside : null)
     git(checkout, 'worktree', 'add', '-q', worktree, 'feat-x')
   })
 
   // Outside the managed worktrees folder the leftover belongs to the user, so only git's record goes.
   it('keeps an unlinked folder outside the worktrees folder', async () => {
     rmSync(join(worktree, '.git'))
-    expect(await removeWorktree(checkout, worktree, true, join(dir, 'managed'))).toEqual({ ok: true, path: worktree })
+    expect(await setWorktreeAside(worktree, true, join(dir, 'managed'))).toEqual({ ok: true, aside: null })
+    await discardWorktree(checkout, null)
     expect(existsSync(worktree)).toBe(true)
     expect(git(checkout, 'worktree', 'list')).not.toContain('feat-x')
   })

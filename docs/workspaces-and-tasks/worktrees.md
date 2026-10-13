@@ -128,7 +128,7 @@ The sweep also observes each task's HEAD. Only the newest observation for a task
 `head:changed`. The first observation seeds silently, and an unknown HEAD keeps the last good one.
 Four workers run the sweep's Git reads, and the client drives its clock.
 
-**The cache serves reads, not refusals.** `removeWorktree` refuses to delete a worktree with
+**The cache serves reads, not refusals.** `setWorktreeAside` refuses to remove a worktree with
 uncommitted changes unless forced, and a stale "clean" there would destroy work. So `worktreeDirty`
 passes `fresh: true`, and a failure is never cached as clean. A test in `worktreeStatus.test.ts`
 writes a file, waits 100 milliseconds, and expects the removal to be refused.
