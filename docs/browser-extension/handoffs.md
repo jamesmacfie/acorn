@@ -45,7 +45,9 @@ action on the extension's own UI, and a message from a page isn't one. In Firefo
 until the person opens the sidebar. A sidebar that is already open gets it at once.
 
 The sidebar also offers each handoff that matches the page beside it, as a button over the Node's
-project list. That is the same action for a site whose layout has no anchor, and for Firefox.
+project list. That is the same action for a site whose layout has no anchor, for a handoff that
+declares no anchors, such as Linear's, and for Firefox. The sidebar reads the page again when the tab
+finishes loading, so the offer goes when the tab moves to a page it may not read.
 
 ## The handoff card
 
@@ -90,6 +92,13 @@ page again and creates from that answer, so the browser never supplies a seed, a
 `ambiguous_mutation`, which the card offers to retry with the same key. The rules for linked tasks
 and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#what-the-host-does-with-the-answer).
 
+## Sites
+
+| Plugin | Pages | Button | Item |
+| --- | --- | --- | --- |
+| GitHub | Pull requests and their tabs | In the header | One per GitHub account that can see it ([GitHub](../github-integration/tasks-and-references.md#browser-handoff)) |
+| Linear | Issues, short and slug addresses | None, sidebar only | One per Linear connection in the page's workspace ([Linear](../integrations/linear.md#browser-handoff)) |
+
 ## Gaps
 
 - A resolve against GitHub's API wasn't checked in a browser: the session's Node had no GitHub
@@ -99,7 +108,14 @@ and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#w
   driver. Chrome's buttons were checked with the toolbar button's `activeTab`, and grants and removal
   in Firefox.
 
-The full results are in [phase 04](../future/extension/04-github-handoff.md#real-browser-results).
+- A Linear resolution against Linear's API wasn't checked in a browser. The session's Node had only a
+  fake Linear key, which Linear rejects, so the handoff showed Linear's "reconnect" answer. Unit tests
+  and the Node's parity tests cover a resolution, two workspaces with the same key, and the projects.
+- Linear has no in-page button, so there is no button to check. Its handoff is offered in the sidebar.
+- The sidebar's site list says "Buttons show on linear.app" after a grant, though Linear draws no
+  button. The grant still lets the sidebar read the page.
+The full results are in [phase 04](../future/extension/04-github-handoff.md#real-browser-results) and
+[phase 05](../future/extension/05-linear-handoff.md#real-browser-results).
 
 ## Why
 

@@ -64,7 +64,8 @@ export type LinearIssueDetail = LinearIssueSummary & {
   estimate?: number | null
   dueDate?: string | null
   branchName?: string | null
-  team?: { key: string; name: string } | null
+  // `id` is missing from a detail cached before the query asked for it; the next refresh fills it in.
+  team?: { id?: string; key: string; name: string } | null
   project?: { id: string; name: string } | null
   cycle?: { number: number; endsAt: string | null } | null
   attachments?: LinearAttachment[]

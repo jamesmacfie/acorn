@@ -177,8 +177,9 @@ broker reports it as unreachable. The host probes after a failed read to tell th
 - The real-browser results and their gaps are in
   [phase 01](./future/extension/01-native-pairing.md#real-browser-results),
   [phase 02](./future/extension/02-agent-conversation.md#real-browser-results),
-  [phase 03](./future/extension/03-page-capture.md#real-browser-results), and
-  [phase 04](./future/extension/04-github-handoff.md#real-browser-results).
+  [phase 03](./future/extension/03-page-capture.md#real-browser-results),
+  [phase 04](./future/extension/04-github-handoff.md#real-browser-results), and
+  [phase 05](./future/extension/05-linear-handoff.md#real-browser-results).
 
 ## Why
 

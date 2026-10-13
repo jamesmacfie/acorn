@@ -216,6 +216,16 @@ describe('a handoff in the sidebar', () => {
     expect(root.textContent).toContain('acme/widget#42')
   })
 
+  it('takes the offer back when the tab moves to a page it may not read', async () => {
+    const { fake, root } = mount({ url: PAGE })
+    await settle(30)
+    expect(button(root, 'Open in Acorn')).toBeDefined()
+    // Leaving the site a toolbar click granted: the browser reports the load, but no address.
+    fake.navigate(undefined)
+    await settle(20)
+    expect(button(root, 'Open in Acorn')).toBeUndefined()
+  })
+
   it('offers the handoff once a toolbar click lets it read the page', async () => {
     const { fake, root } = mount({ url: PAGE })
     fake.activeTab = { ...fake.activeTab, url: undefined }

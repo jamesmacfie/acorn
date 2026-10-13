@@ -17,8 +17,10 @@ export function SiteHandoffs(props: {
   const [pageUrl, setPageUrl] = createSignal<string | undefined>()
   const readTab = async () => setPageUrl((await props.api.tabs.query({ active: true, currentWindow: true }))[0]?.url)
   const onActivated = () => void readTab()
-  const onUpdated = (_tabId: number, change: { url?: string }) => {
-    if (change.url !== undefined) void readTab()
+  // A page this extension can't read reports no `url` when it navigates, as when the tab leaves the site
+  // a toolbar click granted, so a finished load is read too. Otherwise the offer stays on the old page.
+  const onUpdated = (_tabId: number, change: { url?: string; status?: string }) => {
+    if (change.url !== undefined || change.status === 'complete') void readTab()
   }
   // A grant or a removal changes what the sidebar may read, from here or from the browser's settings.
   const onAccess = () => {

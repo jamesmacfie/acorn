@@ -41,7 +41,9 @@ A compiled plugin declares the same descriptors on `NodePlugin.browserHandoffs`,
 Both tiers pass the same schema and the same route check, so the extension can't tell them apart.
 GitHub is the compiled example: its descriptor is in `plugins/github/src/node/index.ts`, and its route,
 loaded on first use, in `plugins/github/src/server/browserHandoff.ts`.
-`packages/node-core/src/server/plugins/__fixtures__/handoffPlugin.mjs` is a loaded one.
+Linear is the loaded example: its descriptor is in `plugins/linear/acorn-plugin.config.mjs` and its
+route in `plugins/linear/src/server/browserHandoff.ts`.
+`packages/node-core/src/server/plugins/__fixtures__/handoffPlugin.mjs` is a minimal loaded one.
 
 ## The resolve route
 
@@ -69,8 +71,21 @@ Answer with `{ items }`, at most 8, each with these fields:
 
 The whole answer must stay under 256 KiB. The host refuses an answer that doesn't parse, and the
 sidebar says the plugin answered with something it can't use. Answer an error the way other routes
-do, as `{ error: { code, message } }` with a 4xx status. The sidebar shows the message, so say what
-the person can do, such as connecting an account.
+do, as `{ error: { code, message } }` with an error status. The sidebar shows the message, so say what
+the person can do, such as connecting an account or trying again in a minute.
+
+Don't answer 401, even for a provider key that needs reconnecting. The host reads a 401 as the Node
+refusing the browser itself, and tells the person to pair again. Use 403 for a provider credential.
+
+A loaded plugin that registers a provider with a fetch route through `ctx.providers.integration`
+must serve `resolve` from that same router. The provider's router answers every path under
+`/v1/p/<pluginId>` over HTTP, so a separate `ctx.routes.fetch` mount is never reached from the
+browser. Linear's route is in its provider router for this reason.
+
+Ask every connection, not the first that answers, and check the page's own scope against the
+provider's answer. A key like `ENG-42` can exist in two workspaces, and only one of them is the page
+the person is looking at. Linear compares the workspace in the address with the workspace in
+Linear's own address for the issue.
 
 ## What the host does with the answer
 

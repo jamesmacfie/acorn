@@ -17,8 +17,6 @@ export function parseLinearRailItemId(value: string): LinearRailTarget | null {
 //
 // The `task` block asks less than rollbar's because an issue carries `branchName`, Linear's own
 // suggestion, so the row names the branch and the host's modal has nothing left to demand.
-// `origin: 'linear'` must stay: `ownsTaskOrigin` matches the exact plugin id, and changing it splits
-// one provider's task history in two.
 // `connection` is the name of the workspace the issue came from, and is passed only when the list
 // holds rows from more than one connected Linear. Two workspaces can both have an ENG-42, so without
 // it those rows read identically; with one connection it would be a column repeating itself.
@@ -42,6 +40,16 @@ const STATE_GLYPH: Record<string, string> = {
   canceled: 'circle-x',
 }
 
+// What a task promoted from an issue starts with, from the rail's +Task and from the browser
+// extension's handoff alike. Linear's own suggested branch, or the identifier when it has none.
+// `origin: 'linear'` must stay: `ownsTaskOrigin` matches the exact plugin id, and changing it splits
+// one provider's task history in two.
+export const linearTaskFields = (issue: { identifier: string; title: string; branchName?: string | null }) => ({
+  origin: 'linear',
+  title: `${issue.identifier} ${issue.title}`,
+  branch: issue.branchName || issue.identifier.toLowerCase(),
+})
+
 export function linearRailItem(issue: LinearProjectIssue, connection?: string): PluginRailItem {
   // The state glyph, the title, and the key. One column, because the host reserves a track per field
   // and a second one leaves the title a few letters in a 300-pixel list. The state's name would repeat
@@ -55,9 +63,7 @@ export function linearRailItem(issue: LinearProjectIssue, connection?: string): 
     // what lines up in columns; this is what identifies the row when there is room for nothing else.
     short: issue.identifier,
     task: {
-      origin: 'linear',
-      title: `${issue.identifier} ${issue.title}`,
-      branch: issue.branchName || issue.identifier.toLowerCase(),
+      ...linearTaskFields(issue),
       // The issue's description, already capped by the route (docs/workflows/starting-runs.md § Starting a run).
       // Nothing draws it; a workflow started from this row's menu puts it in its `issue` input.
       ...(issue.description ? { body: issue.description } : {}),

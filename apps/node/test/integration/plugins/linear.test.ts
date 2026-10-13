@@ -273,4 +273,72 @@ describe('Linear provider parity', () => {
     })
     expect(body.issues[0]).toMatchObject({ integrationId: 'linear-b', branchName: 'eng-42-project' })
   })
+
+  // The browser extension's issue button. Both workspaces have an ENG-42; only the page's workspace is
+  // the issue the person is looking at.
+  const handOff = (url: string) =>
+    app.fetch(
+      new Request('http://acorn.test/api/linear/browser/issue', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url, captures: { workspace: url.split('/')[3], identifier: 'ENG-42' } }),
+      }),
+      env(),
+    )
+
+  it('hands off the page workspace’s issue from a fresh read of every connection', async () => {
+    await cacheDetail('linear-b', 'Stale cached title')
+    vi.mocked(linearFetch).mockImplementation(async (secret) =>
+      graphQl({
+        issues: {
+          nodes: [
+            secret === 'token-b'
+              ? node('Globex login', {
+                  url: 'https://linear.app/globex/issue/ENG-42/globex-login',
+                  team: { id: 'team-g', key: 'ENG', name: 'Engineering' },
+                  project: { id: 'proj-g', name: 'Auth' },
+                })
+              : node('Acme login'),
+          ],
+        },
+      }),
+    )
+
+    const response = await handOff('https://linear.app/globex/issue/ENG-42/globex-login')
+
+    expect(response.status).toBe(200)
+    const { items } = (await response.json()) as { items: { title: string; connection: { id: string } }[] }
+    expect(items.map((item) => [item.connection.id, item.title])).toEqual([['linear-b', 'Globex login']])
+    expect(
+      vi
+        .mocked(linearFetch)
+        .mock.calls.map(([secret]) => secret)
+        .sort(),
+    ).toEqual(['token-a', 'token-b'])
+  })
+
+  it('asks for a reconnect rather than handing off a cached issue when the key needs it', async () => {
+    await cacheDetail('linear-b', 'Cached Workspace B', 1)
+    await t.db.update(schema.integrations).set({ status: 'needs-auth' }).where(eq(schema.integrations.id, 'linear-b'))
+    vi.mocked(linearFetch).mockImplementation(async () => graphQl({ issues: { nodes: [] } }))
+
+    const response = await handOff('https://linear.app/acme/issue/ENG-42')
+
+    expect(response.status).toBe(403)
+    expect(await response.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
+  })
+
+  it('says Linear is rate limiting when every workspace is refused that way', async () => {
+    vi.mocked(linearFetch).mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ errors: [{ message: 'Rate limited', extensions: { code: 'RATELIMITED' } }] }), {
+          status: 400,
+        }),
+    )
+
+    const response = await handOff('https://linear.app/acme/issue/ENG-42')
+
+    expect(response.status).toBe(429)
+    expect(await response.json()).toMatchObject({ error: { code: 'provider_rate_limited' } })
+  })
 })

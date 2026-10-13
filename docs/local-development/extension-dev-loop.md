@@ -94,6 +94,13 @@ declares one:
 - **GitHub.** The session's Node has no GitHub connection, and connecting one takes a person, so a
   pull request resolves only to "Connect GitHub". Its buttons, anchors, and client-side navigation can
   still be checked on any public pull request.
+- **Linear.** Linear ships as a loaded package, so the session's Node doesn't have it until you build
+  it into the Node's data root with
+  `ACORN_DATA_DIR=.acorn/extension-dev/<session>/node pnpm --filter @acorn/node build:plugin linear`
+  and start the session again with `--reuse`. Linear signed out keeps the issue address, so the
+  sidebar offers the handoff. With no connection the route asks you to connect Linear. A fake key,
+  sealed with the Node's `encryptSecret` and `session.key` into an `integrations` row, reaches Linear
+  and comes back as "reconnect". A real resolution needs a real key.
 - **The whole flow without a provider.** Install a loaded package with no client bundle into the
   session's Node with `POST /v1/core/plugins/install { "source": { "path": DIR } }` from a second paired
   device, then stop the session and start it with `--reuse`. Declare a page such as
