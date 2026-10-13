@@ -1,0 +1,57 @@
+{
+  "name": "streaming-replay",
+  "description": "Play one generated ACP reply in a visible desktop window and measure streaming, settled, and focused idle work.",
+  "stages": [
+    {
+      "name": "open",
+      "steps": [
+        { "click": { "target": { "role": "button", "name": "Streaming replay" } } },
+        { "click": { "target": { "role": "button", "name": "Agent" } } },
+        { "startSession": "replay" }
+      ]
+    },
+    {
+      "name": "streaming",
+      "steps": [
+        { "measure": { "phase": "streaming", "state": "start" } },
+        { "send": { "fixture": true } },
+        { "waitTurn": { "timeoutMs": 120000 } },
+        { "measure": { "phase": "streaming", "state": "stop" } }
+      ]
+    },
+    {
+      "name": "settled",
+      "steps": [
+        { "measure": { "phase": "settled", "state": "start" } },
+        { "pause": 3000 },
+        { "measure": { "phase": "settled", "state": "stop" } }
+      ]
+    },
+    {
+      "name": "idle-focused",
+      "steps": [
+        { "measure": { "phase": "idle-focused", "state": "start" } },
+        { "pause": 10000 },
+        { "measure": { "phase": "idle-focused", "state": "stop" } }
+      ]
+    },
+    {
+      "name": "idle-blurred",
+      "steps": [
+        { "windowState": "blurred" },
+        { "measure": { "phase": "idle-blurred", "state": "start" } },
+        { "pause": 10000 },
+        { "measure": { "phase": "idle-blurred", "state": "stop" } }
+      ]
+    },
+    {
+      "name": "hidden",
+      "steps": [
+        { "windowState": "hidden" },
+        { "measure": { "phase": "hidden", "state": "start" } },
+        { "pause": 10000 },
+        { "measure": { "phase": "hidden", "state": "stop" } }
+      ]
+    }
+  ]
+}

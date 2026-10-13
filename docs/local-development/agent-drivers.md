@@ -197,4 +197,4 @@ invariant with its numbers, and the `acorn:` spans on the performance timeline. 
 non-zero when an invariant fails, after the whole flow runs and the report is saved.
 
 Keep the window visible for the whole run. A covered window runs no animation frames, so the diff
-never draws. The runner checks `document.visibilityState` first and stops with that explanation.
+never draws. For a recorded ACP turn, follow [streaming replay](./streaming-replay.md).

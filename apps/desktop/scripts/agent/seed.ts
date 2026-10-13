@@ -4,6 +4,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join } from 'node:path'
 import { max } from 'drizzle-orm'
 import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
+import { TELEMETRY_PREF_KEY } from '@acorn/protocol/telemetry.ts'
 import {
   largeDiffFiles,
   largeDiffSummary,
@@ -42,20 +43,29 @@ const dataDir = args['--data-dir']
 const projectPath = args['--project']
 const fixture = args['--fixture']
 const workspaces = args['--workspaces']
+const telemetry = args['--telemetry']
 const profile = (args['--profile'] || 'small') as LargeSurfaceProfile
 const seed = Number(args['--seed'] || 1)
 if (!dataDir || !projectPath || !isAbsolute(dataDir) || !isAbsolute(projectPath)) {
   throw new Error(
-    'Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces|tui-navigation|delegation-checks|unattended-policy --profile small|scale|canonical --seed N]',
+    'Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces|tui-navigation|delegation-checks|unattended-policy|streaming-replay --profile small|scale|canonical --seed N]',
   )
 }
 if (
   fixture &&
-  !['large-surfaces', 'tui-navigation', 'delegation-checks', 'unattended-policy', 'command-restart'].includes(fixture)
+  ![
+    'large-surfaces',
+    'tui-navigation',
+    'delegation-checks',
+    'unattended-policy',
+    'command-restart',
+    'streaming-replay',
+  ].includes(fixture)
 )
   throw new Error(`Unknown fixture: ${fixture}`)
 if (workspaces !== undefined && workspaces !== 'on' && workspaces !== 'off')
   throw new Error('--workspaces must be on or off.')
+if (telemetry !== undefined && !['on', 'off'].includes(telemetry)) throw new Error('--telemetry must be on or off.')
 if (!['small', 'scale', 'canonical'].includes(profile) || !Number.isInteger(seed))
   throw new Error('Profile must be small, scale or canonical, and seed an integer.')
 
@@ -107,11 +117,15 @@ function writeRepository(root: string): void {
 
 const root = openDataRoot(dataDir)
 try {
-  if (fixture) writeRepository(projectPath)
+  if (fixture === 'streaming-replay') {
+    mkdirSync(projectPath, { recursive: true })
+    writeFileSync(join(projectPath, 'README.md'), '# Generated streaming replay project\n')
+  } else if (fixture) writeRepository(projectPath)
   const db = openDb(join(dataDir, 'core.sqlite'))
   try {
     const ownerId = activeIdentityStore(dataDir).get() ?? ''
     if (workspaces) writePreference(db, ownerId, WORKSPACES_PREF_KEY, workspaces)
+    if (telemetry) writePreference(db, ownerId, TELEMETRY_PREF_KEY, telemetry === 'on' ? '1' : '0')
     const result = await createProject(db, { path: projectPath }, ownerId)
     if (!result.ok) throw new Error(result.reason)
     if (!fixture) {
@@ -132,9 +146,11 @@ try {
               ? 'Review changed files'
               : fixture === 'delegation-checks'
                 ? 'Delegation check report'
-                : fixture === 'unattended-policy'
-                  ? 'Unattended request policy'
-                  : `Large surfaces (${profile})`,
+                : fixture === 'streaming-replay'
+                  ? 'Streaming replay'
+                  : fixture === 'unattended-policy'
+                    ? 'Unattended request policy'
+                    : `Large surfaces (${profile})`,
         icon: null,
         origin: 'local',
         projectId: result.project.id,
@@ -215,54 +231,57 @@ try {
         })
       }
 
-      const notes = [...largeDiffFiles(profile, seed)].flatMap((file) => file.notes)
-      const git = makeTestNodeContext({ plugin: { name: 'git' }, dataDir })
-      try {
-        await seedReviewNotes(git.storage.open(), taskId, notes)
-      } finally {
-        git.cleanup()
-      }
-
-      const agents = makeTestNodeContext({ plugin: { name: 'agents' }, dataDir })
-      let session: Awaited<ReturnType<typeof seedLargeSession>>
-      try {
-        if (fixture === 'command-restart') {
-          session = await seedCommandRestart(agents.storage.open(), agents.core, taskId)
-        } else if (fixture === 'unattended-policy') {
-          session = await seedUnattendedPolicy({
-            db: agents.storage.open(),
-            core: agents.core,
-            secrets: agents.env.SECRETS,
-            dataDir,
-            taskId,
-            taskRoot: projectPath,
-          })
-        } else if (fixture === 'delegation-checks') {
-          session = await seedDelegationCheckReport(agents.storage.open(), agents.core, taskId)
-        } else {
-          session = await seedLargeSession(agents.storage.open(), agents.core, { taskId, profile, seed })
+      let session: Awaited<ReturnType<typeof seedLargeSession>> | undefined
+      if (fixture !== 'streaming-replay') {
+        const notes = [...largeDiffFiles(profile, seed)].flatMap((file) => file.notes)
+        const git = makeTestNodeContext({ plugin: { name: 'git' }, dataDir })
+        try {
+          await seedReviewNotes(git.storage.open(), taskId, notes)
+        } finally {
+          git.cleanup()
         }
-      } finally {
-        agents.cleanup()
+
+        const agents = makeTestNodeContext({ plugin: { name: 'agents' }, dataDir })
+        try {
+          if (fixture === 'command-restart') {
+            session = await seedCommandRestart(agents.storage.open(), agents.core, taskId)
+          } else if (fixture === 'unattended-policy') {
+            session = await seedUnattendedPolicy({
+              db: agents.storage.open(),
+              core: agents.core,
+              secrets: agents.env.SECRETS,
+              dataDir,
+              taskId,
+              taskRoot: projectPath,
+            })
+          } else if (fixture === 'delegation-checks') {
+            session = await seedDelegationCheckReport(agents.storage.open(), agents.core, taskId)
+          } else {
+            session = await seedLargeSession(agents.storage.open(), agents.core, { taskId, profile, seed })
+          }
+        } finally {
+          agents.cleanup()
+        }
       }
 
-      const summary = largeDiffSummary(profile, seed)
+      const summary = fixture === 'streaming-replay' ? null : largeDiffSummary(profile, seed)
       process.stdout.write(
         `${JSON.stringify({
           fixture,
           profile,
           seed,
+          ...(telemetry ? { telemetry } : {}),
           projectId: result.project.id,
           taskId,
-          sessionId: session.session.id,
+          sessionId: session?.session.id,
           ...(otherTaskId ? { otherTaskId, otherWorkspaceTaskId } : {}),
-          files: summary.files,
-          fixedRows: summary.fixedRows,
-          threads: summary.threads,
-          notes: summary.notes,
-          digest: summary.digest,
-          turns: session.turns,
-          events: session.events,
+          files: summary?.files ?? 0,
+          fixedRows: summary?.fixedRows ?? 0,
+          threads: summary?.threads ?? 0,
+          notes: summary?.notes ?? 0,
+          digest: summary?.digest ?? '',
+          turns: session?.turns ?? 0,
+          events: session?.events ?? 0,
         })}\n`,
       )
     }

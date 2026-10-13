@@ -3,6 +3,9 @@
 This page explains how to time a cold start and a task switch on your own machine. Read it before you
 quote a startup number or chase a slow launch.
 
+For repeatable streaming and idle measurements in a real window, use
+[streaming replay](./streaming-replay.md).
+
 ## Timing a cold start
 
 Each of the four processes logs its own boot. Every line carries `+Nms` from that process's start and
@@ -191,4 +194,3 @@ Byte gauges are trace metrics. In **Explore → Metrics**, chart `max(app.bundle
 `method:walk`, grouped by `component` and `release`, for installed bytes. Use
 `app.startup.bytes` grouped by `startup.runtime` and `phase` for startup graphs. Filter on
 `installation:packaged` to leave out development builds.
-

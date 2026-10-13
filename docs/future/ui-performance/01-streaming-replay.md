@@ -1,6 +1,17 @@
 # Phase 01: streaming replay
 
-Status: planned, October 13, 2026.
+Completion note, October 13, 2026: The generated `prose`, `code`, and `tools` ACP fixtures, data-only
+replay harness, desktop flow actions, macOS process sampler, phase-local renderer histograms, and
+base/candidate/candidate/base command landed. A real desktop `tools` turn completed and matched its
+ledger digest. The renderer histogram probe also returned phase-local rows in a Vite-backed window.
+The A/B command takes two prepared renderer directories so it can reload one window without building
+inside the timed run. An agent-launched app always has a hidden window, so the visible-window
+baseline needs a person at the machine. The replay command correctly refused to measure that hidden
+window. The dated check is in
+[streaming replay check](../../testing/streaming-replay-2026-10-13.md). Later phases must collect the
+visible baseline for all fixtures and telemetry modes before claiming a performance change.
+
+Status: tooling landed; person-run baseline pending, October 13, 2026.
 
 Read the [programme page](./README.md) first. It holds the measuring rules every phase follows.
 

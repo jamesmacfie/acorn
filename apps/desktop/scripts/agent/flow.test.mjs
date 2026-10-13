@@ -17,6 +17,12 @@ describe('parsing a flow', () => {
     expect(flow.stages.map((stage) => stage.name)).toEqual(['task-roster', 'changes', 'agent', 'workspace-switch'])
   })
 
+  it('accepts the replay flow and keeps its actions data-only', async () => {
+    const flow = parseFlow(await readFile(join(import.meta.dirname, 'flows', 'streaming-replay.json'), 'utf8'))
+    expect(flow.stages.map((stage) => stage.name)).toEqual(['open', 'streaming', 'settled', 'idle-focused', 'idle-blurred', 'hidden'])
+    expect(() => parseFlow(stage([{ measure: { phase: 'streaming', state: 'eval()' } }, assertion]))).toThrow(/state/)
+  })
+
   it('rejects an action it does not know', () => {
     expect(() => parseFlow(stage([{ hover: { target: { name: 'x' } } }, assertion]))).toThrow(/unknown action "hover"/)
   })

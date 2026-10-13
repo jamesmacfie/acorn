@@ -83,6 +83,52 @@ export type ErrorInput = {
 
 type Histogram = { count: number; sum: number; min: number; max: number; samples: number[] }
 
+function addHistogramSample(histogram: Histogram, value: number): void {
+  histogram.count += 1
+  histogram.sum += value
+  histogram.min = Math.min(histogram.min, value)
+  histogram.max = Math.max(histogram.max, value)
+  if (histogram.samples.length < MAX_SAMPLES) histogram.samples.push(value)
+}
+
+function summarizeHistogram(histogram: Histogram) {
+  const sorted = [...histogram.samples].sort((a, b) => a - b)
+  const percentile = (fraction: number) =>
+    sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))]
+  return {
+    count: histogram.count,
+    sum: histogram.sum,
+    min: histogram.min,
+    max: histogram.max,
+    p50: percentile(0.5),
+    p95: percentile(0.95),
+  }
+}
+
+// The agent-automation driver asks for a phase-local copy. Production collection keeps its normal
+// flush lifetime; this copy exists only between the driver's start and stop events.
+let diagnosticHistograms: Map<
+  string,
+  { owner: string; seam: string; unit: string; attrs?: TelemetryAttrs; histogram: Histogram }
+> | null = null
+
+function diagnosticPhase(event: Event): void {
+  const action = (event as CustomEvent<'start' | 'stop'>).detail
+  if (action === 'start') {
+    diagnosticHistograms = new Map()
+  } else if (action === 'stop') {
+    const rows = [...(diagnosticHistograms ?? new Map()).values()].map(({ owner, seam, unit, attrs, histogram }) => ({
+      owner,
+      name: seam,
+      unit,
+      attrs,
+      ...summarizeHistogram(histogram),
+    }))
+    diagnosticHistograms = null
+    performance.mark('acorn:telemetry.phase', { detail: rows })
+  }
+}
+
 type EmitterState = {
   runtime: PostedTelemetryRuntime
   enabled: boolean
@@ -523,6 +569,17 @@ export const recordDuration = (owner: string, seam: string, ms: number, attrs?: 
 /** Workload values are samples, never labels: one series for every transcript size. */
 export function recordSample(owner: string, seam: string, ms: number, unit = '1', attrs?: TelemetryAttrs): void {
   if (!telemetryEnabled() || !Number.isFinite(ms) || ms < 0) return
+  const diagnostic = diagnosticHistograms
+  if (diagnostic)
+    safely(() => {
+      const key = telemetryHistogramKey(owner, seam, unit, attrs)
+      let slot = diagnostic.get(key)
+      if (!slot && diagnostic.size < MAX_SERIES) {
+        slot = { owner, seam, unit, attrs, histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] } }
+        diagnostic.set(key, slot)
+      }
+      if (slot) addHistogramSample(slot.histogram, ms)
+    })
   recordInteractionWork(state.trace?.spanId, seam)
   safely(() => {
     // Keyed by owner, seam and attributes together, which is the node's key for the node's reason: a
@@ -546,12 +603,7 @@ export function recordSample(owner: string, seam: string, ms: number, unit = '1'
       }
       state.histograms.set(key, slot)
     }
-    const h = slot.histogram
-    h.count += 1
-    h.sum += ms
-    h.min = Math.min(h.min, ms)
-    h.max = Math.max(h.max, ms)
-    if (h.samples.length < MAX_SAMPLES) h.samples.push(ms)
+    addHistogramSample(slot.histogram, ms)
   })
 }
 
@@ -610,16 +662,12 @@ function foldHistograms(): void {
   if (state.histograms.size === 0) return
   const at = Date.now()
   for (const slot of state.histograms.values()) {
-    const h = slot.histogram
-    const sorted = [...h.samples].sort((a, b) => a - b)
-    const percentile = (fraction: number) =>
-      sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))]
     state.queue.push({
       kind: 'metric',
       at,
       name: slot.seam,
       type: 'histogram',
-      value: { count: h.count, sum: h.sum, min: h.min, max: h.max, p50: percentile(0.5), p95: percentile(0.95) },
+      value: summarizeHistogram(slot.histogram),
       unit: slot.unit,
       attrs: cleanAttrs(slot.attrs, slot.owner),
     })
@@ -713,6 +761,8 @@ export type StartTelemetryOptions = {
 /** Called once from the client composition root, before anything renders. Collection still waits on
  *  `setTelemetryEnabled`, which the preference drives. */
 export function startClientTelemetry(options: StartTelemetryOptions): void {
+  if (options.runtime === 'renderer' && typeof window !== 'undefined')
+    window.addEventListener('acorn:telemetry-phase', diagnosticPhase)
   setWorkTelemetry((name, run, sizes) => {
     if (!telemetryEnabled()) return run()
     for (const [key, value] of Object.entries(sizes ?? {})) recordSample('core', `${name}.${key}`, value)
@@ -770,6 +820,8 @@ const surfaceSamples = (entry: SurfaceHealthEntry): [string, number, string][] =
 
 /** Test seam: forget the poster, the queue and the open trace. */
 export function _resetClientTelemetry(): void {
+  if (typeof window !== 'undefined') window.removeEventListener('acorn:telemetry-phase', diagnosticPhase)
+  diagnosticHistograms = null
   clearInteractionWork()
   setWorkTelemetry(null)
   activity = null

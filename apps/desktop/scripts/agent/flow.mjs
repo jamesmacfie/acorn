@@ -82,6 +82,30 @@ const ACTIONS = {
     if (typeof value.text !== 'string') fail(`${path}.text`, 'must be a string')
     if (value.optional !== undefined && typeof value.optional !== 'boolean') fail(`${path}.optional`, 'must be a boolean')
   },
+  send: (value, path) => {
+    onlyKeys(value, ['fixture'], path)
+    if (value.fixture !== true) fail(`${path}.fixture`, 'must be true')
+  },
+  startSession: (value, path) => {
+    if (value !== 'replay') fail(path, 'must be replay')
+  },
+  waitTurn: (value, path) => {
+    onlyKeys(value, ['timeoutMs'], path)
+    needNumber(value.timeoutMs, `${path}.timeoutMs`, 1, MAX_TIMEOUT_MS)
+  },
+  measure: (value, path) => {
+    onlyKeys(value, ['phase', 'state'], path)
+    needString(value.phase, `${path}.phase`)
+    if (!['start', 'stop'].includes(value.state)) fail(`${path}.state`, 'must be start or stop')
+  },
+  pause: (value, path) => needNumber(value, path, 1, MAX_TIMEOUT_MS),
+  switchSession: (value, path) => {
+    onlyKeys(value, ['target'], path)
+    checkTarget(value.target, `${path}.target`)
+  },
+  windowState: (value, path) => {
+    if (!['focused', 'blurred', 'hidden'].includes(value)) fail(path, 'must be focused, blurred, or hidden')
+  },
   wait: (value, path) => {
     onlyKeys(value, ['surface', 'until', 'timeoutMs'], path)
     needSurface(value.surface, `${path}.surface`)
@@ -164,7 +188,7 @@ export function parseFlow(text) {
     names.add(stage.name)
     checkSteps(stage.steps, `${at}.steps`, 0)
   })
-  if (!flow.stages.some((stage) => countAsserts(stage.steps) > 0)) fail('stages', 'must assert at least one invariant')
+  if (!flow.stages.some((stage) => countAsserts(stage.steps) > 0 || stage.steps.some((step) => 'waitTurn' in step))) fail('stages', 'must assert at least one invariant')
   return flow
 }
 
@@ -225,7 +249,7 @@ function waitMet(until, kind, now, previous) {
  * Drive `client` through a parsed flow. `client` is a WebDriverClient or anything with the same
  * methods, which is how the tests run this without a window.
  */
-export async function runFlow(client, flow, { fixture = null, log = () => {} } = {}) {
+export async function runFlow(client, flow, { fixture = null, log = () => {}, replay = null, sampler = null, windowState = null } = {}) {
   const started = Date.now()
   const report = {
     flow: flow.name,
@@ -250,6 +274,7 @@ export async function runFlow(client, flow, { fixture = null, log = () => {} } =
     throw new Error('The Acorn window is hidden (document.visibilityState is "hidden"), so WebKit runs no animation frames and nothing can be measured. Bring it to the front, keep it uncovered, and run the flow again.')
   }
   let lastAction = Date.now()
+  let measuring = null
 
   const run = async (steps, stage) => {
     for (const step of steps) {
@@ -264,6 +289,59 @@ export async function runFlow(client, flow, { fixture = null, log = () => {} } =
         if (action === 'click') await client.click(element)
         else await client.fill(element, value.text)
         lastAction = Date.now()
+      } else if (action === 'send') {
+        if (!replay) throw new Error('A send step needs a replay fixture.')
+        const prompt = await client.find({ role: 'textbox', name: 'Message agent' })
+        if (!prompt) throw new Error('The replay session has no message composer.')
+        await client.fill(prompt, `replay ${replay.name} ${replay.seed}`)
+        const button = await client.find({ role: 'button', name: 'Send' })
+        if (!button) throw new Error('The replay session has no Send button.')
+        await client.click(button)
+        lastAction = Date.now()
+      } else if (action === 'startSession') {
+        const card = (await client.snapshot()).elements.find((entry) =>
+          entry.role === 'button' && /Replay.*Start managed session/.test(entry.name))
+        let provider = card ? await client.resolveElement(card.ref) : null
+        if (!provider) {
+          const menu = await client.find({ role: 'button', name: 'New session' })
+          if (!menu) throw new Error('The Agent pane has no New session control.')
+          await client.click(menu)
+          provider = await client.find({ role: 'option', nameStartsWith: 'Replay' })
+            ?? await client.find({ role: 'button', nameStartsWith: 'Replay' })
+        }
+        if (!provider) throw new Error('The replay harness is not available in the Agent pane.')
+        await client.click(provider)
+        const deadline = Date.now() + 30_000
+        while (!(await client.find({ role: 'textbox', name: 'Message agent' }))) {
+          if (Date.now() > deadline) throw new Error('The replay session did not open its composer within 30 seconds.')
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        }
+        lastAction = Date.now()
+      } else if (action === 'waitTurn') {
+        if (!replay) throw new Error('A waitTurn step needs a replay fixture.')
+        const result = await replay.state.waitTurn(replay.name, replay.seed, value.timeoutMs)
+        stage.checkpoints.push({ name: 'turn-completed', atMs: Date.now() - started, ...result })
+        report.asserts.push({ stage: stage.name, surface: 'replay', invariant: 'digest', pass: true, detail: result })
+      } else if (action === 'measure') {
+        if (!sampler) throw new Error('A measure step needs a resource sampler.')
+        if (value.state === 'start') {
+          if (measuring) throw new Error(`Phase ${measuring.phase} is still measuring.`)
+          measuring = { phase: value.phase, stop: await sampler.start(value.phase) }
+        } else {
+          if (measuring?.phase !== value.phase) throw new Error(`Phase ${value.phase} was not started.`)
+          stage.measurement = await measuring.stop()
+          measuring = null
+        }
+      } else if (action === 'pause') {
+        await new Promise((resolve) => setTimeout(resolve, value))
+      } else if (action === 'switchSession') {
+        const element = await client.find(value.target)
+        if (!element) throw new Error(`Stage "${stage.name}": no session ${JSON.stringify(value.target)}.`)
+        await client.click(element)
+        lastAction = Date.now()
+      } else if (action === 'windowState') {
+        if (!windowState) throw new Error('A windowState step needs window control.')
+        stage.window = await windowState(value)
       } else if (action === 'wait') {
         const deadline = Date.now() + value.timeoutMs
         let previous = null
@@ -323,12 +401,20 @@ export async function runFlow(client, flow, { fixture = null, log = () => {} } =
     }
   }
 
-  for (const definition of flow.stages) {
-    const stage = { name: definition.name, startedMs: Date.now() - started, waits: [], checkpoints: [], skipped: [] }
-    report.stages.push(stage)
-    log(`stage ${definition.name}`)
-    await run(definition.steps, stage)
-    stage.durationMs = Date.now() - started - stage.startedMs
+  try {
+    for (const definition of flow.stages) {
+      const stage = { name: definition.name, startedMs: Date.now() - started, waits: [], checkpoints: [], skipped: [] }
+      report.stages.push(stage)
+      log(`stage ${definition.name}`)
+      await run(definition.steps, stage)
+      stage.durationMs = Date.now() - started - stage.startedMs
+    }
+  } catch (error) {
+    report.durationMs = Date.now() - started
+    report.failed = report.asserts.filter((entry) => !entry.pass).length + 1
+    report.error = error instanceof Error ? error.message : String(error)
+    if (error instanceof Error) error.flowReport = report
+    throw error
   }
   report.durationMs = Date.now() - started
   report.failed = report.asserts.filter((entry) => !entry.pass).length
@@ -338,14 +424,15 @@ export async function runFlow(client, flow, { fixture = null, log = () => {} } =
 
 /** A few lines a person can read: each stage's waits, then every invariant that failed. */
 export function summarizeReport(report) {
-  const lines = [`${report.flow}: ${report.stages.length} stages in ${Math.round(report.durationMs / 1000)}s, ${report.asserts.length - report.failed} of ${report.asserts.length} invariants held.`]
+  const lines = [`${report.flow}: ${report.stages.length} stages in ${Math.round(report.durationMs / 1000)}s, ${Math.max(0, report.asserts.length - report.failed)} of ${report.asserts.length} invariants held.`]
   if (report.fixture) lines.push(`Fixture ${report.fixture.name} ${report.fixture.profile} seed ${report.fixture.seed}: ${report.fixture.files} files, ${report.fixture.fixedRows} rows, ${report.fixture.events} events.`)
   for (const stage of report.stages) {
     const waits = stage.waits.map((wait) => wait.text ? `text ${JSON.stringify(wait.text)} ${wait.ms}ms` : `${wait.surface} ${wait.until} ${wait.ms}ms`).join(', ')
-    lines.push(`  ${stage.name} (${Math.round(stage.durationMs)}ms)${waits ? `: ${waits}` : ''}${stage.skipped.length ? `; skipped ${stage.skipped.join(', ')}` : ''}`)
+    lines.push(`  ${stage.name} (${Math.round(stage.durationMs ?? report.durationMs - stage.startedMs)}ms)${waits ? `: ${waits}` : ''}${stage.skipped.length ? `; skipped ${stage.skipped.join(', ')}` : ''}`)
   }
   for (const entry of report.asserts.filter((item) => !item.pass)) {
     lines.push(`  FAILED ${entry.stage}${entry.at ? ` at ${entry.at}` : ''}: ${entry.surface} ${entry.invariant} ${JSON.stringify(entry.detail)}`)
   }
+  if (report.error) lines.push(`  FAILED ${report.error}`)
   return lines.join('\n')
 }

@@ -134,6 +134,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | --- | --- |
 | [local-development.md](./local-development.md) | Getting the app running, the dev loops, the environment, and the database commands. |
 | [local-development/agent-drivers.md](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client, native control, and the large-surface flow. |
+| [local-development/streaming-replay.md](./local-development/streaming-replay.md) | Generated ACP replies, per-process desktop sampling, and alternating renderer comparisons. |
 | [local-development/profiling.md](./local-development/profiling.md) | Timing a cold start and a task switch. |
 | [local-development/packaged-stacks.md](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
 | [local-development/formatting.md](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, the `git blame` ignore file, and carrying a branch across a formatting commit. |
@@ -162,6 +163,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/agents-and-providers.md](./testing/agents-and-providers.md) | Onboarding, model generation, delegation, and harness checks. |
 | [testing/rail-and-annotations.md](./testing/rail-and-annotations.md) | Rail layout, task marker, and appearance checks with dated results. |
 | [testing/performance-baseline-2026-10-09.md](./testing/performance-baseline-2026-10-09.md) | Dated startup timings, startup graph bytes, and installed bytes taken before the October 2026 startup and size work. |
+| [testing/streaming-replay-2026-10-13.md](./testing/streaming-replay-2026-10-13.md) | Dated ACP replay check and the missing visible-window baseline. |
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by the October 2026 runtime packaging work. |
 | [testing/production-minification-2026-10-09.md](./testing/production-minification-2026-10-09.md) | Dated startup graph bytes, installed bytes, and boot timings from minifying the Node service and loaded plugins. |
 | [testing/selective-renderer-loading-2026-10-09.md](./testing/selective-renderer-loading-2026-10-09.md) | Dated renderer and terminal startup graph bytes, roster bytes, and real-app checks from loading renderer implementations on first use. |

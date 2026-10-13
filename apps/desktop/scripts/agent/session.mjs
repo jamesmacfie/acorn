@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { createWriteStream } from 'node:fs'
-import { mkdir, stat } from 'node:fs/promises'
+import { copyFile, mkdir, stat, writeFile } from 'node:fs/promises'
 import { createServer as createNetServer } from 'node:net'
 import { join } from 'node:path'
 import { createServer as createViteServer } from 'vite'
@@ -75,6 +75,17 @@ async function exists(path) {
   }
 }
 
+async function installReplayHarness(dataDir) {
+  const target = join(dataDir, 'plugins', 'streaming-replay')
+  await mkdir(target, { recursive: true, mode: 0o700 })
+  await Promise.all(['replay-agent.mjs', 'replay-fixtures.mjs'].map((name) =>
+    copyFile(join(import.meta.dirname, name), join(target, name))))
+  await writeFile(join(target, 'acorn-plugin.json'), JSON.stringify({
+    id: 'streaming-replay', name: 'Streaming replay', version: '1.0.0', baseline: 'acorn-1', apiVersion: '5',
+    contributions: { harnesses: [{ id: 'replay', label: 'Replay', spawn: { entry: './replay-agent.mjs' } }] },
+  }))
+}
+
 function tee(child, log) {
   child.stdout?.on('data', (chunk) => {
     log.write(chunk)
@@ -139,14 +150,18 @@ async function main() {
       if (!project.isDirectory()) throw new Error(`Project path is not a directory: ${options.project}`)
     }
 
-    console.log(`[agent-dev:${name}] staging desktop assets`)
-    await run(pnpm, ['run', 'stage'], desktopRoot)
-    await run(pnpm, ['run', 'build:renderer'], desktopRoot)
-    console.log(`[agent-dev:${name}] building the automation-only debug binary`)
-    await run(cargo, ['build', '--manifest-path', join(desktopRoot, 'src-tauri', 'Cargo.toml'), '--features', 'agent-automation'], repoRoot)
+    if (!options.prepared) {
+      console.log(`[agent-dev:${name}] staging desktop assets`)
+      await run(pnpm, ['run', 'stage'], desktopRoot)
+      await run(pnpm, ['run', 'build:renderer'], desktopRoot)
+      console.log(`[agent-dev:${name}] building the automation-only debug binary`)
+      await run(cargo, ['build', '--manifest-path', join(desktopRoot, 'src-tauri', 'Cargo.toml'), '--features', 'agent-automation'], repoRoot)
+    }
 
     if (options.fixture && options.reuse && previous?.fixture) {
       // A reused session keeps the fixture it was generated with, data and repository both.
+      if (options.fixture === 'streaming-replay' && options.telemetry && previous.fixture.telemetry !== options.telemetry)
+        throw new Error('This session was seeded with a different --telemetry mode. Choose a new session name.')
       fixture = previous.fixture
       options.project = fixture.project
     } else if (options.fixture) {
@@ -156,6 +171,7 @@ async function main() {
       console.log(`[agent-dev:${name}] generating the ${options.fixture} fixture (${options.profile}, seed ${options.seed})`)
       const out = await capture(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', project,
         '--fixture', options.fixture, '--profile', options.profile, '--seed', String(options.seed),
+        ...(options.telemetry ? ['--telemetry', options.telemetry] : []),
         ...(options.workspaces ? ['--workspaces', options.workspaces] : [])], desktopRoot)
       const seeded = JSON.parse(out.trim().split('\n').at(-1))
       fixture = { name: options.fixture, project, ...seeded }
@@ -166,6 +182,8 @@ async function main() {
       await run(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', options.project,
         ...(options.workspaces ? ['--workspaces', options.workspaces] : [])], desktopRoot)
     }
+
+    if (options.fixture === 'streaming-replay') await installReplayHarness(dataDir)
 
     let viteUrl = null
     if (options.vite) {

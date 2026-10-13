@@ -1,9 +1,11 @@
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { cp, readFile, rename, rm, stat } from 'node:fs/promises'
+import { isAbsolute, join, resolve } from 'node:path'
 import { parseFlow, runFlow, summarizeReport } from './flow.mjs'
 import { renderPlace, renderSnapshot, WebDriverClient } from './webdriver.mjs'
-import { activeManifests, readJson, refsPath, resolveManifest, writePrivateJson } from './state.mjs'
+import { activeManifests, desktopRoot, readJson, refsPath, resolveManifest, writePrivateJson } from './state.mjs'
 import { nativeTarget, requireSessionApp } from './nativeApp.mjs'
+import { createReplayState } from './replay-state.mjs'
+import { createResourceSampler, setReplayWindowState } from './replay-resources.mjs'
 
 function parseArgs(argv) {
   let session = null
@@ -14,7 +16,7 @@ function parseArgs(argv) {
     else rest.push(argv[index])
   }
   const [command, ...args] = rest
-  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|link|flow|status|target|stop')
+  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|link|flow|replay|replay-ab|status|target|stop')
   return { session, command, args }
 }
 
@@ -25,6 +27,57 @@ async function refFor(manifest, ref) {
   }
   if (!saved.refs?.includes(ref)) throw new Error(`Unknown element reference: ${ref}. Run snapshot again.`)
   return ref
+}
+
+async function replayReport(client, manifest, name) {
+  const flow = parseFlow(await readFile(join(import.meta.dirname, 'flows', 'streaming-replay.json'), 'utf8'))
+  const sampler = await createResourceSampler(client, manifest.appPid)
+  let state = null
+  let originalSize = null
+  try {
+    state = createReplayState(manifest.dataDir)
+    originalSize = await client.environment()
+    const report = await runFlow(client, flow, {
+      fixture: manifest.fixture,
+      replay: { name, seed: manifest.fixture.seed, state },
+      sampler,
+      windowState: (state) => setReplayWindowState(client, manifest.nativeApp.appPath, state),
+      log: (line) => console.log(line),
+    })
+    report.replay = { name, seed: manifest.fixture.seed, telemetry: manifest.fixture.telemetry ?? 'off' }
+    return report
+  } catch (error) {
+    if (error.flowReport) error.flowReport.replay = { name, seed: manifest.fixture.seed, telemetry: manifest.fixture.telemetry ?? 'off' }
+    throw error
+  } finally {
+    if (originalSize) {
+      await setReplayWindowState(client, manifest.nativeApp.appPath, 'focused').catch(() => {})
+      await client.setWindowSize(originalSize.width, originalSize.height).catch(() => {})
+    }
+    state?.close()
+    await sampler.close()
+  }
+}
+
+async function saveReplayReport(manifest, report, suffix = '') {
+  const stamp = report.startedAt.replace(/[:.]/g, '-')
+  const base = join(manifest.directory, 'reports', `streaming-replay-${report.replay.name}${suffix}-${stamp}`)
+  await writePrivateJson(`${base}.json`, report)
+  console.log(summarizeReport(report))
+  console.log(`Report: ${base}.json`)
+  if (report.failed) process.exitCode = 1
+}
+
+async function stageRenderer(source, destination) {
+  if (resolve(source) === resolve(destination)) throw new Error('The staged build cannot be the active renderer directory.')
+  if (!isAbsolute(source) || !(await stat(join(source, 'index.html')).catch(() => null))?.isFile()) {
+    throw new Error(`Renderer build must be an absolute directory containing index.html: ${source}`)
+  }
+  const staged = `${destination}.replay-staging`
+  await rm(staged, { recursive: true, force: true })
+  await cp(source, staged, { recursive: true })
+  await rm(destination, { recursive: true, force: true })
+  await rename(staged, destination)
 }
 
 async function main() {
@@ -109,6 +162,63 @@ async function main() {
     console.log(summarizeReport(report))
     console.log(`Report: ${base}.json`)
     if (report.failed) process.exitCode = 1
+    return
+  }
+  if (command === 'replay') {
+    if (manifest.fixture?.name !== 'streaming-replay') throw new Error('Start the session with --fixture streaming-replay.')
+    if (args.length !== 1 || !['prose', 'code', 'tools'].includes(args[0])) throw new Error('Usage: replay prose|code|tools')
+    try {
+      await saveReplayReport(manifest, await replayReport(client, manifest, args[0]))
+    } catch (error) {
+      if (error.flowReport) await saveReplayReport(manifest, error.flowReport)
+      throw error
+    }
+    return
+  }
+  if (command === 'replay-ab') {
+    if (manifest.fixture?.name !== 'streaming-replay') throw new Error('Start the session with --fixture streaming-replay.')
+    const flags = Object.fromEntries(args.reduce((pairs, value, index) => {
+      if (index % 2 === 0) pairs.push([value, args[index + 1]])
+      return pairs
+    }, []))
+    if (args.length !== 6 || !['prose', 'code', 'tools'].includes(flags['--fixture'])) {
+      throw new Error('Usage: replay-ab --base ABSOLUTE_DIR --candidate ABSOLUTE_DIR --fixture prose|code|tools')
+    }
+    const destination = join(desktopRoot, 'dist', 'client')
+    const backup = join(manifest.directory, 'renderer-before-replay-ab')
+    await cp(destination, backup, { recursive: true })
+    const runs = []
+    try {
+      for (const [index, label] of ['base', 'candidate', 'candidate', 'base'].entries()) {
+        await stageRenderer(flags[`--${label}`], destination)
+        await client.refresh()
+        const report = await replayReport(client, manifest, flags['--fixture'])
+        report.build = label
+        runs.push(report)
+        await saveReplayReport(manifest, report, `-${label}-${index + 1}`)
+      }
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      const path = join(manifest.directory, 'reports', `streaming-replay-ab-${stamp}.json`)
+      const spread = Object.fromEntries(['base', 'candidate'].map((label) => {
+        const cpu = runs.filter((report) => report.build === label)
+          .map((report) => report.stages.find((stage) => stage.name === 'streaming')?.measurement?.processes?.renderer?.cpuMs)
+        const percent = cpu.every((value) => typeof value === 'number') && cpu[0] + cpu[1] > 0
+          ? Math.abs(cpu[0] - cpu[1]) / ((cpu[0] + cpu[1]) / 2) * 100
+          : null
+        return [label, { rendererCpuMs: cpu, percent }]
+      }))
+      const noisy = Object.entries(spread).filter(([, value]) => value.percent === null || value.percent > 10)
+      await writePrivateJson(path, { order: ['base', 'candidate', 'candidate', 'base'], spread, noisy: noisy.map(([label]) => label), runs })
+      console.log(`A/B report: ${path}`)
+      if (noisy.length) {
+        console.error(`Streaming renderer CPU spread exceeds 10% or is missing for ${noisy.map(([label]) => label).join(', ')}. Find the noise source before using this comparison.`)
+        process.exitCode = 1
+      }
+    } finally {
+      await stageRenderer(backup, destination)
+      await rm(backup, { recursive: true, force: true })
+      await client.refresh().catch(() => {})
+    }
     return
   }
   throw new Error(`Unknown command: ${command}`)

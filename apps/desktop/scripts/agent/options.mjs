@@ -1,11 +1,11 @@
 import { resolve } from 'node:path'
 import { repoRoot, validateSessionName } from './state.mjs'
 
-const FIXTURES = ['large-surfaces', 'tui-navigation', 'delegation-checks', 'unattended-policy', 'command-restart']
+const FIXTURES = ['large-surfaces', 'tui-navigation', 'delegation-checks', 'unattended-policy', 'command-restart', 'streaming-replay']
 const PROFILES = ['small', 'scale', 'canonical']
 
 export function parseAgentSessionOptions(argv) {
-  const options = { session: null, project: repoRoot, onboarding: false, reuse: false, smoke: false, vite: false, fixture: null, profile: 'small', seed: 1, workspaces: null }
+  const options = { session: null, project: repoRoot, onboarding: false, reuse: false, smoke: false, vite: false, prepared: false, fixture: null, profile: 'small', seed: 1, workspaces: null, telemetry: null }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--') continue
@@ -15,15 +15,19 @@ export function parseAgentSessionOptions(argv) {
     else if (arg === '--reuse') options.reuse = true
     else if (arg === '--smoke') options.smoke = true
     else if (arg === '--vite') options.vite = true
+    else if (arg === '--prepared') options.prepared = true
     else if (arg === '--fixture') options.fixture = argv[++index] ?? ''
     else if (arg === '--profile') options.profile = argv[++index] ?? ''
     else if (arg === '--seed') options.seed = Number(argv[++index])
     else if (arg === '--workspaces') options.workspaces = argv[++index] ?? ''
+    else if (arg === '--telemetry') options.telemetry = argv[++index] ?? ''
     else throw new Error(`Unknown option: ${arg}`)
   }
   if (options.smoke) options.onboarding = true
   if (options.onboarding && argv.includes('--project')) throw new Error('Use either --onboarding or --project, not both.')
   if (options.workspaces !== null && !['on', 'off'].includes(options.workspaces)) throw new Error('--workspaces must be on or off.')
+  if (options.telemetry !== null && !['on', 'off'].includes(options.telemetry)) throw new Error('--telemetry must be on or off.')
+  if (options.telemetry !== null && options.fixture !== 'streaming-replay') throw new Error('--telemetry is only for --fixture streaming-replay.')
   if (options.onboarding && options.workspaces) throw new Error('--workspaces cannot be used with --onboarding.')
   if (options.fixture !== null) {
     if (!FIXTURES.includes(options.fixture)) throw new Error(`Unknown fixture: ${options.fixture}. Known: ${FIXTURES.join(', ')}.`)

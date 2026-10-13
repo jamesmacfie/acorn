@@ -152,7 +152,13 @@ function readPerformanceEntries(prefix) {
 
 /** The page's engine and viewport, for the report's environment block. */
 function readEnvironment() {
-  return { userAgent: navigator.userAgent, visibility: document.visibilityState, width: innerWidth, height: innerHeight, devicePixelRatio }
+  return { userAgent: navigator.userAgent, visibility: document.visibilityState, focused: document.hasFocus(), width: innerWidth, height: innerHeight, devicePixelRatio }
+}
+
+function telemetryPhase(action) {
+  dispatchEvent(new CustomEvent('acorn:telemetry-phase', { detail: action }))
+  if (action === 'start') return null
+  return performance.getEntriesByName('acorn:telemetry.phase').at(-1)?.detail ?? []
 }
 
 export class WebDriverClient {
@@ -250,6 +256,17 @@ export class WebDriverClient {
     return this.execute(`return (${readEnvironment.toString()})()`)
   }
 
+  telemetryPhase(action) {
+    return this.execute(`return (${telemetryPhase.toString()})(arguments[0])`, [action])
+  }
+
+  rendererProcesses() {
+    return this.request('POST', this.sessionPath('/execute/async'), {
+      script: 'const done = arguments[arguments.length - 1]; window.__TAURI_INTERNALS__.invoke("webview_diagnostics").then(done, (error) => done({ error: String(error) }))',
+      args: [],
+    })
+  }
+
   /** Resolve after `count` animation frames in the page. Frames, not a sleep: the runner waits on
    *  the renderer having had the chance to lay out and paint, which a fixed delay only guesses at. */
   frames(count = 2) {
@@ -261,6 +278,18 @@ export class WebDriverClient {
 
   setWindowSize(width, height) {
     return this.request('POST', this.sessionPath('/window/rect'), { width, height })
+  }
+
+  refresh() {
+    return this.request('POST', this.sessionPath('/refresh'), {})
+  }
+
+  minimize() {
+    return this.request('POST', this.sessionPath('/window/minimize'), {})
+  }
+
+  maximize() {
+    return this.request('POST', this.sessionPath('/window/maximize'), {})
   }
 
   /** The first visible control with this role and name, resolved for an action, or null. */

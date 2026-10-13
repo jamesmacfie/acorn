@@ -37,6 +37,24 @@ beforeEach(() => {
 afterEach(() => {
   _resetClientTelemetry()
   vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
+
+it('reports phase-local work histograms even when normal telemetry flushes', async () => {
+  const target = new EventTarget()
+  vi.stubGlobal('window', target)
+  start()
+  setTelemetryEnabled(true)
+  target.dispatchEvent(new CustomEvent('acorn:telemetry-phase', { detail: 'start' }))
+  recordDuration('core', 'markdown.parse', 2)
+  await flushTelemetry()
+  recordDuration('core', 'markdown.parse', 4)
+  target.dispatchEvent(new CustomEvent('acorn:telemetry-phase', { detail: 'stop' }))
+  const rows = (performance.getEntriesByName('acorn:telemetry.phase') as PerformanceMark[]).at(-1)?.detail
+  expect(rows).toEqual([
+    { owner: 'core', name: 'markdown.parse', unit: 'ms', count: 2, sum: 6, min: 2, max: 4, p50: 4, p95: 4 },
+  ])
+  performance.clearMarks('acorn:telemetry.phase')
 })
 
 describe('with the switch off', () => {
