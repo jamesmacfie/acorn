@@ -30,6 +30,8 @@ export function Workspace(props: {
   storage: BrowserApi['storage']['local']
   nodeId: string
   online: boolean
+  // Whether Open in Acorn may open the desktop app, or copies its link.
+  opensLinks: boolean
   hint: BridgeAgentHint | null
   reconnects: number
   projectChanges: number
@@ -182,6 +184,30 @@ export function Workspace(props: {
     })
   }
 
+  // Start task made a task and a conversation in it. The draft is stored before the conversation
+  // opens, so its composer shows the message and the item, waiting for the person to send them.
+  async function startedHandoffTask(
+    projectId: string,
+    taskId: string,
+    sessionId: string,
+    draft: { text: string; capture: PageCapture },
+  ) {
+    props.dismissHandoff()
+    try {
+      await changeDraft(props.storage, { nodeId, taskId, sessionId }, (stored) => ({
+        ...stored,
+        text: stored.text || draft.text,
+        captures: withCapture(stored.captures ?? [], draft.capture),
+      }))
+    } catch {
+      setProblem('Browser storage is full, so the item was not added to the draft.')
+    }
+    void restore(projectId, taskId, (list) => {
+      if (list.some((session) => session.id === sessionId)) showSession(sessionId)
+      remember()
+    })
+  }
+
   const chooseHandoffTask = (capture: PageCapture) => {
     props.setWaitingContext(capture)
     props.dismissHandoff()
@@ -321,6 +347,7 @@ export function Workspace(props: {
               client={props.client}
               nodeId={nodeId}
               online={props.online}
+              opensLinks={props.opensLinks}
               pageUrl={props.pageUrl}
               handoffs={props.handoffs}
               handoff={props.handoff}
@@ -328,6 +355,7 @@ export function Workspace(props: {
               dismissHandoff={props.dismissHandoff}
               openHandoffTask={openHandoffTask}
               chooseHandoffTask={chooseHandoffTask}
+              startedHandoffTask={(...args) => void startedHandoffTask(...args)}
               waitingContext={props.waitingContext}
               dropWaitingContext={() => props.setWaitingContext(null)}
               projects={projects()}
@@ -377,6 +405,7 @@ export function Workspace(props: {
             taskTitle={task()?.title ?? ''}
             back={back}
             online={props.online}
+            opensLinks={props.opensLinks}
             hint={props.hint}
             reconnects={props.reconnects}
             capture={props.capture}

@@ -1,4 +1,5 @@
 import { render } from 'solid-js/web'
+import { BROWSER_BRIDGE_HOST } from '@acorn/protocol/extensionBridge.ts'
 import { browserApi } from '../browser'
 import { App } from './App'
 import { followAppearance } from './appearance'
@@ -14,4 +15,7 @@ import './sidebar.css'
 const api = browserApi()
 // The stored theme applies before the first paint, so a chosen dark theme doesn't flash light.
 await followAppearance(api, document.documentElement)
-render(() => <App api={api} />, document.getElementById('root')!)
+// Only a release desktop registers `acorn://`. A build for the development bridge runs beside a
+// development desktop, so it copies Acorn links instead of opening them.
+const opensLinks = __ACORN_NATIVE_HOST__ === BROWSER_BRIDGE_HOST
+render(() => <App api={api} opensLinks={opensLinks} />, document.getElementById('root')!)

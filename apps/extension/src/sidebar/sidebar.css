@@ -131,7 +131,8 @@ h2, h3 {
 .dot[data-tone='bad'] { background: var(--state-bad); border-color: var(--state-bad); }
 
 /* ── Controls: 32 px buttons, inputs on the same rung ───────────────────────────────────────── */
-button {
+/* An `acorn://` link is an anchor, so the browser hands it to the desktop app, drawn as a button. */
+button, a.button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -147,11 +148,12 @@ button {
   cursor: pointer;
   transition: var(--transition-color);
 }
+a.button { text-decoration: none; white-space: nowrap; }
 button:disabled { opacity: 0.5; cursor: default; }
-button.quiet { color: var(--text); background: var(--bg); border: var(--control-border); }
-button.quiet:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
-button.link { min-height: 0; padding: 0; background: transparent; border: 0; color: var(--text-muted); }
-button.link:hover:not(:disabled) { color: var(--text); }
+:is(button, a.button).quiet { color: var(--text); background: var(--bg); border: var(--control-border); }
+:is(button, a.button).quiet:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
+:is(button, a.button).link { min-height: 0; padding: 0; background: transparent; border: 0; color: var(--text-muted); }
+:is(button, a.button).link:hover:not(:disabled) { color: var(--text); }
 button.icon { width: var(--control-h); padding: 0; background: transparent; color: var(--text); border-color: transparent; font-size: var(--fs-lg); }
 button.icon:hover:not(:disabled) { background: var(--bg-hover); }
 button.icon[aria-pressed='true'] { background: var(--bg-selected); }

@@ -99,7 +99,8 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
 - `draft:<nodeId>:<taskId>:<sessionId>`: the unsent text, and an unconfirmed send's
   `{ key, text, captures }`, where `captures` lists the IDs of the captures it carried. A draft
   survives closing the sidebar, a reconnect, and switching away. It's removed when the Node accepts
-  it, keeping anything typed since.
+  it, keeping anything typed since. [Start task](./handoffs.md#the-handoff-card) writes a new
+  conversation's first draft here before it opens.
 - `captures:<nodeId>:<taskId>:<sessionId>`: that draft's [page captures](./page-capture.md), with each
   screenshot's attachment ID once the Node holds it. It sits apart from the text because the text is
   saved on each keystroke and a screenshot can be megabytes.

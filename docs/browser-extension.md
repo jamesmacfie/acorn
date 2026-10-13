@@ -14,7 +14,8 @@ Topic pages:
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
   page access, sending them, and the attachment operations.
 - [Handoffs](./browser-extension/handoffs.md): the buttons plugins put on websites, the handoff card,
-  and the operations that resolve a page and create a linked task.
+  the panel's verbs and its `acorn://` links, and the operations that resolve a page and create a
+  linked task.
 - [Project sites](./browser-extension/project-sites.md): the web addresses tied to a project, the
   sidebar's project suggestions and overrides, and the site operations.
 - [Request notifications](./browser-extension/notifications.md): the toolbar badge, the waiting list,

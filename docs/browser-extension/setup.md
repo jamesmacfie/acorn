@@ -121,9 +121,10 @@ Home lists, top to bottom:
 4. **Current task**: the task you last used. It stays whatever page shows, and **Find a task** opens
    the task search in Settings.
 
-A conversation opens over Home, with a back arrow and the task's name above the conversation's own.
-The composer's toolbar holds the three [capture](./page-capture.md) buttons, and each capture shows as
-a chip in the draft.
+A conversation opens over Home, with a back arrow and the task's name above the conversation's own,
+and **Open in Acorn** and **Copy Acorn link** for that conversation ([the panel's
+verbs](./handoffs.md#the-panels-verbs)). The composer's toolbar holds the
+three [capture](./page-capture.md) buttons, and each capture shows as a chip in the draft.
 
 **Settings** holds the Node list and pairing, a search across every project's open tasks, site
 access, each project's sites, notifications, and appearance. Choosing a task in the search makes it

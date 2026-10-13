@@ -9,13 +9,13 @@ side is in `apps/cli/src/browser/bridge.ts`.
 
 ## What a capture is
 
-The composer's toolbar has three icon buttons, named by these labels:
+The composer's toolbar has three **Add to chat** icon buttons, named by these labels:
 
 | Button | What it keeps | What the agent receives |
 | --- | --- | --- |
-| **Add page link** | The tab's address and title | A `context` part labelled `Page: <title>`, holding the title and address |
-| **Add selected text** | The page's selected text, with its address and title | A `context` part labelled `Selected text from <title>`, holding the address and the text |
-| **Add screenshot** | A JPEG of the visible tab at quality 90, with its address and title | An `image` part naming the attachment the Node holds for it |
+| **Add page link to chat** | The tab's address and title | A `context` part labelled `Page: <title>`, holding the title and address |
+| **Add selected text to chat** | The page's selected text, with its address and title | A `context` part labelled `Selected text from <title>`, holding the address and the text |
+| **Add screenshot to chat** | A JPEG of the visible tab at quality 90, with its address and title | An `image` part naming the attachment the Node holds for it |
 
 The parts are the agents plugin's own turn input ([attachments](../managed-agents/attachments.md)).
 The Node hands a `context` part to the agent inside an `<acorn-context source="browser-extension">` block, with

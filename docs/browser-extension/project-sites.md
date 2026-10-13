@@ -81,7 +81,7 @@ Removing access stops the sidebar reading the page, so its suggestions go at onc
 ## Handoffs
 
 A handoff resolves the page through the plugin, which names the item's projects. The host adds every
-project whose associations cover the page, and **Create linked task** may use any of them. An item
+project whose associations cover the page, and **Start task** may use any of them. An item
 whose seed carries a pull number stays with the plugin's projects, because a pull number names a pull
 request only in its own repository. On create, the host reads the chosen project's associations again
 and matches the page itself, so the sidebar can't widen the list

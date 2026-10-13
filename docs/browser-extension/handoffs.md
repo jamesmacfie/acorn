@@ -1,8 +1,8 @@
 # Handoffs in the browser extension
 
 This page covers how the [browser extension](../browser-extension.md) brings an item from a website
-into an Acorn task: the site buttons, page access, the handoff card on the sidebar's Home view, and the native
-operations behind them. Plugins declare the buttons; [browser handoffs](../plugin-authoring/browser-handoffs.md)
+into an Acorn task: the site buttons, page access, the handoff card on the sidebar's Home view, the
+panel's verbs and its `acorn://` links, and the native operations behind them. Plugins declare the buttons; [browser handoffs](../plugin-authoring/browser-handoffs.md)
 is their contract. The code is in `apps/extension/src/background/siteButtons.ts`,
 `apps/extension/src/content/siteButtons.ts`, `apps/extension/src/sidebar/Handoff.tsx`, and
 `apps/cli/src/browser/handoffs.ts`.
@@ -46,8 +46,9 @@ Chrome opens its side panel from the click. Firefox doesn't: `sidebarAction.open
 action on the extension's own UI, and a message from a page isn't one. In Firefox the handoff waits
 until the person opens the sidebar. A sidebar that is already open gets it at once.
 
-The sidebar also offers each handoff that matches the page beside it, as a button in Home's **This
-page** section. That is the same action for a site whose layout has no anchor, for a handoff that
+The sidebar also offers each handoff that matches the page beside it, as **Look up in Acorn** in
+Home's **This page** section. Looking a page up sends its address to the Node, so it waits for this
+click. That is the same action for a site whose layout has no anchor, for a handoff that
 declares no anchors, such as Linear's and Rollbar's, and for Firefox. The sidebar reads the page again when the tab
 finishes loading, so the offer goes when the tab moves to a page it may not read.
 
@@ -57,23 +58,49 @@ The card shows in Home's **This page** section, which a handoff brings forward f
 open conversation. It resolves the page through `handoff.resolve` and shows what came back:
 
 1. Several items, such as one per connection, mean a choice. Nothing picks the first.
-2. **Linked tasks** lists the active tasks that already hold the item. **Open** opens that task's
-   newest conversation, or the new-chat picker when it has none.
-3. **Create linked task** creates a task in one of the item's projects, chosen from a list when there
-   are several, and opens it the same way. The projects are the plugin's, plus any whose
+2. **Linked tasks** lists the active tasks that already hold the item. **Chat** opens that task's
+   newest conversation, or the new-chat picker when it has none. **Open in Acorn** opens the task in
+   the desktop app ([Open in Acorn](#the-panels-verbs)).
+3. An item no task holds says so, with **Open in Acorn** for the item itself, and a **Start task**
+   form: the project, chosen from a list when there are several, an agent, and a first message
+   written from the item, which the person can change. The projects are the plugin's, plus any whose
    [site associations](./project-sites.md#handoffs) cover the page, unless the item carries a pull
-   number. A repeated create, with the same key or after the task
-   exists, answers the existing task.
-4. **Choose another task** opens the task search in Settings. Choosing a task there makes it the
-   current task, and adds no link to it.
+   number. **Start task** creates the linked task with `handoff.create`, then a conversation with
+   that agent, and opens it with the message and the item in its draft.
+4. **Add to a task** opens the task search in Settings. Choosing a task there makes it the current
+   task, and adds no link to it.
 
-Whichever conversation the person opens next gets the item's context in its draft, as an **Item**
-capture beside any links, selections, and screenshots. The same item handed off twice is one
-capture. Until then the sidebar says the context is waiting, with **Leave it out**. Nothing goes to
-an agent until the person sends; the capture becomes a `context` part with `source:
-'browser-extension'`, as page captures do ([page capture](./page-capture.md#what-a-capture-is)).
+Start task's two writes keep their keys, so pressing it again after either one went unconfirmed
+makes no second task or conversation. A repeated create, with the same key or after the task exists,
+answers the existing task.
+
+After **Chat** or **Add to a task**, whichever conversation the person opens next gets the item's
+context in its draft, as an **Item** capture beside any links, selections, and screenshots. The same
+item handed off twice is one capture. Until then the sidebar says the context is waiting, with
+**Leave it out**. Nothing goes to an agent until the person sends, from Start task's draft too; the
+capture becomes a `context` part with `source: 'browser-extension'`, as page captures do
+([page capture](./page-capture.md#what-a-capture-is)).
 
 A Node switch clears the card, as it clears the page buttons.
+
+## The panel's verbs
+
+Each verb means one thing wherever it shows:
+
+| Verb | What it does |
+| --- | --- |
+| **Open in Acorn** | Opens the desktop app through an [`acorn://` link](../frontend/acorn-links.md): a handed-off item's task on the pane that shows it (GitHub's for a pull request), a conversation on the agents pane, or an item no task holds through `open?url=`. |
+| **Copy Acorn link** | Copies that link. |
+| **Start task** | Creates the item's linked task and a chat with the chosen agent, with the first message and the item in its draft ([the handoff card](#the-handoff-card)). |
+| **Add to a task** | Opens the task search, so the item goes into any task's draft. |
+| **Chat** and **New chat** | Open a task's newest conversation, or start one with a chosen agent. |
+| **Add to chat** | Captures the page link, a selection, or a screenshot into the draft. |
+
+Open in Acorn is a plain link, which both browsers hand to the app registered for `acorn://`, with no
+extension permission. Only a release desktop registers the scheme, and it opens only a Node that
+desktop is paired with, as the bridge's Node ID names it. A development build, one that talks to the
+development bridge, shows Copy Acorn link in its place. `src/sidebar/acornLinks.tsx` builds the links
+with client-core's `buildLink`, and holds the table of item panes by plugin.
 
 ## Native operations
 

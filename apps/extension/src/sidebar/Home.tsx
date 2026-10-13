@@ -1,6 +1,5 @@
-import { For, Show, createEffect, createSignal, on } from 'solid-js'
+import { For, Show, createEffect, createSignal } from 'solid-js'
 import type {
-  BridgeAgentProfile,
   BridgeAgentSession,
   BridgeHandoff,
   BridgePendingRequest,
@@ -9,11 +8,10 @@ import type {
   BridgeTask,
 } from '@acorn/protocol/extensionBridge.ts'
 import { pageHandoffs, type PageHandoff } from '../handoffs'
-import { CallFailure, isUncertain } from '../messages'
+import { AgentSelect, agentChoice } from './agentChoice'
 import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from './capture'
 import { conversationItems } from './conversationWindow'
-import { errorGuidance } from './guidance'
 import { Handoff } from './Handoff'
 import { State, agentName, agentState } from './state'
 
@@ -25,6 +23,7 @@ export function ThisPage(props: {
   client: BridgeClient
   nodeId: string
   online: boolean
+  opensLinks: boolean
   pageUrl: string | undefined
   handoffs: readonly BridgeHandoff[]
   handoff: PageHandoff | null
@@ -32,6 +31,12 @@ export function ThisPage(props: {
   dismissHandoff(): void
   openHandoffTask(projectId: string, taskId: string, capture: PageCapture): void
   chooseHandoffTask(capture: PageCapture): void
+  startedHandoffTask(
+    projectId: string,
+    taskId: string,
+    sessionId: string,
+    draft: { text: string; capture: PageCapture },
+  ): void
   waitingContext: PageCapture | null
   dropWaitingContext(): void
   projects: readonly BridgeProject[] | null
@@ -56,6 +61,7 @@ export function ThisPage(props: {
       <Show when={!props.pageUrl}>
         <p class="quiet">Acorn can't read this page. Click the Acorn button in the toolbar while it's showing.</p>
       </Show>
+      {/* Looking the page up sends its address to the Node, so it waits for the person's click. */}
       <Show when={offers().length && !props.handoff}>
         <div class="row">
           <For each={offers()}>
@@ -71,7 +77,7 @@ export function ThisPage(props: {
                   })
                 }
               >
-                {handoff.label}
+                Look up in Acorn
               </button>
             )}
           </For>
@@ -84,8 +90,10 @@ export function ThisPage(props: {
             nodeId={props.nodeId}
             handoff={handoff}
             online={props.online}
+            opensLinks={props.opensLinks}
             openTask={props.openHandoffTask}
             chooseTask={props.chooseHandoffTask}
+            startedTask={props.startedHandoffTask}
             dismiss={props.dismissHandoff}
           />
         )}
@@ -266,14 +274,7 @@ export function Agents(props: {
   )
 }
 
-// The profile a person may start a chat with, or why not.
-const unavailableReason = (profile: BridgeAgentProfile): string | null => {
-  if (!profile.installed) return profile.diagnostics[0] ?? 'Not installed on this Node'
-  if (profile.authenticated === false) return 'Not signed in on this Node'
-  return null
-}
-
-// Starts a conversation in one task, with one choice per provider on its default account.
+// Starts a conversation in one task with the agent the person picks.
 function NewChat(props: {
   client: BridgeClient
   nodeId: string
@@ -283,58 +284,12 @@ function NewChat(props: {
   setOpen(open: boolean): void
   started(session: BridgeAgentSession): void
 }) {
-  const [profiles, setProfiles] = createSignal<BridgeAgentProfile[] | null>(null)
-  const [choice, setChoice] = createSignal('')
-  const [starting, setStarting] = createSignal(false)
-  const [problem, setProblem] = createSignal<string | null>(null)
-  // An unconfirmed start keeps its key, so starting the same chat again can't make a second one.
-  let pending: { key: string; choice: string } | null = null
-
-  const load = async () => {
-    setProblem(null)
-    try {
-      const result = await props.client.call({ op: 'agents.profiles', nodeId: props.nodeId })
-      setProfiles(result.profiles)
-      setChoice(result.profiles.find((profile) => !unavailableReason(profile))?.providerId ?? '')
-    } catch (error) {
-      setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
-    }
-  }
-  createEffect(
-    on(
-      () => props.open,
-      (open) => open && !profiles() && void load(),
-    ),
-  )
+  const agents = agentChoice(props.client, props.nodeId)
+  createEffect(() => props.open && void agents.load())
 
   const start = async () => {
-    const profile = profiles()?.find((candidate) => candidate.providerId === choice())
-    if (!profile || unavailableReason(profile) || starting()) return
-    const key = pending?.choice === profile.providerId ? pending.key : crypto.randomUUID()
-    pending = { key, choice: profile.providerId }
-    setStarting(true)
-    setProblem(null)
-    try {
-      const { session } = await props.client.call({
-        op: 'session.create',
-        nodeId: props.nodeId,
-        taskId: props.taskId,
-        providerId: profile.providerId,
-        profileId: profile.profileId,
-        key,
-      })
-      pending = null
-      props.started(session)
-    } catch (error) {
-      const failure = error instanceof CallFailure ? error : new CallFailure('node_error', String(error))
-      setProblem(
-        isUncertain(failure.code)
-          ? "The Node didn't confirm the new chat. Start it again to retry; the Node won't make a second one."
-          : errorGuidance(failure),
-      )
-    } finally {
-      setStarting(false)
-    }
+    const session = await agents.start(props.taskId)
+    if (session) props.started(session)
   }
 
   return (
@@ -347,47 +302,19 @@ function NewChat(props: {
           </button>
         }
       >
-        <Show when={profiles()} fallback={<p class="quiet">{problem() ? '' : 'Loading agents…'}</p>}>
-          {(loaded) => (
-            <Show
-              when={loaded().some((profile) => !unavailableReason(profile))}
-              fallback={
-                <p class="notice">
-                  No agent can start on this Node.{' '}
-                  {loaded()
-                    .map((profile) => `${profile.label}: ${unavailableReason(profile)}`)
-                    .join('. ')}
-                </p>
-              }
-            >
-              <div class="row">
-                <select name="profile" class="grow" onChange={(event) => setChoice(event.currentTarget.value)}>
-                  <For each={loaded()}>
-                    {(profile) => (
-                      <option
-                        value={profile.providerId}
-                        disabled={unavailableReason(profile) !== null}
-                        selected={profile.providerId === choice()}
-                      >
-                        {unavailableReason(profile)
-                          ? `${profile.label} (${unavailableReason(profile)})`
-                          : profile.label}
-                      </option>
-                    )}
-                  </For>
-                </select>
-                <button type="button" disabled={starting() || !props.online} onClick={() => void start()}>
-                  {starting() ? 'Starting…' : 'Start chat'}
-                </button>
-                <button type="button" class="quiet" onClick={() => props.setOpen(false)}>
-                  Cancel
-                </button>
-              </div>
-            </Show>
-          )}
-        </Show>
+        <div class="row">
+          <AgentSelect agents={agents} />
+          <Show when={agents.chosen()}>
+            <button type="button" disabled={agents.starting() || !props.online} onClick={() => void start()}>
+              {agents.starting() ? 'Starting…' : 'Start chat'}
+            </button>
+          </Show>
+          <button type="button" class="quiet" onClick={() => props.setOpen(false)}>
+            Cancel
+          </button>
+        </div>
       </Show>
-      <Show when={problem()}>
+      <Show when={agents.problem()}>
         {(message) => (
           <p class="problem" role="alert">
             {message()}

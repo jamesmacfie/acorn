@@ -704,9 +704,9 @@ describe('page capture', () => {
     const subject = mount()
     subject.fake.selection = '  The failing assertion  '
     await openSession(subject.root)
-    await capture(subject.root, 'Add page link')
-    await capture(subject.root, 'Add selected text')
-    await capture(subject.root, 'Add screenshot')
+    await capture(subject.root, 'Add page link to chat')
+    await capture(subject.root, 'Add selected text to chat')
+    await capture(subject.root, 'Add screenshot to chat')
     expect(captures(subject.root)).toEqual(['Page · Docs', 'Selected text · Docs', 'Screenshot · Docs'])
     expect(subject.root.textContent).toContain('Goes to Chat s1 in Fix it')
     expect(subject.root.querySelector('[data-testid="capture"] img')!.getAttribute('src')).toMatch(/^data:image\/jpeg/)
@@ -747,8 +747,8 @@ describe('page capture', () => {
     const subject = mount()
     subject.fake.activeTab = { id: 1, windowId: 1 }
     await openSession(subject.root)
-    await capture(subject.root, 'Add page link')
-    await capture(subject.root, 'Add screenshot')
+    await capture(subject.root, 'Add page link to chat')
+    await capture(subject.root, 'Add screenshot to chat')
     expect(captures(subject.root)).toEqual([])
     expect(subject.root.textContent).toContain('Click the Acorn button in the toolbar')
   })
@@ -760,8 +760,8 @@ describe('page capture', () => {
     subject.fake.onCapture = async () => {
       throw new Error('Missing activeTab permission')
     }
-    await capture(subject.root, 'Add page link')
-    await capture(subject.root, 'Add screenshot')
+    await capture(subject.root, 'Add page link to chat')
+    await capture(subject.root, 'Add screenshot to chat')
     expect(captures(subject.root)).toEqual(['Page · Docs'])
     expect(subject.root.textContent).toContain('The browser takes a screenshot only of a page you clicked')
   })
@@ -773,7 +773,7 @@ describe('page capture', () => {
       subject.fake.activeTab = { id: 2, windowId: 1, url: 'https://example.test/other', title: 'Other' }
       return 'data:image/jpeg;base64,/9j/4AAQ'
     }
-    await capture(subject.root, 'Add screenshot')
+    await capture(subject.root, 'Add screenshot to chat')
     expect(captures(subject.root)).toEqual([])
     expect(subject.root.textContent).toContain('The page changed while it was being captured')
   })
@@ -782,13 +782,13 @@ describe('page capture', () => {
     const subject = mount()
     await openSession(subject.root)
     subject.fake.onCapture = async () => `data:image/jpeg;base64,${'A'.repeat(8 * 1024 * 1024)}`
-    await capture(subject.root, 'Add screenshot')
+    await capture(subject.root, 'Add screenshot to chat')
     expect(subject.root.textContent).toContain('over the 5.0 MB a draft keeps')
     subject.fake.selection = 'x'.repeat(600 * 1024)
-    await capture(subject.root, 'Add selected text')
+    await capture(subject.root, 'Add selected text to chat')
     expect(subject.root.textContent).toContain('Captured text is limited to 512 KiB')
     subject.fake.selection = ''
-    await capture(subject.root, 'Add selected text')
+    await capture(subject.root, 'Add selected text to chat')
     expect(subject.root.textContent).toContain('Nothing is selected on this page')
     expect(captures(subject.root)).toEqual([])
     expect(written(subject, 'attachment.upload')).toEqual([])
@@ -797,7 +797,7 @@ describe('page capture', () => {
   it('keeps an uploaded screenshot with the draft when the send is uncertain, and reuses it on retry', async () => {
     const subject = mount()
     await openSession(subject.root)
-    await capture(subject.root, 'Add screenshot')
+    await capture(subject.root, 'Add screenshot to chat')
     subject.state.answers.set('turn.submit', () => ({ error: { code: 'host_unavailable', message: 'Gone.' } }))
     send(subject.root)
     await settle()
@@ -822,7 +822,7 @@ describe('page capture', () => {
   it('keeps the screenshot when its upload fails, and deletes an uploaded one the person removes', async () => {
     const subject = mount()
     await openSession(subject.root)
-    await capture(subject.root, 'Add screenshot')
+    await capture(subject.root, 'Add screenshot to chat')
     subject.state.answers.set('attachment.upload', () => ({
       error: { code: 'node_error', message: 'Attachments are limited to 10 MiB each.' },
     }))
@@ -845,7 +845,7 @@ describe('page capture', () => {
   it('finishes an upload and send for the conversation it started in after a switch', async () => {
     const subject = mount()
     await openSession(subject.root)
-    await capture(subject.root, 'Add screenshot')
+    await capture(subject.root, 'Add screenshot to chat')
     let release!: () => void
     subject.state.holds.set('attachment.upload', (answer) => (release = answer))
     send(subject.root)
@@ -865,7 +865,7 @@ describe('page capture', () => {
     await openSession(subject.root)
     let finish!: (value: string) => void
     subject.fake.onCapture = () => new Promise((resolve) => (finish = resolve))
-    button(subject.root, 'Add screenshot')!.click()
+    button(subject.root, 'Add screenshot to chat')!.click()
     await settle()
     await openChat(subject.root, 'Chat s2')
     finish('data:image/jpeg;base64,/9j/4AAQ')

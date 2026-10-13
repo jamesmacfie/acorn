@@ -102,7 +102,7 @@ The extension never sees the route or the seed. The host:
 - Shows the projects by name, dropping any the Node no longer has. When the seed has no `pullNumber`,
   it adds every project whose site associations cover the page. A pull number names a pull request
   only in its own repository, so an item with one keeps to your `projects`.
-- On **Create linked task**, resolves the page again, finds the chosen item by `identifier` and
+- On **Start task**, resolves the page again, finds the chosen item by `identifier` and
   connection, refuses a project that is neither in its `projects` nor covered by that project's site
   associations, and answers an already-linked task in that
   project instead of creating another. Otherwise it sends `POST /v1/core/tasks` with the seed, the

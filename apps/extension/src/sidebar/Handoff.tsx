@@ -1,13 +1,13 @@
-import { For, Show, createSignal, onMount } from 'solid-js'
+import { For, Show, createEffect, createSignal, onMount } from 'solid-js'
 import type { BridgeHandoffItem } from '@acorn/protocol/extensionBridge.ts'
-import { CallFailure } from '../messages'
+import { TURN_TEXT_MAX_CHARS } from '@acorn/protocol/extensionBridge.ts'
+import { CallFailure, isUncertain } from '../messages'
 import type { PageHandoff } from '../handoffs'
+import { OpenInAcorn, itemTaskLink, outsideItemLink } from './acornLinks'
+import { AgentSelect, agentChoice } from './agentChoice'
 import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from './capture'
 import { errorGuidance } from './guidance'
-
-// Failures after which a create may or may not have reached the Node.
-const UNCERTAIN = new Set(['ambiguous_mutation', 'host_unavailable', 'node_unreachable'])
 
 // What the item's context becomes in a draft: the plugin's proposal, or the item's title and address
 // when it proposed none.
@@ -21,28 +21,37 @@ const handoffCapture = (item: BridgeHandoffItem): Extract<PageCapture, { kind: '
   content: item.context?.content ?? `${item.identifier}: ${item.title}\n${item.url}`,
 })
 
-// One handoff on one Node: resolve the page, then let the person open a linked task, create one in a
-// project the plugin tied the item to, or find any task themselves. The item's context goes to the
-// draft of whatever conversation they open next; nothing is sent from here.
-// docs/browser-extension/handoffs.md.
+// The first message Start task suggests, for the person to edit before they send it.
+const firstMessage = (item: BridgeHandoffItem) => `Read ${item.identifier} (${item.title}) and list what is left to do.`
+
+// One handoff on one Node: resolve the page, then let the person chat in or open a linked task, start
+// a task in a project the plugin tied the item to, or add the item to any task. The item's context
+// only ever lands in a draft; nothing is sent from here. docs/browser-extension/handoffs.md.
 export function Handoff(props: {
   client: BridgeClient
   nodeId: string
   handoff: PageHandoff
   online: boolean
+  // Whether Open in Acorn may open the desktop app, or copies its link.
+  opensLinks: boolean
   // Open this task's newest conversation, or a new chat when it has none, with this context waiting.
   openTask(projectId: string, taskId: string, capture: PageCapture): void
   // Let the person find any task in Settings, with this context waiting.
   chooseTask(capture: PageCapture): void
+  // Start task made a task and a conversation in it: open it with this draft, unsent.
+  startedTask(projectId: string, taskId: string, sessionId: string, draft: { text: string; capture: PageCapture }): void
   dismiss(): void
 }) {
   const [items, setItems] = createSignal<BridgeHandoffItem[] | null>(null)
   const [problem, setProblem] = createSignal<string | null>(null)
   const [chosen, setChosen] = createSignal(0)
   const [projectId, setProjectId] = createSignal('')
+  const [message, setMessage] = createSignal('')
   const [creating, setCreating] = createSignal(false)
-  // An unconfirmed create keeps its key, so creating the same task again can't make a second one.
-  let pendingCreate: { key: string; identifier: string; connectionId: string; projectId: string } | null = null
+  const agents = agentChoice(props.client, props.nodeId)
+  // A create keeps its key, so a retry, after an unconfirmed create or a failed chat start, can't make
+  // a second task.
+  let lastCreate: { key: string; identifier: string; connectionId: string; projectId: string } | null = null
 
   const target = () => ({
     pluginId: props.handoff.pluginId,
@@ -50,10 +59,15 @@ export function Handoff(props: {
     url: props.handoff.url,
   })
   const item = () => items()?.[chosen()] ?? null
+  // Start task is for an item no task holds yet.
+  const startable = () => !!item()?.projects.length && !item()?.linkedTasks.length
+  createEffect(() => startable() && void agents.load())
 
   const choose = (index: number) => {
+    const next = items()?.[index]
     setChosen(index)
-    setProjectId(items()?.[index]?.projects[0]?.id ?? '')
+    setProjectId(next?.projects[0]?.id ?? '')
+    setMessage(next ? firstMessage(next) : '')
   }
 
   const resolve = async () => {
@@ -69,18 +83,14 @@ export function Handoff(props: {
   }
   onMount(() => void resolve())
 
-  const create = async () => {
-    const current = item()
-    const forProject = projectId()
-    if (!current || !forProject || creating()) return
+  // The linked task, made or found again, or null with `problem` saying why there isn't one.
+  const create = async (current: BridgeHandoffItem, forProject: string) => {
     const same =
-      pendingCreate?.identifier === current.identifier &&
-      pendingCreate.connectionId === current.connection.id &&
-      pendingCreate.projectId === forProject
-    const key = same ? pendingCreate!.key : crypto.randomUUID()
-    pendingCreate = { key, identifier: current.identifier, connectionId: current.connection.id, projectId: forProject }
-    setCreating(true)
-    setProblem(null)
+      lastCreate?.identifier === current.identifier &&
+      lastCreate.connectionId === current.connection.id &&
+      lastCreate.projectId === forProject
+    const key = same ? lastCreate!.key : crypto.randomUUID()
+    lastCreate = { key, identifier: current.identifier, connectionId: current.connection.id, projectId: forProject }
     try {
       const { task } = await props.client.call({
         op: 'handoff.create',
@@ -91,12 +101,31 @@ export function Handoff(props: {
         projectId: forProject,
         key,
       })
-      pendingCreate = null
-      props.openTask(task.projectId, task.id, handoffCapture(current))
+      return task
     } catch (error) {
-      if (error instanceof CallFailure && UNCERTAIN.has(error.code))
-        setProblem("The Node didn't confirm the new task. Create it again to retry; the Node won't make a second one.")
+      if (error instanceof CallFailure && isUncertain(error.code))
+        setProblem("The Node didn't confirm the new task. Start it again to retry; the Node won't make a second one.")
       else setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
+      return null
+    }
+  }
+
+  // Makes the linked task and a conversation with the chosen agent, then opens it with the message and
+  // the item in its draft. A retry after either step failed reuses both keys, so nothing is made twice.
+  const startTask = async () => {
+    const current = item()
+    const forProject = projectId()
+    if (!current || !forProject || creating()) return
+    setCreating(true)
+    setProblem(null)
+    try {
+      const task = await create(current, forProject)
+      const session = task && (await agents.start(task.id))
+      if (task && session)
+        props.startedTask(task.projectId, task.id, session.id, {
+          text: message().trim(),
+          capture: handoffCapture(current),
+        })
     } finally {
       setCreating(false)
     }
@@ -106,7 +135,6 @@ export function Handoff(props: {
 
   return (
     <div class="handoff" role="group" aria-label="Handoff">
-      <h3>{props.handoff.label}</h3>
       <p class="quiet">{props.handoff.url}</p>
       <Show when={problem()}>
         {(message) => (
@@ -142,21 +170,37 @@ export function Handoff(props: {
                     <strong>{current().identifier}</strong> {current().title}
                     <span class="quiet"> · {current().connection.label}</span>
                   </p>
-                  <Show when={current().linkedTasks.length}>
-                    <p class="quiet">Linked tasks</p>
-                    <ul>
+                  <Show
+                    when={current().linkedTasks.length}
+                    fallback={
+                      <div class="row">
+                        <span class="quiet grow">No task in Acorn for this yet.</span>
+                        <OpenInAcorn
+                          href={outsideItemLink(props.nodeId, current().url)}
+                          opensLinks={props.opensLinks}
+                          class="quiet"
+                        />
+                      </div>
+                    }
+                  >
+                    <ul class="rows" aria-label="Linked tasks">
                       <For each={current().linkedTasks}>
                         {(task) => (
                           <li>
-                            <div>
+                            <div class="grow">
                               <strong>{task.title}</strong>
                               <span class="quiet">{projectName(task.projectId) ?? ''}</span>
                             </div>
+                            <OpenInAcorn
+                              href={itemTaskLink(props.nodeId, props.handoff.pluginId, task.id)}
+                              opensLinks={props.opensLinks}
+                            />
                             <button
                               type="button"
+                              class="quiet"
                               onClick={() => props.openTask(task.projectId, task.id, handoffCapture(current()))}
                             >
-                              Open
+                              Chat
                             </button>
                           </li>
                         )}
@@ -167,31 +211,62 @@ export function Handoff(props: {
                     when={current().projects.length}
                     fallback={<p class="notice">No project on this Node tracks {current().identifier}.</p>}
                   >
-                    <div class="row">
-                      <Show
-                        when={current().projects.length > 1}
-                        fallback={<span class="quiet">In {current().projects[0]!.name}</span>}
-                      >
-                        <select name="handoff-project" onChange={(event) => setProjectId(event.currentTarget.value)}>
-                          <For each={current().projects}>
-                            {(project) => (
-                              <option value={project.id} selected={project.id === projectId()}>
-                                {project.name}
-                              </option>
-                            )}
-                          </For>
-                        </select>
+                    <Show when={startable()}>
+                      <h3>Start task</h3>
+                      <div class="row">
+                        <Show
+                          when={current().projects.length > 1}
+                          fallback={<span class="quiet">In {current().projects[0]!.name}</span>}
+                        >
+                          <select
+                            name="handoff-project"
+                            aria-label="Project"
+                            onChange={(event) => setProjectId(event.currentTarget.value)}
+                          >
+                            <For each={current().projects}>
+                              {(project) => (
+                                <option value={project.id} selected={project.id === projectId()}>
+                                  {project.name}
+                                </option>
+                              )}
+                            </For>
+                          </select>
+                        </Show>
+                        <AgentSelect agents={agents} />
+                      </div>
+                      <textarea
+                        name="first-message"
+                        aria-label="First message"
+                        rows={3}
+                        maxLength={TURN_TEXT_MAX_CHARS}
+                        value={message()}
+                        onInput={(event) => setMessage(event.currentTarget.value)}
+                      />
+                      <ul class="chips">
+                        <li class="chip">Item · {current().title}</li>
+                      </ul>
+                      <div class="row">
+                        <button
+                          type="button"
+                          disabled={creating() || !props.online || !agents.chosen()}
+                          onClick={() => void startTask()}
+                        >
+                          {creating() ? 'Starting…' : 'Start task'}
+                        </button>
+                        <span class="quiet grow">Nothing goes to the agent until you press Send.</span>
+                      </div>
+                      <Show when={agents.problem()}>
+                        {(message) => (
+                          <p class="problem" role="alert">
+                            {message()}
+                          </p>
+                        )}
                       </Show>
-                      <button type="button" disabled={creating() || !props.online} onClick={() => void create()}>
-                        {creating() ? 'Creating…' : 'Create linked task'}
-                      </button>
-                    </div>
+                    </Show>
                   </Show>
-                  <div class="row">
-                    <button type="button" class="quiet" onClick={() => props.chooseTask(handoffCapture(current()))}>
-                      Choose another task
-                    </button>
-                  </div>
+                  <button type="button" class="link" onClick={() => props.chooseTask(handoffCapture(current()))}>
+                    Add to a task
+                  </button>
                 </>
               )}
             </Show>

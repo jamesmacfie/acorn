@@ -25,7 +25,8 @@ const BRIDGE_RECHECK_MS = 3_000
 // Online, or online with live updates paused: either way the Node answers requests.
 const connected = (status: NodeStatus | null) => status?.state === 'online' || status?.state === 'degraded'
 
-export function App(props: { api: BrowserApi }) {
+// `opensLinks` says whether this build runs beside a desktop that opens `acorn://` links.
+export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [host, setHost] = createSignal<HostState>({ state: 'connecting', message: null, restoreError: null })
   const [fleet, setFleet] = createSignal<BridgeNodes | null>(null)
   const [status, setStatus] = createSignal<NodeStatus | null>(null)
@@ -245,6 +246,7 @@ export function App(props: { api: BrowserApi }) {
                   storage={props.api.storage.local}
                   nodeId={nodeId}
                   online={online()}
+                  opensLinks={props.opensLinks ?? false}
                   hint={hint()}
                   reconnects={reconnects()}
                   projectChanges={projectChanges()}

@@ -8,9 +8,9 @@ import { errorGuidance } from './guidance'
 import { acknowledged, changeDraft, loadDraft, saveDraft, type Draft, type DraftTarget } from './localState'
 
 const CAPTURE_LABELS: Record<CaptureKind, string> = {
-  link: 'Add page link',
-  selection: 'Add selected text',
-  screenshot: 'Add screenshot',
+  link: 'Add page link to chat',
+  selection: 'Add selected text to chat',
+  screenshot: 'Add screenshot to chat',
 }
 
 // Lucide's link, text-cursor, and camera glyphs, drawn in the text colour.
