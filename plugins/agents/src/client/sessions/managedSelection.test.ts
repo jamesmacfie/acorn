@@ -7,6 +7,7 @@ const paneIntent = vi.hoisted(() => ({
 }))
 
 vi.mock('@acorn/plugin-api/client', () => ({
+  activeTaskId: () => null,
   clientEvents: {
     on: (_name: string, listener: typeof paneIntent.listener) => {
       paneIntent.listener = listener

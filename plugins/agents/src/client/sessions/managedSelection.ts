@@ -43,14 +43,16 @@ export function clearManagedSubagent(sessionId: string): void {
 
 export function selectManagedSession(taskId: string, sessionId: string): void {
   if (selectedManagedSession(taskId) !== sessionId) {
-    markAgentSelection(sessionId)
+    markAgentSelection(taskId, sessionId)
     agentTelemetry.startRenderTransition('agents.session.select')
   }
   setSelectedByTask((current) => ({ ...current, [taskId]: sessionId }))
   requestComposerFocus(sessionId)
 }
 
-/** The conversation measures its own mount before the task list restores this selection. */
+/** Selects without measuring an open, for a selection nothing is about to draw: the task list's
+ *  default, which the conversation has already measured as its own mount, or one made for a pane that
+ *  isn't shown. A conversation that mounts on it later measures that mount. */
 export function restoreManagedSessionSelection(taskId: string, sessionId: string): void {
   setSelectedByTask((current) => ({ ...current, [taskId]: sessionId }))
   requestComposerFocus(sessionId)

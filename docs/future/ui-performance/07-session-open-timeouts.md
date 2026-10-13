@@ -1,6 +1,54 @@
 # Phase 07: session-open timeouts
 
-Status: planned, October 13, 2026.
+Status: landed October 13, 2026. A working day in Sentry is still to compare.
+
+## Completion note
+
+October 13, 2026. All three changes landed together, because an agent session can't read a day of
+Sentry data first.
+
+- A `timeout` from `startAgentView` carries `visibility`, the page's `document.visibilityState` when
+  the timer fired. On `agents.session.open` it also carries `claimed`. It's true once a conversation
+  took the open on, and false for a selection mark that nothing claimed. Opens the conversation
+  starts itself count as claimed. The terminal client has no `document`, so it sends no `visibility`.
+- `markAgentSelection` takes the task ID. After the caller's writes, at the next microtask, it
+  cancels an unclaimed mark whose task isn't `activeTaskId()`. A conversation on screen claims
+  synchronously, and one still mounting belongs to the active task, so neither is cut short. If the
+  other task's conversation mounts later, it measures its own open from the mount.
+- `ready` also starts a 100 ms timer. If the page is hidden when it fires, the span ends as `ready`
+  with `hidden: true`, so a hidden window no longer waits out the 30 seconds.
+- The Agents dashboard's run link selected a session for a task showing the Workflows pane. Nothing
+  ever drew that selection, and the task stays active, so the rule above couldn't catch it. It uses
+  `restoreManagedSessionSelection` and measures no open.
+- [Diagnosis](../../telemetry/diagnosis.md) lists the new attributes.
+
+Measured: unit tests beside `agentTelemetry.ts` cover the timeout attributes, a claimed and an
+unclaimed mark, a mark for a task that isn't on screen, and a hidden window. Nothing was measured in
+a real window or in Sentry.
+
+Known gaps:
+
+- The archive page previews a task that isn't the active one. A session opened there before its
+  preview mounts is cancelled, and the conversation then measures from its mount.
+- A selection on the active task whose Agent pane never appears still runs to the timeout, with
+  `claimed: false` and `visibility: visible`.
+- The two `agents.sidebar.open` timeouts get the `visibility` tag and the hidden-window fix. Nothing
+  else changes for them.
+
+After a working day, compare these in Sentry with the
+[baseline](../../testing/sentry-baseline-2026-10-13.md), and record them under `docs/testing/`:
+
+1. `agents.session.open` and `agents.sidebar.open` grouped by `outcome`. Expect fewer timeouts and
+   more `cancelled`.
+2. Every remaining `timeout`, split by `claimed` and `visibility`. Acceptance wants none with
+   `claimed: true` and `visibility: visible`. Any that remain point at a path this phase didn't fix.
+3. How many `ready` spans carry `hidden: true`.
+4. The `agents.session.open` p95 over every outcome against the p95 of `outcome: ready`, excluding
+   `hidden: true`. Acceptance wants them within 20%. The baseline had 6.3 s against 1.2 s.
+
+For later phases: judge phase 04's session-open numbers on `outcome: ready` without `hidden: true`.
+
+## Plan
 
 Read the [programme page](./README.md) first. This phase needs nothing else. It fixes a measurement,
 not the app, so do it before you use `agents.session.open` to judge phase 04.

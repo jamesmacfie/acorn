@@ -21,7 +21,7 @@ import { tasksRoute } from '@acorn/protocol/api.ts'
 import { isActiveAgent, needsAttention } from '../sessions/agentActivity'
 import { managedAgentApi } from '../sessions/managedClient'
 import { managedAgentStore } from '../sessions/managedStore'
-import { openManagedSession, selectManagedSession } from '../sessions/managedSelection'
+import { openManagedSession, restoreManagedSessionSelection } from '../sessions/managedSelection'
 import { workflowRunOf } from './workflowRun'
 import type { AgentSession } from '../../contract/wire.ts'
 import {
@@ -256,8 +256,9 @@ export default function AgentCenter() {
     // Spelled, not imported: plugins/workflows imports this plugin, so an import back would close a
     // cycle the package graph refuses. The pane's own `when` can also be false on a window that has
     // not yet counted this task's runs, so the session is selected as well and the Agent pane is
-    // right if the reader goes looking there instead.
-    selectManagedSession(row.task.id, row.session.id)
+    // right if the reader goes looking there instead. Selected without measuring an open, because no
+    // conversation draws it here. If the reader opens the Agent pane, its conversation measures that.
+    restoreManagedSessionSelection(row.task.id, row.session.id)
     openPane(row.task.id, 'workflows', { kind: 'workflows:show-run', runId: run.runId, stepId: run.stepId })
     navigate(pathForTask(row.task))
   }
