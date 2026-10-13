@@ -388,6 +388,19 @@ Each plugin landing page above has topic pages in a folder of the same name:
   copy](./first-party-plugins/examples.md), [First-party plugins in the
   terminal](./first-party-plugins/terminal.md).
 
+## UI performance proposal
+
+- [UI performance](./future/ui-performance/README.md).
+- [Streaming replay](./future/ui-performance/01-streaming-replay.md).
+- [Open-fence highlighting](./future/ui-performance/02-open-fence-highlighting.md).
+- [Incremental Markdown](./future/ui-performance/03-incremental-markdown.md).
+- [Session revisit](./future/ui-performance/04-session-revisit.md).
+- [Idle cost](./future/ui-performance/05-idle-cost.md).
+
+## Steering proposal
+
+- [Steer a running turn](./future/steering.md).
+
 ## Browser extension proposal
 
 - [Extension context](./future/extension/README.md).

@@ -18,6 +18,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [extension/](./extension/README.md) | Ten phases for Chrome and Firefox, an independent native bridge, task handoff, capture, chat, approvals, and site notifications. | Proposed October 10, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
+| [ui-performance/](./ui-performance/README.md) | A streaming replay harness, then cheaper streaming code blocks, Markdown parsing, session revisits, and idle cost. | Proposed October 13, 2026. Implementation not started. |
 
 ## The single files
 
@@ -31,6 +32,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [opencode.md](./opencode.md) | An external OpenCode harness package: one manifest, a conformance run, and a narrower `envPassthrough` in the authoring example. | Proposed October 9, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
+| [steering.md](./steering.md) | Send a message into a running Claude or Codex turn, with a fallback to the queue when the turn ends first. | Proposed October 13, 2026. Starts with a spike on Claude's adapter. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan
