@@ -99,9 +99,9 @@ The plan was silent or the code disagreed in these places:
 
 - The standalone CLI is the `pnpm pack:node` archive. Its `dist/cli/native-host.js` is the host
   `acorn browser install` registers, so there is no separate bridge package.
-- `pnpm pack:node` fails at this commit, because it builds `@acorn/node`, whose service size check is
-  over its ceiling. The clean build raised `ceiling` in a throwaway export only. The ceiling stays as it
-  was in this branch; see [the Node size budget](#the-node-size-budget).
+- `pnpm pack:node` failed at this commit, because it builds `@acorn/node`, whose service size check was
+  over its ceiling. The clean build raised `ceiling` in a throwaway export only. A later commit raised it
+  on this branch; see [the Node size budget](#the-node-size-budget).
 - A changed certificate showed as "Offline" until something read from the Node. A regenerated
   certificate means a restart, the broker marks the Node offline while it is down, and its retries then
   fail the pinned TLS chain without a new status. The host now probes an offline selected Node on each
@@ -141,11 +141,10 @@ validation, project config, and the agents store and routes. Each is read at boo
 checks every plugin's handoffs, and project config checks site associations. None can move behind a
 lazy import without making manifest validation lazy.
 
-Local `main` raised the ceiling to 1,775,500 bytes for its own work, and its graph already measured
-1,778,176 bytes. Merging this branch adds the 5,113 bytes again. Settle it once, on `main` after the
-merge: measure the merged graph, set the ceiling to that figure plus about 2 KB, and name both causes
-in the commit message, as the script asks. Until then, the desktop suite doesn't run under `pnpm test`,
-and `pnpm pack:node` stops.
+This branch now sets the ceiling to 1,778,000 bytes, the measured 1,775,996 plus about 2 KB. Local
+`main` raised its own ceiling to 1,775,500 bytes, and its graph already measured 1,778,176 bytes, so
+the merge conflicts on that line. Resolve it by measuring the merged graph and setting the ceiling to
+that figure plus about 2 KB.
 
 ## Real-browser results
 
