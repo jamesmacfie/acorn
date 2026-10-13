@@ -78,6 +78,14 @@ To investigate:
 4. Check workload counts and `ui.interaction.work` before assuming one operation is slow.
 5. Compare runtime pressure and queue age when several surfaces degrade together.
 
+`ui.frame.gap` is sampled only for two seconds after activity: input such as a key, a click, a
+pointer move, a wheel turn, or a scroll; an interaction starting or ending; a socket frame from the
+active Node; or the window gaining focus or becoming visible. Streaming and scrolling keep the window
+open, so their dropped frames are still recorded. A window with nothing changing requests no frames,
+so an idle window has no frame-gap samples. A frame requested inside the window records its gap
+however late it lands, so a stall that runs past the window's end is still measured.
+`ui.event_loop.delay` keeps its one-second timer, which is what reports a stall in an idle window.
+
 A frame gap is a paint-opportunity measurement, not proof the compositor presented pixels. Collection
 that's off during startup doesn't measure cache hydration after the fact. The boot account is the
 exception: its marks are kept and sent once collection turns on.

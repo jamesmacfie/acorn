@@ -166,6 +166,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/streaming-replay-2026-10-13.md](./testing/streaming-replay-2026-10-13.md) | Dated ACP replay check and the missing visible-window baseline. |
 | [testing/incremental-markdown-parse-2026-10-13.md](./testing/incremental-markdown-parse-2026-10-13.md) | Dated Markdown parse cost at the end of a 50 KB streamed reply, measured in Node, and the real-window numbers still to take. |
 | [testing/session-revisit-2026-10-13.md](./testing/session-revisit-2026-10-13.md) | Dated cost of returning to a long agent session, measured in jsdom, and the real-window numbers still to take. |
+| [testing/idle-cost-2026-10-13.md](./testing/idle-cost-2026-10-13.md) | Dated count of the work an idle desktop window asks for, measured in tests, and the real-window idle numbers still to take. |
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by the October 2026 runtime packaging work. |
 | [testing/production-minification-2026-10-09.md](./testing/production-minification-2026-10-09.md) | Dated startup graph bytes, installed bytes, and boot timings from minifying the Node service and loaded plugins. |
 | [testing/selective-renderer-loading-2026-10-09.md](./testing/selective-renderer-loading-2026-10-09.md) | Dated renderer and terminal startup graph bytes, roster bytes, and real-app checks from loading renderer implementations on first use. |

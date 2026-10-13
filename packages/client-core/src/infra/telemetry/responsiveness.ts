@@ -9,12 +9,35 @@ import {
 
 export type ResponsivenessPulse = { active: boolean; activity: TelemetryActivity | null }
 
-/** A local responsiveness check, not an uptime monitor. Only a focused, visible window is armed. */
+/** How long frame gaps are sampled after the last sign of activity. */
+const FRAME_SAMPLE_MS = 2_000
+
+// Input that can move the screen. `scroll` doesn't bubble, so the listeners capture at the window.
+const INPUT_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'scroll'] as const
+
+const screenWorkListeners = new Set<() => void>()
+
+/**
+ * Something that can change the screen arrived without input, such as a socket frame while an agent
+ * streams. Frame gaps are sampled for a short while after it.
+ */
+export function noteScreenWork(): void {
+  for (const listener of screenWorkListeners) listener()
+}
+
+/**
+ * A local responsiveness check, not an uptime monitor. Only a focused, visible window is armed.
+ *
+ * Frame gaps are sampled only for a short window after activity. A frame loop that never stops would
+ * wake an idle window at the display's refresh rate to measure nothing. The event-loop check stays on
+ * its one-second timer, so a stall in an idle window is still reported.
+ */
 export function startResponsivenessMonitor(send: (pulse: ResponsivenessPulse) => void): () => void {
   let last = performance.now()
   let active = false
   let frame: number | null = null
   let previousFrame = 0
+  let sampleUntil = 0
   const isActive = () => telemetryEnabled() && document.visibilityState === 'visible' && document.hasFocus()
   const safelySend = (value: ResponsivenessPulse) => {
     try {
@@ -35,24 +58,30 @@ export function startResponsivenessMonitor(send: (pulse: ResponsivenessPulse) =>
       previousFrame = 0
       return
     }
+    // A frame requested inside the window is measured however late it lands, so a stall that runs
+    // past the window's end still records its gap.
     if (previousFrame) recordDuration('core', 'ui.frame.gap', now - previousFrame)
     previousFrame = now
-    frame = requestAnimationFrame(paint)
+    if (now < sampleUntil) frame = requestAnimationFrame(paint)
+    else previousFrame = 0
+  }
+  const sampleFrames = () => {
+    sampleUntil = performance.now() + FRAME_SAMPLE_MS
+    if (frame === null && isActive()) frame = requestAnimationFrame(paint)
   }
   const changed = () => {
     last = performance.now()
     pulse()
-    if (isActive() && frame === null) frame = requestAnimationFrame(paint)
-    if (!isActive() && frame !== null) {
-      cancelAnimationFrame(frame)
-      frame = null
-      previousFrame = 0
-    }
+    if (isActive()) return sampleFrames()
+    if (frame !== null) cancelAnimationFrame(frame)
+    frame = null
+    previousFrame = 0
   }
   const off = onTelemetryActivity(() => {
     pulse()
-    if (active && frame === null) frame = requestAnimationFrame(paint)
+    sampleFrames()
   })
+  screenWorkListeners.add(sampleFrames)
   const timer = setInterval(() => {
     const now = performance.now()
     const delay = Math.max(0, now - last - 1000)
@@ -63,16 +92,18 @@ export function startResponsivenessMonitor(send: (pulse: ResponsivenessPulse) =>
     }
     last = now
     pulse()
-    if (active && frame === null) frame = requestAnimationFrame(paint)
   }, 1000)
+  for (const type of INPUT_EVENTS) window.addEventListener(type, sampleFrames, { capture: true, passive: true })
   document.addEventListener('visibilitychange', changed)
   window.addEventListener('focus', changed)
   window.addEventListener('blur', changed)
   changed()
   return () => {
     off()
+    screenWorkListeners.delete(sampleFrames)
     clearInterval(timer)
     if (frame !== null) cancelAnimationFrame(frame)
+    for (const type of INPUT_EVENTS) window.removeEventListener(type, sampleFrames, { capture: true })
     document.removeEventListener('visibilitychange', changed)
     window.removeEventListener('focus', changed)
     window.removeEventListener('blur', changed)

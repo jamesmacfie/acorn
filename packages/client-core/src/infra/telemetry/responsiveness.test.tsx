@@ -1,6 +1,13 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { _resetClientTelemetry, setTelemetryEnabled, startClientTelemetry, startInteraction } from './emitter'
-import { startResponsivenessMonitor } from './responsiveness'
+import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
+import {
+  _resetClientTelemetry,
+  flushTelemetry,
+  setTelemetryEnabled,
+  startClientTelemetry,
+  startInteraction,
+} from './emitter'
+import { noteScreenWork, startResponsivenessMonitor } from './responsiveness'
 
 let dispose: (() => void) | undefined
 afterEach(() => {
@@ -8,6 +15,7 @@ afterEach(() => {
   dispose = undefined
   _resetClientTelemetry()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   vi.useRealTimers()
 })
 it('sends operation context synchronously and disarms on blur and consent revocation', () => {
@@ -46,4 +54,117 @@ it('a broken diagnostic transport cannot prevent an interaction', () => {
     })
   }).not.toThrow()
   expect(() => startInteraction('agents', { name: 'agents.session.open' })).not.toThrow()
+})
+
+// A display the test drives: each tick moves the clock one 60 Hz frame and runs the frames requested
+// before it, as a compositor would. Counting requests is counting how often an idle window is woken.
+function frameClock() {
+  let pending = new Map<number, FrameRequestCallback>()
+  let nextId = 0
+  let requests = 0
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    requests += 1
+    pending.set(++nextId, callback)
+    return nextId
+  })
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => pending.delete(id))
+  const paint = () => {
+    const due = pending
+    pending = new Map()
+    for (const callback of due.values()) callback(performance.now())
+  }
+  return {
+    requests: () => requests,
+    paint,
+    run(ms: number) {
+      for (let elapsed = 0; elapsed < ms; elapsed += 16) {
+        vi.advanceTimersByTime(16)
+        paint()
+      }
+    },
+  }
+}
+
+// The flush timer posts a batch every few seconds, so a histogram's samples are spread over batches.
+// A flush skips while the previous post is unsettled, so settle it before the last one.
+async function postedHistogram(posted: TelemetryRecord[][], name: string) {
+  await vi.advanceTimersByTimeAsync(0)
+  await flushTelemetry()
+  const total = { count: 0, max: 0 }
+  for (const record of posted.flat()) {
+    if (record.kind !== 'metric' || record.name !== name || typeof record.value !== 'object') continue
+    total.count += record.value.count
+    total.max = Math.max(total.max, record.value.max)
+  }
+  return total
+}
+
+function armedMonitor() {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'performance', 'Date'] })
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+  vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+  const posted: TelemetryRecord[][] = []
+  startClientTelemetry({ runtime: 'renderer', post: async (records) => void posted.push([...records]) })
+  setTelemetryEnabled(true)
+  const clock = frameClock()
+  dispose = startResponsivenessMonitor(() => {})
+  return { clock, posted }
+}
+
+it('stops requesting frames in an idle window and keeps checking the event loop', async () => {
+  const { clock, posted } = armedMonitor()
+  clock.run(60_000)
+  // Arming opens one two-second window, about 125 frames, and nothing after it.
+  expect(clock.requests()).toBeGreaterThan(100)
+  expect(clock.requests()).toBeLessThan(140)
+  const afterFirstMinute = clock.requests()
+  clock.run(60_000)
+  expect(clock.requests()).toBe(afterFirstMinute)
+  expect((await postedHistogram(posted, 'ui.event_loop.delay')).count).toBeGreaterThanOrEqual(119)
+})
+
+it('samples frame gaps again after input, a socket frame, or telemetry activity', async () => {
+  const { clock, posted } = armedMonitor()
+  clock.run(5_000)
+  const wakes: Array<[string, () => void]> = [
+    ['wheel', () => document.body.dispatchEvent(new WheelEvent('wheel'))],
+    // Scroll doesn't bubble, so this proves the window listener captures it.
+    ['scroll', () => document.body.appendChild(document.createElement('div')).dispatchEvent(new Event('scroll'))],
+    ['key', () => document.body.dispatchEvent(new KeyboardEvent('keydown'))],
+    ['socket frame', () => noteScreenWork()],
+    ['interaction', () => startInteraction('agents', { name: 'agents.session.open' }).end()],
+  ]
+  for (const [name, wake] of wakes) {
+    const before = clock.requests()
+    wake()
+    clock.run(5_000)
+    expect(clock.requests() - before, name).toBeGreaterThan(100)
+    expect(clock.requests() - before, name).toBeLessThan(140)
+  }
+  expect((await postedHistogram(posted, 'ui.frame.gap')).count).toBeGreaterThan(500)
+})
+
+it('records the gap of a frame that lands after its sampling window closed', async () => {
+  const { clock, posted } = armedMonitor()
+  clock.run(1_984)
+  // The renderer stalls for three seconds with a frame already requested.
+  vi.advanceTimersByTime(3_000)
+  clock.paint()
+  expect((await postedHistogram(posted, 'ui.frame.gap')).max).toBeGreaterThanOrEqual(3_000)
+  const settled = clock.requests()
+  clock.run(10_000)
+  expect(clock.requests()).toBe(settled)
+})
+
+it('requests no frames while telemetry is off', () => {
+  vi.useFakeTimers()
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+  vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+  startClientTelemetry({ runtime: 'renderer', post: async () => {} })
+  const clock = frameClock()
+  dispose = startResponsivenessMonitor(() => {})
+  document.body.dispatchEvent(new WheelEvent('wheel'))
+  noteScreenWork()
+  clock.run(10_000)
+  expect(clock.requests()).toBe(0)
 })

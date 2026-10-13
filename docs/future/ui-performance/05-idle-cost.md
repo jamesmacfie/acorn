@@ -1,6 +1,34 @@
 # Phase 05: idle cost
 
-Status: planned, October 13, 2026.
+Completion note, October 13, 2026: Three changes landed. The frame-gap sampler in
+`startResponsivenessMonitor` asks for frames only for two seconds after activity: input, telemetry
+activity, a socket frame from the active Node (`noteScreenWork`, called from `wsClient`), or the
+window gaining focus or becoming visible. The event-loop check keeps its one-second timer. A frame
+requested inside the window records its gap however late it lands, so a stall at the window's edge
+isn't lost. The git plugin's Changes rail marker keeps its map when a status poll answers the same
+dot. The agents plugin no longer counts a `waiting` agent as work, so the Workflows pane button
+stops turning a loader while a workflow agent waits for its owner. On a task row the attention mark
+already won, so nothing changes there. [Diagnosis](../../telemetry/diagnosis.md) describes the
+sampler's window.
+
+An agent-launched window is always hidden and fires no animation frames, so this phase didn't run
+the replay's idle phases. Every number is a count from jsdom tests, not real-window CPU or wakeups.
+In a focused idle window with telemetry on, the base sampler asked for 3,751 frames a minute. The
+change asks for about 125 in the two seconds after arming, then none. One rail row reran 24 times
+in an idle minute with three dirty tasks, and now reruns 6 times, once per poll. The other timers
+and socket frames already keep their signals on an unchanged answer, change what they draw on each
+tick, or tick less than once a minute. The dated [idle cost check](../../testing/idle-cost-2026-10-13.md) lists each suspect, what
+it does, and the exact real-window commands a person still needs to run with telemetry on and off.
+
+Deviation: the sampler also wakes on pointer moves, not only on clicks, keys, and scrolls, so a
+drag keeps its frames measured. Agent usage polling every five minutes still redraws the indicator's
+few rows on each answer. The Node's answer carries a fresh capture time, so an equality check would
+rarely hold.
+
+For later phases: a replay report's `idle-focused` phase has near-zero `ui.frame.gap` samples by
+design. Read frame gaps from `streaming` or from an interaction.
+
+Status: implemented; real-window idle numbers pending, October 13, 2026.
 
 Read the [programme page](./README.md) first. This phase starts by measuring with phase 01's idle
 phases.

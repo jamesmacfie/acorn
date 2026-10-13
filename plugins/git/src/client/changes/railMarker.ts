@@ -44,7 +44,11 @@ function ask(taskId: string, revision: number): void {
   if (askedAt.get(taskId) === revision) return
   askedAt.set(taskId, revision)
   localGitApi.status(taskId).then(
-    (status) => setDots((current) => ({ ...current, [taskId]: changesDot(status.changes) })),
+    (status) => {
+      const dot = changesDot(status.changes)
+      // Same dot, same map: every rail row reads it, and most polls answer what the last one did.
+      setDots((current) => (current[taskId] === dot ? current : { ...current, [taskId]: dot }))
+    },
     () => {},
   )
 }

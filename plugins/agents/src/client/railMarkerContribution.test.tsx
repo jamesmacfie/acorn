@@ -110,6 +110,13 @@ describe('the Workflows pane button', () => {
 
     managedAgentStore.upsertSession(row('step', 'wf-b', { runtimeState: 'working', kind: 'workflow' }))
     expect(workflowsButton('wf-b')).toMatchObject([{ id: 'working', busy: true, placements: ['top-end'] }])
+
+    // Waiting at a gate is not work: the loader stops until the owner answers.
+    managedAgentStore.upsertSession(
+      row('step', 'wf-b', { runtimeState: 'waiting', attention: 'workflow_gate', kind: 'workflow' }),
+    )
+    expect(workflowsButton('wf-b')).toEqual([])
+    expect(agentButton('wf-b').map((marker) => marker.id)).toEqual(['attention'])
   })
 })
 

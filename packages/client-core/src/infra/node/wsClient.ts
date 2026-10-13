@@ -23,6 +23,7 @@ import type { NoticeFrame } from '@acorn/protocol/notices.ts'
 import { type WsClientFrame, type WsServerFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from '../platform'
 import { measure } from '../telemetry/emitter'
+import { noteScreenWork } from '../telemetry/responsiveness'
 import { activeNodeId } from './activeNode'
 import { registerWsChannel, routeWsFrame, wsReattachFrames, wsSubscriptionIntent } from './wsChannels'
 import { toast } from '../../features/notifications/toast'
@@ -145,11 +146,14 @@ function connect(): void {
       for (const cb of fleetWorkspacesModeSubs) cb(nodeId, { mode })
     }
     if (nodeId !== activeNodeId()) return
+    // A frame is how a streaming reply or a busy terminal reaches the screen without any input.
+    noteScreenWork()
     dispatch(raw)
   })
   // Binary stream output has the same node filter. Its owner decodes the payload.
   transport.onBytes((nodeId, frame) => {
     if (nodeId !== activeNodeId()) return
+    noteScreenWork()
     binaryHandler?.(frame)
   })
   transport.onStatus((status) => {

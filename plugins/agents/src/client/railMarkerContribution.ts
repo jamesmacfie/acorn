@@ -52,8 +52,10 @@ const forTask = (taskId: string, predicate: (session: AgentSession) => boolean) 
 // spinner only for this task's workflow agents, so a spinner on the Agent button with none here says
 // the agent at work is not the workflow's.
 const WORKFLOWS_PANE_ID = 'workflows'
+// `waiting` counts as active, but the agent has stopped until the owner answers, so it doesn't turn a
+// loader. The Workflows button shows no attention, so there a waiting agent would spin until answered.
 const hasAgentWork = (session: AgentSession) =>
-  isActiveAgent(session) ||
+  (isActiveAgent(session) && session.runtimeState !== 'waiting') ||
   (!['stopped', 'failed', 'archived'].includes(session.runtimeState) &&
     session.subagents.some((child) => child.status === 'pending' || child.status === 'running'))
 const isWorkingWorkflowAgent = (session: AgentSession) => session.kind === 'workflow' && hasAgentWork(session)
