@@ -12,7 +12,7 @@ Topic pages:
 - [Agent conversations](./browser-extension/conversations.md): the agent operations, change hints,
   the conversation window, send retries, and browser storage.
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
-  page access, sending them, and the attachment operations.
+  the page's **Add to Acorn chat** entry, page access, sending them, and the attachment operations.
 - [Handoffs](./browser-extension/handoffs.md): the task chip on websites, the handoff card, the
   panel's verbs and its `acorn://` links, and the operations that resolve a page and create a linked
   task.
@@ -49,8 +49,8 @@ The extension declares no content scripts and holds no host access at install. T
 injects one, `content.js`, into a page it may read that matches a plugin's
 [task chip](./browser-extension/handoffs.md#task-chips) or an app a plugin published for a task, which
 gets the [branch marker](./browser-extension/task-pages.md#the-branch-marker). The manifests
-(`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, and `scripting`, plus
-`sidePanel` in Chrome. They list `http://*/*` and `https://*/*` as optional host access, and
+(`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, `scripting`, and
+`contextMenus`, plus `sidePanel` in Chrome. The browser grants them at install without a prompt. They list `http://*/*` and `https://*/*` as optional host access, and
 `notifications` as an optional permission, which only the person can grant, and turn off private
 windows.
 

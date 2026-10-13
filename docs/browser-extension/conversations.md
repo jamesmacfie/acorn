@@ -103,10 +103,12 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
   conversation's first draft here before it opens.
 - `captures:<nodeId>:<taskId>:<sessionId>`: that draft's [page captures](./page-capture.md), with each
   screenshot's attachment ID once the Node holds it. It sits apart from the text because the text is
-  saved on each keystroke and a screenshot can be megabytes.
+  saved on each keystroke and a screenshot can be megabytes. The background adds a selection here
+  for [Add to Acorn chat](./page-capture.md#add-to-acorn-chat), and an open composer shows it.
 - `destination:<nodeId>`: the current task on that Node, with its project, and the conversation open
   over Home, if any. The panel restores both when it opens and when Settings closes. Only the person's
-  own choices are saved, including a task chosen in Settings' task search.
+  own choices are saved, including a task chosen in Settings' task search and the conversation
+  **Add to Acorn chat** added a selection to.
 - `appearance`: the panel's `{ theme, style }`, with `theme` null to follow the system's light or dark
   ([appearance](./setup.md#appearance)).
 - `handoffs`: the selected Node's [handoffs](./handoffs.md#task-chips), `{ nodeId, handoffs }`,

@@ -29,7 +29,7 @@ import { Waiting } from './Waiting'
 // so a slow reply can't fill the wrong list.
 export function Workspace(props: {
   client: BridgeClient
-  storage: BrowserApi['storage']['local']
+  storage: BrowserApi['storage']
   nodeId: string
   online: boolean
   // Whether Open in Acorn may open the desktop app, or copies its link.
@@ -88,7 +88,7 @@ export function Workspace(props: {
     setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
   }
   // Only the person's own choices are remembered, so a restore that stops part-way loses nothing.
-  const remember = () => void saveDestination(props.storage, nodeId, current())
+  const remember = () => void saveDestination(props.storage.local, nodeId, current())
 
   const loadProjects = async () => {
     setProblem(null)
@@ -158,7 +158,7 @@ export function Workspace(props: {
     const capture = props.waitingContext
     if (capture) {
       try {
-        await changeDraft(props.storage, { nodeId, taskId: forTask, sessionId: id }, (draft) => {
+        await changeDraft(props.storage.local, { nodeId, taskId: forTask, sessionId: id }, (draft) => {
           const captures = draft.captures ?? []
           // The same item handed off twice is one capture.
           if (captures.some((other) => other.kind === 'context' && other.url === capture.url)) return draft
@@ -222,7 +222,7 @@ export function Workspace(props: {
   ) {
     props.dismissHandoff()
     try {
-      await changeDraft(props.storage, { nodeId, taskId, sessionId }, (stored) => ({
+      await changeDraft(props.storage.local, { nodeId, taskId, sessionId }, (stored) => ({
         ...stored,
         text: stored.text || draft.text,
         captures: withCapture(stored.captures ?? [], draft.capture),
@@ -244,7 +244,7 @@ export function Workspace(props: {
 
   // Opens a request's conversation, as a remembered one is restored.
   const openConversation = (target: Destination & { projectId: string; taskId: string }) => {
-    void saveDestination(props.storage, nodeId, target)
+    void saveDestination(props.storage.local, nodeId, target)
     void restore(target.projectId, target.taskId, (list) => {
       if (list.some((session) => session.id === target.sessionId)) showSession(target.sessionId!)
     })
@@ -321,12 +321,12 @@ export function Workspace(props: {
     if (id === plain) delete next[key]
     else next[key] = id ?? ''
     setSiteChoices(next)
-    void saveSiteChoices(props.storage, nodeId, next)
+    void saveSiteChoices(props.storage.local, nodeId, next)
   }
 
   onMount(async () => {
-    const remembered = await loadDestination(props.storage, nodeId)
-    setSiteChoices(await loadSiteChoices(props.storage, nodeId))
+    const remembered = await loadDestination(props.storage.local, nodeId)
+    setSiteChoices(await loadSiteChoices(props.storage.local, nodeId))
     await loadProjects()
     // A request opened from a notification while this loaded chose already.
     if (chosen || !remembered.projectId || !remembered.taskId) return

@@ -48,8 +48,11 @@ export type BackgroundMessage =
   // Every request the selected Node's agents are waiting on, as the badge counts them. The sidebar shows
   // those for its own page or project.
   | { type: 'requests'; nodeId: string | null; requests: BridgePendingRequest[] }
-  // An OS notification was clicked: open that request's conversation.
+  // Open a conversation: a waiting request's, from its OS notification, or the one a right-click
+  // added a selection to.
   | { type: 'open'; target: RequestTarget }
+  // Why a right-click added nothing, in one line.
+  | { type: 'notice'; notice: string }
   // The selected Node's tasks and the page addresses each is known by.
   | { type: 'taskPages'; nodeId: string | null; tasks: BridgePageTask[] }
   // A task chip was clicked: show Home on the page's task, with a new chat about the page for `chat`.

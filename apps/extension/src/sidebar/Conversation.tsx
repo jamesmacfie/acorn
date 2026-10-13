@@ -19,7 +19,7 @@ import { State, agentName, agentState } from './state'
 // to `target` and can't reach another conversation.
 export function Conversation(props: {
   client: BridgeClient
-  storage: BrowserApi['storage']['local']
+  storage: BrowserApi['storage']
   target: DraftTarget
   // The conversation's row as its task's list read it, until the conversation's own read arrives.
   session: BridgeAgentSession

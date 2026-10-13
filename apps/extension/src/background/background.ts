@@ -11,6 +11,7 @@ import { CallFailure, type BackgroundMessage, type BridgeCall, type HostState, t
 import { appTask, pageTasks } from '../taskPages'
 import { nativeBridge } from './nativeBridge'
 import { requestBadge } from './requestBadge'
+import { selectionMenu } from './selectionMenu'
 import { siteButtons } from './siteButtons'
 import { appMarker, chipTask, taskPages } from './taskPages'
 
@@ -38,10 +39,10 @@ export function startBackground(api: BrowserApi, hostName: string): void {
   }
 
   // Clicks waiting for a sidebar to take them, the latest of each kind: a page to hand off, a task to
-  // show, or a notification's conversation. A panel opened by the click connects a moment later, and
-  // gets them then.
+  // show, a conversation to open, or why a right-click added nothing. A panel opened by the click
+  // connects a moment later, and gets them then.
   let waiting: BackgroundMessage[] = []
-  const offer = (message: Extract<BackgroundMessage, { type: 'handoff' | 'showTask' | 'open' }>): void => {
+  const offer = (message: Extract<BackgroundMessage, { type: 'handoff' | 'showTask' | 'open' | 'notice' }>): void => {
     waiting = sidebars.size ? [] : [...waiting.filter((other) => other.type !== message.type), message]
     broadcast(message)
   }
@@ -205,6 +206,19 @@ export function startBackground(api: BrowserApi, hostName: string): void {
       badge.tasksChanged()
     },
     changed: () => void buttons.redraw(),
+  })
+
+  selectionMenu(api, {
+    open: openPanel,
+    // The Node a restore under way may still drop, as it does one forgotten elsewhere.
+    selectedNode: async () => {
+      await restoring
+      const stored = (await api.storage.local.get([SELECTED_NODE_KEY]))[SELECTED_NODE_KEY]
+      return typeof stored === 'string' ? stored : null
+    },
+    read,
+    added: (target) => offer({ type: 'open', target }),
+    refused: (notice) => offer({ type: 'notice', notice }),
   })
 
   api.runtime.onConnect.addListener((port) => {

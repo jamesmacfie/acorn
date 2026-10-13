@@ -34,6 +34,8 @@ export type BrowserApi = {
     // One-off messages between a page's content script and the background.
     sendMessage(message: unknown): Promise<unknown>
     onMessage: Listeners<(message: unknown, sender: MessageSender) => void>
+    // The extension was installed, updated, or reloaded.
+    onInstalled: Listeners<() => void>
   }
   storage: {
     local: {
@@ -53,7 +55,7 @@ export type BrowserApi = {
   // `url` and `title` are present only for a tab this extension may read: the one the toolbar button
   // was just clicked on (`activeTab`), or a site the person granted.
   tabs: {
-    query(query: { active?: true; currentWindow?: true }): Promise<Tab[]>
+    query(query: { active?: true; currentWindow?: true; windowId?: number }): Promise<Tab[]>
     captureVisibleTab(windowId: number, options: { format: 'jpeg'; quality: number }): Promise<string>
     sendMessage(tabId: number, message: unknown): Promise<unknown>
     // `change.url` is reported only for a tab this extension may read.
@@ -77,6 +79,12 @@ export type BrowserApi = {
     create(id: string, options: { type: 'basic'; iconUrl: string; title: string; message: string }): Promise<string>
     clear(id: string): Promise<boolean>
     onClicked: Listeners<(id: string) => void>
+  }
+  // Right-click entries on web pages. The browser keeps them across background restarts, so they are
+  // made once at install. A click grants `activeTab` for the tab it came from, as the toolbar button does.
+  contextMenus: {
+    create(item: { id: string; title: string; contexts: ['selection'] }): unknown
+    onClicked: Listeners<(info: { menuItemId: string | number }, tab?: Tab) => void>
   }
   // Chrome only.
   sidePanel?: {

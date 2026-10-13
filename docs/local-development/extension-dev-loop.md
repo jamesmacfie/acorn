@@ -78,6 +78,9 @@ from it reads the sidebar itself. Capture checks need the real panel beside the 
   `extensions.webextOptionalPermissionPrompts` to `false` in the profile's `user.js` and press a
   button that calls `browser.permissions.request()`. Firefox doesn't take a screenshot on a site
   grant alone, so a Firefox screenshot needs a person's toolbar click.
+- **Add to Acorn chat.** A driver can't click the browser's own menu. After `Extensions.triggerAction`,
+  run `chrome.contextMenus.onClicked.dispatch({ menuItemId: 'add-to-acorn-chat' }, tab)` in the
+  service worker ([what it covers](../browser-extension/page-capture.md#gaps)).
 
 ## Check task chips
 

@@ -6,7 +6,7 @@ import type {
   BridgeConversationRecord,
   BridgeInputPart,
 } from '@acorn/protocol/extensionBridge.ts'
-import { startBackground } from '../background/background'
+import { SELECTED_NODE_KEY, startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
 import { back, button, conversationTitle, findTask, openChat } from '../test/sidebarUi'
 import { App } from './App'
@@ -909,5 +909,108 @@ describe('page capture', () => {
     expect(transcript(subject.root)).toEqual(['YouLookAttachment'])
     await openChat(subject.root, 'Chat s2')
     expect(revoked).toEqual(['blob:shot-1'])
+  })
+})
+
+describe('Add to Acorn chat', () => {
+  const captures = (root: HTMLElement) =>
+    [...root.querySelectorAll('[data-testid="capture"] strong')].map((item) => item.textContent)
+  // The page's right-click entry, on a selection, with this browser's Node remembered.
+  const selected = (fake = fakeBrowser()) => {
+    fake.storage.set(SELECTED_NODE_KEY, 'n1')
+    fake.selection = 'The failing assertion'
+    return fake
+  }
+  const rightClick = async (subject: ReturnType<typeof mount>) => {
+    subject.fake.clickMenu('add-to-acorn-chat')
+    await settle(30)
+  }
+  const storedCaptures = (subject: ReturnType<typeof mount>) =>
+    [...subject.fake.storage.keys()].filter((key) => key.startsWith('captures:'))
+
+  it('is made at install, on selected text', () => {
+    const subject = mount()
+    subject.fake.install()
+    expect(subject.fake.menus.get('add-to-acorn-chat')).toEqual({ title: 'Add to Acorn chat', contexts: ['selection'] })
+  })
+
+  it('adds the selection to the open conversation, beside its other captures, and sends it', async () => {
+    const subject = mount(selected())
+    await openSession(subject.root, 's2')
+    button(subject.root, 'Add page link to chat')!.click()
+    await settle()
+    await rightClick(subject)
+    expect(subject.fake.panelOpens).toEqual([1])
+    expect(conversationTitle(subject.root)).toBe('Claude · Chat s2')
+    expect(captures(subject.root)).toEqual(['Page · Docs', 'Selected text · Docs'])
+
+    send(subject.root)
+    await settle()
+    const [input] = [...subject.state.inputs.values()]
+    expect(input).toMatchObject([
+      { type: 'context', label: 'Page: Docs' },
+      {
+        type: 'context',
+        label: 'Selected text from Docs',
+        content: 'From https://example.test/docs:\n\nThe failing assertion',
+      },
+    ])
+  })
+
+  it("opens the current task's newest conversation from Home", async () => {
+    const subject = mount(selected())
+    await openSession(subject.root, 's2')
+    await back(subject.root)
+    await rightClick(subject)
+    expect(conversationTitle(subject.root)).toBe('Claude · Chat s1')
+    expect(captures(subject.root)).toEqual(['Selected text · Docs'])
+  })
+
+  it('leaves the draft filled when the browser refuses to open the panel', async () => {
+    const fake = selected()
+    fake.refusePanel = true
+    fake.storage.set('destination:n1', { projectId: 'p1', taskId: 't1', sessionId: null })
+    const subject = mount(fake)
+    dispose?.()
+    await rightClick(subject)
+    expect(fake.panelOpens).toEqual([])
+    expect(storedCaptures(subject)).toEqual(['captures:n1:t1:s1'])
+
+    const root = subject.reopen()
+    await settle(30)
+    expect(conversationTitle(root)).toBe('Claude · Chat s1')
+    expect(captures(root)).toEqual(['Selected text · Docs'])
+  })
+
+  it('says why, and keeps nothing, when no task is current', async () => {
+    const subject = mount(selected())
+    await settle()
+    await rightClick(subject)
+    expect(subject.fake.panelOpens).toEqual([1])
+    expect(subject.root.textContent).toContain("No task is current, so the selection wasn't added.")
+    expect(storedCaptures(subject)).toEqual([])
+    button(subject.root, 'Dismiss')!.click()
+    await settle()
+    expect(subject.root.textContent).not.toContain('No task is current')
+  })
+
+  it('says why when no Node is selected', async () => {
+    const fake = fakeBrowser()
+    fake.selection = 'The failing assertion'
+    const subject = mount(fake)
+    await rightClick(subject)
+    expect(subject.root.textContent).toContain("No Node is selected, so the selection wasn't added.")
+    expect(storedCaptures(subject)).toEqual([])
+  })
+
+  it('says why when the Node cannot be reached', async () => {
+    const subject = mount(selected())
+    subject.fake.storage.set('destination:n1', { projectId: 'p1', taskId: 't1', sessionId: null })
+    subject.state.answers.set('sessions.list', () => ({
+      error: { code: 'node_unreachable', message: 'The Node did not answer.' },
+    }))
+    await rightClick(subject)
+    expect(subject.root.textContent).toContain("The selection wasn't added: The Node did not answer.")
+    expect(storedCaptures(subject)).toEqual([])
   })
 })

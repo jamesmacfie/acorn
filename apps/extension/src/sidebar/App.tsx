@@ -56,6 +56,8 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     requests: [],
   })
   const [openRequest, setOpenRequest] = createSignal<RequestTarget | null>(null)
+  // Why the page's right-click entry added nothing, until the person dismisses it or it works.
+  const [notice, setNotice] = createSignal<string | null>(null)
   // The selected Node's tasks and their page addresses, as the background keeps them, and a task chip's
   // click asking Home to show the page's task.
   const [taskPages, setTaskPages] = createSignal<{ nodeId: string | null; tasks: BridgePageTask[] }>({
@@ -105,9 +107,11 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     page: () => setPageChecks((count) => count + 1),
     requests: (nodeId, list) => setRequests({ nodeId, requests: list }),
     open: (target) => {
+      setNotice(null)
       setOpenRequest(target)
       setSettings(false)
     },
+    notice: setNotice,
     taskPages: (nodeId, tasks) => setTaskPages({ nodeId, tasks }),
     showTask: (chat) => {
       setShowTask({ chat })
@@ -223,6 +227,16 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
         )}
       </Show>
       <Show when={host().restoreError}>{(message) => <p class="banner notice">{message()}</p>}</Show>
+      <Show when={notice()}>
+        {(message) => (
+          <div class="banner notice row" role="status">
+            <span class="grow">{message()}</span>
+            <button type="button" class="quiet" onClick={() => setNotice(null)}>
+              Dismiss
+            </button>
+          </div>
+        )}
+      </Show>
       <Show when={problem()}>
         {(error) => (
           <p class="banner problem" role="alert">
@@ -272,7 +286,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
               {(nodeId) => (
                 <Workspace
                   client={client}
-                  storage={props.api.storage.local}
+                  storage={props.api.storage}
                   nodeId={nodeId}
                   online={online()}
                   opensLinks={props.opensLinks ?? false}

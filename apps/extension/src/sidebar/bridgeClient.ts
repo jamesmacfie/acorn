@@ -28,6 +28,7 @@ export function bridgeClient(
     page(): void
     requests(nodeId: string | null, requests: BridgePendingRequest[]): void
     open(target: RequestTarget): void
+    notice(notice: string): void
     taskPages(nodeId: string | null, tasks: BridgePageTask[]): void
     showTask(chat: { url: string; title: string } | null): void
   },
@@ -51,6 +52,7 @@ export function bridgeClient(
       if (message.type === 'page') return events.page()
       if (message.type === 'requests') return events.requests(message.nodeId, message.requests)
       if (message.type === 'open') return events.open(message.target)
+      if (message.type === 'notice') return events.notice(message.notice)
       if (message.type === 'taskPages') return events.taskPages(message.nodeId, message.tasks)
       if (message.type === 'showTask') return events.showTask(message.chat)
       const request = pending.get(message.id)
