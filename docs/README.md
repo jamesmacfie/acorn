@@ -401,6 +401,10 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 - [Steer a running turn](./future/steering.md).
 
+## Plugin rail and artwork proposal
+
+- [Dynamic plugin rail presentation and artwork](./future/plugin-rail-artwork.md).
+
 ## Browser extension proposal
 
 - [Extension context](./future/extension/README.md).
