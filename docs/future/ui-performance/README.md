@@ -1,6 +1,10 @@
 # UI performance
 
-Status: proposed, October 13, 2026. Baseline: `6d9efa88f`. Nothing in this programme is implemented.
+Status: built October 13, 2026, with real-window numbers pending. Baseline: `6d9efa88f`. Phases 01,
+02, 04, and 05 landed code. Phase 03 measured its parse cost under the gate and changed nothing. An
+agent-launched window is always hidden, so every phase measured in Node or jsdom instead. Each phase
+note lists the real-window numbers a person still needs to take with the
+[streaming replay](../../local-development/streaming-replay.md).
 
 This programme makes the desktop cost less in three moments: while an agent streams, when you switch
 back to a session, and while nothing changes. It also gives Acorn a way to measure those costs in the

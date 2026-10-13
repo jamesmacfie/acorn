@@ -18,7 +18,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [extension/](./extension/README.md) | Ten phases for Chrome and Firefox, an independent native bridge, task handoff, capture, chat, approvals, and site notifications. | Proposed October 10, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
-| [ui-performance/](./ui-performance/README.md) | A streaming replay harness, then cheaper streaming code blocks, Markdown parsing, session revisits, and idle cost. | Proposed October 13, 2026. Implementation not started. |
+| [ui-performance/](./ui-performance/README.md) | A streaming replay harness, then cheaper streaming code blocks, Markdown parsing, session revisits, and idle cost. | Built October 13, 2026. Real-window measurements remain open. |
 
 ## The single files
 
