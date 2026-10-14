@@ -48,7 +48,7 @@ const usable = (profile: BridgeAgentProfile): boolean => profile.installed && pr
 // picker, the panel opens and says why in one line.
 //
 // Then the box asks the background for the task's conversations and agents, and sends the question
-// through it. docs/future/element-picker/README.md.
+// through it. See docs/browser-extension/element-picker.md.
 export function askElement(
   api: BrowserApi,
   events: {

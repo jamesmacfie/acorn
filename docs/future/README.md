@@ -14,7 +14,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | --- | --- | --- |
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
-| [element-picker/](./element-picker/README.md) | Four tickets for picking an element on a task page in the browser extension and asking the task's agent about it. | Proposed October 14, 2026. Implementation not started. |
 | [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
 | [split/](./split/README.md) | Nine phases that fix drift in the Node and client split and the core and plugin split, including forge-neutral repositories and change requests. | Proposed October 14, 2026. Implementation not started. |
@@ -47,6 +46,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 
 | Removed plan | Owner or remaining handoff |
 | --- | --- |
+| `element-picker/`, removed October 14, 2026 | [Ask Acorn about an element](../browser-extension/element-picker.md), which lists what wasn't checked in a browser. |
 | `ui-performance/`, phases 01 to 05 removed October 13, 2026, and the rest October 14, 2026 | [Streaming replay](../local-development/streaming-replay.md), [Markdown renders block by block](../ui-design/kit-internals.md#markdown-renders-block-by-block), [idle stop](../managed-agents/operations.md#idle-stop), and [diagnosis](../telemetry/diagnosis.md). Open acceptance: the [checks still to run](../testing/ui-performance-open-checks-2026-10-14.md). |
 | `steering.md`, removed October 13, 2026 | [Steer a running turn](../managed-agents/steering.md). Open acceptance: a real-window Node kill between the harness taking a steer and the Node recording it. |
 | `agent-search-startup.md`, removed October 13, 2026 | [Transcript search](../managed-agents/transcript-search.md). |

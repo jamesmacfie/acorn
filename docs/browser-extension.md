@@ -13,6 +13,7 @@ Topic pages:
   the conversation window, send retries, and browser storage.
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
   the page's **Add to Acorn chat** entry, page access, sending them, and the attachment operations.
+- [Ask Acorn about an element](./browser-extension/element-picker.md): the element picker and its checks.
 - [Handoffs](./browser-extension/handoffs.md): the task chip on websites, the handoff card, the
   panel's verbs and its `acorn://` links, and the operations that resolve a page and create a linked
   task.
@@ -45,10 +46,10 @@ Data flows sidebar → background → native host → pinned Node connection →
 extension never hold a token or certificate. The desktop app takes no part: the bridge pairs and
 connects on its own, so the desktop can stay closed.
 
-The extension declares no content scripts and holds no host access at install. The background
-injects one, `content.js`, into a page it may read that matches a plugin's
-[task chip](./browser-extension/handoffs.md#task-chips) or an app a plugin published for a task, which
-gets the [branch marker](./browser-extension/task-pages.md#the-branch-marker). The manifests
+The extension declares no content scripts and holds no host access at install. The background injects
+`content.js` and `picker.js` into a page it may read that matches a plugin's [task chip](./browser-extension/handoffs.md#task-chips)
+or is an app a plugin published for a task, which gets the [branch marker](./browser-extension/task-pages.md#the-branch-marker),
+and `picker.js` alone after a right-click on [Ask Acorn about this element](./browser-extension/element-picker.md). The manifests
 (`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, `scripting`, and
 `contextMenus`, plus `sidePanel` in Chrome. The browser grants them at install without a prompt. They list `http://*/*` and `https://*/*` as optional host access, and
 `notifications` as an optional permission, which only the person can grant, and turn off private
