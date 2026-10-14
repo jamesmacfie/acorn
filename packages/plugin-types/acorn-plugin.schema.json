@@ -4003,6 +4003,35 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 256
+        },
+        "browserPanel": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "glyph": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "pane": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "route": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "required": [
+            "label",
+            "route"
+          ]
         }
       },
       "additionalProperties": {}

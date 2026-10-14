@@ -9,6 +9,7 @@ import {
   type BridgeAttachment,
   type BridgeErrorCode,
   type BridgeNodes,
+  type BridgePanel,
   type BridgeProject,
   type BridgeRequest,
   type BridgeResults,
@@ -35,6 +36,7 @@ import {
 } from '@acorn/protocol/siteAssociations.ts'
 import {
   BROWSER_HANDOFF_RESOLUTION_MAX_BYTES,
+  BROWSER_PANEL_MAX_BYTES,
   browserHandoffResolution,
   browserHandoffsRoute,
   matchHandoffPage,
@@ -42,6 +44,9 @@ import {
   type BrowserHandoffResolution,
   type BrowserHandoffResolveRequest,
   type BrowserHandoffsResponse,
+  type BrowserPanel,
+  type BrowserPanelView,
+  browserPanelView,
   TASK_ADDRESSES_MAX_BYTES,
   taskAddressList,
 } from '@acorn/protocol/plugin/handoffs.ts'
@@ -140,8 +145,9 @@ export function createBridge(options: {
   let pendingLocal = false
   // An ask the owner hasn't answered. The secret stays in this process; the sidebar sees the phrase.
   let asking: { probe: Probe; secret: string } | null = null
-  // The plugins whose task addresses the last `tasks.pages` read asked for.
-  let addressPlugins = new Set<string>()
+  // The plugins whose state the sidebar shows, as the last `tasks.pages` read found them: those that
+  // publish task addresses, and those that declare a panel.
+  let statusPlugins = new Set<string>()
   const hints = agentHints(options.hint ?? (() => {}))
   const broker = new NodeBroker({
     frame(nodeId, frame) {
@@ -152,10 +158,10 @@ export function createBridge(options: {
       // A workspace rename or a project moved between workspaces changes Home's task list too.
       if (channel === 'project:changed' || channel === 'workspace:changed') options.projectsChanged?.(nodeId)
       if (channel === 'tasks:changed') options.tasksChanged?.(nodeId)
-      // A plugin that publishes task addresses asks clients to read its status again when its state
-      // changes, such as a stack coming up, so its addresses may have changed too.
+      // A plugin that publishes task addresses or a panel asks clients to read its status again when its
+      // state changes, such as a stack coming up, so its addresses and panel may have changed too.
       const pluginId = (frame as { pluginId?: unknown }).pluginId
-      if (channel === 'term:status' && typeof pluginId === 'string' && addressPlugins.has(pluginId))
+      if (channel === 'term:status' && typeof pluginId === 'string' && statusPlugins.has(pluginId))
         options.tasksChanged?.(nodeId)
     },
     bytes() {},
@@ -493,7 +499,7 @@ export function createBridge(options: {
   async function publishedAddresses(nodeId: string): Promise<PublishedAddresses[]> {
     const body = (await nodeRequest(nodeId, { method: 'GET', path: browserHandoffsRoute })) as BrowserHandoffsResponse
     const routes = (body?.taskAddresses ?? []).filter(({ pluginId, route }) => ownsRoute(pluginId, route))
-    addressPlugins = new Set(routes.map((route) => route.pluginId))
+    statusPlugins = new Set([...routes, ...declaredPanels(body)].map((entry) => entry.pluginId))
     const answers = await Promise.all(
       routes.map(async ({ pluginId, route }): Promise<PublishedAddresses[]> => {
         try {
@@ -510,6 +516,36 @@ export function createBridge(options: {
       }),
     )
     return answers.flat()
+  }
+
+  // A plugin's sidebar view for one task, from the route the Node declares now, never one the browser
+  // names. A plugin with no panel, or none for this task, answers null.
+  async function pluginPanel(
+    nodeId: string,
+    target: { pluginId: string; taskId: string; source?: string },
+  ): Promise<BrowserPanelView | null> {
+    const body = (await nodeRequest(nodeId, { method: 'GET', path: browserHandoffsRoute })) as BrowserHandoffsResponse
+    const panel = declaredPanels(body).find((entry) => entry.pluginId === target.pluginId)
+    if (!panel) return null
+    const query = new URLSearchParams({ taskId: target.taskId, ...(target.source ? { source: target.source } : {}) })
+    let answer: unknown
+    try {
+      answer = await nodeRequest(nodeId, {
+        method: 'GET',
+        path: `${panel.route}${panel.route.includes('?') ? '&' : '?'}${query}`,
+        maxResponseBytes: BROWSER_PANEL_MAX_BYTES,
+      })
+    } catch (error) {
+      if (error instanceof BridgeFailure && error.code === 'not_found') return null
+      throw error
+    }
+    const parsed = browserPanelView.safeParse(answer)
+    if (!parsed.success)
+      throw new BridgeFailure(
+        'node_error',
+        `The ${panel.pluginId} plugin answered with something the extension can't use.`,
+      )
+    return parsed.data
   }
 
   async function handle(request: BridgeRequest): Promise<BridgeResults[BridgeRequest['op']]> {
@@ -730,6 +766,7 @@ export function createBridge(options: {
         return {
           nodeId: request.nodeId,
           handoffs: body.handoffs.filter((handoff) => ownsRoute(handoff.pluginId, handoff.resolve)).map(bridgeHandoff),
+          panels: declaredPanels(body).map(bridgePanel),
         }
       }
       case 'handoff.resolve': {
@@ -841,6 +878,10 @@ export function createBridge(options: {
         const sessions = (await Promise.all([...taskIds].map((taskId) => taskSessions(request.nodeId, taskId)))).flat()
         return { nodeId: request.nodeId, runId: request.runId, steps: bridgeSteps(steps, sessions, bridgeSession) }
       }
+      case 'plugin.panel': {
+        const view = await pluginPanel(request.nodeId, request)
+        return { nodeId: request.nodeId, pluginId: request.pluginId, taskId: request.taskId, view }
+      }
       case 'attachment.delete': {
         await taskAttachment(request.nodeId, request.taskId, request.attachmentId)
         const result = (await nodeRequest(request.nodeId, {
@@ -865,6 +906,12 @@ export function createBridge(options: {
     },
   }
 }
+
+// The panels discovery lists whose route stays inside their own plugin's namespace.
+const declaredPanels = (body: BrowserHandoffsResponse | null): BrowserPanel[] =>
+  (Array.isArray(body?.panels) ? body.panels : []).filter((panel) => ownsRoute(panel.pluginId, panel.route))
+
+const bridgePanel = ({ route: _route, ...panel }: BrowserPanel): BridgePanel => panel
 
 const changedIdentityStatus = (nodeId: string): NodeStatus => ({
   nodeId,

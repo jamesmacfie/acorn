@@ -18,6 +18,8 @@ Topic pages:
   panel's verbs and its `acorn://` links, and the operations that resolve a page and create a linked
   task.
 - [Workflows](./browser-extension/workflows.md): starting a workflow, and the Workflows tab.
+- [Plugin panels](./browser-extension/plugin-panels.md): a plugin's read-only view of the sidebar's
+  task, its nav item, and the operation that reads it.
 - [Pages matched to tasks](./browser-extension/task-pages.md): the `tasks.pages` read, the app
   addresses plugins publish, matching the page to its task in the browser, Home's **This page**
   section, and the branch marker on a local app.
@@ -108,6 +110,7 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `handoffs.list`, `handoff.resolve`, `handoff.create` | `nodeId`, and the handoff and page | See [handoffs](./browser-extension/handoffs.md#native-operations) |
 | `sites.list`, `site.add`, `site.remove` | `nodeId`, and the project and association | See [project sites](./browser-extension/project-sites.md#native-operations) |
 | `workflows.list`, `workflow.start`, `workflow.runs`, `workflow.steps` | `nodeId`, and the project, task, or run | See [workflows](./browser-extension/workflows.md#native-operations) |
+| `plugin.panel` | `nodeId`, `pluginId`, `taskId`, `source` (optional) | `{ nodeId, pluginId, taskId, view }`, where `view` is null when the task has no panel; see [plugin panels](./browser-extension/plugin-panels.md#native-operation) |
 | `requests.pending` | `nodeId` | `{ nodeId, requests }`; see [request notifications](./browser-extension/notifications.md#native-operation) |
 
 A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, message } }`. The host

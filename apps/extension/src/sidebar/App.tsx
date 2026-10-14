@@ -5,6 +5,7 @@ import type {
   BridgeHandoff,
   BridgeNodes,
   BridgePageTask,
+  BridgePanel,
   BridgePendingRequest,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
@@ -28,13 +29,17 @@ const BRIDGE_RECHECK_MS = 3_000
 // Online, or online with live updates paused: either way the Node answers requests.
 const connected = (status: NodeStatus | null) => status?.state === 'online' || status?.state === 'degraded'
 
-type View = 'home' | 'agents' | 'workflows' | 'settings'
-const TABS: { id: View; label: string; glyph: string }[] = [
+// A plugin's sidebar panel is `panel:<pluginId>`.
+type View = 'home' | 'agents' | 'workflows' | 'settings' | `panel:${string}`
+type Tab = { id: View; label: string; glyph: string }
+const TABS: Tab[] = [
   { id: 'home', label: 'Home', glyph: 'house' },
   { id: 'agents', label: 'Agents', glyph: 'bot' },
   { id: 'workflows', label: 'Workflows', glyph: 'workflow' },
-  { id: 'settings', label: 'Settings', glyph: 'settings' },
 ]
+const SETTINGS_TAB: Tab = { id: 'settings', label: 'Settings', glyph: 'settings' }
+// The nav glyph of a panel that names none.
+const PANEL_GLYPH = 'puzzle'
 
 // `opensLinks` says whether this build runs beside a desktop that opens `acorn://` links.
 export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
@@ -52,6 +57,9 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [projectChanges, setProjectChanges] = createSignal(0)
   // The selected Node's handoffs, and the one the person asked for, if any.
   const [handoffs, setHandoffs] = createSignal<BridgeHandoff[]>([])
+  // The selected Node's plugin panels, and the plugins with one for the sidebar's task.
+  const [panels, setPanels] = createSignal<BridgePanel[]>([])
+  const [panelsShown, setPanelsShown] = createSignal<string[]>([])
   const [handoff, setHandoff] = createSignal<PageHandoff | null>(null)
   // Counts toolbar clicks, after which the active page may be readable where it wasn't.
   const [pageChecks, setPageChecks] = createSignal(0)
@@ -82,14 +90,26 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   // A handed-off item's context, waiting for the conversation the person opens next.
   const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
   // The bottom bar's choice. Home, Agents, and Workflows share one Workspace; Settings replaces it, and
-  // the Workspace restores from storage when Settings closes. Workflows shows only for a task with runs.
+  // the Workspace restores from storage when Settings closes. Workflows shows only for a task with runs,
+  // and a plugin's panel only for a task it has one for, or while it's open.
   const [view, setView] = createSignal<View>('home')
   const [hasWorkflows, setHasWorkflows] = createSignal(false)
-  const tabs = () => TABS.filter((tab) => tab.id !== 'workflows' || hasWorkflows() || view() === 'workflows')
+  const tabs = (): Tab[] => [
+    ...TABS.filter((tab) => tab.id !== 'workflows' || hasWorkflows() || view() === 'workflows'),
+    ...panels()
+      .filter((panel) => panelsShown().includes(panel.pluginId) || view() === `panel:${panel.pluginId}`)
+      .map((panel): Tab => ({ id: `panel:${panel.pluginId}`, label: panel.label, glyph: panel.glyph ?? PANEL_GLYPH })),
+    SETTINGS_TAB,
+  ]
   const workspaceTab = () => {
     const shown = view()
     return shown === 'settings' ? 'home' : shown
   }
+  // A panel whose plugin stopped, or that another Node doesn't have, closes to Home.
+  createEffect(() => {
+    const shown = view()
+    if (shown.startsWith('panel:') && !panels().some((panel) => shown === `panel:${panel.pluginId}`)) setView('home')
+  })
   // Whether the person has picked a tab since the panel opened. Until then, a remembered conversation
   // reopens on Agents; after, it waits there without moving them.
   let picked = false
@@ -98,6 +118,8 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const heading = (): Heading => {
     if (view() === 'settings') return { title: 'Settings' }
     if (view() === 'home') return { title: 'Home' }
+    const panel = panels().find((each) => view() === `panel:${each.pluginId}`)
+    if (panel) return { title: panel.label }
     return agentsHeading() ?? { title: view() === 'workflows' ? 'Workflows' : 'Agents' }
   }
   // The origins the branch marker is hidden on. Its own menu hides it, and This page shows it again.
@@ -168,7 +190,9 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const loadHandoffs = async (nodeId: string) => {
     try {
       const result = await client.call({ op: 'handoffs.list', nodeId })
-      if (result.nodeId === fleet()?.activeNodeId) setHandoffs(result.handoffs)
+      if (result.nodeId !== fleet()?.activeNodeId) return
+      setHandoffs(result.handoffs)
+      setPanels(result.panels)
     } catch {
       // Without the list the sidebar offers no handoff; pairing and conversations still work.
     }
@@ -198,6 +222,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     if (!switched) return
     // A handoff belongs to the Node it was asked of, as the page buttons do.
     setHandoffs([])
+    setPanels([])
     setHandoff(null)
     setWaitingContext(null)
     setSites([])
@@ -325,6 +350,8 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   showAgents={() => setView('agents')}
                   showWorkflows={() => setView('workflows')}
                   hasWorkflows={setHasWorkflows}
+                  panels={panels()}
+                  panelsShown={setPanelsShown}
                   resumed={() => !picked && setView('agents')}
                   heading={setAgentsHeading}
                   pageUrl={pageUrl()}

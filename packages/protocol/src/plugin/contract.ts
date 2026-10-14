@@ -6,7 +6,7 @@ import { ACORN_BASELINE } from '../baseline.ts'
 import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../data/dataSourceContributions.ts'
 import { PLUGIN_API_RANGE_RE } from './apiVersion.ts'
 import { pluginCliCommandDescriptorSchema } from './cliCommands.ts'
-import { browserHandoffDescriptor } from './handoffs.ts'
+import { browserHandoffDescriptor, browserPanelDescriptor } from './handoffs.ts'
 import {
   chromeAction,
   contextFreeAction,
@@ -135,6 +135,9 @@ const contributionsShape = z.looseObject({
   // A GET route on this plugin's node half listing the exact origins its tasks' apps answer at now, for
   // the browser extension (./handoffs.ts `taskAddressList`).
   taskAddresses: pluginRoute.optional(),
+  // A read-only sidebar panel in the browser extension, served as a view by a GET route on this
+  // plugin's node half (./handoffs.ts `browserPanelView`). One per plugin.
+  browserPanel: browserPanelDescriptor.optional(),
 })
 
 // Every contribution kind a manifest may declare, as a runtime list.
@@ -479,4 +482,5 @@ export type PluginContributions = {
   cliCommands?: import('./cliCommands.ts').PluginCliCommandDescriptor[]
   browserHandoffs?: Omit<import('./handoffs.ts').BrowserHandoff, 'pluginId'>[]
   taskAddresses?: string
+  browserPanel?: import('./handoffs.ts').BrowserPanelDescriptor
 } & Record<string, unknown>

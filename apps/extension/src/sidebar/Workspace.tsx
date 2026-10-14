@@ -5,6 +5,7 @@ import type {
   BridgeAgentSession,
   BridgeHandoff,
   BridgePageTask,
+  BridgePanel,
   BridgePendingRequest,
   BridgeProject,
   BridgeTask,
@@ -12,6 +13,7 @@ import type {
   BridgeWorkflowStep,
   BridgeWorkspace,
 } from '@acorn/protocol/extensionBridge.ts'
+import type { BrowserPanelView } from '@acorn/protocol/plugin/handoffs.ts'
 import type { BrowserApi } from '../browser'
 import { pageHandoffs, type PageHandoff } from '../handoffs'
 import { CallFailure, type RequestTarget } from '../messages'
@@ -31,6 +33,7 @@ import {
   saveHomeWorkspace,
   type Destination,
 } from '../localState'
+import { PluginPanel } from './PluginPanel'
 import { Waiting } from './Waiting'
 import { Workflows } from './Workflows'
 
@@ -53,11 +56,15 @@ export function Workspace(props: {
   reconnects: number
   projectChanges: number
   // The bottom bar's tab, asking for Agents when a conversation opens or Workflows when a run starts,
-  // whether there are runs to show there, and the two tabs' top bar heading.
-  tab: 'home' | 'agents' | 'workflows'
+  // whether there are runs to show there, and the two tabs' top bar heading. A plugin panel's tab is
+  // `panel:<pluginId>`.
+  tab: 'home' | 'agents' | 'workflows' | `panel:${string}`
   showAgents(): void
   showWorkflows(): void
   hasWorkflows(has: boolean): void
+  // The Node's plugin panels, and which plugins have one for the task Agents shows.
+  panels: readonly BridgePanel[]
+  panelsShown(pluginIds: string[]): void
   // The remembered conversation came back as the panel opened.
   resumed(): void
   heading(heading: Heading | null): void
@@ -111,6 +118,11 @@ export function Workspace(props: {
   // The project This page shows, apart from the current task's.
   const [pageProject, setPageProject] = createSignal<string | null>(null)
   const [siteChoices, setSiteChoices] = createSignal<SiteChoices>({})
+  // Each plugin's panel for the task Agents shows, by plugin: null when it has none for the task. Why
+  // the last read of a panel failed, and the log source the person picked in each.
+  const [panelViews, setPanelViews] = createSignal<Record<string, BrowserPanelView | null>>({})
+  const [panelProblems, setPanelProblems] = createSignal<Record<string, string>>({})
+  const [panelSources, setPanelSources] = createSignal<Record<string, string>>({})
   const [problem, setProblem] = createSignal<string | null>(null)
   // Counts the tasks made current, so a restore whose task list answers late can't undo a later choice.
   let chosen = 0
@@ -176,6 +188,34 @@ export function Workspace(props: {
     } catch {
       // Without the runs there is no Workflows tab; everything else still works.
     }
+  }
+
+  // A panel read keeps the last good view when it fails, and is dropped if the task changed meanwhile.
+  const loadPanel = async (pluginId: string, forTask: string) => {
+    const source = panelSources()[pluginId]
+    try {
+      const result = await props.client.call({
+        op: 'plugin.panel',
+        nodeId,
+        pluginId,
+        taskId: forTask,
+        ...(source ? { source } : {}),
+      })
+      if (agentsTask().taskId !== forTask) return
+      setPanelViews((views) => ({ ...views, [pluginId]: result.view }))
+      setPanelProblems(({ [pluginId]: _cleared, ...rest }) => rest)
+    } catch (error) {
+      if (agentsTask().taskId !== forTask) return
+      if (error instanceof CallFailure && (error.code === 'not_selected' || error.code === 'host_unavailable')) return
+      const message = error instanceof CallFailure ? errorGuidance(error) : String(error)
+      setPanelProblems((problems) => ({ ...problems, [pluginId]: message }))
+    }
+  }
+  const openPanel = () => (props.tab.startsWith('panel:') ? props.tab.slice('panel:'.length) : null)
+  const reloadOpenPanel = () => {
+    const pluginId = openPanel()
+    const { taskId } = agentsTask()
+    if (pluginId && taskId) void loadPanel(pluginId, taskId)
   }
 
   // Every change of task closes the conversation in the same write, so a conversation is never
@@ -324,6 +364,21 @@ export function Workspace(props: {
   )
   createEffect(() => props.hasWorkflows(!!runLists()[agentsTask().taskId ?? '']?.length))
   onCleanup(() => props.hasWorkflows(false))
+  // The task Agents shows, or the Node's panels, changed: read every panel, which also says which
+  // tabs show. A plugin answering no panel for the task has no tab. A memo, so a new task list that
+  // leaves the task as it was reads nothing.
+  const panelTask = createMemo(() => agentsTask().taskId)
+  createEffect(
+    on([panelTask, () => props.panels], ([taskId, panels]) => {
+      setPanelViews({})
+      setPanelProblems({})
+      if (taskId) for (const panel of panels) void loadPanel(panel.pluginId, taskId)
+    }),
+  )
+  createEffect(() => props.panelsShown(Object.keys(panelViews()).filter((pluginId) => panelViews()[pluginId] !== null)))
+  onCleanup(() => props.panelsShown([]))
+  // An open panel reads again when the Node's tasks change, which includes a plugin reporting a change.
+  createEffect(on(() => props.tasks, reloadOpenPanel, { defer: true }))
   const step = () => {
     const open = openStep()
     return open && open.taskId === agentsTask().taskId ? open : null
@@ -447,6 +502,7 @@ export function Workspace(props: {
         const forTask = current().sessionId ? current().taskId : agentsTask().taskId
         if (forTask) void loadSessions(forTask)
         if (agentsTask().taskId) void loadRuns(agentsTask().taskId!)
+        reloadOpenPanel()
       },
       { defer: true },
     ),
@@ -458,6 +514,7 @@ export function Workspace(props: {
   // Agents and Workflows name their list and its count in the top bar. An open conversation names itself.
   createEffect(() => {
     const { taskId } = agentsTask()
+    if (openPanel()) return
     if (props.tab === 'workflows') {
       // The Runs header below carries the count, as the desktop's does.
       if (!step()) props.heading({ title: 'Workflows' })
@@ -607,6 +664,35 @@ export function Workspace(props: {
             </>
           )}
         </Show>
+      </Show>
+      <Show when={props.panels.find((panel) => panel.pluginId === openPanel())}>
+        {(panel) => (
+          <Show
+            when={agentsTask().taskId}
+            keyed
+            fallback={
+              <div class="view" aria-label={panel().label}>
+                <p class="empty quiet">This page belongs to no task. Choose one under Home.</p>
+              </div>
+            }
+          >
+            {(taskId) => (
+              <PluginPanel
+                panel={panel()}
+                nodeId={nodeId}
+                taskId={taskId}
+                view={panelViews()[panel().pluginId]}
+                problem={panelProblems()[panel().pluginId] ?? null}
+                opensLinks={props.opensLinks}
+                refresh={() => void loadPanel(panel().pluginId, taskId)}
+                pickSource={(source) => {
+                  setPanelSources((sources) => ({ ...sources, [panel().pluginId]: source }))
+                  void loadPanel(panel().pluginId, taskId)
+                }}
+              />
+            )}
+          </Show>
+        )}
       </Show>
       <Show when={props.tab === 'workflows'}>
         <Show

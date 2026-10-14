@@ -14,6 +14,20 @@ import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type { BridgeRequest } from '@acorn/protocol/extensionBridge.ts'
 import { createBridge } from './bridge'
 
+// Every broker the bridge makes keeps its event handlers here, so a test can deliver a Node's frame
+// without a socket.
+const brokerEvents = vi.hoisted(() => [] as { frame(nodeId: string, frame: unknown): void }[])
+vi.mock('@acorn/custody/broker', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/custody/broker')>()
+  class RecordingBroker extends actual.NodeBroker {
+    constructor(...args: ConstructorParameters<typeof actual.NodeBroker>) {
+      super(...args)
+      brokerEvents.push(args[0])
+    }
+  }
+  return { ...actual, NodeBroker: RecordingBroker }
+})
+
 const CODE = 'GOOD-CODE'
 const TOKEN = 'device-token-secret'
 type Cert = ReturnType<typeof ensureCert>
@@ -74,9 +88,11 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     ] as Record<string, unknown>[],
     resolution: null as unknown,
     resolveRequests: [] as unknown[],
-    // The task address routes discovery declares, and what each answers.
+    // The task address routes and panels discovery declares, and what each plugin route answers: a
+    // body, an Error for a 500, or a bare status.
     taskAddresses: [] as { pluginId: string; route: string }[],
-    addressAnswers: new Map<string, unknown>(),
+    panels: [] as Record<string, unknown>[],
+    pluginAnswers: new Map<string, unknown>(),
     createdTasks: [] as { key: string; body: Record<string, unknown> }[],
     projects: [{ id: 'p1', name: `${nodeId} project`, path: '/src/p1', workspaceId: 'w', sort: 0, hidden: false }],
     workspaces: [
@@ -154,10 +170,11 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     }
     if (url.pathname === '/v1/core/tasks') return reply(200, state.tasks)
     if (url.pathname === '/v1/core/browser-handoffs')
-      return reply(200, { handoffs: state.handoffs, taskAddresses: state.taskAddresses })
-    if (state.addressAnswers.has(url.pathname)) {
-      const answer = state.addressAnswers.get(url.pathname)
-      return answer instanceof Error ? reply(500, { error: { message: answer.message } }) : reply(200, answer)
+      return reply(200, { handoffs: state.handoffs, taskAddresses: state.taskAddresses, panels: state.panels })
+    if (state.pluginAnswers.has(url.pathname)) {
+      const answer = state.pluginAnswers.get(url.pathname)
+      if (answer instanceof Error) return reply(500, { error: { message: answer.message } })
+      return typeof answer === 'number' ? reply(answer, { error: { message: 'No.' } }) : reply(200, answer)
     }
     if (url.pathname === '/v1/p/tracker/handoff') {
       let body = ''
@@ -420,10 +437,15 @@ const agentSession = (id: string) => ({
   config: {},
 })
 
-function bridge() {
+function bridge(events: { tasksChanged?(nodeId: string): void } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'acorn-bridge-custody-'))
   const statuses: NodeStatus[] = []
-  const created = createBridge({ fleet: custody(dir).fleet, deviceName: 'test', status: (s) => statuses.push(s) })
+  const created = createBridge({
+    fleet: custody(dir).fleet,
+    deviceName: 'test',
+    status: (s) => statuses.push(s),
+    ...events,
+  })
   cleanup.push(() => {
     created.dispose()
     rmSync(dir, { recursive: true, force: true })
@@ -946,16 +968,16 @@ describe('browser bridge agent operations', () => {
       // A route outside the plugin's own namespace is never called.
       { pluginId: 'sneaky', route: '/v1/core/tasks' },
     ]
-    node.state.addressAnswers.set('/v1/p/runn/task-addresses', {
+    node.state.pluginAnswers.set('/v1/p/runn/task-addresses', {
       addresses: [
         { ...address, taskId: 'stack', origin: 'https://runn-05ea41.runn.localhost:5104' },
         { ...address, taskId: 'old', origin: 'https://runn-0ld.runn.localhost:5104' },
         { ...address, taskId: 'gone', origin: 'https://runn-g0ne.runn.localhost:5104' },
       ],
     })
-    node.state.addressAnswers.set('/v1/p/broken/addresses', new Error('boom'))
+    node.state.pluginAnswers.set('/v1/p/broken/addresses', new Error('boom'))
     // Another site's host isn't a task's app, so the whole answer is refused.
-    node.state.addressAnswers.set('/v1/p/odd/addresses', {
+    node.state.pluginAnswers.set('/v1/p/odd/addresses', {
       addresses: [
         { ...address, taskId: 'stack', origin: 'https://runn-0dd.runn.localhost:5104' },
         { ...address, taskId: 'stack', origin: 'https://github.com' },
@@ -1178,6 +1200,7 @@ describe('browser bridge handoffs', () => {
           anchors: ['.actions'],
         },
       ],
+      panels: [],
     })
   })
 
@@ -1275,6 +1298,88 @@ describe('browser bridge handoffs', () => {
       task: { id: made.task.id },
     })
     expect(node.state.createdTasks).toHaveLength(1)
+  })
+})
+
+describe('browser bridge plugin panels', () => {
+  const panel = { pluginId: 'runn', label: 'Runn', glyph: 'container', pane: 'runn', route: '/v1/p/runn/browser-panel' }
+  const view = {
+    blocks: [
+      { kind: 'status', label: 'Stack', state: 'running', severity: 'info' },
+      { kind: 'logs', title: 'Logs', sources: [{ id: 'web', label: 'web' }], source: 'web', lines: ['ready'] },
+    ],
+  }
+
+  async function selected(events: { tasksChanged?(nodeId: string): void } = {}) {
+    const node = await fakeNode('node-a')
+    const subject = bridge(events)
+    await subject.call({ op: 'node.probe', endpoint: node.endpoint })
+    await subject.call({ op: 'node.pair', code: CODE, label: 'Studio' })
+    await subject.call({ op: 'node.select', nodeId: 'node-a' })
+    node.state.panels = [
+      panel,
+      // A panel served from outside its plugin's namespace is never listed or called.
+      { pluginId: 'sneaky', label: 'Sneaky', route: '/v1/core/tasks' },
+    ]
+    return { node, ...subject }
+  }
+
+  it('lists the declared panels without their routes', async () => {
+    const { call } = await selected()
+    const { route: _route, ...listed } = panel
+    expect((await call({ op: 'handoffs.list', nodeId: 'node-a' })).panels).toEqual([listed])
+  })
+
+  it("calls the declared route with the task and the person's log source", async () => {
+    const { call, node } = await selected()
+    node.state.pluginAnswers.set(panel.route, view)
+    node.state.paths = []
+    expect(await call({ op: 'plugin.panel', nodeId: 'node-a', pluginId: 'runn', taskId: 't1', source: 'web' })).toEqual(
+      {
+        nodeId: 'node-a',
+        pluginId: 'runn',
+        taskId: 't1',
+        view,
+      },
+    )
+    expect(node.state.paths).toContain('/v1/p/runn/browser-panel?taskId=t1&source=web')
+  })
+
+  it('answers no view for a task the plugin has no panel for, or a plugin with no panel', async () => {
+    const { call, node } = await selected()
+    node.state.pluginAnswers.set(panel.route, 404)
+    expect((await call({ op: 'plugin.panel', nodeId: 'node-a', pluginId: 'runn', taskId: 't1' })).view).toBeNull()
+    node.state.paths = []
+    for (const pluginId of ['tracker', 'sneaky'])
+      expect((await call({ op: 'plugin.panel', nodeId: 'node-a', pluginId, taskId: 't1' })).view).toBeNull()
+    expect(node.state.paths).toEqual(['/v1/core/browser-handoffs', '/v1/core/browser-handoffs'])
+  })
+
+  it('refuses a view the extension cannot draw, or one past the size limit', async () => {
+    const { call, node } = await selected()
+    const read = () => call({ op: 'plugin.panel', nodeId: 'node-a', pluginId: 'runn', taskId: 't1' })
+    node.state.pluginAnswers.set(panel.route, { blocks: [{ kind: 'chart', title: 'CPU' }] })
+    await expect(read()).rejects.toMatchObject({
+      code: 'node_error',
+      message: "The runn plugin answered with something the extension can't use.",
+    })
+    // Valid block by block, and over 512 KiB as a whole.
+    const lines = Array.from({ length: 200 }, () => 'x'.repeat(1_000))
+    const logs = { kind: 'logs', title: 'Logs', sources: [], source: null, lines }
+    node.state.pluginAnswers.set(panel.route, { blocks: [logs, logs, logs] })
+    // The broker stops reading at the limit, as it does for a handoff's resolution.
+    await expect(read()).rejects.toMatchObject({ code: 'node_unreachable' })
+  })
+
+  it('asks the sidebar to read again when a plugin with only a panel reports a change', async () => {
+    const tasksChanged = vi.fn()
+    const { call } = await selected({ tasksChanged })
+    await call({ op: 'tasks.pages', nodeId: 'node-a' })
+    const events = brokerEvents.at(-1)!
+    events.frame('node-a', { channel: 'term:status', pluginId: 'tracker' })
+    expect(tasksChanged).not.toHaveBeenCalled()
+    events.frame('node-a', { channel: 'term:status', pluginId: 'runn' })
+    expect(tasksChanged).toHaveBeenCalledWith('node-a')
   })
 })
 

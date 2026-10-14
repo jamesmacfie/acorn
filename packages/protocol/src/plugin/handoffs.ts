@@ -54,10 +54,14 @@ export type BrowserHandoffDescriptor = z.input<typeof browserHandoffDescriptor>
 // One declared handoff as discovery advertises it: the descriptor, bound to the plugin that serves it.
 export type BrowserHandoff = z.output<typeof browserHandoffDescriptor> & { pluginId: string }
 
-// The Node's list of handoffs its active plugins declare, and the task address route each declares.
-// Device-only: it describes the plugin surface.
+// The Node's list of handoffs its active plugins declare, and the task address route and sidebar panel
+// each declares. Device-only: it describes the plugin surface.
 export const browserHandoffsRoute = '/v1/core/browser-handoffs'
-export type BrowserHandoffsResponse = { handoffs: BrowserHandoff[]; taskAddresses: TaskAddressesRoute[] }
+export type BrowserHandoffsResponse = {
+  handoffs: BrowserHandoff[]
+  taskAddresses: TaskAddressesRoute[]
+  panels: BrowserPanel[]
+}
 
 // What the resolve route receives: the page address, and the captures the caller matched from one of
 // the handoff's own patterns. The plugin still reads its identity from these, not from page text.
@@ -157,6 +161,9 @@ const exactOrigin = z
     )
   }, 'an address is an exact http or https origin on a loopback host with no path, such as https://app.localhost:5104')
 
+// The annotation severities: `info` is a healthy state, `warn` one to check, `danger` a failure.
+const severity = z.enum(['info', 'warn', 'danger'])
+
 export const taskAddressList = z.strictObject({
   addresses: z
     .array(
@@ -166,11 +173,69 @@ export const taskAddressList = z.strictObject({
         // What answers at the address and its state, read together as one line: "Runn stack running".
         label: z.string().trim().min(1).max(40),
         state: z.string().trim().min(1).max(40),
-        // The annotation severities: `info` is a healthy state, `warn` one to check, `danger` a failure.
-        severity: z.enum(['info', 'warn', 'danger']),
+        severity,
       }),
     )
     .max(64),
 })
 export type TaskAddressList = z.infer<typeof taskAddressList>
 export const TASK_ADDRESSES_MAX_BYTES = 64 * 1024
+
+// Browser panels: a read-only view a plugin adds to the extension's sidebar for one task, such as Runn's
+// stack. A plugin declares one GET route on its own Node half as `contributions.browserPanel`; the
+// browser's native host calls it with the sidebar's task and holds the answer to `browserPanelView`.
+// The extension draws the view from the fixed blocks below, as text, so no plugin code runs in the
+// browser. docs/plugin-authoring/browser-panel.md owns the contract.
+export const browserPanelDescriptor = z.object({
+  // The nav item's label, such as "Runn".
+  label: z.string().trim().min(1).max(40),
+  // A Lucide icon name for the nav item.
+  glyph: z.string().min(1).max(64).optional(),
+  // A task-scoped pane in the same manifest, which Open in Acorn opens.
+  pane: z.string().min(1).max(64).optional(),
+  // GET ?taskId=<id>[&source=<id>] → BrowserPanelView, or 404 for a task with no panel.
+  route: pluginRoute,
+})
+export type BrowserPanelDescriptor = z.output<typeof browserPanelDescriptor>
+export type BrowserPanel = BrowserPanelDescriptor & { pluginId: string }
+
+// A log source the person picks, sent back to the plugin's route as `source`.
+export const browserPanelSourceId = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/)
+
+const panelText = z.string().min(1).max(40)
+
+// Strict throughout: a field or block kind this build doesn't know refuses the whole view, so a new
+// kind ships in Acorn before any plugin sends it.
+const panelBlock = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('status'),
+    label: panelText,
+    state: panelText,
+    severity,
+    detail: z.string().max(2_000).optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('links'),
+    title: panelText,
+    // Any scheme, such as a database address. The extension opens only http and https, and copies the rest.
+    links: z.array(z.strictObject({ label: panelText, url: z.string().min(1).max(2_048) })).max(16),
+  }),
+  z.strictObject({
+    kind: z.literal('rows'),
+    title: panelText,
+    rows: z.array(z.strictObject({ label: z.string().min(1).max(80), state: panelText, severity })).max(64),
+  }),
+  z.strictObject({
+    kind: z.literal('logs'),
+    title: panelText,
+    sources: z.array(z.strictObject({ id: browserPanelSourceId, label: panelText })).max(32),
+    // The source `lines` came from, or null when there is none to show.
+    source: browserPanelSourceId.nullable(),
+    lines: z.array(z.string().max(1_000)).max(200),
+  }),
+])
+
+export const browserPanelView = z.strictObject({ blocks: z.array(panelBlock).max(12) })
+export type BrowserPanelView = z.infer<typeof browserPanelView>
+export type BrowserPanelBlock = BrowserPanelView['blocks'][number]
+export const BROWSER_PANEL_MAX_BYTES = 512 * 1024

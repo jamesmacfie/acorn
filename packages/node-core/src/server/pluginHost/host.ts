@@ -209,7 +209,7 @@ export async function initPlugins(
   }
 
   // What a plugin declares rather than registers: its `emits`, its browser handoffs, and its task
-  // address route. A loaded plugin's come from its binding, a built-in's from its own fields. The host owns these undos
+  // address route and sidebar panel. A loaded plugin's come from its binding, a built-in's from its own fields. The host owns these undos
   // alongside context registrations; declarations follow the binding generation and are removed with
   // that instance.
   const registerDeclarations = (
@@ -222,7 +222,7 @@ export async function initPlugins(
       declareBrowserHandoffs(
         plugin.name,
         binding ? (binding.browserHandoffs ?? []) : (plugin.browserHandoffs ?? []),
-        binding?.taskAddresses,
+        binding,
       ),
     )
   }

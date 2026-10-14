@@ -26,10 +26,21 @@ export function validateDependencies(manifest: ManifestInput, ctx: IssueSink): v
 
 export function validateNodeDeclarations(refs: ManifestReferences): void {
   const { manifest, issues: ctx, route } = refs
-  const { agentTools, contextSections, cliCommands, browserHandoffs, taskAddresses } = manifest.contributions
+  const { agentTools, contextSections, cliCommands, browserHandoffs, taskAddresses, browserPanel } =
+    manifest.contributions
   agentTools.forEach((entry, i) => route(entry.handler, ['contributions', 'agentTools', i, 'handler']))
   browserHandoffs.forEach((entry, i) => route(entry.resolve, ['contributions', 'browserHandoffs', i, 'resolve']))
   if (taskAddresses !== undefined) route(taskAddresses, ['contributions', 'taskAddresses'])
+  if (browserPanel !== undefined) {
+    route(browserPanel.route, ['contributions', 'browserPanel', 'route'])
+    // Open in Acorn opens this pane on the sidebar's task, so it has to be one that takes a task.
+    if (browserPanel.pane !== undefined && !refs.taskPanes.has(browserPanel.pane))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'browserPanel', 'pane'],
+        message: `pane names '${browserPanel.pane}', which this manifest does not declare as a task-scoped pane`,
+      })
+  }
   contextSections.forEach((entry, i) => route(entry.read, ['contributions', 'contextSections', i, 'read']))
   const cliNames = new Set<string>()
   cliCommands.forEach((entry, i) => {
@@ -95,6 +106,12 @@ export function validateNodeDeclarations(refs: ManifestReferences): void {
         code: 'custom',
         path: ['contributions', 'taskAddresses'],
         message: 'task addresses come from a node route; declare `node` in the manifest',
+      })
+    if (browserPanel !== undefined)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'browserPanel'],
+        message: 'a browser panel comes from a node route; declare `node` in the manifest',
       })
   }
 }

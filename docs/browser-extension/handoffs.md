@@ -135,7 +135,7 @@ client-core's `buildLink` for the panel and the task chip, and holds the table o
 
 | Operation | Fields | Result |
 | --- | --- | --- |
-| `handoffs.list` | `nodeId` | `{ nodeId, handoffs }`, each `{ pluginId, id, label, match, anchors }` |
+| `handoffs.list` | `nodeId` | `{ nodeId, handoffs, panels }`: each handoff `{ pluginId, id, label, match, anchors }`, and each [plugin panel](./plugin-panels.md) `{ pluginId, label, glyph, pane }` |
 | `handoff.resolve` | `nodeId`, `pluginId`, `handoffId`, `url` | `{ nodeId, url, items }` |
 | `handoff.create` | `nodeId`, `pluginId`, `handoffId`, `url`, `identifier`, `connectionId`, `projectId`, `key` | `{ nodeId, task, created }` |
 

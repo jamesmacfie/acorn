@@ -1,6 +1,11 @@
 import { z } from 'zod'
 import { MAX_AGENT_CONTEXT_BYTES } from '../agents/agentContext.ts'
-import type { BrowserHandoff } from '../plugin/handoffs.ts'
+import {
+  browserPanelSourceId,
+  type BrowserHandoff,
+  type BrowserPanel,
+  type BrowserPanelView,
+} from '../plugin/handoffs.ts'
 import {
   siteAssociationSchema,
   type ProjectSite,
@@ -275,6 +280,17 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   }),
   z.strictObject({ ...envelope, op: z.literal('workflow.runs'), nodeId, taskId: rowId }),
   z.strictObject({ ...envelope, op: z.literal('workflow.steps'), nodeId, taskId: rowId, runId: rowId }),
+  // A plugin's sidebar panel for one task (docs/browser-extension/plugin-panels.md). The host finds the
+  // panel's route in the Node's discovery, so the browser names only the plugin, the task, and the log
+  // source the person picked.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('plugin.panel'),
+    nodeId,
+    pluginId: rowId,
+    taskId: rowId,
+    source: browserPanelSourceId.optional(),
+  }),
 ])
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
 export type BridgeOperation = BridgeRequest['op']
@@ -424,6 +440,9 @@ export type BridgeAttachment = { id: string; taskId: string; filename: string; m
 // that, and only for this handoff.
 export type BridgeHandoff = Omit<BrowserHandoff, 'resolve'>
 
+// A plugin's sidebar panel, as discovery advertises it, without its route: only the host calls that.
+export type BridgePanel = Omit<BrowserPanel, 'route'>
+
 // One item a handoff resolved, with what the sidebar needs to place it: its projects by name, and the
 // active tasks already linked to it. The task seed stays in the host.
 export type BridgeHandoffItem = {
@@ -490,7 +509,7 @@ export type BridgeResults = {
   // `data` is the content as base64, or null when it isn't an image or passes ATTACHMENT_MAX_BYTES.
   'attachment.read': { nodeId: string; taskId: string; attachment: BridgeAttachment; data: string | null }
   'attachment.delete': { nodeId: string; taskId: string; attachmentId: string; removed: boolean }
-  'handoffs.list': { nodeId: string; handoffs: BridgeHandoff[] }
+  'handoffs.list': { nodeId: string; handoffs: BridgeHandoff[]; panels: BridgePanel[] }
   'handoff.resolve': { nodeId: string; url: string; items: BridgeHandoffItem[] }
   // `created` is false when an active task in that project was already linked, which is answered instead.
   'handoff.create': { nodeId: string; task: BridgeTask & { projectId: string }; created: boolean }
@@ -502,6 +521,8 @@ export type BridgeResults = {
   // Newest first.
   'workflow.runs': { nodeId: string; taskId: string; runs: BridgeWorkflowRun[] }
   'workflow.steps': { nodeId: string; runId: string; steps: BridgeWorkflowStep[] }
+  // Null when the plugin declares no panel, or has none for this task.
+  'plugin.panel': { nodeId: string; pluginId: string; taskId: string; view: BrowserPanelView | null }
 }
 
 // Which sessions and tasks changed on the selected Node since the last hint. Nothing more: the

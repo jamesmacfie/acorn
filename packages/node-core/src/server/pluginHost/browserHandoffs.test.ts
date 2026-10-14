@@ -4,7 +4,7 @@ import { memoryIdentityStore } from '../activeIdentity'
 import { createCoreServices, SecretService } from '../core'
 import { makeTestDb, testCoreSeams } from '../../testkit/db'
 import { browserHandoffsRoute } from '../routes/browserHandoffs'
-import { browserHandoffs, taskAddressRoutes } from './browserHandoffs'
+import { browserHandoffs, browserPanels, taskAddressRoutes } from './browserHandoffs'
 import { CapabilityRegistry } from './capabilities'
 import { clearRegistrations, initPlugins, type LoadedPluginBinding } from './host'
 import type { NodePlugin } from './types'
@@ -17,7 +17,11 @@ const handoff = (pluginId: string, over: Partial<BrowserHandoffDescriptor> = {})
   ...over,
 })
 
-const binding = (handoffs: BrowserHandoffDescriptor[], taskAddresses?: string): LoadedPluginBinding => ({
+const binding = (
+  handoffs: BrowserHandoffDescriptor[],
+  taskAddresses?: string,
+  browserPanel?: LoadedPluginBinding['browserPanel'],
+): LoadedPluginBinding => ({
   permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
   storage: {
     open: () => {
@@ -26,6 +30,7 @@ const binding = (handoffs: BrowserHandoffDescriptor[], taskAddresses?: string): 
   },
   browserHandoffs: handoffs,
   taskAddresses,
+  browserPanel,
 })
 
 describe('browser handoff declarations', () => {
@@ -75,6 +80,18 @@ describe('browser handoff declarations', () => {
       { pluginId: 'tracker', ...handoff('tracker'), anchors: [] },
     ])
     expect(response.taskAddresses).toEqual([{ pluginId: 'board', route: '/v1/p/board/addresses' }])
+  })
+
+  it('advertises a declared panel, and drops it with the declaration', async () => {
+    const panel = { label: 'Board', pane: 'board', route: '/v1/p/board/browser-panel' }
+    const result = await host([{ name: 'board', init: () => {} }], {
+      loaded: { board: binding([], undefined, panel) },
+    })
+    const response = (await (await browserHandoffsRoute.request('/')).json()) as BrowserHandoffsResponse
+    expect(response.panels).toEqual([{ pluginId: 'board', ...panel }])
+    await result.reload('board', { plugin: { name: 'board', init: () => {} }, binding: binding([]) })
+    expect(browserPanels()).toEqual([])
+    await result.dispose()
   })
 
   it('advertises nothing for a disabled plugin, or one whose init failed', async () => {
