@@ -449,9 +449,9 @@ export function Workspace(props: {
 
   // Where the sidebar goes when the page beside it moves, by navigating or switching tabs. A page of
   // another task shows what the sidebar last showed for that task, or, over an open conversation, that
-  // task's newest conversation. A page no task holds shows Home, except over an open conversation,
-  // because pages are often visited to capture them into it. Home stays put, unless the sidebar went
-  // there by itself. The tasks arriving, or a plugin publishing the page's address, moves nothing.
+  // task's newest conversation. A page no task holds shows Home, even on a project's site, and an open
+  // conversation waits under Agents. Home stays put, unless the sidebar went there by itself. The
+  // tasks arriving, or a plugin publishing the page's address, moves nothing.
   const pageTaskId = createMemo(() => pageTask()?.task.id ?? null)
   createEffect(
     on(
@@ -461,11 +461,7 @@ export function Workspace(props: {
         if (left && left !== taskId) keepView(left)
         if (url === lastUrl || (props.tab === 'home' && !wentHome)) return
         const task = pageTask()?.task
-        if (!task) {
-          if (props.tab === 'home' || agentsTask().taskId) return
-          if (props.tab !== 'agents' || !current().sessionId) goHome()
-          return
-        }
+        if (!task) return props.tab === 'home' ? undefined : goHome()
         if (task.id === left) return
         const view = taskViews[task.id]
         if (view && showView(task, view)) return

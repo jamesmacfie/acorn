@@ -82,10 +82,10 @@ open in it. When the page moves to another task's page, by navigating or by swit
 sidebar shows what it last showed for that task. A task with nothing remembered keeps the tab, and an
 open conversation moves to that task's newest conversation.
 
-When the page moves to one no task holds, **Agents**, **Workflows**, or a
-[plugin panel](./plugin-panels.md) gives way to Home. An open conversation stays, because pages are
-often visited to capture them into it. Coming back to a task's page from there shows what the sidebar
-last showed for it.
+When the page moves to one no task holds, even on a project's site, **Agents**, **Workflows**, or a
+[plugin panel](./plugin-panels.md) gives way to Home. An open conversation waits under **Agents**, so
+one click brings it back to capture the page into it. Coming back to a task's page from there shows
+what the sidebar last showed for it.
 
 Home stays on Home as pages change, unless the sidebar went there by itself. The task list arriving,
 or a plugin publishing the page's address, moves nothing.

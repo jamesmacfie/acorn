@@ -240,8 +240,11 @@ describe('project suggestions for a site', () => {
     fill(root, 'textarea[name="message"]', 'Half a thought')
     await settle(20)
 
+    // A page no task holds sends the sidebar Home, and the conversation waits under Agents.
     fake.navigate('http://localhost:5173/admin/users')
     await settle(20)
+    expect(root.querySelector('header h1')!.textContent).toBe('Home')
+    await tab(root, 'Agents')
     expect(conversationTitle(root)).toBe('Chat s1')
     await back(root)
     await tab(root, 'Home')

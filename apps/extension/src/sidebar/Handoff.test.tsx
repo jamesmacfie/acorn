@@ -389,7 +389,7 @@ describe('a handoff in the sidebar', () => {
     expect(root.querySelector<HTMLTextAreaElement>('textarea[name="input-focus"]')!.value).toBe('The retry loop')
   })
 
-  it('goes back to Home when the tab moves to a page no task holds, and keeps an open conversation', async () => {
+  it('goes back to Home when the tab moves to a page no task holds, with a conversation waiting under Agents', async () => {
     const { fake, root, state } = mount({ url: PAGE })
     state.pageTasks = [
       {
@@ -413,12 +413,14 @@ describe('a handoff in the sidebar', () => {
       await settle(30)
       expect(heading()).toBe('Home')
     }
-    // Pages are often visited to capture them into a conversation, so an open one stays.
     fake.navigate(PAGE)
     await settle(30)
     await openChat(root, 'Chat s2')
     fake.navigate('https://elsewhere.example/')
     await settle(30)
+    expect(heading()).toBe('Home')
+    // One click back, to capture the page into it.
+    await tab(root, 'Agents')
     expect(conversationTitle(root)).toBe('Chat s2')
   })
 
@@ -568,15 +570,13 @@ describe('moving between task pages', () => {
     const { fake, root } = twoTasks()
     await settle(30)
     await openChat(root, 'Chat s0')
-    // A conversation stays over a page no task holds, so leave it for t1's list first.
-    await back(root)
     fake.navigate('https://elsewhere.example/')
     await settle(30)
     expect(root.querySelector('header h1')!.textContent).toBe('Home')
+    expect(fake.storage.get('taskViews:n1')).toMatchObject({ t1: { tab: 'agents', sessionId: 's0' } })
     // Home was the sidebar's doing, so coming back shows where the person was.
     fake.navigate(ITEM_1)
     await settle(40)
-    expect(root.querySelector('.view[aria-label="Agents"]')).not.toBeNull()
-    expect(fake.storage.get('taskViews:n1')).toMatchObject({ t1: { tab: 'agents', sessionId: null } })
+    expect(conversationTitle(root)).toBe('Chat s0')
   })
 })
