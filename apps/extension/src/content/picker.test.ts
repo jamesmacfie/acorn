@@ -29,6 +29,8 @@ beforeEach(async () => {
       return addEventListener.call(this, type, added, options)
     })
   }
+  // jsdom paints no frames, so the picker's wait for the outline to leave the screen ends at once.
+  vi.stubGlobal('requestAnimationFrame', (painted: FrameRequestCallback) => (painted(0), 0))
   const scope = globalThis as Record<string, unknown>
   delete scope.acornPicker
   sent = []
@@ -49,6 +51,7 @@ afterEach(() => {
   // Each test imports its own copy of the script. Escape takes away what the last one drew.
   person('keydown', document.body, { key: 'Escape' })
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   delete (globalThis as Record<string, unknown>).chrome
 })
 
@@ -64,6 +67,7 @@ const OPENED: AskOpened = {
     { providerId: 'codex', label: 'Codex' },
   ],
   agent: 'codex',
+  screenshot: true,
 }
 
 // What the picker answered, which tells the background it's on the page.
@@ -114,21 +118,20 @@ async function sentAbout(selector: string) {
 }
 
 describe('the element picker', () => {
-  it('opens the box beside the element the person right-clicked', () => {
+  it('opens the box beside the element the person right-clicked, once the background has its screenshot', async () => {
     person('contextmenu', element('.save'))
     expect(pick('target')).toBe(true)
     expect(answers).toEqual([true])
     expect(drawn()?.parentElement).toBe(document.documentElement)
     expect(outline().hidden).toBe(true)
+    expect((drawn() as HTMLElement).style.visibility).toBe('hidden')
+    await settle()
+    expect((drawn() as HTMLElement).style.visibility).toBe('')
     expect(box()!.getAttribute('aria-label')).toBe('Ask Acorn about this element')
     expect(box()!.dataset.theme).toBe('light')
     expect(root!.activeElement).toBe(box()!.querySelector('textarea'))
     const selects = [...box()!.querySelectorAll('select')]
-    expect(selects.map((select) => [select.getAttribute('aria-label'), select.options.length])).toEqual([
-      ['Conversation', 0],
-      ['Agent', 0],
-    ])
-    expect(box()!.querySelector<HTMLButtonElement>('.send')!.disabled).toBe(true)
+    expect(selects.map((select) => select.getAttribute('aria-label'))).toEqual(['Conversation', 'Agent'])
     expect([...box()!.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Cancel', 'Send'])
   })
 
@@ -193,7 +196,8 @@ describe('the element picker', () => {
 
   it('fills the box from the background, and sends a new chat with the agent chosen', async () => {
     await asked('.save')
-    expect(sent).toEqual([{ type: 'acorn:ask.open' }])
+    expect(sent).toEqual([{ type: 'acorn:ask.open', rect: { x: 0, y: 0, width: 0, height: 0 }, devicePixelRatio: 1 }])
+    expect(note().hidden).toBe(true)
     expect([...conversation().options].map((option) => [option.value, option.textContent])).toEqual([
       ['', 'New chat'],
       ['s1', 'Billing rounding'],
@@ -250,6 +254,14 @@ describe('the element picker', () => {
     // Cancel tells the background to forget the pick.
     person('keydown', document.body, { key: 'Escape' })
     expect(sent.at(-1)).toEqual({ type: 'acorn:ask.cancel', pickId: 'pick-1' })
+  })
+
+  it('says when the question goes without a screenshot', async () => {
+    answer = (message) => (message.type === 'acorn:ask.open' ? { ...OPENED, screenshot: false } : { ok: true })
+    await asked('.save')
+    expect(note().textContent).toBe("This goes without a screenshot: the browser didn't allow one here.")
+    type('Why?')
+    expect(send().disabled).toBe(false)
   })
 
   it('says why the box cannot send when the background refuses it', async () => {

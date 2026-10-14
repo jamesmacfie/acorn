@@ -62,12 +62,19 @@ export type ButtonClick =
 // right-clicked, or let them point at one and click it.
 export type PickerMessage = { type: 'acorn:pick'; mode: 'hover' | 'target' }
 // From the element picker to the background, about one picked element. `acorn:ask.open` starts a
-// pick, and the background names it in its answer. `acorn:ask.send` asks the task's agent: in the
-// conversation `sessionId`, or in a new chat with `providerId`'s agent when it's null. The background
-// checks every field, because the element's HTML and path come from the page. `acorn:ask.cancel`
-// drops what the background kept for the pick.
+// pick, once the picker's outline is off the screen, and the background screenshots the element and
+// names the pick in its answer. `acorn:ask.send` asks the task's agent: in the conversation
+// `sessionId`, or in a new chat with `providerId`'s agent when it's null. The background checks every
+// field, because the element's HTML and path come from the page. `acorn:ask.cancel` drops what the
+// background kept for the pick.
 export type AskMessage =
-  | { type: 'acorn:ask.open' }
+  | {
+      type: 'acorn:ask.open'
+      // The element's box in the viewport, in CSS pixels, and the device pixels in one, to crop the
+      // screenshot by.
+      rect: { x: number; y: number; width: number; height: number }
+      devicePixelRatio: number
+    }
   | {
       type: 'acorn:ask.send'
       pickId: string
@@ -89,6 +96,8 @@ export type AskOpened =
       // The agents a new chat can start with, and the one to choose first.
       agents: { providerId: string; label: string }[]
       agent: string | null
+      // False when the browser didn't allow a screenshot, so the question goes without one.
+      screenshot: boolean
     }
   | { ok: false; reason: string }
 // `opensPanel` is false in Firefox, whose sidebar opens only from the extension's own controls.

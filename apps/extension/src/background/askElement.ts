@@ -5,7 +5,7 @@ import type {
   BridgeResults,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi, Tab } from '../browser'
-import { turnInput, withCapture } from '../capture'
+import { capturePage, cropScreenshot, screenshotData, turnInput, withCapture, type PageCapture } from '../capture'
 import type { AskMessage, AskOpened, AskSent, PickerMessage } from '../handoffs'
 import { saveDestination } from '../localState'
 import { CallFailure, isUncertain, type BridgeCall, type RequestTarget } from '../messages'
@@ -29,6 +29,9 @@ type Pick = {
   pickedAt: number
   sessions: BridgeAgentSession[]
   agents: BridgeAgentProfile[]
+  // The element as the person saw it, and its `attachmentId` once the Node holds it. Null when the
+  // browser didn't allow a screenshot.
+  screenshot: Extract<PageCapture, { kind: 'screenshot' }> | null
   // A new chat's key, kept with its agent, and the chat once the Node made it.
   create: { providerId: string; key: string; sessionId: string | null } | null
   // A turn's key, kept with the conversation and input it went with.
@@ -89,12 +92,41 @@ export function askElement(
     await api.tabs.sendMessage(tabId, { type: 'acorn:pick', mode: 'hover' } satisfies PickerMessage)
   }
 
-  const open = async (tabId: number, url: string): Promise<AskOpened> => {
+  // The picked element, cut from a screenshot of the tab. Null when the browser refuses one, as both
+  // browsers do on a granted site without `activeTab`, which a pick from the chip's menu has, or when
+  // anything else stops it, because the question can go without it.
+  const screenshot = async (
+    windowId: number,
+    url: string,
+    { rect, devicePixelRatio }: Extract<AskMessage, { type: 'acorn:ask.open' }>,
+  ): Promise<Pick['screenshot']> => {
+    const numbers = [rect?.x, rect?.y, rect?.width, rect?.height, devicePixelRatio]
+    if (!numbers.every(Number.isFinite) || !(devicePixelRatio > 0)) return null
+    try {
+      const page = await capturePage(api, 'screenshot', windowId)
+      // Another page came to the front of the window first.
+      if (page.kind !== 'screenshot' || page.url !== url) return null
+      const cropped = await cropScreenshot(page, rect, devicePixelRatio)
+      // Throws when it's larger than a capture may be.
+      if (cropped) withCapture([], cropped)
+      return cropped
+    } catch {
+      return null
+    }
+  }
+
+  const open = async (
+    tabId: number,
+    windowId: number,
+    url: string,
+    message: Extract<AskMessage, { type: 'acorn:ask.open' }>,
+  ): Promise<AskOpened> => {
     const nodeId = events.selectedNode()
     const match = events.pageTask(url)
     if (!nodeId || !match) return { ok: false, reason: refusal(0, url)! }
     const { task } = match
-    const [sessions, { profiles }, stored] = await Promise.all([
+    const [shot, sessions, { profiles }, stored] = await Promise.all([
+      screenshot(windowId, url, message),
       events.sessions(task.id) ??
         events.read({ op: 'sessions.list', nodeId, taskId: task.id }).then((result) => result.sessions),
       events.read({ op: 'agents.profiles', nodeId }),
@@ -109,6 +141,7 @@ export function askElement(
       // An archived conversation takes no new messages.
       sessions: sessions.filter((session) => !session.archivedAt),
       agents: profiles.filter(usable),
+      screenshot: shot,
       create: null,
       submit: null,
     }
@@ -121,12 +154,13 @@ export function askElement(
       agents: pick.agents.map(({ providerId, label }) => ({ providerId, label })),
       agent:
         pick.agents.find((agent) => agent.providerId === remembered)?.providerId ?? pick.agents[0]?.providerId ?? null,
+      screenshot: !!shot,
     }
   }
 
-  // Checks the request against what the background read when the box opened, then makes the new chat
-  // if one was asked for, and the turn. A retry of the same pick reuses both keys, so the Node makes at
-  // most one chat and one turn.
+  // Checks the request against what the background read when the box opened, then uploads the
+  // screenshot, makes the new chat if one was asked for, and the turn. A retry of the same pick reuses
+  // the attachment and both keys, so the Node holds one picture and makes at most one chat and one turn.
   const send = async (
     tabId: number,
     title: string,
@@ -164,10 +198,25 @@ export function askElement(
       label: `Element on ${title}`,
       content: `Page: ${url}\nCSS path: ${message.selector}\nSize: ${width} × ${height} CSS pixels\n\n${message.html}`,
     }
-    const input = turnInput(question, withCapture([], capture), new Map())
-    let stage: 'create' | 'submit' = 'create'
+    const shot = pick.screenshot
+    const captures = withCapture([], capture)
+    if (shot) captures.push(shot)
+    let stage: 'upload' | 'create' | 'submit' = 'upload'
     let sessionId: string
     try {
+      if (shot)
+        shot.attachmentId ??= (
+          await events.read({
+            op: 'attachment.upload',
+            nodeId: pick.nodeId,
+            taskId: pick.taskId,
+            filename: `Screenshot of ${new URL(url).hostname || 'page'}.jpg`,
+            mediaType: shot.mediaType,
+            data: screenshotData(shot),
+          })
+        ).attachment.id
+      const input = turnInput(question, captures, new Map(shot?.attachmentId ? [[shot.id, shot.attachmentId]] : []))
+      stage = 'create'
       if (agent) {
         if (pick.create?.providerId !== agent.providerId)
           pick.create = { providerId: agent.providerId, key: crypto.randomUUID(), sessionId: null }
@@ -193,13 +242,13 @@ export function askElement(
     } catch (error) {
       const failure = error instanceof CallFailure ? error : new CallFailure('node_error', String(error))
       if (!isUncertain(failure.code)) return { ok: false, reason: errorGuidance(failure) }
-      return {
-        ok: false,
-        reason:
-          stage === 'create'
-            ? "The Node didn't confirm the new chat. Send again to retry; the Node won't make a second one."
-            : "The Node didn't confirm this message, so it may have arrived. Send again to retry; the Node makes at most one turn.",
+      const reasons = {
+        upload: "The Node didn't confirm the screenshot. Send again to retry; the Node keeps one copy.",
+        create: "The Node didn't confirm the new chat. Send again to retry; the Node won't make a second one.",
+        submit:
+          "The Node didn't confirm this message, so it may have arrived. Send again to retry; the Node makes at most one turn.",
       }
+      return { ok: false, reason: reasons[stage] }
     }
 
     picks.delete(tabId)
@@ -235,7 +284,7 @@ export function askElement(
     if (message.type === 'acorn:ask.send') events.open(tab)
     const answer =
       message.type === 'acorn:ask.open'
-        ? open(tabId, sender.url)
+        ? open(tabId, tab.windowId, sender.url, message)
         : send(tabId, tab.title?.trim() || sender.url, sender.url, message)
     answer
       .catch((error: unknown): AskOpened | AskSent => ({

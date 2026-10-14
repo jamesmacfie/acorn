@@ -41,6 +41,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 `
 // The box's space from the element and from the viewport's edges, in CSS pixels.
 const GAP = 8
+// What the box says when the background has no screenshot of the element.
+const NO_SCREENSHOT = "This goes without a screenshot: the browser didn't allow one here."
 // How long Firefox's box stays to say where the reply is, in milliseconds.
 const SENT_NOTE_MS = 4000
 // The most of the element's HTML that goes to the agent. The background checks the same limit.
@@ -152,6 +154,7 @@ if (api && !scope.acornPicker) {
     box = null
     observer.disconnect()
     host.remove()
+    host.style.visibility = ''
   }
 
   const hover = (): void => {
@@ -207,10 +210,22 @@ if (api && !scope.acornPicker) {
       return added
     }
 
-    void message({ type: 'acorn:ask.open' }).then((raw) => {
-      const answer = raw as AskOpened | undefined
-      if (box !== opened) return answer?.ok && cancel(answer.pickId)
+    // The background screenshots the element, so the box shows only once it has, two frames after the
+    // outline left the screen.
+    const opening = async (): Promise<void> => {
+      await new Promise((painted) => requestAnimationFrame(() => requestAnimationFrame(painted)))
+      if (box !== opened) return
+      const { x, y, width, height } = element.getBoundingClientRect()
+      const answer = (await message({
+        type: 'acorn:ask.open',
+        rect: { x, y, width, height },
+        devicePixelRatio,
+      })) as AskOpened | undefined
+      if (box !== opened) return void (answer?.ok && cancel(answer.pickId))
+      host.style.visibility = ''
+      question.focus()
       if (!answer?.ok) return say(answer?.reason ?? "Acorn didn't answer. Reload the page, then try again.")
+      if (!answer.screenshot) say(NO_SCREENSHOT)
       pickId = answer.pickId
       conversation.append(
         option('', 'New chat'),
@@ -221,7 +236,8 @@ if (api && !scope.acornPicker) {
       agent.value = answer.agent ?? ''
       ready = true
       update()
-    })
+    }
+    void opening()
 
     const submit = async (): Promise<void> => {
       if (send.disabled || !pickId) return
@@ -271,10 +287,10 @@ if (api && !scope.acornPicker) {
     // still see it first, which nothing in the box can stop.
     for (const type of ['keydown', 'keyup', 'keypress']) box.addEventListener(type, (event) => event.stopPropagation())
     root.append(box)
+    host.style.visibility = 'hidden'
     document.documentElement.append(host)
     place()
     observer.observe(document.documentElement, { childList: true, subtree: true })
-    box.querySelector('textarea')!.focus()
   }
 
   const pick = (mode: Mode): void => (mode === 'target' && rightClicked?.isConnected ? ask(rightClicked) : hover())

@@ -67,9 +67,11 @@ lets the extension read the active tab:
   open-on-click opens the panel without granting `activeTab`.
 - **The right-click entry.** Clicking **Add to Acorn chat** grants `activeTab` for the tab it was
   clicked in, as the toolbar button does, so it reads a selection on a site the person never granted.
-- **A granted site.** A site the person granted reads without the toolbar button. In Firefox this
-  covers the link and the selection, but not a screenshot: Firefox takes one only with `activeTab` or
-  `<all_urls>`.
+- **A granted site.** A site the person granted reads without the toolbar button. In both browsers
+  this covers the link and the selection, but not a screenshot: `captureVisibleTab` needs `activeTab`
+  or `<all_urls>`. Chrome 155 refused it with "Either the '<all_urls>' or 'activeTab' permission is
+  required" (checked October 14, 2026: an extension holding `http://127.0.0.1/*` and never granted
+  `activeTab` was refused, and one holding `<all_urls>` took the screenshot of the same tab).
 
 A click inside the sidebar grants nothing. With no access, the sidebar asks the person to click the
 toolbar button while the page is showing. The extension never asks for wider access on its own.
@@ -142,7 +144,9 @@ read that answers after that makes none.
 ## Gaps
 
 - Chrome's persistent site grant wasn't checked in a browser. Granting optional host access needs
-  Chrome's own permission prompt, which a driver can't answer.
+  Chrome's own permission prompt, which a driver can't answer. The screenshot refusal on a granted
+  site was checked with the site listed as required host access instead, which Chrome grants at
+  install and reports the same way through `permissions.getAll`.
 - In Firefox, `activeTab` from the toolbar button wasn't checked, because a driver can't click the
   toolbar. Firefox screenshots therefore weren't taken in a browser.
 - A screenshot over 5 MiB wasn't produced in a browser; the largest was 3.7 MB.

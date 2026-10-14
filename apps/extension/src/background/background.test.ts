@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BackgroundMessage } from '../messages'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
 import { SELECTED_NODE_KEY, startBackground } from './background'
@@ -44,6 +44,12 @@ function scriptedHost(fake: ReturnType<typeof fakeBrowser>, known: string[]) {
     if (message.op === 'agents.profiles') return reply({ nodeId: message.nodeId, profiles: state.profiles })
     if (message.op === 'session.create')
       return reply({ nodeId: message.nodeId, session: { id: `new-${host.received.length}` } })
+    if (message.op === 'attachment.upload')
+      return reply({
+        nodeId: message.nodeId,
+        taskId: (message as { taskId?: string }).taskId,
+        attachment: { id: `att-${host.received.length}` },
+      })
     if (message.op === 'turn.submit')
       return reply({
         nodeId: message.nodeId,
@@ -503,14 +509,40 @@ describe('site buttons', () => {
         sessionId: null,
         providerId: 'claude',
       }
+      const uploads = (fake: ReturnType<typeof fakeBrowser>) =>
+        fake.hosts[0]!.received.filter((message) => (message as { op: string }).op === 'attachment.upload')
       const writes = (fake: ReturnType<typeof fakeBrowser>) =>
         fake.hosts[0]!.received.filter((message) =>
           ['session.create', 'turn.submit'].includes((message as { op: string }).op),
         ) as { op: string; key: string; sessionId?: string; input?: unknown; providerId?: string; profileId?: string }[]
 
+      // The canvas a background has and Node lacks. Every screenshot is 1600 × 1000 device pixels, and
+      // each crop is kept as the area drawn from it.
+      const crops: number[][] = []
+      beforeEach(() => {
+        crops.length = 0
+        vi.stubGlobal('createImageBitmap', async () => ({ width: 1600, height: 1000, close() {} }))
+        vi.stubGlobal(
+          'OffscreenCanvas',
+          class {
+            getContext() {
+              return { drawImage: (_image: unknown, ...area: number[]) => void crops.push(area.slice(0, 4)) }
+            }
+            async convertToBlob() {
+              return new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' })
+            }
+          },
+        )
+      })
+      afterEach(() => vi.unstubAllGlobals())
+      const element = { rect: { x: 100, y: 50, width: 80, height: 32 }, devicePixelRatio: 2 }
+
       // A task page with the picker open on it, and the conversations the task's chip follows.
-      async function opened(options: { flavor?: 'chrome' | 'firefox' } = {}) {
+      async function opened(
+        options: { flavor?: 'chrome' | 'firefox'; at?: typeof element; capture?: () => Promise<string> } = {},
+      ) {
         const { fake, host, panel } = await started(options)
+        if (options.capture) fake.onCapture = options.capture
         host.profiles = profiles
         host.sessions = [
           { id: 's1', title: 'Billing rounding', runtimeState: 'idle', archivedAt: null },
@@ -526,7 +558,11 @@ describe('site buttons', () => {
           requests: false,
         })
         await settle()
-        const answer = (await fake.sendFromPage({ type: 'acorn:ask.open' })) as { ok: true; pickId: string }
+        const answer = (await fake.sendFromPage({ type: 'acorn:ask.open', ...(options.at ?? element) })) as {
+          ok: true
+          pickId: string
+          screenshot: boolean
+        }
         return { fake, host, panel, answer, pickId: answer.pickId }
       }
 
@@ -541,6 +577,7 @@ describe('site buttons', () => {
             { providerId: 'gemini', label: 'Gemini' },
           ],
           agent: 'claude',
+          screenshot: true,
         })
 
         // The page's own chip follows no task here, so the conversations are read for the box.
@@ -559,10 +596,21 @@ describe('site buttons', () => {
         })
       })
 
-      it('sends a new chat about the element, then opens the panel on it', async () => {
+      it('sends a new chat about the element, with its screenshot, then opens the panel on it', async () => {
         const { fake, panel, pickId } = await opened()
+        // The element's box with 8 CSS pixels around it, in device pixels.
+        expect(crops).toEqual([[184, 84, 192, 96]])
         expect(await fake.sendFromPage({ ...question, pickId })).toEqual({ ok: true, opensPanel: true })
         expect(fake.panelOpens).toEqual([1])
+        expect(uploads(fake)).toEqual([
+          expect.objectContaining({
+            nodeId: 'a',
+            taskId: 't1',
+            filename: 'Screenshot of tracker.example.jpg',
+            mediaType: 'image/jpeg',
+            data: '/9j/',
+          }),
+        ])
         const [create, submit] = writes(fake)
         expect(create).toMatchObject({
           op: 'session.create',
@@ -584,6 +632,7 @@ describe('site buttons', () => {
               source: 'browser-extension',
               resourceId: 'https://tracker.example/items/42',
             },
+            { type: 'image', attachmentId: expect.stringMatching(/^att-/), alt: 'Screenshot of Item 42' },
           ],
         })
         const target = { nodeId: 'a', projectId: 'p1', taskId: 't1', sessionId: submit!.sessionId }
@@ -612,16 +661,44 @@ describe('site buttons', () => {
         expect(fake.storage.has('askAgent:a')).toBe(false)
       })
 
-      it('retries an unconfirmed send with the same keys, so the Node makes one chat and one turn', async () => {
+      it('keeps the crop inside the screenshot, and goes without one when none of the element is in it', async () => {
+        await opened({ at: { rect: { x: -20, y: 480, width: 900, height: 60 }, devicePixelRatio: 2 } })
+        expect(crops).toEqual([[0, 944, 1600, 56]])
+        const outside = await opened({ at: { rect: { x: 900, y: 10, width: 50, height: 20 }, devicePixelRatio: 2 } })
+        expect(outside.answer.screenshot).toBe(false)
+        const unsized = await opened({ at: { rect: { x: 1, y: 1, width: 1, height: 1 }, devicePixelRatio: 0 } })
+        expect(unsized.answer.screenshot).toBe(false)
+        expect(crops).toHaveLength(1)
+      })
+
+      it('sends without a screenshot when the browser refuses one, as on a granted site without activeTab', async () => {
+        const { fake, pickId, answer } = await opened({
+          flavor: 'firefox',
+          capture: () => Promise.reject(new Error('Missing activeTab permission')),
+        })
+        expect(answer.screenshot).toBe(false)
+        expect(await fake.sendFromPage({ ...question, pickId })).toEqual({ ok: true, opensPanel: false })
+        expect(uploads(fake)).toEqual([])
+        expect(writes(fake).at(-1)!.input).toEqual([
+          expect.objectContaining({ type: 'text' }),
+          expect.objectContaining({ type: 'context' }),
+        ])
+      })
+
+      it('retries an unconfirmed send with the same attachment and keys, so the Node makes one chat and one turn', async () => {
         const { fake, pickId } = await opened()
         const scripted = fake.onNativeMessage
-        const failing = new Set(['session.create', 'turn.submit'])
+        const failing = new Set(['attachment.upload', 'session.create', 'turn.submit'])
         // Each write fails once in a way that leaves its outcome unknown.
         fake.onNativeMessage = (raw, host) => {
           const message = raw as { id: string; op: string }
           if (!failing.delete(message.op)) return scripted(raw, host)
           host.send({ v: 1, id: message.id, ok: false, error: { code: 'ambiguous_mutation', message: 'lost' } })
         }
+        expect(await fake.sendFromPage({ ...question, pickId })).toEqual({
+          ok: false,
+          reason: "The Node didn't confirm the screenshot. Send again to retry; the Node keeps one copy.",
+        })
         expect(await fake.sendFromPage({ ...question, pickId })).toEqual({
           ok: false,
           reason: "The Node didn't confirm the new chat. Send again to retry; the Node won't make a second one.",
@@ -637,6 +714,9 @@ describe('site buttons', () => {
         expect(submitAgain!.key).toBe(submit!.key)
         expect(submitAgain!.sessionId).toBe(submit!.sessionId)
         expect(writes(fake)).toHaveLength(4)
+        // Uploaded again only after the upload the Node didn't confirm, and then reused.
+        expect(uploads(fake)).toHaveLength(2)
+        expect(submitAgain!.input).toEqual(submit!.input)
 
         // Another question is another turn.
         const second = await opened()
