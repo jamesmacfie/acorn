@@ -1,6 +1,6 @@
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { lazy } from 'solid-js'
-import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { AGENT_TOOL_CARD_POINT, CORE_MARKDOWN_FENCE_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { gitSourceContribution } from './sourceContribution'
 import { gitPaneContribution } from './paneContribution'
 import { openChangesTab } from './gitPane'
@@ -11,6 +11,7 @@ import { EDITOR_LINE_POINT } from '@acorn/plugin-editor/contract/lineAnnotations
 import { readLineBlame } from './lineBlame'
 const GitSettings = lazy(() => import('./GitSettings'))
 const GitAppearance = lazy(() => import('./GitSettings').then((module) => ({ default: module.GitAppearanceSettings })))
+const DiffFence = lazy(() => import('./changes/DiffFence'))
 const ChangesToolCard = lazy(() => import('./changes/ToolCard').then((module) => ({ default: module.ChangesToolCard })))
 
 export const gitClientPlugin: ClientPlugin = {
@@ -64,7 +65,7 @@ export const gitClientPlugin: ClientPlugin = {
 }
 
 /** The Changes tab's client half: what it draws on the rail, the preference it keeps, its palette row,
- *  the two points it hosts, and how its file tool calls read in an agent transcript. */
+ *  the two points it hosts, and how its file tool calls and diff fences read in an agent transcript. */
 function registerChanges(ctx: Parameters<ClientPlugin['init']>[0]) {
   // A dot on each task row and on the pane's rail button for which way the uncommitted lines lean.
   ctx.railMarkers.register(changesRailMarkerContribution)
@@ -129,5 +130,16 @@ function registerChanges(ctx: Parameters<ClientPlugin['init']>[0]) {
     order: 10,
     matches: ['read', 'edit', 'delete', 'move'],
     component: ChangesToolCard,
+  })
+  // A change an agent proposes in a ```diff fence rather than makes, drawn like the file tool cards
+  // above so the two read alike. The host keeps the source, Copy and the Preview toggle
+  // (docs/plugins/markdown-fences.md).
+  ctx.extensions.register({
+    id: 'changes.diff-fence',
+    point: CORE_MARKDOWN_FENCE_POINT,
+    label: 'Diff',
+    order: 10,
+    matches: ['diff', 'patch'],
+    component: DiffFence,
   })
 }
