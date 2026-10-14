@@ -66,6 +66,7 @@ import { WillConfirmationHost } from '../../host/registries/shell/willPhase'
 import { useUnsavedChanges } from './unsavedChanges'
 import { useSettingsDetail } from './settingsDetail'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
+import IconPicker from '../../kit/components/inputs/IconPicker'
 import { settingsRegistry, type SettingsContribution } from '../../host/registries/shell/settings'
 import { activeNodeId, setActiveNode } from '../../infra/node/activeNode'
 import { sourceRegistry } from '../../host/registries/sources/sources'
@@ -211,6 +212,41 @@ describe('SettingsView', () => {
     expect(document.activeElement).toBe(field)
     under.remove()
     dialog.remove()
+  })
+
+  it('keeps focus in an icon picker so it can filter and closes the picker before settings', async () => {
+    const selected = vi.fn()
+    held.push(
+      settingsRegistry.register(
+        page('account-icons', {
+          component: () => <IconPicker value={null} fallback="P" onSelect={selected} ariaLabel="Personal icon" />,
+        }),
+      ),
+    )
+    open({ target: 'account-icons' })
+    host.querySelector<HTMLButtonElement>('[aria-label="Personal icon"]')!.click()
+    await Promise.resolve()
+
+    const filter = document.querySelector<HTMLInputElement>('input[placeholder="Filter icons…"]')!
+    expect(document.activeElement).toBe(filter)
+    filter.value = 'rocket'
+    filter.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    const first = await vi.waitFor(() => {
+      const row = document.querySelector<HTMLButtonElement>('.repo-picker-list button')!
+      expect(row?.textContent).toBe('Rocket')
+      return row
+    })
+    first.click()
+    expect(selected).toHaveBeenCalledWith('rocket')
+    expect(document.querySelector('.repo-picker-popover')).toBeNull()
+
+    host.querySelector<HTMLButtonElement>('[aria-label="Personal icon"]')!.click()
+    await Promise.resolve()
+    document.activeElement!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    )
+    expect(document.querySelector('.repo-picker-popover')).toBeNull()
+    expect(closed).toBe(0)
   })
 
   it('names the node a page reads, as plain text, when the page does not follow the switcher', () => {
