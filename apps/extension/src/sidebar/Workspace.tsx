@@ -22,7 +22,7 @@ import { changeDraft, loadDestination, saveDestination, type Destination } from 
 import { Waiting } from './Waiting'
 
 // The work on one Node: the current task, the page beside the panel, and the conversations of the
-// page's task, or of the current task on a page that belongs to none. Home shows them; opening a
+// page's task, or of the current task on its project's site. Home shows them; opening a
 // conversation makes its task current and replaces Home until the person goes back. The parent mounts one
 // per selected Node, and again each time Settings closes, so it restores the current task from
 // storage. Each list read checks on its return that the choice it was made for is still the choice,
@@ -112,10 +112,15 @@ export function Workspace(props: {
     }
   }
 
-  // The task Home's Agents shows: the page's, or the current task on a page that belongs to none.
+  // The task Home's Agents shows: the page's, or the current task on its project's site. A page tied
+  // to neither shows no task's conversations.
   const pageTask = () => props.pageTasks[0] ?? null
-  const agentsTask = () =>
-    pageTask() ? { projectId: pageTask()!.task.projectId, taskId: pageTask()!.task.id } : current()
+  const agentsTask = (): { projectId: string | null; taskId: string | null } => {
+    const page = pageTask()
+    if (page) return { projectId: page.task.projectId, taskId: page.task.id }
+    const { projectId } = current()
+    return projectId && pageProjects().includes(projectId) ? current() : { projectId: null, taskId: null }
+  }
 
   // Reads a task's conversations, then hands them to `then` if the task is still current.
   const loadSessions = async (forTask: string, then?: (list: BridgeAgentSession[]) => void) => {

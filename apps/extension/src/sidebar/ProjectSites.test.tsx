@@ -427,12 +427,12 @@ describe('This page', () => {
     await settle(30)
     expect(conversationTitle(root)).toBe('Claude · Chat s1')
     await back(root)
-    // A page that matches nothing keeps the task last used pinned.
+    // A page that matches nothing keeps the task last used pinned, but none of its conversations.
     fake.navigate('https://example.com/')
     await settle(20)
     expect(thisPage(root).textContent).toContain('Nothing in Acorn matches this page.')
     expect(currentTask(root)).toBe('Fix login')
-    expect(agentRows(root)).toEqual(['Claude · Chat s1'])
+    expect(agentRows(root)).toEqual([])
   })
 
   it("says over an open conversation when the page is another task's", async () => {

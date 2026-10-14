@@ -77,6 +77,9 @@ function node() {
         return { result: nodes }
       case 'projects.list':
         return { result: { nodeId: 'n1', projects: [{ id: 'p1', name: 'Acorn', path: null, hidden: false }] } }
+      // The test page is on the project's site, so Home lists the current task's conversations.
+      case 'sites.list':
+        return { result: { nodeId: 'n1', sites: [{ projectId: 'p1', origin: 'https://example.test', pathPrefix: '/' }] } }
       case 'tasks.list':
         return { result: { nodeId: 'n1', projectId: 'p1', tasks: [{ id: 't1', title: 'Fix it', branch: null }] } }
       case 'sessions.list':
