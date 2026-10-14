@@ -430,6 +430,8 @@ export function Shell(props: {
       {
         id: 'core.rail.toggle',
         title: 'Rail',
+        hint: 'hide or show the left column',
+        keywords: ['sidebar', 'collapse', 'hide', 'show'],
         category: 'navigation',
         palette: true,
         run: () => {
