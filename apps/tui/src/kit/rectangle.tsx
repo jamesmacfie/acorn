@@ -362,10 +362,9 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
   )
 }
 
-/** An `editor` rectangle: the text of the file, read-only, with the handoff to `$EDITOR` beside it.
- *
- *  A box and a line. The handoff needs nothing of its own: the editor pane's terminal mode runs the
- *  reader's own editor in a PTY on the node, so in cells it simply draws
+/** An `editor` rectangle: a box and a line, because there is no CodeMirror in cells. The caller's
+ *  children draw instead when it passes any. The editor pane doesn't draw one here at all: in this
+ *  client a file opens in the reader's own editor in a PTY on the node
  *  (docs/tui/rectangles.md § Rectangles). Drawn rather than absent because a pane that names one is
  *  telling the truth about what is there. */
 export function EditorRectangle(props: { label: string; children?: JSX.Element }) {

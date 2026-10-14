@@ -85,6 +85,7 @@
     "./host/components/RefPanelBox.tsx": "./src/host/components/RefPanelBox.tsx",
     "./host/components/RefPanelTaskLink.tsx": "./src/host/components/RefPanelTaskLink.tsx",
     "./host/frames/documentSurface.ts": "./src/host/frames/documentSurface.ts",
+    "./host/frames/frameSurface.ts": "./src/host/frames/frameSurface.ts",
     "./host/frames/broker.ts": "./src/host/frames/broker.ts",
     "./host/frames/frameServices.ts": "./src/host/frames/frameServices.ts",
     "./host/frames/remoteRoot.ts": "./src/host/frames/remoteRoot.ts",
