@@ -14,7 +14,6 @@ import {
   Alert,
   Button,
   Card,
-  CodeBlock,
   Fold,
   Heading,
   Icon,
@@ -332,11 +331,6 @@ export default function AgentEventCard(props: {
                           </Row>
                         )}
                       </For>
-                      <Show when={Object.keys(props.turn?.effectivePolicy ?? {}).length}>
-                        <CodeBlock size="xs" wrap>
-                          {JSON.stringify(props.turn?.effectivePolicy, null, 2)}
-                        </CodeBlock>
-                      </Show>
                     </Stack>
                   </Fold>
                 </Show>
