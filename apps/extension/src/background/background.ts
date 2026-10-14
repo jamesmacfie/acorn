@@ -224,8 +224,12 @@ export function startBackground(api: BrowserApi, hostName: string): void {
   askElement(api, {
     open: openPanel,
     selectedNode: () => buttons.nodeId,
-    onTaskPage: (url) => pageTasks(pages.tasks, url).length > 0,
+    // The first, as the chip shows.
+    pageTask: (url) => pageTasks(pages.tasks, url)[0] ?? null,
+    sessions: (taskId) => pages.sessions(taskId),
+    read,
     refused: (notice) => offer({ type: 'notice', notice }),
+    sent: (target) => offer({ type: 'open', target }),
   })
 
   api.runtime.onConnect.addListener((port) => {

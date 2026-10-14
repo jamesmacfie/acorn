@@ -61,3 +61,35 @@ export type ButtonClick =
 // From the background to the element picker on a task's page: pick the element the person last
 // right-clicked, or let them point at one and click it.
 export type PickerMessage = { type: 'acorn:pick'; mode: 'hover' | 'target' }
+// From the element picker to the background, about one picked element. `acorn:ask.open` starts a
+// pick, and the background names it in its answer. `acorn:ask.send` asks the task's agent: in the
+// conversation `sessionId`, or in a new chat with `providerId`'s agent when it's null. The background
+// checks every field, because the element's HTML and path come from the page. `acorn:ask.cancel`
+// drops what the background kept for the pick.
+export type AskMessage =
+  | { type: 'acorn:ask.open' }
+  | {
+      type: 'acorn:ask.send'
+      pickId: string
+      question: string
+      html: string
+      selector: string
+      // The element's size in CSS pixels.
+      size: { width: number; height: number }
+      sessionId: string | null
+      providerId: string | null
+    }
+  | { type: 'acorn:ask.cancel'; pickId: string }
+// Each answer is either what the box needs, or why it can't go on, in one line.
+export type AskOpened =
+  | {
+      ok: true
+      pickId: string
+      sessions: { id: string; title: string }[]
+      // The agents a new chat can start with, and the one to choose first.
+      agents: { providerId: string; label: string }[]
+      agent: string | null
+    }
+  | { ok: false; reason: string }
+// `opensPanel` is false in Firefox, whose sidebar opens only from the extension's own controls.
+export type AskSent = { ok: true; opensPanel: boolean } | { ok: false; reason: string }

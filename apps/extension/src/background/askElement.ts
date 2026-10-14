@@ -1,32 +1,78 @@
+import type {
+  BridgeAgentProfile,
+  BridgeAgentSession,
+  BridgeOperation,
+  BridgeResults,
+} from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi, Tab } from '../browser'
-import type { PickerMessage } from '../handoffs'
+import { turnInput, withCapture } from '../capture'
+import type { AskMessage, AskOpened, AskSent, PickerMessage } from '../handoffs'
+import { saveDestination } from '../localState'
+import { CallFailure, isUncertain, type BridgeCall, type RequestTarget } from '../messages'
+import { errorGuidance } from '../sidebar/guidance'
+import type { PageTask } from '../taskPages'
 
 const MENU_ID = 'ask-acorn-about-element'
+// The agent a new chat from the box last started with, per Node.
+const askAgentKey = (nodeId: string) => `askAgent:${nodeId}`
+const MAX_QUESTION_CHARS = 20_000
+// The picker cuts the element's HTML to this size.
+const MAX_HTML_BYTES = 50 * 1024
+
+// What the background keeps for the one box open on a tab: where it asks, what it may choose from,
+// and the operation keys of its sends.
+type Pick = {
+  id: string
+  nodeId: string
+  projectId: string
+  taskId: string
+  pickedAt: number
+  sessions: BridgeAgentSession[]
+  agents: BridgeAgentProfile[]
+  // A new chat's key, kept with its agent, and the chat once the Node made it.
+  create: { providerId: string; key: string; sessionId: string | null } | null
+  // A turn's key, kept with the conversation and input it went with.
+  submit: { key: string; sessionId: string; input: string } | null
+}
+
+// As the sidebar's agent picker decides it.
+const usable = (profile: BridgeAgentProfile): boolean => profile.installed && profile.authenticated !== false
 
 // Ask Acorn about this element, on a right-click anywhere on a page. Like Add to Acorn chat, the entry
 // is always on the menu. On a page that belongs to a task, a click starts the element picker in the
 // page. When the picker script was already there, it saw the right-click and picks that element;
 // otherwise it's injected now and the person points at the element. When the page can't have the
 // picker, the panel opens and says why in one line.
+//
+// Then the box asks the background for the task's conversations and agents, and sends the question
+// through it. docs/future/element-picker/README.md.
 export function askElement(
   api: BrowserApi,
   events: {
     // Called inside the click, where the browser still counts the person's gesture.
     open(tab: Tab): void
     selectedNode(): string | null
-    // Whether the page belongs to one of the selected Node's tasks.
-    onTaskPage(url: string | undefined): boolean
+    // The first of the selected Node's tasks the page belongs to.
+    pageTask(url: string | undefined): PageTask | null
+    // The task's conversations, or undefined until they are read.
+    sessions(taskId: string): readonly BridgeAgentSession[] | undefined
+    read<Op extends BridgeOperation>(operation: Extract<BridgeCall, { op: Op }>): Promise<BridgeResults[Op]>
     // Why nothing was picked, in one line.
     refused(notice: string): void
+    // A question went to this conversation.
+    sent(target: RequestTarget): void
   },
 ): void {
+  // By tab. A new box on the tab replaces the last one's.
+  const picks = new Map<number, Pick>()
+
   // From what the background holds now, so the panel can open inside the click. A background that has
   // only just started may not have the Node's tasks yet, but it runs as long as a Node's host is
   // connected, and without one nothing can be asked.
   const refusal = (frameId: number | undefined, url: string | undefined): string | null => {
     if (!events.selectedNode())
       return 'No Node is selected, so there is no agent to ask. Choose or pair a Node, then try again.'
-    if (!events.onTaskPage(url))
+    if (!events.pageTask(url))
       return "This page doesn't belong to a task, so there is no agent to ask about it. Open a task's pull request, issue, or app, then try again."
     if (frameId)
       return "That element is inside a frame, which Acorn can't pick from. Right-click outside the frame, then try again."
@@ -42,6 +88,163 @@ export function askElement(
     await api.scripting.executeScript({ target: { tabId }, files: ['picker.js'] })
     await api.tabs.sendMessage(tabId, { type: 'acorn:pick', mode: 'hover' } satisfies PickerMessage)
   }
+
+  const open = async (tabId: number, url: string): Promise<AskOpened> => {
+    const nodeId = events.selectedNode()
+    const match = events.pageTask(url)
+    if (!nodeId || !match) return { ok: false, reason: refusal(0, url)! }
+    const { task } = match
+    const [sessions, { profiles }, stored] = await Promise.all([
+      events.sessions(task.id) ??
+        events.read({ op: 'sessions.list', nodeId, taskId: task.id }).then((result) => result.sessions),
+      events.read({ op: 'agents.profiles', nodeId }),
+      api.storage.local.get([askAgentKey(nodeId)]),
+    ])
+    const pick: Pick = {
+      id: crypto.randomUUID(),
+      nodeId,
+      projectId: task.projectId,
+      taskId: task.id,
+      pickedAt: Date.now(),
+      // An archived conversation takes no new messages.
+      sessions: sessions.filter((session) => !session.archivedAt),
+      agents: profiles.filter(usable),
+      create: null,
+      submit: null,
+    }
+    picks.set(tabId, pick)
+    const remembered = stored[askAgentKey(nodeId)]
+    return {
+      ok: true,
+      pickId: pick.id,
+      sessions: pick.sessions.map(({ id, title }) => ({ id, title })),
+      agents: pick.agents.map(({ providerId, label }) => ({ providerId, label })),
+      agent:
+        pick.agents.find((agent) => agent.providerId === remembered)?.providerId ?? pick.agents[0]?.providerId ?? null,
+    }
+  }
+
+  // Checks the request against what the background read when the box opened, then makes the new chat
+  // if one was asked for, and the turn. A retry of the same pick reuses both keys, so the Node makes at
+  // most one chat and one turn.
+  const send = async (
+    tabId: number,
+    title: string,
+    url: string,
+    message: Extract<AskMessage, { type: 'acorn:ask.send' }>,
+  ): Promise<AskSent> => {
+    const pick = picks.get(tabId)
+    if (pick?.id !== message.pickId)
+      return { ok: false, reason: 'This box is out of date, so nothing was sent. Pick the element again.' }
+    if (events.selectedNode() !== pick.nodeId || events.pageTask(url)?.task.id !== pick.taskId)
+      return {
+        ok: false,
+        reason:
+          'This page no longer belongs to the task the box was opened for, so nothing was sent. Pick the element again.',
+      }
+    const question = typeof message.question === 'string' ? message.question.trim() : ''
+    if (!question || question.length > MAX_QUESTION_CHARS)
+      return { ok: false, reason: `Write a question of up to ${MAX_QUESTION_CHARS.toLocaleString('en')} characters.` }
+    if (typeof message.html !== 'string' || new TextEncoder().encode(message.html).byteLength > MAX_HTML_BYTES)
+      return { ok: false, reason: "The element's HTML is too large to send." }
+    const session = message.sessionId === null ? null : pick.sessions.find((each) => each.id === message.sessionId)
+    if (session === undefined)
+      return { ok: false, reason: "That conversation isn't one of this task's, so nothing was sent. Choose another." }
+    const agent = session ? null : pick.agents.find((each) => each.providerId === message.providerId)
+    if (agent === undefined)
+      return { ok: false, reason: "That agent can't start a chat on this Node, so nothing was sent. Choose another." }
+
+    const { width, height } = message.size
+    const capture = {
+      kind: 'context' as const,
+      id: pick.id,
+      url,
+      title,
+      capturedAt: pick.pickedAt,
+      label: `Element on ${title}`,
+      content: `Page: ${url}\nCSS path: ${message.selector}\nSize: ${width} × ${height} CSS pixels\n\n${message.html}`,
+    }
+    const input = turnInput(question, withCapture([], capture), new Map())
+    let stage: 'create' | 'submit' = 'create'
+    let sessionId: string
+    try {
+      if (agent) {
+        if (pick.create?.providerId !== agent.providerId)
+          pick.create = { providerId: agent.providerId, key: crypto.randomUUID(), sessionId: null }
+        const create = pick.create
+        create.sessionId ??= (
+          await events.read({
+            op: 'session.create',
+            nodeId: pick.nodeId,
+            taskId: pick.taskId,
+            providerId: agent.providerId,
+            profileId: agent.profileId,
+            key: create.key,
+          })
+        ).session.id
+        sessionId = create.sessionId
+      } else sessionId = session!.id
+      stage = 'submit'
+      // The same question about the same element, to the same conversation, is the same turn.
+      const sending = JSON.stringify(input)
+      if (pick.submit?.sessionId !== sessionId || pick.submit.input !== sending)
+        pick.submit = { key: crypto.randomUUID(), sessionId, input: sending }
+      await events.read({ op: 'turn.submit', nodeId: pick.nodeId, sessionId, input, key: pick.submit.key })
+    } catch (error) {
+      const failure = error instanceof CallFailure ? error : new CallFailure('node_error', String(error))
+      if (!isUncertain(failure.code)) return { ok: false, reason: errorGuidance(failure) }
+      return {
+        ok: false,
+        reason:
+          stage === 'create'
+            ? "The Node didn't confirm the new chat. Send again to retry; the Node won't make a second one."
+            : "The Node didn't confirm this message, so it may have arrived. Send again to retry; the Node makes at most one turn.",
+      }
+    }
+
+    picks.delete(tabId)
+    const target = { nodeId: pick.nodeId, projectId: pick.projectId, taskId: pick.taskId, sessionId }
+    // The question went. Full storage only loses the remembered agent and where the panel opens next.
+    await Promise.all([
+      agent ? api.storage.local.set({ [askAgentKey(pick.nodeId)]: agent.providerId }) : undefined,
+      saveDestination(api.storage.local, pick.nodeId, { projectId: pick.projectId, taskId: pick.taskId, sessionId }),
+    ]).catch(() => undefined)
+    events.sent(target)
+    return { ok: true, opensPanel: !!api.sidePanel }
+  }
+
+  // Only from the picker in a page's top frame. A page can't message the extension itself, but the
+  // element's HTML and path come from the page, so every value is checked here.
+  api.runtime.onMessage.addListener((raw, sender, sendResponse) => {
+    const message = raw as AskMessage | null
+    const tab = sender.tab
+    if (
+      !message ||
+      !String(message.type).startsWith('acorn:ask.') ||
+      sender.frameId !== 0 ||
+      tab?.id === undefined ||
+      !sender.url
+    )
+      return
+    const tabId = tab.id
+    if (message.type === 'acorn:ask.cancel') {
+      if (picks.get(tabId)?.id === message.pickId) picks.delete(tabId)
+      return
+    }
+    // Inside the person's click on Send, where the browser still counts the gesture.
+    if (message.type === 'acorn:ask.send') events.open(tab)
+    const answer =
+      message.type === 'acorn:ask.open'
+        ? open(tabId, sender.url)
+        : send(tabId, tab.title?.trim() || sender.url, sender.url, message)
+    answer
+      .catch((error: unknown): AskOpened | AskSent => ({
+        ok: false,
+        reason: error instanceof CallFailure ? errorGuidance(error) : "Acorn couldn't reach the Node. Try again.",
+      }))
+      .then(sendResponse)
+    return true
+  })
 
   api.runtime.onInstalled.addListener(() =>
     api.contextMenus.create({

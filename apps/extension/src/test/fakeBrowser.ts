@@ -12,8 +12,11 @@ function listeners<L extends Listener>() {
   return {
     addListener: (listener: L) => void set.add(listener),
     removeListener: (listener: L) => void set.delete(listener),
-    emit: (...args: Parameters<L>) => {
-      for (const listener of set) listener(...args)
+    // Whether any listener returned `true`, which keeps a message's answer channel open.
+    emit: (...args: Parameters<L>): boolean => {
+      let kept = false
+      for (const listener of set) if ((listener(...args) as unknown) === true) kept = true
+      return kept
     },
   }
 }
@@ -142,7 +145,7 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     // OS notifications on screen, by ID, and every one ever created, in order.
     notifications: new Map<string, { title: string; message: string }>(),
     notified: [] as string[],
-    clickNotification: (id: string): void => onNotificationClicked.emit(id),
+    clickNotification: (id: string): void => void onNotificationClicked.emit(id),
     selection: '',
     // Replaced by a test to script what a page's content scripts answer. By default, nothing.
     pageAnswer: (_message: unknown): unknown => undefined,
@@ -151,19 +154,24 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     tabMessages: [] as { tabId: number; message: unknown }[],
     injected: [] as number[],
     injectedFiles: [] as string[][],
-    // A message from the content script in the active tab, as the browser delivers it.
-    sendFromPage: (message: unknown): void =>
-      onMessage.emit(
-        structuredClone(message),
-        { tab: { ...fake.activeTab }, url: fake.activeTab.url, frameId: 0 },
-        () => {},
-      ),
+    // A message from a content script in the active tab, in its top frame unless `frameId` says
+    // otherwise, as the browser delivers it. Resolves with the background's answer, if it gives one.
+    sendFromPage: (message: unknown, frameId = 0): Promise<unknown> =>
+      new Promise((resolve) => {
+        const kept = onMessage.emit(
+          structuredClone(message),
+          { tab: { ...fake.activeTab }, url: fake.activeTab.url, frameId },
+          (answer) => resolve(structuredClone(answer)),
+        )
+        // A browser answers `undefined` when no listener kept the channel open.
+        if (!kept) resolve(undefined)
+      }),
     // The active tab navigated, as `tabs.onUpdated` reports it.
     navigate: (url: string | undefined): void => {
       fake.activeTab = { ...fake.activeTab, url }
       onUpdated.emit(fake.activeTab.id!, { url, status: 'complete' }, { ...fake.activeTab, active: true })
     },
-    activate: (): void => onActivated.emit({ tabId: fake.activeTab.id!, windowId: fake.activeTab.windowId }),
+    activate: (): void => void onActivated.emit({ tabId: fake.activeTab.id!, windowId: fake.activeTab.windowId }),
     // Optional host access the person granted. `answerRequest` is the person's answer to the prompt.
     granted: new Set<string>(),
     answerRequest: true,

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PickerMessage } from '../handoffs'
+import type { AskMessage, AskOpened, PickerMessage } from '../handoffs'
 
 // The element picker against a real DOM. The browser side is a stub: the message listener the
-// background talks to. The picker draws in a closed shadow root, which the page can't reach, so the
+// background talks to, and the background's answers to the box. The picker draws in a closed shadow root, which the page can't reach, so the
 // test keeps the root as it is attached. jsdom can only make events a page could make, which the
 // picker ignores, so the person's own events go straight to the listeners the picker added.
 type Listener = (message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => unknown
@@ -31,7 +31,17 @@ beforeEach(async () => {
   }
   const scope = globalThis as Record<string, unknown>
   delete scope.acornPicker
-  scope.chrome = { runtime: { onMessage: { addListener: (added: Listener) => void (listener = added) } } }
+  sent = []
+  answer = (message) => (message.type === 'acorn:ask.open' ? OPENED : { ok: true, opensPanel: true })
+  scope.chrome = {
+    runtime: {
+      onMessage: { addListener: (added: Listener) => void (listener = added) },
+      sendMessage: async (message: AskMessage) => {
+        sent.push(message)
+        return answer(message)
+      },
+    },
+  }
   vi.resetModules()
   await import('./picker')
 })
@@ -42,6 +52,20 @@ afterEach(() => {
   delete (globalThis as Record<string, unknown>).chrome
 })
 
+// What the box sent the background, and how the background answers.
+let sent: AskMessage[] = []
+let answer: (message: AskMessage) => unknown
+const OPENED: AskOpened = {
+  ok: true,
+  pickId: 'pick-1',
+  sessions: [{ id: 's1', title: 'Billing rounding' }],
+  agents: [
+    { providerId: 'claude', label: 'Claude' },
+    { providerId: 'codex', label: 'Codex' },
+  ],
+  agent: 'codex',
+}
+
 // What the picker answered, which tells the background it's on the page.
 let answers: unknown[] = []
 const pick = (mode: PickerMessage['mode']) =>
@@ -51,10 +75,42 @@ const drawn = () => document.querySelector('[data-acorn-picker]')
 const outline = () => root!.querySelector<HTMLElement>('.outline')!
 const box = () => (drawn() ? root!.querySelector<HTMLElement>('.box') : null)
 
-// The person's own event at `target`, delivered to the listeners the picker added on the window.
-function person(type: string, target: EventTarget, extra: Record<string, unknown> = {}) {
-  const event = { type, target, isTrusted: true, preventDefault() {}, stopImmediatePropagation() {}, ...extra }
-  for (const added of listeners.get(window) ?? []) if (added.type === type) added.listener(event as unknown as Event)
+// The person's own event at `target`, delivered to the listeners the picker added on `on`: the
+// window, unless it says otherwise.
+function person(type: string, target: EventTarget, extra: Record<string, unknown> = {}, on: EventTarget = window) {
+  const event = {
+    type,
+    target,
+    isTrusted: true,
+    preventDefault() {},
+    stopPropagation() {},
+    stopImmediatePropagation() {},
+    ...extra,
+  }
+  for (const added of listeners.get(on) ?? []) if (added.type === type) added.listener(event as unknown as Event)
+}
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+const field = () => box()!.querySelector('textarea')!
+const [conversation, agent] = [0, 1].map((index) => () => box()!.querySelectorAll('select')[index]!)
+const send = () => box()!.querySelector<HTMLButtonElement>('.send')!
+const note = () => box()!.querySelector<HTMLElement>('.note')!
+const type = (text: string) => {
+  field().value = text
+  field().dispatchEvent(new Event('input'))
+}
+// The box open on the element at `selector`, with the background's answer in.
+async function asked(selector: string) {
+  person('contextmenu', element(selector))
+  pick('target')
+  await settle()
+}
+// What the box sends about the element at `selector`, for a question and a press of Send.
+async function sentAbout(selector: string) {
+  await asked(selector)
+  type('Why?')
+  person('click', send(), {}, send())
+  await settle()
+  return sent.find((message) => message.type === 'acorn:ask.send') as Extract<AskMessage, { type: 'acorn:ask.send' }>
 }
 
 describe('the element picker', () => {
@@ -115,8 +171,7 @@ describe('the element picker', () => {
     // Only the person's own click.
     ;(cancel as HTMLButtonElement).click()
     expect(box()).not.toBeNull()
-    for (const added of listeners.get(cancel) ?? [])
-      added.listener({ isTrusted: true, preventDefault() {}, stopPropagation() {} } as unknown as Event)
+    person('click', cancel, {}, cancel)
     expect(drawn()).toBeNull()
 
     pick('target')
@@ -134,5 +189,143 @@ describe('the element picker', () => {
       .querySelector('textarea')!
       .dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, composed: true }))
     expect(typed).not.toHaveBeenCalled()
+  })
+
+  it('fills the box from the background, and sends a new chat with the agent chosen', async () => {
+    await asked('.save')
+    expect(sent).toEqual([{ type: 'acorn:ask.open' }])
+    expect([...conversation().options].map((option) => [option.value, option.textContent])).toEqual([
+      ['', 'New chat'],
+      ['s1', 'Billing rounding'],
+    ])
+    expect(conversation().value).toBe('')
+    expect(agent().value).toBe('codex')
+    expect(agent().hidden).toBe(false)
+    expect(send().disabled).toBe(true)
+
+    type('  Why is this here?  ')
+    expect(send().disabled).toBe(false)
+    // A click the page made sends nothing.
+    send().click()
+    expect(sent).toHaveLength(1)
+    person('click', send(), {}, send())
+    await settle()
+    expect(sent[1]).toEqual({
+      type: 'acorn:ask.send',
+      pickId: 'pick-1',
+      question: 'Why is this here?',
+      html: '<button class="save">Save</button>',
+      selector: 'body > main:nth-of-type(1) > button:nth-of-type(1)',
+      size: { width: 0, height: 0 },
+      sessionId: null,
+      providerId: 'codex',
+    })
+    // The panel opens on the chat, so the box goes, and the background has already forgotten the pick.
+    expect(drawn()).toBeNull()
+    expect(sent).toHaveLength(2)
+  })
+
+  it('sends to a chosen conversation on Enter, and keeps Shift+Enter for a new line', async () => {
+    await asked('.save')
+    conversation().value = 's1'
+    conversation().dispatchEvent(new Event('change'))
+    expect(agent().hidden).toBe(true)
+    type('Why?')
+    person('keydown', field(), { key: 'Enter', shiftKey: true }, field())
+    await settle()
+    expect(sent).toHaveLength(1)
+    person('keydown', field(), { key: 'Enter' }, field())
+    await settle()
+    expect(sent[1]).toMatchObject({ type: 'acorn:ask.send', sessionId: 's1', providerId: null })
+  })
+
+  it("keeps the box open with the background's reason, and forgets the pick on Escape", async () => {
+    answer = (message) =>
+      message.type === 'acorn:ask.open' ? OPENED : { ok: false, reason: "The Node didn't confirm this message." }
+    await sentAbout('.save')
+    expect(note().hidden).toBe(false)
+    expect(note().textContent).toBe("The Node didn't confirm this message.")
+    expect(send().disabled).toBe(false)
+
+    // Cancel tells the background to forget the pick.
+    person('keydown', document.body, { key: 'Escape' })
+    expect(sent.at(-1)).toEqual({ type: 'acorn:ask.cancel', pickId: 'pick-1' })
+  })
+
+  it('says why the box cannot send when the background refuses it', async () => {
+    answer = () => ({ ok: false, reason: "This page doesn't belong to a task." })
+    await asked('.save')
+    expect(note().textContent).toBe("This page doesn't belong to a task.")
+    type('Why?')
+    expect(send().disabled).toBe(true)
+  })
+
+  it('says where the reply is in Firefox, then closes', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] })
+    answer = (message) => (message.type === 'acorn:ask.open' ? OPENED : { ok: true, opensPanel: false })
+    person('contextmenu', element('.save'))
+    pick('target')
+    await vi.advanceTimersByTimeAsync(0)
+    type('Why?')
+    person('click', send(), {}, send())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(note().textContent).toBe('Sent. Click Acorn in the toolbar to see the reply.')
+    expect(send().disabled).toBe(true)
+    await vi.advanceTimersByTimeAsync(4000)
+    expect(drawn()).toBeNull()
+    vi.useRealTimers()
+  })
+
+  it("cleans the element's HTML", async () => {
+    document.body.innerHTML = `<main><div class="card" id="card" style="color: red" role="region" aria-label="Card" data-row="3" onclick="steal()">
+        <script>secret()</script><style>.x {}</style><noscript>no</noscript><template><p>t</p></template>
+        <link rel="stylesheet" href="x.css"><meta name="x"><input type="hidden" name="csrf" value="token">
+        <input name="email" value="me@example.com" onfocus="x()">
+        <img src="data:image/png;base64,AAAA" srcset="a.png 1x, data:image/png;base64,BBBB 2x" alt="Logo">
+        <a href="blob:https://example.test/1">Download</a> <video poster="https://example.test/p.jpg"></video>
+        <iframe srcdoc="<p>hi</p>"></iframe>
+      </div></main>`
+    expect((await sentAbout('#card')).html).toBe(
+      '<div class="card" id="card" style="color: red" role="region" aria-label="Card" data-row="3"> ' +
+        '<input name="email"> <img src="[data URL]" srcset="[data URL]" alt="Logo"> ' +
+        '<a href="[data URL]">Download</a> <video poster="https://example.test/p.jpg"></video> <iframe></iframe> </div>',
+    )
+  })
+
+  it('cuts HTML over 50 KiB, and says how much more there was', async () => {
+    document.body.innerHTML = `<p class="long">${'word '.repeat(30_000)}</p>`
+    const { html } = await sentAbout('.long')
+    expect(new TextEncoder().encode(html).byteLength).toBeLessThanOrEqual(50 * 1024)
+    expect(html).toMatch(/<!-- truncated by Acorn: 97 KiB more -->$/)
+  })
+
+  it('builds the shortest CSS path that matches only the element', async () => {
+    document.body.innerHTML = `
+      <div id="app"><section><p>One</p><p>Two <b class="target">here</b></p></section></div>
+      <button data-testid="save">Save</button><button id="both" data-testid="both">Both</button><button id="twice">A</button><button id="twice">B</button>
+      <ul><li>One</li><li class="second">Two</li></ul>`
+    const selectors = []
+    for (const selector of [
+      '#app',
+      '.target',
+      '[data-testid="save"]',
+      'button[data-testid="both"]',
+      '#twice + #twice',
+      '.second',
+    ]) {
+      sent = []
+      selectors.push((await sentAbout(selector)).selector)
+      person('keydown', document.body, { key: 'Escape' })
+    }
+    expect(selectors).toEqual([
+      '#app',
+      '#app > section:nth-of-type(1) > p:nth-of-type(2) > b:nth-of-type(1)',
+      '[data-testid="save"]',
+      // The element's own ID comes before its test ID.
+      '#both',
+      'body > button:nth-of-type(4)',
+      'body > ul:nth-of-type(1) > li:nth-of-type(2)',
+    ])
+    for (const selector of selectors) expect(document.querySelectorAll(selector)).toHaveLength(1)
   })
 })
