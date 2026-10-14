@@ -3,7 +3,7 @@ import { render } from 'solid-js/web'
 import type { BridgeAgentSession, BridgeHandoffItem } from '@acorn/protocol/extensionBridge.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
-import { back, button, conversationTitle, idle, openChat, openSettings } from '../test/sidebarUi'
+import { back, button, conversationTitle, idle, openSettings } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined

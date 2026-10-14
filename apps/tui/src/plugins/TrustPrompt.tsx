@@ -100,9 +100,7 @@ export function TrustPrompt() {
             </Line>
             <Show when={added().length}>
               <SectionHeader level="group">What this version asks for that the last one did not</SectionHeader>
-              <For each={added()}>
-                {(line) => <Line tone={line.high ? 'warn' : undefined}>{grantLine(line)}</Line>}
-              </For>
+              <For each={added()}>{(line) => <Line tone={line.high ? 'warn' : undefined}>{grantLine(line)}</Line>}</For>
             </Show>
             {/* One block per tier, never one list. */}
             <For each={kept()}>

@@ -99,9 +99,7 @@ export function Conversation(props: {
   return (
     <div class="view conversation" aria-label="Conversation">
       <div class="subhead">
-        <span class="grow">
-          {[agentName(session()), session().model].filter(Boolean).join(' · ')}
-        </span>
+        <span class="grow">{[agentName(session()), session().model].filter(Boolean).join(' · ')}</span>
         <State tone={state().tone}>{state().label}</State>
         <OpenInAcorn href={link} opensLinks={props.opensLinks} class="link" />
         <Show when={props.opensLinks && link}>{(href) => <CopyAcornLink href={href()} class="link" />}</Show>
@@ -124,7 +122,12 @@ export function Conversation(props: {
                 {(item) =>
                   item.kind === 'tool' ? (
                     <li class="tool">
-                      <span class="dot" data-tone={toolTone(item.status)} role="img" aria-label={item.status ?? 'unknown'} />
+                      <span
+                        class="dot"
+                        data-tone={toolTone(item.status)}
+                        role="img"
+                        aria-label={item.status ?? 'unknown'}
+                      />
                       <span>
                         {item.title}
                         {/* The dot says done on its own; any other state is written out too. */}

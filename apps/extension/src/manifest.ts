@@ -33,7 +33,12 @@ export function extensionManifest(browser: BridgeBrowser, version: string) {
     ...shared,
     permissions: ['nativeMessaging', 'storage', 'activeTab', 'scripting', 'contextMenus'],
     background: { scripts: ['background.js'], type: 'module' },
-    sidebar_action: { default_title: 'Acorn', default_icon: 'icon-128.png', default_panel: 'sidebar.html', open_at_install: false },
+    sidebar_action: {
+      default_title: 'Acorn',
+      default_icon: 'icon-128.png',
+      default_panel: 'sidebar.html',
+      open_at_install: false,
+    },
     browser_specific_settings: {
       gecko: {
         id: FIREFOX_EXTENSION_ID,
