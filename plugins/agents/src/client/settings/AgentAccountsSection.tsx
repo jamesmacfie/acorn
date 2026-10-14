@@ -1,18 +1,20 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createSignal, For, Show } from 'solid-js'
 import {
-  Badge,
   Button,
   CodeBlock,
   ConfirmButton,
+  Icon,
   Inline,
   Input,
+  SegmentedControl,
   Select,
   SettingRow,
   SettingsSection,
   Stack,
   Text,
 } from '@acorn/plugin-api/ui'
+import { IconPicker } from '@acorn/plugin-api/ui/host'
 import type { AgentAccountDescriptor, AgentProviderDescriptor } from '../../contract/wire.ts'
 import { isAccountName } from '../../shared/accounts'
 import { agentProvidersOptions, agentProvidersQueryKey, refreshAgentProviders } from '../providersClient'
@@ -55,6 +57,20 @@ export default function AgentAccountsSection() {
         <Show when={error()}>
           <Text tone="danger">{error()}</Text>
         </Show>
+        <SettingRow
+          label="Show accounts as"
+          help="How the New menu, the session list and the session header tell accounts apart. An account with no icon keeps its name."
+        >
+          <SegmentedControl
+            ariaLabel="Show accounts as"
+            value={withAccounts()[0]?.accountDisplay ?? 'name'}
+            options={[
+              { value: 'name', label: 'Name' },
+              { value: 'icon', label: 'Icon' },
+            ]}
+            onChange={(show) => void apply(() => managedAgentApi.setAccountDisplay(show))}
+          />
+        </SettingRow>
         <For each={withAccounts()}>
           {(provider) => (
             <Stack gap="stack">
@@ -66,7 +82,10 @@ export default function AgentAccountsSection() {
                   <Select
                     label={`Default ${provider.label} account`}
                     value={provider.defaultAccount ?? ''}
-                    options={(provider.accounts ?? []).map((account) => ({ value: account.name, label: account.name }))}
+                    options={(provider.accounts ?? []).map((account) => ({
+                      value: account.name,
+                      label: account.label ?? account.name,
+                    }))}
                     onChange={(name) => void apply(() => managedAgentApi.setDefaultAccount(provider.id, name))}
                   />
                 </SettingRow>
@@ -79,6 +98,9 @@ export default function AgentAccountsSection() {
                     checking={checking()}
                     onCheck={() => void checkAgain()}
                     onRemove={() => void apply(() => managedAgentApi.removeAccount(provider.id, account.name))}
+                    onChange={(change) =>
+                      void apply(() => managedAgentApi.setAccountDetails(provider.id, account.name, change))
+                    }
                   />
                 )}
               </For>
@@ -100,11 +122,18 @@ function AccountRow(props: {
   checking: boolean
   onCheck: () => void
   onRemove: () => void
+  onChange: (change: { label?: string | null; icon?: string | null }) => void
 }) {
   const signedOut = () => props.account.authenticated !== true
+  const label = () => props.account.label ?? props.account.name
+  // An empty name goes back to the folder's name.
+  const rename = (value: string) => {
+    const next = value.trim() || null
+    if (next !== (props.account.label ?? null)) props.onChange({ label: next })
+  }
   return (
     <SettingRow
-      label={`${props.provider.label} · ${props.account.name}`}
+      label={`${props.provider.label} · ${label()}`}
       description={
         signedOut() && props.account.loginCommand
           ? 'Run this on the computer the Node runs on to sign in, then check again.'
@@ -113,23 +142,38 @@ function AccountRow(props: {
     >
       <Stack gap="row">
         <Inline>
-          <Badge tone={props.account.authenticated ? 'ok' : 'neutral'}>
-            {props.account.authenticated ? 'Signed in' : 'Not signed in'}
-          </Badge>
+          <Input
+            value={props.account.label ?? ''}
+            placeholder={props.account.name}
+            maxLength={40}
+            label={`${label()} display name`}
+            onChange={rename}
+          />
+          <IconPicker
+            ariaLabel={`${label()} icon`}
+            value={props.account.icon ?? null}
+            fallback={label().slice(0, 1).toUpperCase()}
+            onSelect={(icon) => props.onChange({ icon })}
+          />
+          <Icon
+            name={props.account.authenticated ? 'circle-check' : 'circle-dashed'}
+            tone={props.account.authenticated ? 'ok' : 'muted'}
+            title={props.account.authenticated ? 'Signed in' : 'Not signed in'}
+          />
           <Show when={signedOut()}>
             <Button size="sm" variant="ghost" busy={props.checking} onPress={props.onCheck}>
               Check again
             </Button>
           </Show>
           <ConfirmButton
-            size="sm"
+            iconOnly
             variant="ghost"
             tone="danger"
-            label="Remove"
-            confirmLabel={`Remove ${props.account.name}?`}
+            label={`Remove ${label()}`}
+            confirmLabel={`Remove ${label()}?`}
             onConfirm={props.onRemove}
           >
-            Remove
+            <Icon name="trash-2" />
           </ConfirmButton>
         </Inline>
         <Show when={signedOut() && props.account.loginCommand}>

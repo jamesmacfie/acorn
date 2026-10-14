@@ -1,4 +1,5 @@
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
+import { accountIcon, accountLabel } from '../../shared/accounts'
 import type { CustomAgent } from '../../shared/customAgents'
 
 /** One row of New: a harness on its own, one of its extra accounts, or a custom agent and the harness
@@ -50,7 +51,19 @@ export const choiceStart = (choice: NewSessionChoice): { customAgentId?: string;
 })
 
 export const choiceLabel = (choice: NewSessionChoice): string =>
-  choice.agent?.name ?? (choice.account ? `${choice.provider.label} · ${choice.account}` : choice.provider.label)
+  choice.agent?.name ??
+  (choice.account
+    ? `${choice.provider.label} · ${accountLabel(choice.provider, choice.account)}`
+    : choice.provider.label)
+
+/** The account's icon, when the row draws it in place of the account's name. */
+export const choiceAccountIcon = (choice: NewSessionChoice): string | undefined =>
+  accountIcon(choice.provider, choice.account ?? null)
+
+/** The name the row shows. It drops the account's name when the account's icon stands in for it.
+ *  Search, the palette and screen readers keep `choiceLabel`. */
+export const choiceText = (choice: NewSessionChoice): string =>
+  choiceAccountIcon(choice) ? choice.provider.label : choiceLabel(choice)
 
 export const choiceGlyph = (choice: NewSessionChoice): string | undefined =>
   choice.agent?.glyph ?? choice.provider.glyph

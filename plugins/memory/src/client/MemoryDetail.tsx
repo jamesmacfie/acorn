@@ -74,13 +74,14 @@ export default function MemoryDetail(props: { address: MemoryAddress; projectId:
     setError('')
     setEditing(true)
   }
-  async function run(operation: () => Promise<unknown>, next?: MemoryAddress) {
+  // `next` is what to open once it succeeds. Null closes the reader, as after a delete.
+  async function run(operation: () => Promise<unknown>, next?: MemoryAddress | null) {
     setBusy(true)
     setError('')
     try {
       await operation()
       setEditing(false)
-      if (active && next) selectMemory(next)
+      if (active && next !== undefined) selectMemory(next ?? undefined)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't change this memory.")
     } finally {
@@ -123,7 +124,7 @@ export default function MemoryDetail(props: { address: MemoryAddress; projectId:
             label="Delete"
             confirmLabel="Delete memory?"
             disabled={busy()}
-            onConfirm={() => void run(() => memoryApi().delete(props.address, document()!.hash, props.projectId))}
+            onConfirm={() => void run(() => memoryApi().delete(props.address, document()!.hash, props.projectId), null)}
           >
             Delete
           </ConfirmButton>

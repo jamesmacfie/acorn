@@ -1,16 +1,48 @@
-import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
+import { For, Show, createSignal, onCleanup, onMount, type JSX } from 'solid-js'
 import { TURN_TEXT_MAX_CHARS } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
 import { CallFailure, isUncertain } from '../messages'
 import type { BridgeClient } from './bridgeClient'
-import { CaptureFailure, screenshotData, turnInput, withCapture, type CaptureKind, type PageCapture } from './capture'
+import { CaptureFailure, screenshotData, turnInput, withCapture, type CaptureKind, type PageCapture } from '../capture'
 import { errorGuidance } from './guidance'
-import { acknowledged, changeDraft, loadDraft, saveDraft, type Draft, type DraftTarget } from './localState'
+import {
+  acknowledged,
+  changeDraft,
+  changedCaptures,
+  loadDraft,
+  saveDraft,
+  type Draft,
+  type DraftTarget,
+} from '../localState'
 
 const CAPTURE_LABELS: Record<CaptureKind, string> = {
-  link: 'Add page link',
-  selection: 'Add selected text',
-  screenshot: 'Add screenshot',
+  link: 'Add page link to chat',
+  selection: 'Add selected text to chat',
+  screenshot: 'Add screenshot to chat',
+}
+
+// Lucide's link, text-cursor, and camera glyphs, drawn in the text colour.
+// Functions, so each composer draws its own nodes.
+const CAPTURE_ICONS: Record<CaptureKind, () => JSX.Element> = {
+  link: () => (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  ),
+  selection: () => (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M17 22h-1a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h1" />
+      <path d="M7 22h1a4 4 0 0 0 4-4v-1" />
+      <path d="M7 2h1a4 4 0 0 1 4 4v1" />
+    </svg>
+  ),
+  screenshot: () => (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3" />
+    </svg>
+  ),
 }
 
 const CAPTURE_NAMES: Record<PageCapture['kind'], string> = {
@@ -28,9 +60,9 @@ const sameIds = (left: readonly string[] | undefined, right: readonly string[]) 
 // lands in this conversation's stored draft, never in the one showing.
 export function Composer(props: {
   client: BridgeClient
-  storage: BrowserApi['storage']['local']
+  storage: BrowserApi['storage']
   target: DraftTarget
-  // Where a message goes, named beside the captures that will go with it.
+  // Where a message goes, named under the message box.
   destination: string
   capture(kind: CaptureKind): Promise<PageCapture>
   // Why sending is off right now, or null.
@@ -46,11 +78,30 @@ export function Composer(props: {
   const [note, setNote] = createSignal<string | null>(null)
   let mounted = true
   let typed = false
-  onCleanup(() => (mounted = false))
+  // A capture stored from elsewhere, such as the page's right-click menu, joins the visible draft, so
+  // the next save here keeps it. This composer's own saves come back with the same captures.
+  const followStorage = (changes: Record<string, { newValue?: unknown }>, area: string) => {
+    const stored = area === 'local' ? changedCaptures(target, changes) : undefined
+    if (
+      !stored ||
+      !loaded() ||
+      sameIds(
+        stored.map((capture) => capture.id),
+        captures().map((capture) => capture.id),
+      )
+    )
+      return
+    setDraft((current) => ({ ...current, captures: stored }))
+  }
+  props.storage.onChanged.addListener(followStorage)
+  onCleanup(() => {
+    mounted = false
+    props.storage.onChanged.removeListener(followStorage)
+  })
 
   onMount(() => {
     // Text typed before storage answered wins over the stored text.
-    void loadDraft(props.storage, target).then((stored) => {
+    void loadDraft(props.storage.local, target).then((stored) => {
       if (!mounted) return
       setDraft(typed ? { ...stored, text: draft().text } : stored)
       setLoaded(true)
@@ -60,11 +111,11 @@ export function Composer(props: {
   // Every change to this conversation's draft goes through here: to the visible draft while mounted,
   // otherwise to the stored one.
   const apply = async (change: (current: Draft) => Draft): Promise<void> => {
-    if (!mounted) return changeDraft(props.storage, target, change)
+    if (!mounted) return changeDraft(props.storage.local, target, change)
     const previous = draft()
     const next = change(previous)
     setDraft(next)
-    await saveDraft(props.storage, target, next, previous)
+    await saveDraft(props.storage.local, target, next, previous)
   }
 
   const text = () => draft().text
@@ -87,7 +138,7 @@ export function Composer(props: {
       if (error instanceof CaptureFailure) setNote(error.message)
       else {
         // Storage refused the larger draft. Keep the visible draft to what is stored.
-        if (mounted) setDraft(await loadDraft(props.storage, target))
+        if (mounted) setDraft(await loadDraft(props.storage.local, target))
         setNote('Browser storage is full. Send or remove captures in other conversations, then try again.')
       }
     } finally {
@@ -189,54 +240,46 @@ export function Composer(props: {
   }
 
   return (
-    <form onSubmit={(event) => void send(event)}>
+    <form class="composer" onSubmit={(event) => void send(event)}>
       <Show when={captures().length}>
-        <div class="captures" aria-label="Captures">
-          <p class="quiet">Goes with your next message to {props.destination}</p>
-          <ul>
-            <For each={captures()}>
-              {(capture) => (
-                <li class="capture" data-testid="capture">
-                  <div>
+        {/* Each capture is a chip; opening it shows exactly what goes to the agent. */}
+        <ul class="chips" aria-label="Captures">
+          <For each={captures()}>
+            {(capture) => (
+              <li class="chip" data-testid="capture">
+                <details>
+                  <summary>
+                    <Show when={capture.kind === 'screenshot' && capture.dataUrl}>
+                      {(source) => <img class="thumb" src={source()} alt={`Screenshot of ${capture.title}`} />}
+                    </Show>
                     <strong>
                       {CAPTURE_NAMES[capture.kind]}
                       {' · '}
                       {capture.title}
                     </strong>
-                    <span class="quiet">{capture.url}</span>
-                    <Show when={capture.kind === 'selection' && capture.text}>
-                      {(selected) => <blockquote>{selected()}</blockquote>}
-                    </Show>
-                    <Show when={capture.kind === 'context' && capture.content}>
-                      {(content) => <pre class="context">{content()}</pre>}
-                    </Show>
-                    <Show when={capture.kind === 'screenshot' && capture.dataUrl}>
-                      {(source) => <img src={source()} alt={`Screenshot of ${capture.title}`} />}
-                    </Show>
-                  </div>
-                  <button type="button" class="quiet" disabled={sending()} onClick={() => remove(capture)}>
-                    Remove
-                  </button>
-                </li>
-              )}
-            </For>
-          </ul>
-        </div>
+                  </summary>
+                  <span class="quiet">{capture.url}</span>
+                  <Show when={capture.kind === 'selection' && capture.text}>
+                    {(selected) => <blockquote>{selected()}</blockquote>}
+                  </Show>
+                  <Show when={capture.kind === 'context' && capture.content}>
+                    {(content) => <pre class="context">{content()}</pre>}
+                  </Show>
+                </details>
+                <button
+                  type="button"
+                  class="icon"
+                  aria-label={`Remove ${CAPTURE_NAMES[capture.kind]}: ${capture.title}`}
+                  disabled={sending()}
+                  onClick={() => remove(capture)}
+                >
+                  ×
+                </button>
+              </li>
+            )}
+          </For>
+        </ul>
       </Show>
-      <div class="row capture-actions">
-        <For each={['link', 'selection', 'screenshot'] as const}>
-          {(kind) => (
-            <button
-              type="button"
-              class="quiet"
-              disabled={!loaded() || capturing() !== null}
-              onClick={() => void capture(kind)}
-            >
-              {capturing() === kind ? 'Capturing…' : CAPTURE_LABELS[kind]}
-            </button>
-          )}
-        </For>
-      </div>
       <textarea
         name="message"
         rows={3}
@@ -245,10 +288,29 @@ export function Composer(props: {
         value={text()}
         onInput={(event) => edit(event.currentTarget.value)}
       />
+      <div class="row toolbar">
+        <For each={['link', 'selection', 'screenshot'] as const}>
+          {(kind) => (
+            <button
+              type="button"
+              class="icon"
+              aria-label={CAPTURE_LABELS[kind]}
+              title={CAPTURE_LABELS[kind]}
+              aria-busy={capturing() === kind}
+              disabled={!loaded() || capturing() !== null}
+              onClick={() => void capture(kind)}
+            >
+              {CAPTURE_ICONS[kind]()}
+            </button>
+          )}
+        </For>
+        <span class="grow" />
+        <button type="submit" disabled={sending() || (!text().trim() && !captures().length) || props.blocked !== null}>
+          {sending() ? 'Sending…' : retrying() ? 'Retry' : 'Send'}
+        </button>
+      </div>
       <Show when={props.blocked ?? note()}>{(shown) => <p class="notice">{shown()}</p>}</Show>
-      <button type="submit" disabled={sending() || (!text().trim() && !captures().length) || props.blocked !== null}>
-        {sending() ? 'Sending…' : retrying() ? 'Retry' : 'Send'}
-      </button>
+      <p class="quiet">Goes to {props.destination}</p>
     </form>
   )
 }

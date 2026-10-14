@@ -8,7 +8,7 @@ vi.mock('../../../infra/node/fleetActions', () => ({
   closeNodePairingWindow: pairing.close,
 }))
 
-import { createNodePairing, NodePairingButton, NodePairingPanel } from './NodePairingCode'
+import { createNodePairing, NodePairingButtons, NodePairingPanel } from './NodePairingCode'
 
 const node: NodeRecord = {
   nodeId: 'node-a',
@@ -29,7 +29,7 @@ beforeEach(() => {
     const pairingState = createNodePairing(() => node.nodeId)
     return (
       <>
-        <NodePairingButton pairing={pairingState} />
+        <NodePairingButtons pairing={pairingState} />
         <NodePairingPanel node={node} pairing={pairingState} />
       </>
     )
@@ -54,5 +54,14 @@ describe('Settings → Nodes pairing', () => {
     closeButton.click()
     await vi.waitFor(() => expect(host.textContent).not.toContain('pairing-secret'))
     expect(pairing.close).toHaveBeenCalledWith('node-a')
+  })
+
+  it('words a code for the browser panel, from the same pairing window', async () => {
+    Array.from(host.querySelectorAll('button'))
+      .find((button) => button.textContent === 'Pair a browser')!
+      .click()
+    await vi.waitFor(() => expect(host.textContent).toContain('pairing-secret'))
+    expect(pairing.open).toHaveBeenCalledWith('node-a')
+    expect(host.textContent).toContain('Open the Acorn panel in your browser and paste this code within 10 minutes.')
   })
 })

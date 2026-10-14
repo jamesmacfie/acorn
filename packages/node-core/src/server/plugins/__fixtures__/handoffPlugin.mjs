@@ -1,5 +1,6 @@
-// A loaded plugin's node half that serves one browser handoff, written against the public contract
-// alone: no browser code and no core import. browserHandoffs.test.ts runs it in its real worker.
+// A loaded plugin's node half that serves one browser handoff and its tasks' app addresses, written
+// against the public contract alone: no browser code and no core import. browserHandoffs.test.ts runs
+// it in its real worker.
 export default {
   name: 'tracker',
   init(ctx) {
@@ -26,6 +27,21 @@ export default {
         })
       },
       { prefix: '/handoff' },
+    )
+    ctx.routes.fetch(
+      async () =>
+        Response.json({
+          addresses: [
+            {
+              taskId: 'task-1',
+              origin: 'https://tracker-app.localhost:5104',
+              label: 'Tracker app',
+              state: 'running',
+              severity: 'info',
+            },
+          ],
+        }),
+      { prefix: '/task-addresses' },
     )
   },
 }

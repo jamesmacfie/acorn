@@ -611,28 +611,39 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 }
 
 /* ── Kbd ────────────────────────────────────────────────────────────────────────────────────
-   The union of three separate keycap rules (.rail-tip-key, .help-key, .plugin-trust-escape kbd).
-   Fixed height with a centred glyph, kept from rail-tips.css: a cap must not grow the line-height
-   of the row it sits in. */
+   One small cap per key, set apart by a hairline gap, in the muted text colour: a shortcut reads as
+   a hint beside its label rather than as a button. Each cap is at least as wide as it is tall, so a
+   single glyph sits in a square. Fixed height with a centred glyph: a cap must not grow the
+   line-height of the row it sits in. A sequence's steps sit further apart than one step's keys. */
 .ui-kbd {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   flex: none;
-  min-width: var(--space-9);
-  height: var(--control-h-sm);
-  padding: 0 var(--space-3);
-  font-family: var(--font-mono);
+  gap: var(--space-3);
+  font-family: var(--font-ui);
   font-size: var(--fs-xs);
-  font-weight: var(--fw-medium);
+  font-weight: var(--fw-normal);
   line-height: 1;
-  color: var(--text);
-  background: var(--bg-subtle);
-  border: var(--control-border);
-  border-radius: var(--radius);
+  color: var(--text-muted);
   white-space: nowrap;
+  --kbd-h: var(--space-9);
 }
-.ui-kbd[data-size='xs'] { min-width: var(--space-8); height: var(--space-8); font-size: var(--fs-2xs); padding: 0 var(--space-2); }
+.ui-kbd[data-size='xs'] { font-size: var(--fs-2xs); --kbd-h: var(--space-8); }
+.ui-kbd-step { display: inline-flex; gap: var(--space-1); }
+.ui-kbd-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: var(--kbd-h);
+  height: var(--kbd-h);
+  padding: 0 var(--space-2);
+  font: inherit;
+  color: inherit;
+  background: var(--bg-subtle);
+  border: var(--control-bw) solid var(--border-strong);
+  border-radius: var(--radius);
+}
 
 /* ── Toolbar ────────────────────────────────────────────────────────────────────────────────
    The strip that was authored fifteen times. This is a pure layout primitive with almost no

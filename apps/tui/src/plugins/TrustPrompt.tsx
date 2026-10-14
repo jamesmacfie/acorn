@@ -15,6 +15,7 @@ import {
 import { Modal, ModalBody, SectionHeader } from '../kit/grouping'
 import { Alert, Row, Rows } from '../kit/showing'
 import { Line } from '../kit/cells'
+import { iconGlyph } from '../kit/glyphs'
 
 // "Do you want to run this?", in a terminal.
 //
@@ -36,6 +37,12 @@ const CHOICES = [
   { key: 'accepted', label: 'Run it' },
   { key: 'rejected', label: "Don't run it" },
 ] as const
+
+// Grant icons are desktop icon names. Most have no terminal mark, so draw the mark or nothing, never the name.
+const grantLine = (line: { icon: string; text: string }) => {
+  const glyph = iconGlyph(line.icon)
+  return `  ${glyph ? `${glyph} ` : ''}${line.text}`
+}
 
 export function TrustPrompt() {
   const [saving, setSaving] = createSignal(false)
@@ -94,7 +101,7 @@ export function TrustPrompt() {
             <Show when={added().length}>
               <SectionHeader level="group">What this version asks for that the last one did not</SectionHeader>
               <For each={added()}>
-                {(line) => <Line tone={line.high ? 'warn' : undefined}>{`  ${line.icon} ${line.text}`}</Line>}
+                {(line) => <Line tone={line.high ? 'warn' : undefined}>{grantLine(line)}</Line>}
               </For>
             </Show>
             {/* One block per tier, never one list. */}
@@ -103,7 +110,7 @@ export function TrustPrompt() {
                 <>
                   <SectionHeader level="group">{TIER_LABEL[tier.key]}</SectionHeader>
                   <For each={tier.lines}>
-                    {(line) => <Line tone={line.high ? 'warn' : undefined}>{`  ${line.icon} ${line.text}`}</Line>}
+                    {(line) => <Line tone={line.high ? 'warn' : undefined}>{grantLine(line)}</Line>}
                   </For>
                 </>
               )}

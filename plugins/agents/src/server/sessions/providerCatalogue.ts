@@ -1,5 +1,5 @@
 import type { AgentAccountDescriptor, AgentConfigOption, AgentProviderDescriptor } from '../../contract/wire.ts'
-import type { AgentAccounts } from '../accounts'
+import type { AccountDetails, AgentAccounts } from '../accounts'
 import { signedIn } from '../../shared/accounts'
 import type { AgentDriverRegistry } from '../drivers/registry'
 import type { AgentDriver } from '../drivers/types'
@@ -27,7 +27,7 @@ export class ProviderCatalogue {
   constructor(
     private readonly registry: AgentDriverRegistry,
     private readonly store: Pick<AgentStore, 'listSessions'>,
-    private readonly accounts: Pick<AgentAccounts, 'list' | 'home' | 'defaultAccount'>,
+    private readonly accounts: Pick<AgentAccounts, 'list' | 'home' | 'defaultAccount' | 'details' | 'showAs'>,
     // The runtime's shutdown. Once it aborts, every probe is refused and nothing is cached.
     private readonly shutdown: AbortSignal,
   ) {
@@ -91,6 +91,7 @@ export class ProviderCatalogue {
   private async probeAccounts(
     driver: AgentDriver,
     descriptor: AgentProviderDescriptor,
+    details: Record<string, AccountDetails>,
   ): Promise<AgentAccountDescriptor[]> {
     const accounts = driver.accounts!
     const names = await this.accounts.list(driver.providerId)
@@ -99,6 +100,7 @@ export class ProviderCatalogue {
         const home = this.accounts.home(driver.providerId, name)
         return {
           name,
+          ...details[name],
           authenticated: (await driver.probeAccount?.(home)) ?? null,
           loginCommand: descriptor.executable
             ? [`${accounts.env}=${shellQuote(home)}`, shellQuote(descriptor.executable), ...accounts.login].join(' ')
@@ -127,8 +129,9 @@ export class ProviderCatalogue {
           const defaultAccount = await this.accounts.defaultAccount(driver.providerId)
           return {
             ...descriptor,
-            accounts: await this.probeAccounts(driver, descriptor),
+            accounts: await this.probeAccounts(driver, descriptor, await this.accounts.details(driver.providerId)),
             ...(defaultAccount ? { defaultAccount } : {}),
+            accountDisplay: await this.accounts.showAs(),
           }
         } catch (error) {
           return {

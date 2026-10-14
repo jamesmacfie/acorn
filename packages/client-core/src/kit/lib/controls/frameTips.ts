@@ -1,5 +1,6 @@
 // The frame-side half of the tooltip protocol (tips.tsx documents the attributes). See
-// docs/ui-design/tooltips.md § Tooltips for why this is a separate, importless module.
+// docs/ui-design/tooltips.md § Tooltips for why this is a separate module with no framework imports.
+import { chordKeys } from '../rendering/formatChord'
 
 /**
  * Mounts the tooltip listener into a plugin frame's own document. See docs/ui-design/tooltips.md
@@ -45,10 +46,21 @@ export function mountFrameTips(doc: Document = document): () => void {
     titleRow.className = 'rail-tip-title'
     titleRow.textContent = title
     if (key) {
+      // The same caps Kbd draws, one per key.
       const cap = doc.createElement('kbd')
       cap.className = 'ui-kbd rail-tip-key'
       cap.dataset.size = 'xs'
-      cap.textContent = key
+      for (const keys of chordKeys(key)) {
+        const step = doc.createElement('span')
+        step.className = 'ui-kbd-step'
+        for (const name of keys) {
+          const keyCap = doc.createElement('kbd')
+          keyCap.className = 'ui-kbd-key'
+          keyCap.textContent = name
+          step.append(keyCap)
+        }
+        cap.append(step)
+      }
       titleRow.append(cap)
     }
     bubble.append(titleRow)

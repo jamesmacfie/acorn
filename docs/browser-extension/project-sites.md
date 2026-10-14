@@ -6,7 +6,7 @@ are stored on the Node, how the sidebar matches and suggests, the override it re
 native operations. The shared rules are in `packages/protocol/src/projects/siteAssociations.ts`. Which projects a page
 belongs to, overrides included, is `pageScope` in `apps/extension/src/pageScope.ts`, which the sidebar
 and the [toolbar badge](./notifications.md) both use. The sidebar's side is in
-`apps/extension/src/sidebar/Destination.tsx` and `ProjectSites.tsx`, and the host's in
+`apps/extension/src/sidebar/Workspace.tsx`, `Home.tsx`, and `ProjectSites.tsx`, and the host's in
 `apps/cli/src/browser/bridge.ts`.
 
 ## What an association is
@@ -45,16 +45,24 @@ them, in the browser. No page address goes to the Node for this. The browser rep
 address only for a site the person allowed, or the tab the toolbar button was clicked on.
 
 Every project with an association covering the page is a candidate. Overlapping prefixes and several
-projects are all candidates, and none outranks another:
+projects are all candidates, and none outranks another. A page that belongs to a task, or matches a
+handoff, shows that first ([This page](./task-pages.md#this-page)); otherwise a page with a candidate
+shows the project picker in Home's **This page** section:
 
-- **One candidate** is chosen in the project picker, under **Suggested for this page**.
+- **One candidate** is chosen in the picker, under **Suggested for this page**.
 - **Several candidates** are listed first in the picker. A project they leave out is cleared, and the
   sidebar asks the person to choose one.
-- **No candidate** changes nothing. The picker keeps whatever was chosen.
+- **No candidate** shows no picker. **This page** says nothing matches and offers to tie the page's
+  site to a project: choosing one and pressing **Tie <origin> to it** adds the whole origin to that
+  project's associations with `site.add`, and the page then has that project as its candidate.
 
-The sidebar follows the page only while no task is chosen. A chosen task, its conversation, and its
-draft stay put when the page changes. If the page suggests other projects, a notice names them, with
-a **Switch to** button for each. Switching clears the task; the draft stays with its conversation.
+Under the picker, **This page** lists the chosen project's open tasks, and clicking one makes it the
+current task. **New task in Acorn** opens the project in the desktop app. A page on a project's site
+never moves the current task by itself: the current task, its conversation, and its draft stay put
+when the page changes, and only **This page** follows it.
+
+Task addresses use the same grammar as associations, an exact origin and a path prefix, and are
+matched the same way ([pages that belong to a task](./task-pages.md#pages-that-belong-to-a-task)).
 
 ## Overrides
 
@@ -66,20 +74,22 @@ suggestion again forgets the override. Choosing no project is remembered as an o
 
 ## The editor
 
-When a project is chosen, **Sites for this project** lists its associations with **Remove**. The field
+Settings → **Project sites** edits one project's associations, starting on the current task's
+project. It lists them with **Remove**. The field
 under it takes an address, such as `https://example.com/app`, and **Add** stores its origin and path.
 **Add <origin>** adds the whole site of the page beside the sidebar. The editor says what the person
 typed wrong before anything goes to the Node.
 
-Site access is listed apart, in the **Site access** card. Each site there says what access is for:
-buttons on its pages, handoffs in the sidebar, or project suggestions. Browsers grant access by host
+Site access is listed apart, under **Site access** in Settings. Each site there says what access is for:
+buttons on its pages, handoffs in the sidebar, project suggestions, or the
+[branch marker](./task-pages.md#the-branch-marker) on a task's app. Browsers grant access by host
 and not by port, so a `http://localhost:5173` association asks for all of `http://localhost`.
 Removing access stops the sidebar reading the page, so its suggestions go at once.
 
 ## Handoffs
 
 A handoff resolves the page through the plugin, which names the item's projects. The host adds every
-project whose associations cover the page, and **Create linked task** may use any of them. An item
+project whose associations cover the page, and **Start task** may use any of them. An item
 whose seed carries a pull number stays with the plugin's projects, because a pull number names a pull
 request only in its own repository. On create, the host reads the chosen project's associations again
 and matches the page itself, so the sidebar can't widen the list

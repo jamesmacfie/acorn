@@ -2,7 +2,12 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createStore } from 'solid-js/store'
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), params: {} as { projectId?: string; taskId?: string } }))
+const mocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  get: vi.fn(),
+  delete: vi.fn(),
+  params: {} as { projectId?: string; taskId?: string },
+}))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: [{ id: 'task-1', projectId: 'project-1' }] }) }))
 vi.mock('@solidjs/router', () => ({ useParams: () => mocks.params, useNavigate: () => vi.fn() }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
@@ -14,6 +19,7 @@ vi.mock('./memoryClient', async (original) => ({
   memoryApi: () => ({
     list: mocks.list,
     get: mocks.get,
+    delete: mocks.delete,
     history: async () => [],
     changes: async () => [],
     preview: async () => ({
@@ -105,6 +111,21 @@ it('shows the overview until a memory is chosen, and the reader after', async ()
   ;(host.querySelector('.ui-row') as HTMLElement).click()
   await vi.waitFor(() => expect(host.textContent).toContain('Deploy through the release pipeline.'))
   expect(host.textContent).not.toContain('Recent changes')
+})
+
+it('goes back to the overview after deleting the open memory', async () => {
+  mocks.list.mockResolvedValue([])
+  mocks.delete.mockResolvedValue(undefined)
+  selectMemory({ name: 'deploy', scope: 'project', projectId: 'project-1' })
+  mount()
+  const button = (label: string) =>
+    [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === label) as HTMLElement
+  await vi.waitFor(() => expect(button('Delete')).toBeDefined())
+  button('Delete').click()
+  await vi.waitFor(() => expect(button('Delete memory?')).toBeDefined())
+  button('Delete memory?').click()
+  await vi.waitFor(() => expect(host.textContent).toContain('Recent changes'))
+  expect(mocks.delete).toHaveBeenCalledWith(expect.objectContaining({ name: 'deploy' }), 'h', 'project-1')
 })
 
 const row = (name: string, projectId: string | null) => ({

@@ -73,19 +73,6 @@
    label widens that auto column and shoves every row's message to the right. */
 .will-concerns li > .ui-check { grid-column: 2 / -1; margin-top: var(--space-2); }
 
-/* `.help-key` is the chord capture input in the shortcuts editor, so it keeps its own rule: Kbd
-   renders a <kbd>, and an <input> cannot be one. */
-.help-key {
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg-subtle);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: 1px var(--space-3);
-  justify-self: start;
-}
-
 /* File finder: input header + scrollable result list. See docs/ui-design/overlays.md § Chrome and overlays
    for why the `.finder-*` family that used to live here is gone. */
 

@@ -14,6 +14,7 @@ WebSocket, and it serves no HTML, JavaScript, or static assets. `createApp()` in
 | --- | --- | --- |
 | Node probe | `GET /v1/node` | Pre-auth. The unauthenticated answer is limited. |
 | Pairing | `POST /v1/pair` | Pre-auth. Spends a one-time code. |
+| Pairing by approval | `POST /v1/pair/requests`, `POST /v1/pair/requests/claim` | Pre-auth. The ask is loopback only. |
 | Core | `/v1/core/*` | A device, or an internal principal the route permits |
 | Plugin | `/v1/p/<plugin>/*` | A device, or an internal principal the route permits |
 | Events and streams | `/v1/events` | Authenticated WebSocket upgrade |
@@ -66,6 +67,38 @@ Pairing uses the pinned connection with the same eight-second deadline.
 hash. The unauthenticated probe carries the TLS certificate fingerprint, and the owner compares it
 with the one on the Node's own screen. Sending a fingerprint over the connection it authenticates
 proves nothing by itself. The value comes from a person reading both screens.
+
+## Pairing by approval
+
+A client on the Node's own computer can pair without a code. The terminal client, the CLI, and the
+browser extension's bridge ask, a paired client shows the owner a dialog, and the asker collects its
+token once the owner allows it. The code stays open beside the wait, for a Node no paired client is
+watching. The store is `packages/node-core/src/server/auth/pairingRequests.ts`.
+
+1. The client sends `POST /v1/pair/requests` with `deviceName`. The Node answers with a `secret`, a
+   three-word `phrase`, and `expiresInMs`, and broadcasts a content-free `pairing:requested` frame.
+2. A paired client reads `GET /v1/core/pair/requests` from the Node that sent the frame and shows the
+   device name and the phrase. The asker prints the same phrase.
+3. The owner answers with `POST /v1/core/pair/requests/:id` and `decision` set to `allow` or `deny`.
+   The answer is on the audit trail as `pairing.request.decided`.
+4. The client polls `POST /v1/pair/requests/claim` with its `secret` once a second. It gets `202`
+   while the owner hasn't answered, and the `POST /v1/pair` result once they allow it. A denial, an
+   expiry, a spent request, and a secret the Node doesn't know all answer the same
+   `401 pairing_failed`.
+
+These limits apply:
+
+- The ask answers only a loopback peer. Anything else gets `403 pairing_local_only` and pairs with a
+  code, because a dialog anyone on the network could raise is one the owner learns to click through.
+- The ask shares the code route's ceiling of 20 requests a minute. The claim has no ceiling, because
+  its secret is 256 random bits.
+- The Node holds one request for two minutes, in memory. A new ask replaces the old one, so a person
+  who restarts `acorn` isn't locked out by their first attempt. A restart drops it.
+- The secret travels only in request bodies, never in a path a log could keep. Any process on the
+  computer can ask, agents included. The phrase is how the owner tells their own request from one
+  raced in by something else.
+- The desktop opens the dialog by itself. The terminal client draws no dialog, so it can ask but
+  can't allow.
 
 `DELETE /v1/core/devices/:id` closes that device's open WebSocket connections at once, because a live
 socket holds no bearer to recheck. A device may revoke itself. Every paired device already has full

@@ -99,15 +99,23 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
 - `draft:<nodeId>:<taskId>:<sessionId>`: the unsent text, and an unconfirmed send's
   `{ key, text, captures }`, where `captures` lists the IDs of the captures it carried. A draft
   survives closing the sidebar, a reconnect, and switching away. It's removed when the Node accepts
-  it, keeping anything typed since.
+  it, keeping anything typed since. [Start task](./handoffs.md#the-handoff-card) writes a new
+  conversation's first draft here before it opens.
 - `captures:<nodeId>:<taskId>:<sessionId>`: that draft's [page captures](./page-capture.md), with each
   screenshot's attachment ID once the Node holds it. It sits apart from the text because the text is
-  saved on each keystroke and a screenshot can be megabytes.
-- `destination:<nodeId>`: the project, task, and session last chosen on that Node, restored when the
-  sidebar opens. Only the person's own choices are saved.
-- `handoffs`: the selected Node's [site buttons](./handoffs.md#site-buttons), `{ nodeId, handoffs }`,
+  saved on each keystroke and a screenshot can be megabytes. The background adds a selection here
+  for [Add to Acorn chat](./page-capture.md#add-to-acorn-chat), and an open composer shows it.
+- `destination:<nodeId>`: the current task on that Node, with its project, and the conversation open
+  over Home, if any. The panel restores both when it opens and when Settings closes. Only the person's
+  own choices are saved, including a task chosen in Settings' task search and the conversation
+  **Add to Acorn chat** added a selection to.
+- `appearance`: the panel's `{ theme, style }`, with `theme` null to follow the system's light or dark
+  ([appearance](./setup.md#appearance)).
+- `handoffs`: the selected Node's [handoffs](./handoffs.md#task-chips), `{ nodeId, handoffs }`,
   kept so pages get their buttons before the native host starts. It goes when no Node is selected.
-
+- `hiddenMarkers`: the origins the person hid the [branch marker](./task-pages.md#the-branch-marker)
+  on, as a list such as `["https://runn-05ea41.runn.localhost:5104"]`. The marker's **Hide on this
+  site** adds one, and **This page** removes it again. It holds for every Node.
 - `siteChoices:<nodeId>`: the person's [project overrides](./project-sites.md#overrides) for each site.
 - `notifiedRequests`: the requests already sent as [OS notifications](./notifications.md#browser-storage).
 

@@ -3,7 +3,8 @@
 Use `acorn://` links to open a place in the desktop app or with `acorn --link` in the terminal client.
 The parser and builder live in `packages/client-core/src/host/registries/commands/addresses.ts`.
 `packages/client-core/src/host/registries/commands/addressOpening.ts` owns desktop dispatch.
-`apps/tui/src/chrome/link.ts` owns terminal navigation.
+`apps/tui/src/chrome/link.ts` owns terminal navigation. The browser extension builds its
+[Open in Acorn](../browser-extension/handoffs.md#the-panels-verbs) links with the same `buildLink`.
 
 ## Address forms
 
@@ -31,7 +32,7 @@ plugin trust, or other authority, and does not carry a credential.
 path, query, or fragment component once and refuses malformed escapes, dot traversal segments, bad
 form combinations, and links over 4,096 characters. An item requires a pane. `open` and `new-task`
 accept only HTTP or HTTPS URLs with a host. `buildLink` encodes each navigation value once and rejects
-invalid or oversized output.
+invalid or oversized output. It builds `open` from an HTTP or HTTPS URL only.
 
 The desktop checks that the selected Node is paired and waits for its shell to restore its place and
 commit that Node's plugin contributions. Rust buffers cold-start and running-app URLs until the

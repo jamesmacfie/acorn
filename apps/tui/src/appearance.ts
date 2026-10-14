@@ -12,11 +12,17 @@ import type { Color } from './colour'
 // wrong. `paletteFor` is what a theme is for: a caller that knows the theme's colours and knows the
 // terminal will take them can hand both over.
 //
-// The appearance layer exposes the six relevant built-in colour tokens as data from its own CSS
+// The appearance layer exposes the eight relevant built-in colour tokens as data from its own CSS
 // source. A configured theme uses those tokens when the terminal supports truecolour.
 
-/** The six colours a role can ask for. `default` is the terminal's own foreground. */
-export type Palette = Record<Slot, Color>
+/** The two backgrounds a list row can ask for: `selected` behind the row the keys are on, `hover`
+ *  behind the row that is open while the keys are somewhere else. The desktop draws the same rows
+ *  with the same two theme colours. */
+export type Surface = 'hover' | 'selected'
+
+/** The six colours a role can ask for, and the two row backgrounds. `default` is the terminal's own
+ *  foreground, and its own background when a surface asks for it. */
+export type Palette = Record<Slot | Surface, Color>
 
 /** The terminal's own slots, in two of `./colour.ts`'s three answers: the terminal's own foreground,
  *  or one of its sixteen numbered slots. Either way the colour comes from the theme the person chose
@@ -36,17 +42,24 @@ export const TERMINAL_PALETTE: Palette = {
   ok: 2,
   warn: 3,
   danger: 1,
+  // No fill. None of the sixteen slots is a background that every theme's text stays legible on, so
+  // a row without a theme colour keeps only its caret.
+  hover: 'default',
+  selected: 'default',
 }
 
-/** Which theme token feeds which slot. Six of the forty; the rest are backgrounds, borders and diff
- *  colours, and a terminal has no surface to paint. */
-const FROM_TOKEN: Record<Slot, string> = {
+/** Which theme token feeds which slot. Eight of the forty: the six text colours and the two row
+ *  backgrounds. The rest are other backgrounds, borders and diff colours, which a terminal does not
+ *  paint. */
+const FROM_TOKEN: Record<Slot | Surface, string> = {
   default: '--text',
   muted: '--text-muted',
   accent: '--accent',
   ok: '--state-ok',
   warn: '--state-warn',
   danger: '--state-bad',
+  hover: '--bg-hover',
+  selected: '--bg-selected',
 }
 
 /** Does this terminal say it can take a 24-bit colour? Where it does not, a hex is worse than the
@@ -76,7 +89,7 @@ const fromHex = (hex: string): Color => {
 export function paletteFor(theme: Readonly<Record<string, string | undefined>>, truecolor: boolean): Palette {
   const palette = { ...TERMINAL_PALETTE }
   if (!truecolor) return palette
-  for (const slot of Object.keys(FROM_TOKEN) as Slot[]) {
+  for (const slot of Object.keys(FROM_TOKEN) as (Slot | Surface)[]) {
     const value = theme[FROM_TOKEN[slot]]?.trim()
     if (value && HEX.test(value)) palette[slot] = fromHex(value)
   }
@@ -89,6 +102,9 @@ let palette: Palette = TERMINAL_PALETTE
  *  colour is a colour somebody downstream has to guess at, so "no colour of its own" is said as the
  *  default slot instead. */
 export const slotColor = (slot: Slot | undefined): Color => palette[slot ?? 'default']
+
+/** The background a row surface resolves to right now. */
+export const surfaceColor = (surface: Surface): Color => palette[surface]
 
 /** Swap the palette when the device configuration changes. */
 export const setPalette = (next: Palette): void => {

@@ -22,9 +22,10 @@ describe('the palette', () => {
   })
 
   it('passes a theme’s hexes through where the terminal says it can take them', () => {
-    const palette = paletteFor({ '--accent': '#8be9fd', '--state-ok': '#50fa7b' }, true)
+    const palette = paletteFor({ '--accent': '#8be9fd', '--state-ok': '#50fa7b', '--bg-selected': '#44475a' }, true)
     expect(palette.accent).toEqual([0x8b, 0xe9, 0xfd])
     expect(palette.ok).toEqual([0x50, 0xfa, 0x7b])
+    expect(palette.selected).toEqual([0x44, 0x47, 0x5a])
     // Untouched tokens keep the terminal's slot rather than becoming undefined.
     expect(palette.warn).toBe(TERMINAL_PALETTE.warn)
   })

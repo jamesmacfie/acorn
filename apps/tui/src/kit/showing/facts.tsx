@@ -1,5 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { For, Show, type JSX } from 'solid-js'
+import { createContext, createSignal, For, onCleanup, Show, useContext, type JSX } from 'solid-js'
+import type { Renderable } from '../../tree/compat'
 import type { Size, Tone } from '@acorn/client-core/kit/tokens'
 import { Line, pad, slot } from '../cells'
 
@@ -25,15 +26,50 @@ export function Facts(props: {
   )
 }
 
+/** Each item's label width, so every value starts in the same column. */
+const LabelColumn = createContext<{ width: () => number; report: (key: object, width?: number) => void }>()
+
+/** One pair per line, values in one column. A label can be a tree, a name and its refresh button,
+ *  so `Facts`' padding of strings can't measure it: each item reports its label's drawn width and
+ *  the list pads every label to the widest. */
 export function DescriptionList(props: { layout?: 'columns' | 'facts'; size?: 'sm' | 'md'; children: JSX.Element }) {
-  return <box flexDirection="column">{props.children}</box>
+  const [widths, setWidths] = createSignal(new Map<object, number>(), { equals: false })
+  const report = (key: object, width?: number) => {
+    if (widths().get(key) === width) return
+    setWidths((map) => {
+      if (width === undefined) map.delete(key)
+      else map.set(key, width)
+      return map
+    })
+  }
+  return (
+    <LabelColumn.Provider value={{ width: () => Math.max(0, ...widths().values()), report }}>
+      <box flexDirection="column">{props.children}</box>
+    </LabelColumn.Provider>
+  )
 }
-DescriptionList.Item = (props: { label: JSX.Element; mono?: boolean; children: JSX.Element }) => (
-  <box flexDirection="row" gap={1}>
-    <Line role="muted">{props.label}</Line>
-    {slot(props.children)}
-  </box>
-)
+DescriptionList.Item = (props: { label: JSX.Element; mono?: boolean; children: JSX.Element }) => {
+  const column = useContext(LabelColumn)
+  const key = {}
+  let label: Renderable | undefined
+  onCleanup(() => column?.report(key))
+  // The inner box keeps its natural width, so the padding never feeds back into what it measures.
+  return (
+    <box flexDirection="row" gap={1}>
+      <box flexDirection="row" flexShrink={0} minWidth={column?.width() ?? 0}>
+        <box
+          flexDirection="row"
+          flexShrink={0}
+          ref={(element: Renderable) => (label = element)}
+          onSizeChange={() => column?.report(key, label?.width)}
+        >
+          <Line role="muted">{props.label}</Line>
+        </box>
+      </box>
+      {slot(props.children)}
+    </box>
+  )
+}
 
 const PIE_QUARTERS = ['○', '◔', '◑', '◕', '●']
 

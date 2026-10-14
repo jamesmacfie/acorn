@@ -30,10 +30,12 @@ import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
 import type { AgentPaneModel } from './agentPaneModel'
 import {
+  choiceAccountIcon,
   choiceAvailable,
   choiceDescription,
   choiceGlyph,
   choiceLabel,
+  choiceText,
   type NewSessionChoice,
 } from './newSessionChoices'
 import { sessionCustomAgent } from '../../shared/customAgents'
@@ -47,7 +49,7 @@ import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderCon
 import { runningBackgroundCommands } from './backgroundCommands'
 import SessionSummaryModal from './SessionSummaryModal'
 import { AGENT_PANE_ID } from '../paneIdentity'
-import { sessionAccount } from '../../shared/accounts'
+import { accountIcon, accountLabel, sessionAccount } from '../../shared/accounts'
 
 // The Agent pane's `detail` region: the open session's header, and the conversation under it.
 //
@@ -90,8 +92,19 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
       <Show when={model.selected()}>
         {(session) => {
           const account = () => sessionAccount(session().config)
-          const name = () => (account() ? `${session().providerId} · ${account()}` : session().providerId)
-          return <ProviderGlyph glyph={providerMarkName(session().providerId)} label={name()} title={name()} />
+          const provider = () => model.providers().find((candidate) => candidate.id === session().providerId)
+          const label = () => {
+            const name = account()
+            return name ? accountLabel(provider(), name) : undefined
+          }
+          const name = () => (label() ? `${session().providerId} · ${label()}` : session().providerId)
+          const icon = () => accountIcon(provider(), account())
+          return (
+            <>
+              <ProviderGlyph glyph={providerMarkName(session().providerId)} label={name()} title={name()} />
+              <Show when={icon()}>{(name) => <Icon name={name()} title={label()} />}</Show>
+            </>
+          )
         }}
       </Show>
       <Heading level={2}>{model.selected()?.title ?? 'Agents'}</Heading>
@@ -238,8 +251,15 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           results={(query) =>
             model.choices().filter((item) => choiceLabel(item).toLowerCase().includes(query.trim().toLowerCase()))
           }
-          leading={(item) => <ProviderGlyph glyph={choiceGlyph(item)} label={choiceLabel(item)} />}
-          rowLabel={choiceLabel}
+          leading={(item) => (
+            <Inline gap="inline">
+              <ProviderGlyph glyph={choiceGlyph(item)} label={choiceLabel(item)} />
+              <Show when={choiceAccountIcon(item)}>
+                {(icon) => <Icon name={icon()} title={accountLabel(item.provider, item.account!)} />}
+              </Show>
+            </Inline>
+          )}
+          rowLabel={choiceText}
           rowDescription={choiceDescription}
           isActive={() => false}
           isDisabled={(item) => !choiceAvailable(item) || model.creating()}
@@ -292,7 +312,10 @@ function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
                 <Stack gap="row">
                   <Inline>
                     <ProviderGlyph glyph={choiceGlyph(choice)} label={choiceLabel(choice)} />
-                    <Text emphasis="strong">{choiceLabel(choice)}</Text>
+                    <Text emphasis="strong">{choiceText(choice)}</Text>
+                    <Show when={choiceAccountIcon(choice)}>
+                      {(icon) => <Icon name={icon()} title={accountLabel(choice.provider, choice.account!)} />}
+                    </Show>
                   </Inline>
                   <Text emphasis="muted">
                     {!choiceAvailable(choice) || choice.agent ? choiceDescription(choice) : 'Start managed session'}

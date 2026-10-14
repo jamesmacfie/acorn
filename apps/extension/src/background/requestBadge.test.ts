@@ -37,6 +37,7 @@ function scriptedHost(fake: ReturnType<typeof fakeBrowser>) {
       BridgePendingRequest[]
     >,
     reads: 0,
+    taskPages: [] as unknown[],
   }
   fake.onNativeMessage = (raw, host: FakeHost) => {
     const message = raw as { id: string; op: string; nodeId?: string | null }
@@ -58,6 +59,7 @@ function scriptedHost(fake: ReturnType<typeof fakeBrowser>) {
     if (message.op === 'handoffs.list') return reply({ nodeId: message.nodeId, handoffs: [] })
     if (message.op === 'projects.list') return reply({ nodeId: message.nodeId, projects: state.projects })
     if (message.op === 'sites.list') return reply({ nodeId: message.nodeId, sites: state.sites })
+    if (message.op === 'tasks.pages') return reply({ nodeId: message.nodeId, tasks: state.taskPages })
     if (message.op === 'requests.pending') {
       state.reads++
       return reply({ nodeId: message.nodeId, requests: state.requests[message.nodeId!] })
@@ -106,6 +108,26 @@ describe('request badge', () => {
     const { fake } = await started()
     // Started on its own: the selection was restored and the requests read, with no sidebar.
     expect(fake.hosts).toHaveLength(1)
+    expect(fake.badges.get(1)).toBe('1')
+  })
+
+  it("counts the requests of the task a page belongs to, as the Node's list says", async () => {
+    const { fake, host } = await started('https://tracker.example/items/42')
+    host.state.requests.a = [waiting('r1', 'web'), waiting('r2', 'docs', { taskId: 't-42' })]
+    host.hint()
+    await settle()
+    expect(fake.badges.get(1)).toBe('')
+    host.state.taskPages = [
+      {
+        id: 't-42',
+        title: 'Item 42',
+        branch: null,
+        projectId: 'docs',
+        pages: [{ origin: 'https://tracker.example', pathPrefix: '/items/42', source: 'tracker' }],
+      },
+    ]
+    fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'a' })
+    await settle()
     expect(fake.badges.get(1)).toBe('1')
   })
 

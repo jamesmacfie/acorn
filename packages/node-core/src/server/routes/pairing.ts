@@ -2,16 +2,25 @@ import { Hono, type Context } from 'hono'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import {
   NODE_PROTOCOL_VERSION,
+  pairingAskSchema,
+  pairingClaimSchema,
+  pairingDecisionSchema,
   pairRequestSchema,
   type DevicesResponse,
   type NodeInfo,
+  type PairingAsk,
+  type PairingClaimPending,
+  type PairingRequestResponse,
   type PairingWindow,
   type PairResult,
 } from '@acorn/protocol/node.ts'
 import { auditActor, auditRequest } from '../auditRequest'
 import { PAIRING_WINDOW_MS } from '../auth/pairingCodes'
+import { pairingRequests } from '../auth/pairingRequests'
 import type { AppEnv } from '../middleware/auth'
+import { broadcastPairingRequested } from '../notify'
 import { respondError } from '../respond'
+import { isLoopbackPeer } from '../transport/loopbackPeer'
 import { readPairingBody } from './pairingBody'
 
 // Pairing and device management (docs/api-reference/transport.md § Pairing,
@@ -50,8 +59,21 @@ function attemptCeiling(now: () => number = () => Date.now()): () => boolean {
 // no details. 401 because the request presented a credential and it was rejected.
 const pairingFailed = (c: Context<AppEnv>): Response => respondError(c, 401, 'pairing_failed', ['Pairing failed.'])
 
+// A device token for the caller, the one time it exists outside the client. Never logged.
+async function paired(c: Context<AppEnv>, deviceName: string): Promise<Response> {
+  const { token, device } = await c.env.DEVICES.issue(deviceName)
+  return c.json({
+    baseline: ACORN_BASELINE,
+    deviceToken: token,
+    nodeId: c.env.NODE_ID,
+    device,
+  } satisfies PairResult)
+}
+
 export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
   const withinCeiling = attemptCeiling()
+  // Per instance, like the ceiling: a request belongs to the Node that was asked.
+  const requests = pairingRequests()
 
   const open = new Hono<AppEnv>()
     .get('/node', (c) => {
@@ -83,14 +105,35 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       // Short-circuit order is load-bearing: a malformed body never reaches consume(), so it cannot
       // spend one of the window's five attempts, and it still answers with the same error.
       if (!parsed.success || !c.env.PAIRING_CODES.consume(parsed.data.code)) return pairingFailed(c)
-      const { token, device } = await c.env.DEVICES.issue(parsed.data.deviceName)
-      // The only time the raw token exists outside the client. Never logged.
-      return c.json({
-        baseline: ACORN_BASELINE,
-        deviceToken: token,
-        nodeId: c.env.NODE_ID,
-        device,
-      } satisfies PairResult)
+      return paired(c, parsed.data.deviceName)
+    })
+    // Pairing by approval (docs/api-reference/transport.md § Pairing by approval). Only from this
+    // computer: a dialog anyone on the network could raise is a dialog the owner learns to click
+    // through. Another machine pairs with a code. Under the same ceiling as codes, so a loop of asks
+    // can't keep the owner's dialog changing faster than they can read it.
+    .post('/pair/requests', async (c) => {
+      if (!isLoopbackPeer(c.env.incoming?.socket.remoteAddress))
+        return respondError(c, 403, 'pairing_local_only', ['Pair from another computer with a pairing code.'])
+      if (!withinCeiling())
+        return respondError(c, 429, 'rate_limited', ['Too many pairing attempts. Try again shortly.'])
+      const body = await readPairingBody(c.req.raw)
+      if (body.oversized) return respondError(c, 413, 'payload_too_large', ['Pairing request exceeds 4 KiB.'])
+      const parsed = pairingAskSchema.safeParse(body.value)
+      if (!parsed.success) return respondError(c, 400, 'bad_request', ['A pairing request needs a device name.'])
+      const ask = requests.ask(parsed.data.deviceName)
+      broadcastPairingRequested()
+      return c.json(ask satisfies PairingAsk)
+    })
+    // The asker polls this until the owner answers. No ceiling: the secret is 256 random bits, and
+    // a ceiling here would count one person's polling against everyone's codes.
+    .post('/pair/requests/claim', async (c) => {
+      const body = await readPairingBody(c.req.raw)
+      if (body.oversized) return respondError(c, 413, 'payload_too_large', ['Pairing request exceeds 4 KiB.'])
+      const parsed = pairingClaimSchema.safeParse(body.value)
+      const claim = parsed.success ? requests.claim(parsed.data.secret) : { status: 'refused' as const }
+      if (claim.status === 'refused') return pairingFailed(c)
+      if (claim.status === 'pending') return c.json({ status: 'pending' } satisfies PairingClaimPending, 202)
+      return paired(c, claim.deviceName)
     })
 
   const core = new Hono<AppEnv>()
@@ -109,6 +152,20 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       // answers 204 rather than a 404 the settings UI would have to special-case.
       c.env.PAIRING_CODES.close()
       auditRequest(c, { action: 'pairing.window.closed' })
+      return c.body(null, 204)
+    })
+    // What the owner's dialog shows, read from here rather than from the frame that announced it.
+    .get('/pair/requests', (c) => c.json({ request: requests.pending() } satisfies PairingRequestResponse))
+    .post('/pair/requests/:id', async (c) => {
+      const parsed = pairingDecisionSchema.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return respondError(c, 400, 'bad_request', ['Answer allow or deny.'])
+      const request = requests.pending()
+      if (!request || !requests.decide(c.req.param('id'), parsed.data.decision))
+        return respondError(c, 404, 'not_found', ['That pairing request was answered, replaced, or expired.'])
+      auditRequest(c, {
+        action: 'pairing.request.decided',
+        details: { decision: parsed.data.decision, deviceName: request.deviceName },
+      })
       return c.body(null, 204)
     })
     .get('/devices', async (c) => c.json({ devices: await c.env.DEVICES.list() } satisfies DevicesResponse))

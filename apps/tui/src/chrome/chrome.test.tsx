@@ -371,13 +371,13 @@ describe('the shell', () => {
     const screen = await renderFixture({ width: 100, height: 28 })
     expect(await screen.frame()).toContain('Browse')
 
-    // One way to lose the column, and it is a chord.
-    await screen.press('b', { ctrl: true })
+    // One way to lose the column, and it is `/`.
+    await screen.press('/')
     const hidden = await screen.frame()
     expect(hidden).not.toContain('Browse')
     expect(hidden).not.toContain('Tasks')
 
-    await screen.press('b', { ctrl: true })
+    await screen.press('/')
     const back = await screen.frame()
     screen.done()
     expect(back).toContain('Browse')

@@ -34,7 +34,7 @@ terminal journeys.
 - Keep the palette and dialogs as scopes. Tab must never reach controls behind an overlay.
 - Keep keyboard access to full marker labels through `Shift+F10` or the menu key. The task row count
   is a disclosure, not the content of the markers.
-- Keep `Ctrl+B` reversible. Hiding the rail must not erase the user's selected task or source.
+- Keep the `/` rail toggle reversible. Hiding the rail must not erase the user's selected task or source.
 
 ## First-run comprehension
 

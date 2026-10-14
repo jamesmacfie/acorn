@@ -39,7 +39,7 @@ import {
 } from './sessionOrder'
 import { isStale } from '../inlineDiff/patchStatus.ts'
 import { eventTime } from './eventTime'
-import { sessionAccount } from '../../shared/accounts'
+import { accountIcon, accountLabel, sessionAccount } from '../../shared/accounts'
 import {
   clearManagedSubagent,
   openManagedSession,
@@ -237,6 +237,16 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
           const entry = found()
           return entry?.kind === 'managed' ? entry : undefined
         }
+        const rowProvider = () => model.providers().find((candidate) => candidate.id === session()?.providerId)
+        const rowAccount = () => {
+          const current = session()
+          return current ? sessionAccount(current.config) : null
+        }
+        const rowAccountLabel = () => {
+          const name = rowAccount()
+          return name ? accountLabel(rowProvider(), name) : undefined
+        }
+        const rowAccountIcon = () => accountIcon(rowProvider(), rowAccount())
         return (
           <Show when={session()}>
             {(current) => (
@@ -304,10 +314,11 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                       <Show when={providerMarkName(current().providerId)}>
                         {(mark) => <ProviderGlyph glyph={mark()} label={current().providerId} />}
                       </Show>
+                      <Show when={rowAccountIcon()}>{(icon) => <Icon name={icon()} title={rowAccountLabel()} />}</Show>
                       <Text emphasis="muted">
                         {[
                           current().providerId,
-                          sessionAccount(current().config),
+                          !rowAccountIcon() && rowAccountLabel(),
                           sessionModelSummary(current()),
                           current().runtimeState,
                         ]

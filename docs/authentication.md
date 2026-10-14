@@ -74,13 +74,20 @@ Pairing uses one-time in-memory codes:
 4. The Node creates a device row and returns the device token once.
 
 In the desktop, **Settings → Nodes → Pair another client** calls the start route for that Node and shows
-the code beside its pinned identity words, and **Close pairing** closes the window early. A standalone
+the code beside its pinned identity words, and **Close pairing** closes the window early. **Pair a
+browser** opens the same window and words the code for the [browser extension](./browser-extension.md)'s
+panel. A standalone
 Node prints its code in its terminal and opens a window again on `SIGUSR1`.
 
 Ordinary failures get one `401 pairing_failed` with no detail. The 4 KiB body ceiling returns
 `413 payload_too_large`, and the 20-a-minute ceiling returns `429 rate_limited`. Neither spends the code
 window or issues a token. [Pairing](./api-reference/transport.md#pairing) owns the byte and deadline
 limits.
+
+A client on the Node's own computer can skip the code. The terminal client, the CLI, and the browser
+extension ask the Node, the desktop opens a dialog with the three words the asker prints, and one
+click on **Allow** pairs it. The code prompt stays open beside the wait.
+[Pairing by approval](./api-reference/transport.md#pairing-by-approval) owns the steps and limits.
 
 The bundled local Node is the exception: the helper spawned it, so the service handshake returns a device
 token without a typed code. It's still stored and checked as a normal device token.
@@ -91,6 +98,8 @@ Device administration is device-only:
 | --- | --- |
 | `POST /v1/core/pair/start` | Open or replace the pairing window |
 | `DELETE /v1/core/pair` | Close the pairing window |
+| `GET /v1/core/pair/requests` | Read the pairing request waiting for an answer |
+| `POST /v1/core/pair/requests/:id` | Allow or deny that request |
 | `GET /v1/core/devices` | List paired devices without token material |
 | `DELETE /v1/core/devices/:id` | Revoke a device |
 

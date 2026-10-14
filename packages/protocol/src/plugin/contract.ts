@@ -38,7 +38,7 @@ import {
   themeDescriptor,
 } from './manifest/displayDescriptors.ts'
 import { extensionDescriptor, extensionPointDescriptor } from './manifest/extensionDescriptors.ts'
-import { brandMark, entry, ID_RE, nodePermissions } from './manifest/manifestFields.ts'
+import { brandMark, entry, ID_RE, nodePermissions, pluginRoute } from './manifest/manifestFields.ts'
 import { pluginAgentToolDescriptorSchema, pluginContextSectionDescriptorSchema } from './runtimeContributions.ts'
 import {
   auditActionDescriptor,
@@ -132,6 +132,9 @@ const contributionsShape = z.looseObject({
   // Buttons the browser extension draws on a website, each resolved by a route on this plugin's node
   // half (./handoffs.ts). Compiled plugins declare the same thing on `NodePlugin.browserHandoffs`.
   browserHandoffs: z.array(browserHandoffDescriptor).max(4).default([]),
+  // A GET route on this plugin's node half listing the exact origins its tasks' apps answer at now, for
+  // the browser extension (./handoffs.ts `taskAddressList`).
+  taskAddresses: pluginRoute.optional(),
 })
 
 // Every contribution kind a manifest may declare, as a runtime list.
@@ -472,4 +475,5 @@ export type PluginContributions = {
   contextSections?: import('./runtimeContributions.ts').PluginContextSectionDescriptor[]
   cliCommands?: import('./cliCommands.ts').PluginCliCommandDescriptor[]
   browserHandoffs?: Omit<import('./handoffs.ts').BrowserHandoff, 'pluginId'>[]
+  taskAddresses?: string
 } & Record<string, unknown>

@@ -1,7 +1,15 @@
 import { FleetStore, type FleetNode } from '@acorn/custody/broker'
 import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
-import { custody, dataRootDir, knownNodeId, rememberedNode, runningNode, type Custody } from '@acorn/custody/local'
-import { pairInteractively } from './pair'
+import {
+  custody,
+  dataRootDir,
+  knownNodeId,
+  pairInteractively,
+  rememberedNode,
+  runningNode,
+  usableLocalToken,
+  type Custody,
+} from '@acorn/custody/local'
 import { startNode, type Handshake } from './supervise'
 
 // The `acorn` command's one decision: which node this run talks to, and whether it owns that node's
@@ -62,17 +70,18 @@ export async function openNode(
 
   const running = runningNode(dataDir)
   if (running) {
-    const token = tokens.read(LOCAL_TOKEN_SCOPE)
+    const token = await usableLocalToken(running, tokens)
     if (!token) {
       if (!allowPair)
         throw new Error('acorn has no token for the local node. Pair the terminal client before opening this link.')
-      // A node this TUI has never met, running under a launcher that is not us — the desktop app,
-      // usually. Its token is that launcher's, so the way in is the same one a stranger gets: a
-      // pairing code the owner asks the node for. A desktop-supervised service has no SIGUSR1
-      // handler; its paired desktop client opens the window through Settings → Nodes. A standalone
-      // node accepts SIGUSR1 and prints its code in the terminal that launched it.
-      console.log(`\n  A node is already running here (pid ${running.pid}), and acorn holds no token for it.`)
-      console.log('  If desktop started it, open Settings → Nodes → Pair another client.')
+      // A node this TUI has never met, or one that refused the saved token, running under a launcher
+      // that is not us — the desktop app, usually. Its token is that launcher's, so this TUI asks for
+      // its own: the desktop shows a dialog to allow it, and a pairing code still works where nobody is
+      // watching. A desktop-supervised service has no SIGUSR1 handler; its paired desktop client opens
+      // a code window through Settings → Nodes. A standalone node accepts SIGUSR1 and prints its code
+      // in the terminal that launched it.
+      console.log(`\n  A node is already running here (pid ${running.pid}), and acorn holds no working token for it.`)
+      console.log('  If desktop started it, allow the request in desktop, or get a code from Settings → Nodes.')
       console.log(`  If it is standalone, run kill -USR1 ${running.pid} and read its terminal output.`)
       const paired = await pairInteractively(running.endpoint, fleet, { label: label(running.nodeId), local: true })
       return done(paired.nodeId)

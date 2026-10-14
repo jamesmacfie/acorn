@@ -88,3 +88,31 @@ it('delivers a complete 413 envelope over HTTP for a chunked oversized body', as
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
 })
+
+it('pairs a client on this computer once the owner allows it, and refuses one from the network', async () => {
+  const { env, issue } = fixture()
+  const { open, core } = pairingRoutes()
+  const local = { ...env, incoming: { socket: { remoteAddress: '127.0.0.1' } } } as unknown as Env
+  const remote = { ...env, incoming: { socket: { remoteAddress: '192.168.1.20' } } } as unknown as Env
+  const post = (body: unknown) => ({ method: 'POST', body: JSON.stringify(body) })
+
+  expect((await open.request('/pair/requests', post({ deviceName: 'acorn' }), remote)).status).toBe(403)
+  const ask = (await (await open.request('/pair/requests', post({ deviceName: 'acorn' }), local)).json()) as {
+    secret: string
+    phrase: string
+  }
+  expect((await open.request('/pair/requests/claim', post({ secret: ask.secret }), local)).status).toBe(202)
+
+  const { request } = (await (await core.request('/pair/requests', {}, local)).json()) as {
+    request: { id: string; phrase: string }
+  }
+  expect(request.phrase).toBe(ask.phrase)
+  expect((await core.request(`/pair/requests/${request.id}`, post({ decision: 'allow' }), local)).status).toBe(204)
+
+  const claimed = await open.request('/pair/requests/claim', post({ secret: ask.secret }), local)
+  expect(claimed.status).toBe(200)
+  expect(await claimed.json()).toMatchObject({ deviceToken: 'synthetic-token', nodeId: 'n1' })
+  expect(issue).toHaveBeenCalledWith('acorn')
+  // Spent: a second claim gets the same refusal as a wrong secret.
+  expect((await open.request('/pair/requests/claim', post({ secret: ask.secret }), local)).status).toBe(401)
+})
