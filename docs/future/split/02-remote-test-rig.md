@@ -55,7 +55,9 @@ Checked by hand, with no agent credentials set:
 shows for the container Node with no typed path. With the window's `folderPath.pick` replaced to
 answer `/Users/jamesmacfie/Source/acorn`, pressing it sent that Mac path to the container Node,
 which answered "Directory does not exist." On a second Node on the same Mac the path would have been
-accepted. After phase 3: not yet recorded.
+accepted. After phase 3: fixed. On the container Node the row shows a typed **Folder path on this
+Node** field and no picker button. Typing a Mac path returned the Node's "Directory does not exist.",
+typing `/srv/projects/sample` saved, and the replaced `folderPath.pick` was never called.
 
 For phase 3:
 

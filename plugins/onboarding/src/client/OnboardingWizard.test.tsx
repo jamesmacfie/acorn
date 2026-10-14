@@ -15,7 +15,7 @@ import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import { activeNodeId, setActiveNode } from '@acorn/plugin-api/client'
 
 const platform = vi.hoisted(() => ({
-  pickFolder: vi.fn<() => Promise<string | null>>(),
+  pickNodeFolder: vi.fn<() => Promise<string | null>>(),
   createProject: vi.fn(),
   patchProject: vi.fn(),
   createWorkspace: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock('@solidjs/router', async (original) => ({
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...(await original<typeof import('@acorn/plugin-api/client')>()),
   canAddProjectFromFolder: () => true,
-  pickFolder: platform.pickFolder,
+  pickNodeFolder: platform.pickNodeFolder,
   createProject: platform.createProject,
   patchProject: platform.patchProject,
   createWorkspace: platform.createWorkspace,
@@ -137,7 +137,7 @@ beforeEach(() => {
   releaseWrite = undefined
   saveError = undefined
   vi.clearAllMocks()
-  platform.pickFolder.mockResolvedValue('/tmp/Alpha')
+  platform.pickNodeFolder.mockResolvedValue('/tmp/Alpha')
   platform.createProject.mockImplementation(async ({ path }: { path: string }) => {
     const id = path.split('/').at(-1)!
     const created = project(id, id)

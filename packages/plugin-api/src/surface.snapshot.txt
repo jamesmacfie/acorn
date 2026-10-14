@@ -147,7 +147,7 @@ client: patchProject
 client: pathForTask
 client: persistDraft
 client: pickFiles
-client: pickFolder
+client: pickNodeFolder
 client: pluginLabel
 client: positionAt
 client: postJson

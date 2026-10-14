@@ -2,12 +2,12 @@ import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { useQueryClient } from '@tanstack/solid-query'
 import { projectsKey, tasksKey, workspacesKey, type Project } from '../../infra/queries'
-import { pickFolder } from '../../infra/platform'
 import { activeNodeId } from '../../infra/node/activeNode'
-import { canAddProjectFromFolder } from './addProject'
+import { canAddProjectFromFolder, pickNodeFolder } from './addProject'
 import { createProject } from './workspaceMutations'
+import { NodePathForm } from './NodePathForm'
 import { projectImporterContributions } from '../../host/registries/sources/projectImporters'
-import { Alert, Button, Input } from '../../kit/components/primitives'
+import { Alert, Button } from '../../kit/components/primitives'
 import { latestSignal } from '../../kit/lib/state/latestSignal'
 import Icon from '../../kit/components/content/Icon'
 import './projects.css'
@@ -18,7 +18,6 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
   const qc = useQueryClient()
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  const [path, setPath] = createSignal('')
   const [activeImporter, setActiveImporter] = createSignal<string | null>(null)
   // One importer's run. Switching Node or importer, or closing it, aborts it.
   const importerRun = latestSignal()
@@ -50,19 +49,21 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
       qc.invalidateQueries({ queryKey: tasksKey }),
     ])
 
+  /** Resolves whether the folder landed on the Node it was meant for. */
   async function addFolder(folder: string, nodeId: string | null, complete?: (id: string) => void) {
     setBusy(true)
     setError('')
     try {
       const workspaceId = props.workspaceId
       const { project } = await createProject({ path: folder, ...(workspaceId ? { workspaceId } : {}) })
-      if (node() !== nodeId) return
+      if (node() !== nodeId) return false
       await refresh()
-      if (node() !== nodeId) return
-      if (mounted) setPath('')
+      if (node() !== nodeId) return false
       complete?.(project.id)
+      return mounted
     } catch (cause) {
       if (mounted && node() === nodeId) setError(cause instanceof Error ? cause.message : "Couldn't add the folder.")
+      return false
     } finally {
       if (mounted && node() === nodeId) setBusy(false)
     }
@@ -71,7 +72,7 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
   async function chooseFolder() {
     const nodeId = node()
     const complete = props.beginAdd?.()
-    const folder = await pickFolder()
+    const folder = await pickNodeFolder(nodeId)
     if (!folder || !mounted) return
     if (node() !== nodeId) return
     await addFolder(folder, nodeId, complete)
@@ -107,26 +108,12 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
             Add folder…
           </Button>
         </Show>
-        {/* The native picker returns a path on this client. For a remote Node, enter a path that
-            exists on the Node instead; no client path crosses the API boundary. */}
         <Show when={!canAddProjectFromFolder()}>
-          <form
-            class="project-add-path"
-            onSubmit={(event) => {
-              event.preventDefault()
-              if (path().trim()) void addFolder(path().trim(), node(), props.beginAdd?.())
-            }}
-          >
-            <Input
-              label="Folder path on this Node"
-              value={path()}
-              onInput={setPath}
-              placeholder="/absolute/path/on/node"
-            />
-            <Button submit disabled={busy() || !path().trim()}>
-              Add project
-            </Button>
-          </form>
+          <NodePathForm
+            action="Add project"
+            busy={busy()}
+            submit={(folder) => addFolder(folder, node(), props.beginAdd?.())}
+          />
         </Show>
         <For each={projectImporterContributions()}>
           {(entry) => (

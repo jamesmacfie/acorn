@@ -119,7 +119,9 @@ entries and client-core contracts. A feature that needs native behavior uses the
 re-exports. Plugins never name a shell binding or read the host global.
 
 A missing seam group doesn't always remove its verb. `pickFolder` returns null where no host installs
-a picker, and callers check `canPickFolder` first so they can drop the control. `pickFiles` and
+a picker, and callers check `canPickFolder` first so they can drop the control. A folder for a Node
+comes from `pickNodeFolder` and `canPickNodeFolder` in the workspaces feature instead, which also
+return null and false when the Node isn't local. Plugins get only `pickNodeFolder`. `pickFiles` and
 `saveFile` carry a fallback, because a page can open its own file input and click its own download
 link. A host that installs the `files` group uses native dialogs instead, and its save writes where you
 choose. Both verbs move bytes, never paths, so an attachment on this machine can reach a Node on

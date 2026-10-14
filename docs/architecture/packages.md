@@ -136,6 +136,10 @@ folder is named `main`, `service`, or `wiring`. Every workspace package carries 
 - **The client stays portable.** Only `packages/client-core/src/infra/platform/` reads `window.acorn`.
   It's a global, so this is a source scan. Tests are exempt, because stubbing `globalThis.window` is how
   the platform code gets tested.
+- **A path for a Node comes from `pickNodeFolder`.** The native picker returns a path on the client's
+  disk, which means nothing to a remote Node. `pickNodeFolder` returns null unless the Node is local,
+  so only it and the **This device** target of the plugin installer call `pickFolder`. Tests are
+  exempt.
 - **Core seams can't be reached around.** The raw identity store is confined to `packages/node-core`
   and the two composition roots that build it. The plugin trust and bundle stores are confined to
   `@acorn/custody`, because trust binds to a hash the host computed and the renderer must stay inert.

@@ -3,7 +3,9 @@ import { Dynamic } from 'solid-js/web'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Project } from '@acorn/protocol/api.ts'
 import { projectsKey, tasksKey, tasksOptions, workspacesKey, workspacesOptions } from '../../infra/queries'
-import { canPickFolder, pickFolder } from '../../infra/platform'
+import { activeNodeId } from '../../infra/node/activeNode'
+import { canPickNodeFolder, pickNodeFolder } from '../workspaces/addProject'
+import { NodePathForm } from '../workspaces/NodePathForm'
 import { deleteProject, patchProject } from '../workspaces/workspaceMutations'
 import { ProjectColorInput } from '../workspaces/ProjectColorInput'
 import {
@@ -163,8 +165,9 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
   const [busy, setBusy] = createSignal(false)
 
   const changeFolder = async () => {
-    const path = await pickFolder()
-    if (path) await folder.run(() => patch({ path }))
+    const nodeId = activeNodeId()
+    const path = await pickNodeFolder(nodeId)
+    if (path && activeNodeId() === nodeId) await folder.run(() => patch({ path }))
   }
 
   const remove = async () => {
@@ -224,7 +227,15 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
               </Text>
             )}
           </Show>
-          <Show when={canPickFolder()}>
+          <Show
+            when={canPickNodeFolder(activeNodeId())}
+            fallback={
+              <NodePathForm
+                action={props.project.path ? 'Change folder' : 'Add folder'}
+                submit={(path) => folder.run(() => patch({ path }))}
+              />
+            }
+          >
             <div>
               <Button onPress={() => void changeFolder()}>
                 {props.project.path ? 'Change folder…' : 'Add folder…'}

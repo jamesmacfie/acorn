@@ -6,7 +6,7 @@ import {
   canPickFolder,
   clientEvents,
   integrationsOptions,
-  pickFolder,
+  pickNodeFolder,
   type ProjectImporterProps,
   projectsKey,
   projectsOptions,
@@ -70,7 +70,7 @@ export default function GithubImporter(props: ProjectImporterProps) {
     const nodeId = activeNodeId()
     // Ask for the folder before anything is written, so cancelling the dialog cancels the import
     // rather than leaving a half-made project behind.
-    const path = await pickFolder()
+    const path = await pickNodeFolder(nodeId)
     if (!path) return
     if (activeNodeId() !== nodeId || !canAddProjectFromFolder()) {
       setError('The active Node changed. Choose the folder again.')

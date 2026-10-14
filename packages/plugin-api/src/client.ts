@@ -218,7 +218,7 @@ export { taskById } from '@acorn/client-core/features/tasks'
 export { workspaceForProject } from '@acorn/client-core/features/workspaces'
 export { createWorkspaceWords } from '@acorn/client-core/features/workspaces'
 
-export { canAddProjectFromFolder } from '@acorn/client-core/features/workspaces'
+export { canAddProjectFromFolder, pickNodeFolder } from '@acorn/client-core/features/workspaces'
 export { ownOnboardingVisibility } from '@acorn/client-core/features/workspaces'
 export { createProject, createWorkspace, patchProject } from '@acorn/client-core/features/workspaces'
 export type { Project } from '@acorn/protocol/api.ts'
@@ -242,8 +242,9 @@ export {
 // ── The platform seam ─────────────────────────────────────────────────────────────────────────
 // What the host provides, as opposed to what the node provides. A plugin gets the groups it has a
 // legitimate use for: the native folder dialog, the file dialogs, and the host-owned preview view.
+// The folder dialog comes only as `pickNodeFolder`, because every plugin folder so far is a Node's.
 // Transport, fleet and plugin custody stay core's business.
-export { canPickFolder, pickFiles, pickFolder, previewViews, saveFile } from '@acorn/client-core/infra/platform'
+export { canPickFolder, pickFiles, previewViews, saveFile } from '@acorn/client-core/infra/platform'
 // Native child webviews do not inherit DOM overflow clipping. Compiled surfaces that position one
 // use the host's shared visible box rather than duplicating the clipping walk.
 export { elementRectKey, visibleElementRect, observeNativePage } from '@acorn/client-core/infra/platform'

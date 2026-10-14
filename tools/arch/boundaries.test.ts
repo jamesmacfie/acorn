@@ -1084,6 +1084,27 @@ describe('architecture boundaries', () => {
     expect(readsHostGlobal(readFileSync(join(SEAM, 'index.ts'), 'utf8'))).toBe(true)
   })
 
+  it('only the Node-aware picker and the device install target open the folder picker', () => {
+    // The picker returns a path on this client's disk. A caller that sends it to a Node has to check
+    // that the Node is local first, and that check is easy to forget, so `pickNodeFolder` makes it for
+    // everyone (docs/architecture/packages.md § Runtime rules).
+    const CALLS_PICKER = /\bpickFolder\s*\(/
+    const callsPicker = (source: string): boolean =>
+      CALLS_PICKER.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    const callers = PACKAGES.flatMap((p) => walk(p.src))
+      .filter((f) => !isTestCode(f) && callsPicker(readFileSync(f, 'utf8')))
+      .map(rel)
+      .sort()
+    expect(callers).toEqual([
+      'packages/client-core/src/features/settings/plugins/InstallPlugin.tsx',
+      'packages/client-core/src/features/workspaces/addProject.ts',
+    ])
+    // Anti-vacuity: the declaration isn't a call, and prose about the picker isn't one either.
+    expect(callsPicker('const path = await pickFolder()')).toBe(true)
+    expect(callsPicker('export const pickFolder = async (): Promise<string | null> =>')).toBe(false)
+    expect(callsPicker('// `pickFolder()` is for paths this device reads')).toBe(false)
+  })
+
   it('the terminal client keeps custody out of everything that draws', () => {
     // The desktop runs the renderer and the broker in two processes, so "the renderer never holds a
     // token" is structural. The TUI is one process, so the same promise is a module boundary instead,
