@@ -13,8 +13,8 @@ const opens = (url: string) => url.startsWith('https://') || url.startsWith('htt
 
 // A plugin's read-only view of one task, drawn from the fixed blocks its route answered with, as text.
 // Changing anything happens in the plugin's pane in Acorn. `view` is undefined while the first read is
-// out, and null when the plugin has no panel for the task. A failed read keeps the last view and says
-// why above it. docs/browser-extension/plugin-panels.md.
+// out, and null when the plugin has no panel for the task, which closes the panel. A failed read keeps
+// the last view and says why above it. docs/browser-extension/plugin-panels.md.
 export function PluginPanel(props: {
   panel: BridgePanel
   nodeId: string
@@ -46,14 +46,7 @@ export function PluginPanel(props: {
           </p>
         )}
       </Show>
-      <Show
-        when={props.view}
-        fallback={
-          <Show when={props.view === null}>
-            <p class="empty quiet">This task has no {props.panel.label} panel.</p>
-          </Show>
-        }
-      >
+      <Show when={props.view}>
         {(view) => <For each={view().blocks}>{(block) => <Block block={block} pickSource={props.pickSource} />}</For>}
       </Show>
       <Show when={props.view === undefined && !props.problem}>

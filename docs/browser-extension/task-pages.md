@@ -75,6 +75,21 @@ it. **Current task** stays pinned below **This page** on a page whose task isn't
 one. The sidebar reads the page again when the tab finishes loading, so the section follows the
 tab. Sites to allow are under Settings → **Permissions**.
 
+## Moving between pages
+
+The sidebar remembers what it showed for each task: the tab, and the conversation or workflow run
+open in it. When the page moves to another task's page, by navigating or by switching tabs, the
+sidebar shows what it last showed for that task. A task with nothing remembered keeps the tab, and an
+open conversation moves to that task's newest conversation.
+
+When the page moves to one no task holds, **Agents**, **Workflows**, or a
+[plugin panel](./plugin-panels.md) gives way to Home. An open conversation stays, because pages are
+often visited to capture them into it. Coming back to a task's page from there shows what the sidebar
+last showed for it.
+
+Home stays on Home as pages change, unless the sidebar went there by itself. The task list arriving,
+or a plugin publishing the page's address, moves nothing.
+
 ## Home's task list
 
 Below **This page**, Home lists the open tasks of one workspace, grouped by project in the

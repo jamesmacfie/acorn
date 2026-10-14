@@ -117,6 +117,9 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
 - `destination:<nodeId>`: the current task on that Node, with its project, and the conversation open
   over Home, if any. The panel restores both when it opens and when Settings closes. Only the person's
   own choices are saved, including the conversation **Add to Acorn chat** added a selection to.
+- `taskViews:<nodeId>`: what the sidebar last showed for each task, `{ tab, sessionId, runId }` by
+  task ID, for [moving between pages](./task-pages.md#moving-between-pages). It keeps the 50 tasks
+  used most recently.
 - `appearance`: the panel's `{ theme, style }`, with `theme` null to follow the system's light or dark
   ([appearance](./setup.md#appearance)).
 - `handoffs`: the selected Node's [handoffs](./handoffs.md#task-chips), `{ nodeId, handoffs }`,
