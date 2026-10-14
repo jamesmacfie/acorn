@@ -254,6 +254,25 @@ describe('a field', () => {
       screen.close()
     }
   })
+
+  it('puts the caret back on its field after a frame that changed other cells', () => {
+    // Writing a cell moves the terminal's caret, so a spinner ticking elsewhere would leave it parked
+    // after the spinner while the field's own caret had not moved.
+    const { screen, writes } = screenOf(10, 2)
+    try {
+      const spinner = createTextNode('a')
+      insertNode(screen.root, el('text', {}, [spinner]))
+      insertNode(screen.root, el('input', { value: 'hello', cursor: 3, focused: true }))
+      screen.frame()
+
+      writes.length = 0
+      replaceText(spinner, 'b')
+      screen.frame()
+      expect(writes.join('')).toMatch(/\x1b\[2;4H\x1b\[\?25h\x1b\[\?2026l$/)
+    } finally {
+      screen.close()
+    }
+  })
 })
 
 describe('a pty rectangle', () => {
