@@ -29,9 +29,13 @@ import {
   changeDraft,
   loadDestination,
   loadHomeWorkspace,
+  loadTaskViews,
+  rememberTaskView,
   saveDestination,
   saveHomeWorkspace,
+  saveTaskViews,
   type Destination,
+  type TaskView,
 } from '../localState'
 import { PluginPanel } from './PluginPanel'
 import { Waiting } from './Waiting'
@@ -56,11 +60,12 @@ export function Workspace(props: {
   reconnects: number
   projectChanges: number
   // The bottom bar's tab, asking for Agents when a conversation opens or Workflows when a run starts,
-  // whether there are runs to show there, and the two tabs' top bar heading. A plugin panel's tab is
-  // `panel:<pluginId>`.
-  tab: 'home' | 'agents' | 'workflows' | `panel:${string}`
+  // or for any tab as the page moves, whether there are runs to show there, and the two tabs' top bar
+  // heading. A plugin panel's tab is `panel:<pluginId>`.
+  tab: 'home' | TaskView['tab']
   showAgents(): void
   showWorkflows(): void
+  showTab(tab: 'home' | TaskView['tab']): void
   hasWorkflows(has: boolean): void
   // The Node's plugin panels, and which plugins have one for the task Agents shows.
   panels: readonly BridgePanel[]
@@ -126,6 +131,10 @@ export function Workspace(props: {
   const [problem, setProblem] = createSignal<string | null>(null)
   // Counts the tasks made current, so a restore whose task list answers late can't undo a later choice.
   let chosen = 0
+  // What the sidebar last showed for each task, and whether it went to Home by itself because the page
+  // moved, rather than the person choosing Home.
+  let taskViews: Record<string, TaskView> = {}
+  let wentHome = false
 
   const report = (error: unknown) => {
     // A reply refused because the Node changed under it is expected, and a missing bridge has its banner.
@@ -204,6 +213,8 @@ export function Workspace(props: {
       if (agentsTask().taskId !== forTask) return
       setPanelViews((views) => ({ ...views, [pluginId]: result.view }))
       setPanelProblems(({ [pluginId]: _cleared, ...rest }) => rest)
+      // An open panel the task doesn't have closes, and its tab with it.
+      if (result.view === null && openPanel() === pluginId) goHome()
     } catch (error) {
       if (agentsTask().taskId !== forTask) return
       if (error instanceof CallFailure && (error.code === 'not_selected' || error.code === 'host_unavailable')) return
@@ -383,14 +394,82 @@ export function Workspace(props: {
     const open = openStep()
     return open && open.taskId === agentsTask().taskId ? open : null
   }
-  // A conversation open in another task follows the page to its task's newest conversation. Drafts
-  // stay with the conversation they were written in.
+  const goHome = () => {
+    wentHome = true
+    props.showTab('home')
+  }
   createEffect(
     on(
-      () => pageTask()?.task.id,
-      (taskId) => {
+      () => props.tab,
+      (tab) => tab !== 'home' && (wentHome = false),
+      { defer: true },
+    ),
+  )
+
+  // Keeps what the sidebar shows for a task, for coming back to its page. Home belongs to no task.
+  const keepView = (taskId: string) => {
+    const tab = props.tab
+    if (tab === 'home') return
+    // An open step needs nothing kept here. It stays open for its task until a step opens in another.
+    const open = openStep()?.taskId === taskId ? openStep() : null
+    const run = selectedRun()?.taskId === taskId ? selectedRun()!.runId : null
+    taskViews = rememberTaskView(taskViews, taskId, {
+      tab,
+      sessionId: tab === 'agents' && current().taskId === taskId ? current().sessionId : null,
+      runId: open?.run.id ?? run,
+    })
+    void saveTaskViews(props.api.storage.local, nodeId, taskViews)
+  }
+  onCleanup(() => {
+    const taskId = pageTask()?.task.id
+    if (taskId) keepView(taskId)
+  })
+
+  // Shows a task's remembered view, or says it can't, when its plugin panel is gone. A conversation
+  // open in another task closes, unless the view is a conversation of its own. Drafts stay with the
+  // conversation they were written in.
+  const showView = (task: { id: string; projectId: string }, view: TaskView): boolean => {
+    if (view.tab.startsWith('panel:') && !props.panels.some((panel) => view.tab === `panel:${panel.pluginId}`))
+      return false
+    const sessionId = view.tab === 'agents' ? view.sessionId : null
+    if (sessionId)
+      void restore(task.projectId, task.id, (list) => {
+        if (!list.some((session) => session.id === sessionId)) return
+        showSession(sessionId)
+        remember()
+      })
+    else if (current().sessionId) {
+      setCurrent((destination) => ({ ...destination, sessionId: null }))
+      remember()
+    }
+    if (view.tab === 'workflows' && view.runId) setSelectedRun({ taskId: task.id, runId: view.runId })
+    props.showTab(view.tab)
+    return true
+  }
+
+  // Where the sidebar goes when the page beside it moves, by navigating or switching tabs. A page of
+  // another task shows what the sidebar last showed for that task, or, over an open conversation, that
+  // task's newest conversation. A page no task holds shows Home, except over an open conversation,
+  // because pages are often visited to capture them into it. Home stays put, unless the sidebar went
+  // there by itself. The tasks arriving, or a plugin publishing the page's address, moves nothing.
+  const pageTaskId = createMemo(() => pageTask()?.task.id ?? null)
+  createEffect(
+    on(
+      [() => props.pageUrl, pageTaskId],
+      ([url, taskId], previous) => {
+        const [lastUrl, left] = previous ?? [undefined, null]
+        if (left && left !== taskId) keepView(left)
+        if (url === lastUrl || (props.tab === 'home' && !wentHome)) return
         const task = pageTask()?.task
-        if (task && current().sessionId && current().taskId !== taskId) chatInTask(task.projectId, task.id)
+        if (!task) {
+          if (props.tab === 'home' || agentsTask().taskId) return
+          if (props.tab !== 'agents' || !current().sessionId) goHome()
+          return
+        }
+        if (task.id === left) return
+        const view = taskViews[task.id]
+        if (view && showView(task, view)) return
+        if (current().sessionId && current().taskId !== task.id) chatInTask(task.projectId, task.id)
       },
       { defer: true },
     ),
@@ -460,6 +539,8 @@ export function Workspace(props: {
     const remembered = await loadDestination(props.api.storage.local, nodeId)
     setSiteChoices(await loadSiteChoices(props.api.storage.local, nodeId))
     setWorkspaceChoice(await loadHomeWorkspace(props.api.storage.local, nodeId))
+    // A view kept while these loaded is newer than the stored one.
+    taskViews = { ...(await loadTaskViews(props.api.storage.local, nodeId)), ...taskViews }
     await loadProjects()
     // A request opened from a notification while this loaded chose already.
     if (chosen || !remembered.projectId || !remembered.taskId) return

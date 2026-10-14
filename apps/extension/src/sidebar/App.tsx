@@ -91,7 +91,8 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
   // The bottom bar's choice. Home, Agents, and Workflows share one Workspace; Settings replaces it, and
   // the Workspace restores from storage when Settings closes. Workflows shows only for a task with runs,
-  // and a plugin's panel only for a task it has one for, or while it's open.
+  // and a plugin's panel only for a task it has one for. Either stays while open, so neither vanishes
+  // while its view loads.
   const [view, setView] = createSignal<View>('home')
   const [hasWorkflows, setHasWorkflows] = createSignal(false)
   const tabs = (): Tab[] => [
@@ -349,6 +350,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   tab={workspaceTab()}
                   showAgents={() => setView('agents')}
                   showWorkflows={() => setView('workflows')}
+                  showTab={setView}
                   hasWorkflows={setHasWorkflows}
                   panels={panels()}
                   panelsShown={setPanelsShown}

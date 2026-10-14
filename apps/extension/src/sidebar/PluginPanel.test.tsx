@@ -18,12 +18,12 @@ afterEach(() => {
 type Request = Record<string, unknown> & { id: string; op: string }
 
 const PAGE = 'https://app.example/'
-const pageTask = (id: string): BridgePageTask => ({
+const pageTask = (id: string, origin = 'https://app.example'): BridgePageTask => ({
   id,
   title: `Task ${id}`,
   branch: null,
   projectId: 'p1',
-  pages: [{ origin: 'https://app.example', pathPrefix: '/', source: 'runn' }],
+  pages: [{ origin, pathPrefix: '/', source: 'runn' }],
 })
 
 const view = (source = 'web'): BrowserPanelView => ({
@@ -84,7 +84,8 @@ function mount() {
           panels: [{ pluginId: 'runn', label: 'Runn', glyph: 'container', pane: 'runn' }],
         }
       case 'tasks.pages':
-        return { nodeId: 'n1', tasks: [pageTask(state.pageTask)] }
+        // A second task, on another site, that has no Runn panel.
+        return { nodeId: 'n1', tasks: [pageTask(state.pageTask), pageTask('t3', 'https://other.example')] }
       case 'projects.list':
         return { nodeId: 'n1', projects: [{ id: 'p1', name: 'Widget', path: null, hidden: false }], workspaces: [] }
       case 'tasks.list':
@@ -213,13 +214,42 @@ describe('plugin panels', () => {
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 
-  it('keeps an open tab while its task has no panel, and says so', async () => {
-    const { fake, state, root } = mount()
+  it('goes back to Home when the tab moves to a page no task holds, or to a task with no panel', async () => {
+    const { fake, root } = mount()
+    await settle(30)
+    for (const elsewhere of ['https://elsewhere.example/', 'https://other.example/']) {
+      fake.navigate(PAGE)
+      await settle(30)
+      await openPanel(root)
+      expect(panel(root)).not.toBeNull()
+      fake.navigate(elsewhere)
+      await settle(30)
+      expect(root.querySelector('header h1')!.textContent).toBe('Home')
+      expect(nav(root)).toEqual(['Home', 'Agents', 'Settings'])
+    }
+  })
+
+  it('opens the panel again on coming back to its task', async () => {
+    const { fake, root } = mount()
     await settle(30)
     await openPanel(root)
-    state.pageTask = 't2'
-    await tasksChanged(fake)
-    expect(nav(root)).toContain('Runn')
-    expect(panel(root)!.textContent).toContain('This task has no Runn panel.')
+    fake.navigate('https://elsewhere.example/')
+    await settle(30)
+    expect(root.querySelector('header h1')!.textContent).toBe('Home')
+    fake.navigate(PAGE)
+    await settle(30)
+    expect(root.querySelector('header h1')!.textContent).toBe('Runn')
+    expect(panel(root)!.querySelector('.state')!.textContent).toBe('Stack running')
+  })
+
+  it('stays open on a page of another task that has a panel', async () => {
+    const { fake, state, root } = mount()
+    state.views.t3 = view('worker')
+    await settle(30)
+    await openPanel(root)
+    fake.navigate('https://other.example/')
+    await settle(30)
+    expect(panelReads(state).at(-1)).toMatchObject({ taskId: 't3' })
+    expect(panel(root)!.querySelectorAll('pre')[1]!.textContent).toBe('worker started\nworker ready')
   })
 })

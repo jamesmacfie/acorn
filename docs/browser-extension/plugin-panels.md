@@ -14,8 +14,9 @@ the current task on its project's site.
 
 A plugin whose route answers a view gets a nav item after **Workflows** and before **Settings**,
 with its label and glyph. A plugin that answers 404 has no panel for the task, and no nav item. An
-open panel's nav item stays while it is open, and says the task has no panel when that is so. A
-panel whose plugin stops closes to Home.
+open panel's nav item stays while its view loads. An open panel closes to Home, taking its nav item
+with it, when the tab moves to a page no task holds, when the new task has no panel, or when the
+plugin stops.
 
 ## The panel
 

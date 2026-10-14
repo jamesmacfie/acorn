@@ -2,7 +2,7 @@ import type { BrowserApi } from './browser'
 import type { PageCapture } from './capture'
 
 // What the sidebar keeps in this browser profile's storage: unsent drafts, the destination it last
-// showed on each Node, and the workspace Home lists. None of it leaves the browser until the person
+// showed on each Node, what it last showed for each task, and the workspace Home lists. None of it leaves the browser until the person
 // sends.
 
 type Storage = BrowserApi['storage']['local']
@@ -89,6 +89,36 @@ export async function loadDestination(storage: Storage, nodeId: string): Promise
 
 export const saveDestination = (storage: Storage, nodeId: string, destination: Destination): Promise<void> =>
   storage.set({ [destinationKey(nodeId)]: destination })
+
+// What the sidebar last showed for a task, so moving back to the task's page shows it again: the tab,
+// and the conversation or workflow run open in it.
+export type TaskView = {
+  tab: 'agents' | 'workflows' | `panel:${string}`
+  sessionId: string | null
+  runId: string | null
+}
+
+// The most tasks remembered on a Node. The oldest is forgotten first.
+const TASK_VIEWS_MAX = 50
+const taskViewsKey = (nodeId: string) => `taskViews:${nodeId}`
+
+export async function loadTaskViews(storage: Storage, nodeId: string): Promise<Record<string, TaskView>> {
+  const stored = (await storage.get([taskViewsKey(nodeId)]))[taskViewsKey(nodeId)]
+  return stored && typeof stored === 'object' ? (stored as Record<string, TaskView>) : {}
+}
+
+// Keys keep insertion order, so the task saved last goes to the end and the first ones are the oldest.
+export function rememberTaskView(
+  views: Record<string, TaskView>,
+  taskId: string,
+  view: TaskView,
+): Record<string, TaskView> {
+  const { [taskId]: _replaced, ...rest } = views
+  return Object.fromEntries([...Object.entries(rest), [taskId, view]].slice(-TASK_VIEWS_MAX))
+}
+
+export const saveTaskViews = (storage: Storage, nodeId: string, views: Record<string, TaskView>): Promise<void> =>
+  storage.set({ [taskViewsKey(nodeId)]: views })
 
 // The workspace whose tasks Home lists, as the person last chose it on each Node.
 const homeWorkspaceKey = (nodeId: string) => `homeWorkspace:${nodeId}`
