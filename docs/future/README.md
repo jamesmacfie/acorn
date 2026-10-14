@@ -14,6 +14,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | --- | --- | --- |
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
+| [element-picker/](./element-picker/README.md) | Four tickets for picking an element on a task page in the browser extension and asking the task's agent about it. | Proposed October 14, 2026. Implementation not started. |
 | [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
