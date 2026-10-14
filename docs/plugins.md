@@ -77,7 +77,8 @@ chooses the destination and keeps panel plans outside plugin frames.
 - [Task checks](./plugins/task-checks.md): what a plugin says before an archive.
 - [Search providers](./plugins/search-providers.md): grouped search across plugins.
 - [Harnesses](./plugins/harnesses.md): how the host delivers a managed agent declared as data.
-- [Code hosts](./plugins/code-hosts.md): claiming Git hosts, and a project's repository facet.
+- [Code hosts](./plugins/code-hosts.md): claiming Git hosts, a project's repository facet, and change
+  requests.
 
 ## Working together
 

@@ -114,11 +114,12 @@ describe('the active-task list route', () => {
 
   // Three: the tasks, their links, and every project they mention. The number is the point, not the
   // three: what must not happen is that it grows with the number of tasks.
+  // Tasks, their links, their primary change requests, and their projects.
   it('issues one project query however many tasks there are', async () => {
     await seed(1, 2)
     const few = await listWithQueryCount()
     expect(few.body).toHaveLength(2)
-    expect(few.queries).toBe(3)
+    expect(few.queries).toBe(4)
 
     t.cleanup()
     t = makeTestDb()
@@ -126,7 +127,7 @@ describe('the active-task list route', () => {
     await seed(3, 8)
     const many = await listWithQueryCount()
     expect(many.body).toHaveLength(24)
-    expect(many.queries).toBe(3)
+    expect(many.queries).toBe(4)
   })
 
   it('still resolves the project onto each task row', async () => {
@@ -731,7 +732,7 @@ describe('creating a task on an existing worktree', () => {
     'removes only a branch created by this request if the row insert fails (base: %s)',
     async (withBase) => {
       if (!withBase) execFileSync('git', ['branch', '--', 'save-fails'], { cwd: join(dir, 'checkout') })
-      vi.spyOn(t.db, 'insert').mockImplementation(() => {
+      vi.spyOn(t.db, 'transaction').mockImplementation(() => {
         throw new Error('insert failed')
       })
       const created = await createSeed({ branch: 'save-fails', ...(withBase ? { baseBranch: 'main' } : {}) })
@@ -742,7 +743,7 @@ describe('creating a task on an existing worktree', () => {
   )
 
   it('rolls back a pinned branch when the task row cannot be saved', async () => {
-    vi.spyOn(t.db, 'insert').mockImplementation(() => {
+    vi.spyOn(t.db, 'transaction').mockImplementation(() => {
       throw new Error('insert failed')
     })
     const created = await createSeed({ branch: 'pinned-save-fails', baseCommit: revision('main') })

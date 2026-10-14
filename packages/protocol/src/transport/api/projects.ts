@@ -150,6 +150,11 @@ export type WorkspaceExternalProjectsResponse = { projects: WorkspaceExternalPro
 // the icon map belongs to the client. An unrecognized name falls back to rendering as text.
 export const ICON_NAME_RE = /^[a-z0-9-]{1,40}$/
 
+// A pull or merge request that backs a task (docs/plugins/code-hosts.md § Change requests).
+// `provider` is the code host plugin that claims its host, or null when none does. `pane` is the
+// client pane that host declared for it, absent while that plugin isn't running.
+export type TaskChangeRequest = { provider: string | null; number: number; pane?: string }
+
 export type Task = {
   id: string
   title: string
@@ -161,7 +166,10 @@ export type Task = {
   repository?: ProjectRepository | null
   github: { owner: string; name: string } | null
   worktreePath: string | null
+  // The primary change request's number when it's on github.com, for the GitHub-named readers.
   pullNumber: number | null
+  // The task's primary change request, absent from a Node older than it.
+  changeRequest?: TaskChangeRequest | null
   status: 'active' | 'archived' | 'cancelled'
   parentId: string | null // task tree (docs/workspaces-and-tasks.md): delegated and nested-workflow tasks point at their creating task
   sort: number
@@ -185,6 +193,9 @@ export type TaskSeed = {
   // takes the branch from it, so `branch` is ignored when this is set.
   worktreePath?: string
   skipSetup?: boolean
+  // A change request on the project's repository, which becomes the task's primary one. `pullNumber`
+  // is the same thing under its GitHub name.
+  changeRequest?: { number: number; sourceBranch?: string }
   pullNumber?: number
   links?: TaskLinkSeed[]
 }

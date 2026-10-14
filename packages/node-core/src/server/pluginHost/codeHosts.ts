@@ -37,3 +37,9 @@ export function declareCodeHost(
 export function codeHostFor(host: string): string | null {
   return holders().find(([, { declaration }]) => declaration.hosts.includes(host))?.[0] ?? null
 }
+
+/** What the running plugin `provider` declared about its change requests, or undefined when it isn't
+ *  running or declared none. */
+export function changeRequestDeclaration(provider: string): CodeHostDescriptor['changeRequest'] {
+  return declared.get(provider)?.declaration.changeRequest
+}

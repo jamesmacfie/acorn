@@ -28,7 +28,7 @@ export const createTask = async (seed: TaskSeed, nodeId?: string | null) => {
 
 export async function patchTask(
   id: string,
-  body: { title?: string; icon?: string | null; status?: 'active' | 'archived'; pullNumber?: number | null },
+  body: { title?: string; icon?: string | null; status?: 'active' | 'archived' },
   nodeId?: string | null,
 ) {
   return writeJson<{ id: string; archivedTaskIds?: string[] }>(

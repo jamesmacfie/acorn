@@ -2,9 +2,10 @@ import { recordSetupDecision } from '../taskScripts/setup'
 import { taskScripts } from '../taskScripts/service'
 // The task read seam (CoreServices.tasks). Plugins hold task ids and ask core to resolve them here,
 // so database handles stay private to their owning layer.
-import { and, eq, isNull, lt, max, or, sql } from 'drizzle-orm'
+import { and, eq, isNull, lt, max, or } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
+import { dedupeBranch, isValidBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
+import type { ProjectRepository } from '@acorn/protocol/api.ts'
 import type { LayoutRecipe, RunTarget } from '../projects/runConfig'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
@@ -21,7 +22,8 @@ import {
   workspaceIdFor,
   type TaskRef,
 } from '../worktrees/taskWorktree'
-import { getProject, normalizeGithubPart } from '../projects/projects'
+import { getProject, githubFacet, normalizeGithubPart, projectRepository } from '../projects/projects'
+import { changeRequestProvider, setPrimaryChangeRequest, type ChangeRequestRow } from './changeRequests'
 import { isTaskArchiving } from '../worktrees/archiveGate'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
@@ -62,6 +64,28 @@ type AttachTaskPullInput = {
   repoOwner: string
   repoName: string
   pullNumber: number
+  sessionId: string
+  requestId?: string
+}
+
+type TaskChangeRequest = {
+  taskId: string
+  provider: string | null
+  host: string
+  path: string
+  number: number
+  role: 'primary' | 'related'
+  provenance: 'task' | 'adopted' | 'agent'
+  sourceBranch?: string
+  sessionId?: string
+  requestId?: string
+}
+
+type AttachChangeRequestInput = {
+  provider: string
+  path: string
+  number: number
+  sourceBranch?: string
   sessionId: string
   requestId?: string
 }
@@ -125,10 +149,17 @@ export type TaskService = {
   // renders one note per linked Linear ticket, and it needs the connection id as well as the
   // identifier, because the same ticket through two Linear connections is two rows.
   links(taskId: string): Promise<TaskLinkRef[]>
+  // Every change request linked to the task, oldest first (docs/plugins/code-hosts.md § Change requests).
+  changeRequests(taskId: string): Promise<TaskChangeRequest[]>
+  // Attach a change request created through a task-scoped agent tool. The first one takes the task's
+  // empty primary slot and later ones are related. The row keeps the agent provenance either way.
+  attachChangeRequest(taskId: string, input: AttachChangeRequestInput): Promise<TaskChangeRequest>
+  // Give every active task on the repository with no primary the change request whose source branch is
+  // the task's branch. Every local clone of the repository takes part, not only the oldest project.
+  adoptChangeRequests(provider: string, path: string, branchToNumber: ReadonlyMap<string, number>): Promise<number>
+  // The three above under their GitHub names, for a github.com repository, until the next plugin API
+  // major. `pulls` keeps its old meaning: agent attachments only.
   pulls(taskId: string): Promise<TaskPullRelation[]>
-  // Attach a PR created through a task-scoped agent tool. The task's scalar primary remains the
-  // operational truth; the first transaction that finds it empty claims it and later creates become
-  // related. The durable row retains provenance for both outcomes.
   attachPull(taskId: string, input: AttachTaskPullInput): Promise<TaskPullRelation>
   adoptPullNumbers(repoOwner: string, repoName: string, branchToPull: ReadonlyMap<string, number>): Promise<number>
   // Materialise a dispatched child task under a parent (docs/workflows.md) and return its id. The
@@ -160,6 +191,144 @@ export type CompiledTaskService = TaskService & {
 }
 
 export function createTaskService(db: AppDatabase): CompiledTaskService {
+  const table = schema.taskChangeRequests
+
+  const toChangeRequest = (row: ChangeRequestRow): TaskChangeRequest => ({
+    taskId: row.taskId,
+    provider: changeRequestProvider(row),
+    host: row.repoHost,
+    path: row.repoPath,
+    number: row.number,
+    role: row.role as TaskChangeRequest['role'],
+    provenance: row.provenance as TaskChangeRequest['provenance'],
+    ...(row.sourceBranch ? { sourceBranch: row.sourceBranch } : {}),
+    ...(row.sessionId ? { sessionId: row.sessionId } : {}),
+    ...(row.requestId ? { requestId: row.requestId } : {}),
+  })
+
+  const toPullRelation = (request: TaskChangeRequest): TaskPullRelation | null => {
+    const github = request.provenance === 'agent' && request.sessionId ? githubFacet(request) : null
+    return github
+      ? {
+          taskId: request.taskId,
+          repoOwner: github.owner,
+          repoName: github.name,
+          pullNumber: request.number,
+          role: request.role,
+          provenance: 'agent',
+          sessionId: request.sessionId!,
+          ...(request.requestId ? { requestId: request.requestId } : {}),
+        }
+      : null
+  }
+
+  // Attach to the task when its project's repository passes `matches`, which is how the generic and
+  // the GitHub-named methods name a repository.
+  const attach = (
+    taskId: string,
+    input: Omit<AttachChangeRequestInput, 'provider' | 'path'>,
+    matches: (repository: ProjectRepository) => boolean,
+  ): TaskChangeRequest => {
+    if (!Number.isSafeInteger(input.number) || input.number <= 0)
+      throw new Error('A change request number must be a positive integer.')
+    if (!input.sessionId.trim()) throw new Error('A managed agent session is required to attach a change request.')
+    if (input.sourceBranch !== undefined && !isValidBranch(input.sourceBranch))
+      throw new Error(`'${input.sourceBranch}' is not a valid source branch.`)
+    const result = db.transaction((tx) => {
+      const task = tx
+        .select({ projectId: schema.tasks.projectId })
+        .from(schema.tasks)
+        .where(eq(schema.tasks.id, taskId))
+        .get()
+      if (!task) throw new Error('Task not found.')
+      const project = tx.select().from(schema.projects).where(eq(schema.projects.id, task.projectId)).get()
+      const repository = project && projectRepository(project)
+      if (!repository || !matches(repository))
+        throw new Error("The change request's repository does not match the task's project.")
+      const key = and(
+        eq(table.taskId, taskId),
+        eq(table.repoHost, repository.host),
+        eq(table.repoPath, repository.path),
+        eq(table.number, input.number),
+      )
+      const existing = tx.select().from(table).where(key).get()
+      if (existing?.sessionId) return { changed: false, row: existing }
+      if (existing) {
+        // Linked on the task or adopted before the agent attached it. The agent's provenance is the
+        // one a code host can't reconstruct later, so it's the one kept.
+        tx.update(table)
+          .set({ provenance: 'agent', sessionId: input.sessionId, requestId: input.requestId ?? null })
+          .where(key)
+          .run()
+      } else {
+        const link = {
+          provider: repository.provider ?? '',
+          repoHost: repository.host,
+          repoPath: repository.path,
+          number: input.number,
+          provenance: 'agent' as const,
+          sourceBranch: input.sourceBranch ?? null,
+          sessionId: input.sessionId,
+          requestId: input.requestId ?? null,
+        }
+        const primary = tx
+          .select({ number: table.number })
+          .from(table)
+          .where(and(eq(table.taskId, taskId), eq(table.role, 'primary')))
+          .get()
+        if (!primary) setPrimaryChangeRequest(tx, taskId, link)
+        else
+          tx.insert(table)
+            .values({ ...link, taskId, role: 'related', createdAt: Date.now() })
+            .run()
+      }
+      return { changed: true, row: tx.select().from(table).where(key).get()! }
+    })
+    if (result.changed) broadcastTasksChanged({ taskId })
+    return toChangeRequest(result.row)
+  }
+
+  const adopt = (
+    path: string,
+    matches: (repository: ProjectRepository) => boolean,
+    branchToNumber: ReadonlyMap<string, number>,
+  ): number => {
+    if (!branchToNumber.size) return 0
+    const adopted = db.transaction((tx) => {
+      const candidates = tx
+        .select({ id: schema.tasks.id, branch: schema.tasks.branch, project: schema.projects })
+        .from(schema.tasks)
+        .innerJoin(schema.projects, eq(schema.projects.id, schema.tasks.projectId))
+        .leftJoin(table, and(eq(table.taskId, schema.tasks.id), eq(table.role, 'primary')))
+        .where(
+          and(
+            eq(schema.projects.repoPath, path.trim().toLowerCase()),
+            eq(schema.tasks.status, 'active'),
+            isNull(table.taskId),
+          ),
+        )
+        .all()
+      let count = 0
+      for (const task of candidates) {
+        const number = task.branch ? branchToNumber.get(task.branch) : undefined
+        const repository = projectRepository(task.project)
+        if (!number || !Number.isSafeInteger(number) || number <= 0 || !repository || !matches(repository)) continue
+        setPrimaryChangeRequest(tx, task.id, {
+          provider: repository.provider ?? '',
+          repoHost: repository.host,
+          repoPath: repository.path,
+          number,
+          provenance: 'adopted',
+          sourceBranch: task.branch,
+        })
+        count++
+      }
+      return count
+    })
+    if (adopted) broadcastTasksChanged({ taskId: null })
+    return adopted
+  }
+
   return {
     createRoot: async (projectId, seed, intendedTaskId) => {
       const project = await getProject(db, projectId)
@@ -204,7 +373,6 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
               origin: seed.origin,
               projectId: project.id,
               branch,
-              pullNumber: null,
               worktreePath: null,
               status: 'active',
               parentId: null,
@@ -236,50 +404,14 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
     },
     deleted: async () =>
       (await db.select({ id: schema.deletedTasks.id }).from(schema.deletedTasks)).map((row) => row.id),
-    adoptPullNumbers: async (repoOwner, repoName, branchToPull) => {
-      if (!branchToPull.size) return 0
-      const candidates = await db
-        .select({ id: schema.tasks.id, branch: schema.tasks.branch })
-        .from(schema.tasks)
-        .leftJoin(schema.projects, eq(schema.projects.id, schema.tasks.projectId))
-        .where(
-          and(
-            // Adoption is a GitHub-domain operation, so every local project clone with this facet
-            // participates, not only the oldest project.
-            and(
-              sql`lower(${schema.projects.githubOwner}) = ${normalizeGithubPart(repoOwner)}`,
-              sql`lower(${schema.projects.githubName}) = ${normalizeGithubPart(repoName)}`,
-            ),
-            eq(schema.tasks.status, 'active'),
-            isNull(schema.tasks.pullNumber),
-          ),
-        )
-      const now = Date.now()
-      const updates = candidates.flatMap((task) => {
-        const pullNumber = task.branch ? branchToPull.get(task.branch) : undefined
-        return pullNumber == null
-          ? []
-          : [
-              db
-                .update(schema.tasks)
-                .set({ pullNumber, updatedAt: now })
-                .where(
-                  and(
-                    eq(schema.tasks.id, task.id),
-                    eq(schema.tasks.branch, task.branch!),
-                    eq(schema.tasks.status, 'active'),
-                    isNull(schema.tasks.pullNumber),
-                  ),
-                ),
-            ]
-      })
-      if (!updates.length) return 0
-      // One batch within core's file, which is all the atomicity docs/data-layer.md permits here.
-      const results = await db.batch(updates as [(typeof updates)[number], ...(typeof updates)[number][]])
-      const adopted = results.reduce((count, result) => count + Number(result.changes), 0)
-      if (adopted) broadcastTasksChanged({ taskId: null })
-      return adopted
-    },
+    adoptChangeRequests: async (provider, path, branchToNumber) =>
+      adopt(path, (repository) => repository.provider === provider, branchToNumber),
+    adoptPullNumbers: async (repoOwner, repoName, branchToPull) =>
+      adopt(
+        `${normalizeGithubPart(repoOwner)}/${normalizeGithubPart(repoName)}`,
+        (repository) => repository.host === 'github.com',
+        branchToPull,
+      ),
     load: async (taskId) => {
       const row = await loadTask(db, taskId)
       return row && toTaskRef(row)
@@ -333,113 +465,30 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         })
         .from(schema.taskLinks)
         .where(eq(schema.taskLinks.taskId, taskId)),
-    pulls: async (taskId) => {
-      const rows = await db
-        .select()
-        .from(schema.taskPulls)
-        .where(eq(schema.taskPulls.taskId, taskId))
-        .orderBy(schema.taskPulls.createdAt)
-      return rows.map((row) => ({
-        taskId: row.taskId,
-        repoOwner: row.repoOwner,
-        repoName: row.repoName,
-        pullNumber: row.pullNumber,
-        role: row.role as TaskPullRelation['role'],
-        provenance: row.provenance as TaskPullRelation['provenance'],
-        sessionId: row.sessionId,
-        ...(row.requestId ? { requestId: row.requestId } : {}),
-      }))
-    },
+    changeRequests: async (taskId) =>
+      (await db.select().from(table).where(eq(table.taskId, taskId)).orderBy(table.createdAt)).map(toChangeRequest),
+    attachChangeRequest: async (taskId, input) =>
+      attach(
+        taskId,
+        input,
+        (repository) => repository.provider === input.provider && repository.path === input.path.trim().toLowerCase(),
+      ),
+    pulls: async (taskId) =>
+      (await db.select().from(table).where(eq(table.taskId, taskId)).orderBy(table.createdAt)).flatMap(
+        (row) => toPullRelation(toChangeRequest(row)) ?? [],
+      ),
     attachPull: async (taskId, input) => {
-      if (!Number.isSafeInteger(input.pullNumber) || input.pullNumber <= 0)
-        throw new Error('Pull number must be a positive integer.')
-      if (!input.sessionId.trim()) throw new Error('A managed agent session is required to attach a pull request.')
-      const repoOwner = normalizeGithubPart(input.repoOwner)
-      const repoName = normalizeGithubPart(input.repoName)
-
-      const result = db.transaction((tx) => {
-        const task = tx
-          .select({
-            id: schema.tasks.id,
-            pullNumber: schema.tasks.pullNumber,
-            projectOwner: schema.projects.githubOwner,
-            projectName: schema.projects.githubName,
-          })
-          .from(schema.tasks)
-          .leftJoin(schema.projects, eq(schema.projects.id, schema.tasks.projectId))
-          .where(eq(schema.tasks.id, taskId))
-          .get()
-        if (!task) throw new Error('Task not found.')
-        if (
-          !task.projectOwner ||
-          !task.projectName ||
-          normalizeGithubPart(task.projectOwner) !== repoOwner ||
-          normalizeGithubPart(task.projectName) !== repoName
-        )
-          throw new Error('Pull request repository does not match the task project.')
-
-        const existing = tx
-          .select()
-          .from(schema.taskPulls)
-          .where(
-            and(
-              eq(schema.taskPulls.taskId, taskId),
-              eq(schema.taskPulls.repoOwner, repoOwner),
-              eq(schema.taskPulls.repoName, repoName),
-              eq(schema.taskPulls.pullNumber, input.pullNumber),
-            ),
-          )
-          .get()
-        if (existing) {
-          return {
-            changed: false,
-            relation: {
-              taskId: existing.taskId,
-              repoOwner: existing.repoOwner,
-              repoName: existing.repoName,
-              pullNumber: existing.pullNumber,
-              role: existing.role as TaskPullRelation['role'],
-              provenance: existing.provenance as TaskPullRelation['provenance'],
-              sessionId: existing.sessionId,
-              ...(existing.requestId ? { requestId: existing.requestId } : {}),
-            },
-          }
-        }
-
-        const claimsPrimary = task.pullNumber == null || task.pullNumber === input.pullNumber
-        const role: TaskPullRelation['role'] = claimsPrimary ? 'primary' : 'related'
-        if (claimsPrimary) {
-          // A user may have cleared or replaced the scalar primary since an older agent attachment.
-          // Demote that historical row before recording the new winner so the partial unique index
-          // and the operational scalar agree again.
-          tx.update(schema.taskPulls)
-            .set({ role: 'related' })
-            .where(and(eq(schema.taskPulls.taskId, taskId), eq(schema.taskPulls.role, 'primary')))
-            .run()
-        }
-        if (task.pullNumber == null) {
-          tx.update(schema.tasks)
-            .set({ pullNumber: input.pullNumber, updatedAt: Date.now() })
-            .where(and(eq(schema.tasks.id, taskId), isNull(schema.tasks.pullNumber)))
-            .run()
-        }
-        const relation: TaskPullRelation = {
-          taskId,
-          repoOwner,
-          repoName,
-          pullNumber: input.pullNumber,
-          role,
-          provenance: 'agent',
-          sessionId: input.sessionId,
-          ...(input.requestId ? { requestId: input.requestId } : {}),
-        }
-        tx.insert(schema.taskPulls)
-          .values({ ...relation, requestId: relation.requestId ?? null, createdAt: Date.now() })
-          .run()
-        return { changed: true, relation }
-      })
-      if (result.changed) broadcastTasksChanged({ taskId })
-      return result.relation
+      const owner = normalizeGithubPart(input.repoOwner)
+      const name = normalizeGithubPart(input.repoName)
+      const request = attach(
+        taskId,
+        { number: input.pullNumber, sessionId: input.sessionId, requestId: input.requestId },
+        (repository) => {
+          const github = githubFacet(repository)
+          return github?.owner === owner && github.name === name
+        },
+      )
+      return toPullRelation(request)!
     },
     createChild: async (parentTaskId, seed, intendedChildId) => {
       const { saveTaskBranch, withBranchReservation } = await import('../worktrees/taskBranch')
@@ -494,7 +543,6 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
                   origin: seed.origin ?? 'local',
                   projectId: project.id,
                   branch,
-                  pullNumber: null,
                   worktreePath: null,
                   status: 'active',
                   parentId: parentTaskId,

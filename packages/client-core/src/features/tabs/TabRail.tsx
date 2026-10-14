@@ -21,7 +21,6 @@ import {
   type RailDropPosition,
   type RailOrder,
 } from './railOrder'
-import { checksState } from '../../kit/lib/rendering/displayMeta'
 import {
   activeTaskId,
   layoutForTask,
@@ -147,7 +146,11 @@ export default function TabRail() {
   onCleanup(cancelPrefetch)
   const warmTask = (task: Task) => {
     cancelPrefetch()
-    prefetching = schedulePanePrefetch(task, queryClient, (layoutForTask(task.id) ?? defaultLayout()).panes)
+    prefetching = schedulePanePrefetch(
+      task,
+      queryClient,
+      (layoutForTask(task.id) ?? defaultLayout(task.changeRequest?.pane)).panes,
+    )
   }
 
   // Scope the rail to the active workspace through project IDs, so switching workspaces swaps the
@@ -483,17 +486,13 @@ export default function TabRail() {
     <div class="tabrail-list">
       <For each={visibleTasks()}>
         {(w) => {
-          // CI checks are provider-owned data, so the shared rail draws none; the GitHub PR pane is the
-          // check surface.
           const scripts = createTaskScripts(() => w.id)
-          const checks = () => []
           const st = () => taskStatus(w.id)
           // Core's own states plus whatever plugins publish for this task. RailTab orders them,
           // picks a free corner for each, and legends the lot in the hover tooltip, so the icons
           // and the words cannot drift.
           const markers = () => [
             ...railStatusMarkers({
-              checks: w.pullNumber != null && checks().length ? checksState(checks()) : null,
               unread: !!unreadForTask(w.id),
               status: st(),
               archiving:

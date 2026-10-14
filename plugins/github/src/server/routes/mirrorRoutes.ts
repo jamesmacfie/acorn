@@ -24,7 +24,7 @@ export const mirrorRoutes = (store: PluginDatabase, core: CoreServices, emit: Gi
     .route('/', repoLabels(store, emit))
     // Takes `core` as well as the handle: refreshing the open-PR list also adopts a PR into any
     // local-first task on that branch. `tasks` is core's table, so that write goes through
-    // CoreServices.tasks.adoptPullNumbers instead of the mirror's transaction.
+    // CoreServices.tasks.adoptChangeRequests instead of the mirror's transaction.
     .route('/', pulls(store, core, emit))
     .route('/', pullDetail(store, emit))
     // The one github router with no plugin database handle: it shells out to git in the mapped project

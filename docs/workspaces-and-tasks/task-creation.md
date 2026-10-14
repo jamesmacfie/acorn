@@ -49,7 +49,8 @@ request created. **Existing worktree** uses its own ownership check.
 
 `POST /v1/core/tasks` takes `origin` and `projectId`, plus optional `title`, `icon`, `branch`,
 `branchSource`, `baseBranch`, `baseCommit`, `targetIdentity`, `worktreePath`, `skipSetup`,
-`pullNumber`, and `links`. `branchSource` defaults to `exact`; `derived` adds a numeric suffix on
+`changeRequest`, and `links`. `changeRequest` is `{ number, sourceBranch? }` on the project's
+repository, and `pullNumber` is the same under its GitHub name. `branchSource` defaults to `exact`; `derived` adds a numeric suffix on
 collision. Choose at most one of `baseBranch`, `baseCommit`, and `worktreePath`. A base needs a
 task branch. `baseBranch` names a local branch. `baseCommit` is a full SHA-1 or SHA-256 commit ID
 in the target repository. The Node creates the branch from that commit before saving the task and

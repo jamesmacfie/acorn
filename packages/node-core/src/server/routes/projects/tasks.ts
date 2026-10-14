@@ -21,6 +21,16 @@ import { isTaskConfined, mayActOnTask, ownerId } from '../../middleware/requireU
 import { integrationProviderRegistry } from '../../integrations/registry'
 import { warmItemDetails } from '../../integrations/itemDetail'
 import { getProject, githubFacet, projectRepository, type ProjectRow } from '../../projects/projects'
+import {
+  changeRequestPrefix,
+  primaryChangeRequest,
+  primaryChangeRequests,
+  projectChangeRequestRepository,
+  setPrimaryChangeRequest,
+  toWireChangeRequest,
+  type ChangeRequestRow,
+} from '../../core/changeRequests'
+import { isValidBranch } from '@acorn/protocol/branch.ts'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
@@ -30,18 +40,44 @@ import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 
 type Row = typeof schema.tasks.$inferSelect
 
+// A change request on the task project's repository. The source branch reaches `git fetch` when the
+// code host declares no ref, so it's held to the branch rule.
+const changeRequestBody = z.object({
+  number: z.int().positive(),
+  sourceBranch: z.string().refine(isValidBranch).optional(),
+})
+
 // Zod at the mutation boundary (docs/architecture/node-api.md § Wire validation). Getting the
-// positive-integer constraint on pullNumber wrong here writes a bad row rather than returning a 400.
+// positive-integer constraint on a change request number wrong here writes a bad row rather than
+// returning a 400. `pullNumber` is `changeRequest` under its GitHub name.
 const taskPatchBody = z.object({
   title: z.string().optional(),
   icon: z.string().nullable().optional(),
   status: z.enum(['active', 'archived']).optional(),
+  changeRequest: changeRequestBody.nullable().optional(),
   pullNumber: z.int().positive().nullable().optional(),
 })
 
+// The change request a body asks for: undefined leaves it alone and null clears it. A body that names
+// two different ones is refused.
+function requestedChangeRequest(body: {
+  changeRequest?: z.infer<typeof changeRequestBody> | null
+  pullNumber?: number | null
+}): z.infer<typeof changeRequestBody> | null | undefined | 'conflict' {
+  const legacy = body.pullNumber == null ? body.pullNumber : { number: body.pullNumber }
+  if (body.changeRequest === undefined) return legacy
+  if (legacy !== undefined && (legacy?.number ?? null) !== (body.changeRequest?.number ?? null)) return 'conflict'
+  return body.changeRequest
+}
+
 const cleanIcon = (v: unknown): string | null => (typeof v === 'string' && ICON_NAME_RE.test(v) ? v : null)
 
-function rowToTask(row: Row, links: TaskLink[], project: Awaited<ReturnType<typeof getProject>>): Task | null {
+function rowToTask(
+  row: Row,
+  links: TaskLink[],
+  project: Awaited<ReturnType<typeof getProject>>,
+  changeRequest: ChangeRequestRow | undefined,
+): Task | null {
   const projectId = row.projectId
   const repository = project ? projectRepository(project) : null
   const github = githubFacet(repository)
@@ -56,6 +92,7 @@ function rowToTask(row: Row, links: TaskLink[], project: Awaited<ReturnType<type
     github: github && { owner: github.owner, name: github.name },
     worktreePath: row.worktreePath,
     pullNumber: row.pullNumber,
+    changeRequest: changeRequest ? toWireChangeRequest(changeRequest) : null,
     status: row.status as Task['status'],
     parentId: row.parentId,
     sort: row.sort,
@@ -83,6 +120,7 @@ const taskSeedBody = z.object({
     .optional(),
   worktreePath: z.string().min(1).optional(),
   skipSetup: z.boolean().optional(),
+  changeRequest: changeRequestBody.optional(),
   pullNumber: z.int().positive().optional(),
   links: z
     .array(
@@ -172,6 +210,7 @@ export const tasks = new Hono<AppEnv>()
     if (!rows.length) return c.json([] as Task[])
     const ids = rows.map((r) => r.id)
     const linkRows = await db.select().from(schema.taskLinks).where(inArray(schema.taskLinks.taskId, ids))
+    const changeRequests = await primaryChangeRequests(db, ids)
     const byTask = new Map<string, TaskLink[]>()
     for (const l of linkRows) {
       const list = byTask.get(l.taskId) ?? []
@@ -189,7 +228,12 @@ export const tasks = new Hono<AppEnv>()
       }
     }
     const list = rows.flatMap((r) => {
-      const task = rowToTask(r, byTask.get(r.id) ?? [], r.projectId ? (projects.get(r.projectId) ?? null) : null)
+      const task = rowToTask(
+        r,
+        byTask.get(r.id) ?? [],
+        r.projectId ? (projects.get(r.projectId) ?? null) : null,
+        changeRequests.get(r.id),
+      )
       if (!task) return []
       return [archived ? ({ ...task, archivedAt: r.archivedAt ?? r.updatedAt } satisfies ArchivedTask) : task]
     })
@@ -210,6 +254,14 @@ export const tasks = new Hono<AppEnv>()
     const uid = ownerId(c)
     const project = await getProject(db, seed.projectId)
     if (!project) return respondError(c, 404, 'not_found', ['No such project.'])
+    const requested = requestedChangeRequest(seed)
+    if (requested === 'conflict') return respondError(c, 400, 'bad_request', ['Name one change request.'])
+    const changeRequest = requested && {
+      ...projectChangeRequestRepository(project),
+      number: requested.number,
+      provenance: 'task' as const,
+      sourceBranch: requested.sourceBranch,
+    }
     const linkInputs = (seed.links ?? []) as LinkInput[]
     let links: TaskLink[]
     try {
@@ -235,31 +287,37 @@ export const tasks = new Hono<AppEnv>()
     const now = Date.now()
     const id = randomUUID()
     let branch = attachedBranch ?? (project.vcs === 'git' ? seed.branch || null : null)
-    const projectLabel = project.githubName ?? project.name
+    const repositoryName = projectRepository(project)?.path.split('/').at(-1)
     const title =
       seed.title?.trim() ||
-      (seed.pullNumber ? `#${seed.pullNumber} ${projectLabel}` : branch ? `${project.name} · ${branch}` : project.name)
+      (changeRequest
+        ? `${changeRequestPrefix(changeRequest.provider || null)}${changeRequest.number} ${repositoryName ?? project.name}`
+        : branch
+          ? `${project.name} · ${branch}`
+          : project.name)
     const sort = (value ?? -1) + 1
     const icon = cleanIcon(seed.icon)
     const save = (allocatedBranch: string | null) => {
-      db.insert(schema.tasks)
-        .values({
-          id,
-          title,
-          icon,
-          origin: seed.origin,
-          projectId: project.id,
-          branch: allocatedBranch,
-          skipSetup: seed.skipSetup ?? false,
-          pullNumber: seed.pullNumber ?? null,
-          worktreePath,
-          status: 'active',
-          sort,
-          createdAt: now,
-          updatedAt: now,
-          archivedAt: null,
-        })
-        .run()
+      db.transaction((tx) => {
+        tx.insert(schema.tasks)
+          .values({
+            id,
+            title,
+            icon,
+            origin: seed.origin,
+            projectId: project.id,
+            branch: allocatedBranch,
+            skipSetup: seed.skipSetup ?? false,
+            worktreePath,
+            status: 'active',
+            sort,
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
+          })
+          .run()
+        if (changeRequest) setPrimaryChangeRequest(tx, id, changeRequest)
+      })
       return allocatedBranch
     }
     const { saveTaskBranch, TaskBranchError, withBranchReservation } = await import('../../worktrees/taskBranch')
@@ -334,31 +392,8 @@ export const tasks = new Hono<AppEnv>()
     // until it reconnected (docs/plugins/events.md § Hearing a core event).
     await recordSetupDecision(db, id, false)
     broadcastTasksChanged({ taskId: id })
-    return c.json(
-      rowToTask(
-        {
-          id,
-          scriptGeneration: 1,
-          scriptHistoryKnown: true,
-          title,
-          icon,
-          origin: seed.origin,
-          projectId: project.id,
-          branch,
-          skipSetup: seed.skipSetup ?? false,
-          pullNumber: seed.pullNumber ?? null,
-          worktreePath,
-          status: 'active',
-          parentId: null,
-          sort,
-          createdAt: now,
-          updatedAt: now,
-          archivedAt: null,
-        },
-        links,
-        project,
-      ),
-    )
+    const [created] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id))
+    return c.json(rowToTask(created!, links, project, await primaryChangeRequest(db, id)))
   })
   .patch('/:id', async (c) => {
     const id = c.req.param('id')
@@ -371,6 +406,15 @@ export const tasks = new Hono<AppEnv>()
     const db = getDb(c.env)
     const [existing] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id))
     if (!existing) return respondError(c, 404, 'not_found')
+    const requested = requestedChangeRequest(body)
+    if (requested === 'conflict') return respondError(c, 400, 'bad_request', ['Name one change request.'])
+    const primaryBefore = requested === undefined ? undefined : await primaryChangeRequest(db, id)
+    const changeRequest = requested && {
+      ...projectChangeRequestRepository(await getProject(db, existing.projectId)),
+      number: requested.number,
+      provenance: 'task' as const,
+      sourceBranch: requested.sourceBranch,
+    }
     const patch: Partial<Row> = { updatedAt: Date.now() }
     if (body.title !== undefined && body.title.trim()) patch.title = body.title.trim()
     // A name to set, or null to clear back to the origin-derived default.
@@ -380,16 +424,15 @@ export const tasks = new Hono<AppEnv>()
       patch.status = body.status
       patch.archivedAt = body.status === 'archived' ? Date.now() : null
     }
-    // Link a task to a PR after the fact (Flow B: local-first task → PR created → number back-filled).
-    // Accept a positive number to set, or null to unlink.
-    if (typeof body.pullNumber === 'number') patch.pullNumber = body.pullNumber
-    else if (body.pullNumber === null) patch.pullNumber = null
     const archiveTree = patch.status === 'archived' ? taskArchiveTree(db, id) : []
     if (archiveTree.some((task) => !mayActOnTask(c, task.id))) return respondError(c, 404, 'not_found')
     const archivedTasks = archiveTree.filter((task) => task.status !== 'archived')
     const update = async () =>
       db.transaction((tx) => {
         tx.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id)).run()
+        // Link a change request after the fact (a local-first task whose branch later opened one), or
+        // unlink with null.
+        if (requested !== undefined) setPrimaryChangeRequest(tx, id, changeRequest ?? null)
         for (const task of archivedTasks) {
           if (task.id !== id)
             tx.update(schema.tasks)
@@ -416,7 +459,7 @@ export const tasks = new Hono<AppEnv>()
       (patch.title !== undefined && patch.title !== existing.title) ||
       (patch.icon !== undefined && patch.icon !== existing.icon) ||
       (patch.status !== undefined && patch.status !== existing.status) ||
-      (patch.pullNumber !== undefined && patch.pullNumber !== existing.pullNumber)
+      (requested !== undefined && (requested?.number ?? null) !== (primaryBefore?.number ?? null))
     if (publicStateChanged) broadcastTasksChanged({ taskId: id })
     return c.json({
       id,

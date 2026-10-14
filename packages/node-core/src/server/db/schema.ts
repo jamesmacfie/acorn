@@ -197,7 +197,9 @@ export const tasks = sqliteTable('tasks', {
   scriptGeneration: integer('script_generation').notNull().default(1),
   scriptHistoryKnown: integer('script_history_known', { mode: 'boolean' }).notNull().default(true),
   skipSetup: integer('skip_setup', { mode: 'boolean' }).notNull().default(false), // task-specific opt-out of the project setup script
-  pullNumber: integer('pull_number'), // null for local-first until a PR is inherited (Flow B)
+  // A copy of the primary change request's number when it's on github.com, for the GitHub-named
+  // readers. `setPrimaryChangeRequest` writes the two together. Goes at the next plugin API major.
+  pullNumber: integer('pull_number'),
   status: text('status').notNull(), // 'active' | 'archived' | 'cancelled' (workflow child task)
   parentId: text('parent_id'), // task tree (docs/workflows.md): set on dispatched children; null = root
   sort: integer('sort').notNull().default(0), // rail ordering
@@ -214,10 +216,37 @@ export const deletedTasks = sqliteTable('deleted_tasks', {
   deletedAt: integer('deleted_at').notNull(),
 })
 
-// Pull requests Acorn created while acting inside a task. `tasks.pull_number` remains the task's
-// operational primary (worktree/checks/context); these rows preserve the one-to-many relation and
-// agent provenance that GitHub cannot reconstruct after the fact. Repository identity is stored with
-// the number because #42 is meaningful only inside one repository.
+// Every change request linked to a task: a GitHub pull request, a GitLab merge request
+// (docs/plugins/code-hosts.md § Change requests). The `primary` row is the task's own, which core checks
+// out and opens the code host's pane for. Related rows keep the agent provenance a code host can't
+// reconstruct later. The repository is stored with the number because !12 means something only inside
+// one repository.
+export const taskChangeRequests = sqliteTable(
+  'task_change_requests',
+  {
+    taskId: text('task_id').notNull(), // → tasks.id
+    // The code host plugin that claimed the host when it was linked. '' when none did, because a
+    // primary key column can't be null here.
+    provider: text('provider').notNull(),
+    repoHost: text('repo_host').notNull(), // '' when the project had no remote
+    repoPath: text('repo_path').notNull(),
+    number: integer('number').notNull(),
+    role: text('role').notNull(), // 'primary' | 'related'
+    provenance: text('provenance').notNull(), // 'task' | 'adopted' | 'agent'
+    sourceBranch: text('source_branch'), // fetched by name when the code host declares no ref
+    sessionId: text('session_id'), // the agent session that attached it
+    requestId: text('request_id'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.taskId, t.repoHost, t.repoPath, t.number] }),
+    uniqueIndex('task_change_requests_one_primary_idx')
+      .on(t.taskId)
+      .where(sql`${t.role} = 'primary'`),
+  ],
+)
+
+// Read by nothing since `task_change_requests` took its rows. Goes at the next plugin API major.
 export const taskPulls = sqliteTable(
   'task_pulls',
   {

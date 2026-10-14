@@ -103,8 +103,9 @@ pull request's URL, and `pathForTask` falls back to `/t/:taskId`. Two more claim
 
 - `origins` maps the task origins a source creates to their glyphs, because a source's rail ID and
   the origin it stamps can differ. GitHub's rail is `github`, and its tasks carry `github-pr`.
-- `defaultPane` is the pane a task opens on the first time. `defaultPaneForTask` asks the owner of the
-  task's URL first and a link's provider second. A task no source claims keeps the layout default.
+- `defaultPane` is the pane a task opens on the first time, after the pane its primary change
+  request's code host declares. `defaultPaneForTask` asks the owner of the task's URL first and a
+  link's provider second. A task neither claims draws the first pane it offers.
 
 Task panes use query parameters: `/t/:taskId?pane=…` opens a pane, and `&item=…` adds a selection
 intent. Both forms are stripped after they open ([addressing a pane](../panes.md#addressing-a-pane)).

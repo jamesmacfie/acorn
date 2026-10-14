@@ -13,7 +13,8 @@ import type { TaskStatus } from '@acorn/protocol/task.ts'
 import type { ProjectWorktree } from '@acorn/protocol/api.ts'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../projects/runConfig'
-import { getProject, type ProjectRow } from '../projects/projects'
+import { getProject, githubFacet, projectRepository, type ProjectRow } from '../projects/projects'
+import { changeRequestName, changeRequestRef, primaryChangeRequest } from '../core/changeRequests'
 import { gitText } from '../core/git'
 import { getProjectConfig } from '../projects/projectConfig'
 import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../projects/repoConfigSnapshot'
@@ -54,8 +55,11 @@ export const setWorktreesRoot = (dir: string): void => {
 }
 export const getWorktreesRoot = (): string => worktreesRoot
 
+// Worktree folders stay named after GitHub's owner and name where a project has them, because a live
+// worktree can't be moved and new ones should sit beside it.
 export function projectWorktreeIdentity(project: ProjectRow): { owner: string; repo: string } {
-  return { owner: project.githubOwner ?? 'p', repo: project.githubName ?? slugifyProjectName(project.name) }
+  const github = githubFacet(projectRepository(project))
+  return { owner: github?.owner ?? 'p', repo: github?.name ?? slugifyProjectName(project.name) }
 }
 
 export const isDir = (p: string): boolean => {
@@ -381,7 +385,13 @@ export async function resolveTaskCwd(
   const create = import('./preparationTelemetry').then(({ prepareTask, prepareWorktreePhase }) =>
     prepareTask(t.id, false, async () => {
       const { owner, repo } = projectWorktreeIdentity(project!)
-      const wt = await ensureWorktree(worktreesRoot, checkout, owner, repo, branch, t.pullNumber)
+      const changeRequest = await primaryChangeRequest(db, t.id)
+      const head = changeRequest && {
+        number: changeRequest.number,
+        ref: changeRequestRef(changeRequest, branch),
+        name: changeRequestName(changeRequest),
+      }
+      const wt = await ensureWorktree(worktreesRoot, checkout, owner, repo, branch, head ?? null)
       // Falling back to the project root here would put the task in the main checkout, on whatever
       // branch the user last left it, silently, and typically alongside whatever other task lives there.
       // The failures that reach this line (git refusing a branch already checked out in another

@@ -49,14 +49,14 @@ A task is the single-project unit of work, and each one is a rail row. A task ho
 - One required `projectId`.
 - An optional branch and an optional worktree path.
 - An origin. It's a source ID the owning plugin declared, or `local` for a task core made itself.
-  The source that tracks a task also names the pane it opens on first activation (`defaultPane`).
-  A task no source claims lands on the layout reducer's default.
-- An optional primary pull request number, title, and icon, plus rail sort, status, archive time,
-  and parent task.
+  A task with a primary change request opens on its code host's pane on first activation. Otherwise
+  the source that tracks it names the pane (`defaultPane`), and a task neither claims opens on the
+  first pane it offers.
+- A title and an icon, plus rail sort, status, archive time, and parent task.
 - Task links to external items, and feature-owned terminal, agent, and pane state.
-- Zero or more `task_pulls` relations for pull requests acorn created in the task. The primary pull
-  request owns worktree, checks, and task context behavior. Related pull requests are for review
-  only.
+- Zero or more [change requests](plugins/code-hosts.md#change-requests), a code host's pull or merge
+  requests. The primary one owns worktree checkout, the title, and the first pane. Related ones are
+  for review only.
 
 A task with a null branch runs in the project folder. A task with a branch gets its own Git
 worktree, created the first time a surface needs files. The project row, not a copied owner and

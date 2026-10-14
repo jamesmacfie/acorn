@@ -22,10 +22,11 @@ export function activateTaskSignals(t: Task, options?: { pane?: PaneId }): void 
   setActiveTaskId(t.id)
   markTaskRead(t.id) // viewing acknowledges its notices (docs/notifications.md)
   if (options?.pane) return dispatchLayout(t.id, { type: 'show', pane: options.pane })
-  // First open: the source that tracks this task says which pane it starts on. Seeding it keeps the
-  // persisted layout explicit. A task no source claims is left alone, which is the reducer's default.
+  // First open: a task backed by a change request starts on its code host's pane, and otherwise the
+  // source that tracks it says. Seeding it keeps the persisted layout explicit. A task neither claims
+  // is left alone, and draws the first pane it offers.
   if (layoutForTask(t.id) == null) {
-    const pane = defaultPaneForTask(t)
+    const pane = t.changeRequest?.pane ?? defaultPaneForTask(t)
     if (pane) dispatchLayout(t.id, { type: 'show', pane })
   }
 }

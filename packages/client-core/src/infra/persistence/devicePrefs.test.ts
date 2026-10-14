@@ -72,18 +72,13 @@ describe('isDevicePref', () => {
     }
   })
 
-  it('leaves the four COMPOSITION kinds on the node whose resources they describe', () => {
+  it('leaves the three COMPOSITION kinds on the node whose resources they describe', () => {
     // These keys describe one node's tasks and repos and must not become device preferences.
-    for (const key of [
-      PrefKeys.taskLayoutsScoped,
-      PrefKeys.editorOpenFilesScoped,
-      PrefKeys.prFiltersScoped,
-      PrefKeys.contextSelectionScoped,
-    ]) {
+    for (const key of [PrefKeys.taskLayoutsScoped, PrefKeys.editorOpenFilesScoped, PrefKeys.contextSelectionScoped]) {
       expect(isDevicePref(key), key).toBe(false)
       expect(isDevicePref(`${key}:node-a/task-1`), key).toBe(false)
     }
-    for (const key of [PrefKeys.taskLayouts, PrefKeys.editorOpenFiles, PrefKeys.prFilters, 'pane_shortcuts']) {
+    for (const key of [PrefKeys.taskLayouts, PrefKeys.editorOpenFiles, 'pane_shortcuts']) {
       expect(isDevicePref(key), key).toBe(false)
     }
   })

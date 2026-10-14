@@ -26,17 +26,19 @@ const project = {
 describe('github_pull_create agent tool', () => {
   it('creates from the task branch, attaches agent provenance, and announces the change', async () => {
     vi.mocked(createPullRequest).mockResolvedValue({ ok: true, number: 73 })
-    const attachPull = vi.fn().mockResolvedValue({
+    const attachChangeRequest = vi.fn().mockResolvedValue({
       taskId: 'task-1',
-      repoOwner: 'acme',
-      repoName: 'widget',
-      pullNumber: 73,
+      provider: 'github',
+      host: 'github.com',
+      path: 'acme/widget',
+      number: 73,
       role: 'primary',
       provenance: 'agent',
+      sourceBranch: 'feat/task',
       sessionId: 'session-1',
     })
     const core = {
-      tasks: { load: vi.fn().mockResolvedValue(task), attachPull },
+      tasks: { load: vi.fn().mockResolvedValue(task), attachChangeRequest },
       projects: { byId: vi.fn().mockResolvedValue(project) },
     } as unknown as Pick<CoreServices, 'projects' | 'tasks'>
     const providers = {
@@ -76,10 +78,11 @@ describe('github_pull_create agent tool', () => {
       },
       emit,
     )
-    expect(attachPull).toHaveBeenCalledWith('task-1', {
-      repoOwner: 'acme',
-      repoName: 'widget',
-      pullNumber: 73,
+    expect(attachChangeRequest).toHaveBeenCalledWith('task-1', {
+      provider: 'github',
+      path: 'acme/widget',
+      number: 73,
+      sourceBranch: 'feat/task',
       sessionId: 'session-1',
     })
     expect(onAttached).toHaveBeenCalledOnce()

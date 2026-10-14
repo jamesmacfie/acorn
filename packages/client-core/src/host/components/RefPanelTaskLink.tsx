@@ -32,9 +32,8 @@ export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
   const projectId = (): string => chosen() || (choices().length === 1 ? choices()[0]!.id : '')
 
   // `taskTracksRef`, not a link check written here (docs/plugins/client-half.md § "Loaded plugins: the client
-  // half"): a github-pr task records its pull request as `pullNumber` on the task row rather than as
-  // a link, so matching only `task.links` finds nothing for a PR and offers to create a task that
-  // already exists.
+  // half"): a task records its change request on the task rather than as a link, so matching only
+  // `task.links` finds nothing for a pull request and offers to create a task that already exists.
   //
   // First match, and the honest ceiling: one reference can accumulate several tasks over time and
   // this shows the oldest. A chooser is the upgrade, and it needs a design rather than a `find` →

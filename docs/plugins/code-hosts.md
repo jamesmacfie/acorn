@@ -62,6 +62,38 @@ Core hands the facet to context sections as `repository`, and the `repo_info` ag
 A typed data source whose plugin is the provider gets the paths of the projects in scope as
 `workspaceLinks`.
 
+## Change requests
+
+A change request is a code host's pull request or merge request. A task can link any number of them
+on its project's repository, in core's `task_change_requests` table. One is the task's primary: core
+checks it out when it makes the worktree, titles the task with its number, and opens the code host's
+pane for it. The rest are related, such as the second pull request an agent opened in the same task.
+
+A code host tells core how to treat its change requests with an optional `changeRequest` block:
+
+```json
+"codeHost": {
+  "label": "GitLab",
+  "hosts": ["gitlab.com"],
+  "changeRequest": { "ref": "merge-requests/{number}/head", "label": "merge request", "prefix": "!", "pane": "mr" }
+}
+```
+
+| Field | What core does with it |
+| --- | --- |
+| `ref` | Fetches it from origin to check a change request out. Without one, core fetches the source branch by name, so a fork's change request on such a host can't be checked out. |
+| `label` | Names a change request in an error, such as "Could not fetch merge request !12". Defaults to `change request`. |
+| `prefix` | Goes before the number in a task title, as in `!12 api`. Defaults to `#`. |
+| `pane` | Opens when a task with a primary change request on the host is first shown. A task without one opens on the first pane it offers. |
+
+A plugin links one in one of three ways. A task created with `changeRequest: { number, sourceBranch? }`
+on `POST /v1/core/tasks` takes it as its primary, and `PATCH` sets or clears the primary the same
+way. `ctx.core.tasks.attachChangeRequest` records one an agent opened, with its session. The first
+takes an empty primary slot and later ones are related. `adoptChangeRequests(provider, path,
+branchToNumber)` gives a primary to every active task on that branch that has none. The provider and
+path must name the task project's repository. `changeRequests(taskId)` lists them all. The wire task
+carries the primary as `changeRequest`, with the provider and the declared pane.
+
 ## The GitHub-named fields
 
 `ProjectRef.github`, the wire `Project.github` and `Task.github`, `byGithub`, the `github` and
@@ -69,3 +101,9 @@ A typed data source whose plugin is the provider gets the paths of the projects 
 facet. Each is now read off a `github.com` repository whose path is an owner and a name, so it stays
 correct. The next plugin API major removes them. The checklist is in
 [phase 5 of the split programme](../future/split/05-repository-identity.md).
+
+`pullNumber` on the wire task, `TaskRef`, a task seed, and a patch, and `pulls`, `attachPull`, and
+`adoptPullNumbers` on the task service, are the same for change requests on `github.com`. The
+`tasks.pull_number` column copies the primary's number there, and `task_pulls` is no longer read. The
+next major removes those too, with the checklist in
+[phase 6](../future/split/06-change-requests.md).

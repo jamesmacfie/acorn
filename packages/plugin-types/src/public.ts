@@ -86,6 +86,8 @@ export type {
   ChildTaskSeed,
   AttachTaskPullInput,
   TaskPullRelation,
+  AttachChangeRequestInput,
+  TaskChangeRequest,
   RunTarget,
   LayoutRecipe,
   TaskRunConfig,

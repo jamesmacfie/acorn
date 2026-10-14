@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import type { Project } from '@acorn/protocol/api.ts'
+import type { Project, Task } from '@acorn/protocol/api.ts'
+import { setWorktreesRoot } from '@acorn/node-core/server/worktrees'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
@@ -23,6 +24,23 @@ describe('a loaded code host', () => {
   let core: TestDb
   let env: Env
   let running: Awaited<ReturnType<typeof initPlugins>> | null = null
+  let services: ReturnType<typeof createCoreServices>
+
+  const post = (path: string, body: unknown) =>
+    createApp().fetch(
+      new Request(`http://127.0.0.1${path}`, {
+        method: 'POST',
+        headers: { authorization: 'Bearer paired-device-token', 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      env,
+    )
+
+  const postProject = async (path: string): Promise<Project> => {
+    const response = await post('/v1/core/projects', { path })
+    expect(response.status).toBe(200)
+    return ((await response.json()) as { project: Project }).project
+  }
 
   // A folder holding a Git checkout whose origin is `remote`, added over the projects route.
   const addProject = async (name: string, remote: string): Promise<Project> => {
@@ -30,16 +48,40 @@ describe('a loaded code host', () => {
     mkdirSync(path, { recursive: true })
     execFileSync('git', ['init'], { cwd: path, stdio: 'pipe' })
     execFileSync('git', ['remote', 'add', 'origin', remote], { cwd: path, stdio: 'pipe' })
-    const response = await createApp().fetch(
-      new Request('http://127.0.0.1/v1/core/projects', {
-        method: 'POST',
-        headers: { authorization: 'Bearer paired-device-token', 'content-type': 'application/json' },
-        body: JSON.stringify({ path }),
-      }),
-      env,
-    )
+    return postProject(path)
+  }
+
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync('git', ['-c', 'user.email=t@t.test', '-c', 'user.name=T', ...args], { cwd, stdio: 'pipe' })
+      .toString()
+      .trim()
+
+  // A clone of a local repository that names `remote` as its origin, so the project lands on that
+  // remote's host while every fetch reaches the local one. Returns the project and the commit the local
+  // repository serves at `refs/merge-requests/12/head` and on the branch `feat/source`.
+  const cloneProject = async (name: string, remote: string): Promise<{ project: Project; head: string }> => {
+    const upstream = join(dataRoot, 'upstream', name)
+    mkdirSync(upstream, { recursive: true })
+    git(upstream, 'init', '-q', '-b', 'main')
+    git(upstream, 'commit', '-q', '--allow-empty', '-m', 'base')
+    git(upstream, 'commit', '-q', '--allow-empty', '-m', 'change request')
+    const head = git(upstream, 'rev-parse', 'HEAD')
+    git(upstream, 'reset', '-q', '--hard', 'HEAD~1')
+    git(upstream, 'update-ref', 'refs/merge-requests/12/head', head)
+    git(upstream, 'update-ref', 'refs/heads/feat/source', head)
+    const path = join(dataRoot, 'checkouts', name)
+    git(dataRoot, 'clone', '-q', upstream, path)
+    git(path, 'remote', 'set-url', 'origin', remote)
+    const project = await postProject(path)
+    // After the project is added, because `git remote get-url` reads through it.
+    git(path, 'config', `url.${upstream}.insteadOf`, remote)
+    return { project, head }
+  }
+
+  const createTask = async (seed: Record<string, unknown>): Promise<Task> => {
+    const response = await post('/v1/core/tasks', { origin: 'local', ...seed })
     expect(response.status).toBe(200)
-    return ((await response.json()) as { project: Project }).project
+    return (await response.json()) as Task
   }
 
   beforeAll(async () => {
@@ -60,14 +102,15 @@ describe('a loaded code host', () => {
       const result = await loadExternalPlugins(dataRoot, { builtins: [] })
       expect(result.failures).toEqual([])
       const loaded = result.loaded[0]!
+      services = createCoreServices({
+        db: core.db,
+        secrets: core.secrets,
+        activeIdentity: memoryIdentityStore('james'),
+        ...testCoreSeams(),
+      })
       running = await initPlugins([loaded.plugin], {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({
-          db: core.db,
-          secrets: core.secrets,
-          activeIdentity: memoryIdentityStore('james'),
-          ...testCoreSeams(),
-        }),
+        core: services,
         dataDir: dataRoot,
         env,
         loaded: new Map([[loaded.manifest.id, loadedPluginBinding(loaded)]]),
@@ -75,6 +118,7 @@ describe('a loaded code host', () => {
     } finally {
       error.mockRestore()
     }
+    setWorktreesRoot(join(dataRoot, 'worktrees'))
   })
 
   afterAll(async () => {
@@ -96,6 +140,32 @@ describe('a loaded code host', () => {
     const project = await addProject('other', 'https://git.example.org/team/tool.git')
     expect(project.repository).toEqual({ provider: null, host: 'git.example.org', path: 'team/tool', externalId: null })
   }, 20_000)
+
+  // Its change requests, with no core file naming the host (docs/plugins/code-hosts.md § Change requests).
+  it('titles, checks out, and points the pane at a merge request', async () => {
+    const { project, head } = await cloneProject('mr', 'git@gitlab.test:group/subgroup/mr.git')
+    const task = await createTask({ projectId: project.id, branch: 'mr-12', changeRequest: { number: 12 } })
+    expect(task).toMatchObject({
+      title: '!12 mr',
+      pullNumber: null,
+      changeRequest: { provider: 'gitlab-test', number: 12, pane: 'gitlab-test-mr' },
+    })
+    const root = await services.tasks.root(task.id)
+    expect(git(root!, 'rev-parse', 'HEAD')).toBe(head)
+    expect(git(root!, 'branch', '--show-current')).toBe('mr-12')
+  }, 30_000)
+
+  it('checks out the source branch on a host that declares no ref', async () => {
+    const { project, head } = await cloneProject('plain', 'https://git.example.org/team/plain.git')
+    const task = await createTask({
+      projectId: project.id,
+      branch: 'feat/source',
+      changeRequest: { number: 3, sourceBranch: 'feat/source' },
+    })
+    expect(task).toMatchObject({ title: '#3 plain', changeRequest: { provider: null, number: 3 } })
+    expect(git(project.path!, 'branch', '--list', 'feat/source')).toBe('')
+    expect(git((await services.tasks.root(task.id))!, 'rev-parse', 'HEAD')).toBe(head)
+  }, 30_000)
 
   it('stops naming the host once the plugin stops', async () => {
     await running?.dispose()

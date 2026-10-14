@@ -13,7 +13,7 @@ schemas.
 | Area | Tables |
 | --- | --- |
 | Identity and transport | `devices`, `idempotency`, `audit` |
-| Workspaces and tasks | `workspaces`, `projects`, `workspace_external_projects`, `tasks`, `task_links`, `task_pulls`, `task_script_attempts` |
+| Workspaces and tasks | `workspaces`, `projects`, `workspace_external_projects`, `tasks`, `task_links`, `task_change_requests`, `task_pulls`, `task_script_attempts` |
 | Project configuration and trust | `projects`, `config_acks` |
 | Provider registry | `integrations` |
 | External item projection | `issues`, `issue_resources`, provider `sync_state` markers |
@@ -26,8 +26,9 @@ schemas.
 
 - `devices` stores only token hashes.
 - `integrations` stores encrypted provider credentials and non-secret provider metadata.
-- `task_pulls` stores the pull request relations acorn created for a task, including managed-agent
-  provenance. The GitHub mirror stays plugin-owned and disposable.
+- `task_change_requests` stores every change request linked to a task, its primary included, with
+  managed-agent provenance. `task_pulls` held GitHub's before it and is no longer read. The GitHub
+  mirror stays plugin-owned and disposable.
 - `plugin_model_grants` stores the backend, model, and daily allowance the owner chose for a loaded
   plugin, keyed by owner ID and plugin ID. `plugin_model_calls` stores one row per call that plugin
   made through its models facet: its day, reservation, charge, and reported usage, never a prompt or a

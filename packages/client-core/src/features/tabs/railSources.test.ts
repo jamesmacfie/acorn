@@ -38,6 +38,7 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
               icon: seed.icon ?? null,
               worktreePath: null,
               pullNumber: seed.pullNumber ?? null,
+              changeRequest: null,
               status: 'active',
               parentId: null,
               sort: 0,

@@ -148,7 +148,7 @@ token can archive its own tree but never delete one. The Node runs these steps:
    plugin, the client archives with the status flip first and then deletes.
 2. Claim every task in the tree with the archive gate and check that each is still archived. Another
    archive in progress, or a restore that got there first, answers 409.
-3. In one core transaction, delete the `tasks`, `task_pulls`, `task_links`, and `task_script_attempts`
+3. In one core transaction, delete the `tasks`, `task_change_requests`, `task_pulls`, `task_links`, and `task_script_attempts`
    rows, and the client preferences keyed by those task ids, and insert a row in `deleted_tasks` for
    each.
 4. Broadcast the tasks change, run the `core:task-deleted` hook with the deleted ids, and answer

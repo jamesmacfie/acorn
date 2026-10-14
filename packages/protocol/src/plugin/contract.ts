@@ -100,6 +100,25 @@ export const codeHostDescriptor = z.object({
     )
     .min(1)
     .max(16),
+  // How core treats this host's change requests, its pull or merge requests. Every field is optional.
+  changeRequest: z
+    .object({
+      // The ref core fetches from origin to check one out, such as `merge-requests/{number}/head`.
+      // Without one, core fetches the source branch by name. It's a Git argument, so no leading dash,
+      // no `:` that would end the refspec, and no `..`.
+      ref: z
+        .string()
+        .max(200)
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*\{number\}[A-Za-z0-9._/-]*$/, 'a ref is a path holding {number} once')
+        .refine((ref) => !ref.includes('..'), 'a ref has no ..')
+        .optional(),
+      // What a person calls one, such as `merge request`, and the mark before its number in a title.
+      label: z.string().min(1).max(64).optional(),
+      prefix: z.string().min(1).max(4).optional(),
+      // The client pane that shows one. A task whose primary change request is on this host opens on it.
+      pane: z.string().min(1).max(64).optional(),
+    })
+    .optional(),
 })
 export type CodeHostDescriptor = z.infer<typeof codeHostDescriptor>
 
