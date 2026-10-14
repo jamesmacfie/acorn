@@ -7,6 +7,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { request } from 'node:https'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { fileURLToPath } from 'node:url'
 import { manifestPath, readJson, validateSessionName } from '../apps/desktop/scripts/agent/state.mjs'
 import { WebDriverClient } from '../apps/desktop/scripts/agent/webdriver.mjs'
 
@@ -23,7 +24,7 @@ Agent credentials never go in the image. To run managed agent turns in the conta
 these in this shell first, and the container receives them: ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, OPENAI_API_KEY.
 `
 
-const ROOT = new URL('..', import.meta.url).pathname
+const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const IMAGE = 'acorn-node'
 const CONTAINER = 'acorn-remote-node'
 // Fixed, and published at the same number, because the Node's Host check compares the port.
