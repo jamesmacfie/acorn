@@ -93,6 +93,11 @@ shows what came back:
 4. **Add to a task** opens the task search in Settings. Choosing a task there makes it the current
    task, and adds no link to it.
 
+The card closes when the tab leaves the item. A page still shows the item when it matches the same
+handoff and every capture the two addresses share is equal, so a pull request's **Files** tab keeps
+the card and another pull request closes it. The card stays when the person has changed Start task's
+first message, or a start is under way, and then says the page it's about was left.
+
 Start task's two writes keep their keys, so pressing it again after either one went unconfirmed
 makes no second task or conversation. A repeated create, with the same key or after the task exists,
 answers the existing task.

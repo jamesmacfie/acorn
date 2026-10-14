@@ -50,8 +50,10 @@ const SCREENSHOT_ACCESS_GUIDANCE =
 // The tab beside the sidebar, or the active tab of `windowId`, if this extension may read it. The
 // background names the window, because it has no window of its own.
 async function readableTab(api: BrowserApi, windowId?: number): Promise<Tab & { id: number; url: string }> {
-  const [tab] = await api.tabs.query(
-    windowId === undefined ? { active: true, currentWindow: true } : { active: true, windowId },
+  // Filtered here, because Firefox 151 has answered an `active` query without the address it reports
+  // for the same tab in a wider one.
+  const tab = (await api.tabs.query(windowId === undefined ? { currentWindow: true } : { windowId })).find(
+    (each) => each.active,
   )
   if (tab?.id === undefined || !tab.url) throw new CaptureFailure('no_access', NO_ACCESS_GUIDANCE)
   return tab as Tab & { id: number; url: string }

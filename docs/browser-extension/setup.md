@@ -127,7 +127,10 @@ Home lists, top to bottom:
 A conversation opens over Home, with a back arrow and the task's name above the conversation's own,
 and **Open in Acorn** and **Copy Acorn link** for that conversation ([the panel's
 verbs](./handoffs.md#the-panels-verbs)). The composer's toolbar holds the
-three [capture](./page-capture.md) buttons, and each capture shows as a chip in the draft.
+three [capture](./page-capture.md) buttons, and each capture shows as a chip in the draft. Moving to
+another page leaves the conversation open, so the person can capture that page into it. When the page
+belongs to a different task, a line above the conversation names that task, with **Switch**, which
+opens the task's newest conversation. Each conversation keeps its own draft.
 
 **Settings** holds the Node list and pairing, a search across every project's open tasks, site
 access, each project's sites, notifications, and appearance. Choosing a task in the search makes it

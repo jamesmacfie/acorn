@@ -200,10 +200,11 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
         setBadgeBackgroundColor: async () => undefined,
       },
       tabs: {
-        query: async (query: { active?: true }): Promise<Tab[]> => [
-          { ...fake.activeTab, active: true },
-          ...(query.active ? [] : fake.otherTabs.map((tab) => ({ ...tab, active: false }))),
-        ],
+        // Like Firefox 151, an `active` query leaves out the address a wider query reports.
+        query: async (query: { active?: true }): Promise<Tab[]> =>
+          query.active
+            ? [{ ...fake.activeTab, active: true, url: undefined }]
+            : [{ ...fake.activeTab, active: true }, ...fake.otherTabs.map((tab) => ({ ...tab, active: false }))],
         captureVisibleTab: (windowId: number): Promise<string> => fake.onCapture(windowId),
         sendMessage: async (tabId: number, message: unknown) =>
           void fake.tabMessages.push({ tabId, message: structuredClone(message) }),

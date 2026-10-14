@@ -7,7 +7,9 @@ import type { BrowserApi } from '../browser'
 // person hands a page off or captures it. Call inside a component, which owns the listeners.
 export function activePageUrl(api: BrowserApi, pageChecks: Accessor<number>): Accessor<string | undefined> {
   const [url, setUrl] = createSignal<string | undefined>()
-  const read = async () => setUrl((await api.tabs.query({ active: true, currentWindow: true }))[0]?.url)
+  // Filtered here, because Firefox 151 has answered an `active` query without the address it reports
+  // for the same tab in a wider one.
+  const read = async () => setUrl((await api.tabs.query({ currentWindow: true })).find((tab) => tab.active)?.url)
   const onActivated = () => void read()
   // A page this extension can't read reports no `url` when it navigates, as when the tab leaves the site
   // a toolbar click granted, so a finished load is read too. Otherwise the sidebar keeps the old page.

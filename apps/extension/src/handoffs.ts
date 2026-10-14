@@ -14,6 +14,20 @@ export const handoffKey = (handoff: Pick<BridgeHandoff, 'pluginId' | 'id'>): str
 export const pageHandoffs = (handoffs: readonly BridgeHandoff[], url: string | undefined): BridgeHandoff[] =>
   url ? handoffs.filter((handoff) => matchHandoffPage(handoff, url)) : []
 
+// Whether `url` shows the item a handoff was asked for on: the page matches the same handoff, and every
+// capture the two addresses share is equal, so a pull request's Files tab is still that pull request.
+export const onHandoffPage = (
+  handoffs: readonly BridgeHandoff[],
+  handoff: PageHandoff,
+  url: string | undefined,
+): boolean => {
+  const declared = handoffs.find((each) => each.pluginId === handoff.pluginId && each.id === handoff.handoffId)
+  const asked = declared && matchHandoffPage(declared, handoff.url)
+  const here = declared && url ? matchHandoffPage(declared, url) : null
+  if (!asked || !here) return false
+  return Object.entries(asked).every(([name, value]) => !(name in here) || here[name] === value)
+}
+
 // The browser match pattern for each host a handoff's pages are on. The content-link grammar allows
 // one `*.` host wildcard and https only, both of which match patterns can say.
 export const siteAccess = (handoff: Pick<BridgeHandoff, 'match'>): string[] => [
