@@ -77,10 +77,9 @@ export type SourceContribution<Item = unknown> = {
    *
    * `scroll` asks for the padded, scrolling detail column (`DetailColumn scroll`). A detail that is a
    * plain run of content needs it; one that draws its own split or scroller fills the column instead.
-   * `measure: 'page'` stops a detail that is a form or a document at `--page-measure`
-   * (`DetailColumn measure`). A terminal ignores both.
+   * A terminal ignores it.
    */
-  regions?: { list: Component; detail: Component; scroll?: boolean; measure?: 'page' }
+  regions?: { list: Component; detail: Component; scroll?: boolean }
   // The task origins this source creates, as origin id → Lucide glyph (features/tasks/origin.ts). A
   // source whose origin is its own id needs nothing here; github's rail is `github` and the tasks it
   // makes carry `github-pr`, so it says so.

@@ -246,6 +246,38 @@ describe('syncFrameContributions', () => {
     expect(paneRegistry.get('board-quiet')?.statusAnnotations).toBeUndefined()
   })
 
+  it("gives a linked-items pane the URLs of the task's own links from its provider", () => {
+    seedTrusted(
+      row('board', {
+        frames: [
+          surface({ target: 'pane', id: 'board-linked', providerId: 'board' }),
+          surface({ target: 'pane', id: 'board-plain' }),
+        ],
+      }),
+    )
+    syncFrameContributions()
+
+    const link = (providerId: string, url?: string) => ({
+      connectionId: 'c1',
+      providerId,
+      identifier: 'ENG-1',
+      ...(url ? { ref: { providerId, connectionId: 'c1', displayId: 'ENG-1', url } } : {}),
+    })
+    const url = paneRegistry.get('board-linked')!.url!
+    expect(
+      url({
+        links: [
+          link('board', 'https://b.example/1'),
+          link('other', 'https://o.example'),
+          link('board'),
+          link('board', 'https://b.example/2'),
+        ],
+      } as Task),
+    ).toBe('https://b.example/1\nhttps://b.example/2')
+    expect(url({ links: [link('board')] } as Task)).toBeUndefined()
+    expect(paneRegistry.get('board-plain')?.url).toBeUndefined()
+  })
+
   it('a coreSlot surface registers an OFFER, and replaces nothing until the owner picks it', () => {
     // The exclusive slot (`exclusiveSlotRegistry` owns the arbitration and its own test). What this
     // one pins is the wiring: the target lands in its own registry rather than in `panes`, so a

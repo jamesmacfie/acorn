@@ -6,6 +6,7 @@ import { clientEvents, consumePaneIntent } from '../registries/commands/clientEv
 import { refreshTreeDocumentGrant } from '../tree/bridgeAuthority'
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import type { DocumentHandle } from '../../features/editor/documentModel'
+import type { Task } from '../../infra/queries'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import { isCoreExclusiveSlot, qualifiedExtensionPointId, type DetailRegion } from '@acorn/protocol/extensionPoints.ts'
@@ -505,11 +506,22 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         const availability = surface.availability
           ? paneAvailability(`plugin.${pluginId}.${surface.id}.availability`, surface.availability)
           : null
+        const providerId = surface.providerId
         const pane = own(paneRegistry, {
           id: surface.id,
           label: surface.label,
           glyph: surface.glyph,
           order: surface.order,
+          // A linked-items pane's address is its links' own, read from the task row rather than asked
+          // of the plugin. One per line when the task links several.
+          ...(providerId
+            ? {
+                url: (task: Task) =>
+                  task.links
+                    .flatMap((link) => (link.providerId === providerId && link.ref?.url ? [link.ref.url] : []))
+                    .join('\n') || undefined,
+              }
+            : {}),
           showInSwitcher: surface.showInSwitcher,
           readsArchived: surface.readsArchived,
           // Read only on this task-pane branch, so the flag on any other surface consents to nothing.

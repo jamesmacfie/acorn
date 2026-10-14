@@ -172,7 +172,8 @@ export function Shell(props: {
   // rather than the terminal's — the same rule a layout keeps
   // (docs/tui/rectangles.md § What the TUI never does).
   const [cells, setCells] = createSignal(80)
-  // One way to lose the left column: a reader asked, on `ctrl+b`.
+  // One way to lose the left column: a reader asked, on `/`. A source list keeps `/` as its filter,
+  // because its intent layer answers before this command does (../keys/tiers.ts).
   const [hidden, setHidden] = createSignal(false)
   const firstSetupStep = (): SetupStep => {
     if (!prefs.data?.[WORKSPACES_PREF_KEY] && !model.projects()?.length) return 'mode'
@@ -503,7 +504,7 @@ export function Shell(props: {
           command: 'core.rail.toggle',
           description: 'Rail',
           category: 'Global',
-          defaultChord: 'ctrl+b',
+          defaultChord: '/',
           when: 'global',
         },
         {

@@ -125,6 +125,22 @@ describe('TaskPaneHost', () => {
       ?.click()
     expect(dispatched).toEqual([{ type: 'add', pane: 'changes' }])
   })
+  it("offers Copy URL on a pane that names the task's address, and copies it", async () => {
+    const writeText = vi.fn(async () => {})
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    pane({ id: 'pr', order: 0 })
+    pane({ id: 'linear', order: 1, url: (subject) => `https://linear.app/acme/issue/${subject.id}` })
+    mount()
+    const icon = [...host.querySelectorAll<HTMLElement>('.pane-switcher .tabrail-tab')].find(
+      (entry) => entry.getAttribute('aria-label') === 'linear',
+    )!
+    icon.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 40 }))
+    ;[...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((entry) => entry.textContent?.trim() === 'Copy URL')
+      ?.click()
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('https://linear.app/acme/issue/task-1'))
+    vi.unstubAllGlobals()
+  })
   it("draws the layout's panes, in the layout's order", () => {
     pane({ id: 'pr', order: 0 })
     pane({ id: 'changes', order: 1 })

@@ -4,6 +4,7 @@ import { pullRefMatchesTask } from '../shared/pullRef'
 import { DIFF_LINE_KEY, SUMMARY_BADGES_MAX } from './extensionPoints'
 import { prFiltersSlice } from './pullList/filterStore'
 import { prPaneContribution } from './pullDetail/paneContribution'
+import { prRailMarkerContribution } from './pullDetail/railMarker'
 import { githubShortcutsSlotContribution } from './slotContribution'
 import { githubContentLinkContributions } from './contentLinks'
 import { githubIntegrationFlow } from './integrationFlow'
@@ -91,6 +92,8 @@ export const githubClientPlugin: ClientPlugin = {
     })
     ctx.integrationFlows.register(githubIntegrationFlow)
     ctx.panes.register(prPaneContribution)
+    // CI, review, conflicts, and draft or merged state, in the corners of that pane's button.
+    ctx.railMarkers.register(prRailMarkerContribution)
     // The two places another plugin may come into a pull request
     // (docs/plugins/cooperative-extension-points.md § Cooperative extension points). Marks on a line of
     // the diff, keyed the way the shared viewer keys a row; and room beside the state and checks on the

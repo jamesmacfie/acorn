@@ -40,6 +40,11 @@ On desktop, right-click the Preview rail button and select **Copy URL** to copy 
 preview start URL. This works while the pane is closed. The action reports a failure if the URL is
 unavailable or the clipboard write fails.
 
+The Pull request, Linear, and Rollbar rail buttons offer the same **Copy URL** item. It copies the
+pull request's GitHub address, or the address of each Linear issue or Rollbar error the task links, one
+per line. A pane offers it by setting `url(task)` on its contribution, and the item is hidden when that
+returns nothing. A linked-items pane gets `url` from the host, which reads the task's own links.
+
 Compiled provider panes appear when their provider is connected and the task has relevant data. The
 four loaded panes, `database`, `http`, `linear`, and `rollbar`, come from manifests and appear
 whenever the plugin runs on the Node the window is talking to. All four draw **trees**: their code

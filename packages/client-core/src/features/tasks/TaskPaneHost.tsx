@@ -31,6 +31,8 @@ import ExclusiveSlotHost from '../../host/plugins/ExclusiveSlotHost'
 import { registerCoreExclusiveSlot } from '../../host/registries/extensionPoints/exclusiveSlots'
 import { registerContextMenuItems, type RailPaneTarget } from '../../host/registries/panes/contextMenus'
 import { ContextMenuHost, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
+import { copyText } from '../../kit/lib/controls/clipboard'
+import { toast } from '../notifications/toast'
 import { featureMounted, openFeature } from '../../infra/telemetry/featureOpening'
 import { createLinkPreviewBoundary } from '../../host/linkPreview/linkPreview'
 import { markersFor } from '../../host/registries/rail/railMarkerFeed'
@@ -150,6 +152,19 @@ export default function TaskPaneHost(props: {
       run: (target) => {
         if (paneMenuTarget(target.id)?.pinned && target.nodeId === activeNodeId())
           dispatch({ type: 'pin', pane: target.id, pinned: false })
+      },
+    },
+    {
+      id: `${menuId}:copy-url`,
+      location: 'rail.pane',
+      label: 'Copy URL',
+      icon: 'copy',
+      order: 130,
+      when: (target) => target.taskId === props.task.id && !!paneContribution(target.id)?.url?.(props.task),
+      run: async (target) => {
+        const url = target.taskId === props.task.id ? paneContribution(target.id)?.url?.(props.task) : undefined
+        if (url && (await copyText(url))) toast('URL copied', { tone: 'success' })
+        else toast('Could not copy the URL', { tone: 'danger' })
       },
     },
     {
