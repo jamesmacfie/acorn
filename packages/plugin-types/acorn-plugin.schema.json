@@ -94,6 +94,16 @@
         ]
       }
     },
+    "clients": {
+      "minItems": 1,
+      "maxItems": 8,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 32
+      }
+    },
     "apiVersion": {
       "type": "string",
       "minLength": 1,

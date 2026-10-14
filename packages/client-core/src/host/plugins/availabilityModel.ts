@@ -1,4 +1,5 @@
 import { speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
+import { runsIn } from '@acorn/protocol/plugin/clients.ts'
 import type { InstalledPluginRow, NodePluginRow, PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
 import { runtimeIdentityForRow } from './runtimeIdentity'
 import { decisionKey, type PluginDistributionSnapshot } from './distributionModel'
@@ -19,6 +20,7 @@ type LoadedSelectionState =
   | { kind: 'rejected'; hash: string }
   | { kind: 'bundle-missing'; hash: string }
   | { kind: 'incompatible' }
+  | { kind: 'other-app' }
   | { kind: 'declaration-conflict'; hash: string }
   | { kind: 'none' }
 
@@ -97,6 +99,8 @@ export function contributionAvailability(
   if (!speaksApiVersion(runtime.runtime.apiVersion, apiVersion)) {
     return { available: false, runtime, selection: { kind: 'incompatible' }, reason: 'incompatible' }
   }
+  if (!runsIn(runtime.runtime, snapshot.app))
+    return { available: false, runtime, selection: { kind: 'other-app' }, reason: 'other-app' }
   const hash = runtime.runtime.client?.hash ?? ''
   const key = decisionKey(pluginId, hash)
   if (snapshot.conflictingKeys.has(key)) {

@@ -16,6 +16,7 @@
 // one, and hand `mountTree` a renderer per surface — `mountTree({ toolCard: solidTree(ToolCard) })`.
 // The builder points the preset here; there is no framework key to name, because Solid is the only
 // thing a tree bundle compiles through.
+import type { PaneProps, StackProps, TabPanelProps } from '@acorn/protocol/tree/nodes.ts'
 import { createRenderer } from 'solid-js/universal'
 import { createStore, reconcile } from 'solid-js/store'
 import type { JSX } from 'solid-js'
@@ -76,9 +77,9 @@ export const {
 /**
  * What a kit node takes here: anything, checked on arrival.
  *
- * Loose on purpose. The host validates every prop against the wire schema before it reaches a
- * component (@acorn/protocol/tree/props.ts), so a narrow type here would be a second, drifting copy
- * of a rule that is already enforced where it matters. What it does buy is the shape of the value: a
+ * Layout nodes have typed props so authors can discover sizing and scrolling ownership. Other nodes
+ * remain loose. The host validates every prop against the wire schema before it reaches a
+ * component (@acorn/protocol/tree/props.ts). Static types do not grant authority: a
  * function survives only under one of the kit's event names, and `class`, `style` and the rest
  * of the DOM escape hatches are dropped before they cross.
  */
@@ -95,8 +96,8 @@ export type KitNodeProps = Record<string, unknown> & { children?: unknown }
  * would use on a DOM element — a prop that changes patches one node, and a list that grows inserts
  * one child.
  */
-const kitNode = (type: KitNodeName | typeof CHROME_SLOT_NODE) => {
-  const node = (props: KitNodeProps): RemoteNode => {
+const kitNode = <Props extends object = KitNodeProps>(type: KitNodeName | typeof CHROME_SLOT_NODE) => {
+  const node = (props: Props): RemoteNode => {
     const own = createNode(type)
     spread(own, props, false)
     return own
@@ -104,14 +105,15 @@ const kitNode = (type: KitNodeName | typeof CHROME_SLOT_NODE) => {
   // Solid ships one `JSX` namespace and it is typed for the DOM, so a universal renderer's component
   // can never line up with it. Nothing is being asserted about the value: the renderer treats what
   // comes back as opaque, and this cast is what lets an author write ordinary JSX.
-  return node as unknown as (props: KitNodeProps) => JSX.Element
+  return node as unknown as (props: Props) => JSX.Element
 }
 
+type LayoutProps = { Pane: PaneProps; Stack: StackProps; TabPanel: TabPanelProps }
+
 /** Every kit node, keyed by name. The named exports below are this object, destructured. */
-export const KIT_NODE_COMPONENTS = Object.fromEntries(KIT_NODES.map((name) => [name, kitNode(name)])) as Record<
-  KitNodeName,
-  (props: KitNodeProps) => JSX.Element
->
+export const KIT_NODE_COMPONENTS = Object.fromEntries(KIT_NODES.map((name) => [name, kitNode<object>(name)])) as {
+  [Name in KitNodeName]: (props: Name extends keyof LayoutProps ? LayoutProps[Name] : KitNodeProps) => JSX.Element
+}
 
 /** Only a rail or topbar replacement receives a host-minted slotRef that this can place. */
 export const Slot = kitNode(CHROME_SLOT_NODE)
@@ -120,6 +122,7 @@ export const Slot = kitNode(CHROME_SLOT_NODE)
 // `KIT_NODES`: a name here that the kit does not have is a type error, and a name the kit has that is
 // missing here is caught by ./remoteSolid.test.tsx.
 export const {
+  Pane,
   Stack,
   Inline,
   Section,

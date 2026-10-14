@@ -7,6 +7,7 @@ import { foreignRailSources, RAIL_SOURCE_VISIBILITY_MAX, SETTINGS_SEARCH_MAX } f
 import { NODE_CORE_FACETS } from './coreFacets'
 import { isRecord } from '../integrations/codec'
 import { pluginManifestShape, CONTRIBUTION_KINDS } from '@acorn/protocol/plugin/contract.ts'
+import { PLUGIN_CLIENTS } from '@acorn/protocol/plugin/clients.ts'
 import { validateDependencies, validateNodeDeclarations, validateRuntimeContributions } from './manifestValidation/node'
 import { validateFrames, validateSurfaceDestinations } from './manifestValidation/surfaces'
 import { validateChrome } from './manifestValidation/chrome'
@@ -99,6 +100,10 @@ function unknownIn(json: unknown, manifest: PluginManifest): string[] {
     ...manifest.permissions.node.core
       .filter((facet) => !(NODE_CORE_FACETS as readonly string[]).includes(facet))
       .map((facet) => `permissions.node.core: ${facet}`),
+    // Same for apps: a later build's app is kept in the list and never matches here (protocol's clients.ts).
+    ...(manifest.clients ?? [])
+      .filter((app) => !(PLUGIN_CLIENTS as readonly string[]).includes(app))
+      .map((app) => `clients: ${app}`),
     ...caughtSettingsPlacements(contributions.frames, manifest.contributions.frames),
     ...foreignRailSourceSwitches(manifest),
   ]

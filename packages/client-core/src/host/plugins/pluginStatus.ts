@@ -1,4 +1,5 @@
 import { PLUGIN_API_MAJOR, type NodePluginRow } from '@acorn/protocol/api.ts'
+import { clientsNote, runsIn } from '@acorn/protocol/plugin/clients.ts'
 import { contributionAvailability } from './availabilityModel'
 import {
   awaitingInputApproval,
@@ -77,6 +78,9 @@ export function nodePluginStatus(
         return status('muted', 'Rejected on this device', false, 'disabled')
       case 'bundle-missing':
         return status('danger', 'Its client bundle is not available on this device', true, 'failed')
+      // Left out of this app by its author, which is neither broken nor anything for the person to do.
+      case 'other-app':
+        return status('muted', clientsNote(runtime.runtime.clients ?? []))
       case 'incompatible':
         return status('danger', 'Its client bundle does not work with this version of acorn', true, 'failed')
       case 'declaration-conflict':
@@ -113,6 +117,8 @@ export function devicePluginStatus(
   devMode = false,
 ): PluginStatus {
   if (entry.row.disabled) return status('muted', 'Off', false, 'disabled')
+  if (!runsIn(entry.row.installed, snapshot.app))
+    return status('muted', clientsNote(entry.row.installed?.clients ?? []))
   const key = decisionKey(entry.row.name, entry.hash)
   if (snapshot.acceptedKeys.has(key))
     return devMode

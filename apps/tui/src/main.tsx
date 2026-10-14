@@ -140,6 +140,7 @@ const pluginsReady = new Promise<void>((resolve) => {
 })
 const stopClientRuntime = await startClientRuntime({
   runtime: 'tui',
+  app: 'terminal',
   client: () => client,
   onDeviceConfig: (config) => {
     // A terminal has no OS light/dark signal. In follow-system mode, use the configured light pick.

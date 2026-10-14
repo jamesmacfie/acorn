@@ -255,6 +255,7 @@ writeFileSync(
     baseline,
     apiVersion: apiMajor,
     ...(spec.emits?.length ? { emits: spec.emits } : {}),
+    ...(spec.clients ? { clients: spec.clients } : {}),
     ...(spec.entry ? { node: './dist/node.js' } : {}),
     ...(spec.client ? { client: './dist/client.js' } : {}),
     // Always './migrations' in the built package regardless of where the source chain lives, so the

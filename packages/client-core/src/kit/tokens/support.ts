@@ -25,6 +25,7 @@ export type NodeSupportRow = Record<Host, SupportLevel> & { loss?: string }
 
 export const NODE_SUPPORT = {
   // Grouping
+  Pane: { dom: 'full', tui: 'full' },
   Stack: { dom: 'full', tui: 'full' },
   Inline: { dom: 'full', tui: 'full' },
   Section: { dom: 'full', tui: 'full' },

@@ -7,6 +7,7 @@ import {
 } from '@acorn/protocol/api.ts'
 import { declaredSurfaces, eligiblePlugins, hasWithheldCode, isTaskPane } from './contributions'
 import { _resetPluginDistribution, _seedDevicePluginDistribution, _seedPluginDistribution } from './distribution'
+import { setClientApp } from './clientApp'
 
 // The shared answer both registration passes start from. Each pass has its own suite
 // (chrome/chromeRegister.test.ts, frames/register.test.ts).
@@ -50,9 +51,24 @@ const row = (
   },
 })
 
-afterEach(() => _resetPluginDistribution())
+afterEach(() => {
+  _resetPluginDistribution()
+  setClientApp('desktop')
+})
 
 describe('eligiblePlugins', () => {
+  it('registers nothing for a plugin that leaves this app out', () => {
+    const markup = row('markup', { clients: ['desktop'], client: { hash: HASH, bytes: 12 } }, [
+      surface({ id: 'editor', target: 'pane' }),
+    ])
+    _seedPluginDistribution([['node-a', [markup]]], [`markup ${HASH}`])
+    expect(eligiblePlugins().map((entry) => entry.pluginId)).toEqual(['markup'])
+
+    setClientApp('terminal')
+    _seedPluginDistribution([['node-a', [markup]]], [`markup ${HASH}`])
+    expect(eligiblePlugins()).toEqual([])
+  })
+
   it('withdraws every device contribution on disable while retaining device precedence', () => {
     _seedPluginDistribution(
       [['node-a', [row('board', { version: '2.0.0', client: { hash: HASH_B, bytes: 12 } })]]],

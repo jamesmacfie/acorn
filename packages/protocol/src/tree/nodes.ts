@@ -22,6 +22,7 @@ export const TREE_PROTOCOL_VERSION = 1
 /** Every node a tree may name. Mirrors `NODE_SUPPORT` in client-core's kit. */
 export const KIT_NODES = [
   // Grouping
+  'Pane',
   'Stack',
   'Inline',
   'Section',
@@ -111,6 +112,8 @@ export const KIT_NODES = [
   'Only',
   'Fallback',
 ] as const
+
+export type { PaneProps, StackProps, TabPanelProps } from './layout.ts'
 
 export type KitNodeName = (typeof KIT_NODES)[number]
 

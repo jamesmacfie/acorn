@@ -5,6 +5,7 @@ import {
   type PluginRuntimeIdentity,
 } from '@acorn/protocol/api.ts'
 import { speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
+import { runsIn } from '@acorn/protocol/plugin/clients.ts'
 import {
   hasFrameRegion,
   hasRemoteRegion,
@@ -64,7 +65,9 @@ export function eligiblePlugins(options: { includeInactive?: boolean } = {}): El
     // explainable. Every invocation still checks the active runtime on this node.
     const runtime =
       active ?? (options.includeInactive && row.installed ? { ...row.installed, activation: 'node' as const } : null)
-    if (!runtime) continue
+    // A plugin for another app declares nothing here. The device loop above is already filtered, because
+    // `selectedDevice` never holds one.
+    if (!runtime || !runsIn(runtime, snapshot.app)) continue
     const selection = snapshot.selectionsByNode.get(nodeId)?.get(row.name)
     const hash = speaksApiVersion(runtime.apiVersion, PLUGIN_API_MAJOR)
       ? (selection?.hash ?? runtime.client?.hash ?? '')

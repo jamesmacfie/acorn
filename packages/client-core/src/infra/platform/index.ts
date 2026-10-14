@@ -295,6 +295,7 @@ export type PluginPutResult =
         | 'has-node-half'
         | 'invalid-manifest'
         | 'plugin-id-mismatch'
+        | 'other-app'
     }
 type PluginDeviceInstallResult = { hash: string; pluginId: string; version: string } | { error: string }
 

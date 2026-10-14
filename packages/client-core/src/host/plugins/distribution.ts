@@ -1,6 +1,8 @@
 import { createSignal } from 'solid-js'
 import { corePluginsRoute, PLUGIN_API_MAJOR, type NodePluginRow, type NodePluginState } from '@acorn/protocol/api.ts'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
+import { runsIn } from '@acorn/protocol/plugin/clients.ts'
+import { clientApp } from './clientApp'
 import { hasNodeHalf } from '@acorn/protocol/plugin/bundles.ts'
 import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import type { PluginAckRecord, PluginHostState } from '../../infra/platform'
@@ -28,7 +30,7 @@ import { stopTreeWorkers } from '../tree/workerTeardown'
 const log = createLogger('plugins')
 const emptyHost = (): PluginHostState => ({ cached: {}, acks: [], devGrants: [] })
 const emptySnapshot = (): PluginDistributionSnapshot =>
-  derivePluginDistribution(new Map(), emptyHost(), 0, PLUGIN_API_MAJOR)
+  derivePluginDistribution(new Map(), emptyHost(), 0, PLUGIN_API_MAJOR, [], clientApp())
 const [distribution, setDistribution] = createSignal<PluginDistributionSnapshot>(emptySnapshot())
 let initialized = false
 let reconcileTail: Promise<void> = Promise.resolve()
@@ -145,6 +147,7 @@ export function deviceEntries(state: PluginHostState): DevicePluginEntry[] {
           icon: manifest.icon,
           icons: manifest.icons,
           emits: manifest.emits,
+          ...(manifest.clients ? { clients: manifest.clients } : {}),
         },
       },
       sourceLabel: cached.sourceLabel ?? 'this device',
@@ -229,7 +232,14 @@ export function markPluginNodeStale(nodeId: string): void {
   const byNode = new Map(current.byNode)
   byNode.set(nodeId, { ...observation, reachable: false, stale: true })
   publish(
-    derivePluginDistribution(byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, current.devicePlugins),
+    derivePluginDistribution(
+      byNode,
+      lastHostState,
+      current.revision + 1,
+      PLUGIN_API_MAJOR,
+      current.devicePlugins,
+      clientApp(),
+    ),
   )
 }
 
@@ -239,7 +249,14 @@ export function forgetPluginNode(nodeId: string): void {
   if (!byNode.delete(nodeId)) return
   const current = distribution()
   publish(
-    derivePluginDistribution(byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, current.devicePlugins),
+    derivePluginDistribution(
+      byNode,
+      lastHostState,
+      current.revision + 1,
+      PLUGIN_API_MAJOR,
+      current.devicePlugins,
+      clientApp(),
+    ),
   )
 }
 
@@ -312,14 +329,15 @@ function enqueuePass(options: DistributionSyncOptions): Promise<void> {
         if (old) byNode.set(nodeId, { ...old, stale: true })
       }
     })
-    // Cache active and installed offers; caching an update never selects it.
+    // Cache active and installed offers; caching an update never selects it. A bundle for another app
+    // is never downloaded.
     const seen = new Set<string>()
     const puts: { nodeId: string; pluginId: string; hash: string; version: string }[] = []
     for (const observation of options.deviceOnly ? [] : byNode.values()) {
       if (!observation.reachable || observation.stale) continue
       for (const row of observation.rows) {
         const runtime = runtimeIdentityForRow(row)
-        const offers = [runtime, row.installed].filter((value) => value?.client)
+        const offers = [runtime, row.installed].filter((value) => value?.client && runsIn(value, clientApp()))
         for (const offer of offers) {
           const hash = offer!.client!.hash
           const sourceKey = decisionKey(observation.nodeId, hash)
@@ -364,7 +382,7 @@ function enqueuePass(options: DistributionSyncOptions): Promise<void> {
     setDevicePluginIds([...new Set(local.map((entry) => entry.row.name))])
     const currentPaired = options.trustOnly || options.deviceOnly ? paired : new Set(nodes().map((node) => node.nodeId))
     for (const id of byNode.keys()) if (!currentPaired.has(id)) byNode.delete(id)
-    publish(derivePluginDistribution(byNode, host, distribution().revision + 1, PLUGIN_API_MAJOR, local))
+    publish(derivePluginDistribution(byNode, host, distribution().revision + 1, PLUGIN_API_MAJOR, local, clientApp()))
   }
   const result = reconcileTail.then(pass)
   reconcileTail = result.catch((error: unknown) => log.warn('could not reconcile plugin distribution', error))
@@ -422,7 +440,9 @@ export function _seedPluginDistribution(
   initialized = true
   dismissed.clear()
   lastHostState = { cached, acks, devGrants: [] }
-  setDistribution(derivePluginDistribution(byNode, lastHostState, distribution().revision + 1, PLUGIN_API_MAJOR))
+  setDistribution(
+    derivePluginDistribution(byNode, lastHostState, distribution().revision + 1, PLUGIN_API_MAJOR, [], clientApp()),
+  )
 }
 
 /** Test seam for provenance arbitration and device enablement at the shared contribution gate. */
@@ -443,7 +463,16 @@ export function _seedDevicePluginDistribution(entries: readonly DevicePluginEntr
       : ack
   })
   lastHostState = { ...lastHostState, cached, acks }
-  publish(derivePluginDistribution(current.byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, entries))
+  publish(
+    derivePluginDistribution(
+      current.byNode,
+      lastHostState,
+      current.revision + 1,
+      PLUGIN_API_MAJOR,
+      entries,
+      clientApp(),
+    ),
+  )
 }
 
 // Test seam, for the half of the boot pass above that `_seedPluginDistribution` does not stand in for:

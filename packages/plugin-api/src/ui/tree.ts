@@ -10,6 +10,7 @@
 export {
   solidTree,
   KIT_NODE_COMPONENTS,
+  Pane,
   Stack,
   Inline,
   Section,

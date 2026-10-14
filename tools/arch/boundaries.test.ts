@@ -647,8 +647,9 @@ describe('architecture boundaries', () => {
       // Includes the static dependency policy capability, the secret check contracts, the plugin_authoring
       // point list, the browser handoff contract, which the extension and its native host read
       // without the whole manifest contract, and the project site association rules, which the Node,
-      // the native host, and the extension share without the `api.ts` facade.
-      '@acorn/protocol': 86,
+      // the native host, and the extension share without the `api.ts` facade, and the list of client apps
+      // a plugin can name, which custody reads without the manifest contract.
+      '@acorn/protocol': 87,
       // client-core publishes narrow entrypoints where a consumer can't take a barrel that pulls in
       // renderer-only modules. Pure leaves the terminal, logic tests or remote trees need: model-provider
       // error guidance, `kit/lib/savedSignal`, `kit/lib/formatChord`, `kit/lib/ansi`, and the address
@@ -838,6 +839,8 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/features/settings/uiStyles.ts', "the 'terminal' UI style"],
       ['packages/client-core/src/host/frames/PluginFrame.tsx', "the 'terminal' UI style, passed to a frame"],
       ['packages/client-core/src/host/tree/RemoteTree.tsx', "the 'terminal' UI style, passed to a tree"],
+      // `terminal` the client app a plugin's manifest can list in `clients`.
+      ['packages/protocol/src/plugin/clients.ts', "the 'terminal' client app"],
       // `terminal` the moment a setup script runs, and `terminal` the command palette category.
       ['packages/client-core/src/features/settings/ProjectConfigTabs.tsx', "the 'terminal' setup-script trigger"],
       ['packages/node-core/src/server/routes/projects/projects.ts', "the 'terminal' setup-script trigger"],

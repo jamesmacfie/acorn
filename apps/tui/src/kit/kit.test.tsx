@@ -28,6 +28,7 @@ import {
   SettingRow,
   SettingsSection,
   SplitHandle,
+  Pane,
   Stack,
   TabPanel,
   Tabs,
@@ -406,15 +407,15 @@ const CASES: Case[] = [
   },
   {
     node: 'ListColumn',
-    draws: 'reduced: the left column, with its label',
+    draws: 'reduced: the left column, its label left to the accessible name',
     render: () => (
       <ListColumn label="notes">
         <Text>a note</Text>
       </ListColumn>
     ),
     check: (frame) => {
-      has(frame, 'NOTES')
       has(frame, 'a note')
+      expect(frame.text).not.toContain('NOTES')
     },
   },
   {
@@ -519,17 +520,33 @@ const CASES: Case[] = [
     },
   },
   {
+    node: 'Pane',
+    draws: 'a header above a body that receives the remaining rows',
+    render: () => (
+      <Pane>
+        <Text>header</Text>
+        <TabPanel idPrefix="pane" id="body" active="body">
+          <Text>body</Text>
+        </TabPanel>
+      </Pane>
+    ),
+    check: (frame) => {
+      has(frame, 'header')
+      has(frame, 'body')
+    },
+  },
+  {
     node: 'TabPanel',
     draws: 'the rows under the tab strip, and nothing for a panel that is not current',
     render: () => (
-      <Stack>
+      <Pane>
         <TabPanel idPrefix="t" id="a" active="a">
           <Text>current</Text>
         </TabPanel>
         <TabPanel idPrefix="t" id="b" active="a">
           <Text>other</Text>
         </TabPanel>
-      </Stack>
+      </Pane>
     ),
     check: (frame) => {
       has(frame, 'current')
@@ -1230,39 +1247,6 @@ const CASES: Case[] = [
   },
 ]
 
-/**
- * What this painter cannot draw yet, case by case, and what each is waiting for.
- *
- * Both entries are the same Yoga difference, recorded below with everything that was tried, and
- * neither is above the layout pass.
- *
- * Keyed by the title the case is reported under, so a rename shows up as a case that stopped being
- * skipped rather than as a silent skip of the wrong one — the anti-vacuity check below reads it.
- */
-const HELD: Readonly<Record<string, string>> = {
-  // Not a widget's fault, and not the painter's either: the cases expect OpenTUI's Yoga build, which
-  // disagrees with yoga-layout about what a `flexBasis: 0` child contributes to a parent whose own
-  // height is `auto`. Ours contributes the basis, so the box is nought tall and nothing inside it is
-  // drawn; OpenTUI's contributes the child's content, so the same tree comes out one row tall. No
-  // yoga-layout `Config` knob reproduces it — web defaults, every errata and the web-flex-basis
-  // feature were each tried. Both cases put a viewport straight inside a `Stack`, which nothing in the
-  // app does: every viewport it draws is inside a `Panel` or a grown column, where the two agree.
-  'TabPanel: the rows under the tab strip, and nothing for a panel that is not current':
-    'a viewport in a parent with no height of its own',
-  'is a parent stop: Down enters the panel it is showing, Escape comes back':
-    'a viewport in a parent with no height of its own',
-}
-
-/** The reason this case is held, or nothing at all. */
-const owed = (title: string): string | undefined => HELD[title]
-
-/** A case's title, with what it is waiting for, for the skipped half's report. */
-const held = <T,>(rows: readonly (readonly [string, T])[]): (readonly [string, T])[] =>
-  rows.filter(([title]) => owed(title)).map(([title, entry]) => [`${title} — held: ${owed(title)!}`, entry] as const)
-
-const drawable = <T,>(rows: readonly (readonly [string, T])[]): (readonly [string, T])[] =>
-  rows.filter(([title]) => !owed(title))
-
 describe('the kit in cells', () => {
   it('keeps three bare selects on one narrow row', async () => {
     const screen = await renderCells(
@@ -1318,22 +1302,7 @@ describe('the kit in cells', () => {
       frame.done()
     }
   }
-  it('holds back nothing it cannot name', () => {
-    // Every key in the table has to be a title some case is actually reported under, or the skip is
-    // silent and the case it meant to hold runs and fails. Checked here rather than trusted, because
-    // the two halves are a rename apart (§ HELD).
-    const titles = new Set([
-      ...CASES.map((entry) => `${entry.node}: ${entry.draws}`),
-      ...BEHAVIOURS.map((entry) => `${entry.node}: ${entry.does}`),
-      'puts the keys on the control a click lands on, and Enter presses that one',
-      'lets go of the keys when the control holding them goes disabled',
-      'types into the field that has the keys, wherever the renderer is drawing its caret',
-      'is a parent stop: Down enters the panel it is showing, Escape comes back',
-    ])
-    expect(Object.keys(HELD).filter((title) => !titles.has(title))).toEqual([])
-  })
-
-  it.each(drawable(cases))('%s', drawCase, 20_000)
+  it.each(cases)('%s', drawCase, 20_000)
   it.each([80, 120])('shows status essentials and details at %i columns', async (width) => {
     const frame = await renderCells(
       () => (
@@ -1354,10 +1323,6 @@ describe('the kit in cells', () => {
       frame.done()
     }
   })
-  // The held half, as skips rather than as absences, so the report says which node is waiting and why
-  // (§ HELD).
-  if (held(cases).length) it.skip.each(held(cases))('%s', drawCase)
-
   it('keeps a striped card inside a narrow pane and colors its left edge on every row', async () => {
     const frame = await renderCells(
       () => (
@@ -2374,151 +2339,138 @@ describe('every control is a stop', () => {
       screen.done()
     }
   }
-  it.each(drawable(behaviours))('%s', driveCase, 30_000)
-  if (held(behaviours).length) it.skip.each(held(behaviours))('%s', driveCase)
+  it.each(behaviours)('%s', driveCase, 30_000)
 
-  it.skipIf(owed('puts the keys on the control a click lands on, and Enter presses that one'))(
-    'puts the keys on the control a click lands on, and Enter presses that one',
-    async () => {
-      // The proof that a click is a hit test. The renderer's own `autoFocus` is off, so nothing but the
-      // store moves the keys: it takes the renderable the click landed on and walks up to the nearest
-      // thing that can hold them, which is this button (../keys/regions.ts § Clicks are hit tests).
-      const pressed: string[] = []
-      const screen = await renderCells(
-        () => (
-          <HeaderBodyFooter
-            stateKey="clicking"
-            label="Clicking"
-            regions={{
-              body: () => (
-                <Stack>
-                  <Button label="First" onPress={() => pressed.push('first')} />
-                  <Button label="Second" onPress={() => pressed.push('second')} />
-                </Stack>
-              ),
-            }}
-          />
-        ),
-        { width: 40, height: 8 },
-      )
-      try {
-        // The pane opens on its first stop, because nothing pressed Tab and this host has no pointer to
-        // land the keys with (../keys/regions.ts § regionFocus).
-        lit(screen, '[First]')
-        const clicked = await screen.click(...cellOf(screen, '[Second]'))
-        lit(clicked, '[Second]')
-        // A click focuses and presses, which is the whole of this host's pointer model
-        // (docs/tui/rectangles.md § What the TUI never does). Enter then presses the one under the caret, which is
-        // the half that says the click moved the keys and not only the highlight.
-        expect(pressed).toEqual(['second'])
-        await clicked.press('RETURN')
-        expect(pressed).toEqual(['second', 'second'])
-      } finally {
-        screen.done()
-      }
-    },
-    30_000,
-  )
+  it('puts the keys on the control a click lands on, and Enter presses that one', async () => {
+    // The proof that a click is a hit test. The renderer's own `autoFocus` is off, so nothing but the
+    // store moves the keys: it takes the renderable the click landed on and walks up to the nearest
+    // thing that can hold them, which is this button (../keys/regions.ts § Clicks are hit tests).
+    const pressed: string[] = []
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="clicking"
+          label="Clicking"
+          regions={{
+            body: () => (
+              <Stack>
+                <Button label="First" onPress={() => pressed.push('first')} />
+                <Button label="Second" onPress={() => pressed.push('second')} />
+              </Stack>
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 8 },
+    )
+    try {
+      // The pane opens on its first stop, because nothing pressed Tab and this host has no pointer to
+      // land the keys with (../keys/regions.ts § regionFocus).
+      lit(screen, '[First]')
+      const clicked = await screen.click(...cellOf(screen, '[Second]'))
+      lit(clicked, '[Second]')
+      // A click focuses and presses, which is the whole of this host's pointer model
+      // (docs/tui/rectangles.md § What the TUI never does). Enter then presses the one under the caret, which is
+      // the half that says the click moved the keys and not only the highlight.
+      expect(pressed).toEqual(['second'])
+      await clicked.press('RETURN')
+      expect(pressed).toEqual(['second', 'second'])
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
 
-  it.skipIf(owed('types into the field that has the keys, wherever the renderer is drawing its caret'))(
-    'types into the field that has the keys, wherever the renderer is drawing its caret',
-    async () => {
-      // The sentence the typing hand-off rests on, as a regression test: a field's `handleKeyPress`
-      // reads the key and nothing else — it has no focus of its own to check — so the dispatcher can
-      // hand it a key without anything else having focused it. If that stopped being true, typing would
-      // quietly start depending on the caret mirror agreeing with the store
-      // (docs/tui/keys.md § The five key groups, ../keys/install.ts § typeInto).
-      const typed: string[] = []
-      const screen = await renderCells(
-        () => (
-          <HeaderBodyFooter
-            stateKey="typing"
-            label="Typing"
-            regions={{
-              body: () => (
-                <Stack>
-                  <Input value="" onInput={(value) => typed.push(value)} />
-                  <Button label="Elsewhere" onPress={() => {}} />
-                </Stack>
-              ),
-            }}
-          />
-        ),
-        { width: 40, height: 8 },
-      )
-      try {
-        // The pane opens on the field, which is its first stop.
-        const field = focusedRenderable()
-        expect(field, 'the field did not take the keys').not.toBe(null)
+  it('types into the field that has the keys, wherever the renderer is drawing its caret', async () => {
+    // The sentence the typing hand-off rests on, as a regression test: a field's `handleKeyPress`
+    // reads the key and nothing else — it has no focus of its own to check — so the dispatcher can
+    // hand it a key without anything else having focused it. If that stopped being true, typing would
+    // quietly start depending on the caret mirror agreeing with the store
+    // (docs/tui/keys.md § The five key groups, ../keys/install.ts § typeInto).
+    const typed: string[] = []
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="typing"
+          label="Typing"
+          regions={{
+            body: () => (
+              <Stack>
+                <Input value="" onInput={(value) => typed.push(value)} />
+                <Button label="Elsewhere" onPress={() => {}} />
+              </Stack>
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 8 },
+    )
+    try {
+      // The pane opens on the field, which is its first stop.
+      const field = focusedRenderable()
+      expect(field, 'the field did not take the keys').not.toBe(null)
 
-        // Now call `focus()` on something else, behind the store's back. It is the mirror and the
-        // mirror is a no-op — a node has no focus of its own to move and a field asks the store
-        // whether it has the keys rather than being told (../tree/compat.ts § focus). So this is the
-        // half of the case that survives having one owner: the call happens and nothing about who has
-        // the keys changes.
-        const elsewhere = every(screen.renderer.root).find((node) => node.focusable && node !== field)
-        expect(elsewhere, 'nothing else on the screen could take the caret').toBeTruthy()
-        elsewhere!.focus()
+      // Now call `focus()` on something else, behind the store's back. It is the mirror and the
+      // mirror is a no-op — a node has no focus of its own to move and a field asks the store
+      // whether it has the keys rather than being told (../tree/compat.ts § focus). So this is the
+      // half of the case that survives having one owner: the call happens and nothing about who has
+      // the keys changes.
+      const elsewhere = every(screen.renderer.root).find((node) => node.focusable && node !== field)
+      expect(elsewhere, 'nothing else on the screen could take the caret').toBeTruthy()
+      elsewhere!.focus()
 
-        // `h` rather than a letter nothing binds, because it is a bare key: `collapse` is bound to it
-        // at the region tier, the typing shadow claims it inside the keymap while a field has the keys,
-        // and the hand-off types it. A letter would only prove the last of those three
-        // (../keys/tiers.ts § TYPING).
-        const one = await screen.press('h')
-        expect(typed).toEqual(['h'])
-        expect(one.text).toContain('h')
-        expect(focusedRenderable()).toBe(field)
-      } finally {
-        screen.done()
-      }
-    },
-    30_000,
-  )
+      // `h` rather than a letter nothing binds, because it is a bare key: `collapse` is bound to it
+      // at the region tier, the typing shadow claims it inside the keymap while a field has the keys,
+      // and the hand-off types it. A letter would only prove the last of those three
+      // (../keys/tiers.ts § TYPING).
+      const one = await screen.press('h')
+      expect(typed).toEqual(['h'])
+      expect(one.text).toContain('h')
+      expect(focusedRenderable()).toBe(field)
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
 
-  it.skipIf(owed('lets go of the keys when the control holding them goes disabled'))(
-    'lets go of the keys when the control holding them goes disabled',
-    async () => {
-      // The flag is the store's declaration of what can hold the keys, so a control that loses it while
-      // it has them is a node the landing pass has to leave. Otherwise the keys stay for the rest of the
-      // run, every box above reports a focused descendant, and the reader sees a dialog whose buttons
-      // are lit and dead (../keys/stops.ts § pressable, docs/tui/reporting.md § The invariants).
-      const [off, setOff] = createSignal(false)
-      const pressed: string[] = []
-      const screen = await renderCells(
-        () => (
-          <HeaderBodyFooter
-            stateKey="disabling"
-            label="Disabling"
-            regions={{
-              body: () => (
-                <Stack>
-                  <Button label="Risky" disabled={off()} onPress={() => pressed.push('risky')} />
-                  <Button label="Safe" onPress={() => pressed.push('safe')} />
-                </Stack>
-              ),
-            }}
-          />
-        ),
-        { width: 40, height: 8 },
-      )
-      try {
-        lit(screen, '[Risky]')
-        const risky = focusedRenderable()
-        setOff(true)
-        const disabled = await screen.frame()
-        expect(focusedRenderable(), 'the disabled control is still holding the keys').not.toBe(risky)
+  it('lets go of the keys when the control holding them goes disabled', async () => {
+    // The flag is the store's declaration of what can hold the keys, so a control that loses it while
+    // it has them is a node the landing pass has to leave. Otherwise the keys stay for the rest of the
+    // run, every box above reports a focused descendant, and the reader sees a dialog whose buttons
+    // are lit and dead (../keys/stops.ts § pressable, docs/tui/reporting.md § The invariants).
+    const [off, setOff] = createSignal(false)
+    const pressed: string[] = []
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="disabling"
+          label="Disabling"
+          regions={{
+            body: () => (
+              <Stack>
+                <Button label="Risky" disabled={off()} onPress={() => pressed.push('risky')} />
+                <Button label="Safe" onPress={() => pressed.push('safe')} />
+              </Stack>
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 8 },
+    )
+    try {
+      lit(screen, '[Risky]')
+      const risky = focusedRenderable()
+      setOff(true)
+      const disabled = await screen.frame()
+      expect(focusedRenderable(), 'the disabled control is still holding the keys').not.toBe(risky)
 
-        // And they can still land somewhere, which is the half a wedge makes impossible.
-        const moved = await disabled.click(...cellOf(disabled, '[Safe]'))
-        lit(moved, '[Safe]')
-        await moved.press('RETURN')
-        expect(pressed).toEqual(['safe', 'safe'])
-      } finally {
-        screen.done()
-      }
-    },
-    30_000,
-  )
+      // And they can still land somewhere, which is the half a wedge makes impossible.
+      const moved = await disabled.click(...cellOf(disabled, '[Safe]'))
+      lit(moved, '[Safe]')
+      await moved.press('RETURN')
+      expect(pressed).toEqual(['safe', 'safe'])
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
 
   it('lands the keys somewhere when the only control on screen goes disabled', async () => {
     // The other half of the same wedge, and the half a click cannot rescue. Losing the flag blurs the
@@ -2581,7 +2533,7 @@ describe('every control is a stop', () => {
 function TwoPanels() {
   const [tab, setTab] = createSignal('a')
   return (
-    <Stack>
+    <Pane>
       <Tabs
         idPrefix="fixture"
         ariaLabel="Fixture"
@@ -2598,7 +2550,7 @@ function TwoPanels() {
       <TabPanel idPrefix="fixture" id="b" active={tab()}>
         <Button label="Inside two" onPress={() => {}} />
       </TabPanel>
-    </Stack>
+    </Pane>
   )
 }
 
@@ -2634,32 +2586,28 @@ const inPane = (body: () => JSX.Element, height: number) =>
   renderCells(() => <HeaderBodyFooter stateKey="strip" label="Strip" regions={{ body }} />, { width: 60, height })
 
 describe('a tab strip with panels', () => {
-  it.skipIf(owed('is a parent stop: Down enters the panel it is showing, Escape comes back'))(
-    'is a parent stop: Down enters the panel it is showing, Escape comes back',
-    async () => {
-      const screen = await inPane(() => <TwoPanels />, 12)
-      try {
-        // Entry lands on the strip rather than in the panel, because a parent stop is what `entryStop`
-        // prefers — and the proof is that the arrows are the strip's.
-        const second = await screen.press('ARROW_RIGHT')
-        expect(second.text).toContain('[Two]')
-        expect(second.text).toContain('Inside two')
+  it('is a parent stop: Down enters the panel it is showing, Escape comes back', async () => {
+    const screen = await inPane(() => <TwoPanels />, 12)
+    try {
+      // Entry lands on the strip rather than in the panel, because a parent stop is what `entryStop`
+      // prefers — and the proof is that the arrows are the strip's.
+      const second = await screen.press('ARROW_RIGHT')
+      expect(second.text).toContain('[Two]')
+      expect(second.text).toContain('Inside two')
 
-        // Down into the panel this strip is showing. The button inside it draws in the focused form.
-        const inside = await second.press('ARROW_DOWN')
-        lit(inside, '[Inside two]')
+      // Down into the panel this strip is showing. The button inside it draws in the focused form.
+      const inside = await second.press('ARROW_DOWN')
+      lit(inside, '[Inside two]')
 
-        // Escape climbs to the strip, and the arrows are the strip's again.
-        const back = await inside.press('ESCAPE')
-        const first = await back.press('ARROW_LEFT')
-        expect(first.text).toContain('[One]')
-        expect(first.text).toContain('Inside one')
-      } finally {
-        screen.done()
-      }
-    },
-    30_000,
-  )
+      // Escape climbs to the strip, and the arrows are the strip's again.
+      const back = await inside.press('ESCAPE')
+      const first = await back.press('ARROW_LEFT')
+      expect(first.text).toContain('[One]')
+      expect(first.text).toContain('Inside one')
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
 
   it('is an ordinary stop with no panels, so a region enters on the list below it', async () => {
     const screen = await inPane(() => <FilterAndRows />, 12)

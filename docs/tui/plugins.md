@@ -93,6 +93,10 @@ tiers, the same permission-key diff, and the same accept, refuse, and show-me ac
 `trustModel.ts`. A plugin can't draw over it, because a plugin draws inside a slot and the dialog owns
 the key layer.
 
+A plugin whose manifest `clients` list leaves out `"terminal"` never reaches the prompt. The terminal
+doesn't download its bundle or queue it for approval. It still asks about the plugin's skills, which
+the Node grants ([which apps it runs in](../plugin-authoring/the-manifest.md#which-apps-it-runs-in)).
+
 ### The third column
 
 [Security](../security.md) covers the terminal client in its trust boundaries, transport and auth,

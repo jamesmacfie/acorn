@@ -62,3 +62,10 @@ it('rejects a frame with no window to receive the bridge on', async () => {
     target.addEventListener = saved
   }
 })
+
+import type * as Remote from './remote/solid.ts'
+import type * as PublishedRemote from './remote/public.ts'
+const _pane: Mutual<typeof Remote.Pane, typeof PublishedRemote.Pane> = [true, true]
+const _stack: Mutual<typeof Remote.Stack, typeof PublishedRemote.Stack> = [true, true]
+const _panel: Mutual<typeof Remote.TabPanel, typeof PublishedRemote.TabPanel> = [true, true]
+void [_pane, _stack, _panel]

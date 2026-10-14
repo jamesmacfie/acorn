@@ -37,6 +37,7 @@ import {
 } from '../mutations'
 import { buildConversationEntries, reviewDecision } from './model'
 import { actionFailure, type ActionFailure } from '../actionErrors'
+import { branchReferenceCandidates } from './branchReferences'
 
 // Everything one pull request knows, held once per pull and read by every surface that draws it
 // (docs/github-integration.md, docs/panes/layout.md § Layout model).
@@ -148,16 +149,22 @@ function build(scope: PrScope) {
   // Linear tickets linked from the pull's body, comments, reviews and threads. The host reads every
   // registered recogniser, so this finds any provider's URLs; it is narrowed to Linear because the
   // enrichment route and the chip downstream of it are Linear-only.
-  const linearRefs = createMemo(() => {
+  const linearTextRefs = createMemo(() => {
     const data = detail.data
     if (!data) return []
     const texts: (string | null | undefined)[] = [data.pull?.body]
     for (const comment of data.comments) texts.push(comment.body)
     for (const review of data.reviews) texts.push(review.body)
     for (const thread of data.threads) for (const comment of thread.comments) texts.push(comment.body)
-    return scanContentRefs(texts).filter((ref) => ref.providerId === 'linear')
+    return scanContentRefs(texts)
+      .filter((ref) => ref.providerId === 'linear')
+      .map((ref) => ({ ...ref, item: ref.item.toUpperCase() }))
   })
-  const integrations = createQuery(() => integrationsOptions(linearRefs().length > 0))
+  const branchCandidates = createMemo(() => branchReferenceCandidates(detail.data?.pull?.headRef))
+  const linearIdentifiers = createMemo(() => [
+    ...new Set([...linearTextRefs().map((ref) => ref.item), ...branchCandidates()]),
+  ])
+  const integrations = createQuery(() => integrationsOptions(linearIdentifiers().length > 0))
   const linearConnected = () =>
     (integrations.data?.integrations ?? []).some(
       (entry) => entry.providerId === 'linear' && entry.status === 'connected',
@@ -166,14 +173,21 @@ function build(scope: PrScope) {
   // (docs/first-party-plugins.md § First-party for one specific reason). The connection check stays
   // because a 403 with no connection wastes a round trip when the "connect Linear" fallback is what
   // should render.
-  const linearIssues = createQuery(() =>
-    refResolutionsOptions(
-      'linear',
-      linearRefs().map((ref) => ref.item),
-      linearConnected(),
-    ),
-  )
+  const linearIssues = createQuery(() => refResolutionsOptions('linear', linearIdentifiers(), linearConnected()))
   const linearSummary = createMemo(() => new Map((linearIssues.data ?? []).map((issue) => [issue.identifier, issue])))
+  const linearRefs = createMemo(() => {
+    const refs = new Map(linearTextRefs().map((ref) => [ref.item, ref]))
+    // Branch fragments have no provider or URL until Linear confirms them. Keep the query's inputs
+    // independent of this result so a branch-only issue can trigger its own lookup.
+    if (linearConnected()) {
+      for (const identifier of branchCandidates()) {
+        const issue = linearSummary().get(identifier)
+        if (!issue?.url || refs.has(identifier)) continue
+        refs.set(identifier, { providerId: 'linear', kind: 'linear.issue', item: identifier, url: issue.url })
+      }
+    }
+    return [...refs.values()]
+  })
   // `openRefPanel` refuses when Linear is not installed on this device, which is why nothing here
   // checks first.
   const showLinearIssue = (identifier: string): void =>
@@ -181,7 +195,7 @@ function build(scope: PrScope) {
 
   // Which bare `CRA-404`-shaped tokens are safe to linkify here, and for whom. Learned from the refs
   // already confirmed in this pull by their full URLs, so the prefix is witnessed rather than guessed.
-  const refPrefixes = createMemo(() => learnRefPrefixes(linearRefs()))
+  const refPrefixes = createMemo(() => learnRefPrefixes(linearTextRefs()))
 
   const assignedLabels = createMemo(() => new Set((detail.data?.labels ?? []).map((label) => label.name.toLowerCase())))
   const requestedReviewers = createMemo(() => new Set(detail.data?.requestedReviewers ?? []))

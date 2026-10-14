@@ -1,5 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createSignal, For, onCleanup, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
+import type { TabPanelProps } from '@acorn/protocol/tree/nodes.ts'
 import type { Renderable } from '../../tree/compat'
 import { COLLECTION_INTENTS, createCollectionIntents, type Intent } from '@acorn/client-core/kit/keys'
 import { Line, slot } from '../cells'
@@ -97,24 +98,38 @@ export function Tabs(props: {
 
 /** The panel half. `hidden` rather than unmounting, the same thunk rule the DOM layout keeps, so a
  *  panel holds its state across a switch. */
-export function TabPanel(props: {
-  idPrefix: string
-  id: string
-  active: string
-  children: JSX.Element
-  scrollOffset?: number
-  padding?: 'pane'
-  onChange?: (offset: number) => void
-}) {
+export function TabPanel(props: TabPanelProps<JSX.Element>) {
+  createEffect(() => {
+    if (props.scroll === false && props.active !== props.id) scheduleSettle()
+  })
   return (
-    <ScrollViewport
-      visible={props.active === props.id}
-      scrollOffset={props.scrollOffset}
-      onChange={props.onChange}
-      onBox={(box) => registerPanel(props.idPrefix, box)}
+    <Show
+      when={props.scroll !== false}
+      fallback={
+        <box
+          flexDirection="column"
+          flexGrow={1}
+          flexShrink={1}
+          flexBasis={0}
+          minWidth={0}
+          minHeight={0}
+          visible={props.active === props.id}
+          overflow="hidden"
+          ref={(box: Renderable) => registerPanel(props.idPrefix, box)}
+        >
+          {props.children}
+        </box>
+      }
     >
-      {props.children}
-    </ScrollViewport>
+      <ScrollViewport
+        visible={props.active === props.id}
+        scrollOffset={props.scrollOffset}
+        onChange={props.onChange}
+        onBox={(box) => registerPanel(props.idPrefix, box)}
+      >
+        {props.children}
+      </ScrollViewport>
+    </Show>
   )
 }
 /** One line of tab labels with a `×` on the current one. */

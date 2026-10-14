@@ -55,6 +55,7 @@ import {
 import { ContributionBoundary } from '../../kit/components/content/ContributionBoundary'
 import { RegionLoading } from '../../host/layouts/RegionLoading'
 import { createDismissable } from '../../kit/lib/controls/dismissable'
+import { anchoredSurfacesWithin } from '../../kit/lib/controls/anchor'
 import { createDomCollection } from '../../kit/keys/collection'
 import { restoreFocusOnCleanup } from '../../kit/keys/trap'
 import { readLocal, writeLocal } from '../../kit/lib/state/deviceStorage'
@@ -627,7 +628,7 @@ export default function SettingsView(props: {
   const onFocusIn = (event: FocusEvent) => {
     const target = event.target
     if (!(target instanceof HTMLElement)) return
-    if (root.contains(target)) {
+    if (root.contains(target) || anchoredSurfacesWithin(root).some((surface) => surface.contains(target))) {
       lastInside = target
       return
     }

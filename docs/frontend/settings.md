@@ -108,3 +108,6 @@ dispatcher, and the region chords do nothing while focus is inside an `aria-moda
 the layer, and focus returns on close, so keys typed in Settings never reach a terminal underneath.
 Menus, select lists, and confirmations portal to the body and paint above the layer, and an open one
 takes the first Escape.
+The focus guard treats anchored dropdowns opened within Settings as part of the layer, including
+their filter fields. If a control underneath takes focus, the guard returns it to the last focused
+Settings control or dropdown.

@@ -104,6 +104,7 @@ export { DiffPane } from '@acorn/client-core/features/diff/DiffPane.tsx'
 // Each one covers a shape two or more panes would otherwise draw with raw tags and a private class. See
 // docs/ui-design/closed-kit.md § The closed kit for the admission rule they had to pass, and
 // @acorn/plugin-api/ui/tokens for the role enums their props take.
+export { Pane } from '@acorn/client-core/kit/components/layout'
 export { Stack } from '@acorn/client-core/kit/components/layout'
 export { Inline } from '@acorn/client-core/kit/components/layout'
 export { Text } from '@acorn/client-core/kit/components/content'

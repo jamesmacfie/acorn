@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js'
 import { render } from 'solid-js/web'
 import { expect, it, vi } from 'vitest'
+import { Pane } from './public'
 import { TabPanel, Tabs } from './Tabs'
 
 it('records scrolling when remote props are replaced without changing the retained offset', async () => {
@@ -195,6 +196,37 @@ it('draws tree children as trailing actions, and no actions box when there are n
     expect(host.querySelector('.ui-tabs-actions')).toBeNull()
     setItems(['Error'])
     expect(host.querySelector('.ui-tabs-actions')?.textContent).toBe('Error')
+  } finally {
+    dispose()
+  }
+})
+
+it('leaves scroll restoration and events to the child when the panel does not own scrolling', async () => {
+  const host = document.createElement('div')
+  const changed = vi.fn()
+  const [scroll, setScroll] = createSignal(false)
+  const dispose = render(
+    () => (
+      <Pane>
+        <TabPanel idPrefix="child" id="logs" active="logs" scroll={scroll()} scrollOffset={321} onChange={changed}>
+          <div>Child viewport</div>
+        </TabPanel>
+      </Pane>
+    ),
+    host,
+  )
+  try {
+    const panel = host.querySelector<HTMLElement>('[role="tabpanel"]')!
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(panel.scrollTop).toBe(0)
+    panel.dispatchEvent(new Event('scroll'))
+    expect(changed).not.toHaveBeenCalled()
+    setScroll(true)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(panel.scrollTop).toBe(321)
+    panel.scrollTop = 123
+    panel.dispatchEvent(new Event('scroll'))
+    expect(changed).toHaveBeenCalledWith(123)
   } finally {
     dispose()
   }

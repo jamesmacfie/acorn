@@ -1,4 +1,5 @@
 import { speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
+import { runsIn, type PluginClient } from '@acorn/protocol/plugin/clients.ts'
 import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import type {
   InstalledPluginRow,
@@ -74,6 +75,8 @@ export type PluginTrustRequest = {
 
 export type PluginDistributionSnapshot = {
   revision: number
+  /** The app this snapshot was derived for. A declaration that doesn't list it is offered nothing here. */
+  app: PluginClient
   byNode: ReadonlyMap<string, NodePluginObservation>
   selectionsByNode: ReadonlyMap<string, ReadonlyMap<string, PluginSelection>>
   offeredCandidates: readonly OfferedPluginCandidate[]
@@ -165,10 +168,14 @@ export function derivePluginDistribution(
   revision: number,
   apiVersion: string,
   devicePlugins: readonly DevicePluginEntry[] = [],
+  app: PluginClient = 'desktop',
 ): PluginDistributionSnapshot {
+  // A bundle for another app is never selected or asked about here. Skills and inputs are approved on
+  // the node, so the node-approval loop at the end doesn't check the app.
   const offeredCandidates = [...byNode.values()]
     .filter((observation) => observation.reachable && !observation.stale)
     .flatMap((observation) => observation.rows.flatMap((row) => offersFor(observation.nodeId, row)))
+    .filter((candidate) => runsIn(candidate.declaration, app))
   const byKey = new Map<string, OfferedPluginCandidate[]>()
   for (const candidate of offeredCandidates) {
     const key = decisionKey(candidate.pluginId, candidate.hash)
@@ -184,7 +191,7 @@ export function derivePluginDistribution(
   const selectedDevice = new Map<string, DevicePluginEntry>()
   for (const entry of devicePlugins) {
     const installed = entry.row.installed
-    if (!installed || !speaksApiVersion(installed.apiVersion, apiVersion)) continue
+    if (!installed || !speaksApiVersion(installed.apiVersion, apiVersion) || !runsIn(installed, app)) continue
     const previous = selectedDevice.get(entry.row.name)
     if (
       !previous ||
@@ -220,7 +227,7 @@ export function derivePluginDistribution(
     if (observation.reachable && !observation.stale) {
       for (const row of observation.rows) {
         const runtime = runtimeIdentityForRow(row)
-        if (!runtime || !speaksApiVersion(runtime.apiVersion, apiVersion)) continue
+        if (!runtime || !speaksApiVersion(runtime.apiVersion, apiVersion) || !runsIn(runtime, app)) continue
         const hash = runtime.client?.hash ?? ''
         const key = decisionKey(row.name, hash)
         if (
@@ -311,6 +318,7 @@ export function derivePluginDistribution(
   )
   return {
     revision,
+    app,
     byNode,
     selectionsByNode,
     offeredCandidates,

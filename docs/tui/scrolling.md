@@ -64,8 +64,9 @@ turn. A mounted viewport keeps its offset.
 reports viewport moves. These values also cross the remote kit contract as JSON and a semantic event.
 
 A viewport's height comes from `flexBasis: 0` on a flex line, and the content inside is free-sized, so
-a viewport nested in a viewport has nothing to bound it. One scroller per column, and the pane says
-which node it is.
+a viewport nested in a viewport has nothing to bound it. Use `Pane` or `Stack grow` to bound a tab body. Set `TabPanel scroll={false}` when a child such as `Log`
+owns the viewport. Each body chooses one scrolling owner; the enclosing region then fits without
+scrolling. See [pane layout](../plugins/tree-contract.md#pane-layout).
 
 A page key clamps instead of wrapping. `pageNext` goes to the last row and `pagePrev` to the first,
 and each hands the key back once there, so the viewport below scrolls. This is in the shared

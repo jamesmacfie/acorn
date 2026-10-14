@@ -154,6 +154,9 @@ export type InstalledPluginRow = {
   // rather than defaulted for the same reason `reason` is: this row is persisted in the query cache
   // and a required field would need a bumped key.
   emits?: readonly import('../../plugin/contract.ts').PluginEmit[]
+  // The client apps the manifest lists (@acorn/protocol/plugin/clients.ts). Absent means every app, which
+  // is also how a cached row from before this field reads.
+  clients?: readonly string[]
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
   // brand's own colour as a six-digit hex. The device registers `icon` as `brand:<pluginId>` and each
   // `icons` key as `brand:<pluginId>/<key>`, stamping the prefix from the roster row so a package can't

@@ -11,9 +11,9 @@ import type { AcornBridge, TreeMount, TreeRender } from 'acorn-plugin-sdk'
 /**
  * What a kit node takes: anything, checked on arrival.
  *
- * Loose on purpose. Acorn validates every prop before it reaches a component, so a narrow type here
- * would be a second, drifting copy of a rule already enforced where it matters. What the check does
- * guarantee is the shape: a function survives only under one of acorn's semantic event names
+ * Layout nodes have typed props for sizing and scrolling ownership. Other nodes remain loose.
+ * Acorn validates every prop before it reaches a component: a function survives only under
+ * one of acorn's semantic event names
  * (`onPress`, `onChange`, `onSelect` and the rest), and `class`, `style` and the other DOM escape
  * hatches are dropped before they cross.
  */
@@ -26,7 +26,35 @@ export type KitNodeProps = Record<string, unknown> & { children?: unknown }
  * reader gets has the shell's focus behaviour, keyboard handling, ARIA and style pack. A name that
  * this acorn does not have draws a labelled placeholder rather than failing the tree around it.
  */
-export declare const Stack: (props: KitNodeProps) => JSX.Element
+/** Layout props shared by the DOM, terminal, and remote tree adapters. */
+type LayoutSpace = 'none' | 'inline' | 'row' | 'stack' | 'section'
+
+/** A bounded column. Content above and below its body keeps its natural height. */
+export interface PaneProps<Child = unknown> {
+  gap?: LayoutSpace
+  children: Child
+}
+
+/** A run of content, or a bounded column when grow is set. */
+export interface StackProps<Child = unknown> extends PaneProps<Child> {
+  /** Fill the region so a child viewport has a height to scroll against. */
+  grow?: boolean
+}
+
+export interface TabPanelProps<Child = unknown> {
+  idPrefix: string
+  id: string
+  active: string
+  children: Child
+  /** False when a child such as Log owns scrolling. Defaults to true. */
+  scroll?: boolean
+  scrollOffset?: number
+  padding?: 'pane'
+  onChange?: (offset: number) => void
+}
+
+export declare const Pane: (props: PaneProps) => JSX.Element
+export declare const Stack: (props: StackProps) => JSX.Element
 export declare const Inline: (props: KitNodeProps) => JSX.Element
 export declare const Section: (props: KitNodeProps) => JSX.Element
 export declare const Fold: (props: KitNodeProps) => JSX.Element
@@ -46,7 +74,7 @@ export declare const DetailColumn: (props: KitNodeProps) => JSX.Element
 export declare const SplitHandle: (props: KitNodeProps) => JSX.Element
 export declare const DocumentTabs: (props: KitNodeProps) => JSX.Element
 export declare const SectionHeader: (props: KitNodeProps) => JSX.Element
-export declare const TabPanel: (props: KitNodeProps) => JSX.Element
+export declare const TabPanel: (props: TabPanelProps) => JSX.Element
 export declare const ToolbarSpacer: (props: KitNodeProps) => JSX.Element
 export declare const SettingsSection: (props: KitNodeProps) => JSX.Element
 export declare const SettingRow: (props: KitNodeProps) => JSX.Element

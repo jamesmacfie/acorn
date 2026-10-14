@@ -26,6 +26,7 @@ export type FocusRole = 'stop' | 'collection' | 'item' | 'trap' | 'none' | 'cond
 
 export const NODE_FOCUS = {
   // Grouping
+  Pane: 'none',
   Stack: 'none',
   Inline: 'none',
   Section: 'conditional',

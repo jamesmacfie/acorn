@@ -349,7 +349,7 @@ export function startHelperServer(
     },
     'plugins-install': async (raw) => {
       const { source, expectedPluginId } = installSchema.parse(raw)
-      const result = await helper.pluginCache.putFromSource(source, expectedPluginId)
+      const result = await helper.pluginCache.putFromSource(source, 'desktop', expectedPluginId)
       if ('hash' in result)
         helper.pluginTrust.recordDevAccept({
           pluginId: result.pluginId,

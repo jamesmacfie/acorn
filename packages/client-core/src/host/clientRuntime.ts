@@ -2,6 +2,7 @@ import { createEffect, createRoot, onCleanup } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 import type { PostedTelemetryRuntime } from '@acorn/protocol/telemetry.ts'
+import type { PluginClient } from '@acorn/protocol/plugin/clients.ts'
 import { watchConnectionChanges } from '../features/integrations/watchConnectionChanges'
 import { initSystemNotices, initWorkflowNotices } from '../features/notifications/deliver'
 import { watchProjectChanges } from '../features/projects/watchProjectChanges'
@@ -14,6 +15,7 @@ import { startDeviceConfigSync } from '../infra/persistence/deviceConfigSync'
 import { startClientTelemetry } from '../infra/telemetry/emitter'
 import { postTelemetryBatch } from '../infra/telemetry/post'
 import { watchPluginChanges } from './plugins/reload'
+import { setClientApp } from './plugins/clientApp'
 import { clientScheduleRegistry, startClientSchedules } from './registries/shell/schedules'
 
 // Everything a client host starts the same way, in one call. The desktop renderer
@@ -28,6 +30,9 @@ import { clientScheduleRegistry, startClientSchedules } from './registries/shell
 export type ClientRuntimeHost = {
   /** Which runtime this client's telemetry records name. */
   runtime: PostedTelemetryRuntime
+  /** Which app this is, for the plugins that list the apps they run in. Stated, never worked out from
+   *  what the host offers. */
+  app: PluginClient
   /** The query cache that preferences from the device config file are saved into. */
   client: () => QueryClient
   /** Called with each device config the file supplies, before its preferences are saved. */
@@ -40,6 +45,7 @@ export type ClientRuntimeHost = {
 /** Starts the shared runtime and resolves once the device config file has been applied, with the
  *  one function that stops all of it. */
 export async function startClientRuntime(host: ClientRuntimeHost): Promise<() => void> {
+  setClientApp(host.app)
   startClientTelemetry({ runtime: host.runtime, post: postTelemetryBatch(host.runtime) })
 
   const stops: (() => void)[] = [

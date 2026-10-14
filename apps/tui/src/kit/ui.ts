@@ -27,6 +27,7 @@ export {
   SettingRow,
   SettingsSection,
   SplitHandle,
+  Pane,
   Stack,
   TabPanel,
   Tabs,
