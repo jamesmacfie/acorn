@@ -15,14 +15,16 @@ import {
 import type { DockerContainerDetail, DockerPort } from '../shared/model'
 import { portAddress } from './nodeAddress'
 
-function portTitle(port: DockerPort): string {
-  const address = portAddress(port)
+function portTitle(port: DockerPort, nodeId: string | null): string {
+  const address = portAddress(port, nodeId)
   if (!address) return 'Not published'
   return address.caveat ? `Copy ${address.url}. ${address.caveat}` : `Copy ${address.url}`
 }
 
 export default function ContainerInfo(props: {
   detail: DockerContainerDetail
+  /** The Node whose Docker runs this container, which the port addresses point at. */
+  nodeId: string | null
   showEnv: boolean
   onToggleEnv(): void
   onCopyPort(port: DockerPort): void
@@ -66,7 +68,10 @@ export default function ContainerInfo(props: {
             <ChipRow ariaLabel="Published ports">
               <For each={d().ports}>
                 {(port) => (
-                  <Chip title={portTitle(port)} {...(port.hostPort ? { onPress: () => props.onCopyPort(port) } : {})}>
+                  <Chip
+                    title={portTitle(port, props.nodeId)}
+                    {...(port.hostPort ? { onPress: () => props.onCopyPort(port) } : {})}
+                  >
                     {port.hostPort ? `${port.hostPort} → ` : ''}
                     {port.containerPort}/{port.protocol}
                   </Chip>

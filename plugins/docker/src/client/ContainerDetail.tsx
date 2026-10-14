@@ -324,6 +324,7 @@ function ContainerDetailView(props: ContainerDetailProps) {
             >
               <ContainerInfo
                 detail={d()}
+                nodeId={owner.nodeId}
                 showEnv={showEnv()}
                 onToggleEnv={() => {
                   setShowEnv(!showEnv())
