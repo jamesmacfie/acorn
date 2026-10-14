@@ -60,8 +60,6 @@ export function Workspace(props: {
   // conversation's draft for review, never straight to an agent.
   waitingContext: PageCapture | null
   setWaitingContext(capture: PageCapture | null): void
-  // Opens Settings' task search.
-  findTask(): void
   // Every request the Node's agents are waiting on, and one whose conversation the person asked to
   // open from an OS notification.
   requests: readonly BridgePendingRequest[]
@@ -236,12 +234,6 @@ export function Workspace(props: {
     })
   }
 
-  const chooseHandoffTask = (capture: PageCapture) => {
-    props.setWaitingContext(capture)
-    props.dismissHandoff()
-    props.findTask()
-  }
-
   // Opens a request's conversation, as a remembered one is restored.
   const openConversation = (target: Destination & { projectId: string; taskId: string }) => {
     void saveDestination(props.storage.local, nodeId, target)
@@ -411,7 +403,6 @@ export function Workspace(props: {
               startHandoff={props.startHandoff}
               dismissHandoff={props.dismissHandoff}
               openHandoffTask={openHandoffTask}
-              chooseHandoffTask={chooseHandoffTask}
               startedHandoffTask={(...args) => void startedHandoffTask(...args)}
               waitingContext={props.waitingContext}
               dropWaitingContext={() => props.setWaitingContext(null)}
@@ -455,11 +446,7 @@ export function Workspace(props: {
             </Show>
             {/* The task the person last used stays pinned when the page is not its own. */}
             <Show when={!pageTask() || (current().taskId && current().taskId !== pageTask()!.task.id)}>
-              <CurrentTask
-                task={task()}
-                projectName={current().projectId ? projectName(current().projectId!) : null}
-                findTask={props.findTask}
-              />
+              <CurrentTask task={task()} projectName={current().projectId ? projectName(current().projectId!) : null} />
             </Show>
           </div>
         }

@@ -44,7 +44,6 @@ export function ThisPage(props: {
   startHandoff(handoff: PageHandoff): void
   dismissHandoff(): void
   openHandoffTask(projectId: string, taskId: string, capture: PageCapture): void
-  chooseHandoffTask(capture: PageCapture): void
   startedHandoffTask(
     projectId: string,
     taskId: string,
@@ -85,14 +84,16 @@ export function ThisPage(props: {
               online={props.online}
               opensLinks={props.opensLinks}
               openTask={props.openHandoffTask}
-              chooseTask={props.chooseHandoffTask}
               startedTask={props.startedHandoffTask}
               dismiss={props.dismissHandoff}
             />
           )}
         </Match>
         <Match when={!props.pageUrl}>
-          <p class="quiet">Acorn can't read this page. Click the Acorn button in the toolbar while it's showing.</p>
+          <p class="quiet">
+            Your browser hides this page's address from Acorn. Click the Acorn icon in the browser toolbar to find tasks
+            for this page.
+          </p>
         </Match>
         <Match when={props.pageTasks.length}>
           <ul class="rows" aria-label="Page tasks">
@@ -399,8 +400,15 @@ export function lastLines(read: (sessionId: string, afterSeq: number, limit: num
   }
 }
 
-// Every conversation in the current task: its agent, title, state, and last line. A row opens it,
-// and New chat starts another.
+// The kinds of conversation a task has, grouped as the desktop app's Agents sidebar groups them.
+const SESSION_GROUPS: { label: string; has(session: BridgeAgentSession): boolean }[] = [
+  { label: 'Managed chats', has: (session) => !session.inline && session.kind !== 'workflow' },
+  { label: 'Inline chats', has: (session) => session.inline },
+  { label: 'Workflows', has: (session) => !session.inline && session.kind === 'workflow' },
+]
+
+// Every conversation in the current task, grouped by kind: its agent, title, state, and last line.
+// A row opens it, and New chat starts another.
 export function Agents(props: {
   client: BridgeClient
   nodeId: string
@@ -423,26 +431,38 @@ export function Agents(props: {
       <Show when={props.sessions} fallback={<p class="quiet">Loading conversations…</p>}>
         {(sessions) => (
           <Show when={sessions().length} fallback={<p class="quiet">This task has no conversation yet.</p>}>
-            <ul class="rows">
-              <For each={sessions()}>
-                {(session) => {
-                  const state = () => agentState(session, waiting(session.id))
-                  return (
-                    <li>
-                      <button type="button" class="row-button" onClick={() => props.open(session.id)}>
-                        <span class="row">
-                          <strong class="grow">
-                            {agentName(session)} · {session.title}
-                          </strong>
-                          <State tone={state().tone}>{state().label}</State>
-                        </span>
-                        <Show when={props.lines.line(session.id)}>{(line) => <span class="quiet">{line()}</span>}</Show>
-                      </button>
-                    </li>
-                  )
-                }}
-              </For>
-            </ul>
+            <For each={SESSION_GROUPS}>
+              {(group) => {
+                const rows = () => sessions().filter(group.has)
+                return (
+                  <Show when={rows().length}>
+                    <h3>{group.label}</h3>
+                    <ul class="rows" aria-label={group.label}>
+                      <For each={rows()}>
+                        {(session) => {
+                          const state = () => agentState(session, waiting(session.id))
+                          return (
+                            <li>
+                              <button type="button" class="row-button" onClick={() => props.open(session.id)}>
+                                <span class="row">
+                                  <strong class="grow">
+                                    {agentName(session)} · {session.title}
+                                  </strong>
+                                  <State tone={state().tone}>{state().label}</State>
+                                </span>
+                                <Show when={props.lines.line(session.id)}>
+                                  {(line) => <span class="quiet">{line()}</span>}
+                                </Show>
+                              </button>
+                            </li>
+                          )
+                        }}
+                      </For>
+                    </ul>
+                  </Show>
+                )
+              }}
+            </For>
           </Show>
         )}
       </Show>
@@ -512,16 +532,11 @@ function NewChat(props: {
 
 // The task the person last used. It stays here whatever page is showing, so a capture always has a
 // conversation to go to.
-export function CurrentTask(props: { task: BridgeTask | null; projectName: string | null; findTask(): void }) {
+export function CurrentTask(props: { task: BridgeTask | null; projectName: string | null }) {
   return (
     <section aria-label="Current task">
-      <div class="section-head">
-        <h2>Current task</h2>
-        <button type="button" class="link" onClick={() => props.findTask()}>
-          Find a task
-        </button>
-      </div>
-      <Show when={props.task} fallback={<p class="quiet">No task yet. Choose one under This page, or find one.</p>}>
+      <h2>Current task</h2>
+      <Show when={props.task} fallback={<p class="quiet">No task yet. Choose one under This page.</p>}>
         {(task) => (
           <p>
             <strong>{task().title}</strong>

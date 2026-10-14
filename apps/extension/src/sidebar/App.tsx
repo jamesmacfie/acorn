@@ -65,7 +65,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     tasks: [],
   })
   const [showTask, setShowTask] = createSignal<{ chat: { url: string; title: string } | null } | null>(null)
-  // A handed-off item's context, kept here so it outlives a visit to Settings' task search.
+  // A handed-off item's context, waiting for the conversation the person opens next.
   const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
   // Settings replaces Home or the open conversation, which restores from storage when it closes.
   const [settings, setSettings] = createSignal(false)
@@ -312,7 +312,6 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   dismissHandoff={() => setHandoff(null)}
                   waitingContext={waitingContext()}
                   setWaitingContext={setWaitingContext}
-                  findTask={() => setSettings(true)}
                   requests={requests().nodeId === nodeId ? requests().requests : []}
                   openRequest={openRequest()}
                   openedRequest={() => setOpenRequest(null)}

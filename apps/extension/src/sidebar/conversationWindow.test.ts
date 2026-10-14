@@ -56,6 +56,7 @@ function ledger(last: number) {
         providerId: 'p',
         profileId: 'p',
         kind: 'interactive',
+        inline: false,
         runtimeState: 'ready',
         attention: 'none',
         lastEventSeq: state.last,

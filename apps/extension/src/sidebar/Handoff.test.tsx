@@ -44,6 +44,7 @@ const session = (id: string, taskId: string): BridgeAgentSession => ({
   providerId: 'claude',
   profileId: 'claude-code',
   kind: 'interactive',
+  inline: false,
   runtimeState: 'ready',
   attention: 'none',
   lastEventSeq: 0,
@@ -274,23 +275,6 @@ describe('a handoff in the sidebar', () => {
     await settle()
     expect(writeText).toHaveBeenCalledWith(`acorn://n1/open?url=${encodeURIComponent(PAGE)}`)
     expect(button(root, 'Copied')).toBeDefined()
-  })
-
-  it('lets the person pick any other task, which gets the context without a link', async () => {
-    const { fake, root, state } = mount()
-    await settle(20)
-    await clickSiteButton(fake)
-    button(root, 'Add to a task')!.click()
-    await settle(20)
-    // Settings opens on its task search, which lists every open task.
-    const found = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Tasks"] .row-button')]
-    expect(found.map((row) => row.textContent)).toEqual(['Existing workWidget'])
-    found[0]!.click()
-    await settle(30)
-    expect(currentTask(root)).toBe('Existing work')
-    await openChat(root, 'Chat s1')
-    expect(captures(root)).toHaveLength(1)
-    expect(state.requests.some((request) => request.op === 'handoff.create')).toBe(false)
   })
 
   it('offers the handoff for the page beside it when no button could be drawn', async () => {

@@ -8,7 +8,7 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import { SELECTED_NODE_KEY, startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
-import { back, button, conversationTitle, findTask, openChat } from '../test/sidebarUi'
+import { back, button, conversationTitle, openChat, rememberTask } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -27,6 +27,7 @@ const session = (id: string, extra: Partial<BridgeAgentSession> = {}): BridgeAge
   providerId: 'claude',
   profileId: 'claude-code',
   kind: 'interactive',
+  inline: false,
   runtimeState: 'ready',
   attention: 'none',
   lastEventSeq: 0,
@@ -242,10 +243,10 @@ const send = (root: HTMLElement) =>
 const transcript = (root: HTMLElement) => [...root.querySelectorAll('.transcript li')].map((item) => item.textContent)
 const draft = (root: HTMLElement) => root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')?.value
 
-async function openSession(root: HTMLElement, sessionId = 's1') {
+async function openSession(subject: ReturnType<typeof mount>, sessionId = 's1') {
   await settle()
-  await findTask(root, 'Fix it')
-  await openChat(root, `Chat ${sessionId}`)
+  await rememberTask(subject.root, subject.fake.storage, 'p1', 't1')
+  await openChat(subject.root, `Chat ${sessionId}`)
 }
 // The conversation's own reads, apart from the short ones Home makes for each row's last line.
 const windowReads = (requests: Request[]) =>
@@ -256,7 +257,7 @@ describe('conversation', () => {
     const subject = mount()
     subject.say('s1', 'Hello from the desktop', 'user_message')
     subject.say('s1', 'Hi')
-    await openSession(subject.root)
+    await openSession(subject)
     // Where a message goes: the task, then the conversation.
     expect(subject.root.querySelector('[aria-label="Conversation"] .view-head')!.textContent).toContain('Fix it')
     expect(conversationTitle(subject.root)).toBe('Claude · Chat s1')
@@ -276,7 +277,7 @@ describe('conversation', () => {
 
   it('keeps an unsent draft and the destination when the sidebar closes and opens again', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     type(subject.root, 'Half a thought')
     await settle()
     const root = subject.reopen()
@@ -288,7 +289,7 @@ describe('conversation', () => {
   it('gives each conversation its own draft and drops a slow read for the one it left', async () => {
     const subject = mount()
     subject.say('s1', 'Only in s1')
-    await openSession(subject.root)
+    await openSession(subject)
     type(subject.root, 'For s1')
     await back(subject.root)
     // Open s1 again, but leave for s2 before its read answers.
@@ -309,7 +310,7 @@ describe('conversation', () => {
 
   it('keeps an unconfirmed message and retries it with the same key, making one turn', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     type(subject.root, 'Run the tests')
     // The Node takes the turn but the answer is lost on the way back.
     subject.state.answers.set('turn.submit', (request) => {
@@ -335,7 +336,7 @@ describe('conversation', () => {
 
   it('sends to the conversation the message was written in, even after a switch', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     type(subject.root, 'For s1 only')
     let release!: () => void
     subject.state.holds.set('turn.submit', (answer) => (release = answer))
@@ -356,7 +357,7 @@ describe('conversation', () => {
 
   it('reads again when the Node comes back, and holds sends while it is away', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     subject.state.host!.send({ v: 1, event: 'status', status: { nodeId: 'n1', state: 'offline' } })
     await settle()
     type(subject.root, 'Wait for it')
@@ -372,7 +373,7 @@ describe('conversation', () => {
 
   it('keeps the draft of a conversation that is gone or archived and refuses to send', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     type(subject.root, 'Still here')
     subject.state.sessions[0]!.archivedAt = 5
     subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1'], tasks: [], missed: false })
@@ -388,7 +389,7 @@ describe('conversation', () => {
 
   it('starts a chat with an installed profile and names the ones that cannot start', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     await back(subject.root)
     button(subject.root, 'New chat')!.click()
     await settle()
@@ -425,7 +426,7 @@ describe('home', () => {
     subject.say('s1', 'Line one\nEdited the totals')
     subject.state.sessions[1]!.runtimeState = 'working'
     await settle()
-    await findTask(subject.root, 'Fix it')
+    await rememberTask(subject.root, subject.fake.storage, 'p1', 't1')
     expect(subject.root.querySelector('[aria-label="Current task"]')!.textContent).toContain('Fix it')
     expect(rows(subject.root)).toEqual([
       ['Claude · Chat s1', 'Ready', 'Edited the totals'],
@@ -447,6 +448,23 @@ describe('home', () => {
     await settle()
     expect(tails().length).toBe(before + 1)
     expect(rows(subject.root)[0]).toEqual(['Claude · Chat s1', 'Ready', 'Ran the tests'])
+  })
+
+  it('groups the conversations into managed chats, inline chats, and workflows', async () => {
+    const subject = mount()
+    subject.state.sessions.push(session('s3', { kind: 'workflow' }), session('s4', { inline: true }))
+    subject.state.events.set('s3', []).set('s4', [])
+    await settle()
+    await rememberTask(subject.root, subject.fake.storage, 'p1', 't1')
+    const groups = [...subject.root.querySelectorAll('[aria-label="Agents"] ul.rows')].map((list) => [
+      list.getAttribute('aria-label'),
+      [...list.querySelectorAll('strong')].map((row) => row.textContent),
+    ])
+    expect(groups).toEqual([
+      ['Managed chats', ['Claude · Chat s1', 'Claude · Chat s2']],
+      ['Inline chats', ['Claude · Chat s4']],
+      ['Workflows', ['Claude · Chat s3']],
+    ])
   })
 
   it('answers a waiting request on Home with the buttons the conversation uses', async () => {
@@ -505,7 +523,7 @@ describe('questions and approvals', () => {
   it('shows a permission request in full and answers with the option id', async () => {
     const subject = mount()
     subject.state.agentRequests.push(permission())
-    await openSession(subject.root)
+    await openSession(subject)
     expect(card(subject.root)!.textContent).toContain('Run rm -rf build')
     expect(card(subject.root)!.textContent).toContain('In /src/acorn')
     expect(status(subject.root)).toBe('Waiting for an answer')
@@ -555,7 +573,7 @@ describe('questions and approvals', () => {
         ],
       }),
     )
-    await openSession(subject.root)
+    await openSession(subject)
     const field = (name: string) => card(subject.root)!.querySelector<HTMLInputElement>(`[name="${name}"]`)!
     expect(field('answer:token').type).toBe('password')
     expect(field('answer:why').type).toBe('text')
@@ -587,7 +605,7 @@ describe('questions and approvals', () => {
   it('settles a request another client answered first, with no second answer', async () => {
     const subject = mount()
     subject.state.agentRequests.push(permission())
-    await openSession(subject.root)
+    await openSession(subject)
     // Another client answers while this sidebar still shows the buttons.
     Object.assign(subject.state.agentRequests[0]!, { status: 'resolved', answer: 'Allow' })
     button(subject.root, 'Reject')!.click()
@@ -611,7 +629,7 @@ describe('questions and approvals', () => {
   it('reads again after an unconfirmed answer, never resends it, and reuses its key when pressed again', async () => {
     const subject = mount()
     subject.state.agentRequests.push(permission())
-    await openSession(subject.root)
+    await openSession(subject)
     // The answer never reaches the Node, and the reply is lost.
     subject.state.answers.set('request.resolve', () => ({
       error: { code: 'ambiguous_mutation', message: 'The Node did not confirm the change.' },
@@ -636,7 +654,7 @@ describe('questions and approvals', () => {
   it('binds an answer to its conversation when the person switches away before it returns', async () => {
     const subject = mount()
     subject.state.agentRequests.push(permission())
-    await openSession(subject.root)
+    await openSession(subject)
     let release!: () => void
     subject.state.holds.set('request.resolve', (answer) => (release = answer))
     button(subject.root, 'Allow')!.click()
@@ -656,7 +674,7 @@ describe('questions and approvals', () => {
   it('holds answers while the Node is away', async () => {
     const subject = mount()
     subject.state.agentRequests.push(permission())
-    await openSession(subject.root)
+    await openSession(subject)
     subject.state.host!.send({ v: 1, event: 'status', status: { nodeId: 'n1', state: 'offline' } })
     await settle()
     expect(button(subject.root, 'Allow')!.hasAttribute('disabled')).toBe(true)
@@ -676,7 +694,7 @@ describe('questions and approvals', () => {
         unsupported: "The extension can't answer a workflow gate request yet. Answer it in the Acorn app.",
       }),
     )
-    await openSession(subject.root)
+    await openSession(subject)
     const [approval, gate] = [...subject.root.querySelectorAll<HTMLElement>('article.request')]
     expect(approval!.textContent).toContain('App: Notes (com.apple.Notes)')
     expect(approval!.textContent).toContain('Always allow lasts.')
@@ -701,7 +719,7 @@ describe('page capture', () => {
   it('keeps captures in the browser until send, then sends them in one turn', async () => {
     const subject = mount()
     subject.fake.selection = '  The failing assertion  '
-    await openSession(subject.root)
+    await openSession(subject)
     await capture(subject.root, 'Add page link to chat')
     await capture(subject.root, 'Add selected text to chat')
     await capture(subject.root, 'Add screenshot to chat')
@@ -744,7 +762,7 @@ describe('page capture', () => {
   it('asks for the toolbar button when the browser gives no access to the page', async () => {
     const subject = mount()
     subject.fake.activeTab = { id: 1, windowId: 1 }
-    await openSession(subject.root)
+    await openSession(subject)
     await capture(subject.root, 'Add page link to chat')
     await capture(subject.root, 'Add screenshot to chat')
     expect(captures(subject.root)).toEqual([])
@@ -753,7 +771,7 @@ describe('page capture', () => {
 
   it('says a granted site still needs the toolbar button for a screenshot', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     // Firefox's answer when a site is granted but the toolbar button wasn't clicked.
     subject.fake.onCapture = async () => {
       throw new Error('Missing activeTab permission')
@@ -766,7 +784,7 @@ describe('page capture', () => {
 
   it('keeps no screenshot when the tab changes while it is taken', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     subject.fake.onCapture = async () => {
       subject.fake.activeTab = { id: 2, windowId: 1, url: 'https://example.test/other', title: 'Other' }
       return 'data:image/jpeg;base64,/9j/4AAQ'
@@ -778,7 +796,7 @@ describe('page capture', () => {
 
   it('reports a capture over the limits before anything is uploaded', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     subject.fake.onCapture = async () => `data:image/jpeg;base64,${'A'.repeat(8 * 1024 * 1024)}`
     await capture(subject.root, 'Add screenshot to chat')
     expect(subject.root.textContent).toContain('over the 5.0 MB a draft keeps')
@@ -794,7 +812,7 @@ describe('page capture', () => {
 
   it('keeps an uploaded screenshot with the draft when the send is uncertain, and reuses it on retry', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     await capture(subject.root, 'Add screenshot to chat')
     subject.state.answers.set('turn.submit', () => ({ error: { code: 'host_unavailable', message: 'Gone.' } }))
     send(subject.root)
@@ -819,7 +837,7 @@ describe('page capture', () => {
 
   it('keeps the screenshot when its upload fails, and deletes an uploaded one the person removes', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     await capture(subject.root, 'Add screenshot to chat')
     subject.state.answers.set('attachment.upload', () => ({
       error: { code: 'node_error', message: 'Attachments are limited to 10 MiB each.' },
@@ -842,7 +860,7 @@ describe('page capture', () => {
 
   it('finishes an upload and send for the conversation it started in after a switch', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     await capture(subject.root, 'Add screenshot to chat')
     let release!: () => void
     subject.state.holds.set('attachment.upload', (answer) => (release = answer))
@@ -860,7 +878,7 @@ describe('page capture', () => {
 
   it('lands a screenshot taken before a switch in the draft it was taken for', async () => {
     const subject = mount()
-    await openSession(subject.root)
+    await openSession(subject)
     let finish!: (value: string) => void
     subject.fake.onCapture = () => new Promise((resolve) => (finish = resolve))
     button(subject.root, 'Add screenshot to chat')!.click()
@@ -903,7 +921,7 @@ describe('page capture', () => {
       },
     })
     subject.state.sessions[0]!.lastEventSeq = 1
-    await openSession(subject.root)
+    await openSession(subject)
     expect(written(subject, 'attachment.read')).toMatchObject([{ taskId: 't1', attachmentId: 'a1' }])
     expect(subject.root.querySelector('.transcript img')!.getAttribute('src')).toBe('blob:shot-1')
     expect(transcript(subject.root)).toEqual(['YouLookAttachment'])
@@ -936,7 +954,7 @@ describe('Add to Acorn chat', () => {
 
   it('adds the selection to the open conversation, beside its other captures, and sends it', async () => {
     const subject = mount(selected())
-    await openSession(subject.root, 's2')
+    await openSession(subject, 's2')
     button(subject.root, 'Add page link to chat')!.click()
     await settle()
     await rightClick(subject)
@@ -959,7 +977,7 @@ describe('Add to Acorn chat', () => {
 
   it("opens the current task's newest conversation from Home", async () => {
     const subject = mount(selected())
-    await openSession(subject.root, 's2')
+    await openSession(subject, 's2')
     await back(subject.root)
     await rightClick(subject)
     expect(conversationTitle(subject.root)).toBe('Claude · Chat s1')

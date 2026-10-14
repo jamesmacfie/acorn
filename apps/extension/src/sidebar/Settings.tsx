@@ -1,15 +1,15 @@
 import { For, Show, createResource, createSignal, onCleanup, onMount } from 'solid-js'
-import type { BridgeHandoff, BridgeNodes, BridgeProject, BridgeTask } from '@acorn/protocol/extensionBridge.ts'
+import type { BridgeHandoff, BridgeNodes, BridgeProject } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import type { BrowserApi } from '../browser'
 import { STYLES, THEMES, loadAppearance, saveAppearance, type Appearance } from './appearance'
 import type { BridgeClient } from './bridgeClient'
-import { loadDestination, saveDestination } from '../localState'
+import { loadDestination } from '../localState'
 import { ProjectSites } from './ProjectSites'
 import { SiteAccess } from './SiteAccess'
 
-// Everything that isn't the work: the Nodes and pairing, a search for any task, which sites the
-// extension may read, each project's sites, notifications, and appearance.
+// Everything that isn't the work: the Nodes and pairing, which sites the extension may read, each
+// project's sites, notifications, and appearance.
 export function Settings(props: {
   api: BrowserApi
   client: BridgeClient
@@ -87,7 +87,6 @@ export function Settings(props: {
             sites={props.sites}
             pageUrl={props.pageUrl}
             sitesChanged={props.sitesChanged}
-            chose={props.close}
           />
         )}
       </Show>
@@ -98,8 +97,7 @@ export function Settings(props: {
   )
 }
 
-// The selected Node's tasks and project sites. Mounted per Node, so a list read for one never fills
-// another's.
+// The selected Node's project sites. Mounted per Node, so a list read for one never fills another's.
 function NodeSettings(props: {
   client: BridgeClient
   storage: BrowserApi['storage']['local']
@@ -108,111 +106,51 @@ function NodeSettings(props: {
   sites: readonly ProjectSite[]
   pageUrl: string | undefined
   sitesChanged(projectId: string, sites: SiteAssociation[]): void
-  // A task was chosen; Home opens on it.
-  chose(): void
 }) {
   const nodeId = props.nodeId
   const [projects, setProjects] = createSignal<BridgeProject[]>([])
-  // Every project's active tasks, read once Settings opens. The Node has no search across projects.
-  const [tasks, setTasks] = createSignal<{ task: BridgeTask; project: BridgeProject }[] | null>(null)
-  const [failed, setFailed] = createSignal(false)
   // The current task's project, to start the sites editor on.
   const [sitesProject, setSitesProject] = createSignal<string | null>(null)
   onMount(async () => {
     setSitesProject((await loadDestination(props.storage, nodeId)).projectId)
-    try {
-      const result = await props.client.call({ op: 'projects.list', nodeId })
-      const visible = result.projects.filter((project) => !project.hidden)
-      setProjects(visible)
-      const lists = await Promise.all(
-        visible.map(async (project) => {
-          const listed = await props.client.call({ op: 'tasks.list', nodeId, projectId: project.id })
-          return listed.tasks.map((task) => ({ task, project }))
-        }),
-      )
-      setTasks(lists.flat())
-    } catch {
-      setFailed(true)
-    }
+    // A failed read leaves Project sites hidden until Settings opens again.
+    const result = await props.client.call({ op: 'projects.list', nodeId }).catch(() => null)
+    if (result) setProjects(result.projects.filter((project) => !project.hidden))
   })
-  const [query, setQuery] = createSignal('')
-  const matches = () => {
-    const words = query().trim().toLowerCase()
-    return (tasks() ?? []).filter(({ task, project }) =>
-      [task.title, task.branch ?? '', project.name].some((field) => field.toLowerCase().includes(words)),
-    )
-  }
-  const choose = async (project: BridgeProject, task: BridgeTask) => {
-    await saveDestination(props.storage, nodeId, { projectId: project.id, taskId: task.id, sessionId: null })
-    props.chose()
-  }
 
   return (
-    <>
-      <section aria-label="Tasks">
-        <h2>Tasks</h2>
-        <input
-          name="task-search"
-          type="search"
-          placeholder="Search tasks by title, branch, or project"
-          value={query()}
-          onInput={(event) => setQuery(event.currentTarget.value)}
-        />
-        <Show when={!failed()} fallback={<p class="problem">The tasks couldn't be read. Open Settings again.</p>}>
-          <Show when={tasks()} fallback={<p class="quiet">Loading tasks…</p>}>
-            <Show when={matches().length} fallback={<p class="quiet">No open task matches.</p>}>
-              <ul class="rows">
-                <For each={matches()}>
-                  {({ task, project }) => (
-                    <li>
-                      <button type="button" class="row-button" onClick={() => void choose(project, task)}>
-                        <strong>{task.title}</strong>
-                        <span class="quiet">
-                          {project.name}
-                          {task.branch ? ` · ${task.branch}` : ''}
-                        </span>
-                      </button>
-                    </li>
-                  )}
-                </For>
-              </ul>
-            </Show>
-          </Show>
+    <Show when={projects().length}>
+      <section aria-label="Project sites">
+        <h2>Project sites</h2>
+        <select name="sites-project" onChange={(event) => setSitesProject(event.currentTarget.value || null)}>
+          <option value="" selected={!sitesProject()}>
+            Choose a project
+          </option>
+          <For each={projects()}>
+            {(project) => (
+              <option value={project.id} selected={project.id === sitesProject()}>
+                {project.name}
+              </option>
+            )}
+          </For>
+        </select>
+        <Show when={sitesProject()} keyed>
+          {(projectId) => (
+            <ProjectSites
+              client={props.client}
+              nodeId={nodeId}
+              projectId={projectId}
+              sites={props.sites
+                .filter((site) => site.projectId === projectId)
+                .map(({ origin, pathPrefix }) => ({ origin, pathPrefix }))}
+              pageUrl={props.pageUrl}
+              online={props.online}
+              changed={props.sitesChanged}
+            />
+          )}
         </Show>
       </section>
-      <Show when={projects().length}>
-        <section aria-label="Project sites">
-          <h2>Project sites</h2>
-          <select name="sites-project" onChange={(event) => setSitesProject(event.currentTarget.value || null)}>
-            <option value="" selected={!sitesProject()}>
-              Choose a project
-            </option>
-            <For each={projects()}>
-              {(project) => (
-                <option value={project.id} selected={project.id === sitesProject()}>
-                  {project.name}
-                </option>
-              )}
-            </For>
-          </select>
-          <Show when={sitesProject()} keyed>
-            {(projectId) => (
-              <ProjectSites
-                client={props.client}
-                nodeId={nodeId}
-                projectId={projectId}
-                sites={props.sites
-                  .filter((site) => site.projectId === projectId)
-                  .map(({ origin, pathPrefix }) => ({ origin, pathPrefix }))}
-                pageUrl={props.pageUrl}
-                online={props.online}
-                changed={props.sitesChanged}
-              />
-            )}
-          </Show>
-        </section>
-      </Show>
-    </>
+    </Show>
   )
 }
 

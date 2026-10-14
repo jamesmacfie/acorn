@@ -37,8 +37,6 @@ export function Handoff(props: {
   opensLinks: boolean
   // Open this task's newest conversation, or a new chat when it has none, with this context waiting.
   openTask(projectId: string, taskId: string, capture: PageCapture): void
-  // Let the person find any task in Settings, with this context waiting.
-  chooseTask(capture: PageCapture): void
   // Start task made a task and a conversation in it: open it with this draft, unsent.
   startedTask(projectId: string, taskId: string, sessionId: string, draft: { text: string; capture: PageCapture }): void
   dismiss(): void
@@ -265,9 +263,6 @@ export function Handoff(props: {
                       </Show>
                     </Show>
                   </Show>
-                  <button type="button" class="link" onClick={() => props.chooseTask(handoffCapture(current()))}>
-                    Add to a task
-                  </button>
                 </>
               )}
             </Show>

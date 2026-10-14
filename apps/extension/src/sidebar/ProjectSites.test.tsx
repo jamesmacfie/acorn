@@ -33,6 +33,7 @@ const session: BridgeAgentSession = {
   providerId: 'claude',
   profileId: 'claude-code',
   kind: 'interactive',
+  inline: false,
   runtimeState: 'ready',
   attention: 'none',
   lastEventSeq: 0,

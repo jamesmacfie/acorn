@@ -42,13 +42,12 @@ export async function useTask(root: ParentNode, title: string) {
   await settle(20)
 }
 
-// Makes a task current through Settings' task search, the way on a page that matches nothing.
-export async function findTask(root: ParentNode, title: string) {
-  button(root.querySelector('[aria-label="Current task"]')!, 'Find a task')!.click()
-  await settle(20)
-  const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Settings"] [aria-label="Tasks"] .row-button')]
-  rows.find((row) => row.querySelector('strong')?.textContent === title)!.click()
-  await settle(30)
+// Makes a task current the way a remembered one comes back: Home reads the stored choice again as
+// Settings closes. A page that matches nothing offers no way to choose a task.
+export async function rememberTask(root: ParentNode, storage: Map<string, unknown>, projectId: string, taskId: string) {
+  storage.set('destination:n1', { projectId, taskId, sessionId: null })
+  await openSettings(root)
+  await back(root)
 }
 
 // Opens a conversation from Agents, going back to Home first when one is open.

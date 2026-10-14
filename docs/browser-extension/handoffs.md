@@ -90,14 +90,12 @@ shows what came back:
    [site associations](./project-sites.md#handoffs) cover the page, unless the item carries a pull
    number. **Start task** creates the linked task with `handoff.create`, then a conversation with
    that agent, and opens it with the message and the item in its draft.
-4. **Add to a task** opens the task search in Settings. Choosing a task there makes it the current
-   task, and adds no link to it.
 
 Start task's two writes keep their keys, so pressing it again after either one went unconfirmed
 makes no second task or conversation. A repeated create, with the same key or after the task exists,
 answers the existing task.
 
-After **Chat** or **Add to a task**, whichever conversation the person opens next gets the item's
+After **Chat**, whichever conversation the person opens next gets the item's
 context in its draft, as an **Item** capture beside any links, selections, and screenshots. The same
 item handed off twice is one capture. Until then the sidebar says the context is waiting, with
 **Leave it out**. Nothing goes to an agent until the person sends, from Start task's draft too; the
@@ -115,7 +113,6 @@ Each verb means one thing wherever it shows:
 | **Open in Acorn** | Opens the desktop app through an [`acorn://` link](../frontend/acorn-links.md): a handed-off item's task on the pane that shows it (GitHub's for a pull request), a conversation on the agents pane, or an item no task holds through `open?url=`. |
 | **Copy Acorn link** | Copies that link. |
 | **Start task** | Creates the item's linked task and a chat with the chosen agent, with the first message and the item in its draft ([the handoff card](#the-handoff-card)). |
-| **Add to a task** | Opens the task search, so the item goes into any task's draft. |
 | **Chat** and **New chat** | Open a task's newest conversation, or start one with a chosen agent. |
 | **Add to chat** | Captures the page link, a selection, or a screenshot into the draft. |
 

@@ -119,19 +119,18 @@ Home lists, top to bottom:
    item no task holds with its handoff, the project its site suggests with that project's open tasks,
    or nothing, with an offer to tie the site to a project ([This page](./task-pages.md#this-page)).
 3. **Agents**: every conversation in the page's task, or in the current task on a page that belongs
-   to none, with its agent, title, state, and last line. A row opens the conversation and makes its
-   task current. **New chat** starts another.
-4. **Current task**: the task you last used, pinned whenever the page isn't its own. **Find a task**
-   opens the task search in Settings.
+   to none, grouped as **Managed chats**, **Inline chats**, and **Workflows**, each with its agent,
+   title, state, and last line. A row opens the conversation and makes its task current. **New chat**
+   starts another.
+4. **Current task**: the task you last used, pinned whenever the page isn't its own.
 
 A conversation opens over Home, with a back arrow and the task's name above the conversation's own,
 and **Open in Acorn** and **Copy Acorn link** for that conversation ([the panel's
 verbs](./handoffs.md#the-panels-verbs)). The composer's toolbar holds the
 three [capture](./page-capture.md) buttons, and each capture shows as a chip in the draft.
 
-**Settings** holds the Node list and pairing, a search across every project's open tasks, site
-access, each project's sites, notifications, and appearance. Choosing a task in the search makes it
-current and returns to Home.
+**Settings** holds the Node list and pairing, site access, each project's sites, notifications, and
+appearance.
 
 A state shows as a coloured dot beside a word, never colour alone: green for working or online, amber
 for waiting, red for failed or unreachable, and an empty ring for idle.

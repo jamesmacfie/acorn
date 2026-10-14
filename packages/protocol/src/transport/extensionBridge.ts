@@ -283,6 +283,8 @@ export type BridgeAgentSession = {
   providerId: string
   profileId: string
   kind: string
+  // A chat started from a line of a diff.
+  inline: boolean
   runtimeState: string
   attention: string
   lastEventSeq: number
