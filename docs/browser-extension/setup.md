@@ -122,7 +122,8 @@ Home lists, top to bottom:
 3. **Agents**: every conversation in the page's task, or in the current task when the page is on its
    project's site, grouped as **Managed chats**, **Inline chats**, and **Workflows**, each with its
    agent, title, state, and last line. A page tied to no task or project shows none. A row opens the
-   conversation and makes its task current. **New chat** starts another.
+   conversation and makes its task current. **New chat** starts another from the desktop's New
+   picker: each harness or named login, then each custom agent.
 4. **Current task**: the task you last used, pinned whenever the page has a match but isn't its own.
 
 A conversation opens over Home, with a back arrow and the task's name above the conversation's own,

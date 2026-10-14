@@ -22,7 +22,7 @@ import {
   choiceStart,
   newSessionChoices,
   type NewSessionChoice,
-} from './sessions/newSessionChoices'
+} from '../contract/newSessionChoices.ts'
 import { customAgentsRoute, type CustomAgent } from '../shared/customAgents'
 import { requestSessionGoalEditor } from './sessions/sessionGoalCommand'
 

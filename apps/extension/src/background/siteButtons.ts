@@ -148,7 +148,14 @@ export function siteButtons(
     if (!handoff || !pageHandoffs([handoff], sender.url).length) return
     if (message.type === 'acorn:handoff') {
       events.open(sender.tab)
-      events.clicked({ pluginId: handoff.pluginId, handoffId: handoff.id, label: handoff.label, url: sender.url })
+      events.clicked({
+        pluginId: handoff.pluginId,
+        handoffId: handoff.id,
+        label: handoff.label,
+        url: sender.url,
+        // The page sent this, so only the two known choices pass.
+        start: message.start === 'workflow' ? 'workflow' : 'task',
+      })
     } else if (message.type === 'acorn:chip' && events.chip(sender.url)) {
       events.open(sender.tab)
       events.showTask(message.action === 'chat' ? { url: sender.url, title: sender.tab.title ?? sender.url } : null)

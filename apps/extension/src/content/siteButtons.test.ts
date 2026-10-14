@@ -160,13 +160,23 @@ describe('task chips in the page', () => {
     expect(items()).toEqual(['Show in side panel', 'New chat about this page', 'Copy Acorn link'])
   })
 
-  it('reads Start task with no task, and opens the Start task form from the click', () => {
+  it('reads Start task with no task, and offers to create a task or start a workflow from its menu', () => {
     show([button()])
     expect(main().textContent).toBe('Start task')
     expect(main().getAttribute('aria-label')).toBe('Start task (Open in Acorn)')
-    expect(menu()).toBeNull()
+    // The chip itself opens the menu, so there is no ▾ beside it.
+    expect(chip().querySelector('.more')).toBeNull()
+    expect(menu()!.hidden).toBe(true)
     press(main())
-    expect(sent).toEqual([{ type: 'acorn:handoff', key: 'tracker:item' }])
+    expect(sent).toEqual([])
+    expect(menu()!.hidden).toBe(false)
+    expect(items()).toEqual(['Create task', 'Start workflow…'])
+    press(item('Start workflow…'))
+    expect(sent).toEqual([{ type: 'acorn:handoff', key: 'tracker:item', start: 'workflow' }])
+    expect(menu()!.hidden).toBe(true)
+    press(main())
+    press(item('Create task'))
+    expect(sent.at(-1)).toEqual({ type: 'acorn:handoff', key: 'tracker:item', start: 'task' })
   })
 
   it('opens the menu from the chip in Firefox, which opens its panel only from the toolbar', () => {
@@ -181,11 +191,12 @@ describe('task chips in the page', () => {
       'To open the panel on this task, click Acorn in the toolbar.',
     ])
 
-    // With no task the click also hands the page to the background, to wait for the sidebar.
+    // With no task a choice hands the page to the background, to wait for the sidebar.
     show([button()], { opensPanel: false })
     press(main())
-    expect(sent).toEqual([{ type: 'acorn:handoff', key: 'tracker:item' }])
-    expect(items()).toEqual(['To start the task, click Acorn in the toolbar.'])
+    expect(items()).toEqual(['Create task', 'Start workflow…', 'Then click Acorn in the toolbar to open the panel.'])
+    press(item('Create task'))
+    expect(sent).toEqual([{ type: 'acorn:handoff', key: 'tracker:item', start: 'task' }])
   })
 
   it('ignores a click the page made rather than the person', () => {

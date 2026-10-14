@@ -7,6 +7,8 @@ import {
   type SiteAddress,
   type SiteAssociation,
 } from '../projects/siteAssociations.ts'
+import type { DataSchema } from '../data/values/dataSchemas.ts'
+import type { DataValue } from '../data/values/dataValues.ts'
 import type { NodeProbeResult, NodeRecord, NodeStatus } from './broker.ts'
 
 // The browser extension's native messaging contract: the identities a host registration allows, the
@@ -165,7 +167,8 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   // Every active task's page addresses, so the browser matches the page to its task itself and no
   // page address goes to the Node for it (docs/browser-extension/task-pages.md).
   z.strictObject({ ...envelope, op: z.literal('tasks.pages'), nodeId }),
-  z.strictObject({ ...envelope, op: z.literal('agents.profiles'), nodeId }),
+  // The rows of the desktop's New picker. `refresh` asks the Node to check its harnesses again first.
+  z.strictObject({ ...envelope, op: z.literal('agents.choices'), nodeId, refresh: z.boolean().optional() }),
   z.strictObject({ ...envelope, op: z.literal('sessions.list'), nodeId, taskId: rowId }),
   z.strictObject({
     ...envelope,
@@ -185,6 +188,13 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     taskId: rowId,
     providerId: z.string().min(1).max(100),
     profileId: z.string().min(1).max(100),
+    // A choice's custom agent, or one of the harness's named logins, in the agents plugin's account
+    // name grammar. The Node checks both exist.
+    customAgentId: rowId.optional(),
+    account: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]{0,31}$/)
+      .optional(),
     key: operationKey,
   }),
   z.strictObject({
@@ -249,6 +259,22 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('sites.list'), nodeId }),
   z.strictObject({ ...envelope, op: z.literal('site.add'), nodeId, projectId: rowId, site: siteAssociationSchema }),
   z.strictObject({ ...envelope, op: z.literal('site.remove'), nodeId, projectId: rowId, site: siteAssociationSchema }),
+  // Workflows (docs/browser-extension/workflows.md). The list is what a task in the project can run.
+  // A start carries its key like any other write, and the Node checks the values against the
+  // definition's own inputs. A run's steps name the task they belong to, so the host can find each
+  // step's conversation among that task's sessions.
+  z.strictObject({ ...envelope, op: z.literal('workflows.list'), nodeId, projectId: rowId }),
+  z.strictObject({
+    ...envelope,
+    op: z.literal('workflow.start'),
+    nodeId,
+    taskId: rowId,
+    defId: z.string().min(1).max(256),
+    inputs: z.record(z.string().min(1).max(200), z.json()).optional(),
+    key: operationKey,
+  }),
+  z.strictObject({ ...envelope, op: z.literal('workflow.runs'), nodeId, taskId: rowId }),
+  z.strictObject({ ...envelope, op: z.literal('workflow.steps'), nodeId, taskId: rowId, runId: rowId }),
 ])
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
 export type BridgeOperation = BridgeRequest['op']
@@ -269,14 +295,21 @@ type BridgePageStatus = { label: string; state: string; tone: 'ok' | 'warn' | 'b
 // An active task with the addresses it is known by. Tasks with none are left out.
 export type BridgePageTask = BridgeTask & { projectId: string; pages: BridgeTaskPage[] }
 
-// An agent harness the Node can start a session with, from the agents plugin's provider roster.
-export type BridgeAgentProfile = {
+// One row of the desktop's New picker: a harness, one of its named logins, or a custom agent on it,
+// in the agents plugin's words (its `newSessionChoices`). `label` is the full name, for search and
+// screen readers; `text` is what the row shows, without an account its `accountIcon` stands for.
+// `glyph` is a Lucide name or a `brand:` mark. A row that can't start says why in `description`.
+export type BridgeAgentChoice = {
   providerId: string
   profileId: string
+  customAgentId: string | null
+  account: string | null
   label: string
-  installed: boolean
-  authenticated: boolean | null
-  diagnostics: string[]
+  text: string
+  description: string
+  glyph: string | null
+  accountIcon: string | null
+  available: boolean
 }
 
 // The fields of the agents plugin's session row the sidebar draws. `runtimeState` and `attention`
@@ -401,6 +434,33 @@ export type BridgeHandoffItem = {
   context: { label: string; content: string } | null
 }
 
+// A workflow a task can run, from the workflows plugin's merged definition list, with the inputs it
+// asks for in that plugin's shape (`WorkflowInput`).
+export type BridgeWorkflow = {
+  id: string
+  name: string
+  inputs: {
+    name: string
+    label?: string
+    description?: string
+    required?: boolean
+    default?: DataValue
+    schema?: DataSchema
+  }[]
+}
+// A task's workflow run, and one of its steps, narrowed from the workflows plugin's rows. `status`
+// carries that plugin's values unchanged. A step's `session` is the agent conversation it ran, once
+// the step has one.
+export type BridgeWorkflowRun = { id: string; name: string; status: string; createdAt: number; updatedAt: number }
+export type BridgeWorkflowStep = {
+  id: string
+  name: string
+  status: string
+  createdAt: number
+  updatedAt: number
+  session: BridgeAgentSession | null
+}
+
 export type BridgeResults = {
   'nodes.list': BridgeNodes
   'node.probe': NodeProbeResult
@@ -415,7 +475,7 @@ export type BridgeResults = {
   'projects.list': { nodeId: string; projects: BridgeProject[] }
   'tasks.list': { nodeId: string; projectId: string; tasks: BridgeTask[] }
   'tasks.pages': { nodeId: string; tasks: BridgePageTask[] }
-  'agents.profiles': { nodeId: string; profiles: BridgeAgentProfile[] }
+  'agents.choices': { nodeId: string; choices: BridgeAgentChoice[] }
   'sessions.list': { nodeId: string; taskId: string; sessions: BridgeAgentSession[] }
   'session.read': BridgeSessionRead
   'session.create': { nodeId: string; session: BridgeAgentSession }
@@ -435,6 +495,11 @@ export type BridgeResults = {
   'sites.list': { nodeId: string; sites: ProjectSite[] }
   'site.add': { nodeId: string; projectId: string; sites: SiteAssociation[] }
   'site.remove': { nodeId: string; projectId: string; sites: SiteAssociation[] }
+  'workflows.list': { nodeId: string; projectId: string; workflows: BridgeWorkflow[] }
+  'workflow.start': { nodeId: string; taskId: string; runId: string }
+  // Newest first.
+  'workflow.runs': { nodeId: string; taskId: string; runs: BridgeWorkflowRun[] }
+  'workflow.steps': { nodeId: string; runId: string; steps: BridgeWorkflowStep[] }
 }
 
 // Which sessions and tasks changed on the selected Node since the last hint. Nothing more: the

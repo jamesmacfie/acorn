@@ -32,7 +32,12 @@ import {
   selectedManagedSession,
 } from './managedSelection'
 import { agentSessionRoster } from './sessionRoster'
-import { choiceAvailable, choiceStart, newSessionChoices, type NewSessionChoice } from './newSessionChoices'
+import {
+  choiceAvailable,
+  choiceStart,
+  newSessionChoices,
+  type NewSessionChoice,
+} from '../../contract/newSessionChoices.ts'
 import { customAgentsOptions } from '../settings/customAgentsClient'
 import { agentProvidersOptions, refreshAgentProviders } from '../providersClient'
 
@@ -478,7 +483,7 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     providers: () => providers() ?? [],
     /** True until the first providers answer arrives, so a control can say so rather than look empty. */
     providersLoading,
-    /** New's rows: every harness, then every custom agent (./newSessionChoices.ts). */
+    /** New's rows: every harness, then every custom agent (plugins/agents/src/contract/newSessionChoices.ts). */
     choices,
     /** Probe the harnesses again, for the Refresh button in the New menu. */
     refreshProviders: () =>

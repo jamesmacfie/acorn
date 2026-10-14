@@ -74,8 +74,8 @@ start.
   enforce the limits: eight context parts, 512 KiB of context, and eight images. The Node wraps a
   `context` part in `<acorn-context source="browser-extension">` and escapes it, so page text can't
   pass for the person's own words.
-- **Agents.** `agents.profiles` lists the agents a Node can start. `agentChoice.tsx` defaults to the
-  first usable one.
+- **Agents.** `agents.choices` lists the agents a Node can start, as the desktop's New picker rows.
+  `agentChoice.tsx` loads them and starts a chat from one.
 
 ## How it works
 
@@ -168,7 +168,7 @@ The background acts on a picker message only when all of these hold:
 - `sender.frameId` is `0` and `sender.tab` is set.
 - `pageTasks()` still matches `sender.url` to the task the box was opened for.
 - A chosen conversation belongs to that task, by the list the background read.
-- A chosen agent is in `agents.profiles` for the selected Node, and is usable.
+- A chosen agent is in `agents.choices` for the selected Node, and is usable.
 - The question is 1 to 20,000 characters and the HTML is at most 50 KiB. The `turn.submit` schema
   checks its own limits again.
 

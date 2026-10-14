@@ -1,11 +1,15 @@
 import { For, Show, createEffect, createSignal, on, onMount } from 'solid-js'
-import type { BridgeHandoffItem } from '@acorn/protocol/extensionBridge.ts'
-import { TURN_TEXT_MAX_CHARS } from '@acorn/protocol/extensionBridge.ts'
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
+import type { BridgeHandoffItem, BridgeWorkflow } from '@acorn/protocol/extensionBridge.ts'
+import {
+  collectItemWorkflowInputs,
+  itemWorkflowInputsReady,
+  prefillFromItem,
+} from '@acorn/plugin-workflows/contract/itemInputs.ts'
 import { CallFailure, isUncertain } from '../messages'
-import type { PageHandoff } from '../handoffs'
+import type { HandoffStart, PageHandoff } from '../handoffs'
 import { itemTaskLink, outsideItemLink } from '../acornLinks'
 import { OpenInAcorn } from './OpenInAcorn'
-import { AgentSelect, agentChoice } from './agentChoice'
 import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { errorGuidance } from './guidance'
@@ -22,12 +26,22 @@ const handoffCapture = (item: BridgeHandoffItem): Extract<PageCapture, { kind: '
   content: item.context?.content ?? `${item.identifier}: ${item.title}\n${item.url}`,
 })
 
-// The first message Start task suggests, for the person to edit before they send it.
-const firstMessage = (item: BridgeHandoffItem) => `Read ${item.identifier} (${item.title}) and list what is left to do.`
+// What a workflow input shows before the person types: the definition's default, then what the item
+// fills in by the desktop's rule.
+const seededValues = (workflow: BridgeWorkflow, item: BridgeHandoffItem): Record<string, DataValue> => {
+  const prefill = prefillFromItem({ title: item.title, body: item.context?.content, link: item.url })
+  return Object.fromEntries(
+    workflow.inputs.flatMap((input) => {
+      const value = prefill[input.name] ?? input.default
+      return value === undefined ? [] : [[input.name, value]]
+    }),
+  )
+}
 
-// One handoff on one Node: resolve the page, then let the person chat in or open a linked task, start
-// a task in a project the plugin tied the item to, or add the item to any task. The item's context
-// only ever lands in a draft; nothing is sent from here. docs/browser-extension/handoffs.md.
+// One handoff on one Node: resolve the page, then let the person chat in or open a linked task, or, in
+// a project the plugin tied the item to, create a task or start a workflow in a new one, as the chip's
+// menu chose. A created task's item context only ever lands in a draft, so nothing reaches an agent
+// until the person sends; a workflow's agents start at once. docs/browser-extension/handoffs.md.
 export function Handoff(props: {
   client: BridgeClient
   nodeId: string
@@ -39,20 +53,26 @@ export function Handoff(props: {
   opensLinks: boolean
   // Open this task's newest conversation, or a new chat when it has none, with this context waiting.
   openTask(projectId: string, taskId: string, capture: PageCapture): void
-  // Start task made a task and a conversation in it: open it with this draft, unsent.
-  startedTask(projectId: string, taskId: string, sessionId: string, draft: { text: string; capture: PageCapture }): void
+  // Create task made the item's task: show it, with this context waiting for its first conversation.
+  createdTask(projectId: string, taskId: string, capture: PageCapture): void
+  // Start workflow made the item's task and started this run in it.
+  startedWorkflow(projectId: string, taskId: string, runId: string): void
   dismiss(): void
 }) {
   const [items, setItems] = createSignal<BridgeHandoffItem[] | null>(null)
   const [problem, setProblem] = createSignal<string | null>(null)
   const [chosen, setChosen] = createSignal(0)
   const [projectId, setProjectId] = createSignal('')
-  const [message, setMessage] = createSignal('')
+  const [start, setStart] = createSignal<HandoffStart>(props.handoff.start ?? 'task')
   const [creating, setCreating] = createSignal(false)
-  const agents = agentChoice(props.client, props.nodeId)
-  // A create keeps its key, so a retry, after an unconfirmed create or a failed chat start, can't make
-  // a second task.
+  // Each project's runnable workflows, as last read, the one chosen, and what the person typed.
+  const [workflows, setWorkflows] = createSignal<Record<string, BridgeWorkflow[]>>({})
+  const [workflowId, setWorkflowId] = createSignal('')
+  const [values, setValues] = createSignal<Record<string, string>>({})
+  // A create keeps its key, so a retry, after an unconfirmed create or a failed start, can't make a
+  // second task. A start keeps its own for the same task, workflow, and values.
   let lastCreate: { key: string; identifier: string; connectionId: string; projectId: string } | null = null
+  let lastStart: { key: string; taskId: string; workflowId: string; inputs: string } | null = null
 
   const target = () => ({
     pluginId: props.handoff.pluginId,
@@ -60,16 +80,34 @@ export function Handoff(props: {
     url: props.handoff.url,
   })
   const item = () => items()?.[chosen()] ?? null
-  // Start task is for an item no task holds yet.
+  // Creating or starting is for an item no task holds yet.
   const startable = () => !!item()?.projects.length && !item()?.linkedTasks.length
-  createEffect(() => startable() && void agents.load())
 
   const choose = (index: number) => {
-    const next = items()?.[index]
     setChosen(index)
-    setProjectId(next?.projects[0]?.id ?? '')
-    setMessage(next ? firstMessage(next) : '')
+    setProjectId(items()?.[index]?.projects[0]?.id ?? '')
+    setValues({})
   }
+
+  const projectWorkflows = () => workflows()[projectId()] ?? null
+  const workflow = () => projectWorkflows()?.find((each) => each.id === workflowId()) ?? projectWorkflows()?.[0] ?? null
+  const loadWorkflows = async (forProject: string) => {
+    if (workflows()[forProject]) return
+    try {
+      const result = await props.client.call({ op: 'workflows.list', nodeId: props.nodeId, projectId: forProject })
+      setWorkflows((lists) => ({ ...lists, [forProject]: result.workflows }))
+    } catch (error) {
+      setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
+    }
+  }
+  createEffect(() => startable() && start() === 'workflow' && projectId() && void loadWorkflows(projectId()))
+
+  const valueOf = (name: string): string => {
+    const value = values()[name] ?? (item() && workflow() ? seededValues(workflow()!, item()!)[name] : undefined)
+    return value === undefined ? '' : typeof value === 'string' ? value : JSON.stringify(value)
+  }
+  const ready = () =>
+    start() === 'task' || (!!workflow() && itemWorkflowInputsReady(workflow()!.id, workflow()!.inputs, valueOf))
 
   const resolve = async () => {
     setProblem(null)
@@ -111,33 +149,65 @@ export function Handoff(props: {
     }
   }
 
-  // Makes the linked task and a conversation with the chosen agent, then opens it with the message and
-  // the item in its draft. A retry after either step failed reuses both keys, so nothing is made twice.
-  const startTask = async () => {
+  // The run's ID, or null with `problem` saying why there isn't one.
+  const startRun = async (taskId: string, chosen: BridgeWorkflow, inputs: Record<string, DataValue>) => {
+    const asked = { taskId, workflowId: chosen.id, inputs: JSON.stringify(inputs) }
+    const same =
+      lastStart?.taskId === asked.taskId &&
+      lastStart.workflowId === asked.workflowId &&
+      lastStart.inputs === asked.inputs
+    const key = same ? lastStart!.key : crypto.randomUUID()
+    lastStart = { key, ...asked }
+    try {
+      const result = await props.client.call({
+        op: 'workflow.start',
+        nodeId: props.nodeId,
+        taskId,
+        defId: chosen.id,
+        ...(Object.keys(inputs).length ? { inputs } : {}),
+        key,
+      })
+      return result.runId
+    } catch (error) {
+      if (error instanceof CallFailure && isUncertain(error.code))
+        setProblem("The Node didn't confirm the run. Start it again to retry; the Node won't start a second one.")
+      else setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
+      return null
+    }
+  }
+
+  // Makes the linked task, then for a workflow starts the run in it. A retry after either step failed
+  // reuses both keys, so nothing is made twice.
+  const submit = async () => {
     const current = item()
     const forProject = projectId()
-    if (!current || !forProject || creating()) return
+    const chosen = workflow()
+    if (!current || !forProject || creating() || !ready()) return
+    let inputs: Record<string, DataValue> = {}
+    if (start() === 'workflow') {
+      try {
+        inputs = collectItemWorkflowInputs(chosen!.inputs, valueOf)
+      } catch (error) {
+        setProblem(`Check the workflow's inputs: ${error instanceof Error ? error.message : String(error)}`)
+        return
+      }
+    }
     setCreating(true)
     setProblem(null)
     try {
       const task = await create(current, forProject)
-      const session = task && (await agents.start(task.id))
-      if (task && session)
-        props.startedTask(task.projectId, task.id, session.id, {
-          text: message().trim(),
-          capture: handoffCapture(current),
-        })
+      if (!task) return
+      if (start() === 'task') return props.createdTask(task.projectId, task.id, handoffCapture(current))
+      const runId = await startRun(task.id, chosen!, inputs)
+      if (runId) props.startedWorkflow(task.projectId, task.id, runId)
     } finally {
       setCreating(false)
     }
   }
 
-  // The person changed Start task's first message, which leaving the page mustn't throw away.
-  const edited = () => {
-    const current = item()
-    return !!current && message() !== firstMessage(current)
-  }
-  // Leaving the item's page closes the card, unless closing it would lose that message or a start
+  // The person typed a workflow input, which leaving the page mustn't throw away.
+  const edited = () => Object.keys(values()).length > 0
+  // Leaving the item's page closes the card, unless closing it would lose what they typed or a start
   // under way.
   createEffect(
     on(
@@ -153,7 +223,7 @@ export function Handoff(props: {
     <div class="handoff" role="group" aria-label="Handoff">
       <p class="quiet">{props.handoff.url}</p>
       <Show when={!props.onPage && edited()}>
-        <p class="notice">This is about a page you've left. It stays open so your message isn't lost.</p>
+        <p class="notice">This is about a page you've left. It stays open so what you typed isn't lost.</p>
       </Show>
       <Show when={problem()}>
         {(message) => (
@@ -231,8 +301,19 @@ export function Handoff(props: {
                     fallback={<p class="notice">No project on this Node tracks {current().identifier}.</p>}
                   >
                     <Show when={startable()}>
-                      <h3>Start task</h3>
                       <div class="row">
+                        <select
+                          name="handoff-start"
+                          aria-label="Start"
+                          onChange={(event) => setStart(event.currentTarget.value as HandoffStart)}
+                        >
+                          <option value="task" selected={start() === 'task'}>
+                            Create task
+                          </option>
+                          <option value="workflow" selected={start() === 'workflow'}>
+                            Start workflow
+                          </option>
+                        </select>
                         <Show
                           when={current().projects.length > 1}
                           fallback={<span class="quiet">In {current().projects[0]!.name}</span>}
@@ -251,36 +332,68 @@ export function Handoff(props: {
                             </For>
                           </select>
                         </Show>
-                        <AgentSelect agents={agents} />
                       </div>
-                      <textarea
-                        name="first-message"
-                        aria-label="First message"
-                        rows={3}
-                        maxLength={TURN_TEXT_MAX_CHARS}
-                        value={message()}
-                        onInput={(event) => setMessage(event.currentTarget.value)}
-                      />
-                      <ul class="chips">
-                        <li class="chip">Item · {current().title}</li>
-                      </ul>
+                      <Show when={start() === 'workflow'}>
+                        <Show when={projectWorkflows()} fallback={<p class="quiet">Loading workflows…</p>}>
+                          {(list) => (
+                            <Show
+                              when={list().length}
+                              fallback={
+                                <p class="notice">
+                                  This project has no workflow to run. Create and publish one in Acorn.
+                                </p>
+                              }
+                            >
+                              <select
+                                name="handoff-workflow"
+                                aria-label="Workflow"
+                                onChange={(event) => setWorkflowId(event.currentTarget.value)}
+                              >
+                                <For each={list()}>
+                                  {(each) => (
+                                    <option value={each.id} selected={each.id === workflow()?.id}>
+                                      {each.name}
+                                    </option>
+                                  )}
+                                </For>
+                              </select>
+                              <For each={workflow()?.inputs}>
+                                {(input) => (
+                                  <label>
+                                    {input.label ?? input.name}
+                                    {input.required ? ' *' : ''}
+                                    <textarea
+                                      name={`input-${input.name}`}
+                                      rows={2}
+                                      value={valueOf(input.name)}
+                                      onInput={(event) =>
+                                        setValues((typed) => ({ ...typed, [input.name]: event.currentTarget.value }))
+                                      }
+                                    />
+                                    <Show when={input.description}>
+                                      {(description) => <span class="quiet">{description()}</span>}
+                                    </Show>
+                                  </label>
+                                )}
+                              </For>
+                            </Show>
+                          )}
+                        </Show>
+                      </Show>
                       <div class="row">
                         <button
                           type="button"
-                          disabled={creating() || !props.online || !agents.chosen()}
-                          onClick={() => void startTask()}
+                          disabled={creating() || !props.online || !ready()}
+                          onClick={() => void submit()}
                         >
-                          {creating() ? 'Starting…' : 'Start task'}
+                          {creating() ? 'Starting…' : start() === 'task' ? 'Create task' : 'Start workflow'}
                         </button>
-                        <span class="quiet grow">Nothing goes to the agent until you press Send.</span>
+                        <span class="quiet grow">
+                          {start() === 'task'
+                            ? 'The item waits for the first conversation you open.'
+                            : 'The workflow starts its agents straight away.'}
+                        </span>
                       </div>
-                      <Show when={agents.problem()}>
-                        {(message) => (
-                          <p class="problem" role="alert">
-                            {message()}
-                          </p>
-                        )}
-                      </Show>
                     </Show>
                   </Show>
                 </>

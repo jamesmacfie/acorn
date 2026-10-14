@@ -80,6 +80,9 @@ importers:
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../../plugins/agents
+      '@acorn/plugin-workflows':
+        specifier: workspace:*
+        version: link:../../plugins/workflows
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
@@ -288,9 +291,15 @@ importers:
       '@acorn/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
+      '@acorn/dashboards-core':
+        specifier: workspace:*
+        version: link:../../packages/dashboards-core
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../../plugins/agents
+      '@acorn/plugin-workflows':
+        specifier: workspace:*
+        version: link:../../plugins/workflows
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

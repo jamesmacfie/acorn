@@ -13,7 +13,7 @@ panel opens on that conversation.
 
 1. On a pick, the picker script sends `acorn:ask.open`. The background answers with the task, the
    task's conversations (from `taskPages().sessions(taskId)`, else `sessions.list`), the usable
-   agents from `agents.profiles`, and the agent stored under `askAgent:<nodeId>`.
+   agents from `agents.choices`, and the agent stored under `askAgent:<nodeId>`.
 2. Fill the dropdowns. **New chat** is selected by default. The agent dropdown shows only for a new
    chat.
 3. On **Send**, clean the HTML and build the CSS path. See

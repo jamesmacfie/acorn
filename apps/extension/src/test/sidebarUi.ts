@@ -18,8 +18,8 @@ export async function pick(root: ParentNode, name: string, value: string) {
   await settle(20)
 }
 
-// Switches views from the bottom bar: Home, Agents, or Settings.
-export async function tab(root: ParentNode, label: 'Home' | 'Agents' | 'Settings') {
+// Switches views from the bottom bar: Home, Agents, Workflows, or Settings.
+export async function tab(root: ParentNode, label: 'Home' | 'Agents' | 'Workflows' | 'Settings') {
   button(root.querySelector('nav')!, label)!.click()
   await settle(20)
 }
