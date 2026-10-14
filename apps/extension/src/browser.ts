@@ -31,9 +31,12 @@ export type BrowserApi = {
     getURL(path: string): string
     onConnect: Listeners<(port: Port) => void>
     lastError?: { message?: string } | null
-    // One-off messages between a page's content script and the background.
+    // One-off messages between a page's content script and the background. A listener answers through
+    // `sendResponse` and returns `true`, which both browsers accept.
     sendMessage(message: unknown): Promise<unknown>
-    onMessage: Listeners<(message: unknown, sender: MessageSender) => void>
+    onMessage: Listeners<
+      (message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => true | void
+    >
     // The extension was installed, updated, or reloaded.
     onInstalled: Listeners<() => void>
   }
@@ -83,8 +86,13 @@ export type BrowserApi = {
   // Right-click entries on web pages. The browser keeps them across background restarts, so they are
   // made once at install. A click grants `activeTab` for the tab it came from, as the toolbar button does.
   contextMenus: {
-    create(item: { id: string; title: string; contexts: ['selection'] }): unknown
-    onClicked: Listeners<(info: { menuItemId: string | number }, tab?: Tab) => void>
+    create(item: {
+      id: string
+      title: string
+      contexts: ('selection' | 'page' | 'link' | 'image' | 'video' | 'audio')[]
+    }): unknown
+    // `frameId` is 0, or absent, for a click in the tab's top frame.
+    onClicked: Listeners<(info: { menuItemId: string | number; frameId?: number }, tab?: Tab) => void>
   }
   // Chrome only.
   sidePanel?: {

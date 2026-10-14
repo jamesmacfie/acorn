@@ -56,6 +56,13 @@ went with the current task would change with state the page doesn't show, and th
 what to do when there's nowhere for the text to go. The menu is made once at install, and both
 browsers keep it across background restarts.
 
+## Ask Acorn about an element
+
+Right-clicking a page also offers **Ask Acorn about this element**. On a page that belongs to a task,
+it sends a question about one element straight to the task's agent, with the element's HTML, a CSS
+path, and a cropped screenshot, and fills no draft. For how it works, see
+[Ask Acorn about an element](./element-picker.md).
+
 ## Page access
 
 The extension asks for `activeTab`, `scripting`, and `contextMenus`, and lists `http://*/*` and
@@ -65,11 +72,14 @@ lets the extension read the active tab:
 - **The toolbar button.** Clicking the Acorn button opens the sidebar and grants `activeTab` for that
   tab, until it navigates. The background handles the click itself, because Chrome's own
   open-on-click opens the panel without granting `activeTab`.
-- **The right-click entry.** Clicking **Add to Acorn chat** grants `activeTab` for the tab it was
-  clicked in, as the toolbar button does, so it reads a selection on a site the person never granted.
-- **A granted site.** A site the person granted reads without the toolbar button. In Firefox this
-  covers the link and the selection, but not a screenshot: Firefox takes one only with `activeTab` or
-  `<all_urls>`.
+- **The right-click entries.** Clicking **Add to Acorn chat** or **Ask Acorn about this element**
+  grants `activeTab` for the tab it was clicked in, as the toolbar button does, so it reads a
+  selection or takes a screenshot on a site the person never granted.
+- **A granted site.** A site the person granted reads without the toolbar button. In both browsers
+  this covers the link and the selection, but not a screenshot: `captureVisibleTab` needs `activeTab`
+  or `<all_urls>`. Chrome 155 refused it with "Either the '<all_urls>' or 'activeTab' permission is
+  required" (checked October 14, 2026: an extension holding `http://127.0.0.1/*` and never granted
+  `activeTab` was refused, and one holding `<all_urls>` took the screenshot of the same tab).
 
 A click inside the sidebar grants nothing. With no access, the sidebar asks the person to click the
 toolbar button while the page is showing. The extension never asks for wider access on its own.
@@ -142,7 +152,9 @@ read that answers after that makes none.
 ## Gaps
 
 - Chrome's persistent site grant wasn't checked in a browser. Granting optional host access needs
-  Chrome's own permission prompt, which a driver can't answer.
+  Chrome's own permission prompt, which a driver can't answer. The screenshot refusal on a granted
+  site was checked with the site listed as required host access instead, which Chrome grants at
+  install and reports the same way through `permissions.getAll`.
 - In Firefox, `activeTab` from the toolbar button wasn't checked, because a driver can't click the
   toolbar. Firefox screenshots therefore weren't taken in a browser.
 - A screenshot over 5 MiB wasn't produced in a browser; the largest was 3.7 MB.

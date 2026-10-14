@@ -7,10 +7,13 @@ import { extensionManifest } from './src/manifest'
 
 // One build per browser, chosen by mode: `vite build --mode chrome` or `--mode firefox`. The output
 // is an unpacked extension: the sidebar page, the background entry at a fixed name the manifest
-// names, the content script the background injects into pages that get a task chip, and the manifest. Everything ships in the package; nothing loads remote code.
+// names, the content scripts the background injects into pages (the task chip's, and the element
+// picker's), and the manifest. Everything ships in the package; nothing loads remote code.
 //
 // ACORN_EXTENSION_HOST=development points the build at the development native host, and
 // ACORN_EXTENSION_OUT_DIR moves the output. `pnpm dev:extension` sets both for its session.
+const CONTENT_SCRIPTS = ['content', 'picker']
+
 export default defineConfig(({ mode }) => {
   const browser = mode === 'firefox' ? 'firefox' : 'chrome'
   const development = process.env.ACORN_EXTENSION_HOST === 'development'
@@ -25,11 +28,12 @@ export default defineConfig(({ mode }) => {
       {
         name: 'acorn:extension-manifest',
         generateBundle(_options, bundle) {
-          // The background injects the content script as one classic script, which can't import. A
+          // The background injects each content script as one classic script, which can't import. A
           // shared chunk would break it in every page, so the build fails instead.
-          const content = Object.values(bundle).find((chunk) => chunk.type === 'chunk' && chunk.name === 'content')
-          if (content?.type === 'chunk' && (content.imports.length || content.dynamicImports.length))
-            this.error('content.js must not import anything: keep src/content/ to type imports.')
+          for (const chunk of Object.values(bundle))
+            if (chunk.type === 'chunk' && CONTENT_SCRIPTS.includes(chunk.name))
+              if (chunk.imports.length || chunk.dynamicImports.length)
+                this.error(`${chunk.name}.js must not import anything: keep src/content/ to type imports.`)
           this.emitFile({
             type: 'asset',
             fileName: 'manifest.json',
@@ -50,12 +54,15 @@ export default defineConfig(({ mode }) => {
           sidebar: resolve(import.meta.dirname, 'sidebar.html'),
           background: resolve(import.meta.dirname, 'src/background/main.ts'),
           content: resolve(import.meta.dirname, 'src/content/siteButtons.ts'),
+          picker: resolve(import.meta.dirname, 'src/content/picker.ts'),
         },
         output: {
-          // Fixed names for the two files the extension names itself: the manifest's background and
-          // the content script the background injects.
+          // Fixed names for the files the extension names itself: the manifest's background and the
+          // content scripts the background injects.
           entryFileNames: (chunk) =>
-            chunk.name === 'background' || chunk.name === 'content' ? `${chunk.name}.js` : 'assets/[name]-[hash].js',
+            chunk.name === 'background' || CONTENT_SCRIPTS.includes(chunk.name)
+              ? `${chunk.name}.js`
+              : 'assets/[name]-[hash].js',
         },
       },
     },

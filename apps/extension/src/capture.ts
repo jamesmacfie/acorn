@@ -42,8 +42,8 @@ export class CaptureFailure extends Error {
 // `activeTab` access for a click on the toolbar button; a click inside the sidebar doesn't count.
 const NO_ACCESS_GUIDANCE =
   "Acorn can't read this page yet. Click the Acorn button in the toolbar while the page is showing, then capture again."
-// A site the person granted lets the sidebar read the page, but Firefox takes a screenshot only of a
-// page the toolbar button was clicked on, or with access to every site.
+// A site the person granted lets the sidebar read the page, but both browsers take a screenshot only
+// of a page the toolbar button or a menu entry was clicked on, or with access to every site.
 const SCREENSHOT_ACCESS_GUIDANCE =
   'The browser takes a screenshot only of a page you clicked the Acorn button in the toolbar on. Click it while the page is showing, then try again.'
 
@@ -116,6 +116,38 @@ export async function capturePage(api: BrowserApi, kind: CaptureKind, windowId?:
     mediaType: 'image/jpeg',
     byteSize: base64Bytes(dataUrl.slice(dataUrl.indexOf(',') + 1)),
   }
+}
+
+// The room left around a cropped element, in CSS pixels, so its edges show.
+const CROP_PADDING = 8
+
+// A screenshot cut down to `rect`, the element's box in the viewport in CSS pixels, with padding, and
+// kept inside the image. `ratio` is the device pixels in one CSS pixel. Null when none of `rect` is in
+// the picture.
+export async function cropScreenshot(
+  capture: Extract<PageCapture, { kind: 'screenshot' }>,
+  rect: { x: number; y: number; width: number; height: number },
+  ratio: number,
+): Promise<Extract<PageCapture, { kind: 'screenshot' }> | null> {
+  const image = await createImageBitmap(await (await fetch(capture.dataUrl)).blob())
+  const left = Math.max(0, Math.floor((rect.x - CROP_PADDING) * ratio))
+  const top = Math.max(0, Math.floor((rect.y - CROP_PADDING) * ratio))
+  const width = Math.min(image.width, Math.ceil((rect.x + rect.width + CROP_PADDING) * ratio)) - left
+  const height = Math.min(image.height, Math.ceil((rect.y + rect.height + CROP_PADDING) * ratio)) - top
+  if (width <= 0 || height <= 0) {
+    image.close()
+    return null
+  }
+  const canvas = new OffscreenCanvas(width, height)
+  canvas.getContext('2d')!.drawImage(image, left, top, width, height, 0, 0, width, height)
+  image.close()
+  const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: SCREENSHOT_QUALITY / 100 })
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  // In slices, because spreading a whole image into one call passes the engine's argument limit.
+  let binary = ''
+  for (let start = 0; start < bytes.length; start += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000))
+  return { ...capture, dataUrl: `data:image/jpeg;base64,${btoa(binary)}`, byteSize: bytes.byteLength }
 }
 
 export const screenshotData = (capture: Extract<PageCapture, { kind: 'screenshot' }>): string =>

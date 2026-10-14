@@ -1,5 +1,5 @@
 import type { BrowserApi } from '../browser'
-import type { AppMarker, ButtonClick, ContentMessage } from '../handoffs'
+import type { AppMarker, ButtonClick, ContentMessage, PickerMessage } from '../handoffs'
 
 // The task chips and the branch marker on a website page. The background injects this into a page it
 // may read and says what the page gets; this script only draws it, keeps it through the page's own
@@ -59,7 +59,13 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--text); outline-
 const MARK =
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 1.5v2M2.5 7h11c0-2.5-2.5-3.5-5.5-3.5S2.5 4.5 2.5 7zM4 7v3l4 4.5 4-4.5V7"/></svg>'
 
-const scope = globalThis as { browser?: BrowserApi; chrome?: BrowserApi; acornSiteButtons?: boolean }
+// The element picker's script, injected beside this one, shares this global.
+const scope = globalThis as {
+  browser?: BrowserApi
+  chrome?: BrowserApi
+  acornSiteButtons?: boolean
+  acornPicker?: (mode: PickerMessage['mode']) => void
+}
 const api = scope.browser ?? scope.chrome
 
 // Injected again after a navigation or a new grant; the first copy already listens.
@@ -102,6 +108,7 @@ if (api && !scope.acornSiteButtons) {
     anchor.querySelector(`button:not([${ATTRIBUTE}]), a`)?.getBoundingClientRect().height || 28
 
   const report = (message: ButtonClick) => void api.runtime.sendMessage(message)
+  const pickElement = () => scope.acornPicker?.('hover')
 
   // Only the person's own click. A page can call `click()` on any element, and that mustn't open the
   // sidebar on its behalf. The click stays with the pill, so the page's own handlers don't see it.
@@ -243,6 +250,7 @@ if (api && !scope.acornSiteButtons) {
       if (page.opensPanel) menu.add('Show in side panel', () => chipClick('show'))
       if (task.link && page.opensLinks) menu.link(task.link)
       if (page.opensPanel) menu.add('New chat about this page', () => chipClick('chat'))
+      menu.add('Ask about an element', pickElement)
       if (task.link) menu.copy(task.link)
       if (!page.opensPanel) menu.note('To open the panel on this task, click Acorn in the toolbar.')
     } else {
@@ -279,6 +287,7 @@ if (api && !scope.acornSiteButtons) {
     const markerClick = (action: 'show' | 'hide') => report({ type: 'acorn:marker', action })
     if (page.opensPanel) menu.add('Show in side panel', () => markerClick('show'))
     if (shown.link && page.opensLinks) menu.link(shown.link)
+    menu.add('Ask about an element', pickElement)
     if (shown.link) menu.copy(shown.link)
     menu.add('Hide on this site', () => markerClick('hide'))
     if (!page.opensPanel) menu.note('To open the panel on this task, click Acorn in the toolbar.')

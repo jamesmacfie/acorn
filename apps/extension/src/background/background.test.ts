@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BackgroundMessage } from '../messages'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
 import { SELECTED_NODE_KEY, startBackground } from './background'
@@ -11,7 +11,8 @@ function scriptedHost(fake: ReturnType<typeof fakeBrowser>, known: string[]) {
     active: null as string | null,
     handoffs: [] as unknown[],
     taskPages: [] as unknown[],
-    sessions: [] as { id: string; runtimeState: string }[],
+    sessions: [] as { id: string; runtimeState: string; title?: string; archivedAt?: number | null }[],
+    choices: [] as unknown[],
   }
   fake.onNativeMessage = (raw, host: FakeHost) => {
     const message = raw as { id: string; op: string; nodeId?: string | null }
@@ -40,6 +41,21 @@ function scriptedHost(fake: ReturnType<typeof fakeBrowser>, known: string[]) {
     if (message.op === 'projects.list')
       return message.nodeId === state.active ? reply({ nodeId: message.nodeId, projects: [] }) : fail('not_selected')
     if (message.op === 'tasks.pages') return reply({ nodeId: message.nodeId, tasks: state.taskPages })
+    if (message.op === 'agents.choices') return reply({ nodeId: message.nodeId, choices: state.choices })
+    if (message.op === 'session.create')
+      return reply({ nodeId: message.nodeId, session: { id: `new-${host.received.length}` } })
+    if (message.op === 'attachment.upload')
+      return reply({
+        nodeId: message.nodeId,
+        taskId: (message as { taskId?: string }).taskId,
+        attachment: { id: `att-${host.received.length}` },
+      })
+    if (message.op === 'turn.submit')
+      return reply({
+        nodeId: message.nodeId,
+        sessionId: (message as { sessionId?: string }).sessionId,
+        turnId: 'turn1',
+      })
     if (message.op === 'sessions.list')
       return reply({
         nodeId: message.nodeId,
@@ -370,5 +386,414 @@ describe('site buttons', () => {
     expect(lastMessage(development.fake)).toMatchObject({ opensLinks: false, opensPanel: true })
     const firefox = await started({ flavor: 'firefox' })
     expect(lastMessage(firefox.fake)).toMatchObject({ opensLinks: true, opensPanel: false })
+  })
+
+  describe('ask about an element', () => {
+    const ASK = 'ask-acorn-about-element'
+    const picks = (fake: ReturnType<typeof fakeBrowser>) =>
+      fake.tabMessages
+        .map(({ message }) => message)
+        .filter((message) => (message as { type: string }).type === 'acorn:pick')
+
+    it('adds the right-click entry at install, for an element of any kind', () => {
+      const fake = fakeBrowser()
+      startBackground(fake.api, 'com.acorn.browser_bridge')
+      fake.install()
+      expect(fake.menus.get(ASK)).toEqual({
+        title: 'Ask Acorn about this element',
+        contexts: ['page', 'link', 'image', 'video', 'audio'],
+      })
+    })
+
+    it('picks the right-clicked element on a task page that already has the picker', async () => {
+      const { fake } = await started()
+      expect(fake.injectedFiles.at(-1)).toEqual(['content.js', 'picker.js'])
+      // The picker answers its own message.
+      fake.pageAnswer = (message) => (message as { type: string }).type === 'acorn:pick'
+      const injections = fake.injectedFiles.length
+      fake.clickMenu(ASK)
+      await settle()
+      expect(picks(fake)).toEqual([{ type: 'acorn:pick', mode: 'target' }])
+      expect(fake.injectedFiles).toHaveLength(injections)
+      expect(fake.panelOpens).toEqual([])
+    })
+
+    it("injects the picker on a page that has only the chip's script, which answers nothing", async () => {
+      const { fake } = await started()
+      const injections = fake.injectedFiles.length
+      fake.clickMenu(ASK)
+      await settle()
+      expect(fake.injectedFiles.slice(injections)).toEqual([['picker.js']])
+      expect(picks(fake)).toEqual([
+        { type: 'acorn:pick', mode: 'target' },
+        { type: 'acorn:pick', mode: 'hover' },
+      ])
+    })
+
+    it('injects the picker on a task page without it, and lets the person point at the element', async () => {
+      const app = 'https://app.example'
+      const { fake, host } = await started({ url: `${app}/planner` })
+      host.taskPages = [{ ...pageTask, pages: [{ origin: app, pathPrefix: '/', source: 'runn' }] }]
+      fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'a' })
+      await settle()
+      expect(fake.injectedFiles).toEqual([])
+      fake.clickMenu(ASK)
+      await settle()
+      expect(fake.injectedFiles).toEqual([['picker.js']])
+      expect(picks(fake)).toEqual([{ type: 'acorn:pick', mode: 'hover' }])
+    })
+
+    it('refuses in one line, with the panel open, off a task page, in a frame, or with no Node', async () => {
+      const notices = (panel: ReturnType<typeof sidebar>) =>
+        panel.messages.filter((message) => message.type === 'notice').map((message) => message.notice)
+
+      const { fake, panel } = await started({ url: 'https://tracker.example/items/43' })
+      fake.clickMenu(ASK)
+      fake.activeTab = { ...fake.activeTab, url: 'https://tracker.example/items/42' }
+      fake.clickMenu(ASK, 3)
+      await settle()
+      expect(fake.panelOpens).toEqual([1, 1])
+      expect(notices(panel)).toEqual([
+        "This page doesn't belong to a task, so there is no agent to ask about it. Open a task's pull request, issue, or app, then try again.",
+        "That element is inside a frame, which Acorn can't pick from. Right-click outside the frame, then try again.",
+      ])
+
+      const unselected = fakeBrowser()
+      scriptedHost(unselected, ['a'])
+      startBackground(unselected.api, 'com.acorn.browser_bridge')
+      await settle()
+      unselected.clickMenu(ASK)
+      // A panel the click opened connects a moment later, and gets the notice then.
+      const opened = sidebar(unselected)
+      await settle()
+      expect(unselected.panelOpens).toEqual([1])
+      expect(notices(opened)).toEqual([
+        'No Node is selected, so there is no agent to ask. Choose or pair a Node, then try again.',
+      ])
+      expect(picks(fake)).toEqual([])
+      expect(picks(unselected)).toEqual([])
+    })
+
+    describe('the box', () => {
+      // A harness, a named login on it, one that can't start, and a custom agent on the first harness.
+      const row = (providerId: string, label: string, extra: Record<string, unknown> = {}) => ({
+        providerId,
+        profileId: 'default',
+        customAgentId: null,
+        account: null,
+        label,
+        text: label,
+        description: '',
+        glyph: null,
+        accountIcon: null,
+        available: true,
+        ...extra,
+      })
+      const choices = [
+        row('claude', 'Claude'),
+        row('claude', 'Claude · work', { account: 'work' }),
+        row('codex', 'Codex', { available: false }),
+        row('claude', 'Reviewer', { customAgentId: 'reviewer' }),
+      ]
+      const question = {
+        type: 'acorn:ask.send',
+        question: '  Why is this button here?  ',
+        html: '<button class="save">Save</button>',
+        selector: '#app > button:nth-of-type(2)',
+        size: { width: 80, height: 32 },
+        sessionId: null,
+        agent: 'claude::',
+      }
+      const uploads = (fake: ReturnType<typeof fakeBrowser>) =>
+        fake.hosts[0]!.received.filter((message) => (message as { op: string }).op === 'attachment.upload')
+      const writes = (fake: ReturnType<typeof fakeBrowser>) =>
+        fake.hosts[0]!.received.filter((message) =>
+          ['session.create', 'turn.submit'].includes((message as { op: string }).op),
+        ) as {
+          op: string
+          key: string
+          sessionId?: string
+          input?: unknown
+          providerId?: string
+          profileId?: string
+          account?: string
+          customAgentId?: string
+        }[]
+
+      // The canvas a background has and Node lacks. Every screenshot is 1600 × 1000 device pixels, and
+      // each crop is kept as the area drawn from it.
+      const crops: number[][] = []
+      beforeEach(() => {
+        crops.length = 0
+        vi.stubGlobal('createImageBitmap', async () => ({ width: 1600, height: 1000, close() {} }))
+        vi.stubGlobal(
+          'OffscreenCanvas',
+          class {
+            getContext() {
+              return { drawImage: (_image: unknown, ...area: number[]) => void crops.push(area.slice(0, 4)) }
+            }
+            async convertToBlob() {
+              return new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' })
+            }
+          },
+        )
+      })
+      afterEach(() => vi.unstubAllGlobals())
+      const element = { rect: { x: 100, y: 50, width: 80, height: 32 }, devicePixelRatio: 2 }
+
+      // A task page with the picker open on it, and the conversations the task's chip follows.
+      async function opened(
+        options: { flavor?: 'chrome' | 'firefox'; at?: typeof element; capture?: () => Promise<string> } = {},
+      ) {
+        const { fake, host, panel } = await started(options)
+        if (options.capture) fake.onCapture = options.capture
+        host.choices = choices
+        host.sessions = [
+          { id: 's1', title: 'Billing rounding', runtimeState: 'idle', archivedAt: null },
+          { id: 's2', title: 'Old chat', runtimeState: 'idle', archivedAt: 5 },
+        ]
+        fake.hosts[0]!.send({
+          v: 1,
+          event: 'agent',
+          nodeId: 'a',
+          sessions: [],
+          tasks: ['t1'],
+          missed: false,
+          requests: false,
+        })
+        await settle()
+        const answer = (await fake.sendFromPage({ type: 'acorn:ask.open', ...(options.at ?? element) })) as {
+          ok: true
+          pickId: string
+          screenshot: boolean
+        }
+        return { fake, host, panel, answer, pickId: answer.pickId }
+      }
+
+      it("answers with the task's open conversations and usable agents, the remembered one first", async () => {
+        const { answer } = await opened()
+        expect(answer).toEqual({
+          ok: true,
+          pickId: expect.any(String),
+          sessions: [{ id: 's1', title: 'Billing rounding' }],
+          agents: [
+            { key: 'claude::', label: 'Claude' },
+            { key: 'claude:work:', label: 'Claude · work' },
+            { key: 'claude::reviewer', label: 'Reviewer' },
+          ],
+          agent: 'claude::',
+          screenshot: true,
+        })
+
+        // The page's own chip follows no task here, so the conversations are read for the box.
+        const app = 'https://app.example'
+        const { fake, host } = await started({ url: `${app}/planner` })
+        host.taskPages = [{ ...pageTask, pages: [{ origin: app, pathPrefix: '/', source: 'runn' }] }]
+        host.choices = choices
+        host.sessions = [{ id: 's9', title: 'Planner', runtimeState: 'idle', archivedAt: null }]
+        fake.storage.set('askAgent:a', 'claude::reviewer')
+        fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'a' })
+        await settle()
+        expect(await fake.sendFromPage({ type: 'acorn:ask.open' })).toMatchObject({
+          ok: true,
+          sessions: [{ id: 's9', title: 'Planner' }],
+          agent: 'claude::reviewer',
+        })
+      })
+
+      it('sends a new chat about the element, with its screenshot, then opens the panel on it', async () => {
+        const { fake, panel, pickId } = await opened()
+        // The element's box with 8 CSS pixels around it, in device pixels.
+        expect(crops).toEqual([[184, 84, 192, 96]])
+        expect(await fake.sendFromPage({ ...question, pickId })).toEqual({ ok: true, opensPanel: true })
+        expect(fake.panelOpens).toEqual([1])
+        expect(uploads(fake)).toEqual([
+          expect.objectContaining({
+            nodeId: 'a',
+            taskId: 't1',
+            filename: 'Screenshot of tracker.example.jpg',
+            mediaType: 'image/jpeg',
+            data: '/9j/',
+          }),
+        ])
+        const [create, submit] = writes(fake)
+        expect(create).toMatchObject({
+          op: 'session.create',
+          nodeId: 'a',
+          taskId: 't1',
+          providerId: 'claude',
+          profileId: 'default',
+        })
+        expect(create).not.toHaveProperty('account')
+        expect(create).not.toHaveProperty('customAgentId')
+        expect(submit).toMatchObject({
+          op: 'turn.submit',
+          sessionId: expect.stringMatching(/^new-/),
+          input: [
+            { type: 'text', text: 'Why is this button here?' },
+            {
+              type: 'context',
+              label: 'Element on Item 42',
+              content:
+                'Page: https://tracker.example/items/42\nCSS path: #app > button:nth-of-type(2)\nSize: 80 × 32 CSS pixels\n\n<button class="save">Save</button>',
+              source: 'browser-extension',
+              resourceId: 'https://tracker.example/items/42',
+            },
+            { type: 'image', attachmentId: expect.stringMatching(/^att-/), alt: 'Screenshot of Item 42' },
+          ],
+        })
+        const target = { nodeId: 'a', projectId: 'p1', taskId: 't1', sessionId: submit!.sessionId }
+        expect(panel.messages).toContainEqual({ type: 'open', target })
+        expect(fake.storage.get('askAgent:a')).toBe('claude::')
+        expect(fake.storage.get('destination:a')).toEqual({
+          projectId: 'p1',
+          taskId: 't1',
+          sessionId: submit!.sessionId,
+        })
+
+        // The pick is spent.
+        expect(await fake.sendFromPage({ ...question, pickId })).toEqual({
+          ok: false,
+          reason: 'This box is out of date, so nothing was sent. Pick the element again.',
+        })
+      })
+
+      it('starts the row the person chose: a named login, or a custom agent', async () => {
+        const login = await opened()
+        await login.fake.sendFromPage({ ...question, pickId: login.pickId, agent: 'claude:work:' })
+        const [fromLogin] = writes(login.fake)
+        expect(fromLogin).toMatchObject({ op: 'session.create', providerId: 'claude', account: 'work' })
+        expect(fromLogin).not.toHaveProperty('customAgentId')
+        expect(login.fake.storage.get('askAgent:a')).toBe('claude:work:')
+
+        const custom = await opened()
+        await custom.fake.sendFromPage({ ...question, pickId: custom.pickId, agent: 'claude::reviewer' })
+        const [fromCustom] = writes(custom.fake)
+        expect(fromCustom).toMatchObject({ op: 'session.create', providerId: 'claude', customAgentId: 'reviewer' })
+        expect(fromCustom).not.toHaveProperty('account')
+      })
+
+      it('adds the turn to a chosen conversation, without a new chat', async () => {
+        const { fake, pickId } = await opened()
+        expect(await fake.sendFromPage({ ...question, pickId, sessionId: 's1', agent: null })).toEqual({
+          ok: true,
+          opensPanel: true,
+        })
+        expect(writes(fake)).toEqual([expect.objectContaining({ op: 'turn.submit', sessionId: 's1' })])
+        expect(fake.storage.has('askAgent:a')).toBe(false)
+      })
+
+      it('keeps the crop inside the screenshot, and goes without one when none of the element is in it', async () => {
+        await opened({ at: { rect: { x: -20, y: 480, width: 900, height: 60 }, devicePixelRatio: 2 } })
+        expect(crops).toEqual([[0, 944, 1600, 56]])
+        const outside = await opened({ at: { rect: { x: 900, y: 10, width: 50, height: 20 }, devicePixelRatio: 2 } })
+        expect(outside.answer.screenshot).toBe(false)
+        const unsized = await opened({ at: { rect: { x: 1, y: 1, width: 1, height: 1 }, devicePixelRatio: 0 } })
+        expect(unsized.answer.screenshot).toBe(false)
+        expect(crops).toHaveLength(1)
+      })
+
+      it('sends without a screenshot when the browser refuses one, as on a granted site without activeTab', async () => {
+        const { fake, pickId, answer } = await opened({
+          flavor: 'firefox',
+          capture: () => Promise.reject(new Error('Missing activeTab permission')),
+        })
+        expect(answer.screenshot).toBe(false)
+        expect(await fake.sendFromPage({ ...question, pickId })).toEqual({ ok: true, opensPanel: false })
+        expect(uploads(fake)).toEqual([])
+        expect(writes(fake).at(-1)!.input).toEqual([
+          expect.objectContaining({ type: 'text' }),
+          expect.objectContaining({ type: 'context' }),
+        ])
+      })
+
+      it('retries an unconfirmed send with the same attachment and keys, so the Node makes one chat and one turn', async () => {
+        const { fake, pickId } = await opened()
+        const scripted = fake.onNativeMessage
+        const failing = new Set(['attachment.upload', 'session.create', 'turn.submit'])
+        // Each write fails once in a way that leaves its outcome unknown.
+        fake.onNativeMessage = (raw, host) => {
+          const message = raw as { id: string; op: string }
+          if (!failing.delete(message.op)) return scripted(raw, host)
+          host.send({ v: 1, id: message.id, ok: false, error: { code: 'ambiguous_mutation', message: 'lost' } })
+        }
+        expect(await fake.sendFromPage({ ...question, pickId })).toEqual({
+          ok: false,
+          reason: "The Node didn't confirm the screenshot. Send again to retry; the Node keeps one copy.",
+        })
+        expect(await fake.sendFromPage({ ...question, pickId })).toEqual({
+          ok: false,
+          reason: "The Node didn't confirm the new chat. Send again to retry; the Node won't make a second one.",
+        })
+        expect(await fake.sendFromPage({ ...question, pickId })).toEqual({
+          ok: false,
+          reason:
+            "The Node didn't confirm this message, so it may have arrived. Send again to retry; the Node makes at most one turn.",
+        })
+        expect(await fake.sendFromPage({ ...question, pickId })).toEqual({ ok: true, opensPanel: true })
+        const [create, createAgain, submit, submitAgain] = writes(fake)
+        expect(createAgain!.key).toBe(create!.key)
+        expect(submitAgain!.key).toBe(submit!.key)
+        expect(submitAgain!.sessionId).toBe(submit!.sessionId)
+        expect(writes(fake)).toHaveLength(4)
+        // Uploaded again only after the upload the Node didn't confirm, and then reused.
+        expect(uploads(fake)).toHaveLength(2)
+        expect(submitAgain!.input).toEqual(submit!.input)
+
+        // Another question is another turn.
+        const second = await opened()
+        second.fake.onNativeMessage = (raw, host) => {
+          const message = raw as { id: string; op: string }
+          if (message.op !== 'turn.submit' || writes(second.fake).length > 2) return scripted(raw, host)
+          host.send({ v: 1, id: message.id, ok: false, error: { code: 'ambiguous_mutation', message: 'lost' } })
+        }
+        await second.fake.sendFromPage({ ...question, pickId: second.pickId })
+        await second.fake.sendFromPage({ ...question, pickId: second.pickId, question: 'And this one?' })
+        const [, first, changed] = writes(second.fake)
+        expect(changed!.key).not.toBe(first!.key)
+      })
+
+      it('refuses in one line, and sends nothing, when a check fails', async () => {
+        const { fake, pickId } = await opened()
+        const refused = async (message: Record<string, unknown>) =>
+          ((await fake.sendFromPage({ ...question, pickId, ...message })) as { reason?: string }).reason
+        expect(await refused({ pickId: 'other' })).toBe(
+          'This box is out of date, so nothing was sent. Pick the element again.',
+        )
+        expect(await refused({ question: '   ' })).toBe('Write a question of up to 20,000 characters.')
+        expect(await refused({ question: 'x'.repeat(20_001) })).toBe('Write a question of up to 20,000 characters.')
+        expect(await refused({ html: 'é'.repeat(30 * 1024) })).toBe("The element's HTML is too large to send.")
+        expect(await refused({ sessionId: 's2', agent: null })).toBe(
+          "That conversation isn't one of this task's, so nothing was sent. Choose another.",
+        )
+        expect(await refused({ agent: 'codex::' })).toBe(
+          "That agent can't start a chat on this Node, so nothing was sent. Choose another.",
+        )
+        // Only the picker in the top frame is answered.
+        expect(await fake.sendFromPage({ ...question, pickId }, 2)).toBeUndefined()
+        fake.activeTab = { ...fake.activeTab, url: 'https://tracker.example/items/43' }
+        expect(await refused({})).toBe(
+          'This page no longer belongs to the task the box was opened for, so nothing was sent. Pick the element again.',
+        )
+        expect(await fake.sendFromPage({ type: 'acorn:ask.open' })).toEqual({
+          ok: false,
+          reason:
+            "This page doesn't belong to a task, so there is no agent to ask about it. Open a task's pull request, issue, or app, then try again.",
+        })
+        expect(writes(fake)).toEqual([])
+      })
+
+      it('forgets a cancelled pick', async () => {
+        const { fake, pickId } = await opened()
+        await fake.sendFromPage({ type: 'acorn:ask.cancel', pickId })
+        expect(await fake.sendFromPage({ ...question, pickId })).toMatchObject({ ok: false })
+        expect(writes(fake)).toEqual([])
+      })
+
+      it('tells Firefox to say where the reply is', async () => {
+        const { fake, pickId } = await opened({ flavor: 'firefox' })
+        expect(await fake.sendFromPage({ ...question, pickId })).toEqual({ ok: true, opensPanel: false })
+      })
+    })
   })
 })

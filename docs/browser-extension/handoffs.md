@@ -45,16 +45,17 @@ plugin's `label` stays in the chip's accessible name.
   conversations. A conversation is waiting while the Node holds a request from it. A click opens the
   panel on Home with the task. The arrow beside it opens a menu: **Show in side panel**, **Open in
   Acorn** (a plain `acorn://` link to the task, on its item's pane), **New chat about this page**
-  (Home's new-chat picker for the task, with the page's link waiting for the draft), and **Copy
-  Acorn link**. A development build leaves out Open in Acorn, as the panel does.
+  (Home's new-chat picker for the task, with the page's link waiting for the draft), **Ask about an
+  element** (the [element picker](./element-picker.md)), and **Copy Acorn link**. A development
+  build leaves out Open in Acorn, as the panel does.
 - **A page no task holds** reads **Start task**. A click opens a menu with the desktop row menu's two
   choices: **Create task** and **Start workflow…**. Either one opens the panel on the handoff card,
   which resolves the page and shows that choice's form.
 
 Firefox opens its sidebar only from the extension's own controls, so there the chip's click opens
 the menu, with a line saying to click Acorn in the toolbar for the panel. A task's menu has Open in
-Acorn as a plain link and Copy Acorn link. Start task's choice hands the page to the background, and
-the handoff card shows when the person opens the sidebar.
+Acorn as a plain link, Ask about an element, and Copy Acorn link. Start task's choice hands the page
+to the background, and the handoff card shows when the person opens the sidebar.
 
 A tab that stops matching, loses access, or whose Node is no longer selected is told to draw nothing,
 and its chip goes. That happens on navigation, on a removed grant (from the sidebar or the browser's

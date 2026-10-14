@@ -125,6 +125,9 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
   on, as a list such as `["https://runn-05ea41.runn.localhost:5104"]`. The marker's **Hide on this
   site** adds one, and **This page** removes it again. It holds for every Node.
 - `siteChoices:<nodeId>`: the person's [project overrides](./project-sites.md#overrides) for each site.
+- `askAgent:<nodeId>`: the agent row the [element picker's box](./element-picker.md#the-box) last
+  started a new chat from on that Node, as its `choiceKey`, such as `claude:work:`. It's the box's
+  default for the next one.
 - `notifiedRequests`: the requests already sent as [OS notifications](./notifications.md#browser-storage).
 
 Nothing else is stored, and no draft leaves the browser until the person sends it.

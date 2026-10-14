@@ -16,11 +16,11 @@ import {
 export const HANDOFFS_KEY = 'handoffs'
 type Cached = { nodeId: string | null; handoffs: BridgeHandoff[] }
 
-// Which pages get which buttons. A page gets the content script only when the extension may read it:
-// a site the person granted, or the tab the toolbar button was clicked on. A tab that loses its match,
-// its access, or its Node is told to draw nothing. On a page that belongs to a task, the button is the
-// task chip. A page on an app a plugin published for a task gets the branch marker, unless the person
-// hid it on that origin.
+// Which pages get which buttons. A page gets the content script, and the element picker beside it,
+// only when the extension may read it: a site the person granted, or the tab the toolbar button was
+// clicked on. A tab that loses its match, its access, or its Node is told to draw nothing. On a page
+// that belongs to a task, the button is the task chip. A page on an app a plugin published for a task
+// gets the branch marker, unless the person hid it on that origin.
 export function siteButtons(
   api: BrowserApi,
   events: {
@@ -72,7 +72,7 @@ export function siteButtons(
     // A page with only a marker draws no chip, so its task's agents needn't be followed.
     const task = handoffs.length ? events.chip(url!) : null
     try {
-      await api.scripting.executeScript({ target: { tabId }, files: ['content.js'] })
+      await api.scripting.executeScript({ target: { tabId }, files: ['content.js', 'picker.js'] })
     } catch {
       // No access to this page after all. The sidebar still offers the handoff.
       return

@@ -1,5 +1,6 @@
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type {
+  BridgeAgentChoice,
   BridgeAgentHint,
   BridgeErrorCode,
   BridgePageTask,
@@ -15,6 +16,10 @@ type WithoutEnvelope<Request> = Request extends unknown ? Omit<Request, 'v' | 'i
 export type BridgeCall = WithoutEnvelope<BridgeRequest>
 
 export type SidebarMessage = { id: string; call: BridgeCall }
+
+// Which row of `agents.choices` a new chat starts from: the harness, the login, and the custom agent.
+export const choiceKey = (choice: BridgeAgentChoice): string =>
+  [choice.providerId, choice.account ?? '', choice.customAgentId ?? ''].join(':')
 
 // The extension's own failures sit beside the host's: the host isn't there, or a reply was refused.
 export type CallErrorCode = BridgeErrorCode | 'host_unavailable' | 'reply_too_large'

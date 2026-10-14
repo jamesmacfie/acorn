@@ -90,8 +90,9 @@ and not by port, so `https://runn-05ea41.runn.localhost:5104` asks for all of
 `https://runn-05ea41.runn.localhost`.
 
 A click opens the panel on Home with the task. The arrow beside it opens a menu: **Show in side
-panel**, **Open in Acorn** (the task on the plugin's pane), **Copy Acorn link**, and **Hide on this
-site**. In Firefox the click opens the menu, which says to click Acorn in the toolbar for the panel.
+panel**, **Open in Acorn** (the task on the plugin's pane), **Ask about an element** (the
+[element picker](./element-picker.md)), **Copy Acorn link**, and **Hide on this site**. In Firefox
+the click opens the menu, which says to click Acorn in the toolbar for the panel.
 **Hide on this site** adds the page's origin to `hiddenMarkers` in `storage.local`
 ([browser storage](./conversations.md#browser-storage)), and the background takes the marker off
 every tab on that origin. **This page** shows it again. The background checks a marker click against
