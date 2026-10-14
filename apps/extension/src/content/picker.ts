@@ -231,7 +231,7 @@ if (api && !scope.acornPicker) {
         option('', 'New chat'),
         ...answer.sessions.map((session) => option(session.id, session.title || 'Untitled chat')),
       )
-      if (answer.agents.length) agent.append(...answer.agents.map((each) => option(each.providerId, each.label)))
+      if (answer.agents.length) agent.append(...answer.agents.map((each) => option(each.key, each.label)))
       else agent.append(option('', 'No agent can start on this Node'))
       agent.value = answer.agent ?? ''
       ready = true
@@ -253,7 +253,7 @@ if (api && !scope.acornPicker) {
         selector: cssPath(element),
         size: { width: Math.round(width), height: Math.round(height) },
         sessionId: conversation.value || null,
-        providerId: conversation.value ? null : agent.value || null,
+        agent: conversation.value ? null : agent.value || null,
       })) as AskSent | undefined
       if (box !== opened) return
       sending = false

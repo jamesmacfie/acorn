@@ -63,10 +63,10 @@ const OPENED: AskOpened = {
   pickId: 'pick-1',
   sessions: [{ id: 's1', title: 'Billing rounding' }],
   agents: [
-    { providerId: 'claude', label: 'Claude' },
-    { providerId: 'codex', label: 'Codex' },
+    { key: 'claude::', label: 'Claude' },
+    { key: 'claude:work:', label: 'Claude · work' },
   ],
-  agent: 'codex',
+  agent: 'claude:work:',
   screenshot: true,
 }
 
@@ -203,7 +203,7 @@ describe('the element picker', () => {
       ['s1', 'Billing rounding'],
     ])
     expect(conversation().value).toBe('')
-    expect(agent().value).toBe('codex')
+    expect(agent().value).toBe('claude:work:')
     expect(agent().hidden).toBe(false)
     expect(send().disabled).toBe(true)
 
@@ -222,7 +222,7 @@ describe('the element picker', () => {
       selector: 'body > main:nth-of-type(1) > button:nth-of-type(1)',
       size: { width: 0, height: 0 },
       sessionId: null,
-      providerId: 'codex',
+      agent: 'claude:work:',
     })
     // The panel opens on the chat, so the box goes, and the background has already forgotten the pick.
     expect(drawn()).toBeNull()
@@ -240,7 +240,7 @@ describe('the element picker', () => {
     expect(sent).toHaveLength(1)
     person('keydown', field(), { key: 'Enter' }, field())
     await settle()
-    expect(sent[1]).toMatchObject({ type: 'acorn:ask.send', sessionId: 's1', providerId: null })
+    expect(sent[1]).toMatchObject({ type: 'acorn:ask.send', sessionId: 's1', agent: null })
   })
 
   it("keeps the box open with the background's reason, and forgets the pick on Escape", async () => {

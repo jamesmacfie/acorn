@@ -1,5 +1,5 @@
 import type {
-  BridgeAgentProfile,
+  BridgeAgentChoice,
   BridgeAgentSession,
   BridgeOperation,
   BridgeResults,
@@ -8,12 +8,12 @@ import type { BrowserApi, Tab } from '../browser'
 import { capturePage, cropScreenshot, screenshotData, turnInput, withCapture, type PageCapture } from '../capture'
 import type { AskMessage, AskOpened, AskSent, PickerMessage } from '../handoffs'
 import { saveDestination } from '../localState'
-import { CallFailure, isUncertain, type BridgeCall, type RequestTarget } from '../messages'
+import { CallFailure, choiceKey, isUncertain, type BridgeCall, type RequestTarget } from '../messages'
 import { errorGuidance } from '../sidebar/guidance'
 import type { PageTask } from '../taskPages'
 
 const MENU_ID = 'ask-acorn-about-element'
-// The agent a new chat from the box last started with, per Node.
+// The `choiceKey` of the row a new chat from the box last started from, per Node.
 const askAgentKey = (nodeId: string) => `askAgent:${nodeId}`
 const MAX_QUESTION_CHARS = 20_000
 // The picker cuts the element's HTML to this size.
@@ -28,18 +28,16 @@ type Pick = {
   taskId: string
   pickedAt: number
   sessions: BridgeAgentSession[]
-  agents: BridgeAgentProfile[]
+  // The rows of `agents.choices` that can start.
+  agents: BridgeAgentChoice[]
   // The element as the person saw it, and its `attachmentId` once the Node holds it. Null when the
   // browser didn't allow a screenshot.
   screenshot: Extract<PageCapture, { kind: 'screenshot' }> | null
-  // A new chat's key, kept with its agent, and the chat once the Node made it.
-  create: { providerId: string; key: string; sessionId: string | null } | null
+  // A new chat's key, kept with its row, and the chat once the Node made it.
+  create: { agent: string; key: string; sessionId: string | null } | null
   // A turn's key, kept with the conversation and input it went with.
   submit: { key: string; sessionId: string; input: string } | null
 }
-
-// As the sidebar's agent picker decides it.
-const usable = (profile: BridgeAgentProfile): boolean => profile.installed && profile.authenticated !== false
 
 // Ask Acorn about this element, on a right-click anywhere on a page. Like Add to Acorn chat, the entry
 // is always on the menu. On a page that belongs to a task, a click starts the element picker in the
@@ -125,11 +123,11 @@ export function askElement(
     const match = events.pageTask(url)
     if (!nodeId || !match) return { ok: false, reason: refusal(0, url)! }
     const { task } = match
-    const [shot, sessions, { profiles }, stored] = await Promise.all([
+    const [shot, sessions, { choices }, stored] = await Promise.all([
       screenshot(windowId, url, message),
       events.sessions(task.id) ??
         events.read({ op: 'sessions.list', nodeId, taskId: task.id }).then((result) => result.sessions),
-      events.read({ op: 'agents.profiles', nodeId }),
+      events.read({ op: 'agents.choices', nodeId }),
       api.storage.local.get([askAgentKey(nodeId)]),
     ])
     const pick: Pick = {
@@ -140,20 +138,20 @@ export function askElement(
       pickedAt: Date.now(),
       // An archived conversation takes no new messages.
       sessions: sessions.filter((session) => !session.archivedAt),
-      agents: profiles.filter(usable),
+      agents: choices.filter((choice) => choice.available),
       screenshot: shot,
       create: null,
       submit: null,
     }
     picks.set(tabId, pick)
+    const keys = pick.agents.map((agent) => choiceKey(agent))
     const remembered = stored[askAgentKey(nodeId)]
     return {
       ok: true,
       pickId: pick.id,
       sessions: pick.sessions.map(({ id, title }) => ({ id, title })),
-      agents: pick.agents.map(({ providerId, label }) => ({ providerId, label })),
-      agent:
-        pick.agents.find((agent) => agent.providerId === remembered)?.providerId ?? pick.agents[0]?.providerId ?? null,
+      agents: pick.agents.map((agent, index) => ({ key: keys[index]!, label: agent.label })),
+      agent: keys.find((key) => key === remembered) ?? keys[0] ?? null,
       screenshot: !!shot,
     }
   }
@@ -184,7 +182,7 @@ export function askElement(
     const session = message.sessionId === null ? null : pick.sessions.find((each) => each.id === message.sessionId)
     if (session === undefined)
       return { ok: false, reason: "That conversation isn't one of this task's, so nothing was sent. Choose another." }
-    const agent = session ? null : pick.agents.find((each) => each.providerId === message.providerId)
+    const agent = session ? null : pick.agents.find((each) => choiceKey(each) === message.agent)
     if (agent === undefined)
       return { ok: false, reason: "That agent can't start a chat on this Node, so nothing was sent. Choose another." }
 
@@ -218,8 +216,8 @@ export function askElement(
       const input = turnInput(question, captures, new Map(shot?.attachmentId ? [[shot.id, shot.attachmentId]] : []))
       stage = 'create'
       if (agent) {
-        if (pick.create?.providerId !== agent.providerId)
-          pick.create = { providerId: agent.providerId, key: crypto.randomUUID(), sessionId: null }
+        if (pick.create?.agent !== choiceKey(agent))
+          pick.create = { agent: choiceKey(agent), key: crypto.randomUUID(), sessionId: null }
         const create = pick.create
         create.sessionId ??= (
           await events.read({
@@ -228,6 +226,8 @@ export function askElement(
             taskId: pick.taskId,
             providerId: agent.providerId,
             profileId: agent.profileId,
+            ...(agent.customAgentId ? { customAgentId: agent.customAgentId } : {}),
+            ...(agent.account ? { account: agent.account } : {}),
             key: create.key,
           })
         ).session.id
@@ -255,7 +255,7 @@ export function askElement(
     const target = { nodeId: pick.nodeId, projectId: pick.projectId, taskId: pick.taskId, sessionId }
     // The question went. Full storage only loses the remembered agent and where the panel opens next.
     await Promise.all([
-      agent ? api.storage.local.set({ [askAgentKey(pick.nodeId)]: agent.providerId }) : undefined,
+      agent ? api.storage.local.set({ [askAgentKey(pick.nodeId)]: choiceKey(agent) }) : undefined,
       saveDestination(api.storage.local, pick.nodeId, { projectId: pick.projectId, taskId: pick.taskId, sessionId }),
     ]).catch(() => undefined)
     events.sent(target)

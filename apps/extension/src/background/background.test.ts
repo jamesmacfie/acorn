@@ -12,7 +12,7 @@ function scriptedHost(fake: ReturnType<typeof fakeBrowser>, known: string[]) {
     handoffs: [] as unknown[],
     taskPages: [] as unknown[],
     sessions: [] as { id: string; runtimeState: string; title?: string; archivedAt?: number | null }[],
-    profiles: [] as unknown[],
+    choices: [] as unknown[],
   }
   fake.onNativeMessage = (raw, host: FakeHost) => {
     const message = raw as { id: string; op: string; nodeId?: string | null }
@@ -41,7 +41,7 @@ function scriptedHost(fake: ReturnType<typeof fakeBrowser>, known: string[]) {
     if (message.op === 'projects.list')
       return message.nodeId === state.active ? reply({ nodeId: message.nodeId, projects: [] }) : fail('not_selected')
     if (message.op === 'tasks.pages') return reply({ nodeId: message.nodeId, tasks: state.taskPages })
-    if (message.op === 'agents.profiles') return reply({ nodeId: message.nodeId, profiles: state.profiles })
+    if (message.op === 'agents.choices') return reply({ nodeId: message.nodeId, choices: state.choices })
     if (message.op === 'session.create')
       return reply({ nodeId: message.nodeId, session: { id: `new-${host.received.length}` } })
     if (message.op === 'attachment.upload')
@@ -475,31 +475,25 @@ describe('site buttons', () => {
     })
 
     describe('the box', () => {
-      const profiles = [
-        {
-          providerId: 'claude',
-          profileId: 'default',
-          label: 'Claude',
-          installed: true,
-          authenticated: true,
-          diagnostics: [],
-        },
-        {
-          providerId: 'codex',
-          profileId: 'default',
-          label: 'Codex',
-          installed: true,
-          authenticated: false,
-          diagnostics: [],
-        },
-        {
-          providerId: 'gemini',
-          profileId: 'work',
-          label: 'Gemini',
-          installed: true,
-          authenticated: null,
-          diagnostics: [],
-        },
+      // A harness, a named login on it, one that can't start, and a custom agent on the first harness.
+      const row = (providerId: string, label: string, extra: Record<string, unknown> = {}) => ({
+        providerId,
+        profileId: 'default',
+        customAgentId: null,
+        account: null,
+        label,
+        text: label,
+        description: '',
+        glyph: null,
+        accountIcon: null,
+        available: true,
+        ...extra,
+      })
+      const choices = [
+        row('claude', 'Claude'),
+        row('claude', 'Claude · work', { account: 'work' }),
+        row('codex', 'Codex', { available: false }),
+        row('claude', 'Reviewer', { customAgentId: 'reviewer' }),
       ]
       const question = {
         type: 'acorn:ask.send',
@@ -508,14 +502,23 @@ describe('site buttons', () => {
         selector: '#app > button:nth-of-type(2)',
         size: { width: 80, height: 32 },
         sessionId: null,
-        providerId: 'claude',
+        agent: 'claude::',
       }
       const uploads = (fake: ReturnType<typeof fakeBrowser>) =>
         fake.hosts[0]!.received.filter((message) => (message as { op: string }).op === 'attachment.upload')
       const writes = (fake: ReturnType<typeof fakeBrowser>) =>
         fake.hosts[0]!.received.filter((message) =>
           ['session.create', 'turn.submit'].includes((message as { op: string }).op),
-        ) as { op: string; key: string; sessionId?: string; input?: unknown; providerId?: string; profileId?: string }[]
+        ) as {
+          op: string
+          key: string
+          sessionId?: string
+          input?: unknown
+          providerId?: string
+          profileId?: string
+          account?: string
+          customAgentId?: string
+        }[]
 
       // The canvas a background has and Node lacks. Every screenshot is 1600 × 1000 device pixels, and
       // each crop is kept as the area drawn from it.
@@ -544,7 +547,7 @@ describe('site buttons', () => {
       ) {
         const { fake, host, panel } = await started(options)
         if (options.capture) fake.onCapture = options.capture
-        host.profiles = profiles
+        host.choices = choices
         host.sessions = [
           { id: 's1', title: 'Billing rounding', runtimeState: 'idle', archivedAt: null },
           { id: 's2', title: 'Old chat', runtimeState: 'idle', archivedAt: 5 },
@@ -574,10 +577,11 @@ describe('site buttons', () => {
           pickId: expect.any(String),
           sessions: [{ id: 's1', title: 'Billing rounding' }],
           agents: [
-            { providerId: 'claude', label: 'Claude' },
-            { providerId: 'gemini', label: 'Gemini' },
+            { key: 'claude::', label: 'Claude' },
+            { key: 'claude:work:', label: 'Claude · work' },
+            { key: 'claude::reviewer', label: 'Reviewer' },
           ],
-          agent: 'claude',
+          agent: 'claude::',
           screenshot: true,
         })
 
@@ -585,15 +589,15 @@ describe('site buttons', () => {
         const app = 'https://app.example'
         const { fake, host } = await started({ url: `${app}/planner` })
         host.taskPages = [{ ...pageTask, pages: [{ origin: app, pathPrefix: '/', source: 'runn' }] }]
-        host.profiles = profiles
+        host.choices = choices
         host.sessions = [{ id: 's9', title: 'Planner', runtimeState: 'idle', archivedAt: null }]
-        fake.storage.set('askAgent:a', 'gemini')
+        fake.storage.set('askAgent:a', 'claude::reviewer')
         fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'a' })
         await settle()
         expect(await fake.sendFromPage({ type: 'acorn:ask.open' })).toMatchObject({
           ok: true,
           sessions: [{ id: 's9', title: 'Planner' }],
-          agent: 'gemini',
+          agent: 'claude::reviewer',
         })
       })
 
@@ -620,6 +624,8 @@ describe('site buttons', () => {
           providerId: 'claude',
           profileId: 'default',
         })
+        expect(create).not.toHaveProperty('account')
+        expect(create).not.toHaveProperty('customAgentId')
         expect(submit).toMatchObject({
           op: 'turn.submit',
           sessionId: expect.stringMatching(/^new-/),
@@ -638,7 +644,7 @@ describe('site buttons', () => {
         })
         const target = { nodeId: 'a', projectId: 'p1', taskId: 't1', sessionId: submit!.sessionId }
         expect(panel.messages).toContainEqual({ type: 'open', target })
-        expect(fake.storage.get('askAgent:a')).toBe('claude')
+        expect(fake.storage.get('askAgent:a')).toBe('claude::')
         expect(fake.storage.get('destination:a')).toEqual({
           projectId: 'p1',
           taskId: 't1',
@@ -652,9 +658,24 @@ describe('site buttons', () => {
         })
       })
 
+      it('starts the row the person chose: a named login, or a custom agent', async () => {
+        const login = await opened()
+        await login.fake.sendFromPage({ ...question, pickId: login.pickId, agent: 'claude:work:' })
+        const [fromLogin] = writes(login.fake)
+        expect(fromLogin).toMatchObject({ op: 'session.create', providerId: 'claude', account: 'work' })
+        expect(fromLogin).not.toHaveProperty('customAgentId')
+        expect(login.fake.storage.get('askAgent:a')).toBe('claude:work:')
+
+        const custom = await opened()
+        await custom.fake.sendFromPage({ ...question, pickId: custom.pickId, agent: 'claude::reviewer' })
+        const [fromCustom] = writes(custom.fake)
+        expect(fromCustom).toMatchObject({ op: 'session.create', providerId: 'claude', customAgentId: 'reviewer' })
+        expect(fromCustom).not.toHaveProperty('account')
+      })
+
       it('adds the turn to a chosen conversation, without a new chat', async () => {
         const { fake, pickId } = await opened()
-        expect(await fake.sendFromPage({ ...question, pickId, sessionId: 's1', providerId: null })).toEqual({
+        expect(await fake.sendFromPage({ ...question, pickId, sessionId: 's1', agent: null })).toEqual({
           ok: true,
           opensPanel: true,
         })
@@ -742,10 +763,10 @@ describe('site buttons', () => {
         expect(await refused({ question: '   ' })).toBe('Write a question of up to 20,000 characters.')
         expect(await refused({ question: 'x'.repeat(20_001) })).toBe('Write a question of up to 20,000 characters.')
         expect(await refused({ html: 'é'.repeat(30 * 1024) })).toBe("The element's HTML is too large to send.")
-        expect(await refused({ sessionId: 's2', providerId: null })).toBe(
+        expect(await refused({ sessionId: 's2', agent: null })).toBe(
           "That conversation isn't one of this task's, so nothing was sent. Choose another.",
         )
-        expect(await refused({ providerId: 'codex' })).toBe(
+        expect(await refused({ agent: 'codex::' })).toBe(
           "That agent can't start a chat on this Node, so nothing was sent. Choose another.",
         )
         // Only the picker in the top frame is answered.

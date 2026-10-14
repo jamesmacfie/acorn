@@ -2,13 +2,9 @@ import { Show, createSignal } from 'solid-js'
 import type { BridgeAgentChoice, BridgeAgentSession } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
-import { CallFailure, isUncertain } from '../messages'
+import { CallFailure, choiceKey, isUncertain } from '../messages'
 import type { BridgeClient } from './bridgeClient'
 import { errorGuidance } from './guidance'
-
-// Which row a start came from: the harness, the login, and the custom agent.
-const choiceKey = (choice: BridgeAgentChoice) =>
-  [choice.providerId, choice.account ?? '', choice.customAgentId ?? ''].join(':')
 
 // What a new conversation can start from on one Node, as the desktop's New picker lists it: each
 // harness or its named logins, then each custom agent. And the start itself.

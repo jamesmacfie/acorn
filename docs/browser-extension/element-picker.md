@@ -39,10 +39,14 @@ question field, two dropdowns, **Cancel**, and **Send**:
 
 - **Conversation** offers **New chat**, chosen by default, and the task's conversations that aren't
   archived.
-- **Agent** shows only for a new chat. It lists the agents the Node can start that are installed and
-  not signed out, the sidebar's rule. It defaults to the agent last used from the box, stored as
-  `askAgent:<nodeId>` ([browser storage](./conversations.md#browser-storage)), else the first. With
-  none, it says no agent can start on this Node, and **Send** stays off for a new chat.
+- **Agent** shows only for a new chat. It lists the rows of `agents.choices` that can start, the
+  same rows as the sidebar's **New chat**: each harness or its named logins, then each custom agent.
+  For more information, see [the agent operations](./conversations.md#the-agent-operations). A row's
+  value is its `choiceKey`, the harness, login, and custom agent joined with colons, such as
+  `claude:work:`, so a new chat starts the row the person chose. It defaults to the row last used
+  from the box, stored as `askAgent:<nodeId>` ([browser storage](./conversations.md#browser-storage)),
+  else the first. With none, it says no agent can start on this Node, and **Send** stays off for a
+  new chat.
 
 **Enter** sends, and **Shift+Enter** adds a line. **Cancel**, **Esc**, a tab switch, a navigation, or
 the element leaving the page closes the box and sends nothing.
@@ -110,7 +114,7 @@ unless all of these hold:
 - The same Node is selected, and the page still belongs to the task the box opened for, by the
   address the browser reports for the tab, never one the page supplied.
 - A chosen conversation is in the list the background read when the box opened.
-- A chosen agent is one of the usable agents it read then.
+- A chosen agent row is one of the rows that could start when it read them, for the same Node.
 - The question is 1 to 20,000 characters, and the HTML is at most 50 KiB.
 
 The host checks `turn.submit` against its own schema again. A page address reaches the Node only on
@@ -119,7 +123,7 @@ The host checks `turn.submit` against its own schema again. A page address reach
 ## Retries
 
 For each pick, the background keeps the screenshot's attachment ID, the `session.create` key with its
-agent and the chat it made, and the `turn.submit` key with the conversation and input it went with. A
+agent row and the chat it made, and the `turn.submit` key with the conversation and input it went with. A
 second **Send** reuses them, so a send the Node didn't confirm can't make a second chat or turn, and
 the Node keeps one copy of the screenshot. A changed question gets a new turn key. After an uncertain
 failure, the box names the step the Node didn't confirm and says **Send** retries it.
