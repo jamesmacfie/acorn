@@ -359,8 +359,8 @@ describe('keys and focus in cells', () => {
     const screen = await renderFixture({ width: 100, height: 28 })
     try {
       await screen.until('Invalidate')
-      // `ctrl+b` hides the whole rail, which on a browse screen leaves one region.
-      await screen.press('b', { ctrl: true })
+      // `/` hides the whole rail, which on a browse screen leaves one region.
+      await screen.press('/')
       await screen.frame()
 
       const before = focusedRenderable()
