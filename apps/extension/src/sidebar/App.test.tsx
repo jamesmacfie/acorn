@@ -85,6 +85,12 @@ function mount(
       known.push('new')
       return reply({ nodeId: 'new', label: request.label, endpoint: 'https://new.test', local: false })
     }
+    // Each Node ties the test page's site to its one project.
+    if (request.op === 'sites.list')
+      return reply({
+        nodeId: request.nodeId,
+        sites: [{ projectId: `${request.nodeId}-p`, origin: 'https://example.test', pathPrefix: '/' }],
+      })
     if (request.op === 'projects.list') {
       const nodeId = request.nodeId!
       held.push({
@@ -128,8 +134,8 @@ describe('sidebar', () => {
     held[0]!.release()
     await settle()
     expect(nodeChip(root)).toContain('Node b')
-    // The page matches nothing, so This page offers to tie its site to one of b's projects.
-    const options = [...root.querySelectorAll('select[name="tie-project"] option')].map((option) => option.textContent)
+    // The page is on b's project's site, which This page suggests only from b's project list.
+    const options = [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
     expect(options).toEqual(['Choose a project', 'b project'])
   })
 
@@ -137,15 +143,15 @@ describe('sidebar', () => {
     const { fake, root } = mount(['a'])
     await settle()
     await useNode(root, 'Node a')
-    expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
     expect(root.querySelector('[aria-label="Nodes"]')).toBeNull()
     await openSettings(root)
-    expect(root.querySelector('[aria-label="Home"]')).toBeNull()
+    expect(root.querySelector('.view[aria-label="Home"]')).toBeNull()
     expect(root.querySelector('[aria-label="Nodes"]')!.textContent).toContain('Node a')
     await pick(root, 'theme', 'nord')
     expect(fake.storage.get('appearance')).toEqual({ theme: 'nord', style: 'terminal' })
     await back(root)
-    expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
 
     expect(root.querySelector('[data-testid="node-status"]')).toBeNull()
     fake.hosts[0]!.send({ v: 1, event: 'status', status: { nodeId: 'a', state: 'offline' } })
@@ -182,7 +188,7 @@ describe('sidebar', () => {
     expect(root.querySelector('[aria-label="Notifications"]')).not.toBeNull()
     button(root, 'Done')!.click()
     await settle()
-    expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 
   it('pairs the Node on this Mac once Acorn allows it, with no code', async () => {
@@ -242,7 +248,7 @@ describe('sidebar', () => {
     expect(choose.querySelector('li')!.textContent).toContain('Node aOn this Mac')
     button(choose, 'Use')!.click()
     await settle()
-    expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
 
     button(root.querySelector('header .menu-items')!, 'Forget Node a')!.click()
     await settle()

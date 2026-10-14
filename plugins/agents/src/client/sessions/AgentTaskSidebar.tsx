@@ -22,7 +22,7 @@ import {
 import { managedAgentStore } from './managedStore'
 import type { AgentPaneModel } from './agentPaneModel'
 import { AGENT_PANE_ID } from '../paneIdentity'
-import { sessionModelSummary } from '../settings/agentConfigOptions'
+import { sessionModelSummary } from '../../contract/sessionModel.ts'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
 import { attentionMark } from './stateTone'

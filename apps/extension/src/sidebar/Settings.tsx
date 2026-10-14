@@ -24,16 +24,9 @@ export function Settings(props: {
   apps: readonly SiteAssociation[]
   pageUrl: string | undefined
   sitesChanged(projectId: string, sites: SiteAssociation[]): void
-  close(): void
 }) {
   return (
     <div class="view" aria-label="Settings">
-      <div class="view-head">
-        <button type="button" class="icon" aria-label="Back" onClick={() => props.close()}>
-          ‹
-        </button>
-        <span class="title">Settings</span>
-      </div>
       <section aria-label="Nodes">
         <h2>Nodes</h2>
         <Show

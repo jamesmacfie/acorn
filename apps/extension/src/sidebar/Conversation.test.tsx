@@ -8,7 +8,7 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import { SELECTED_NODE_KEY, startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
-import { back, button, conversationTitle, openChat, rememberTask } from '../test/sidebarUi'
+import { back, button, conversationTitle, openChat, rememberTask, tab } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -26,6 +26,7 @@ const session = (id: string, extra: Partial<BridgeAgentSession> = {}): BridgeAge
   title: `Chat ${id}`,
   providerId: 'claude',
   profileId: 'claude-code',
+  model: null,
   kind: 'interactive',
   inline: false,
   runtimeState: 'ready',
@@ -79,7 +80,9 @@ function node() {
         return { result: { nodeId: 'n1', projects: [{ id: 'p1', name: 'Acorn', path: null, hidden: false }] } }
       // The test page is on the project's site, so Home lists the current task's conversations.
       case 'sites.list':
-        return { result: { nodeId: 'n1', sites: [{ projectId: 'p1', origin: 'https://example.test', pathPrefix: '/' }] } }
+        return {
+          result: { nodeId: 'n1', sites: [{ projectId: 'p1', origin: 'https://example.test', pathPrefix: '/' }] },
+        }
       case 'tasks.list':
         return { result: { nodeId: 'n1', projectId: 'p1', tasks: [{ id: 't1', title: 'Fix it', branch: null }] } }
       case 'sessions.list':
@@ -261,9 +264,9 @@ describe('conversation', () => {
     subject.say('s1', 'Hello from the desktop', 'user_message')
     subject.say('s1', 'Hi')
     await openSession(subject)
-    // Where a message goes: the task, then the conversation.
-    expect(subject.root.querySelector('[aria-label="Conversation"] .view-head')!.textContent).toContain('Fix it')
-    expect(conversationTitle(subject.root)).toBe('Claude · Chat s1')
+    // Where a message goes: the conversation, under its task, in the top bar.
+    expect(subject.root.querySelector('header .eyebrow')!.textContent).toBe('Fix it')
+    expect(conversationTitle(subject.root)).toBe('Chat s1')
     expect(transcript(subject.root)).toEqual(['YouHello from the desktop', 'AgentHi'])
 
     subject.say('s1', 'A reply another client caused')
@@ -310,7 +313,7 @@ describe('conversation', () => {
     await settle()
     const root = subject.reopen()
     await settle(20)
-    expect(conversationTitle(root)).toBe('Claude · Chat s1')
+    expect(conversationTitle(root)).toBe('Chat s1')
     expect(draft(root)).toBe('Half a thought')
   })
 
@@ -328,7 +331,7 @@ describe('conversation', () => {
     await openChat(subject.root, 'Chat s2')
     slow()
     await settle()
-    expect(conversationTitle(subject.root)).toBe('Claude · Chat s2')
+    expect(conversationTitle(subject.root)).toBe('Chat s2')
     expect(transcript(subject.root)).toEqual([])
     expect(draft(subject.root)).toBe('')
     await openChat(subject.root, 'Chat s1')
@@ -439,59 +442,61 @@ describe('conversation', () => {
       ['claude', 'claude-code'],
     ])
     expect(new Set(creates.map((request) => request.key)).size).toBe(1)
-    expect(conversationTitle(subject.root)).toBe('Claude · New chat')
+    expect(conversationTitle(subject.root)).toBe('New chat')
   })
 })
 
 describe('home', () => {
+  // Each row's title, its provider, model, and state line, and whether its state icon turns.
   const rows = (root: HTMLElement) =>
-    [...root.querySelectorAll('[aria-label="Agents"] .row-button')].map((row) =>
-      [...row.querySelectorAll('strong, .state, .quiet')].map((part) => part.textContent),
-    )
+    [...root.querySelectorAll('[aria-label="Agents"] .row-button')].map((row) => [
+      row.querySelector('strong')!.textContent,
+      row.querySelector('.agent-meta')!.textContent,
+      row.querySelector('.ui-icon[data-spin]') !== null,
+    ])
+  const heading = (root: HTMLElement) => root.querySelector('header h1')!.textContent
 
-  it("lists the current task's conversations with their state and last line, and goes back from one", async () => {
+  it("lists the current task's conversations as the desktop does, and goes back from one", async () => {
     const subject = mount()
-    subject.say('s1', 'Line one\nEdited the totals')
+    subject.state.sessions[0]!.model = 'Opus · High'
     subject.state.sessions[1]!.runtimeState = 'working'
     await settle()
     await rememberTask(subject.root, subject.fake.storage, 'p1', 't1')
     expect(subject.root.querySelector('[aria-label="Current task"]')!.textContent).toContain('Fix it')
+    expect(heading(subject.root)).toBe('Home')
+    // The list is Agents', not Home's.
+    expect(subject.root.querySelector('.view[aria-label="Agents"]')).toBeNull()
+    await tab(subject.root, 'Agents')
+    expect(heading(subject.root)).toBe('Agents2')
     expect(rows(subject.root)).toEqual([
-      ['Claude · Chat s1', 'Ready', 'Edited the totals'],
-      ['Claude · Chat s2', 'Working'],
+      ['Chat s1', 'claude · Opus · High · ready', false],
+      ['Chat s2', 'claude · working', true],
     ])
 
     await openChat(subject.root, 'Chat s1')
-    expect(subject.root.querySelector('[aria-label="Home"]')).toBeNull()
+    expect(subject.root.querySelector('.view[aria-label="Agents"]')).toBeNull()
+    expect(heading(subject.root)).toBe('Chat s1')
     await back(subject.root)
     expect(subject.root.querySelector('[aria-label="Conversation"]')).toBeNull()
+    expect(heading(subject.root)).toBe('Agents2')
     expect(subject.fake.storage.get('destination:n1')).toEqual({ projectId: 'p1', taskId: 't1', sessionId: null })
-
-    // A row reads its last line again only once its conversation moves on.
-    const tails = () =>
-      subject.state.requests.filter((request) => request.op === 'session.read' && request.limit === 20)
-    const before = tails().length
-    subject.say('s1', 'Ran the tests')
-    subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1'], tasks: [], missed: false })
-    await settle()
-    expect(tails().length).toBe(before + 1)
-    expect(rows(subject.root)[0]).toEqual(['Claude · Chat s1', 'Ready', 'Ran the tests'])
   })
 
-  it('groups the conversations into managed chats, inline chats, and workflows', async () => {
+  it('groups the conversations into managed sessions, workflow runs, and inline chats', async () => {
     const subject = mount()
     subject.state.sessions.push(session('s3', { kind: 'workflow' }), session('s4', { inline: true }))
     subject.state.events.set('s3', []).set('s4', [])
     await settle()
     await rememberTask(subject.root, subject.fake.storage, 'p1', 't1')
+    await tab(subject.root, 'Agents')
     const groups = [...subject.root.querySelectorAll('[aria-label="Agents"] ul.rows')].map((list) => [
       list.getAttribute('aria-label'),
       [...list.querySelectorAll('strong')].map((row) => row.textContent),
     ])
     expect(groups).toEqual([
-      ['Managed chats', ['Claude · Chat s1', 'Claude · Chat s2']],
-      ['Inline chats', ['Claude · Chat s4']],
-      ['Workflows', ['Claude · Chat s3']],
+      ['Managed sessions', ['Chat s1', 'Chat s2']],
+      ['Workflow runs', ['Chat s3']],
+      ['Inline chats', ['Chat s4']],
     ])
   })
 
@@ -734,189 +739,9 @@ describe('questions and approvals', () => {
   })
 })
 
-describe('page capture', () => {
-  const captures = (root: HTMLElement) =>
-    [...root.querySelectorAll('[data-testid="capture"] strong')].map((item) => item.textContent)
-  const capture = async (root: HTMLElement, label: string) => {
-    button(root, label)!.click()
-    await settle()
-  }
+describe('attachments', () => {
   const written = (subject: ReturnType<typeof mount>, op: string) =>
     subject.state.requests.filter((request) => request.op === op)
-
-  it('keeps captures in the browser until send, then sends them in one turn', async () => {
-    const subject = mount()
-    subject.fake.selection = '  The failing assertion  '
-    await openSession(subject)
-    await capture(subject.root, 'Add page link to chat')
-    await capture(subject.root, 'Add selected text to chat')
-    await capture(subject.root, 'Add screenshot to chat')
-    expect(captures(subject.root)).toEqual(['Page · Docs', 'Selected text · Docs', 'Screenshot · Docs'])
-    expect(subject.root.textContent).toContain('Goes to Chat s1 in Fix it')
-    expect(subject.root.querySelector('[data-testid="capture"] img')!.getAttribute('src')).toMatch(/^data:image\/jpeg/)
-    // Capture and preview send nothing to the Node.
-    expect(written(subject, 'attachment.upload')).toEqual([])
-    expect(written(subject, 'turn.submit')).toEqual([])
-
-    button(subject.root, 'Remove Page: Docs')!.click()
-    await settle()
-    const root = subject.reopen()
-    await settle(20)
-    expect(captures(root)).toEqual(['Selected text · Docs', 'Screenshot · Docs'])
-
-    type(root, 'What broke?')
-    send(root)
-    await settle()
-    expect(written(subject, 'attachment.upload')).toMatchObject([
-      { taskId: 't1', mediaType: 'image/jpeg', filename: 'Screenshot of example.test.jpg' },
-    ])
-    const [input] = [...subject.state.inputs.values()]
-    expect(input).toMatchObject([
-      { type: 'text', text: 'What broke?' },
-      {
-        type: 'context',
-        label: 'Selected text from Docs',
-        content: 'From https://example.test/docs:\n\nThe failing assertion',
-        source: 'browser-extension',
-        resourceId: 'https://example.test/docs',
-      },
-      { type: 'image', attachmentId: 'att-1', alt: 'Screenshot of Docs' },
-    ])
-    expect(captures(root)).toEqual([])
-    expect(draft(root)).toBe('')
-    expect([...subject.fake.storage.keys()].filter((key) => /^(draft|captures):/.test(key))).toEqual([])
-  })
-
-  it('asks for the toolbar button when the browser gives no access to the page', async () => {
-    const subject = mount()
-    subject.fake.activeTab = { id: 1, windowId: 1 }
-    await openSession(subject)
-    await capture(subject.root, 'Add page link to chat')
-    await capture(subject.root, 'Add screenshot to chat')
-    expect(captures(subject.root)).toEqual([])
-    expect(subject.root.textContent).toContain('Click the Acorn button in the toolbar')
-  })
-
-  it('says a granted site still needs the toolbar button for a screenshot', async () => {
-    const subject = mount()
-    await openSession(subject)
-    // Firefox's answer when a site is granted but the toolbar button wasn't clicked.
-    subject.fake.onCapture = async () => {
-      throw new Error('Missing activeTab permission')
-    }
-    await capture(subject.root, 'Add page link to chat')
-    await capture(subject.root, 'Add screenshot to chat')
-    expect(captures(subject.root)).toEqual(['Page · Docs'])
-    expect(subject.root.textContent).toContain('The browser takes a screenshot only of a page you clicked')
-  })
-
-  it('keeps no screenshot when the tab changes while it is taken', async () => {
-    const subject = mount()
-    await openSession(subject)
-    subject.fake.onCapture = async () => {
-      subject.fake.activeTab = { id: 2, windowId: 1, url: 'https://example.test/other', title: 'Other' }
-      return 'data:image/jpeg;base64,/9j/4AAQ'
-    }
-    await capture(subject.root, 'Add screenshot to chat')
-    expect(captures(subject.root)).toEqual([])
-    expect(subject.root.textContent).toContain('The page changed while it was being captured')
-  })
-
-  it('reports a capture over the limits before anything is uploaded', async () => {
-    const subject = mount()
-    await openSession(subject)
-    subject.fake.onCapture = async () => `data:image/jpeg;base64,${'A'.repeat(8 * 1024 * 1024)}`
-    await capture(subject.root, 'Add screenshot to chat')
-    expect(subject.root.textContent).toContain('over the 5.0 MB a draft keeps')
-    subject.fake.selection = 'x'.repeat(600 * 1024)
-    await capture(subject.root, 'Add selected text to chat')
-    expect(subject.root.textContent).toContain('Captured text is limited to 512 KiB')
-    subject.fake.selection = ''
-    await capture(subject.root, 'Add selected text to chat')
-    expect(subject.root.textContent).toContain('Nothing is selected on this page')
-    expect(captures(subject.root)).toEqual([])
-    expect(written(subject, 'attachment.upload')).toEqual([])
-  })
-
-  it('keeps an uploaded screenshot with the draft when the send is uncertain, and reuses it on retry', async () => {
-    const subject = mount()
-    await openSession(subject)
-    await capture(subject.root, 'Add screenshot to chat')
-    subject.state.answers.set('turn.submit', () => ({ error: { code: 'host_unavailable', message: 'Gone.' } }))
-    send(subject.root)
-    await settle()
-    expect(subject.root.textContent).toContain("didn't confirm this message")
-    expect(subject.fake.storage.get('captures:n1:t1:s1')).toMatchObject([{ attachmentId: 'att-1' }])
-    expect(button(subject.root, 'Retry')).toBeTruthy()
-
-    subject.state.answers.delete('turn.submit')
-    send(subject.root)
-    await settle()
-    expect(written(subject, 'attachment.upload')).toHaveLength(1)
-    const keys = written(subject, 'turn.submit').map((request) => request.key)
-    expect(new Set(keys).size).toBe(1)
-    expect(subject.state.inputs.get(keys[0] as string)).toEqual([
-      { type: 'image', attachmentId: 'att-1', alt: 'Screenshot of Docs' },
-    ])
-    expect(captures(subject.root)).toEqual([])
-    // A sent screenshot leaves the draft without being deleted on the Node.
-    expect(written(subject, 'attachment.delete')).toEqual([])
-  })
-
-  it('keeps the screenshot when its upload fails, and deletes an uploaded one the person removes', async () => {
-    const subject = mount()
-    await openSession(subject)
-    await capture(subject.root, 'Add screenshot to chat')
-    subject.state.answers.set('attachment.upload', () => ({
-      error: { code: 'node_error', message: 'Attachments are limited to 10 MiB each.' },
-    }))
-    send(subject.root)
-    await settle()
-    expect(subject.root.textContent).toContain('Attachments are limited to 10 MiB each.')
-    expect(captures(subject.root)).toEqual(['Screenshot · Docs'])
-    expect(written(subject, 'turn.submit')).toEqual([])
-
-    subject.state.answers.delete('attachment.upload')
-    subject.state.answers.set('turn.submit', () => ({ error: { code: 'node_error', message: 'Refused.' } }))
-    send(subject.root)
-    await settle()
-    button(subject.root, 'Remove Screenshot: Docs')!.click()
-    await settle()
-    expect(written(subject, 'attachment.delete')).toMatchObject([{ taskId: 't1', attachmentId: 'att-1' }])
-    expect(subject.fake.storage.has('captures:n1:t1:s1')).toBe(false)
-  })
-
-  it('finishes an upload and send for the conversation it started in after a switch', async () => {
-    const subject = mount()
-    await openSession(subject)
-    await capture(subject.root, 'Add screenshot to chat')
-    let release!: () => void
-    subject.state.holds.set('attachment.upload', (answer) => (release = answer))
-    send(subject.root)
-    await settle()
-    subject.state.holds.delete('attachment.upload')
-    await openChat(subject.root, 'Chat s2')
-    expect(captures(subject.root)).toEqual([])
-    release()
-    await settle()
-    expect(written(subject, 'turn.submit')).toMatchObject([{ sessionId: 's1' }])
-    expect(subject.fake.storage.has('captures:n1:t1:s1')).toBe(false)
-    expect(captures(subject.root)).toEqual([])
-  })
-
-  it('lands a screenshot taken before a switch in the draft it was taken for', async () => {
-    const subject = mount()
-    await openSession(subject)
-    let finish!: (value: string) => void
-    subject.fake.onCapture = () => new Promise((resolve) => (finish = resolve))
-    button(subject.root, 'Add screenshot to chat')!.click()
-    await settle()
-    await openChat(subject.root, 'Chat s2')
-    finish('data:image/jpeg;base64,/9j/4AAQ')
-    await settle()
-    expect(captures(subject.root)).toEqual([])
-    expect(subject.fake.storage.get('captures:n1:t1:s1')).toMatchObject([{ kind: 'screenshot', title: 'Docs' }])
-  })
 
   it('draws the screenshots a turn sent, read through the bridge', async () => {
     const created: string[] = []
@@ -980,21 +805,18 @@ describe('Add to Acorn chat', () => {
     expect(subject.fake.menus.get('add-to-acorn-chat')).toEqual({ title: 'Add to Acorn chat', contexts: ['selection'] })
   })
 
-  it('adds the selection to the open conversation, beside its other captures, and sends it', async () => {
+  it('adds the selection to the open conversation and sends it', async () => {
     const subject = mount(selected())
     await openSession(subject, 's2')
-    button(subject.root, 'Add page link to chat')!.click()
-    await settle()
     await rightClick(subject)
     expect(subject.fake.panelOpens).toEqual([1])
-    expect(conversationTitle(subject.root)).toBe('Claude · Chat s2')
-    expect(captures(subject.root)).toEqual(['Page · Docs', 'Selected text · Docs'])
+    expect(conversationTitle(subject.root)).toBe('Chat s2')
+    expect(captures(subject.root)).toEqual(['Selected text · Docs'])
 
     send(subject.root)
     await settle()
     const [input] = [...subject.state.inputs.values()]
     expect(input).toMatchObject([
-      { type: 'context', label: 'Page: Docs' },
       {
         type: 'context',
         label: 'Selected text from Docs',
@@ -1008,7 +830,7 @@ describe('Add to Acorn chat', () => {
     await openSession(subject, 's2')
     await back(subject.root)
     await rightClick(subject)
-    expect(conversationTitle(subject.root)).toBe('Claude · Chat s1')
+    expect(conversationTitle(subject.root)).toBe('Chat s1')
     expect(captures(subject.root)).toEqual(['Selected text · Docs'])
   })
 
@@ -1024,7 +846,7 @@ describe('Add to Acorn chat', () => {
 
     const root = subject.reopen()
     await settle(30)
-    expect(conversationTitle(root)).toBe('Claude · Chat s1')
+    expect(conversationTitle(root)).toBe('Chat s1')
     expect(captures(root)).toEqual(['Selected text · Docs'])
   })
 

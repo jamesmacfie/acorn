@@ -1,7 +1,8 @@
 import { Show } from 'solid-js'
 import { Icon } from '@acorn/plugin-api/ui'
 import type { AgentSubagentStatus } from '../../contract/wire.ts'
-import { queuedMark, runtimeIcon, runtimeTone, subagentIcon, subagentTone } from './stateTone'
+import { runtimeIcon, runtimeTone } from '../../contract/runtimeState.ts'
+import { queuedMark, subagentIcon, subagentTone } from './stateTone'
 
 // The one place a managed session's runtime state becomes a mark: the rows in the task sidebar, the
 // word in the pane header, the Agent Center roster. Shape and colour are `runtimeIcon` and

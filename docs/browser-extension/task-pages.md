@@ -67,15 +67,12 @@ states:
    no anchors, such as Linear's and Rollbar's, and for Firefox.
 3. **A project site with no item.** The project its [site associations](./project-sites.md) suggest,
    that project's open tasks, and **New task in Acorn**, which opens the project in the desktop app.
-4. **Nothing matches.** One line, and an offer to tie the page's site to a project, which adds the
-   origin as one of that project's sites.
 
-**Current task** stays pinned below on a page whose task isn't the current one, and on a page that
-matches nothing, so a capture always has somewhere to go. The sidebar reads the page again when the
-tab finishes loading, so the section follows the tab, and says so when the page is one it may not
-read. Then it also lists each site under **Site access** that isn't allowed yet, with **Allow**. The
-browser hides the address of a page the extension may not read, so the panel can't tell which of
-those sites the page is on, and offers them all.
+A page that matches none of these, or one the browser hides from the extension, shows only the Acorn
+mark. The current task stays current there, so a capture still has somewhere to go, but Home doesn't
+show it. **Current task** stays pinned below **This page** on a page whose task isn't the current
+one. The sidebar reads the page again when the tab finishes loading, so the section follows the
+tab. Sites to allow are under **Site access** in Settings.
 
 ## The branch marker
 

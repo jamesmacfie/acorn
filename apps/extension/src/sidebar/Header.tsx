@@ -3,16 +3,20 @@ import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type { BridgeNodes } from '@acorn/protocol/extensionBridge.ts'
 import { State, nodeState } from './state'
 
-// The Acorn mark, the selected Node as a chip with its status, and the gear. The chip's menu switches
-// Nodes, pairs another, and forgets the selected one.
+// What the top bar names: a view, with a count for a list, or an open conversation with its task in
+// small letters above it and a way back to the list.
+export type Heading = { title: string; count?: number; eyebrow?: string; back?: () => void }
+
+// The view's heading, drawn like a desktop pane header, then the selected Node as a chip with its
+// status. The browser's own panel header already says Acorn. The chip's menu switches Nodes, pairs
+// another, and forgets the selected one.
 export function Header(props: {
+  heading: Heading
   fleet: BridgeNodes | null
   status: NodeStatus | null
-  settingsOpen: boolean
   select(nodeId: string): void
   pair(): void
   forget(nodeId: string): void
-  toggleSettings(): void
 }) {
   let menu!: HTMLDetailsElement
   const selected = () => props.fleet?.nodes.find((node) => node.nodeId === props.fleet?.activeNodeId) ?? null
@@ -23,8 +27,22 @@ export function Header(props: {
 
   return (
     <header class="top">
-      <img class="mark" src="icon-128.png" alt="" />
-      <span class="brand">acorn</span>
+      <Show when={props.heading.back}>
+        {(back) => (
+          <button type="button" class="icon" aria-label="Back" onClick={() => back()()}>
+            ‹
+          </button>
+        )}
+      </Show>
+      <div class="heading" data-eyebrow={props.heading.eyebrow === undefined ? undefined : ''}>
+        <Show when={props.heading.eyebrow}>{(eyebrow) => <span class="eyebrow">{eyebrow()}</span>}</Show>
+        <h1>
+          {props.heading.title}
+          <Show when={props.heading.count !== undefined}>
+            <span class="count">{props.heading.count}</span>
+          </Show>
+        </h1>
+      </div>
       <details class="menu" ref={menu}>
         <summary class="chip" aria-label="Node">
           <Show when={selected()} fallback={<State tone="idle">No Node</State>}>
@@ -55,18 +73,6 @@ export function Header(props: {
           </Show>
         </div>
       </details>
-      <button
-        type="button"
-        class="icon gear"
-        aria-label="Settings"
-        aria-pressed={props.settingsOpen}
-        onClick={() => props.toggleSettings()}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
-      </button>
     </header>
   )
 }

@@ -25,8 +25,6 @@ export function SiteAccess(props: {
   handoffs: readonly BridgeHandoff[]
   sites: readonly ProjectSite[]
   apps: readonly SiteAssociation[]
-  // Home's version, for a page it can't read: only the sites not allowed yet, under a short line.
-  notAllowedOnly?: boolean
 }) {
   // Each site this Node's handoffs, project associations, or tasks' apps are on, with what access to
   // it is for.
@@ -66,56 +64,39 @@ export function SiteAccess(props: {
   const grant = (pattern: string) => void props.api.permissions.request({ origins: [pattern] })
   const revoke = (pattern: string) => void props.api.permissions.remove({ origins: [pattern] })
   const siteName = (pattern: string) => pattern.replace(/^https:\/\//, '').replace(/\/\*$/, '')
-  // Waits for the grants, so an allowed site doesn't flash up before they are read.
-  const shown = () =>
-    props.notAllowedOnly ? sites().filter((site) => granted()?.get(site.pattern) === false) : sites()
-
-  const rows = () => (
-    <ul class="rows">
-      <For each={shown()}>
-        {(site) => (
-          <li>
-            <div class="grow">
-              <strong>{siteName(site.pattern)}</strong>
-              <span class="quiet">
-                {site.uses}
-                {granted()?.get(site.pattern) ? ' · Allowed' : ' · Not allowed'}
-              </span>
-            </div>
-            <Show
-              when={granted()?.get(site.pattern)}
-              fallback={
-                <button type="button" class="quiet" onClick={() => grant(site.pattern)}>
-                  Allow
-                </button>
-              }
-            >
-              <button type="button" class="quiet" onClick={() => revoke(site.pattern)}>
-                Remove
-              </button>
-            </Show>
-          </li>
-        )}
-      </For>
-    </ul>
-  )
 
   return (
-    <Show when={shown().length}>
-      <Show
-        when={!props.notAllowedOnly}
-        fallback={
-          <div aria-label="Sites to allow">
-            <p class="quiet">Or allow the sites Acorn works with:</p>
-            {rows()}
-          </div>
-        }
-      >
-        <section aria-label="Site access">
-          <h2>Site access</h2>
-          {rows()}
-        </section>
-      </Show>
+    <Show when={sites().length}>
+      <section aria-label="Site access">
+        <h2>Site access</h2>
+        <ul class="rows">
+          <For each={sites()}>
+            {(site) => (
+              <li>
+                <div class="grow">
+                  <strong>{siteName(site.pattern)}</strong>
+                  <span class="quiet">
+                    {site.uses}
+                    {granted()?.get(site.pattern) ? ' · Allowed' : ' · Not allowed'}
+                  </span>
+                </div>
+                <Show
+                  when={granted()?.get(site.pattern)}
+                  fallback={
+                    <button type="button" class="quiet" onClick={() => grant(site.pattern)}>
+                      Allow
+                    </button>
+                  }
+                >
+                  <button type="button" class="quiet" onClick={() => revoke(site.pattern)}>
+                    Remove
+                  </button>
+                </Show>
+              </li>
+            )}
+          </For>
+        </ul>
+      </section>
     </Show>
   )
 }

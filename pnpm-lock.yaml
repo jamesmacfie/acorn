@@ -288,6 +288,9 @@ importers:
       '@acorn/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
+      '@acorn/plugin-agents':
+        specifier: workspace:*
+        version: link:../../plugins/agents
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

@@ -282,6 +282,9 @@ export type BridgeAgentSession = {
   title: string
   providerId: string
   profileId: string
+  // The model and its reasoning effort as the desktop's rows write them, such as `Opus · High`. Null
+  // until the provider reports a model.
+  model: string | null
   kind: string
   // A chat started from a line of a diff.
   inline: boolean

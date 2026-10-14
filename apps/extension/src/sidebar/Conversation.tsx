@@ -7,8 +7,8 @@ import { conversationLink } from '../acornLinks'
 import { CopyAcornLink, OpenInAcorn } from './OpenInAcorn'
 import { attachmentPreviews } from './attachmentPreviews'
 import type { BridgeClient } from './bridgeClient'
-import type { CaptureKind, PageCapture } from '../capture'
 import { Composer } from './Composer'
+import type { Heading } from './Header'
 import { conversationItems, conversationReader, type ConversationWindow } from './conversationWindow'
 import { errorGuidance } from './guidance'
 import type { DraftTarget } from '../localState'
@@ -26,12 +26,13 @@ export function Conversation(props: {
   session: BridgeAgentSession
   taskTitle: string
   back(): void
+  // Names this conversation, under its task, in the top bar.
+  heading(heading: Heading): void
   online: boolean
   // Whether Open in Acorn may open the desktop app, or copies its link.
   opensLinks: boolean
   hint: BridgeAgentHint | null
   reconnects: number
-  capture(kind: CaptureKind): Promise<PageCapture>
 }) {
   const target = props.target
   const listed = props.session
@@ -92,24 +93,18 @@ export function Conversation(props: {
       (view()?.requests ?? []).some((request) => request.status === 'pending'),
     )
 
+  // Where a message goes: the conversation, under its task.
+  createEffect(() => props.heading({ eyebrow: props.taskTitle, title: session().title, back: props.back }))
+
   return (
     <div class="view conversation" aria-label="Conversation">
-      {/* Where a message goes: the task, then the conversation. */}
-      <div data-testid="destination">
-        <div class="view-head">
-          <button type="button" class="icon" aria-label="Back" onClick={() => props.back()}>
-            ‹
-          </button>
-          <span class="title grow">{props.taskTitle}</span>
-          <OpenInAcorn href={link} opensLinks={props.opensLinks} class="link" />
-          <Show when={props.opensLinks && link}>{(href) => <CopyAcornLink href={href()} class="link" />}</Show>
-        </div>
-        <div class="subhead">
-          <span class="grow">
-            {agentName(session())} · {session().title}
-          </span>
-          <State tone={state().tone}>{state().label}</State>
-        </div>
+      <div class="subhead">
+        <span class="grow">
+          {[agentName(session()), session().model].filter(Boolean).join(' · ')}
+        </span>
+        <State tone={state().tone}>{state().label}</State>
+        <OpenInAcorn href={link} opensLinks={props.opensLinks} class="link" />
+        <Show when={props.opensLinks && link}>{(href) => <CopyAcornLink href={href()} class="link" />}</Show>
       </div>
       <div class="conversation-body">
         <Show when={readError() && !gone()}>
@@ -179,8 +174,6 @@ export function Conversation(props: {
         client={props.client}
         storage={props.storage}
         target={target}
-        destination={`${session().title} in ${props.taskTitle}`}
-        capture={props.capture}
         blocked={blocked()}
         settled={() => void reader.refresh()}
       />

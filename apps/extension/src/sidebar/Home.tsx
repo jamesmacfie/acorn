@@ -1,44 +1,37 @@
-import { For, Match, Show, Switch, createEffect, createSignal } from 'solid-js'
+import { For, Match, Show, Switch, createEffect } from 'solid-js'
 import type {
   BridgeAgentSession,
   BridgeHandoff,
   BridgePendingRequest,
   BridgeProject,
-  BridgeSessionRead,
   BridgeTask,
 } from '@acorn/protocol/extensionBridge.ts'
-import { parseSiteAddress, type ProjectSite, type SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
+import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
+import { runtimeIcon, runtimeTone } from '@acorn/plugin-agents/contract/runtimeState.ts'
 import { itemTaskLink, projectLink } from '../acornLinks'
-import type { BrowserApi } from '../browser'
 import { onHandoffPage, pageHandoffs, type PageHandoff } from '../handoffs'
-import { CallFailure } from '../messages'
 import type { PageTask } from '../taskPages'
 import { AgentSelect, agentChoice } from './agentChoice'
 import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
-import { conversationItems } from './conversationWindow'
-import { errorGuidance } from './guidance'
 import { Handoff } from './Handoff'
 import { OpenInAcorn } from './OpenInAcorn'
-import { SiteAccess } from './SiteAccess'
-import { State, agentName, agentState } from './state'
+import { State } from './state'
 
 // Home's sections below Waiting for you. Workspace owns the state they draw.
 
-// What the panel knows about the page beside it, in one of four states: a task it belongs to, an
-// item no task holds yet, a project site with no item, or nothing. A handoff in progress replaces them.
+// What the panel knows about the page beside it, in one of three states: a task it belongs to, an
+// item no task holds yet, or a project site with no item. A handoff in progress replaces them, and a
+// page that matches nothing never gets here.
 // docs/browser-extension/task-pages.md.
 export function ThisPage(props: {
   client: BridgeClient
   nodeId: string
   online: boolean
   opensLinks: boolean
-  api: BrowserApi
   pageUrl: string | undefined
   handoffs: readonly BridgeHandoff[]
-  // The sites access is for, which a page Acorn can't read offers to allow.
-  sites: readonly ProjectSite[]
-  apps: readonly SiteAssociation[]
   // The tasks the page belongs to, matched in the browser.
   pageTasks: readonly PageTask[]
   markerHidden(origin: string): boolean
@@ -62,7 +55,6 @@ export function ThisPage(props: {
   suggested: readonly string[]
   // The page is on a site tied to a project, or the person chose a project for it.
   onSite: boolean
-  sitesChanged(projectId: string, sites: SiteAssociation[]): void
   // The page matches several projects and the person hasn't chosen one.
   several: boolean
   project: string | null
@@ -95,15 +87,6 @@ export function ThisPage(props: {
               dismiss={props.dismissHandoff}
             />
           )}
-        </Match>
-        <Match when={!props.pageUrl}>
-          <p class="quiet">
-            Your browser hides this page's address from Acorn. Click the Acorn icon in the browser toolbar to find tasks
-            for this page.
-          </p>
-          {/* The browser hides the address of a page Acorn can't read, so every site still to allow is
-              offered, not just this one. */}
-          <SiteAccess api={props.api} handoffs={props.handoffs} sites={props.sites} apps={props.apps} notAllowedOnly />
         </Match>
         <Match when={props.pageTasks.length}>
           <ul class="rows" aria-label="Page tasks">
@@ -179,18 +162,6 @@ export function ThisPage(props: {
         </Match>
         <Match when={props.onSite}>
           <SiteProject {...props} />
-        </Match>
-        <Match when={props.pageUrl}>
-          {(url) => (
-            <TieSite
-              client={props.client}
-              nodeId={props.nodeId}
-              online={props.online}
-              pageUrl={url()}
-              projects={props.projects}
-              changed={props.sitesChanged}
-            />
-          )}
         </Match>
       </Switch>
       <Show when={props.waitingContext}>
@@ -294,81 +265,6 @@ function SiteProject(props: {
   )
 }
 
-// A page that matches nothing: one line, and an offer to tie its site to a project, so the panel
-// suggests that project here from now on (docs/browser-extension/project-sites.md).
-function TieSite(props: {
-  client: BridgeClient
-  nodeId: string
-  online: boolean
-  pageUrl: string
-  projects: readonly BridgeProject[] | null
-  changed(projectId: string, sites: SiteAssociation[]): void
-}) {
-  const [projectId, setProjectId] = createSignal('')
-  const [busy, setBusy] = createSignal(false)
-  const [problem, setProblem] = createSignal<string | null>(null)
-  const site = () => {
-    const parsed = parseSiteAddress(props.pageUrl)
-    return parsed.ok ? { origin: parsed.site.origin, pathPrefix: '/' } : null
-  }
-  const tie = async (forSite: SiteAssociation) => {
-    setBusy(true)
-    setProblem(null)
-    try {
-      const result = await props.client.call({
-        op: 'site.add',
-        nodeId: props.nodeId,
-        projectId: projectId(),
-        site: forSite,
-      })
-      props.changed(result.projectId, result.sites)
-    } catch (error) {
-      setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <>
-      <p class="quiet">Nothing in Acorn matches this page.</p>
-      <Show when={site()}>
-        {(forSite) => (
-          <Show when={props.projects?.length}>
-            <div class="row">
-              <select
-                name="tie-project"
-                aria-label="Project"
-                onChange={(event) => setProjectId(event.currentTarget.value)}
-              >
-                <option value="" selected={!projectId()}>
-                  Choose a project
-                </option>
-                <ProjectOptions projects={props.projects ?? []} selected={projectId()} />
-              </select>
-              <button
-                type="button"
-                class="quiet"
-                disabled={!projectId() || busy() || !props.online}
-                onClick={() => void tie(forSite())}
-              >
-                Tie {forSite().origin} to it
-              </button>
-            </div>
-          </Show>
-        )}
-      </Show>
-      <Show when={problem()}>
-        {(message) => (
-          <p class="problem" role="alert">
-            {message()}
-          </p>
-        )}
-      </Show>
-    </>
-  )
-}
-
 function ProjectOptions(props: { projects: readonly BridgeProject[]; selected: string | null }) {
   return (
     <For each={props.projects}>
@@ -381,44 +277,20 @@ function ProjectOptions(props: { projects: readonly BridgeProject[]; selected: s
   )
 }
 
-// How far back a row's last line is looked for.
-const TAIL_EVENTS = 20
-// shortcut: only the newest conversations get a last line, one read each; raise it if tasks with
-// more conversations turn out to be common.
-const TAIL_SESSIONS = 10
-
-// The last thing said in each conversation, for its row: read from the conversation's end, and again
-// only once the conversation has moved on.
-export function lastLines(read: (sessionId: string, afterSeq: number, limit: number) => Promise<BridgeSessionRead>) {
-  const [lines, setLines] = createSignal<Record<string, string>>({})
-  const readAt = new Map<string, number>()
-  return {
-    line: (sessionId: string): string | undefined => lines()[sessionId],
-    follow(sessions: readonly BridgeAgentSession[]) {
-      for (const session of sessions.slice(0, TAIL_SESSIONS)) {
-        if (readAt.get(session.id) === session.lastEventSeq) continue
-        readAt.set(session.id, session.lastEventSeq)
-        void read(session.id, Math.max(0, session.lastEventSeq - TAIL_EVENTS), TAIL_EVENTS)
-          .then((page) => {
-            const last = conversationItems(page.records).at(-1)
-            const text = !last ? '' : last.kind === 'tool' ? last.title : last.text
-            setLines((current) => ({ ...current, [session.id]: text.trim().split('\n').at(-1) ?? '' }))
-          })
-          .catch(() => readAt.delete(session.id))
-      }
-    },
-  }
-}
-
-// The kinds of conversation a task has, grouped as the desktop app's Agents sidebar groups them.
+// The kinds of conversation a task has, grouped and named as the desktop app's Agents sidebar groups them.
 const SESSION_GROUPS: { label: string; has(session: BridgeAgentSession): boolean }[] = [
-  { label: 'Managed chats', has: (session) => !session.inline && session.kind !== 'workflow' },
+  { label: 'Managed sessions', has: (session) => !session.inline && session.kind !== 'workflow' },
+  { label: 'Workflow runs', has: (session) => !session.inline && session.kind === 'workflow' },
   { label: 'Inline chats', has: (session) => session.inline },
-  { label: 'Workflows', has: (session) => !session.inline && session.kind === 'workflow' },
 ]
 
-// Every conversation in the current task, grouped by kind: its agent, title, state, and last line.
-// A row opens it, and New chat starts another.
+// A provider's logo, when the agents plugin has one for it (main.tsx registers them).
+const providerMark = (providerId: string) =>
+  brandMarkRegistry.get(`agents/${providerId}`) ? `brand:agents/${providerId}` : undefined
+
+// Every conversation in the Agents task, grouped by kind. A row is the desktop's: the state as an icon,
+// the title, and the provider, model, and state in words, with a mark when the agent waits on the
+// person. A row opens it, and New chat starts another.
 export function Agents(props: {
   client: BridgeClient
   nodeId: string
@@ -426,18 +298,15 @@ export function Agents(props: {
   online: boolean
   sessions: readonly BridgeAgentSession[] | null
   requests: readonly BridgePendingRequest[]
-  lines: ReturnType<typeof lastLines>
   open(sessionId: string): void
   newChat: boolean
   setNewChat(open: boolean): void
   started(session: BridgeAgentSession): void
 }) {
-  createEffect(() => props.sessions && props.lines.follow(props.sessions))
   const waiting = (sessionId: string) => props.requests.some((request) => request.sessionId === sessionId)
 
   return (
     <section aria-label="Agents">
-      <h2>Agents</h2>
       <Show when={props.sessions} fallback={<p class="quiet">Loading conversations…</p>}>
         {(sessions) => (
           <Show when={sessions().length} fallback={<p class="quiet">This task has no conversation yet.</p>}>
@@ -450,18 +319,31 @@ export function Agents(props: {
                     <ul class="rows" aria-label={group.label}>
                       <For each={rows()}>
                         {(session) => {
-                          const state = () => agentState(session, waiting(session.id))
+                          const icon = () => runtimeIcon(session.runtimeState)
                           return (
                             <li>
-                              <button type="button" class="row-button" onClick={() => props.open(session.id)}>
-                                <span class="row">
-                                  <strong class="grow">
-                                    {agentName(session)} · {session.title}
-                                  </strong>
-                                  <State tone={state().tone}>{state().label}</State>
+                              <button type="button" class="row-button agent-row" onClick={() => props.open(session.id)}>
+                                {/* The loader turns, as a working session's does on the desktop. */}
+                                <Icon
+                                  name={icon()}
+                                  tone={runtimeTone(session.runtimeState)}
+                                  spin={icon() === 'loader-circle'}
+                                />
+                                <span class="agent-text">
+                                  <strong>{session.title}</strong>
+                                  <span class="quiet agent-meta">
+                                    <Show when={providerMark(session.providerId)}>
+                                      {(mark) => <Icon name={mark()} tone="brand" />}
+                                    </Show>
+                                    <span>
+                                      {[session.providerId, session.model, session.runtimeState]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                    </span>
+                                  </span>
                                 </span>
-                                <Show when={props.lines.line(session.id)}>
-                                  {(line) => <span class="quiet">{line()}</span>}
+                                <Show when={waiting(session.id)}>
+                                  <Icon name="circle-alert" tone="warn" title="Waiting for you" />
                                 </Show>
                               </button>
                             </li>

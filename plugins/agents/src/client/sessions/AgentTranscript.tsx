@@ -11,7 +11,7 @@ import {
   visibleConversationItems,
   type AgentConversationItem,
 } from './conversationItems'
-import { sessionModelSummary } from '../settings/agentConfigOptions'
+import { sessionModelSummary } from '../../contract/sessionModel.ts'
 import {
   Button,
   createTimelineWindow,

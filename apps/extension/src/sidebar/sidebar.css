@@ -20,6 +20,32 @@ body {
 p { margin: 0; }
 ul { list-style: none; margin: 0; padding: 0; }
 
+/* ── Navigation ─────────────────────────────────────────────────────────────────────────────── */
+/* The desktop rail's controls on their side, pinned to the bottom edge: the same square boxes, with a
+ * divider after each and the active stripe on top. Settings sits apart at the far end. The body leaves
+ * room for the bar, and the composer sticks just above it. */
+body { padding-bottom: var(--pane-head-h); }
+.rail {
+  position: fixed;
+  inset: auto 0 0;
+  display: flex;
+  height: var(--pane-head-h);
+  border-top: var(--chrome-divider);
+  background: var(--bg-subtle);
+}
+.rail .tabrail-tab {
+  width: var(--tabrail-w);
+  height: 100%;
+  padding: 0;
+  border-radius: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-right: var(--divider);
+  border-top: var(--stripe-w) solid transparent;
+}
+.rail .tabrail-tab:last-child { margin-left: auto; border-right: 0; border-left: var(--divider); }
+.rail .tabrail-tab.active { border-top-color: var(--accent); }
+
 /* ── Header ─────────────────────────────────────────────────────────────────────────────────── */
 .top {
   display: flex;
@@ -27,10 +53,24 @@ ul { list-style: none; margin: 0; padding: 0; }
   gap: var(--gap-inline);
   height: var(--pane-head-h);
   padding: 0 var(--space-6);
+  background: var(--bg-subtle);
   border-bottom: var(--chrome-divider);
 }
-.mark { width: var(--icon-box); height: var(--icon-box); }
-.brand { font-weight: var(--fw-semibold); margin-right: auto; }
+/* A view's name in the desktop pane header's label style, with a list's count beside it. An open
+ * conversation's title reads as a title instead, with its task as the small label above. */
+.heading { flex: 1; display: grid; min-width: 0; }
+.heading :is(h1, .eyebrow) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.heading h1, .heading .eyebrow {
+  margin: 0;
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--text-muted);
+}
+.heading .eyebrow { font-size: var(--fs-2xs); }
+.heading .count { margin-left: var(--space-2); color: var(--text-faint); }
+.heading[data-eyebrow] h1 { font-size: var(--fs); font-weight: var(--heading-weight); text-transform: none; letter-spacing: 0; color: var(--text); }
 .menu { position: relative; }
 .menu summary { list-style: none; }
 .menu summary::-webkit-details-marker { display: none; }
@@ -80,10 +120,16 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .view-head .title { font-weight: var(--heading-weight); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subhead { display: flex; align-items: center; gap: var(--gap-inline); padding: var(--space-3) var(--space-6); border-bottom: var(--divider); }
+.subhead .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Agents with no task to list. */
+.empty { padding: var(--space-6); }
 /* One column no wider than the panel: an auto column grows to its longest unbroken word, so a long
  * command in the transcript widened the conversation past the composer and the panel. */
 .view > section, .conversation-body, .composer { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-row); padding: var(--space-6); }
 .view > section { border-bottom: var(--chrome-divider); }
+/* Home on a page that matches nothing: the Acorn mark alone, in the middle of the panel. */
+.idle { display: grid; place-items: center; min-height: 70vh; }
+.idle img { width: 64px; opacity: 0.4; }
 /* A lone button in a section or form keeps its own width rather than the column's. */
 :is(.view > section, form) > button { justify-self: start; }
 h2, h3 {
@@ -121,6 +167,22 @@ h2, h3 {
   border-radius: 0;
 }
 .row-button:hover:not(:disabled) { background: var(--bg-hover); }
+/* An agent row, the desktop's stacked row: the state icon beside the title, and the provider's logo,
+ * model, and state in words under it. */
+.row-button.agent-row { display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-3) var(--space-2); }
+.agent-row > .ui-icon { margin-top: 0.2em; }
+.agent-text { flex: 1; display: grid; gap: var(--space-1); min-width: 0; }
+.agent-meta { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: var(--fs-sm); }
+/* The kit's icon tones and turn, copied from primitives.css, which the panel doesn't load. */
+.ui-icon { flex: none; }
+.ui-icon[data-tone='muted'] { color: var(--text-muted); }
+.ui-icon[data-tone='accent'] { color: var(--accent); }
+.ui-icon[data-tone='ok'] { color: var(--state-ok); }
+.ui-icon[data-tone='warn'] { color: var(--state-warn); }
+.ui-icon[data-tone='danger'] { color: var(--state-bad); }
+.ui-icon[data-tone='brand'] { color: var(--brand-legible); }
+.ui-icon[data-spin] { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .row-button[aria-current='true'] { box-shadow: inset var(--marker-w) 0 0 var(--accent); padding-left: var(--space-4); }
 .row { display: flex; gap: var(--gap-inline); align-items: center; flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
@@ -243,7 +305,7 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .ui-markdown th { background: var(--bg-subtle); font-weight: var(--fw-semibold); }
 .attachments { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); }
 .attachments img { display: block; max-width: 100%; max-height: 160px; object-fit: contain; border: var(--divider); border-radius: var(--radius-control); }
-.composer { position: sticky; bottom: 0; background: var(--bg); border-top: var(--chrome-divider); }
+.composer { position: sticky; bottom: var(--pane-head-h); background: var(--bg); border-top: var(--chrome-divider); }
 .toolbar { flex-wrap: nowrap; }
 
 /* Each capture is a chip; opening it shows what goes to the agent. */
