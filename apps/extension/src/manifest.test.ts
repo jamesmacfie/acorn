@@ -15,7 +15,7 @@ describe('extension manifests', () => {
   it('gives Chrome a module service worker and a side panel', () => {
     expect(extensionManifest('chrome', '1.0.0')).toMatchObject({
       manifest_version: 3,
-      permissions: ['nativeMessaging', 'storage', 'sidePanel', 'activeTab', 'scripting', 'contextMenus'],
+      permissions: ['nativeMessaging', 'storage', 'sidePanel', 'activeTab', 'scripting', 'contextMenus', 'tabs'],
       background: { service_worker: 'background.js', type: 'module' },
       side_panel: { default_path: 'sidebar.html' },
       incognito: 'not_allowed',
@@ -27,7 +27,7 @@ describe('extension manifests', () => {
   it('gives Firefox a background script, a sidebar, and its pinned ID', () => {
     const manifest = extensionManifest('firefox', '1.0.0')
     expect(manifest).toMatchObject({
-      permissions: ['nativeMessaging', 'storage', 'activeTab', 'scripting', 'contextMenus'],
+      permissions: ['nativeMessaging', 'storage', 'activeTab', 'scripting', 'contextMenus', 'tabs'],
       background: { scripts: ['background.js'], type: 'module' },
       sidebar_action: { default_icon: 'icon-128.png', default_panel: 'sidebar.html' },
       browser_specific_settings: { gecko: { id: FIREFOX_EXTENSION_ID } },

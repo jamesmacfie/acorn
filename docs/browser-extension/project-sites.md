@@ -55,8 +55,8 @@ it never clears them.
 ## Suggestions in the sidebar
 
 The sidebar keeps the selected Node's associations in memory and matches the page beside it against
-them, in the browser. No page address goes to the Node for this. The browser reports the page's
-address only for a site the person allowed, or the tab the toolbar button was clicked on.
+them, in the browser. No page address goes to the Node for this. The `tabs` permission gives the
+sidebar the page's address on any site.
 
 Every project with an association covering the page is a candidate. Overlapping prefixes and several
 projects are all candidates, and none outranks another. A page that belongs to a task, or matches a
@@ -66,7 +66,7 @@ shows the project picker in Home's **This page** section:
 - **One candidate** is chosen in the picker, under **Suggested for this page**.
 - **Several candidates** are listed first in the picker. A project they leave out is cleared, and the
   sidebar asks the person to choose one.
-- **No candidate** shows no picker, and Home shows only the Acorn mark. To tie the page's site to a
+- **No candidate** shows no picker, and Home shows only its task list. To tie the page's site to a
   project, add it under Settings → **Projects**.
 
 Under the picker, **This page** lists the chosen project's open tasks, and clicking one makes it the
@@ -130,5 +130,6 @@ project's list fresh, change one entry, and write it back, so another client's c
 lost. A change that leaves the list as it was writes nothing. Two clients changing one project at the
 same moment can still lose one change, as with any config field.
 
-The host sends `{ v, event: 'projects', nodeId }` when the selected Node broadcasts `project:changed`,
+The host sends `{ v, event: 'projects', nodeId }` when the selected Node broadcasts `project:changed`
+or `workspace:changed`,
 and the sidebar reads the list again. A reply for a Node that is no longer selected is dropped.

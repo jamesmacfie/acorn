@@ -34,7 +34,7 @@ section would choose for that page ([project sites](./project-sites.md#suggestio
 - The person's choice for the page's site, kept in `siteChoices:<nodeId>`, wins. A choice of no
   project means the page has none.
 - Otherwise, every visible project whose associations cover the page. Hidden projects don't count.
-- A page that reports no address, because the extension may not read it, has none.
+- A page that reports no address, such as a new tab, has none.
 
 Matching runs in the browser, against lists the Node already sent. `requests.pending` names only the
 Node, so no page address goes to the Node for the badge. A project the person explicitly chose for a conversation doesn't move the badge.
@@ -42,9 +42,9 @@ A conversation stays bound across navigation, and the badge follows the page.
 
 ## The toolbar badge
 
-The background sets a badge on each tab it may read, with the number of waiting requests for that
-tab's projects. The browser shows a tab's badge while the tab is active. A tab it may not read gets no
-badge, and the extension asks for no wider access to draw one.
+The background sets a badge on each tab, with the number of waiting requests for that tab's
+projects. The browser shows a tab's badge while the tab is active. The `tabs` permission gives every
+tab's address, so a badge needs no access to the site.
 
 The background opens its native connection as it starts, when a Node is selected, so the badge works
 with the sidebar closed. An open native port keeps the background running in both browsers. When a

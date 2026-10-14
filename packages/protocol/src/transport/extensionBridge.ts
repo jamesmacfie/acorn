@@ -279,7 +279,9 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
 export type BridgeOperation = BridgeRequest['op']
 
-export type BridgeProject = { id: string; name: string; path: string | null; hidden: boolean }
+export type BridgeProject = { id: string; name: string; path: string | null; hidden: boolean; workspaceId: string }
+// A workspace, the group of projects Home's task list shows one of at a time.
+export type BridgeWorkspace = { id: string; name: string }
 export type BridgeNodes = { nodes: NodeRecord[]; activeNodeId: string | null; status: NodeStatus | null }
 
 export type BridgeTask = { id: string; title: string; branch: string | null }
@@ -292,7 +294,7 @@ export type BridgeTaskPage = SiteAddress & { source: string; status?: BridgePage
 // What a plugin says answers at an address it published, and its state, read together as one line
 // ("Runn stack running"), with the state's tone.
 type BridgePageStatus = { label: string; state: string; tone: 'ok' | 'warn' | 'bad' }
-// An active task with the addresses it is known by. Tasks with none are left out.
+// An active task with the addresses it is known by, which may be none.
 export type BridgePageTask = BridgeTask & { projectId: string; pages: BridgeTaskPage[] }
 
 // One row of the desktop's New picker: a harness, one of its named logins, or a custom agent on it,
@@ -472,7 +474,7 @@ export type BridgeResults = {
   'node.collect': NodeRecord | null
   'node.select': BridgeNodes
   'node.forget': BridgeNodes
-  'projects.list': { nodeId: string; projects: BridgeProject[] }
+  'projects.list': { nodeId: string; projects: BridgeProject[]; workspaces: BridgeWorkspace[] }
   'tasks.list': { nodeId: string; projectId: string; tasks: BridgeTask[] }
   'tasks.pages': { nodeId: string; tasks: BridgePageTask[] }
   'agents.choices': { nodeId: string; choices: BridgeAgentChoice[] }

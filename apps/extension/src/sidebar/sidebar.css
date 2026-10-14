@@ -128,8 +128,6 @@ body { padding-bottom: var(--pane-head-h); }
 .view > section, .conversation-body, .composer { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-row); padding: var(--space-6); }
 .view > section { border-bottom: var(--chrome-divider); }
 /* Home on a page that matches nothing: the Acorn mark alone, in the middle of the panel. */
-.idle { display: grid; place-items: center; min-height: 70vh; }
-.idle img { width: 64px; opacity: 0.4; }
 /* A lone button in a section or form keeps its own width rather than the column's. */
 :is(.view > section, .view > section > section, form) > button { justify-self: start; }
 /* Settings: the desktop's tab strip, narrow enough for five tabs, over one padded column per tab. */
@@ -182,6 +180,11 @@ h2, h3 {
 /* A New picker row's harness mark and, for a login shown as an icon, the account's icon. */
 .agent-marks { display: inline-flex; align-items: center; gap: var(--space-2); }
 .row-button[aria-current='true'] { box-shadow: inset var(--marker-w) 0 0 var(--accent); padding-left: var(--space-4); }
+/* A Home task row, with its links open under it. */
+.rows > li.task { flex-direction: column; align-items: stretch; gap: 0; }
+.task-links { display: grid; gap: var(--space-2); padding: 0 0 var(--space-3) var(--space-4); font-size: var(--fs-sm); }
+.task-links > li > .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.section-head > select { width: auto; max-width: 60%; }
 /* The kit's spinning icon turns on base.css's keyframes, which the panel doesn't load. */
 @keyframes spin { to { transform: rotate(360deg); } }
 .row { display: flex; gap: var(--gap-inline); align-items: center; flex-wrap: wrap; }

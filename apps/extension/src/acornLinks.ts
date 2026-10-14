@@ -29,6 +29,8 @@ const task = (taskId: string, pane: string | undefined, item?: string): Extract<
 
 export const itemTaskLink = (nodeId: string, pluginId: string, taskId: string) =>
   link(nodeId, task(taskId, ITEM_PANES[pluginId]))
+// The task on whichever pane it showed last.
+export const taskLink = (nodeId: string, taskId: string) => link(nodeId, task(taskId, undefined))
 export const conversationLink = (nodeId: string, taskId: string, sessionId: string) =>
   link(nodeId, task(taskId, AGENT_PANE, sessionId))
 // The project's place in the desktop app, where a task is made with the desktop's own choices.

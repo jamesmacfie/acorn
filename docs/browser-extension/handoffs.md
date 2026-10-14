@@ -17,8 +17,8 @@ reads it. A list for a Node that is no longer selected is dropped.
 
 For each tab whose address matches a handoff, the background injects `content.js` and tells it which
 chips to draw. The same script draws the [branch marker](./task-pages.md#the-branch-marker) on an app
-a plugin published for a task, under the same access rules. The browser reports a tab's address only when the extension may read the tab, so a
-tab gets a chip only on:
+a plugin published for a task, under the same access rules. Injecting a script needs access to the
+page's site, so a tab gets a chip only on:
 
 - **A granted site.** **Permissions** in the sidebar's Settings lists each site its handoffs, project
   associations, and tasks' apps are on, what access is for there (buttons on its pages, handoffs in

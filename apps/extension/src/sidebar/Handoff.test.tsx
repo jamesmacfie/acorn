@@ -413,7 +413,7 @@ describe('a handoff in the sidebar', () => {
     expect(button(root, 'Look up in Acorn')).toBeDefined()
   })
 
-  it('shows only the Acorn mark on a page it may not read', async () => {
+  it('shows only the task list on a page it may not read', async () => {
     const { fake, root } = mount()
     fake.activeTab = { ...fake.activeTab, url: undefined }
     fake.activate()

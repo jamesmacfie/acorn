@@ -7,13 +7,14 @@ branch marker on a local app. The [task chip](./handoffs.md#task-chips) on the p
 [toolbar badge](./notifications.md) match from the same list. The code is in
 `apps/cli/src/browser/handoffs.ts` (`taskPages`),
 `apps/extension/src/taskPages.ts`, `apps/extension/src/background/taskPages.ts`, and
-`apps/extension/src/sidebar/Home.tsx`.
+`apps/extension/src/sidebar/Home.tsx`. Home's task list, which lists the same tasks with their links,
+is described here too.
 
 ## Pages that belong to a task
 
 Each active task already records the addresses of its items. `tasks.pages` returns them for every
-active task on the selected Node, each with the task's ID, title, project, and branch, and leaves out
-a task with none. The host builds the list from the Node's own task list, `GET /v1/core/tasks`, the
+active task on the selected Node, each with the task's ID, title, project, and branch. A task with no
+address has an empty list, so Home's task list can show every task. The host builds the list from the Node's own task list, `GET /v1/core/tasks`, the
 same read and device authority `tasks.list` uses, so it costs no GitHub or other provider call:
 
 - A pull request is the project's GitHub repository and the task's pull number, so its address is
@@ -68,11 +69,34 @@ states:
 3. **A project site with no item.** The project its [site associations](./project-sites.md) suggest,
    that project's open tasks, and **New task in Acorn**, which opens the project in the desktop app.
 
-A page that matches none of these, or one the browser hides from the extension, shows only the Acorn
-mark. The current task stays current there, so a capture still has somewhere to go, but Home doesn't
-show it. **Current task** stays pinned below **This page** on a page whose task isn't the current
+A page that matches none of these has no **This page** section, and Home shows only its task list.
+The current task stays current there, so a capture still has somewhere to go, but Home doesn't show
+it. **Current task** stays pinned below **This page** on a page whose task isn't the current
 one. The sidebar reads the page again when the tab finishes loading, so the section follows the
 tab. Sites to allow are under Settings → **Permissions**.
+
+## Home's task list
+
+Below **This page**, Home lists the open tasks of one workspace, grouped by project in the
+workspace's order. `projects.list` returns each project's workspace and the workspaces in the
+desktop rail's order, and the tasks are the `tasks.pages` list above, so the list costs no extra read.
+The picker beside **Tasks** chooses the workspace. The sidebar keeps the choice per Node in
+`homeWorkspace:<nodeId>` in `storage.local`. With no choice, it shows the current task's workspace,
+or else the first one.
+
+A row shows the task's links under it, one task at a time:
+
+- Each address the task is known by, as its host and path, or as the plugin's state line for an app
+  a plugin published. **Switch to tab** brings forward the tab already showing it, matched the same way
+  a page is matched to its task, and focuses that tab's window. **Open** opens it in a new tab.
+- **Open in Acorn** on the task, and **Chat**, which opens the task's newest conversation. A task with
+  no address says so.
+
+The page's own task is the exception. Its row, here or under **This page**, opens **Agents**, which
+lists that task's conversations.
+
+The sidebar learns which links are open from the `tabs` permission, which gives every tab's address.
+It reads the tabs again when one navigates or closes. Tab addresses stay in the browser.
 
 ## The branch marker
 

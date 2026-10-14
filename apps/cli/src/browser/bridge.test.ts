@@ -79,6 +79,10 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     addressAnswers: new Map<string, unknown>(),
     createdTasks: [] as { key: string; body: Record<string, unknown> }[],
     projects: [{ id: 'p1', name: `${nodeId} project`, path: '/src/p1', workspaceId: 'w', sort: 0, hidden: false }],
+    workspaces: [
+      { id: 'w2', name: 'Later', sort: 1, isDefault: false, projects: [] },
+      { id: 'w', name: 'Main', sort: 0, isDefault: true, projects: [{ id: 'p1', name: `${nodeId} project`, sort: 0 }] },
+    ],
     // Each project's site associations, as its config holds them, and every config write.
     sites: new Map<string, unknown[]>(),
     configWrites: [] as { projectId: string; patch: unknown }[],
@@ -343,6 +347,7 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       await state.projectsDelay
       return reply(200, { projects: state.projects })
     }
+    if (req.url === '/v1/core/workspaces') return reply(200, state.workspaces)
     const config = /^\/v1\/core\/projects\/([^/]+)\/config$/.exec(url.pathname)
     if (config && state.projects.some((project) => project.id === config[1])) {
       const projectId = config[1]!
@@ -590,13 +595,18 @@ describe('browser bridge local discovery', () => {
 })
 
 describe('browser bridge selection', () => {
-  it('lists the selected Node projects and refuses an unselected Node', async () => {
+  it('lists the selected Node projects with their workspaces and refuses an unselected Node', async () => {
     const { call } = await paired()
     await expect(call({ op: 'projects.list', nodeId: 'node-a' })).rejects.toMatchObject({ code: 'not_selected' })
     expect(await call({ op: 'node.select', nodeId: 'node-a' })).toMatchObject({ activeNodeId: 'node-a' })
     expect(await call({ op: 'projects.list', nodeId: 'node-a' })).toEqual({
       nodeId: 'node-a',
-      projects: [{ id: 'p1', name: 'node-a project', path: '/src/p1', hidden: false }],
+      projects: [{ id: 'p1', name: 'node-a project', path: '/src/p1', hidden: false, workspaceId: 'w' }],
+      // In the rail's order.
+      workspaces: [
+        { id: 'w', name: 'Main' },
+        { id: 'w2', name: 'Later' },
+      ],
     })
     await expect(call({ op: 'node.select', nodeId: 'missing' })).rejects.toMatchObject({ code: 'unknown_node' })
   })
@@ -877,7 +887,8 @@ describe('browser bridge agent operations', () => {
           { connectionId: 'c3', providerId: 'other', identifier: 'x', ref: { url: 'mailto:someone@example.com' } },
         ],
       },
-      // The project's repository alone names no page, and an archived task is never listed.
+      // The project's repository alone names no page, so the task is listed with none. An archived
+      // task is never listed.
       { ...task, id: 'plain', title: 'No item', projectId: 'p1', github: { owner: 'acme', name: 'runn' } },
       {
         ...task,
@@ -907,6 +918,7 @@ describe('browser bridge agent operations', () => {
           projectId: 'p1',
           pages: [{ origin: 'https://linear.app', pathPrefix: '/acme/issue/ENG-42/fix', source: 'linear' }],
         },
+        { id: 'plain', title: 'No item', branch: null, projectId: 'p1', pages: [] },
       ],
     })
     // One read of the Node's active tasks and one of its plugins' declarations, besides the broker's own

@@ -80,11 +80,12 @@ export type PublishedAddresses = { pluginId: string; addresses: TaskAddressList[
 
 const TONES = { info: 'ok', warn: 'warn', danger: 'bad' } as const
 
-// The addresses each active task is known by. Most come from the Node's task list alone, so finding a
-// page's task costs no provider call: a task's links carry their item's address when the provider
-// stamped one, and core records a pull request as the project's GitHub repository and the task's pull
-// number rather than as a link, so its address is built here, as the GitHub plugin builds it. The
-// rest are exact origins plugins published for their tasks, such as a running local stack's app.
+// Every active task, with the addresses it is known by, so Home can list them all. Most come from the
+// Node's task list alone, so finding a page's task costs no provider call: a task's links carry their
+// item's address when the provider stamped one, and core records a pull request as the project's GitHub
+// repository and the task's pull number rather than as a link, so its address is built here, as the
+// GitHub plugin builds it. The rest are exact origins plugins published for their tasks, such as a
+// running local stack's app.
 export function taskPages(tasks: readonly Task[], published: readonly PublishedAddresses[] = []): BridgePageTask[] {
   return tasks.flatMap((task) => {
     if (task.status !== 'active') return []
@@ -112,8 +113,6 @@ export function taskPages(tasks: readonly Task[], published: readonly PublishedA
             source: pluginId,
             status: { label: address.label, state: address.state, tone: TONES[address.severity] },
           })
-    return pages.length
-      ? [{ id: task.id, title: task.title, branch: task.branch, projectId: task.projectId, pages }]
-      : []
+    return [{ id: task.id, title: task.title, branch: task.branch, projectId: task.projectId, pages }]
   })
 }

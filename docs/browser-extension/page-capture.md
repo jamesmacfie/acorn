@@ -65,8 +65,9 @@ path, and a cropped screenshot, and fills no draft. For how it works, see
 
 ## Page access
 
-The extension asks for `activeTab`, `scripting`, and `contextMenus`, and lists `http://*/*` and
-`https://*/*` as optional host access, so it holds no site at install. A capture works when the browser
+The extension asks for `activeTab`, `scripting`, `contextMenus`, and `tabs`, and lists `http://*/*`
+and `https://*/*` as optional host access, so it holds no site at install. `tabs` gives every tab's
+address, but reading a page's content still needs access to its site. A capture works when the browser
 lets the extension read the active tab:
 
 - **The toolbar button.** Clicking the Acorn button opens the sidebar and grants `activeTab` for that
