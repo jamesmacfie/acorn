@@ -276,6 +276,18 @@ export function Workspace(props: {
       (taskId) => taskId && void loadSessions(taskId),
     ),
   )
+  // A conversation open in another task follows the page to its task's newest conversation. Drafts
+  // stay with the conversation they were written in.
+  createEffect(
+    on(
+      () => pageTask()?.task.id,
+      (taskId) => {
+        const task = pageTask()?.task
+        if (task && current().sessionId && current().taskId !== taskId) chatInTask(task.projectId, task.id)
+      },
+      { defer: true },
+    ),
+  )
 
   // A handoff shows on Home, so it closes the conversation.
   createEffect(
@@ -472,37 +484,19 @@ export function Workspace(props: {
         }
       >
         {(sessionId) => (
-          <>
-            {/* The page beside the panel belongs to another task. The conversation stays, because pages
-                are often visited to capture them into it; Switch opens that task, and drafts are kept. */}
-            <Show when={pageTask() && pageTask()!.task.id !== current().taskId ? pageTask() : null}>
-              {(other) => (
-                <div class="banner notice row" role="status">
-                  <span class="grow">This page is in task {other().task.title}.</span>
-                  <button
-                    type="button"
-                    class="quiet"
-                    onClick={() => chatInTask(other().task.projectId, other().task.id)}
-                  >
-                    Switch
-                  </button>
-                </div>
-              )}
-            </Show>
-            <Conversation
-              client={props.client}
-              storage={props.api.storage}
-              target={{ nodeId, taskId: current().taskId!, sessionId }}
-              session={session()!}
-              taskTitle={task()?.title ?? ''}
-              back={back}
-              online={props.online}
-              opensLinks={props.opensLinks}
-              hint={props.hint}
-              reconnects={props.reconnects}
-              capture={props.capture}
-            />
-          </>
+          <Conversation
+            client={props.client}
+            storage={props.api.storage}
+            target={{ nodeId, taskId: current().taskId!, sessionId }}
+            session={session()!}
+            taskTitle={task()?.title ?? ''}
+            back={back}
+            online={props.online}
+            opensLinks={props.opensLinks}
+            hint={props.hint}
+            reconnects={props.reconnects}
+            capture={props.capture}
+          />
         )}
       </Show>
     </>

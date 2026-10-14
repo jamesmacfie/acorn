@@ -57,6 +57,8 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
     pending: [] as Record<string, unknown>[],
     // Projects another client adds after the sidebar opened.
     addedProjects: [] as { id: string; name: string; path: null; hidden: boolean }[],
+    // Open tasks in p1 besides Fix login.
+    addedTasks: [] as { id: string; title: string; branch: string | null }[],
     // Each Node's tasks with their page addresses, and its handoffs.
     taskPages: [] as BridgePageTask[],
     handoffs: [] as BridgeHandoff[],
@@ -107,7 +109,8 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
         return {
           nodeId,
           projectId: request.projectId,
-          tasks: request.projectId === 'p1' ? [{ id: 't1', title: 'Fix login', branch: null }] : [],
+          tasks:
+            request.projectId === 'p1' ? [{ id: 't1', title: 'Fix login', branch: null }, ...state.addedTasks] : [],
         }
       case 'sessions.list':
         return { nodeId, taskId: request.taskId, sessions: request.taskId === 't1' ? [session] : [] }
@@ -435,7 +438,7 @@ describe('This page', () => {
     expect(fake.storage.get('destination:n1')).toMatchObject({ taskId: 't1' })
   })
 
-  it("says over an open conversation when the page is another task's", async () => {
+  it('moves an open conversation to the task of the page it moves to', async () => {
     const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
     const otherTask: BridgePageTask = {
       ...pullTask,
@@ -444,19 +447,22 @@ describe('This page', () => {
       pages: [{ origin: 'https://github.com', pathPrefix: '/acme/web/pull/9', source: 'github' }],
     }
     state.taskPages = [pullTask, otherTask]
+    state.addedTasks.push({ id: 't2', title: 'Speed up search', branch: null })
     await settle(30)
     button(thisPage(root), 'Chat')!.click()
     await settle(30)
-    const otherTaskLine = () => root.querySelector('[role="status"]')?.textContent ?? ''
-    expect(otherTaskLine()).not.toContain('This page is in task')
-    // The conversation stays open on another task's page, and says whose page it is.
-    fake.navigate('https://github.com/acme/web/pull/9')
-    await settle(20)
     expect(conversationTitle(root)).toBe('Claude · Chat s1')
-    expect(otherTaskLine()).toContain('This page is in task Speed up search.')
+    // The other task has no conversation, so Home opens on its new-chat picker.
+    fake.navigate('https://github.com/acme/web/pull/9')
+    await settle(30)
+    expect(root.querySelector('[aria-label="Conversation"]')).toBeNull()
+    expect(thisPage(root).querySelector('strong')!.textContent).toBe('Speed up search')
+    expect(button(root.querySelector('[aria-label="Agents"]')!, 'Cancel')).toBeDefined()
+    expect(fake.storage.get('destination:n1')).toMatchObject({ taskId: 't2' })
+    // With no conversation open, Home's Agents follows the page on its own.
     fake.navigate('https://github.com/acme/web/pull/7/files')
-    await settle(20)
-    expect(otherTaskLine()).not.toContain('This page is in task')
+    await settle(30)
+    expect(agentRows(root)).toEqual(['Claude · Chat s1'])
   })
 
   it('reads the list again when the Node says a task changed', async () => {
