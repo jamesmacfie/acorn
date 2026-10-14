@@ -6,6 +6,7 @@ import {
   markAttentionSeen,
   saveFile,
   setTerminalOpen,
+  toast,
   type PaneModelContext,
   type Task,
 } from '@acorn/plugin-api/client'
@@ -58,7 +59,7 @@ export type SessionAction = {
  *  `window.confirm` are unstyled in the shell and suppressed outright in a sandboxed frame, so both
  *  are dialogs. The session travels with the dialog, because the sidebar's row menu can act on a
  *  session that is not the open one. */
-export type AgentDialog = { kind: 'rename' | 'archive' | 'summary'; session: AgentSession }
+export type AgentDialog = { kind: 'rename' | 'archive' | 'summary' | 'session-id'; session: AgentSession }
 
 /** Nothing to lose by archiving: no turns and an empty draft. The task context the composer attaches
  *  on its own does not count as input. An unloaded snapshot means we cannot tell, so we ask. */
@@ -258,8 +259,9 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
 
   /** One entry point for both menus: the header's, which always addresses the open session, and the
    *  sidebar row's, which names its own. */
-  function sessionAction(session: AgentSession, kind: 'rename' | 'archive' | 'stop') {
+  function sessionAction(session: AgentSession, kind: 'rename' | 'archive' | 'stop' | 'copy-id') {
     if (kind === 'stop') return void action(() => managedAgentApi.cancel(session.id))
+    if (kind === 'copy-id') return void copySessionId(session)
     if (kind === 'rename') setRenameText(session.title)
     if (kind === 'archive') {
       const shared = composerDraftState(session.id)
@@ -271,6 +273,16 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
       if (blank) return void archive(session)
     }
     setDialog({ kind, session })
+  }
+
+  /** A terminal without clipboard support, or a refused desktop write, gets the ID in a dialog to
+   *  select by hand. */
+  async function copySessionId(session: AgentSession) {
+    // Loaded on use: the kit entry pulls in JSX components, and logic tests import this model.
+    const copied = await import('@acorn/plugin-api/ui').then(({ copyText }) => copyText(session.id)).catch(() => false)
+    if (copied) return toast('Session ID copied', { tone: 'success' })
+    toast('Couldn’t copy session ID', { tone: 'danger' })
+    setDialog({ kind: 'session-id', session })
   }
 
   async function rename() {
@@ -426,6 +438,7 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
         run: () => void regenerateTitle(),
       },
       { id: 'rename', label: 'Rename session', icon: 'pencil', run: () => sessionAction(session, 'rename') },
+      { id: 'copy-id', label: 'Copy session ID', icon: 'copy', run: () => sessionAction(session, 'copy-id') },
       {
         id: 'summarize',
         label: 'Summarize run…',

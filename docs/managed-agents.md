@@ -100,3 +100,5 @@ These pages cover the client:
 - [The composer](./managed-agents/composer.md): the message field and its slots.
 - [The transcript store](./managed-agents/transcript-store.md): how the client holds a session.
 - [Transcript search](./managed-agents/transcript-search.md): the full-text index.
+- [Cross-session reads](./managed-agents/cross-session-reads.md): the tools that let an agent find
+  and read other sessions in its project.

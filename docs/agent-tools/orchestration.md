@@ -9,6 +9,11 @@ The plugin also contributes two read-tier tools for a managed agent's own histor
 [transcript search](../managed-agents/transcript-search.md#search-from-a-managed-session) for scope,
 limits, and trust treatment.
 
+Three more read-tier tools reach other sessions in the caller's project: `agent_session_list`,
+`agent_session_search`, and `agent_session_read`. They read history only and can't prompt, cancel, or
+answer for a session. [Cross-session reads](../managed-agents/cross-session-reads.md) covers their
+scope, pages, and cursors. `agent_read` stays limited to children the caller started.
+
 ## Managed-session orchestration
 
 | Tool | Input | Result |

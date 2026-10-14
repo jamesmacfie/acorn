@@ -36,7 +36,7 @@ The registry is the authority on this list. These tools ship:
 | `notes` | `notes_list`, `notes_read`, `notes_write`, `notes_append` |
 | `memory` | `memory_list`, `memory_search`, `memory_get`, `memory_write`, `memory_delete` |
 | `terminal` | `run_targets`, `run_status`, `run_start`, `run_stop`, `run_restart`, in tasks with run targets |
-| `agents` | `agent_spawn`, `agent_prompt`, `agent_wait`, `agent_read`, `agent_cancel` |
+| `agents` | `agent_spawn`, `agent_prompt`, `agent_wait`, `agent_read`, `agent_cancel`, `session_history_search`, `session_history_read`, `agent_session_list`, `agent_session_search`, `agent_session_read` |
 | `browser` | `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_fill`, `browser_screenshot`, `browser_console` |
 | `workflows` | `workflow_catalog`, `workflows_list`, `workflow_get`, `workflow_validate`, `workflow_draft`, `workflow_run`, `workflow_read`, `workflow_wait`, `workflow_cancel` |
 
@@ -106,6 +106,9 @@ tool names; a stale preference key cannot introduce a tool into the report.
 - [Loaded tools and context sections](./agent-tools/loaded-tools.md) covers the manifest form.
 
 - [Managed-session orchestration](./agent-tools/orchestration.md) covers the `agent_*` tools.
+
+- [Cross-session reads](./managed-agents/cross-session-reads.md) covers `agent_session_list`,
+  `agent_session_search`, and `agent_session_read`.
 
 - [Context sections](./agent-tools/context-sections.md) covers task context assembly and the route.
 

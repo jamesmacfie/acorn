@@ -61,6 +61,17 @@ vi.mock('./managedClient', () => ({
   },
 }))
 
+const copyText = vi.fn(async (_text: string) => true)
+const toast = vi.fn()
+vi.mock('@acorn/plugin-api/ui', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  copyText: (text: string) => copyText(text),
+}))
+vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  toast: (...args: unknown[]) => toast(...args),
+}))
+
 // The custom agents never answer, so a case that turns queries on sees them as a cold cache too, and
 // nothing reaches for a node.
 vi.mock('../settings/customAgentsClient', () => ({
@@ -279,5 +290,24 @@ it('retries a saved turn through fresh host admission without copying host polic
     effectivePolicy: { model: 'opus', effort: 'high', retryOfTurnId: 'failed', includePartialHistory: true },
   })
   expect(model.error()).toBe('')
+  dispose()
+})
+
+it('copies the clicked session’s ID and says so only once the clipboard took it', async () => {
+  const { model, dispose } = createRoot((dispose) => ({
+    model: withQueryClient(() => createAgentPaneModel({ id: 't1' } as never, { shown: () => false })),
+    dispose,
+  }))
+  const other = { ...session, id: 'clicked-row' }
+  model.sessionAction(other, 'copy-id')
+  await vi.waitFor(() => expect(toast).toHaveBeenLastCalledWith('Session ID copied', { tone: 'success' }), 15_000)
+  expect(copyText).toHaveBeenCalledWith('clicked-row')
+  expect(model.dialog()).toBeNull()
+
+  copyText.mockResolvedValueOnce(false)
+  model.sessionAction(other, 'copy-id')
+  await vi.waitFor(() => expect(toast).toHaveBeenLastCalledWith('Couldn’t copy session ID', { tone: 'danger' }))
+  // The fallback shows the ID to select by hand, which is what a terminal without OSC 52 needs.
+  expect(model.dialog()).toEqual({ kind: 'session-id', session: other })
   dispose()
 })

@@ -116,8 +116,16 @@ reach those rows. A read that names a task ID is exempt. On an archived task, th
 read-only ([restoring a task](../workspaces-and-tasks/archive.md#restoring-a-task)).
 
 Archiving is the only way the UI retires a session. The pane header's menu and each row's menu offer
-rename, archive, and stop while running. Archive asks first. The delete route exists for callers that
-mean it.
+rename, **Copy session ID**, archive, and stop while running. Archive asks first. The delete route
+exists for callers that mean it.
+
+**Copy session ID** copies the clicked session's Acorn ID as plain text, never the provider's own ID
+or a delegation ID. It works on archived tasks too. It shows **Session ID copied** once the clipboard
+write succeeds. When the write fails, or a terminal doesn't support OSC 52
+(`apps/tui/src/kit/copy.ts`), it shows **Couldn't copy session ID** and opens a dialog
+with the ID in a read-only field to select by hand. A provider-native subagent row has no menu, so it
+has no ID to copy. Copying an ID grants nothing: an agent reads the session through
+[cross-session reads](./cross-session-reads.md), which check the project.
 
 Terminal handoff gives a raw provider TUI an exclusive input lease, so a managed session and a
 terminal can't write the same provider session at once. Notifications and the attention inbox show

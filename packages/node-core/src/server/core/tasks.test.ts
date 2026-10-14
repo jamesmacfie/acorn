@@ -87,6 +87,12 @@ describe('the task service workspace lookups', () => {
     expect(await tasks.workspaceIdOrNull('in-workspace')).toBe('ws1')
   })
 
+  it('lists one project’s tasks, archived ones included', async () => {
+    await t.db.update(schema.tasks).set({ status: 'archived' }).where(eq(schema.tasks.id, 'in-workspace'))
+    expect(await tasks.inProject('project-widget')).toEqual([{ id: 'in-workspace', title: 'a', status: 'archived' }])
+    expect(await tasks.inProject('nobody')).toEqual([])
+  })
+
   it('keeps an archived task branch claimed while archive teardown is unsettled', async () => {
     t.db
       .update(schema.tasks)

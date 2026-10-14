@@ -291,7 +291,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   [Session events and waits](./managed-agents/session-events.md), [Session
   messages](./managed-agents/session-messages.md), [Sessions](./managed-agents/sessions.md),
   [Skills](./managed-agents/skills.md),
-  [Subagents](./managed-agents/subagents.md), [Transcript
+  [Subagents](./managed-agents/subagents.md), [Cross-session
+  reads](./managed-agents/cross-session-reads.md), [Transcript
   search](./managed-agents/transcript-search.md), [The transcript
   store](./managed-agents/transcript-store.md), [The transcript](./managed-agents/transcript.md),
   [Unattended follow-ups](./managed-agents/unattended-follow-ups.md).

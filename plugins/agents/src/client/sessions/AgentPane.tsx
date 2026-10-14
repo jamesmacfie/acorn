@@ -283,6 +283,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
 const READS_STORED_SESSION: ReadonlySet<string> = new Set([
   'regenerate-title',
   'rename',
+  'copy-id',
   'export-markdown',
   'export-json',
   'export-redacted-markdown',
@@ -360,6 +361,22 @@ function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
             </Button>
           </Modal.Actions>
         </Modal>
+      </Show>
+      <Show when={model.dialog()?.kind === 'session-id' ? model.dialog()!.session : undefined}>
+        {(session) => (
+          <Modal onDismiss={() => model.setDialog(null)} title="Session ID" size="sm">
+            <Modal.Body>
+              <Field label="Select the ID and copy it with your keyboard">
+                <Input value={session().id} readOnly />
+              </Field>
+            </Modal.Body>
+            <Modal.Actions>
+              <Button variant="ghost" onPress={() => model.setDialog(null)}>
+                Close
+              </Button>
+            </Modal.Actions>
+          </Modal>
+        )}
       </Show>
       <Show when={model.dialog()?.kind === 'archive' ? model.dialog()!.session : undefined}>
         {(session) => (

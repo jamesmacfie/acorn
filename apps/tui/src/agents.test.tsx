@@ -192,7 +192,7 @@ describe('running an agent from a terminal', () => {
       // `until`, not `frame`: the rows are built from the provider list, which is a resource the pane
       // is still fetching when the menu opens.
       const open = await screen.until('Fork session')
-      for (const row of ['Fork session', 'Rename session', 'Export Markdown', 'Archive session']) {
+      for (const row of ['Fork session', 'Rename session', 'Copy session ID', 'Export Markdown', 'Archive session']) {
         expect(open).toContain(row)
       }
     } finally {

@@ -69,7 +69,9 @@ config marker both exclude a session from managed delegation.
 
 A workspace-scoped list or search first resolves task IDs through
 `CoreServices.tasks.idsForWorkspace()`, then narrows the plugin's own tables to them. An empty answer
-narrows to nothing. Falling back to unfiltered would leak another workspace's sessions.
+narrows to nothing. Falling back to unfiltered would leak another workspace's sessions. The
+cross-session tools do the same with `CoreServices.tasks.inProject()` for the caller's project
+([cross-session reads](./cross-session-reads.md#who-can-read-what)).
 
 Roster pages order by `updatedAt DESC, id DESC`. A reader that sends `cursorFormat=tuple-v1` gets a
 `v1:<updatedAt>:<id>` cursor and seeks on both values, so pages continue after the anchor row is

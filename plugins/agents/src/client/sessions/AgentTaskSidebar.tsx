@@ -293,6 +293,13 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                               >
                                 Rename session
                               </Menu.Item>
+                              <Menu.Item
+                                context={menu}
+                                leading={<Icon name="copy" />}
+                                onSelect={() => model.sessionAction(current(), 'copy-id')}
+                              >
+                                Copy session ID
+                              </Menu.Item>
                               <Menu.Separator />
                               <Menu.Item
                                 context={menu}

@@ -859,6 +859,19 @@ export class AgentStore {
     })
   }
 
+  /** One transaction for the cross-session tools' reads (crossSession.ts). `catchUp` names what the
+   *  search projection brings current first: every session before a ranked search, because they all
+   *  affect ranking, one session before a thread read, and none for a list. */
+  async crossSessionRead<T>(catchUp: 'all' | 'none' | { sessionId: string }, work: (tx: Transaction) => T): Promise<T> {
+    const projection = await this.ensureSearchProjection()
+    return projection.guard(() =>
+      this.db.transaction((tx) => {
+        if (catchUp !== 'none') projection.catchUp(tx, catchUp === 'all' ? undefined : catchUp.sessionId)
+        return work(tx)
+      }),
+    )
+  }
+
   async activeTurn(sessionId: string): Promise<AgentTurn | null> {
     const [row] = await this.db
       .select()

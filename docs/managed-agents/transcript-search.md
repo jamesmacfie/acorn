@@ -74,6 +74,16 @@ payloads. Returned text uses the pasted-content wrapper: an old message is evide
 in the session, not a fresh instruction or proof that an action succeeded. Search is lexical, so a
 paraphrase can miss.
 
+## Cross-session search
+
+`agent_session_search` reads this index across every session in the caller's project, and
+`agent_session_read` folds a session's events the way the projection does
+([cross-session reads](./cross-session-reads.md)). Search catches up every dirty session before
+ranking, as Agent Center does. A read catches up only the session it reads, then finds message starts
+by their search text: a streamed continuation has none once projected, and neither does a tool call's
+superseded opener. The scope filter passes task IDs as one JSON array, so a large project can't reach
+SQLite's bound-parameter limit.
+
 ## Tool rows
 
 A tool call is indexed once, on its latest row, and the opener gives up its search text. A file change

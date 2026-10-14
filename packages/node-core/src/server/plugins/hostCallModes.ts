@@ -67,6 +67,7 @@ const modes = {
       workspaceId: 'async',
       workspaceIdOrNull: 'async',
       idsForWorkspace: 'async',
+      inProject: 'async',
       links: 'async',
       pulls: 'async',
       attachPull: 'async',

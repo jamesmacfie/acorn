@@ -122,7 +122,10 @@ renderer-facing agent-tool route or managed-agent execution and approval control
 execution controls refuse service tokens too, because trusted workflow and delegation execution use
 guarded capabilities. A task token can read and cancel its task's managed sessions, but not the
 Node-wide agents run source. The session claim authorizes session-required tools such as orchestration,
-and the Node reads it from the verified token, never from `x-acorn-session-id`.
+and the Node reads it from the verified token, never from `x-acorn-session-id`. Three read-tier tools
+let a managed session read other sessions in its task's project
+([cross-session reads](./managed-agents/cross-session-reads.md#who-can-read-what)). That doesn't widen
+the task token's session HTTP routes.
 
 HTTP root workflow starts need a device principal for repository, user, and database definitions, and
 refuse task and service tokens before parsing the body. A task token keeps its own workflow file

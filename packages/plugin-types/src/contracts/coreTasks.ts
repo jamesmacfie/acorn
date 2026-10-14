@@ -75,6 +75,9 @@ export type CoreTaskService = {
   /** The same lookup with "no workspace" as a value. A real database failure still throws. */
   workspaceIdOrNull(taskId: string): Promise<string | null>
   idsForWorkspace(workspaceId: string): Promise<string[]>
+  /** Every task in a project, archived and cancelled ones included. Deleted tasks are gone.
+   *  `status` is `active`, `archived`, or `cancelled`. */
+  inProject(projectId: string): Promise<{ id: string; title: string; status: string }[]>
   links(taskId: string): Promise<TaskLinkRef[]>
   pulls(taskId: string): Promise<TaskPullRelation[]>
   attachPull(taskId: string, input: AttachTaskPullInput): Promise<TaskPullRelation>

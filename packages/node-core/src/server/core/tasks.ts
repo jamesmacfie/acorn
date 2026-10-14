@@ -117,6 +117,10 @@ export type TaskService = {
   // Not status-filtered. An archived task's agent transcripts still belong to the workspace, and the
   // session's own `archivedAt` is what the list and search queries filter on.
   idsForWorkspace(workspaceId: string): Promise<string[]>
+  // Every task in a project with its title and status, for the agents plugin's cross-session tools,
+  // which scope reads to the caller's project. Not status-filtered, for the same reason as
+  // `idsForWorkspace`: an archived task's transcripts still belong to the project.
+  inProject(projectId: string): Promise<{ id: string; title: string; status: string }[]>
   // The external tickets and errors linked to a task (`task_links`). plugins/notes' seeding pass
   // renders one note per linked Linear ticket, and it needs the connection id as well as the
   // identifier, because the same ticket through two Linear connections is two rows.
@@ -315,6 +319,11 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         : []
       return projectTasks.map((row) => row.id)
     },
+    inProject: async (projectId) =>
+      db
+        .select({ id: schema.tasks.id, title: schema.tasks.title, status: schema.tasks.status })
+        .from(schema.tasks)
+        .where(eq(schema.tasks.projectId, projectId)),
     links: (taskId) =>
       db
         .select({

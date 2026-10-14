@@ -490,6 +490,7 @@ acorn-plugin-types: member CoreTaskService.cancel
 acorn-plugin-types: member CoreTaskService.createChild
 acorn-plugin-types: member CoreTaskService.deleted
 acorn-plugin-types: member CoreTaskService.idsForWorkspace
+acorn-plugin-types: member CoreTaskService.inProject
 acorn-plugin-types: member CoreTaskService.links
 acorn-plugin-types: member CoreTaskService.load
 acorn-plugin-types: member CoreTaskService.pulls
