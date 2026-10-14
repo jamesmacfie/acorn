@@ -11,14 +11,28 @@ and the [toolbar badge](./notifications.md) both use. The sidebar's side is in
 
 ## What an association is
 
-An association is an exact origin and a path prefix, such as `https://example.com` and `/app`. The
-origin includes the scheme and any port, so `http://localhost:5173` and `http://localhost:5174` are two
-sites. The prefix matches whole path segments: `/app` covers `/app` and `/app/login`, not `/apps`. It
-defaults to `/`, which covers the whole origin.
+An association is one of four kinds, each stored in its own shape:
 
-Only `http` and `https` are allowed, and an address with a user name or password is refused. The Node
-stores the canonical form, so `https://Example.com/app/` is stored as `https://example.com` and `/app`.
-A project holds at most 32.
+| Kind | Stored as | Covers |
+| --- | --- | --- |
+| Starts with | `{ origin, pathPrefix }` | The address and every page under it |
+| Domain | `{ domain }` | The host and its subdomains, on `http` or `https` and any port |
+| Exact page | `{ exact }` | One page's origin and path, whatever its query or fragment |
+| Regex | `{ regex }` | Any address the JavaScript regular expression finds a match in |
+
+A prefix is an exact origin and a path prefix, such as `https://example.com` and `/app`. The origin
+includes the scheme and any port, so `http://localhost:5173` and `http://localhost:5174` are two
+sites. The prefix matches whole path segments: `/app` covers `/app` and `/app/login`, not `/apps`. It
+defaults to `/`, which covers the whole origin. Lists stored before the other kinds existed hold only
+prefixes, so they read unchanged.
+
+A domain such as `example.com` covers `app.example.com` too, but not `badexample.com`. An exact page
+such as `https://example.com/a` covers `https://example.com/a/?b=1`, and not `https://example.com/a/b`.
+A pattern is tested against the page's whole address, unanchored, and holds at most 500 characters.
+
+Only `http` and `https` addresses are allowed, and an address with a user name or password is refused.
+The Node stores the canonical form, so `https://Example.com/app/` is stored as `https://example.com`
+and `/app`, and a domain is stored lowercase. A pattern must compile. A project holds at most 32.
 
 An association is a suggestion. It grants no browser access and restricts nothing: any task can still
 be chosen on any page.
@@ -53,15 +67,15 @@ shows the project picker in Home's **This page** section:
 - **Several candidates** are listed first in the picker. A project they leave out is cleared, and the
   sidebar asks the person to choose one.
 - **No candidate** shows no picker, and Home shows only the Acorn mark. To tie the page's site to a
-  project, add it under **Project sites** in Settings.
+  project, add it under Settings → **Projects**.
 
 Under the picker, **This page** lists the chosen project's open tasks, and clicking one makes it the
 current task. **New task in Acorn** opens the project in the desktop app. A page on a project's site
 never moves the current task by itself: the current task, its conversation, and its draft stay put
 when the page changes, and only **This page** follows it.
 
-Task addresses use the same grammar as associations, an exact origin and a path prefix, and are
-matched the same way ([pages that belong to a task](./task-pages.md#pages-that-belong-to-a-task)).
+Task addresses use the prefix kind's grammar, an exact origin and a path prefix, and are matched the
+same way ([pages that belong to a task](./task-pages.md#pages-that-belong-to-a-task)).
 
 ## Overrides
 
@@ -73,17 +87,25 @@ suggestion again forgets the override. Choosing no project is remembered as an o
 
 ## The editor
 
-Settings → **Project sites** edits one project's associations, starting on the current task's
-project. It lists them with **Remove**. The field
-under it takes an address, such as `https://example.com/app`, and **Add** stores its origin and path.
-**Add <origin>** adds the whole site of the page beside the sidebar. The editor says what the person
-typed wrong before anything goes to the Node.
+Settings uses the desktop's tab strip: **Nodes**, **Projects**, **Permissions**, **Notifications**,
+and **Appearance**.
 
-Site access is listed apart, under **Site access** in Settings. Each site there says what access is for:
+**Projects** lists every visible project on the selected Node with its associations, each with its
+kind and **Remove**. **Add site** opens a dialog with a project picker, which starts on the current
+task's project and offers a filter once the list is long, a choice of kind, and the address or
+pattern. Until the person types, the field holds the page beside the sidebar in the chosen kind's
+form, so the dialog starts on the page's domain. A pattern starts empty. Under the field the dialog
+says whether the entry covers that page, and it says what was typed wrong before anything goes to the
+Node.
+
+Site access is listed apart, under **Permissions**. Each site there says what access is for:
 buttons on its pages, handoffs in the sidebar, project suggestions, or the
 [branch marker](./task-pages.md#the-branch-marker) on a task's app. Browsers grant access by host
-and not by port, so a `http://localhost:5173` association asks for all of `http://localhost`.
-Removing access stops the sidebar reading the page, so its suggestions go at once.
+and not by port, so a `http://localhost:5173` association asks for all of `http://localhost`. A domain
+asks for `https://*.<domain>/*`, so a domain served only over plain `http` gets no access row of its
+own. A pattern names no host, so it asks for nothing: its pages match only where other access lets the
+sidebar read the address. Removing access stops the sidebar reading the page, so its suggestions go at
+once.
 
 ## Handoffs
 
@@ -98,7 +120,7 @@ and matches the page itself, so the sidebar can't widen the list
 
 | Operation | Fields | Result |
 | --- | --- | --- |
-| `sites.list` | `nodeId` | `{ nodeId, sites }`, each `{ projectId, origin, pathPrefix }` |
+| `sites.list` | `nodeId` | `{ nodeId, sites }`, each an association with its `projectId` |
 | `site.add` | `nodeId`, `projectId`, `site` | `{ nodeId, projectId, sites }`: that project's list after the change |
 | `site.remove` | `nodeId`, `projectId`, `site` | The same |
 

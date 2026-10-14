@@ -80,7 +80,7 @@ advertise its address, or be reached through an SSH tunnel, as
 
 ## Turn on site features
 
-- In Settings, click **Allow** beside a site under **Site access** for its buttons, sidebar handoffs,
+- In Settings, click **Allow** beside a site under **Permissions** for its buttons, sidebar handoffs,
   and project suggestions. The browser asks you first.
 - To capture from a site you haven't allowed, click the Acorn toolbar button on that page, then
   capture.

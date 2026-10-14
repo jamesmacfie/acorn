@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { render } from 'solid-js/web'
 import type { BridgeAgentSession, BridgeHandoff, BridgePageTask } from '@acorn/protocol/extensionBridge.ts'
-import type { ProjectSite } from '@acorn/protocol/siteAssociations.ts'
+import { sameSite, type ProjectSite, type SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
 import {
@@ -87,13 +87,11 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
       case 'site.add':
       case 'site.remove': {
         const projectId = request.projectId as string
-        const site = request.site as { origin: string; pathPrefix: string }
-        const others = state.sites[nodeId]!.filter(
-          (row) => !(row.projectId === projectId && row.origin === site.origin && row.pathPrefix === site.pathPrefix),
-        )
+        const site = request.site as SiteAssociation
+        const others = state.sites[nodeId]!.filter((row) => !(row.projectId === projectId && sameSite(row, site)))
         state.sites[nodeId] = request.op === 'site.add' ? [...others, { projectId, ...site }] : others
         const sites = state.sites[nodeId]!.filter((row) => row.projectId === projectId).map(
-          ({ origin, pathPrefix }) => ({ origin, pathPrefix }),
+          ({ projectId: _projectId, ...rest }) => rest,
         )
         return { nodeId, projectId, sites }
       }
@@ -137,7 +135,7 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
   return { fake, state, root }
 }
 
-const fill = (root: HTMLElement, selector: string, value: string) => {
+const fill = (root: ParentNode, selector: string, value: string) => {
   const field = root.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)!
   field.value = value
   field.dispatchEvent(new Event('input', { bubbles: true }))
@@ -272,49 +270,76 @@ describe('project suggestions for a site', () => {
 })
 
 describe('the project site editor', () => {
-  it('adds and removes associations, and refuses what it cannot store', async () => {
+  it('adds each kind of site from a dialog that starts on the page, and removes them', async () => {
     const { state, root } = mount({ url: 'https://example.com/app/login' })
     await settle(30)
     await openSettings(root)
-    await pick(root, 'sites-project', 'p1')
+    button(root, 'Projects')!.click()
+    await settle(20)
     expect(root.querySelectorAll('[data-testid="project-site"]')).toHaveLength(0)
+    const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')
+    const open = async () => {
+      button(root, 'Add site')!.click()
+      await settle(20)
+    }
+    const submit = async () => {
+      button(dialog()!, 'Add site')!.click()
+      await settle(20)
+    }
+    const added = () => state.requests.filter((request) => request.op === 'site.add')
 
-    fill(root, 'input[name="site"]', 'ftp://example.com')
-    root
-      .querySelector('form:has(input[name="site"])')!
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await settle(20)
-    expect(root.querySelector('.sites [role="alert"]')!.textContent).toBe('Use an http:// or https:// address.')
-    fill(root, 'input[name="site"]', 'https://user:pw@example.com')
-    root
-      .querySelector('form:has(input[name="site"])')!
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await settle(20)
-    expect(root.querySelector('.sites [role="alert"]')!.textContent).toBe('Leave the user name and password out.')
-    expect(state.requests.some((request) => request.op === 'site.add')).toBe(false)
+    // The page's domain, on the first project, by default.
+    await open()
+    expect(dialog()!.querySelector<HTMLInputElement>('input[name="site"]')!.value).toBe('example.com')
+    expect(selected(dialog()!, 'site-project')).toBe('p1')
+    await submit()
+    expect(dialog()).toBeNull()
+    expect(added().at(-1)).toMatchObject({ nodeId: 'n1', projectId: 'p1', site: { domain: 'example.com' } })
 
-    fill(root, 'input[name="site"]', 'https://Example.com/app/')
-    root
-      .querySelector('form:has(input[name="site"])')!
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    // A pattern starts empty, says whether it covers the page, and is checked before it is sent.
+    await open()
+    button(dialog()!, 'Regex')!.click()
     await settle(20)
-    expect(state.requests.find((request) => request.op === 'site.add')).toMatchObject({
-      nodeId: 'n1',
-      projectId: 'p1',
-      site: { origin: 'https://example.com', pathPrefix: '/app' },
+    expect(dialog()!.querySelector<HTMLInputElement>('input[name="site"]')!.value).toBe('')
+    fill(dialog()!, 'input[name="site"]', '(')
+    await submit()
+    expect(dialog()!.textContent).toContain("That pattern isn't a valid regular expression.")
+    expect(added()).toHaveLength(1)
+    fill(dialog()!, 'input[name="site"]', '/app/')
+    await settle(20)
+    expect(dialog()!.textContent).toContain('Covers this page.')
+    await submit()
+    expect(added().at(-1)).toMatchObject({ projectId: 'p1', site: { regex: '/app/' } })
+
+    // Another project, and the page's address as a prefix.
+    await open()
+    await pick(dialog()!, 'site-project', 'p2')
+    button(dialog()!, 'Starts with')!.click()
+    await settle(20)
+    await submit()
+    expect(added().at(-1)).toMatchObject({
+      projectId: 'p2',
+      site: { origin: 'https://example.com', pathPrefix: '/app/login' },
     })
-    button(root, 'Add https://example.com')!.click()
-    await settle(20)
-    const listed = () => [...root.querySelectorAll('[data-testid="project-site"]')].map((row) => row.textContent)
-    expect(listed()).toEqual(['https://example.com/app', 'https://example.com'])
-    expect(button(root, 'Add https://example.com')).toBeUndefined()
-    // Where a project is suggested and what the extension may read are listed apart.
-    expect(siteAccess(root)).toEqual(['example.com: Project suggestions · Not allowed'])
 
-    button(root, 'Remove')!.click()
+    const listed = (project: string) =>
+      [...root.querySelectorAll(`[aria-label="${project}"] [data-testid="project-site"]`)].map((row) => row.textContent)
+    expect(listed('Web')).toEqual(['example.com', '/app/'])
+    expect(listed('Docs')).toEqual(['https://example.com/app/login'])
+    // Where a project is suggested and what the extension may read are listed apart. A pattern asks
+    // for no access.
+    expect(siteAccess(root)).toEqual([
+      '*.example.com: Project suggestions · Not allowed',
+      'example.com: Project suggestions · Not allowed',
+    ])
+
+    button(root.querySelector('[aria-label="Web"]')!, 'Remove')!.click()
     await settle(20)
-    expect(listed()).toEqual(['https://example.com'])
-    expect(state.sites.n1).toEqual([site('p1', 'https://example.com')])
+    expect(listed('Web')).toEqual(['/app/'])
+    expect(state.sites.n1).toEqual([
+      { projectId: 'p1', regex: '/app/' },
+      { projectId: 'p2', origin: 'https://example.com', pathPrefix: '/app/login' },
+    ])
   })
 
   it('asks for access to a localhost association by host, as browsers grant it', async () => {

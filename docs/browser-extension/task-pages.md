@@ -72,7 +72,7 @@ A page that matches none of these, or one the browser hides from the extension, 
 mark. The current task stays current there, so a capture still has somewhere to go, but Home doesn't
 show it. **Current task** stays pinned below **This page** on a page whose task isn't the current
 one. The sidebar reads the page again when the tab finishes loading, so the section follows the
-tab. Sites to allow are under **Site access** in Settings.
+tab. Sites to allow are under Settings → **Permissions**.
 
 ## The branch marker
 
@@ -84,7 +84,7 @@ only, the extension's own look, and the page's light or dark theme, read from th
 A page with no plugin address gets no marker.
 
 The marker needs page access like any chip. A local app's origin is a site like any other, so the
-person allows it under **Site access**, where it's listed as **Branch marker on its pages**, or clicks
+person allows it under Settings → **Permissions**, where it's listed as **Branch marker on its pages**, or clicks
 the toolbar button on the tab. The extension asks for nothing by itself. Browsers grant access by host
 and not by port, so `https://runn-05ea41.runn.localhost:5104` asks for all of
 `https://runn-05ea41.runn.localhost`.

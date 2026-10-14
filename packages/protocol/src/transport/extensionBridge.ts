@@ -1,7 +1,12 @@
 import { z } from 'zod'
 import { MAX_AGENT_CONTEXT_BYTES } from '../agents/agentContext.ts'
 import type { BrowserHandoff } from '../plugin/handoffs.ts'
-import { siteAssociationSchema, type ProjectSite, type SiteAssociation } from '../projects/siteAssociations.ts'
+import {
+  siteAssociationSchema,
+  type ProjectSite,
+  type SiteAddress,
+  type SiteAssociation,
+} from '../projects/siteAssociations.ts'
 import type { NodeProbeResult, NodeRecord, NodeStatus } from './broker.ts'
 
 // The browser extension's native messaging contract: the identities a host registration allows, the
@@ -257,7 +262,7 @@ export type BridgeTask = { id: string; title: string; branch: string | null }
 // matched by whole segments, so a pull request's address covers its tabs and one at `/` covers the
 // origin. `source` is the plugin or provider that knows the address, such as `github` or `linear`.
 // `status` is set on an address a plugin published for the task, such as its local stack's app.
-export type BridgeTaskPage = SiteAssociation & { source: string; status?: BridgePageStatus }
+export type BridgeTaskPage = SiteAddress & { source: string; status?: BridgePageStatus }
 // What a plugin says answers at an address it published, and its state, read together as one line
 // ("Runn stack running"), with the state's tone.
 type BridgePageStatus = { label: string; state: string; tone: 'ok' | 'warn' | 'bad' }

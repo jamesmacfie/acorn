@@ -131,7 +131,13 @@ body { padding-bottom: var(--pane-head-h); }
 .idle { display: grid; place-items: center; min-height: 70vh; }
 .idle img { width: 64px; opacity: 0.4; }
 /* A lone button in a section or form keeps its own width rather than the column's. */
-:is(.view > section, form) > button { justify-self: start; }
+:is(.view > section, .view > section > section, form) > button { justify-self: start; }
+/* Settings: the desktop's tab strip, narrow enough for five tabs, over one padded column per tab. */
+.settings .ui-tab { min-width: 0; padding: 0 var(--space-4); }
+.settings .ui-tab-panel > section, .sites > section { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-row); }
+.sites { gap: var(--gap-section); }
+.sites .section-head { align-items: center; }
+.sites .section-head > button { flex: none; white-space: nowrap; }
 h2, h3 {
   margin: 0;
   font-size: var(--label-size);
@@ -173,17 +179,9 @@ h2, h3 {
 .agent-row > .ui-icon { margin-top: 0.2em; }
 .agent-text { flex: 1; display: grid; gap: var(--space-1); min-width: 0; }
 .agent-meta { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: var(--fs-sm); }
-/* The kit's icon tones and turn, copied from primitives.css, which the panel doesn't load. */
-.ui-icon { flex: none; }
-.ui-icon[data-tone='muted'] { color: var(--text-muted); }
-.ui-icon[data-tone='accent'] { color: var(--accent); }
-.ui-icon[data-tone='ok'] { color: var(--state-ok); }
-.ui-icon[data-tone='warn'] { color: var(--state-warn); }
-.ui-icon[data-tone='danger'] { color: var(--state-bad); }
-.ui-icon[data-tone='brand'] { color: var(--brand-legible); }
-.ui-icon[data-spin] { animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
 .row-button[aria-current='true'] { box-shadow: inset var(--marker-w) 0 0 var(--accent); padding-left: var(--space-4); }
+/* The kit's spinning icon turns on base.css's keyframes, which the panel doesn't load. */
+@keyframes spin { to { transform: rotate(360deg); } }
 .row { display: flex; gap: var(--gap-inline); align-items: center; flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
 
@@ -198,8 +196,9 @@ h2, h3 {
 @media (prefers-reduced-motion: reduce) { .dot[data-tone='active'] { animation: none; } }
 
 /* ── Controls: 32 px buttons, inputs on the same rung ───────────────────────────────────────── */
-/* An `acorn://` link is an anchor, so the browser hands it to the desktop app, drawn as a button. */
-button, a.button {
+/* An `acorn://` link is an anchor, so the browser hands it to the desktop app, drawn as a button. The
+ * kit's own controls (`ui-` classes) keep the desktop's look, so these plain-element rules skip them. */
+:is(button, a.button):where(:not([class*='ui-'])) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -225,7 +224,7 @@ button.icon { width: var(--control-h); padding: 0; background: transparent; colo
 button.icon:hover:not(:disabled) { background: var(--bg-hover); }
 button.icon[aria-pressed='true'] { background: var(--bg-selected); }
 button.icon svg { width: var(--icon-size); height: var(--icon-size); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-input:not([type='checkbox']), select, textarea {
+input:not([type='checkbox']):where(:not([class*='ui-'])), select:where(:not([class*='ui-'])), textarea:where(:not([class*='ui-'])) {
   min-width: 0;
   min-height: var(--control-h);
   padding: var(--space-2) var(--space-4);
@@ -240,7 +239,7 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 :is(input, select, textarea):focus { outline: none; border-color: var(--accent); }
 textarea { resize: vertical; }
 form { display: grid; gap: var(--gap-row); }
-label { display: grid; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-muted); }
+label:where(:not([class*='ui-'])) { display: grid; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-muted); }
 label.check { display: flex; align-items: center; gap: var(--space-3); color: var(--text); }
 fieldset { border: var(--surface-border); border-radius: var(--radius-surface); margin: 0; padding: var(--space-3) var(--space-4); display: grid; gap: var(--space-2); }
 
@@ -285,8 +284,8 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .transcript > li.tool .dot { margin-top: calc((1lh - 8px) / 2); }
 .transcript > li.error p { margin-top: var(--space-1); white-space: pre-wrap; }
 
-/* Rendered Markdown: the desktop's .ui-markdown rules (client-core primitives.css), which the panel
- * can't load whole. Lists get their markers back from the reset at the top. */
+/* Rendered Markdown, on the desktop's .ui-markdown rules (client-core primitives.css). Lists get their
+ * markers back from the reset at the top. */
 .ui-markdown { font-size: var(--fs-sm); line-height: var(--lh); }
 .ui-markdown > :first-child { margin-top: var(--space-1); }
 .ui-markdown > :last-child { margin-bottom: 0; }

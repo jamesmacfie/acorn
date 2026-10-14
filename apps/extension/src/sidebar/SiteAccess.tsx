@@ -1,6 +1,6 @@
 import { For, Show, createResource, onCleanup, onMount } from 'solid-js'
 import type { BridgeHandoff } from '@acorn/protocol/extensionBridge.ts'
-import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
+import type { ProjectSite, SiteAddress, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import type { BrowserApi } from '../browser'
 import { siteAccess } from '../handoffs'
 
@@ -13,9 +13,15 @@ const USE_LABELS: Record<SiteUse, string> = {
 }
 
 // Browser match patterns can't name a port in Firefox, so a project's `http://localhost:5173` asks for
-// all of `http://localhost`. The association itself still matches only its own port.
-const associationAccess = (site: SiteAssociation): string =>
-  `${new URL(site.origin).protocol}//${new URL(site.origin).hostname}/*`
+// all of `http://localhost`. The association itself still matches only its own port. A pattern names
+// no host, so it asks for nothing: its pages are read only where other access allows.
+const addressAccess = (address: string): string => `${new URL(address).protocol}//${new URL(address).hostname}/*`
+function associationAccess(site: SiteAssociation): string | null {
+  if ('regex' in site) return null
+  // shortcut: https only, as the manifest offers each scheme apart; a domain on plain http needs its own row.
+  if ('domain' in site) return `https://*.${site.domain}/*`
+  return addressAccess('exact' in site ? site.exact : site.origin)
+}
 
 // The per-site access that lets the extension read a site's pages at all, for buttons, sidebar
 // handoffs, project suggestions, or the branch marker on an app a plugin published for a task.
@@ -24,7 +30,7 @@ export function SiteAccess(props: {
   api: BrowserApi
   handoffs: readonly BridgeHandoff[]
   sites: readonly ProjectSite[]
-  apps: readonly SiteAssociation[]
+  apps: readonly SiteAddress[]
 }) {
   // Each site this Node's handoffs, project associations, or tasks' apps are on, with what access to
   // it is for.
@@ -33,8 +39,11 @@ export function SiteAccess(props: {
     const add = (pattern: string, use: SiteUse) => uses.set(pattern, (uses.get(pattern) ?? new Set()).add(use))
     for (const handoff of props.handoffs)
       for (const pattern of siteAccess(handoff)) add(pattern, handoff.anchors.length ? 'buttons' : 'sidebar')
-    for (const site of props.sites) add(associationAccess(site), 'projects')
-    for (const app of props.apps) add(associationAccess(app), 'markers')
+    for (const site of props.sites) {
+      const pattern = associationAccess(site)
+      if (pattern) add(pattern, 'projects')
+    }
+    for (const app of props.apps) add(addressAccess(app.origin), 'markers')
     return [...uses].map(([pattern, used]) => ({ pattern, uses: [...used].map((use) => USE_LABELS[use]).join(' · ') }))
   }
 
@@ -66,9 +75,9 @@ export function SiteAccess(props: {
   const siteName = (pattern: string) => pattern.replace(/^https:\/\//, '').replace(/\/\*$/, '')
 
   return (
-    <Show when={sites().length}>
-      <section aria-label="Site access">
-        <h2>Site access</h2>
+    <section aria-label="Site access">
+      <p class="quiet">The sites the extension may read, and what it reads them for.</p>
+      <Show when={sites().length} fallback={<p class="quiet">No site needs access yet.</p>}>
         <ul class="rows">
           <For each={sites()}>
             {(site) => (
@@ -96,7 +105,7 @@ export function SiteAccess(props: {
             )}
           </For>
         </ul>
-      </section>
-    </Show>
+      </Show>
+    </section>
   )
 }
