@@ -40,7 +40,7 @@ settings page, touches that plugin's `src/` and the golden lists. A new compiled
 - `apps/node/package.json` and `apps/desktop/package.json`, each with
   `"@acorn/plugin-<id>": "workspace:*"` for the half it composes.
 
-A loaded plugin needs one entry in `BUNDLED_PLUGINS` in `apps/desktop/scripts/build-bundled-plugins.mjs`
+A loaded plugin needs one entry in `BUNDLED_PLUGINS` in `scripts/bundled-plugins.mjs`
 and its own `acorn-plugin.config.mjs`. It touches no composition list and no golden list, because the
 manifest is the record. Some loaded packages have an `apps/node` dependency entry only because that
 app's tests import them.

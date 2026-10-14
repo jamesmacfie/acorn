@@ -80,7 +80,7 @@ sends it in the Node's start message, never its environment ([Node keys](./secur
 | `ACORN_DATA_DIR` | Isolates a run in another data root. The default is `apps/node/.acorn/`, which Git ignores. |
 | `ACORN_SKIP_MCP_REGISTRATION=1` | Stops the Node registering its MCP server with the person's Claude and Codex CLIs. The `dev:agent` and `dev:tui:agent` launchers set it. |
 | `ACORN_PORT` | Forces a port. Otherwise the Node prefers the last port in `node.json`, then an ephemeral one. |
-| `ACORN_BUNDLED_PLUGINS_DIR` | Gives a standalone Node a directory of app-owned plugin packages to reconcile from. The desktop always has one. `pnpm dev:node` doesn't, and without it the reconcile step doesn't run. |
+| `ACORN_BUNDLED_PLUGINS_DIR` | Gives a standalone Node a directory of app-owned plugin packages to reconcile from, in place of the tarball's `plugins` folder. The desktop always has one. `pnpm dev:node` doesn't, and without it the reconcile step doesn't run. |
 | `ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` | Shows the trust dialog for the app's own bundled packages, which a development build otherwise accepts as a packaged build does. |
 | `ACORN_PERF=1` | Prints boot and request timing. See [profiling](./local-development/profiling.md). |
 

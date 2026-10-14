@@ -26,7 +26,8 @@ A self-hoster can use this on its own. It is the first cloud-shaped thing acorn 
   handshake line and a pairing banner, and drains on SIGTERM ([node distribution](../../../node-distribution.md)).
 - `node-pty` is the only native module, and `apps/node/externals.ts` lists the packages installed
   beside the bundle.
-- A standalone Node has no bundled loaded plugins unless `ACORN_BUNDLED_PLUGINS_DIR` names a folder.
+- The standalone tarball carries the bundled loaded plugins in its `plugins` folder, and the Node
+  reconciles them on boot.
 - [The bundle design](../../bundle.md#build-the-container-image) records the container requirements
   and release dependencies. No Dockerfile exists for acorn.
 
@@ -54,8 +55,8 @@ Add `apps/node/Dockerfile` (new). Recommended shape:
   compiles `node-pty`.
 - Runtime stage from the same base, with `git`, `tmux`, `ripgrep`, `ca-certificates`,
   and the agent CLIs acorn drives (Claude Code and Codex to start).
-- The built loaded plugins copied into the image, with `ACORN_BUNDLED_PLUGINS_DIR` pointing at them,
-  so the image carries the same plugins as the desktop.
+- The tarball's `plugins` folder kept beside `dist/`, so the image carries the same plugins as the
+  desktop.
 - A non-root `acorn` user, `ACORN_DATA_DIR=/data`, and `/data` declared as a volume.
 - A fixed `ACORN_PORT`, because the Host check compares the port, and a remapped port fails as a
   bare 403.

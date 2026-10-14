@@ -33,8 +33,8 @@ that comparison is what makes pairing safe. A code opens automatically only whil
 `kill -USR1 <pid>` opens another without a restart. Windows has no `SIGUSR1`, so pairing a second device
 there means a restart.
 
-A standalone Node supports pure-Node features: workspaces, tasks, providers, Git, files, the database
-plugin, Docker, HTTP, and core routes. Shell-only operations such as native dialogs, child webviews, and
+A standalone Node supports pure-Node features: workspaces, tasks, providers, Git, files, Docker, the
+bundled loaded plugins, and core routes. Shell-only operations such as native dialogs, child webviews, and
 window management are unavailable. It wires the terminal, managed-agent, and workflow engines when their
 dependencies are present, and an unsupported native adapter reports an explicit unavailable state.
 
@@ -107,11 +107,11 @@ guard compares the port too.
 ## Plugins
 
 Both hosts build the `PLUGIN_STATE` bridge, the roster, installer, and disabled list, through
-`apps/node/src/composition/pluginState.ts`. The desktop ships every built plugin as app resources and
-copies them into the data root before discovery. A standalone Node has no `resourcesPath`, so plugins
-arrive only through the owner's install route. A developer running from a checkout can name a source with
-`ACORN_BUNDLED_PLUGINS_DIR`, and the root then reconciles as the desktop's does. Both call one
-`reconcileBundledPackages`.
+`apps/node/src/composition/pluginState.ts`. Both ship the loaded plugins listed in
+`scripts/bundled-plugins.mjs`: the desktop in its app resources, the tarball in a `plugins` folder
+beside `dist/`. Before discovery, both call `reconcileBundledPackages` to copy them into the data root.
+`ACORN_BUNDLED_PLUGINS_DIR` names another folder and wins. A checkout has none, so `pnpm dev:node`
+reconciles nothing unless you set it. Other plugins arrive through the owner's install route.
 
 Reconciliation hashes the source and installed package on each pass and leaves the ownership file alone
 when the status, version, fingerprint, and installation time match. A missing ownership row is repaired

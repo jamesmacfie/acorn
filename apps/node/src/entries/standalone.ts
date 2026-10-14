@@ -1,7 +1,8 @@
 // The entry for `pnpm dev:node` and the packaged standalone Node (docs/node-distribution.md). See
 // docs/architecture-overview.md § Runtime topology for how this differs from the supervised node the
 // desktop shell starts.
-import { closeSync, readFileSync, writeSync } from 'node:fs'
+import { closeSync, existsSync, readFileSync, writeSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { devDataDir } from '@acorn/node-core/server/transport/listener.ts'
 import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/server/transport'
@@ -49,12 +50,15 @@ log.warn(
   `this Node keeps its signing and encryption keys in ${root.dir} or its environment, where agents it runs can read them`,
 )
 
-const bundledRoot = process.env.ACORN_BUNDLED_PLUGINS_DIR
+// The unpacked tarball keeps its bundled plugins beside `dist/` (scripts/pack-node.mjs), and this
+// entry is its own chunk, so the folder is one level up from this file. A checkout has no such folder,
+// so `pnpm dev:node` and a built `apps/node/dist` still find nothing. ACORN_BUNDLED_PLUGINS_DIR wins.
+const packagedPlugins = fileURLToPath(new URL('../plugins', import.meta.url))
+const bundledRoot = process.env.ACORN_BUNDLED_PLUGINS_DIR || (existsSync(packagedPlugins) ? packagedPlugins : undefined)
 const development = process.env.NODE_ENV !== 'production'
 // Looks like a bug and is not one: `dev:node` with no bundled root reconciles nothing, so a
-// `build:plugin` copy in the data root keeps running and a newer bundled package never arrives. That
-// is the right answer for a service-managed node. Only a developer needs
-// `ACORN_BUNDLED_PLUGINS_DIR` set.
+// `build:plugin` copy in the data root keeps running and a newer bundled package never arrives.
+// Only a developer needs `ACORN_BUNDLED_PLUGINS_DIR` set.
 if (development && !bundledRoot) {
   pluginLog.info(
     'ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled. Whatever is in the data root keeps running.',

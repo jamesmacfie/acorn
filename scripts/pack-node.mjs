@@ -17,6 +17,8 @@
 //   scripts/prune-runtime.mjs  run after `npm ci`: removes files no runtime loads, including the Claude
 //                  SDK's bundled executable
 //   migrations/    every Drizzle chain: core's at the root, each plugin's under its own name
+//   plugins/       the desktop's bundled loaded plugins (scripts/bundled-plugins.mjs), which the Node
+//                  reconciles into its data root on boot
 //   package.json   generated, listing only the real runtime dependencies (see RUNTIME below)
 //   package-lock.json  resolved at pack time, so every operator installs the same versions
 //   README.md      pointing at docs/node-distribution.md
@@ -28,6 +30,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildBundledPlugins } from './bundled-plugins.mjs'
 import { externalSpecifiers, packageName, readChunkGraph } from './chunkGraph.mts'
 import { requiredRuntimePackages } from './nodeRuntimePackages.ts'
 import { REVIEWED_PACKAGES } from './prune-runtime.mjs'
@@ -127,6 +130,8 @@ mkdirSync(join(staging, 'scripts'), { recursive: true })
 cpSync(join(ROOT, 'scripts/prune-runtime.mjs'), join(staging, 'scripts/prune-runtime.mjs'))
 const chains = stageMigrations(join(staging, 'migrations'))
 console.log(`[pack-node] staged ${chains} migration chains`)
+const plugins = buildBundledPlugins(join(staging, 'plugins'))
+console.log(`[pack-node] staged ${plugins.length} bundled plugins`)
 
 // Versions come from apps/desktop's manifest, the package that already pins them for the bundled node,
 // so the standalone one cannot drift from it. `catalog:` entries are resolved out of pnpm-workspace.yaml,
