@@ -17,6 +17,7 @@ Topic pages:
 - [Handoffs](./browser-extension/handoffs.md): the task chip on websites, the handoff card, the
   panel's verbs and its `acorn://` links, and the operations that resolve a page and create a linked
   task.
+- [Workflows](./browser-extension/workflows.md): starting a workflow, and the Workflows tab.
 - [Pages matched to tasks](./browser-extension/task-pages.md): the `tasks.pages` read, the app
   addresses plugins publish, matching the page to its task in the browser, Home's **This page**
   section, and the branch marker on a local app.
@@ -93,15 +94,16 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `projects.list` | `nodeId` | `{ nodeId, projects }`, each `{ id, name, path, hidden }` |
 | `tasks.list` | `nodeId`, `projectId` | `{ nodeId, projectId, tasks }`: that project's active tasks, each `{ id, title, branch }` |
 | `tasks.pages` | `nodeId` | `{ nodeId, tasks }`: every active task with a page address, each `{ id, title, branch, projectId, pages }`, including the app origins plugins publish; see [pages that belong to a task](./browser-extension/task-pages.md#pages-that-belong-to-a-task) |
-| `agents.profiles` | `nodeId` | `{ nodeId, profiles }`: the agents plugin's providers, each with `installed`, `authenticated`, and `diagnostics` |
+| `agents.choices` | `nodeId`, `refresh` (optional) | `{ nodeId, choices }`: the desktop's New picker rows; see [agent conversations](./browser-extension/conversations.md) |
 | `sessions.list` | `nodeId`, `taskId` | `{ nodeId, taskId, sessions }`: the task's newest 100 unarchived sessions |
 | `session.read` | `nodeId`, `sessionId`, `afterSeq`, `limit` (at most 500) | `{ nodeId, sessionId, session, records, reach, queued }` |
-| `session.create` | `nodeId`, `taskId`, `providerId`, `profileId`, `key` | `{ nodeId, session }` |
+| `session.create` | `nodeId`, `taskId`, `providerId`, `profileId`, `customAgentId` and `account` (optional), `key` | `{ nodeId, session }` |
 | `turn.submit` | `nodeId`, `sessionId`, `input`, `key` | `{ nodeId, sessionId, turnId }` |
 | `request.resolve` | `nodeId`, `sessionId`, `requestId`, `resolution`, `key` | `{ nodeId, sessionId, request }`; see [answering the agent](./browser-extension/conversations.md#answering-the-agent) |
 | `attachment.upload`, `attachment.read`, `attachment.delete` | `nodeId`, `taskId`, and the attachment | See [page capture](./browser-extension/page-capture.md#attachment-operations) |
 | `handoffs.list`, `handoff.resolve`, `handoff.create` | `nodeId`, and the handoff and page | See [handoffs](./browser-extension/handoffs.md#native-operations) |
 | `sites.list`, `site.add`, `site.remove` | `nodeId`, and the project and association | See [project sites](./browser-extension/project-sites.md#native-operations) |
+| `workflows.list`, `workflow.start`, `workflow.runs`, `workflow.steps` | `nodeId`, and the project, task, or run | See [workflows](./browser-extension/workflows.md#native-operations) |
 | `requests.pending` | `nodeId` | `{ nodeId, requests }`; see [request notifications](./browser-extension/notifications.md#native-operation) |
 
 A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, message } }`. The host

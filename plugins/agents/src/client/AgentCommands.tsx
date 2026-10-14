@@ -15,7 +15,7 @@ import {
   choiceStart,
   newSessionChoices,
   type NewSessionChoice,
-} from './sessions/newSessionChoices'
+} from '../contract/newSessionChoices.ts'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from './settings/sessionDefaultsClient'
 import {
   AGENT_TOOL_FOLD_CHOICES,

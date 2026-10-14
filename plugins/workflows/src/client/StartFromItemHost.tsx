@@ -17,14 +17,8 @@ import { PromoteToTaskModal } from '@acorn/plugin-api/ui/host'
 import { Field, Input, Select } from '@acorn/plugin-api/ui'
 import { workflowApi } from './workflowsClient'
 import { startWorkflow } from './startWorkflow'
-import {
-  closeStartFromItem,
-  collectItemWorkflowInputs,
-  itemWorkflowInputsReady,
-  prefillFromItem,
-  prefillFromRecord,
-  startFromItemTarget,
-} from './startFromItem'
+import { closeStartFromItem, prefillFromRecord, startFromItemTarget } from './startFromItem'
+import { collectItemWorkflowInputs, itemWorkflowInputsReady, prefillFromItem } from '../contract/itemInputs.ts'
 
 // "Start workflow…" on an integration's row, drawn (docs/workflows/starting-runs.md § Starting a run).
 //

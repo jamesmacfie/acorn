@@ -54,17 +54,28 @@ import type {
   AgentSessionSnapshot,
   AgentTurn,
 } from '@acorn/plugin-agents/contract/wire.ts'
+import type { CustomAgent } from '@acorn/plugin-agents/contract/newSessionChoices.ts'
 import {
   agentHints,
   agentsRoute,
   attachmentRoute,
   bridgeAttachment,
-  bridgeProfile,
+  bridgeChoices,
   bridgeRequest,
   bridgeSession,
   bridgeSessionRead,
   sessionRoute,
 } from './agents'
+import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/plugin-workflows/contract/wire.ts'
+import {
+  bridgeRuns,
+  bridgeSteps,
+  runStepsRoute,
+  runnableWorkflows,
+  stepTaskId,
+  taskWorkflowsRoute,
+  workflowDefsRoute,
+} from './workflows'
 import {
   bridgeHandoff,
   bridgeHandoffItem,
@@ -348,6 +359,16 @@ export function createBridge(options: {
     return list as Row[]
   }
 
+  // A task's newest hundred sessions, which is one page of the route. Archived sessions are left out.
+  async function taskSessions(nodeId: string, taskId: string): Promise<AgentSession[]> {
+    const query = new URLSearchParams({ taskId, archived: 'false', limit: '100' })
+    return readList<AgentSession>(
+      nodeId,
+      `${agentsRoute}/sessions?${query}`,
+      (body) => (body as AgentSessionList | null)?.sessions,
+    )
+  }
+
   async function listProjectRows(nodeId: string): Promise<Project[]> {
     return readList<Project>(nodeId, projectsRoute, (body) => (body as ProjectsResponse | null)?.projects)
   }
@@ -563,18 +584,23 @@ export function createBridge(options: {
         ])
         return { nodeId: request.nodeId, tasks: taskPages(tasks, published) }
       }
-      case 'agents.profiles': {
-        const rows = await readList<AgentProviderDescriptor>(request.nodeId, `${agentsRoute}/providers`, (b) => b)
-        return { nodeId: request.nodeId, profiles: rows.map(bridgeProfile) }
+      case 'agents.choices': {
+        const [providers, agents] = await Promise.all([
+          readList<AgentProviderDescriptor>(
+            request.nodeId,
+            `${agentsRoute}/providers${request.refresh ? '?force=true' : ''}`,
+            (b) => b,
+          ),
+          // Without the custom agents the picker still offers every harness, as the desktop's does.
+          readList<CustomAgent>(request.nodeId, `${agentsRoute}/custom-agents`, (b) => b).catch((error: unknown) => {
+            if (error instanceof BridgeFailure && error.code !== 'node_error' && error.code !== 'not_found') throw error
+            return []
+          }),
+        ])
+        return { nodeId: request.nodeId, choices: bridgeChoices(providers, agents) }
       }
       case 'sessions.list': {
-        // The newest hundred, which is one page of the route. Archived sessions are left out.
-        const query = new URLSearchParams({ taskId: request.taskId, archived: 'false', limit: '100' })
-        const rows = await readList<AgentSession>(
-          request.nodeId,
-          `${agentsRoute}/sessions?${query}`,
-          (body) => (body as AgentSessionList | null)?.sessions,
-        )
+        const rows = await taskSessions(request.nodeId, request.taskId)
         return { nodeId: request.nodeId, taskId: request.taskId, sessions: rows.map(bridgeSession) }
       }
       case 'session.read': {
@@ -598,6 +624,8 @@ export function createBridge(options: {
             providerId: request.providerId,
             profileId: request.profileId,
             kind: 'interactive',
+            ...(request.customAgentId ? { customAgentId: request.customAgentId } : {}),
+            ...(request.account ? { account: request.account } : {}),
             config: {},
           },
         })) as AgentSession
@@ -753,6 +781,57 @@ export function createBridge(options: {
             ? sites.filter((site) => !sameSite(site, request.site))
             : sites,
         )
+      case 'workflows.list': {
+        const project = (await listProjectRows(request.nodeId)).find((row) => row.id === request.projectId)
+        if (!project) throw new BridgeFailure('not_found', 'That project is no longer on this Node.')
+        const body = (await nodeRequest(request.nodeId, {
+          method: 'GET',
+          path: workflowDefsRoute(project.workspaceId),
+        })) as { workflows?: WorkflowDefSummary[] } | null
+        if (!Array.isArray(body?.workflows))
+          throw new BridgeFailure('node_error', 'The Node returned an unreadable list of workflows.')
+        return {
+          nodeId: request.nodeId,
+          projectId: request.projectId,
+          workflows: runnableWorkflows(body.workflows, request.projectId),
+        }
+      }
+      case 'workflow.start': {
+        // The route answers a refusal it understood as `error` in a 200, as the desktop reads it.
+        const result = (await nodeRequest(request.nodeId, {
+          method: 'POST',
+          path: taskWorkflowsRoute(request.taskId),
+          key: request.key,
+          body: { defId: request.defId, ...(request.inputs ? { inputs: request.inputs } : {}) },
+        })) as { runId?: unknown; error?: unknown } | null
+        if (result?.error === 'needs-trust')
+          throw new BridgeFailure(
+            'node_error',
+            "This workflow is in the repository's own config, which Acorn doesn't trust yet. Start it once in Acorn to trust it.",
+          )
+        if (typeof result?.error === 'string') throw new BridgeFailure('node_error', result.error)
+        if (typeof result?.runId !== 'string')
+          throw new BridgeFailure(
+            'ambiguous_mutation',
+            'The Node did not confirm the run, so it may or may not have started.',
+          )
+        return { nodeId: request.nodeId, taskId: request.taskId, runId: result.runId }
+      }
+      case 'workflow.runs': {
+        const runs = await readList<WorkflowRunRow>(
+          request.nodeId,
+          `${taskWorkflowsRoute(request.taskId)}/runs`,
+          (b) => b,
+        )
+        return { nodeId: request.nodeId, taskId: request.taskId, runs: bridgeRuns(runs) }
+      }
+      case 'workflow.steps': {
+        const steps = await readList<WorkflowStepRow>(request.nodeId, runStepsRoute(request.runId), (body) => body)
+        // The run's task, and the task of each step the runner gave one of its own.
+        const taskIds = new Set([request.taskId, ...steps.flatMap((step) => stepTaskId(step) ?? [])])
+        const sessions = (await Promise.all([...taskIds].map((taskId) => taskSessions(request.nodeId, taskId)))).flat()
+        return { nodeId: request.nodeId, runId: request.runId, steps: bridgeSteps(steps, sessions, bridgeSession) }
+      }
       case 'attachment.delete': {
         await taskAttachment(request.nodeId, request.taskId, request.attachmentId)
         const result = (await nodeRequest(request.nodeId, {

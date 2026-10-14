@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@acorn/client-core": "workspace:*",
+    "@acorn/dashboards-core": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
+    "@acorn/plugin-workflows": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "solid-js": "catalog:"
   },

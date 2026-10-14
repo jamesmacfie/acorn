@@ -9,7 +9,7 @@ import {
   choiceStart,
   choiceText,
   newSessionChoices,
-} from './newSessionChoices'
+} from '../../contract/newSessionChoices.ts'
 
 const provider = (id: string, installed = true) =>
   ({

@@ -262,8 +262,8 @@ describe('site buttons', () => {
     expect(fake.hosts).toEqual([])
     expect(lastButtons(fake)).toEqual(buttons)
 
-    fake.sendFromPage({ type: 'acorn:handoff', key: 'tracker:other' })
-    fake.sendFromPage({ type: 'acorn:handoff', key: 'tracker:item' })
+    fake.sendFromPage({ type: 'acorn:handoff', key: 'tracker:other', start: 'task' })
+    fake.sendFromPage({ type: 'acorn:handoff', key: 'tracker:item', start: 'workflow' })
     expect(fake.panelOpens).toEqual([3])
     const panel = sidebar(fake)
     await settle()
@@ -272,6 +272,7 @@ describe('site buttons', () => {
       handoffId: 'item',
       label: 'Open in Acorn',
       url: 'https://tracker.example/items/42',
+      start: 'workflow',
     }
     expect(panel.messages).toContainEqual({ type: 'handoff', handoff: handed })
 

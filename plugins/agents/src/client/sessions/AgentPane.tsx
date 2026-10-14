@@ -37,7 +37,7 @@ import {
   choiceLabel,
   choiceText,
   type NewSessionChoice,
-} from './newSessionChoices'
+} from '../../contract/newSessionChoices.ts'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { canStopAgent, canStopSubagent } from './agentActivity'
 import { selectedManagedSubagent } from './managedSelection'

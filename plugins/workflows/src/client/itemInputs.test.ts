@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collectItemWorkflowInputs, itemWorkflowInputsReady, prefillFromItem } from './startFromItem'
+import { collectItemWorkflowInputs, itemWorkflowInputsReady, prefillFromItem } from '../contract/itemInputs.ts'
 
 // The prefill rule (docs/workflows/starting-runs.md § Starting a run). It is the whole reason "Start workflow…" is
 // one click rather than a form: a Rollbar error, a Linear issue and a GitHub pull request all arrive

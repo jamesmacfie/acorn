@@ -1,4 +1,4 @@
-import { Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
+import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
 import type { ProjectSite } from '@acorn/protocol/siteAssociations.ts'
 import type {
   BridgeAgentHint,
@@ -7,6 +7,8 @@ import type {
   BridgePendingRequest,
   BridgeProject,
   BridgeTask,
+  BridgeWorkflowRun,
+  BridgeWorkflowStep,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
 import { pageHandoffs, type PageHandoff } from '../handoffs'
@@ -21,10 +23,11 @@ import { errorGuidance } from './guidance'
 import { Agents, CurrentTask, ThisPage } from './Home'
 import { changeDraft, loadDestination, saveDestination, type Destination } from '../localState'
 import { Waiting } from './Waiting'
+import { Workflows } from './Workflows'
 
-// The work on one Node: the current task, the page beside the panel, and the conversations of the
-// page's task, or of the current task on its project's site. Home shows the page and the current task;
-// Agents lists the conversations. Opening a conversation makes its task current, shows Agents, and
+// The work on one Node: the current task, the page beside the panel, and the conversations and
+// workflow runs of the page's task, or of the current task on its project's site. Home shows the page
+// and the current task; Agents lists the conversations, and Workflows the runs and their steps. Opening a conversation makes its task current, shows Agents, and
 // replaces the list until the person goes back. The parent mounts one
 // per selected Node, and again each time Settings closes, so it restores the current task from
 // storage. Each list read checks on its return that the choice it was made for is still the choice,
@@ -39,9 +42,12 @@ export function Workspace(props: {
   hint: BridgeAgentHint | null
   reconnects: number
   projectChanges: number
-  // The bottom bar's tab, asking for Agents when a conversation opens, and Agents' top bar heading.
-  tab: 'home' | 'agents'
+  // The bottom bar's tab, asking for Agents when a conversation opens or Workflows when a run starts,
+  // whether there are runs to show there, and the two tabs' top bar heading.
+  tab: 'home' | 'agents' | 'workflows'
   showAgents(): void
+  showWorkflows(): void
+  hasWorkflows(has: boolean): void
   // The remembered conversation came back as the panel opened.
   resumed(): void
   heading(heading: Heading | null): void
@@ -78,7 +84,15 @@ export function Workspace(props: {
   const [current, setCurrent] = createSignal<Destination>({ projectId: null, taskId: null, sessionId: null })
   // Each task's conversations, as last read. Keyed by task, so a slow reply fills only its own list.
   const [sessionLists, setSessionLists] = createSignal<Record<string, BridgeAgentSession[]>>({})
-  const [newChat, setNewChat] = createSignal(false)
+  // Each task's workflow runs, as last read, the run Workflows shows in a task, and the step whose
+  // conversation is open there. The last two name their task, so they only show while it's shown.
+  const [runLists, setRunLists] = createSignal<Record<string, BridgeWorkflowRun[]>>({})
+  const [selectedRun, setSelectedRun] = createSignal<{ taskId: string; runId: string } | null>(null)
+  const [openStep, setOpenStep] = createSignal<{
+    taskId: string
+    run: BridgeWorkflowRun
+    step: BridgeWorkflowStep
+  } | null>(null)
   // The project This page shows, apart from the current task's.
   const [pageProject, setPageProject] = createSignal<string | null>(null)
   const [siteChoices, setSiteChoices] = createSignal<SiteChoices>({})
@@ -137,14 +151,21 @@ export function Workspace(props: {
     }
   }
 
-  // Every change of task closes the conversation in the same batch, so a conversation is never
+  // A Node without the workflows plugin answers with a failure, which leaves Workflows hidden.
+  const loadRuns = async (forTask: string) => {
+    try {
+      const result = await props.client.call({ op: 'workflow.runs', nodeId, taskId: forTask })
+      setRunLists((lists) => ({ ...lists, [forTask]: result.runs }))
+    } catch {
+      // Without the runs there is no Workflows tab; everything else still works.
+    }
+  }
+
+  // Every change of task closes the conversation in the same write, so a conversation is never
   // mounted with a task it doesn't belong to.
   function useTask(projectId: string, taskId: string, then?: (list: BridgeAgentSession[]) => void) {
     chosen++
-    batch(() => {
-      setCurrent({ projectId, taskId, sessionId: null })
-      setNewChat(false)
-    })
+    setCurrent({ projectId, taskId, sessionId: null })
     void loadSessions(taskId, then)
   }
 
@@ -206,16 +227,13 @@ export function Workspace(props: {
     if (shown) void loadSessions(shown)
   }
 
-  // A task's newest conversation opens, or the new-chat picker when it has none.
+  // A task's newest conversation opens, or Agents with its new-chat picker when it has none.
   const chatInTask = (projectId: string, taskId: string) =>
     void restore(projectId, taskId, (list) => {
       remember()
       const newest = list[0]
       if (newest) void openSession({ projectId, taskId }, newest.id)
-      else {
-        setNewChat(true)
-        props.showAgents()
-      }
+      else props.showAgents()
     })
 
   // A handoff's linked or new task, with the item's context waiting for the conversation.
@@ -225,29 +243,21 @@ export function Workspace(props: {
     chatInTask(projectId, taskId)
   }
 
-  // Start task made a task and a conversation in it. The draft is stored before the conversation
-  // opens, so its composer shows the message and the item, waiting for the person to send them.
-  async function startedHandoffTask(
-    projectId: string,
-    taskId: string,
-    sessionId: string,
-    draft: { text: string; capture: PageCapture },
-  ) {
+  // Create task made the item's task. It becomes current, and Home shows it, with the item's context
+  // waiting for the first conversation the person opens.
+  const createdHandoffTask = (projectId: string, taskId: string, capture: PageCapture) => {
+    props.setWaitingContext(capture)
     props.dismissHandoff()
-    try {
-      await changeDraft(props.api.storage.local, { nodeId, taskId, sessionId }, (stored) => ({
-        ...stored,
-        text: stored.text || draft.text,
-        captures: withCapture(stored.captures ?? [], draft.capture),
-      }))
-    } catch {
-      setProblem('Browser storage is full, so the item was not added to the draft.')
-    }
-    void restore(projectId, taskId, (list) => {
-      if (list.some((session) => session.id === sessionId)) showSession(sessionId)
-      props.showAgents()
-      remember()
-    })
+    void restore(projectId, taskId, () => remember())
+  }
+
+  // Start workflow made the item's task and started a run in it, which Workflows shows.
+  const startedHandoffWorkflow = (projectId: string, taskId: string, runId: string) => {
+    props.dismissHandoff()
+    setSelectedRun({ taskId, runId })
+    void loadRuns(taskId)
+    props.showWorkflows()
+    void restore(projectId, taskId, () => remember())
   }
 
   // Opens a request's conversation, as a remembered one is restored.
@@ -266,8 +276,8 @@ export function Workspace(props: {
     }),
   )
 
-  // A task chip was clicked: Home shows the page's task, and for New chat about this page, the
-  // new-chat picker with the page's link waiting for the conversation it starts.
+  // A task chip was clicked: Home shows the page's task, and for New chat about this page, Agents with
+  // the page's link waiting for the conversation the person starts or opens next.
   createEffect(
     on(
       () => props.showTask,
@@ -278,7 +288,6 @@ export function Workspace(props: {
         if (!request.chat) return
         const { url, title } = request.chat
         props.setWaitingContext({ kind: 'link', id: crypto.randomUUID(), url, title, capturedAt: Date.now() })
-        setNewChat(true)
       },
     ),
   )
@@ -289,6 +298,19 @@ export function Workspace(props: {
       (taskId) => taskId && void loadSessions(taskId),
     ),
   )
+  // The task Agents and Workflows show changed: read its runs, and say whether it has any.
+  createEffect(
+    on(
+      () => agentsTask().taskId,
+      (taskId) => taskId && void loadRuns(taskId),
+    ),
+  )
+  createEffect(() => props.hasWorkflows(!!runLists()[agentsTask().taskId ?? '']?.length))
+  onCleanup(() => props.hasWorkflows(false))
+  const step = () => {
+    const open = openStep()
+    return open && open.taskId === agentsTask().taskId ? open : null
+  }
   // A conversation open in another task follows the page to its task's newest conversation. Drafts
   // stay with the conversation they were written in.
   createEffect(
@@ -369,9 +391,11 @@ export function Workspace(props: {
       () => props.hint,
       (hint) => {
         const { taskId } = agentsTask()
-        if (hint?.nodeId !== nodeId || !taskId || current().sessionId) return
+        if (hint?.nodeId !== nodeId || !taskId) return
         const listed = (id: string) => sessionLists()[taskId]?.some((session) => session.id === id)
-        if (hint.missed || hint.tasks.includes(taskId) || hint.sessions.some(listed)) void loadSessions(taskId)
+        if (!hint.missed && !hint.tasks.includes(taskId) && !hint.sessions.some(listed)) return
+        void loadRuns(taskId)
+        if (!current().sessionId) void loadSessions(taskId)
       },
       { defer: true },
     ),
@@ -391,6 +415,7 @@ export function Workspace(props: {
         if (!projects()) void loadProjects()
         const forTask = current().sessionId ? current().taskId : agentsTask().taskId
         if (forTask) void loadSessions(forTask)
+        if (agentsTask().taskId) void loadRuns(agentsTask().taskId!)
       },
       { defer: true },
     ),
@@ -399,10 +424,15 @@ export function Workspace(props: {
   const task = () => taskLists()[current().projectId ?? '']?.find((row) => row.id === current().taskId) ?? null
   const session = () => sessionLists()[current().taskId ?? '']?.find((row) => row.id === current().sessionId) ?? null
   const projectName = (id: string) => projects()?.find((row) => row.id === id)?.name ?? id
-  // Agents names the list and its count in the top bar. An open conversation names itself.
+  // Agents and Workflows name their list and its count in the top bar. An open conversation names itself.
   createEffect(() => {
-    if (current().sessionId) return
     const { taskId } = agentsTask()
+    if (props.tab === 'workflows') {
+      // The Runs header below carries the count, as the desktop's does.
+      if (!step()) props.heading({ title: 'Workflows' })
+      return
+    }
+    if (current().sessionId) return
     props.heading({ title: 'Agents', count: taskId ? sessionLists()[taskId]?.length : undefined })
   })
   onCleanup(() => props.heading(null))
@@ -448,7 +478,8 @@ export function Workspace(props: {
               startHandoff={props.startHandoff}
               dismissHandoff={props.dismissHandoff}
               openHandoffTask={openHandoffTask}
-              startedHandoffTask={(...args) => void startedHandoffTask(...args)}
+              createdHandoffTask={createdHandoffTask}
+              startedHandoffWorkflow={startedHandoffWorkflow}
               waitingContext={props.waitingContext}
               dropWaitingContext={() => props.setWaitingContext(null)}
               projects={projects()}
@@ -490,14 +521,11 @@ export function Workspace(props: {
                       sessions={sessionLists()[taskId] ?? null}
                       requests={props.requests}
                       open={(id) => void openSession(target(), id)}
-                      newChat={newChat()}
-                      setNewChat={setNewChat}
                       started={(started) => {
                         setSessionLists((lists) => ({
                           ...lists,
                           [taskId]: [started, ...(lists[taskId] ?? []).filter((row) => row.id !== started.id)],
                         }))
-                        setNewChat(false)
                         void openSession(target(), started.id)
                       }}
                     />
@@ -539,6 +567,51 @@ export function Workspace(props: {
                 reconnects={props.reconnects}
               />
             </>
+          )}
+        </Show>
+      </Show>
+      <Show when={props.tab === 'workflows'}>
+        <Show
+          when={step()}
+          keyed
+          fallback={
+            <div class="view" aria-label="Workflows">
+              <Show
+                when={agentsTask().taskId}
+                keyed
+                fallback={<p class="empty quiet">This page belongs to no task. Choose one under Home.</p>}
+              >
+                {(taskId) => (
+                  <Workflows
+                    client={props.client}
+                    nodeId={nodeId}
+                    taskId={taskId}
+                    runs={runLists()[taskId] ?? null}
+                    selected={selectedRun()?.taskId === taskId ? selectedRun()!.runId : null}
+                    select={(runId) => setSelectedRun({ taskId, runId })}
+                    refreshRuns={() => void loadRuns(taskId)}
+                    open={(run, step) => setOpenStep({ taskId, run, step })}
+                  />
+                )}
+              </Show>
+            </div>
+          }
+        >
+          {/* A step's conversation, named for the step under its run, with the way back to the run. */}
+          {(open) => (
+            <Conversation
+              client={props.client}
+              storage={props.api.storage}
+              target={{ nodeId, taskId: open.step.session!.taskId, sessionId: open.step.session!.id }}
+              session={open.step.session!}
+              taskTitle={open.run.name}
+              back={() => setOpenStep(null)}
+              heading={(heading) => props.heading({ ...heading, title: open.step.name })}
+              online={props.online}
+              opensLinks={props.opensLinks}
+              hint={props.hint}
+              reconnects={props.reconnects}
+            />
           )}
         </Show>
       </Show>

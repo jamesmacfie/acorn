@@ -5,8 +5,10 @@ import { matchHandoffPage } from '@acorn/protocol/plugin/handoffs.ts'
 // page matches, and which site access shows their buttons. The background and the sidebar both match
 // from the cached list, so a page address goes to the Node only when the person asks for a handoff.
 
-// A handoff the person asked for on one page: a button click, or the sidebar's own offer.
-export type PageHandoff = { pluginId: string; handoffId: string; label: string; url: string }
+// A handoff the person asked for on one page: a button click, or the sidebar's own offer. `start` is
+// what the chip's menu chose to do with the item: make a task, or start a workflow in one.
+export type HandoffStart = 'task' | 'workflow'
+export type PageHandoff = { pluginId: string; handoffId: string; label: string; url: string; start?: HandoffStart }
 
 export const handoffKey = (handoff: Pick<BridgeHandoff, 'pluginId' | 'id'>): string =>
   `${handoff.pluginId}:${handoff.id}`
@@ -55,7 +57,7 @@ export type ContentMessage = {
 // `show` opens the panel on the page's task, and `chat` opens it on a new chat about the page. The
 // marker's `hide` hides it on the page's origin.
 export type ButtonClick =
-  | { type: 'acorn:handoff'; key: string }
+  | { type: 'acorn:handoff'; key: string; start: HandoffStart }
   | { type: 'acorn:chip'; key: string; action: 'show' | 'chat' }
   | { type: 'acorn:marker'; action: 'show' | 'hide' }
 // From the background to the element picker on a task's page: pick the element the person last

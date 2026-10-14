@@ -15,6 +15,30 @@ import type { DraftTarget } from '../localState'
 import { Requests } from './Requests'
 import { State, agentName, agentState, toolTone } from './state'
 
+// How near the bottom of the page still counts as reading the newest message.
+const FOLLOW_SLACK_PX = 40
+
+// The panel's page is the scroller. Like the desktop's transcript, a conversation opens on its newest
+// message and keeps it in view as messages arrive and the composer grows, until the reader scrolls up.
+// Scrolling back to the bottom follows again.
+function followNewest(element: HTMLElement): void {
+  const page = document.scrollingElement ?? document.documentElement
+  let following = true
+  const pin = () => {
+    if (following) page.scrollTop = page.scrollHeight
+  }
+  const scrolled = () => {
+    following = page.scrollHeight - page.scrollTop - page.clientHeight <= FOLLOW_SLACK_PX
+  }
+  const resized = new ResizeObserver(pin)
+  resized.observe(element)
+  addEventListener('scroll', scrolled, { passive: true })
+  onCleanup(() => {
+    resized.disconnect()
+    removeEventListener('scroll', scrolled)
+  })
+}
+
 // One conversation: a window of its messages and tool calls, and a composer whose draft belongs to
 // this conversation alone. The parent mounts one per session, so every reply and write here is bound
 // to `target` and can't reach another conversation.
@@ -97,7 +121,7 @@ export function Conversation(props: {
   createEffect(() => props.heading({ eyebrow: props.taskTitle, title: session().title, back: props.back }))
 
   return (
-    <div class="view conversation" aria-label="Conversation">
+    <div class="view conversation" aria-label="Conversation" ref={followNewest}>
       <div class="subhead">
         <span class="grow">{[agentName(session()), session().model].filter(Boolean).join(' · ')}</span>
         <State tone={state().tone}>{state().label}</State>

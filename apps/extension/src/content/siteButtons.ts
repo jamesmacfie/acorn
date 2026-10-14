@@ -194,16 +194,23 @@ if (api && !scope.acornSiteButtons) {
     }
   }
 
-  // The menu under a pill. In Chrome a ▾ beside the main button opens it; in Firefox, which opens its
-  // panel only from the extension's own controls, the main button does. Returns how to open it.
-  const attachMenu = (host: Element, root: ShadowRoot, chip: HTMLElement, main: HTMLElement, items: HTMLElement[]) => {
+  // The menu under a pill. With `split`, a ▾ beside the main button opens it, and the main button
+  // keeps its own click; otherwise the main button opens it. Returns how to open it.
+  const attachMenu = (
+    host: Element,
+    root: ShadowRoot,
+    chip: HTMLElement,
+    main: HTMLElement,
+    items: HTMLElement[],
+    split: boolean,
+  ) => {
     for (const element of items) element.setAttribute('role', element.tagName === 'P' ? 'note' : 'menuitem')
     const menu = document.createElement('div')
     menu.className = 'menu'
     menu.setAttribute('role', 'menu')
     menu.append(...items)
     let toggle = main
-    if (page.opensPanel) {
+    if (split) {
       toggle = document.createElement('button')
       toggle.setAttribute('type', 'button')
       toggle.className = 'more'
@@ -235,34 +242,32 @@ if (api && !scope.acornSiteButtons) {
     // The plugin's label stays in the accessible name, beside what the chip shows.
     main.setAttribute('aria-label', `${main.textContent} (${button.label})`)
 
-    // The menu: the task's verbs, and in Firefox, where a page can't open the sidebar, how to open it.
+    // The menu: the task's verbs, or with no task the two ways to start one, as the desktop's row menu
+    // offers them. In Firefox, where a page can't open the sidebar, it says how to open it.
     const menu = menuItems()
     const chipClick = (action: 'show' | 'chat') => report({ type: 'acorn:chip', key: button.key, action })
-    if (task && page.opensPanel) menu.add('Show in side panel', () => chipClick('show'))
-    if (task?.link && page.opensLinks) menu.link(task.link)
-    if (task && page.opensPanel) menu.add('New chat about this page', () => chipClick('chat'))
-    if (task) menu.add('Ask about an element', pickElement)
-    if (task?.link) menu.copy(task.link)
-    if (!page.opensPanel)
-      menu.note(
-        task
-          ? 'To open the panel on this task, click Acorn in the toolbar.'
-          : 'To start the task, click Acorn in the toolbar.',
-      )
-
-    // Chrome opens the panel from the chip itself: on the task, or on Start task's form. Firefox opens
-    // the menu, and a Start task click waits for the sidebar.
-    let setOpen = (_open: boolean) => {}
-    if (!page.opensPanel || (task !== null && menu.items.length > 0)) {
-      setOpen = attachMenu(host, root, chip, main, menu.items)
-      menu.bind(() => setOpen(false))
+    if (task) {
+      if (page.opensPanel) menu.add('Show in side panel', () => chipClick('show'))
+      if (task.link && page.opensLinks) menu.link(task.link)
+      if (page.opensPanel) menu.add('New chat about this page', () => chipClick('chat'))
+      menu.add('Ask about an element', pickElement)
+      if (task.link) menu.copy(task.link)
+      if (!page.opensPanel) menu.note('To open the panel on this task, click Acorn in the toolbar.')
+    } else {
+      menu.add('Create task', () => report({ type: 'acorn:handoff', key: button.key, start: 'task' }))
+      menu.add('Start workflow…', () => report({ type: 'acorn:handoff', key: button.key, start: 'workflow' }))
+      if (!page.opensPanel) menu.note('Then click Acorn in the toolbar to open the panel.')
     }
+
+    // Chrome opens the panel on the task from the chip itself, with the menu on a ▾ beside it. With no
+    // task, and in Firefox, the chip opens the menu, and a choice there waits in the sidebar.
+    const split = task !== null && page.opensPanel
+    const setOpen = attachMenu(host, root, chip, main, menu.items, split)
+    menu.bind(() => setOpen(false))
     main.addEventListener('click', (event) => {
       if (!trusted(event)) return
-      if (!task) report({ type: 'acorn:handoff', key: button.key })
-      if (page.opensPanel) {
-        if (task) chipClick('show')
-      } else setOpen(true)
+      if (split) chipClick('show')
+      else setOpen(true)
     })
     drawnFor.set(host, button)
     return host
@@ -286,7 +291,7 @@ if (api && !scope.acornSiteButtons) {
     if (shown.link) menu.copy(shown.link)
     menu.add('Hide on this site', () => markerClick('hide'))
     if (!page.opensPanel) menu.note('To open the panel on this task, click Acorn in the toolbar.')
-    const setOpen = attachMenu(host, root, chip, main, menu.items)
+    const setOpen = attachMenu(host, root, chip, main, menu.items, page.opensPanel)
     menu.bind(() => setOpen(false))
     main.addEventListener('click', (event) => {
       if (!trusted(event)) return

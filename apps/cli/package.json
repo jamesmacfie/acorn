@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@acorn/plugin-agents": "workspace:*",
+    "@acorn/plugin-workflows": "workspace:*",
     "ajv": "^8.20.0",
     "@types/node": "^26.0.0",
     "typescript": "^6.0.3",

@@ -48,13 +48,14 @@ plugin's `label` stays in the chip's accessible name.
   (Home's new-chat picker for the task, with the page's link waiting for the draft), **Ask about an
   element** (the [element picker](./element-picker.md)), and **Copy Acorn link**. A development
   build leaves out Open in Acorn, as the panel does.
-- **A page no task holds** reads **Start task**. A click opens the panel on the handoff card, which
-  resolves the page and offers Start task's form.
+- **A page no task holds** reads **Start task**. A click opens a menu with the desktop row menu's two
+  choices: **Create task** and **Start workflow…**. Either one opens the panel on the handoff card,
+  which resolves the page and shows that choice's form.
 
 Firefox opens its sidebar only from the extension's own controls, so there the chip's click opens
-the menu: Open in Acorn as a plain link, Ask about an element on a task's chip, Copy Acorn link, and
-a line saying to click Acorn in the toolbar for the panel. **Start task** also hands the page to the background, and the handoff card
-shows when the person opens the sidebar.
+the menu, with a line saying to click Acorn in the toolbar for the panel. A task's menu has Open in
+Acorn as a plain link, Ask about an element, and Copy Acorn link. Start task's choice hands the page
+to the background, and the handoff card shows when the person opens the sidebar.
 
 A tab that stops matching, loses access, or whose Node is no longer selected is told to draw nothing,
 and its chip goes. That happens on navigation, on a removed grant (from the sidebar or the browser's
@@ -67,9 +68,10 @@ The content script reports only a trusted click: a page that calls `click()` on 
 nothing. The background checks the handoff still matches the address the browser reports for the
 sending frame, never one the page supplied, and for a task chip that the page still belongs to a
 task. Then it opens the panel and hands the sidebar either the page, `{ type: 'handoff', handoff:
-{ pluginId, handoffId, label, url } }`, or a request to show the page's task, `{ type: 'showTask',
+{ pluginId, handoffId, label, url, start } }`, or a request to show the page's task, `{ type: 'showTask',
 chat }`, where `chat` is the page's address and title for New chat about this page and null
-otherwise.
+otherwise. `start` is `task` or `workflow`, from the menu. The page sends it, so the background
+passes on only those two values.
 
 Chrome opens its side panel from the click. Firefox doesn't: `sidebarAction.open` counts only a user
 action on the extension's own UI, and a message from a page isn't one. A sidebar that is already open
@@ -85,26 +87,26 @@ shows what came back:
 2. **Linked tasks** lists the active tasks that already hold the item. **Chat** opens that task's
    newest conversation, or the new-chat picker when it has none. **Open in Acorn** opens the task in
    the desktop app ([Open in Acorn](#the-panels-verbs)).
-3. An item no task holds says so, with **Open in Acorn** for the item itself, and a **Start task**
-   form: the project, chosen from a list when there are several, an agent, and a first message
-   written from the item, which the person can change. The projects are the plugin's, plus any whose
+3. An item no task holds says so, with **Open in Acorn** for the item itself, and the chip's choice,
+   which a select changes, in a project: the plugin's, plus any whose
    [site associations](./project-sites.md#handoffs) cover the page, unless the item carries a pull
-   number. **Start task** creates the linked task with `handoff.create`, then a conversation with
-   that agent, and opens it with the message and the item in its draft.
+   number. **Create task** creates the linked task with `handoff.create` and shows it on Home, with
+   the item's context waiting. **Start workflow** also starts a run in it
+   ([workflows](./workflows.md#starting-a-workflow)).
 
 The card closes when the tab leaves the item. A page still shows the item when it matches the same
 handoff and every capture the two addresses share is equal, so a pull request's **Files** tab keeps
-the card and another pull request closes it. The card stays when the person has changed Start task's
-first message, or a start is under way, and then says the page it's about was left.
+the card and another pull request closes it. The card stays when the person has typed a workflow
+input, or a start is under way, and then says the page it's about was left.
 
-Start task's two writes keep their keys, so pressing it again after either one went unconfirmed
-makes no second task or conversation. A repeated create, with the same key or after the task exists,
-answers the existing task.
+The card's writes keep their keys, so pressing it again after one went unconfirmed makes no second
+task or run. A repeated create, with the same key or after the task exists, answers the existing
+task.
 
-After **Chat**, whichever conversation the person opens next gets the item's
+After **Chat** or **Create task**, whichever conversation the person opens next gets the item's
 context in its draft, as an **Item** capture beside any links, selections, and screenshots. The same
 item handed off twice is one capture. Until then the sidebar says the context is waiting, with
-**Leave it out**. Nothing goes to an agent until the person sends, from Start task's draft too; the
+**Leave it out**. Nothing goes to an agent until the person sends; the
 capture becomes a `context` part with `source: 'browser-extension'`, as page captures do
 ([page capture](./page-capture.md#what-a-capture-is)).
 
@@ -118,7 +120,8 @@ Each verb means one thing wherever it shows:
 | --- | --- |
 | **Open in Acorn** | Opens the desktop app through an [`acorn://` link](../frontend/acorn-links.md): a handed-off item's task on the pane that shows it (GitHub's for a pull request), a conversation on the agents pane, or an item no task holds through `open?url=`. |
 | **Copy Acorn link** | Copies that link. |
-| **Start task** | Creates the item's linked task and a chat with the chosen agent, with the first message and the item in its draft ([the handoff card](#the-handoff-card)). |
+| **Create task** | Creates the item's linked task and shows it on Home, with the item waiting for its first conversation ([the handoff card](#the-handoff-card)). |
+| **Start workflow** | Creates the item's linked task and starts a workflow run in it ([workflows](./workflows.md)). |
 | **Chat** and **New chat** | Open a task's newest conversation, or start one with a chosen agent. |
 | **Add to chat** | Captures the page link, a selection, or a screenshot into the draft. |
 
@@ -162,6 +165,7 @@ and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#w
 
 - The chip was checked in Chrome on a public pull request, with and without a task, including its
   menu, New chat about this page, Start task, and the chip changing when the task was archived.
+  Start task's menu, with Create task and Start workflow…, was checked in unit tests only.
   Firefox's chip and menu were checked in unit tests only. A chip's working and waiting counts were
   checked in unit tests only, because the session's Node ran no agent.
 

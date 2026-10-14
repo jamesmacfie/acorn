@@ -44,7 +44,7 @@ body { padding-bottom: var(--pane-head-h); }
   border-top: var(--stripe-w) solid transparent;
 }
 .rail .tabrail-tab:last-child { margin-left: auto; border-right: 0; border-left: var(--divider); }
-.rail .tabrail-tab.active { border-top-color: var(--accent); }
+.rail .tabrail-tab.active { border-top-color: var(--rail-accent, var(--accent)); }
 
 /* ── Header ─────────────────────────────────────────────────────────────────────────────────── */
 .top {
@@ -69,7 +69,7 @@ body { padding-bottom: var(--pane-head-h); }
   color: var(--text-muted);
 }
 .heading .eyebrow { font-size: var(--fs-2xs); }
-.heading .count { margin-left: var(--space-2); color: var(--text-faint); }
+.heading .count, h3 .count { margin-left: var(--space-2); color: var(--text-faint); }
 .heading[data-eyebrow] h1 { font-size: var(--fs); font-weight: var(--heading-weight); text-transform: none; letter-spacing: 0; color: var(--text); }
 .menu { position: relative; }
 .menu summary { list-style: none; }
@@ -179,6 +179,8 @@ h2, h3 {
 .agent-row > .ui-icon { margin-top: 0.2em; }
 .agent-text { flex: 1; display: grid; gap: var(--space-1); min-width: 0; }
 .agent-meta { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: var(--fs-sm); }
+/* A New picker row's harness mark and, for a login shown as an icon, the account's icon. */
+.agent-marks { display: inline-flex; align-items: center; gap: var(--space-2); }
 .row-button[aria-current='true'] { box-shadow: inset var(--marker-w) 0 0 var(--accent); padding-left: var(--space-4); }
 /* The kit's spinning icon turns on base.css's keyframes, which the panel doesn't load. */
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -197,8 +199,10 @@ h2, h3 {
 
 /* ── Controls: 32 px buttons, inputs on the same rung ───────────────────────────────────────── */
 /* An `acorn://` link is an anchor, so the browser hands it to the desktop app, drawn as a button. The
- * kit's own controls (`ui-` classes) keep the desktop's look, so these plain-element rules skip them. */
-:is(button, a.button):where(:not([class*='ui-'])) {
+ * kit's own controls (`ui-` classes) keep the desktop's look, so these plain-element rules skip them.
+ * The selector weighs nothing, so any rule with a class beats it: a row, a menu item, a rail tab, or
+ * a picker row draws as itself, not as an accent-filled button. */
+:where(button, a.button):where(:not([class*='ui-'])) {
   display: inline-flex;
   align-items: center;
   justify-content: center;

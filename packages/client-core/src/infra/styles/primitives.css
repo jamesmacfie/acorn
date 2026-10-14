@@ -2175,3 +2175,105 @@ a.ui-row:hover { background: var(--bg-hover); }
    scroll container of its own; the inner box carries the total height as an inline style and its
    rows are absolutely placed, which is the only geometry a virtualiser can produce. */
 .ui-rows-scroll { flex: 1; min-height: 0; overflow: auto; }
+
+/* The kit Picker (kit/components/inputs/Picker.tsx): a button that opens a searchable popover. Here,
+   with the other kit primitives, so a surface that loads only the kit's sheets, such as the browser
+   extension, draws it too. */
+.repo-picker { position: relative; }
+/* The trigger is a kit Button, so its height, radius, hover, focus ring and disabled state are
+   .ui-btn's and a picker lines up with any button of the same size beside it. What is left here is
+   the picker's own: a cap on how much of a bar a long repo name may take, and the truncation that
+   goes with it. */
+.repo-picker > .ui-btn { max-width: 300px; }
+.repo-picker-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.repo-picker-chevron { flex: none; color: var(--text-muted); font-size: var(--fs-2xs); }
+
+.repo-picker-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: var(--z-popover);
+  width: 300px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  background: var(--popover-bg);
+  border: var(--surface-border);
+  border-radius: var(--radius-popover);
+  box-shadow: var(--elev-popover);
+  overflow: hidden;
+}
+/* Portalled to body and pinned to the button's rect (inline top/left/width) so it overlays
+   adjacent panes instead of being clipped by their overflow. Above .overlay-backdrop (100): a Picker
+   inside a modal (the Database pane's example multi-select) is portalled to body, so it is a sibling
+   of the backdrop rather than a descendant and would otherwise render behind it. It only exists while
+   open, so being top-most is always what's wanted. */
+.repo-picker-popover-fixed { position: fixed; top: auto; left: auto; z-index: var(--z-picker); }
+.repo-picker-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-inline-end: var(--space-2);
+  border-bottom: var(--chrome-divider);
+}
+.repo-picker-filter {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: 0;
+  /* The kit's filter height, the small control rung, rather than a box sized by its own padding. The
+     inline pad puts the typed text on the rows' text edge below (6 + 2 marker + 4). */
+  min-height: var(--control-h-sm);
+  padding: 0 var(--space-6);
+  outline: none;
+}
+.repo-picker-status {
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: var(--chrome-divider);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.repo-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--space-5); margin: 0; }
+.repo-picker-footer { padding: var(--space-2); border-top: var(--chrome-divider); }
+/* overflow-x: hidden is load-bearing: without it `overflow-y: auto` computes overflow-x to `auto`
+   too, so long branch names get a horizontal scrollbar instead of ellipsizing (.repo-picker-name
+   already clips). max-height tracks the viewport so the list runs near-full-height before scrolling. */
+.repo-picker-list { list-style: none; margin: 0; padding: var(--space-2) 0; max-height: min(50vh, 420px); overflow-y: auto; overflow-x: hidden; }
+.repo-picker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  border-left: var(--tab-active-w) solid transparent;
+}
+.repo-picker-row:hover { background: var(--bg-subtle); }
+.repo-picker-row.active { background: var(--bg-selected); border-left-color: var(--accent); }
+.repo-picker-row.disabled { opacity: 0.5; }
+.repo-picker-name {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: none;
+  border: 0;
+  padding: var(--space-3) var(--space-2);
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.repo-picker-name:disabled { cursor: default; }
+.repo-picker-name > span,
+.repo-picker-name > small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repo-picker-name > small { margin-top: var(--space-1); color: var(--text-faint); font-size: var(--fs-2xs); }

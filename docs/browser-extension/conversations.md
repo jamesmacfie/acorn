@@ -25,9 +25,14 @@ carries none of its code. It narrows each answer to what the sidebar draws:
   conversation only at dispatch.
 - `session.read` also carries `requests`: every request the agent is still waiting on, oldest first,
   then the 10 that settled most recently. See [answering the agent](#answering-the-agent).
-- `session.create` sends `kind: 'interactive'` and an empty `config`, so the Node applies the same
-  defaults any other client gets. The sidebar offers one choice per provider, on its default
-  account, and names any that can't start.
+- `agents.choices` returns the rows of the desktop's **New** picker, built by the host with the
+  agents plugin's `plugins/agents/src/contract/newSessionChoices.ts`: each harness, or its named
+  logins in its place, then each custom agent on a harness the Node registers. Each row has its
+  name, its mark and account icon, what it says under its name, and whether it can start. `refresh`
+  asks the Node to check its harnesses again, as the picker's refresh button does.
+- `session.create` sends `kind: 'interactive'`, the row's `customAgentId` and `account` when it has
+  them, and an empty `config`, so the Node applies the same defaults any other client gets. The
+  sidebar's **New chat** is the kit's own `Picker`, as on the desktop.
 
 ## Writes and retries
 
@@ -91,6 +96,10 @@ events behind, it starts again at the end. It folds streamed messages by message
 by tool ID with the last title and status reported, skipping any update a folded record already
 covers. Each conversation is mounted for one session ID, and its reads stop applying when it is left,
 so a slow reply can't land in another conversation.
+
+A conversation opens scrolled to its newest message and keeps it in view as messages arrive, as the
+desktop's transcript does. Scrolling up stops that, and scrolling back to within 40 pixels of the
+bottom starts it again.
 
 ## Browser storage
 
