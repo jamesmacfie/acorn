@@ -32,7 +32,7 @@ export const memoryClientPlugin: ClientPlugin = {
       order: 70,
       glyph: 'brain',
       label: 'Memory',
-      regions: { list: MemoryList, detail: MemoryCenterDetail, scroll: true, measure: 'page' },
+      regions: { list: MemoryList, detail: MemoryCenterDetail, scroll: true },
       // The page shows memory for the selected project.
       projectScoped: true,
     })
