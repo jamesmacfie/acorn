@@ -3,7 +3,7 @@ import type { BrowserApi, MessageSender, Port, Tab } from '../browser'
 // The one fake of the extension API, shared by background and sidebar tests. It models what those
 // tests depend on: asynchronous port delivery, both browsers' ways of reporting a closed port,
 // profile storage, a native host the test scripts, the active tab page capture reads, messages to and
-// from a page's content script, and optional host access. Native messaging itself, the browser's
+// from a page's content script, the right-click menu, and optional host access. Native messaging itself, the browser's
 // permission prompt, gestures, and real selectors are checked in a browser through `pnpm dev:extension`.
 
 type Listener = (...args: never[]) => void
@@ -66,11 +66,14 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
   const onRemoved = listeners<(permissions: { origins?: string[]; permissions?: string[] }) => void>()
   const onStorageChanged = listeners<(changes: Record<string, { newValue?: unknown }>, area: string) => void>()
   const onNotificationClicked = listeners<(id: string) => void>()
+  const onInstalled = listeners<() => void>()
+  const onMenuClicked = listeners<(info: { menuItemId: string | number }, tab?: Tab) => void>()
   const runtime: BrowserApi['runtime'] = {
     lastError: null,
     getURL: (path) => `chrome-extension://fake/${path}`,
     onConnect,
     onMessage,
+    onInstalled,
     sendMessage: async (message) => void onMessage.emit(structuredClone(message), {}),
     connect({ name }) {
       const close = (end: FakePort) => {
@@ -122,6 +125,13 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     onNativeMessage: (_message: unknown, _host: FakeHost): void => {},
     // The toolbar button, clicked on the active tab.
     clickAction: () => onClicked.emit({ ...fake.activeTab }),
+    // The extension was installed, and the right-click entries it made then, by ID.
+    install: () => onInstalled.emit(),
+    menus: new Map<string, { title: string; contexts: string[] }>(),
+    // A right-click entry, clicked on the active tab.
+    clickMenu: (menuItemId: string) => onMenuClicked.emit({ menuItemId }, { ...fake.activeTab }),
+    // Whether the browser refuses to open the panel, as it does outside a gesture it counts.
+    refusePanel: false,
     // The tab beside the sidebar. Without `url` the extension may not read it, as without activeTab.
     activeTab: { id: 1, windowId: 1, url: 'https://example.test/docs', title: 'Docs' } as Tab,
     // Tabs in the background of the window, which `tabs.query({})` lists after the active one.
@@ -200,6 +210,11 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
         onUpdated,
         onActivated,
       },
+      contextMenus: {
+        create: ({ id, title, contexts }: { id: string; title: string; contexts: string[] }) =>
+          void fake.menus.set(id, { title, contexts }),
+        onClicked: onMenuClicked,
+      },
       scripting: {
         executeScript: (async (injection: { target: { tabId: number }; files?: string[] }) => {
           if (fake.activeTab.url === undefined) throw new Error('Missing host permission for the tab')
@@ -246,14 +261,18 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
             sidePanel: {
               setPanelBehavior: async (behavior: { openPanelOnActionClick: boolean }) =>
                 void (fake.panelBehavior = behavior),
-              open: async ({ windowId }: { windowId: number }) => void fake.panelOpens.push(windowId),
+              open: async ({ windowId }: { windowId: number }) => void fake.openPanel(windowId),
             },
           }
-        : { sidebarAction: { open: async () => void fake.panelOpens.push(null) } }),
+        : { sidebarAction: { open: async () => void fake.openPanel(null) } }),
     } satisfies BrowserApi as BrowserApi,
     panelBehavior: null as { openPanelOnActionClick: boolean } | null,
     // Each opening of the panel: the window in Chrome, null in Firefox, whose sidebar has no window.
     panelOpens: [] as (number | null)[],
+    openPanel: (windowId: number | null): void => {
+      if (fake.refusePanel) throw new Error('sidePanel.open() may only be called in response to a user gesture.')
+      fake.panelOpens.push(windowId)
+    },
   }
   return fake
 }

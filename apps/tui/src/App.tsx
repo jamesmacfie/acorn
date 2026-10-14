@@ -27,6 +27,7 @@ import { setExtendedPane } from '@acorn/client-core/host/chrome'
 import { ExtendedPane } from './plugins/ExtendedPane'
 import { setRemoteTree } from '@acorn/client-core/host/tree'
 import { setDocumentSurface } from '@acorn/client-core/host/frames/documentSurface.ts'
+import { setFrameSurface } from '@acorn/client-core/host/frames/frameSurface.ts'
 import { LAYOUTS } from './layouts'
 import { Line } from './kit/cells'
 import { RemoteTree } from './plugins/remoteTreeLoader'
@@ -63,6 +64,9 @@ setRemoteTree(RemoteTree)
 setDocumentSurface(
   lazy(() => import('./plugins/DocumentSurface').then((module) => ({ default: module.DocumentSurface }))),
 )
+// A loaded plugin's frame region is a web page, and this host has no iframe to put it in. One line
+// stands in for it, rather than the reconciler throwing on `<iframe>` (./plugins/FrameStandIn.tsx).
+setFrameSurface(lazy(() => import('./plugins/FrameStandIn').then((module) => ({ default: module.FrameStandIn }))))
 
 // A plugin that contributes a rail source by descriptor rather than by code gets `ChromeSourcePanel`
 // on the desktop, which is DOM all the way down, and the reconciler throws on it. This host supplies

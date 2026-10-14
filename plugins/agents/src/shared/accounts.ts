@@ -20,3 +20,14 @@ export function signedIn(provider: AgentProviderDescriptor, account: string | nu
   if (!account) return provider.authenticated
   return provider.accounts?.find((candidate) => candidate.name === account)?.authenticated ?? false
 }
+
+/** What a surface calls an account: the display name the person gave it, else its folder's name. */
+export const accountLabel = (provider: AgentProviderDescriptor | undefined, account: string): string =>
+  provider?.accounts?.find((candidate) => candidate.name === account)?.label ?? account
+
+/** The icon a surface draws in place of an account's name: set when the person chose icons for the
+ *  harness and gave this account one. Undefined means the surface names the account. */
+export function accountIcon(provider: AgentProviderDescriptor | undefined, account: string | null): string | undefined {
+  if (provider?.accountDisplay !== 'icon' || !account) return undefined
+  return provider.accounts?.find((candidate) => candidate.name === account)?.icon
+}

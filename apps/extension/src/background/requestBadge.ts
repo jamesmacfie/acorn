@@ -25,10 +25,11 @@ const notificationId = (key: string) => `acorn-request:${key}`
 const notificationText = (kind: string): string =>
   kind === 'permission' ? 'An agent is asking for permission.' : 'An agent has a question for you.'
 
-// The requests agents are waiting on for each tab's projects, shown on the toolbar badge, and as an OS
-// notification when the person has allowed them. The open requests come from the selected Node; which
-// of them belong to a tab is decided here, from the page's address, the cached associations, and the
-// person's choices, so no page address goes to the Node. The list is read again on every request
+// The requests agents are waiting on for each tab's projects and tasks, shown on the toolbar badge, and
+// as an OS notification when the person has allowed them. The open requests come from the selected
+// Node; which of them belong to a tab is decided here, from the page's address, the cached
+// associations, the person's choices, and the tasks the page belongs to, so no page address goes to
+// the Node. The list is read again on every request
 // change, a dropped-frames hint, and each return of the connection, and dropped whenever the
 // connection is down, so a count is never older than the Node's own state.
 export function requestBadge(
@@ -38,6 +39,8 @@ export function requestBadge(
     broadcast(message: BackgroundMessage): void
     // An OS notification was clicked: show its conversation.
     open(target: RequestTarget): void
+    // The tasks a page belongs to, from the list the Node sent.
+    pageTaskIds(url: string): string[]
   },
 ) {
   let nodeId: string | null = null
@@ -51,7 +54,8 @@ export function requestBadge(
   const scoped = (url: string | undefined): BridgePendingRequest[] => {
     if (!pending || !url) return []
     const projects = pageScope(sites, visible, choices, url).projects
-    return pending.filter((request) => projects.includes(request.projectId))
+    const tasks = deps.pageTaskIds(url)
+    return pending.filter((request) => projects.includes(request.projectId) || tasks.includes(request.taskId))
   }
 
   const drawTab = (tabId: number, url: string | undefined): Promise<void> => {
@@ -230,13 +234,18 @@ export function requestBadge(
     projectsChanged(changed: string): void {
       if (changed === nodeId) void readScope()
     },
+    // The Node's tasks or their addresses changed, which can move a request onto or off a page.
+    tasksChanged(): void {
+      void draw()
+      void deliver()
+    },
     // The toolbar button granted this tab, which the browser reports with no tab or permission event.
     tabGranted(tabId: number, url: string | undefined): void {
       void drawTab(tabId, url)
       void deliver()
     },
     // What a sidebar that connects now should show.
-    get current(): BackgroundMessage {
+    get current(): Extract<BackgroundMessage, { type: 'requests' }> {
       return { type: 'requests', nodeId, requests: pending ?? [] }
     },
   }

@@ -7,7 +7,7 @@ import { extensionManifest } from './src/manifest'
 
 // One build per browser, chosen by mode: `vite build --mode chrome` or `--mode firefox`. The output
 // is an unpacked extension: the sidebar page, the background entry at a fixed name the manifest
-// names, the content script the background injects into pages with site buttons, and the manifest. Everything ships in the package; nothing loads remote code.
+// names, the content script the background injects into pages that get a task chip, and the manifest. Everything ships in the package; nothing loads remote code.
 //
 // ACORN_EXTENSION_HOST=development points the build at the development native host, and
 // ACORN_EXTENSION_OUT_DIR moves the output. `pnpm dev:extension` sets both for its session.

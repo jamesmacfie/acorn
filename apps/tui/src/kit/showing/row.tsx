@@ -7,6 +7,7 @@ import { Menu } from '../grouping/menu'
 import { bindKeys } from '../../keys/install'
 import { focusedRenderable } from '../../keys/regions'
 import { PANE } from '../../keys/tiers'
+import { surfaceColor } from '../../appearance'
 
 /** The fewest cells a row's own words are worth. Below it the row stops giving and runs off the right
  *  edge instead, where the frame cuts it — so in a twenty-eight cell rail a pull request reads as its
@@ -78,9 +79,13 @@ export function Row(props: {
   tipAt?: number
   children: JSX.Element
 }) {
-  // The active row is the collection's, the selected row is the pane's, and in a terminal they are
-  // drawn by the same two cells: a caret for where the keys are, the `match` role for what is chosen.
+  // The active row is the collection's, the selected row is the pane's. The active row gets the caret
+  // and the strong fill, so the row the keys are on reads from across the screen. The selected row
+  // gets the light fill once the keys move elsewhere, as the desktop's rows do. Both fills cover
+  // the whole row, every line of it. A caret or a coloured title alone was easy to miss on a
+  // two-line row.
   const isActive = () => !!props.item?.active()
+  const fill = () => (isActive() ? surfaceColor('selected') : props.selected ? surfaceColor('hover') : undefined)
   // A row inside a collection hands its press over, so `activate` can reach it: on the DOM a `Row` is
   // a button and Enter on it raises a click by itself, and there is no element here to do that
   // (../../keys/collection.ts).
@@ -98,6 +103,7 @@ export function Row(props: {
       flexShrink={0}
       overflow="hidden"
       paddingLeft={props.depth ? props.depth * 2 : 0}
+      backgroundColor={fill()}
       ref={(element: Renderable) => {
         // A collection row can hold focus and become a region's first stop. `NODE_FOCUS` marks a
         // standalone `Row` as an item, so it has no stop until a collection supplies `item`.

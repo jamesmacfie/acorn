@@ -351,10 +351,17 @@ export default function EditorPane(props: { task: Task }) {
       when={imagePath()}
       fallback={
         <>
-          <SelectionActions select={editor.selectionTarget} isCurrent={editor.selectionIsCurrent}>
-            <Rectangle kind="editor" label="Editor" mount={editor.mountEditor} />
-          </SelectionActions>
+          <Only hosts={['dom']}>
+            <SelectionActions select={editor.selectionTarget} isCurrent={editor.selectionIsCurrent}>
+              <Rectangle kind="editor" label="Editor" mount={editor.mountEditor} />
+            </SelectionActions>
+          </Only>
+          {/* The terminal client has no CodeMirror. A picked file opens in the reader's own editor, so
+              between files the box says so. */}
           <Only hosts={['tui']}>
+            <EmptyState title="Pick a file to open it in your terminal editor">
+              Opens with $EDITOR, then $VISUAL, then vi. Quit the editor to come back here.
+            </EmptyState>
             <Show when={active()} keyed>
               {(path) => (
                 <FileDiagnostics
@@ -452,19 +459,21 @@ export default function EditorPane(props: { task: Task }) {
             actions={
               <>
                 {/* Two glyphs rather than two words, which read as one phrase: a mode switch, and a
-                    send. */}
-                <ToggleButton
-                  iconOnly
-                  variant="bare"
-                  size="sm"
-                  label="Edit in your terminal editor"
-                  tip="Edit in your terminal editor"
-                  tipSub="Uses $EDITOR"
-                  pressed={mode() === 'terminal'}
-                  onPressedChange={(pressed) => void saveEditorMode(queryClient, pressed ? 'terminal' : 'graphical')}
-                >
-                  <Icon name="square-terminal" />
-                </ToggleButton>
+                    send. The terminal client always uses the reader's own editor, so it has no switch. */}
+                <Only hosts={['dom']}>
+                  <ToggleButton
+                    iconOnly
+                    variant="bare"
+                    size="sm"
+                    label="Edit in your terminal editor"
+                    tip="Edit in your terminal editor"
+                    tipSub="Uses $EDITOR"
+                    pressed={mode() === 'terminal'}
+                    onPressedChange={(pressed) => void saveEditorMode(queryClient, pressed ? 'terminal' : 'graphical')}
+                  >
+                    <Icon name="square-terminal" />
+                  </ToggleButton>
+                </Only>
                 {/* Outside the slot, so a contributor can never take the way back to the text. */}
                 <Show when={renderedPath() ? occupied() : editor.rendererOffered()}>
                   <ToggleButton

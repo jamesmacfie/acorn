@@ -58,7 +58,13 @@ import {
   type FileDecision,
 } from './editorDocumentLifecycle'
 import { editorRootKey, EDITOR_ROOT_STALE_MS, type EditorApi } from './editorClient'
-import { readEditorIndentation, readEditorLineBlame, readEditorMode, readEditorWordWrap } from './editorPrefs'
+import {
+  type EditorMode,
+  readEditorIndentation,
+  readEditorLineBlame,
+  readEditorMode,
+  readEditorWordWrap,
+} from './editorPrefs'
 import { createLineAnnotations } from './lineAnnotations'
 import {
   activeFile,
@@ -195,8 +201,9 @@ export function createEditorController(input: EditorControllerInput) {
   })
 
   // Which editor draws an open file. `on` re-fires on identity rather than value, so its source is a
-  // memo and not an inline getter.
-  const mode = createMemo(() => readEditorMode(prefs()))
+  // memo and not an inline getter. The terminal client can't draw CodeMirror, so there a file always
+  // opens in the reader's own editor and the preference only applies to the desktop.
+  const mode = createMemo((): EditorMode => (graphical ? readEditorMode(prefs()) : 'terminal'))
   const imagePath = createMemo(() => (mode() === 'graphical' && imageTypeForPath(active() ?? '') ? active() : null))
   const wantsTerminal = createMemo(() => (mode() === 'terminal' ? active() : null))
   const [ptyPath, setPtyPath] = createSignal<string | null>(null)
@@ -803,11 +810,12 @@ export function createEditorController(input: EditorControllerInput) {
     if (!from || from.path !== path || line !== undefined) navigate(nodeId, taskId, from, to)
   }
   const activatePath = (path: string) => {
-    if (path === active()) return
+    if (path === active()) return reopenEditor(path)
     recordNavigation(path)
     editorActivate(taskId, path)
   }
   function openPath(relPath: string, ephemeral: boolean) {
+    reopenEditor(relPath)
     recordNavigation(relPath)
     editorOpen(taskId, relPath, ephemeral) // the active() effect swaps the surface
   }
@@ -1334,6 +1342,14 @@ export function createEditorController(input: EditorControllerInput) {
       setPtyPath(path)
     }),
   )
+
+  // In the terminal client the box is empty once the reader's editor exits. Picking the same file
+  // again starts it again, because the active path didn't change and `wantsTerminal` won't re-fire.
+  const reopenEditor = (path: string) => {
+    if (graphical || mode() !== 'terminal' || path !== active() || ptyPath()) return
+    pool.externalEditors.add(path)
+    setPtyPath(path)
+  }
 
   const onEditorExit = (path: string, code: number) => {
     pool.externalEditors.delete(path)

@@ -55,9 +55,10 @@ means.
 
 A sandboxed plugin frame has its own document, so the shell's tip can't see elements in it.
 `kit/lib/controls/frameTips.ts` mounts the same delegated listener and bubble into the frame's
-document, as frames already mount their own copy of the shared CSS. It has no framework and no
-imports, because it's reached from `@acorn/plugin-api/ui/sdk`, which bundles into the frame and mustn't
-bring part of the shell or a second Solid. It flips, clamps, and marks help tips the same way.
+document, as frames already mount their own copy of the shared CSS. It has no framework, and its one
+import is `formatChord.ts`, which imports nothing. That matters because it's reached from
+`@acorn/plugin-api/ui/sdk`, which bundles into the frame and mustn't bring part of the shell or a
+second Solid. It flips, clamps, and marks help tips the same way.
 
 ## The help mark
 

@@ -8,8 +8,8 @@ import {
   pairInteractively,
   rememberedNode,
   runningNode,
+  usableLocalToken,
 } from '@acorn/custody/local'
-import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import type { NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
 import { CliError } from './error'
@@ -78,7 +78,7 @@ export function matchingNode(fleet: FleetStore, target: string): FleetNode | und
 }
 
 const localPairingInstructions = (pid: number): string =>
-  `If desktop started the local Node, open Settings > Nodes > Pair another client. ` +
+  `If desktop started the local Node, allow the request in desktop, or get a code from Settings > Nodes > Pair another client. ` +
   `If it is standalone, run kill -USR1 ${pid} and read its terminal output.`
 
 export async function openCliNode(target?: string): Promise<CliNode> {
@@ -129,7 +129,7 @@ export async function openCliNode(target?: string): Promise<CliNode> {
     const prior = fleet.get(running.nodeId)
     if (prior?.fingerprint && prior.fingerprint !== running.fingerprint)
       throw new CliError('identity_mismatch', 'The local Node certificate changed; pairing is required.', 3)
-    const token = tokens.read(LOCAL_TOKEN_SCOPE)
+    const token = await usableLocalToken(running, tokens)
     if (!token) {
       if (!process.stdin.isTTY || !process.stdout.isTTY) {
         throw new CliError(

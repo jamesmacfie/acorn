@@ -40,6 +40,23 @@ describe('agent accounts', () => {
     expect(await accounts.defaultAccount('claude')).toBe('personal')
   })
 
+  it('keeps each account display name and icon, drops them with the account, and shows accounts one way', async () => {
+    expect(await accounts.details('claude')).toEqual({})
+    await accounts.create('claude', 'work')
+    await expect(accounts.setDetails('claude', 'gone', { icon: 'star' })).rejects.toThrow(/not found/)
+    await accounts.setDetails('claude', 'work', { label: 'Work (Acme)', icon: 'briefcase' })
+    await accounts.setDetails('claude', 'work', { icon: null })
+    expect(await accounts.details('claude')).toEqual({ work: { label: 'Work (Acme)' } })
+    expect(await accounts.list('claude')).toEqual(['work'])
+    await accounts.remove('claude', 'work')
+    await accounts.create('claude', 'work')
+    expect(await accounts.details('claude')).toEqual({})
+    expect(await accounts.showAs()).toBe('name')
+    await accounts.setShowAs('icon')
+    expect(await accounts.showAs()).toBe('icon')
+    expect(await accounts.list('claude')).toEqual(['work'])
+  })
+
   it('refuses a name that could leave its folder or break a shell line', () => {
     for (const name of ['../x', 'Work', "it's", '', '-x']) expect(() => accounts.home('claude', name)).toThrow()
   })

@@ -209,8 +209,14 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       const accounts = new AgentAccounts(agentAccountsRoot(dataDir))
       const usageService = createAgentUsageService({
         probeDir,
-        accounts: async (providerId) =>
-          (await accounts.list(providerId)).map((name) => ({ name, home: accounts.home(providerId, name) })),
+        accounts: async (providerId) => {
+          const details = await accounts.details(providerId)
+          return (await accounts.list(providerId)).map((name) => ({
+            name,
+            home: accounts.home(providerId, name),
+            ...(details[name]?.label ? { label: details[name].label } : {}),
+          }))
+        },
         pricingForUser: (userId) => readAgentPricingPreferences(core.prefs, userId),
         onRefreshed: () => ctx.events.send({ channel: pluginChannel('agents', 'usage-refreshed') }),
       })

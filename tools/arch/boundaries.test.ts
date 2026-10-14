@@ -656,8 +656,9 @@ describe('architecture boundaries', () => {
       // tree host, `host/linkPreview/linkPreview`, `host/annotations/statusAnnotations`, and the git pane's
       // task launch signal and draft model. Lazy chunks the desktop registers on their own: each settings
       // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
-      // `LinkPreviewHost` (docs/frontend/startup-budget.md).
-      '@acorn/client-core': 183, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, and the Markdown fence model and view.
+      // `LinkPreviewHost` (docs/frontend/startup-budget.md). The token and style pack stylesheets, which
+      // the browser extension loads without the app's own stylesheet.
+      '@acorn/client-core': 189, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, and the Markdown fence model and view.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
       // (docs/managed-agents/read-block.md).
       '@acorn/node-core': 66,

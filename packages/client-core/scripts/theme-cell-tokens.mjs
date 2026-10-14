@@ -13,7 +13,7 @@ const ids = ['light', 'dark', ...blocks.flatMap((block) => {
   const match = /^:root\[data-theme="([^"]+)"\]$/.exec(block.selector)
   return match && match[1] !== 'dark' ? [match[1]] : []
 })]
-const cellTokens = ['text', 'text-muted', 'accent', 'add-marker', 'warn', 'del-marker']
+const cellTokens = ['text', 'text-muted', 'accent', 'add-marker', 'warn', 'del-marker', 'bg-hover', 'bg-selected']
 const palettes = Object.fromEntries(ids.map((id) => {
   const source = id === 'light' ? find(':root', '--text') : id === 'dark' ? find(':root', '--dark-text') : find(`:root[data-theme="${id}"]`, '--text')
   if (!source) throw new Error(`No CSS theme: ${id}`)

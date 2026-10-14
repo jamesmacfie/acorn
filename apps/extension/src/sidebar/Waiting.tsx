@@ -1,73 +1,90 @@
-import { For, Show, createResource, onCleanup, onMount } from 'solid-js'
-import type { BridgePendingRequest } from '@acorn/protocol/extensionBridge.ts'
-import type { BrowserApi } from '../browser'
+import { For, Show, createEffect, createMemo, createSignal, on } from 'solid-js'
+import type { BridgeAgentRequest, BridgePendingRequest } from '@acorn/protocol/extensionBridge.ts'
+import type { BridgeClient } from './bridgeClient'
+import { Requests } from './Requests'
 
-const NOTIFICATIONS = { permissions: ['notifications'] }
-const KIND_LABELS: Record<string, string> = { permission: 'Permission', question: 'Question', elicitation: 'Question' }
-
-// The requests agents are waiting on for this page's projects, the same ones the toolbar badge counts,
-// and the opt-in for OS notifications of them. Choosing one opens its conversation, where it is
-// answered. docs/browser-extension/notifications.md.
+// Every request the Node's agents are waiting on, across its projects, answered in place with the
+// same cards the conversation draws. Shown only while something waits. docs/browser-extension/notifications.md.
 export function Waiting(props: {
-  permissions: BrowserApi['permissions']
+  client: BridgeClient
+  nodeId: string
   requests: readonly BridgePendingRequest[]
-  // Whose requests these are: the page's projects, or the project chosen for a page with none.
-  scope: string
+  online: boolean
   open(request: BridgePendingRequest): void
 }) {
-  // The browser permission is the opt-in, so turning it off in the browser's settings turns it off here.
-  const [allowed, { refetch }] = createResource(() => props.permissions.contains(NOTIFICATIONS))
-  const onAccess = () => void refetch()
-  onMount(() => {
-    props.permissions.onAdded.addListener(onAccess)
-    props.permissions.onRemoved.addListener(onAccess)
-  })
-  onCleanup(() => {
-    props.permissions.onAdded.removeListener(onAccess)
-    props.permissions.onRemoved.removeListener(onAccess)
-  })
-  // `request` must run inside the person's click, so nothing is awaited before it.
-  // A declined prompt fires no permission event, so the box is set from the browser's answer.
-  const toggle = (box: HTMLInputElement) => {
-    const asked = box.checked ? props.permissions.request(NOTIFICATIONS) : props.permissions.remove(NOTIFICATIONS)
-    void asked
-      .catch(() => false)
-      .then(async () => {
-        box.checked = await props.permissions.contains(NOTIFICATIONS)
-      })
-  }
+  // One group per conversation, in the order its first request arrived.
+  const sessions = createMemo(() => [...new Set(props.requests.map((request) => request.sessionId))])
+  const waitingIn = (sessionId: string) => props.requests.filter((request) => request.sessionId === sessionId)
 
   return (
-    <section class="card" aria-label="Waiting for you">
-      <h2>Waiting for you</h2>
-      <Show when={props.requests.length} fallback={<p class="quiet">No agent is waiting on {props.scope}.</p>}>
-        <ul>
-          <For each={props.requests}>
-            {(request) => (
-              <li>
-                <div>
-                  <strong>{request.title}</strong>
-                  <span class="quiet">
-                    {KIND_LABELS[request.kind] ?? 'Request'} · {request.taskTitle}
-                  </span>
-                </div>
-                <button type="button" class="quiet" onClick={() => props.open(request)}>
-                  Open
-                </button>
-              </li>
-            )}
-          </For>
-        </ul>
+    <Show when={props.requests.length}>
+      <section aria-label="Waiting for you">
+        <h2>Waiting for you</h2>
+        <For each={sessions()}>
+          {(sessionId) => (
+            <WaitingConversation
+              client={props.client}
+              nodeId={props.nodeId}
+              requests={waitingIn(sessionId)}
+              online={props.online}
+              open={props.open}
+            />
+          )}
+        </For>
+      </section>
+    </Show>
+  )
+}
+
+// One conversation's waiting requests. The pending list names them without their buttons or
+// questions, so the conversation's own requests are read whenever the list changes.
+function WaitingConversation(props: {
+  client: BridgeClient
+  nodeId: string
+  requests: readonly BridgePendingRequest[]
+  online: boolean
+  open(request: BridgePendingRequest): void
+}) {
+  // Every request in the group shares its conversation and task.
+  const head = props.requests[0]!
+  const target = { nodeId: props.nodeId, taskId: head.taskId, sessionId: head.sessionId }
+  const [requests, setRequests] = createSignal<BridgeAgentRequest[]>([])
+  const read = async () => {
+    try {
+      // Only the requests: no event is past the end, so the page carries none.
+      const page = await props.client.call({
+        op: 'session.read',
+        nodeId: target.nodeId,
+        sessionId: target.sessionId,
+        afterSeq: Number.MAX_SAFE_INTEGER,
+        limit: 1,
+      })
+      setRequests(page.requests)
+    } catch {
+      // The row still names the request, and Open reaches it in its conversation.
+    }
+  }
+  createEffect(
+    on(
+      () => props.requests.map((request) => request.requestId).join(),
+      () => void read(),
+    ),
+  )
+
+  return (
+    <div class="waiting">
+      <div class="row">
+        <span class="quiet grow">{head.taskTitle}</span>
+        <button type="button" class="link" onClick={() => props.open(head)}>
+          Open
+        </button>
+      </div>
+      <Show
+        when={requests().length}
+        fallback={<For each={props.requests}>{(request) => <p data-testid="waiting-title">{request.title}</p>}</For>}
+      >
+        <Requests client={props.client} target={target} requests={requests()} online={props.online} settled={read} />
       </Show>
-      <label class="row">
-        <input
-          type="checkbox"
-          name="notify"
-          checked={allowed() === true}
-          onChange={(event) => toggle(event.currentTarget)}
-        />
-        Notify me when an agent waits on the projects of the page I'm on
-      </label>
-    </section>
+    </div>
   )
 }

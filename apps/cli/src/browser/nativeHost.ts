@@ -77,6 +77,7 @@ export function runNativeHost(argv: string[]): void {
     hint: (hint) => send({ v: BROWSER_BRIDGE_PROTOCOL_VERSION, event: 'agent', ...hint }),
     handoffsChanged: (nodeId) => send({ v: BROWSER_BRIDGE_PROTOCOL_VERSION, event: 'handoffs', nodeId }),
     projectsChanged: (nodeId) => send({ v: BROWSER_BRIDGE_PROTOCOL_VERSION, event: 'projects', nodeId }),
+    tasksChanged: (nodeId) => send({ v: BROWSER_BRIDGE_PROTOCOL_VERSION, event: 'tasks', nodeId }),
   })
   const close = (code: number): void => {
     bridge.dispose()

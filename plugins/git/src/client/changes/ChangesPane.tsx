@@ -238,54 +238,78 @@ function NotesBanner(props: { model: ChangesModel }) {
   )
 }
 
-function DependencySummary(props: { model: ChangesModel }) {
-  const [open, setOpen] = createSignal(false)
+// What the staged or unstaged dependency files change, as one fold drawn like the secret check's.
+// Silent when the review read everything and found nothing: a reformatted package.json is not news.
+function DependencySummary(props: { model: ChangesModel; taskId: string }) {
   const review = () =>
     !props.model.dependencies || props.model.dependencies.loading || props.model.dependencies.error
       ? undefined
       : props.model.dependencies()
+  const worthShowing = () => {
+    const answer = review()
+    return answer && (answer.findings.length || answer.coverage !== 'complete') ? answer : undefined
+  }
   return (
     <>
       <Show when={props.model.dependencies?.error}>
-        <Text>Dependency review failed. Refresh Changes to retry.</Text>
+        <Alert variant="banner" tone="warn">
+          Dependency review failed. Refresh Changes to retry.
+        </Alert>
       </Show>
-      <Show when={review()}>
+      <Show when={worthShowing()}>
         {(answer) => (
-          <Stack gap="none">
-            <Button variant="ghost" size="sm" onPress={() => setOpen(!open())}>
-              Dependencies: {answer().packageCount} package{answer().packageCount === 1 ? '' : 's'},{' '}
-              {answer().findings.length} finding{answer().findings.length === 1 ? '' : 's'} · {answer().coverage} ·{' '}
-              {answer().scope}
-            </Button>
-            <Show when={open()}>
-              <Text>
-                {answer().manager}
-                {answer().managerVersion ? ` ${answer().managerVersion}` : ''}. Advisory review; integrity is not
-                provenance.
-              </Text>
-              <For each={answer().findings}>
-                {(finding) => (
-                  <Stack gap="none">
-                    <Text>
-                      {finding.warning ? 'Warning · ' : ''}
-                      {finding.kind}: {finding.name} {finding.before ?? 'absent'} → {finding.after ?? 'absent'}
+          <Fold
+            label="Dependencies"
+            count={answer().findings.length}
+            meta={
+              <Show when={answer().coverage !== 'complete'}>
+                <Text emphasis="muted">{answer().coverage === 'partial' ? 'partly checked' : 'not supported'}</Text>
+              </Show>
+            }
+            contentIndent="none"
+            persistKey="changes.dependencies"
+          >
+            <Rows
+              id={`changes.${props.taskId}.dependencies`}
+              ariaLabel="Dependency changes"
+              items={answer().findings.map((finding, index) => ({ key: String(index), label: finding.name, finding }))}
+            >
+              {(entry, item) => (
+                <Row
+                  item={item}
+                  variant="stacked"
+                  label={`Show ${entry.finding.path}`}
+                  onPress={() => props.model.select({ path: entry.finding.path, staged: answer().scope === 'staged' })}
+                >
+                  <Text emphasis="mono">
+                    {entry.finding.name} {entry.finding.before ?? 'absent'} → {entry.finding.after ?? 'absent'}
+                  </Text>
+                  <Text emphasis="muted">
+                    {entry.finding.warning ? 'Warning · ' : ''}
+                    {entry.finding.kind} · {entry.finding.path}
+                  </Text>
+                  <Show when={entry.finding.detail}>
+                    <Text emphasis="muted" wrap>
+                      {entry.finding.detail}
                     </Text>
-                    <Show when={finding.detail}>
-                      <Text>{finding.detail}</Text>
-                    </Show>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onPress={() => props.model.select({ path: finding.path, staged: answer().scope === 'staged' })}
-                    >
-                      {finding.path}
-                    </Button>
-                  </Stack>
+                  </Show>
+                </Row>
+              )}
+            </Rows>
+            <Stack gap="none">
+              <Text emphasis="muted" wrap>
+                Checked with {answer().manager}
+                {answer().managerVersion ? ` ${answer().managerVersion}` : ''}. Advisory only.
+              </Text>
+              <For each={answer().limits}>
+                {(limit) => (
+                  <Text emphasis="muted" wrap>
+                    {limit}
+                  </Text>
                 )}
               </For>
-              <For each={answer().limits}>{(limit) => <Text>{limit}</Text>}</For>
-            </Show>
-          </Stack>
+            </Stack>
+          </Fold>
         )}
       </Show>
     </>
@@ -676,7 +700,7 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
     <Show when={model().isGit()}>
       <Stack gap="none">
         <NotesBanner model={model()} />
-        <DependencySummary model={model()} />
+        <DependencySummary model={model()} taskId={props.task.id} />
         <SecretCheckSummary model={model()} taskId={props.task.id} />
         {SECTIONS.map(({ key, title }) => (
           <Show when={sectionOf(key)}>
