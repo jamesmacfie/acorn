@@ -123,6 +123,7 @@
     "railMarkers": [
       "agents",
       "docker",
+      "pr-status",
       "changes",
       "workflows.task-groups"
     ],
@@ -261,6 +262,9 @@
       ],
       "refPanels": [
         "github-pull"
+      ],
+      "railMarkers": [
+        "pr-status"
       ],
       "persistedStateSlices": [
         "github.pr-filters"
