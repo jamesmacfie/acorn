@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { runtimeTone, subagentTone } from './stateTone'
+import { runtimeTone } from '../../contract/runtimeState.ts'
+import { subagentTone } from './stateTone'
 
 describe('agent state tones', () => {
   it('renders completed subagents with the same muted tone as completed sessions', () => {

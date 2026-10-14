@@ -9,7 +9,9 @@ export function extensionManifest(browser: BridgeBrowser, version: string) {
     name: 'Acorn',
     version,
     description: 'Work with Acorn agents beside the page you are reading.',
-    action: { default_title: 'Open Acorn' },
+    // Firefox draws a puzzle piece for an action or sidebar that names no icon of its own.
+    icons: { 128: 'icon-128.png' },
+    action: { default_title: 'Open Acorn', default_icon: 'icon-128.png' },
     // Private windows stay out of reach in this release.
     incognito: 'not_allowed',
     // Page capture reads the tab the toolbar button or the right-click entry was clicked on
@@ -31,7 +33,7 @@ export function extensionManifest(browser: BridgeBrowser, version: string) {
     ...shared,
     permissions: ['nativeMessaging', 'storage', 'activeTab', 'scripting', 'contextMenus'],
     background: { scripts: ['background.js'], type: 'module' },
-    sidebar_action: { default_title: 'Acorn', default_panel: 'sidebar.html', open_at_install: false },
+    sidebar_action: { default_title: 'Acorn', default_icon: 'icon-128.png', default_panel: 'sidebar.html', open_at_install: false },
     browser_specific_settings: {
       gecko: {
         id: FIREFOX_EXTENSION_ID,

@@ -9,7 +9,7 @@ import type { AgentSession } from '../contract/wire.ts'
 import { isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { managedAgentStore } from './sessions/managedStore'
 import { AGENT_PANE_ID } from './paneIdentity'
-import { runtimeIcon } from './sessions/stateTone'
+import { runtimeIcon } from '../contract/runtimeState.ts'
 
 export type AgentRailState = { working: number; attention: number }
 

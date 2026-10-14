@@ -1,4 +1,4 @@
-import { Show, batch, createEffect, createMemo, createSignal, on, onMount } from 'solid-js'
+import { Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
 import type { ProjectSite } from '@acorn/protocol/siteAssociations.ts'
 import type {
   BridgeAgentHint,
@@ -14,16 +14,18 @@ import { CallFailure, type RequestTarget } from '../messages'
 import { loadSiteChoices, pageScope, saveSiteChoices, type SiteChoices } from '../pageScope'
 import type { PageTask } from '../taskPages'
 import type { BridgeClient } from './bridgeClient'
-import { CaptureFailure, withCapture, type CaptureKind, type PageCapture } from '../capture'
+import { CaptureFailure, withCapture, type PageCapture } from '../capture'
 import { Conversation } from './Conversation'
+import type { Heading } from './Header'
 import { errorGuidance } from './guidance'
-import { Agents, CurrentTask, ThisPage, lastLines } from './Home'
+import { Agents, CurrentTask, ThisPage } from './Home'
 import { changeDraft, loadDestination, saveDestination, type Destination } from '../localState'
 import { Waiting } from './Waiting'
 
 // The work on one Node: the current task, the page beside the panel, and the conversations of the
-// page's task, or of the current task on its project's site. Home shows them; opening a
-// conversation makes its task current and replaces Home until the person goes back. The parent mounts one
+// page's task, or of the current task on its project's site. Home shows the page and the current task;
+// Agents lists the conversations. Opening a conversation makes its task current, shows Agents, and
+// replaces the list until the person goes back. The parent mounts one
 // per selected Node, and again each time Settings closes, so it restores the current task from
 // storage. Each list read checks on its return that the choice it was made for is still the choice,
 // so a slow reply can't fill the wrong list.
@@ -37,7 +39,12 @@ export function Workspace(props: {
   hint: BridgeAgentHint | null
   reconnects: number
   projectChanges: number
-  capture(kind: CaptureKind): Promise<PageCapture>
+  // The bottom bar's tab, asking for Agents when a conversation opens, and Agents' top bar heading.
+  tab: 'home' | 'agents'
+  showAgents(): void
+  // The remembered conversation came back as the panel opened.
+  resumed(): void
+  heading(heading: Heading | null): void
   // The page beside the panel, when it may be read, with the handoffs and site associations it is
   // matched against here in the browser.
   pageUrl: string | undefined
@@ -182,6 +189,7 @@ export function Workspace(props: {
       void loadTasks(target.projectId)
     }
     setCurrent({ projectId: target.projectId, taskId: forTask, sessionId: id })
+    props.showAgents()
     remember()
   }
 
@@ -204,7 +212,10 @@ export function Workspace(props: {
       remember()
       const newest = list[0]
       if (newest) void openSession({ projectId, taskId }, newest.id)
-      else setNewChat(true)
+      else {
+        setNewChat(true)
+        props.showAgents()
+      }
     })
 
   // A handoff's linked or new task, with the item's context waiting for the conversation.
@@ -234,6 +245,7 @@ export function Workspace(props: {
     }
     void restore(projectId, taskId, (list) => {
       if (list.some((session) => session.id === sessionId)) showSession(sessionId)
+      props.showAgents()
       remember()
     })
   }
@@ -243,6 +255,7 @@ export function Workspace(props: {
     void saveDestination(props.api.storage.local, nodeId, target)
     void restore(target.projectId, target.taskId, (list) => {
       if (list.some((session) => session.id === target.sessionId)) showSession(target.sessionId!)
+      props.showAgents()
     })
   }
   createEffect(
@@ -343,7 +356,9 @@ export function Workspace(props: {
     // A request opened from a notification while this loaded chose already.
     if (chosen || !remembered.projectId || !remembered.taskId) return
     void restore(remembered.projectId, remembered.taskId, (list) => {
-      if (list.some((session) => session.id === remembered.sessionId)) showSession(remembered.sessionId!)
+      if (!list.some((session) => session.id === remembered.sessionId)) return
+      showSession(remembered.sessionId!)
+      props.resumed()
     })
   })
 
@@ -384,9 +399,13 @@ export function Workspace(props: {
   const task = () => taskLists()[current().projectId ?? '']?.find((row) => row.id === current().taskId) ?? null
   const session = () => sessionLists()[current().taskId ?? '']?.find((row) => row.id === current().sessionId) ?? null
   const projectName = (id: string) => projects()?.find((row) => row.id === id)?.name ?? id
-  const lines = lastLines((sessionId, afterSeq, limit) =>
-    props.client.call({ op: 'session.read', nodeId, sessionId, afterSeq, limit }),
-  )
+  // Agents names the list and its count in the top bar. An open conversation names itself.
+  createEffect(() => {
+    if (current().sessionId) return
+    const { taskId } = agentsTask()
+    props.heading({ title: 'Agents', count: taskId ? sessionLists()[taskId]?.length : undefined })
+  })
+  onCleanup(() => props.heading(null))
 
   return (
     <>
@@ -395,57 +414,74 @@ export function Workspace(props: {
           {problem()}
         </p>
       </Show>
-      <Show
-        when={current().sessionId}
-        keyed
-        fallback={
-          <div class="view" aria-label="Home">
-            <Waiting
+      <Show when={props.tab === 'home'}>
+        <div class="view" aria-label="Home">
+          <Waiting
+            client={props.client}
+            nodeId={nodeId}
+            requests={props.requests}
+            online={props.online}
+            open={(request) => openConversation(request)}
+          />
+          {/* A page tied to no task, item, or project shows only the Acorn mark. */}
+          <Show
+            when={pageMatched()}
+            fallback={
+              <div class="idle">
+                <img src="icon-128.png" alt="Acorn" />
+              </div>
+            }
+          >
+            <ThisPage
               client={props.client}
               nodeId={nodeId}
-              requests={props.requests}
               online={props.online}
-              open={(request) => openConversation(request)}
+              opensLinks={props.opensLinks}
+              pageUrl={props.pageUrl}
+              handoffs={props.handoffs}
+              pageTasks={props.pageTasks}
+              markerHidden={props.markerHidden}
+              showMarker={props.showMarker}
+              projectName={projectName}
+              chat={chatInTask}
+              handoff={props.handoff}
+              startHandoff={props.startHandoff}
+              dismissHandoff={props.dismissHandoff}
+              openHandoffTask={openHandoffTask}
+              startedHandoffTask={(...args) => void startedHandoffTask(...args)}
+              waitingContext={props.waitingContext}
+              dropWaitingContext={() => props.setWaitingContext(null)}
+              projects={projects()}
+              suggested={scope().suggested}
+              onSite={onSite()}
+              several={!pageProject() && pageProjects().length > 1}
+              project={pageProject()}
+              pickProject={pickProject}
+              tasks={pageProject() ? (taskLists()[pageProject()!] ?? null) : null}
+              currentTaskId={current().taskId}
+              pickTask={pickTask}
             />
-            {/* A page tied to no task, item, or project shows only the Acorn mark. */}
-            <Show
-              when={pageMatched()}
-              fallback={
-                <div class="idle">
-                  <img src="icon-128.png" alt="Acorn" />
-                </div>
-              }
-            >
-              <ThisPage
-                client={props.client}
-                nodeId={nodeId}
-                online={props.online}
-                opensLinks={props.opensLinks}
-                pageUrl={props.pageUrl}
-                handoffs={props.handoffs}
-                pageTasks={props.pageTasks}
-                markerHidden={props.markerHidden}
-                showMarker={props.showMarker}
-                projectName={projectName}
-                chat={chatInTask}
-                handoff={props.handoff}
-                startHandoff={props.startHandoff}
-                dismissHandoff={props.dismissHandoff}
-                openHandoffTask={openHandoffTask}
-                startedHandoffTask={(...args) => void startedHandoffTask(...args)}
-                waitingContext={props.waitingContext}
-                dropWaitingContext={() => props.setWaitingContext(null)}
-                projects={projects()}
-                suggested={scope().suggested}
-                onSite={onSite()}
-                several={!pageProject() && pageProjects().length > 1}
-                project={pageProject()}
-                pickProject={pickProject}
-                tasks={pageProject() ? (taskLists()[pageProject()!] ?? null) : null}
-                currentTaskId={current().taskId}
-                pickTask={pickTask}
+            {/* The task the person last used stays pinned when the page is not its own. */}
+            <Show when={!pageTask() || (current().taskId && current().taskId !== pageTask()!.task.id)}>
+              <CurrentTask
+                task={task()}
+                projectName={current().projectId ? projectName(current().projectId!) : null}
               />
-              <Show when={agentsTask().taskId} keyed>
+            </Show>
+          </Show>
+        </div>
+      </Show>
+      <Show when={props.tab === 'agents'}>
+        <Show
+          when={current().sessionId}
+          keyed
+          fallback={
+            <div class="view" aria-label="Agents">
+              <Show
+                when={agentsTask().taskId}
+                keyed
+                fallback={<p class="empty quiet">This page belongs to no task. Choose one under Home.</p>}
+              >
                 {(taskId) => {
                   const target = () => ({ projectId: agentsTask().projectId!, taskId })
                   return (
@@ -456,7 +492,6 @@ export function Workspace(props: {
                       online={props.online}
                       sessions={sessionLists()[taskId] ?? null}
                       requests={props.requests}
-                      lines={lines}
                       open={(id) => void openSession(target(), id)}
                       newChat={newChat()}
                       setNewChat={setNewChat}
@@ -472,32 +507,43 @@ export function Workspace(props: {
                   )
                 }}
               </Show>
-              {/* The task the person last used stays pinned when the page is not its own. */}
-              <Show when={!pageTask() || (current().taskId && current().taskId !== pageTask()!.task.id)}>
-                <CurrentTask
-                  task={task()}
-                  projectName={current().projectId ? projectName(current().projectId!) : null}
-                />
+            </div>
+          }
+        >
+          {(sessionId) => (
+            <>
+              {/* The page beside the panel belongs to another task. The conversation stays, because pages
+                  are often visited to capture them into it; Switch opens that task, and drafts are kept. */}
+              <Show when={pageTask() && pageTask()!.task.id !== current().taskId ? pageTask() : null}>
+                {(other) => (
+                  <div class="banner notice row" role="status">
+                    <span class="grow">This page is in task {other().task.title}.</span>
+                    <button
+                      type="button"
+                      class="quiet"
+                      onClick={() => chatInTask(other().task.projectId, other().task.id)}
+                    >
+                      Switch
+                    </button>
+                  </div>
+                )}
               </Show>
-            </Show>
-          </div>
-        }
-      >
-        {(sessionId) => (
-          <Conversation
-            client={props.client}
-            storage={props.api.storage}
-            target={{ nodeId, taskId: current().taskId!, sessionId }}
-            session={session()!}
-            taskTitle={task()?.title ?? ''}
-            back={back}
-            online={props.online}
-            opensLinks={props.opensLinks}
-            hint={props.hint}
-            reconnects={props.reconnects}
-            capture={props.capture}
-          />
-        )}
+              <Conversation
+                client={props.client}
+                storage={props.api.storage}
+                target={{ nodeId, taskId: current().taskId!, sessionId }}
+                session={session()!}
+                taskTitle={task()?.title ?? ''}
+                back={back}
+                heading={props.heading}
+                online={props.online}
+                opensLinks={props.opensLinks}
+                hint={props.hint}
+                reconnects={props.reconnects}
+              />
+            </>
+          )}
+        </Show>
       </Show>
     </>
   )

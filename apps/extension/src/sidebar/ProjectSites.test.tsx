@@ -14,6 +14,7 @@ import {
   openSettings,
   pick,
   selected,
+  tab,
   useNode,
   useTask,
 } from '../test/sidebarUi'
@@ -33,6 +34,7 @@ const session: BridgeAgentSession = {
   title: 'Chat s1',
   providerId: 'claude',
   profileId: 'claude-code',
+  model: null,
   kind: 'interactive',
   inline: false,
   runtimeState: 'ready',
@@ -238,8 +240,9 @@ describe('project suggestions for a site', () => {
 
     fake.navigate('http://localhost:5173/admin/users')
     await settle(20)
-    expect(conversationTitle(root)).toBe('Claude · Chat s1')
+    expect(conversationTitle(root)).toBe('Chat s1')
     await back(root)
+    await tab(root, 'Home')
     // This page follows the page; the current task stays.
     expect(selected(root, 'project')).toBe('p2')
     expect(currentTask(root)).toBe('Fix login')
@@ -353,7 +356,7 @@ describe('requests waiting on the Node', () => {
 
     button(root.querySelector('[aria-label="Waiting for you"]')!, 'Open')!.click()
     await settle(40)
-    expect(conversationTitle(root)).toBe('Claude · Chat s1')
+    expect(conversationTitle(root)).toBe('Chat s1')
   })
 
   it("asks for notifications only from the person's click, and opens a clicked notification's conversation", async () => {
@@ -373,7 +376,7 @@ describe('requests waiting on the Node', () => {
     // The click leaves Settings for the request's conversation.
     fake.clickNotification('acorn-request:s1:r1')
     await settle(40)
-    expect(conversationTitle(root)).toBe('Claude · Chat s1')
+    expect(conversationTitle(root)).toBe('Chat s1')
 
     await openSettings(root)
     notify().checked = false
@@ -418,23 +421,27 @@ describe('This page', () => {
     expect(thisPage(root).textContent).toContain('Task in Web · fix/login')
     // A development build copies the link Open in Acorn would follow, onto the pull request's pane.
     expect(button(thisPage(root), 'Copy Acorn link')!.title).toBe('acorn://n1/t/t1?pane=pr')
-    expect(agentRows(root)).toEqual(['Claude · Chat s1'])
     // Nothing is current yet, and the page's task needs no second mention.
     expect(root.querySelector('[aria-label="Current task"]')).toBeNull()
+    await tab(root, 'Agents')
+    expect(agentRows(root)).toEqual(['Chat s1'])
     // The list came from the Node; the page's address didn't go to it.
     expect(state.requests.some((request) => request.op === 'tasks.pages')).toBe(true)
     expect(JSON.stringify(state.requests)).not.toContain('/pull/7')
 
-    // Chat opens the task's newest conversation, which makes it the current task.
+    // Chat opens the task's newest conversation on Agents, which makes it the current task.
+    await tab(root, 'Home')
     button(thisPage(root), 'Chat')!.click()
     await settle(30)
-    expect(conversationTitle(root)).toBe('Claude · Chat s1')
+    expect(conversationTitle(root)).toBe('Chat s1')
     await back(root)
-    // A page that matches nothing shows only the Acorn mark. The task stays current for captures.
+    // A page that matches nothing lists no conversations, and Home shows only the Acorn mark. The task
+    // stays current for captures.
     fake.navigate('https://example.com/')
     await settle(20)
-    expect(idle(root)).toBe(true)
     expect(agentRows(root)).toEqual([])
+    await tab(root, 'Home')
+    expect(idle(root)).toBe(true)
     expect(fake.storage.get('destination:n1')).toMatchObject({ taskId: 't1' })
   })
 
@@ -451,18 +458,20 @@ describe('This page', () => {
     await settle(30)
     button(thisPage(root), 'Chat')!.click()
     await settle(30)
-    expect(conversationTitle(root)).toBe('Claude · Chat s1')
-    // The other task has no conversation, so Home opens on its new-chat picker.
+    expect(conversationTitle(root)).toBe('Chat s1')
+    // The other task has no conversation, so Agents opens on its new-chat picker.
     fake.navigate('https://github.com/acme/web/pull/9')
     await settle(30)
     expect(root.querySelector('[aria-label="Conversation"]')).toBeNull()
-    expect(thisPage(root).querySelector('strong')!.textContent).toBe('Speed up search')
-    expect(button(root.querySelector('[aria-label="Agents"]')!, 'Cancel')).toBeDefined()
+    expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'Cancel')).toBeDefined()
     expect(fake.storage.get('destination:n1')).toMatchObject({ taskId: 't2' })
-    // With no conversation open, Home's Agents follows the page on its own.
+    await tab(root, 'Home')
+    expect(thisPage(root).querySelector('strong')!.textContent).toBe('Speed up search')
+    // With no conversation open, Agents follows the page on its own.
     fake.navigate('https://github.com/acme/web/pull/7/files')
     await settle(30)
-    expect(agentRows(root)).toEqual(['Claude · Chat s1'])
+    await tab(root, 'Agents')
+    expect(agentRows(root)).toEqual(['Chat s1'])
   })
 
   it('reads the list again when the Node says a task changed', async () => {
@@ -505,9 +514,11 @@ describe('This page', () => {
     fake.sendFromPage({ type: 'acorn:chip', key: 'github:pull', action: 'chat' })
     await settle(30)
     expect(root.querySelector('.view[aria-label="Settings"]')).toBeNull()
+    // The new-chat picker is Agents'; Home names the page waiting for the chat.
+    expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'Cancel')).toBeDefined()
+    await tab(root, 'Home')
     expect(thisPage(root).querySelector('strong')!.textContent).toBe('Fix login')
     expect(root.querySelector('[aria-label="Waiting context"]')!.textContent).toContain('Page goes into the draft')
-    expect(button(root.querySelector('[aria-label="Agents"]')!, 'Cancel')).toBeDefined()
   })
 
   it("shows a local app's branch, task, and stack, links to the plugin's pane, and asks for its site", async () => {

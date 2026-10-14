@@ -18,14 +18,19 @@ export async function pick(root: ParentNode, name: string, value: string) {
   await settle(20)
 }
 
-export async function openSettings(root: ParentNode) {
-  button(root.querySelector('header')!, 'Settings')!.click()
+// Switches views from the bottom bar: Home, Agents, or Settings.
+export async function tab(root: ParentNode, label: 'Home' | 'Agents' | 'Settings') {
+  button(root.querySelector('nav')!, label)!.click()
   await settle(20)
 }
 
-// Back from Settings or a conversation.
+export const openSettings = (root: ParentNode) => tab(root, 'Settings')
+
+// Back from a conversation to the Agents list, or from Settings to Home.
 export async function back(root: ParentNode) {
-  button(root.querySelector('.view-head')!, 'Back')!.click()
+  const fromConversation = button(root.querySelector('header')!, 'Back')
+  if (!fromConversation) return tab(root, 'Home')
+  fromConversation.click()
   await settle(20)
 }
 
@@ -50,11 +55,12 @@ export async function rememberTask(root: ParentNode, storage: Map<string, unknow
   await back(root)
 }
 
-// Opens a conversation from Agents, going back to Home first when one is open.
+// Opens a conversation from Agents, going back to the list first when one is open.
 export async function openChat(root: ParentNode, title: string) {
   if (root.querySelector('[aria-label="Conversation"]')) await back(root)
+  else await tab(root, 'Agents')
   const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Agents"] .row-button')]
-  rows.find((row) => row.querySelector('strong')?.textContent?.endsWith(` · ${title}`))!.click()
+  rows.find((row) => row.querySelector('strong')?.textContent === title)!.click()
   await settle(20)
 }
 
@@ -63,5 +69,8 @@ export async function openChat(root: ParentNode, title: string) {
 export const idle = (root: ParentNode) => root.querySelector('[aria-label="Home"] .idle') !== null
 export const currentTask = (root: ParentNode) =>
   root.querySelector('[aria-label="Current task"] strong')?.textContent ?? null
+// An open conversation's title, as the top bar names it.
 export const conversationTitle = (root: ParentNode) =>
-  root.querySelector('[aria-label="Conversation"] .subhead .grow')?.textContent ?? null
+  root.querySelector('[aria-label="Conversation"]')
+    ? (root.querySelector('header .heading[data-eyebrow] h1')?.textContent ?? null)
+    : null

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentConfigOption, AgentSession } from '../../contract/wire.ts'
-import { sameAgentConfigOptions, sessionModelLabel, sessionModelSummary } from './agentConfigOptions'
+import { sessionModelLabel, sessionModelSummary } from '../../contract/sessionModel.ts'
+import { sameAgentConfigOptions } from './agentConfigOptions'
 
 const options = (): AgentConfigOption[] => [
   {

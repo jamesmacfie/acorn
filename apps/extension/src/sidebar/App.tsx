@@ -1,4 +1,4 @@
-import { Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type {
   BridgeAgentHint,
@@ -8,15 +8,16 @@ import type {
   BridgePendingRequest,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
+import { RailTab } from '@acorn/client-core/features/tabs/RailTab.tsx'
 import type { BrowserApi } from '../browser'
 import { HIDDEN_MARKERS_KEY, type PageHandoff } from '../handoffs'
 import { CallFailure, type CallError, type HostState, type RequestTarget } from '../messages'
 import { pageTasks } from '../taskPages'
 import { activePageUrl } from './activePage'
 import { bridgeClient } from './bridgeClient'
-import { capturePage, type PageCapture } from '../capture'
+import type { PageCapture } from '../capture'
 import { INSTALL_COMMAND, errorGuidance, hostGuidance, installFixes, statusGuidance } from './guidance'
-import { Header } from './Header'
+import { Header, type Heading } from './Header'
 import { Pairing } from './Pairing'
 import { Settings } from './Settings'
 import { Workspace } from './Workspace'
@@ -26,6 +27,12 @@ const BRIDGE_RECHECK_MS = 3_000
 
 // Online, or online with live updates paused: either way the Node answers requests.
 const connected = (status: NodeStatus | null) => status?.state === 'online' || status?.state === 'degraded'
+
+const TABS = [
+  { id: 'home', label: 'Home', glyph: 'house' },
+  { id: 'agents', label: 'Agents', glyph: 'bot' },
+  { id: 'settings', label: 'Settings', glyph: 'settings' },
+] as const
 
 // `opensLinks` says whether this build runs beside a desktop that opens `acorn://` links.
 export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
@@ -72,8 +79,19 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [showTask, setShowTask] = createSignal<{ chat: { url: string; title: string } | null } | null>(null)
   // A handed-off item's context, waiting for the conversation the person opens next.
   const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
-  // Settings replaces Home or the open conversation, which restores from storage when it closes.
-  const [settings, setSettings] = createSignal(false)
+  // The bottom bar's choice. Home and Agents share one Workspace; Settings replaces it, and the
+  // Workspace restores from storage when Settings closes.
+  const [view, setView] = createSignal<'home' | 'agents' | 'settings'>('home')
+  // Whether the person has picked a tab since the panel opened. Until then, a remembered conversation
+  // reopens on Agents; after, it waits there without moving them.
+  let picked = false
+  // What Agents names in the top bar: the list and its count, or the open conversation.
+  const [agentsHeading, setAgentsHeading] = createSignal<Heading | null>(null)
+  const heading = (): Heading => {
+    if (view() === 'settings') return { title: 'Settings' }
+    if (view() === 'home') return { title: 'Home' }
+    return agentsHeading() ?? { title: 'Agents' }
+  }
   // The origins the branch marker is hidden on. Its own menu hides it, and This page shows it again.
   const [hiddenMarkers, setHiddenMarkers] = createSignal<string[]>([])
   const readHiddenMarkers = (value: unknown) =>
@@ -101,7 +119,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     agents: (next) => next.nodeId === fleet()?.activeNodeId && setHint(next),
     handoff: (next) => {
       setHandoff(next)
-      setSettings(false)
+      setView('home')
     },
     handoffsChanged: (nodeId) => nodeId === fleet()?.activeNodeId && void loadHandoffs(nodeId),
     projectsChanged: (nodeId) => {
@@ -114,13 +132,14 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     open: (target) => {
       setNotice(null)
       setOpenRequest(target)
-      setSettings(false)
+      setView('agents')
     },
     notice: setNotice,
     taskPages: (nodeId, tasks) => setTaskPages({ nodeId, tasks }),
     showTask: (chat) => {
       setShowTask({ chat })
-      setSettings(false)
+      // A new chat about the page starts in Agents; the page's task alone shows on Home.
+      setView(chat ? 'agents' : 'home')
       setPairing(false)
     },
   })
@@ -196,16 +215,12 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   return (
     <main>
       <Header
+        heading={heading()}
         fleet={fleet()}
         status={status()}
-        settingsOpen={settings()}
         select={(nodeId) => void select(nodeId)}
         pair={() => setPairing(true)}
         forget={(nodeId) => void forget(nodeId)}
-        toggleSettings={() => {
-          setPairing(false)
-          setSettings((open) => !open)
-        }}
       />
       {/* One line for anything wrong with the bridge or the Node, with the next step. */}
       <Show when={hostGuidance(host())}>
@@ -256,12 +271,12 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
           </p>
         )}
       </Show>
-      <Show when={fleet() && !fleet()!.activeNodeId && !settings() && !pairing()}>
+      <Show when={fleet() && !fleet()!.activeNodeId && view() !== 'settings' && !pairing()}>
         <div class="banner notice row">
           <span class="grow">
             {fleet()!.nodes.length ? 'Choose a Node to work with.' : 'No Node is paired with this browser yet.'}
           </span>
-          <button type="button" onClick={() => (fleet()!.nodes.length ? setSettings(true) : setPairing(true))}>
+          <button type="button" onClick={() => (fleet()!.nodes.length ? setView('settings') : setPairing(true))}>
             {fleet()!.nodes.length ? 'Choose a Node' : 'Pair a Node'}
           </button>
         </div>
@@ -285,7 +300,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
         }
       >
         <Show
-          when={settings()}
+          when={view() === 'settings'}
           fallback={
             <Show when={fleet()?.activeNodeId} keyed>
               {(nodeId) => (
@@ -298,7 +313,10 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   hint={hint()}
                   reconnects={reconnects()}
                   projectChanges={projectChanges()}
-                  capture={(kind) => capturePage(props.api, kind)}
+                  tab={view() === 'agents' ? 'agents' : 'home'}
+                  showAgents={() => setView('agents')}
+                  resumed={() => !picked && setView('agents')}
+                  heading={setAgentsHeading}
                   pageUrl={pageUrl()}
                   handoffs={handoffs()}
                   sites={sites()}
@@ -340,10 +358,27 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
               const nodeId = fleet()?.activeNodeId
               if (nodeId) sitesChanged(nodeId, projectId, changed)
             }}
-            close={() => setSettings(false)}
           />
         </Show>
       </Show>
+      {/* The desktop rail's controls, laid along the bottom edge, Settings apart at the far end. */}
+      <nav class="rail" aria-label="Navigation">
+        <For each={TABS}>
+          {(tab) => (
+            <RailTab
+              glyph={tab.glyph}
+              label={tab.label}
+              active={view() === tab.id}
+              aria-current={view() === tab.id ? 'page' : undefined}
+              onClick={() => {
+                picked = true
+                setPairing(false)
+                setView(tab.id)
+              }}
+            />
+          )}
+        </For>
+      </nav>
     </main>
   )
 }

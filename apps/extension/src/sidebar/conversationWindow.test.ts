@@ -55,6 +55,7 @@ function ledger(last: number) {
         title: 'Chat',
         providerId: 'p',
         profileId: 'p',
+        model: null,
         kind: 'interactive',
         inline: false,
         runtimeState: 'ready',

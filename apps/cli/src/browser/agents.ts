@@ -16,6 +16,7 @@ import {
   sentOptionId,
 } from '@acorn/plugin-agents/contract/appApproval.ts'
 import type { AgentLifecycleFrame } from '@acorn/plugin-agents/contract/lifecycle.ts'
+import { sessionModelSummary } from '@acorn/plugin-agents/contract/sessionModel.ts'
 import type {
   BridgeAgentHint,
   BridgeAgentProfile,
@@ -29,8 +30,8 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 
 // The agents plugin's route bodies, narrowed to what the sidebar draws. The types are that plugin's
-// contract. The only code the CLI bundle takes from it is the app-access wording in its contract, so
-// the sidebar describes a grant in the same words as the desktop.
+// contract. The only code the CLI bundle takes from it is the app-access wording and the model line in
+// its contract, so the sidebar describes a grant and a session in the same words as the desktop.
 
 export const agentsRoute = '/v1/p/agents'
 export const sessionRoute = (sessionId: string) => `${agentsRoute}/sessions/${encodeURIComponent(sessionId)}`
@@ -76,6 +77,7 @@ export const bridgeSession = (session: AgentSession): BridgeAgentSession => ({
   title: session.title,
   providerId: session.providerId,
   profileId: session.profileId,
+  model: sessionModelSummary(session) ?? null,
   kind: session.kind,
   inline: session.origin?.kind === 'inline-diff',
   runtimeState: session.runtimeState,

@@ -1,9 +1,9 @@
-import { For, Show, createSignal, onCleanup, onMount, type JSX } from 'solid-js'
+import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
 import { TURN_TEXT_MAX_CHARS } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
 import { CallFailure, isUncertain } from '../messages'
 import type { BridgeClient } from './bridgeClient'
-import { CaptureFailure, screenshotData, turnInput, withCapture, type CaptureKind, type PageCapture } from '../capture'
+import { screenshotData, turnInput, type PageCapture } from '../capture'
 import { errorGuidance } from './guidance'
 import {
   acknowledged,
@@ -14,36 +14,6 @@ import {
   type Draft,
   type DraftTarget,
 } from '../localState'
-
-const CAPTURE_LABELS: Record<CaptureKind, string> = {
-  link: 'Add page link to chat',
-  selection: 'Add selected text to chat',
-  screenshot: 'Add screenshot to chat',
-}
-
-// Lucide's link, text-cursor, and camera glyphs, drawn in the text colour.
-// Functions, so each composer draws its own nodes.
-const CAPTURE_ICONS: Record<CaptureKind, () => JSX.Element> = {
-  link: () => (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-    </svg>
-  ),
-  selection: () => (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M17 22h-1a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h1" />
-      <path d="M7 22h1a4 4 0 0 0 4-4v-1" />
-      <path d="M7 2h1a4 4 0 0 1 4 4v1" />
-    </svg>
-  ),
-  screenshot: () => (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-      <circle cx="12" cy="13" r="3" />
-    </svg>
-  ),
-}
 
 const CAPTURE_NAMES: Record<PageCapture['kind'], string> = {
   link: 'Page',
@@ -62,9 +32,6 @@ export function Composer(props: {
   client: BridgeClient
   storage: BrowserApi['storage']
   target: DraftTarget
-  // Where a message goes, named under the message box.
-  destination: string
-  capture(kind: CaptureKind): Promise<PageCapture>
   // Why sending is off right now, or null.
   blocked: string | null
   // A send finished, either way. The conversation reads itself again.
@@ -74,7 +41,6 @@ export function Composer(props: {
   const [draft, setDraft] = createSignal<Draft>({ text: '' })
   const [loaded, setLoaded] = createSignal(false)
   const [sending, setSending] = createSignal(false)
-  const [capturing, setCapturing] = createSignal<CaptureKind | null>(null)
   const [note, setNote] = createSignal<string | null>(null)
   let mounted = true
   let typed = false
@@ -126,24 +92,6 @@ export function Composer(props: {
     void apply((current) => ({ ...current, text: value })).catch(() =>
       setNote('Browser storage is full, so this draft may not survive closing the sidebar.'),
     )
-  }
-
-  const capture = async (kind: CaptureKind) => {
-    setCapturing(kind)
-    setNote(null)
-    try {
-      const captured = await props.capture(kind)
-      await apply((current) => ({ ...current, captures: withCapture(current.captures ?? [], captured) }))
-    } catch (error) {
-      if (error instanceof CaptureFailure) setNote(error.message)
-      else {
-        // Storage refused the larger draft. Keep the visible draft to what is stored.
-        if (mounted) setDraft(await loadDraft(props.storage.local, target))
-        setNote('Browser storage is full. Send or remove captures in other conversations, then try again.')
-      }
-    } finally {
-      setCapturing(null)
-    }
   }
 
   // A capture the Node already holds is deleted there too, unless another capture in this draft is the
@@ -289,28 +237,12 @@ export function Composer(props: {
         onInput={(event) => edit(event.currentTarget.value)}
       />
       <div class="row toolbar">
-        <For each={['link', 'selection', 'screenshot'] as const}>
-          {(kind) => (
-            <button
-              type="button"
-              class="icon"
-              aria-label={CAPTURE_LABELS[kind]}
-              title={CAPTURE_LABELS[kind]}
-              aria-busy={capturing() === kind}
-              disabled={!loaded() || capturing() !== null}
-              onClick={() => void capture(kind)}
-            >
-              {CAPTURE_ICONS[kind]()}
-            </button>
-          )}
-        </For>
         <span class="grow" />
         <button type="submit" disabled={sending() || (!text().trim() && !captures().length) || props.blocked !== null}>
           {sending() ? 'Sending…' : retrying() ? 'Retry' : 'Send'}
         </button>
       </div>
       <Show when={props.blocked ?? note()}>{(shown) => <p class="notice">{shown()}</p>}</Show>
-      <p class="quiet">Goes to {props.destination}</p>
     </form>
   )
 }

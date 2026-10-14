@@ -19,6 +19,8 @@ describe('extension manifests', () => {
       background: { service_worker: 'background.js', type: 'module' },
       side_panel: { default_path: 'sidebar.html' },
       incognito: 'not_allowed',
+      icons: { 128: 'icon-128.png' },
+      action: { default_icon: 'icon-128.png' },
     })
   })
 
@@ -27,7 +29,7 @@ describe('extension manifests', () => {
     expect(manifest).toMatchObject({
       permissions: ['nativeMessaging', 'storage', 'activeTab', 'scripting', 'contextMenus'],
       background: { scripts: ['background.js'], type: 'module' },
-      sidebar_action: { default_panel: 'sidebar.html' },
+      sidebar_action: { default_icon: 'icon-128.png', default_panel: 'sidebar.html' },
       browser_specific_settings: { gecko: { id: FIREFOX_EXTENSION_ID } },
       incognito: 'not_allowed',
     })

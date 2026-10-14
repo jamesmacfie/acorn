@@ -143,15 +143,15 @@ describe('sidebar', () => {
     const { fake, root } = mount(['a'])
     await settle()
     await useNode(root, 'Node a')
-    expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
     expect(root.querySelector('[aria-label="Nodes"]')).toBeNull()
     await openSettings(root)
-    expect(root.querySelector('[aria-label="Home"]')).toBeNull()
+    expect(root.querySelector('.view[aria-label="Home"]')).toBeNull()
     expect(root.querySelector('[aria-label="Nodes"]')!.textContent).toContain('Node a')
     await pick(root, 'theme', 'nord')
     expect(fake.storage.get('appearance')).toEqual({ theme: 'nord', style: 'terminal' })
     await back(root)
-    expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
 
     expect(root.querySelector('[data-testid="node-status"]')).toBeNull()
     fake.hosts[0]!.send({ v: 1, event: 'status', status: { nodeId: 'a', state: 'offline' } })
@@ -188,7 +188,7 @@ describe('sidebar', () => {
     expect(root.querySelector('[aria-label="Notifications"]')).not.toBeNull()
     button(root, 'Done')!.click()
     await settle()
-    expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 
   it('pairs the Node on this Mac once Acorn allows it, with no code', async () => {
@@ -248,7 +248,7 @@ describe('sidebar', () => {
     expect(choose.querySelector('li')!.textContent).toContain('Node aOn this Mac')
     button(choose, 'Use')!.click()
     await settle()
-    expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
 
     button(root.querySelector('header .menu-items')!, 'Forget Node a')!.click()
     await settle()

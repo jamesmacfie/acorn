@@ -43,6 +43,7 @@ const session = (id: string, taskId: string): BridgeAgentSession => ({
   title: `Chat ${id}`,
   providerId: 'claude',
   profileId: 'claude-code',
+  model: null,
   kind: 'interactive',
   inline: false,
   runtimeState: 'ready',
@@ -169,8 +170,8 @@ describe('a handoff in the sidebar', () => {
     expect(button(root, 'Start task')).toBeUndefined()
     button(root, 'Chat')!.click()
     await settle(30)
-    expect(root.querySelector('[aria-label="Conversation"] .view-head')!.textContent).toContain('Existing work')
-    expect(conversationTitle(root)).toBe('Claude · Chat s1')
+    expect(root.querySelector('header .eyebrow')!.textContent).toBe('Existing work')
+    expect(conversationTitle(root)).toBe('Chat s1')
     expect(captures(root)).toEqual([expect.stringContaining('Item · Fix the flaky test')])
     expect(root.textContent).toContain('The test waits on a timer.')
     // Nothing went to an agent.
@@ -202,8 +203,8 @@ describe('a handoff in the sidebar', () => {
       providerId: 'claude',
       profileId: 'claude-code',
     })
-    expect(root.querySelector('[aria-label="Conversation"] .view-head .title')!.textContent).toBe('Fix the flaky test')
-    expect(conversationTitle(root)).toBe('Claude · Chat s-new')
+    expect(root.querySelector('header .eyebrow')!.textContent).toBe('Fix the flaky test')
+    expect(conversationTitle(root)).toBe('Chat s-new')
     expect(root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!.value).toBe(
       'Find why the test is flaky.',
     )
@@ -233,7 +234,7 @@ describe('a handoff in the sidebar', () => {
     expect(new Set(keys('handoff.create')).size).toBe(1)
     expect(keys('session.create')).toHaveLength(2)
     expect(new Set(keys('session.create')).size).toBe(1)
-    expect(conversationTitle(root)).toBe('Claude · Chat s-new')
+    expect(conversationTitle(root)).toBe('Chat s-new')
   })
 
   it('opens the item and its task in Acorn through acorn:// links in a release build', async () => {
@@ -259,7 +260,7 @@ describe('a handoff in the sidebar', () => {
     // The conversation header opens the task on the agents pane with this conversation selected.
     button(root, 'Chat')!.click()
     await settle(30)
-    const head = root.querySelector('[aria-label="Conversation"] .view-head')!
+    const head = root.querySelector('[aria-label="Conversation"] .subhead')!
     expect(head.querySelector('a')!.getAttribute('href')).toBe('acorn://n1/t/t1?pane=agents&item=s1')
     expect(button(head, 'Copy Acorn link')).toBeDefined()
   })
