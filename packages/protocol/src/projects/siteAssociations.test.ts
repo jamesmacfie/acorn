@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   SITE_ASSOCIATIONS_MAX,
+  associationMatches,
   matchingSiteProjects,
   parseSiteAddress,
+  parseSiteAssociation,
   siteAssociationsSchema,
   siteMatches,
 } from './siteAssociations.ts'
@@ -32,10 +34,53 @@ describe('parseSiteAddress', () => {
   })
 })
 
+describe('parseSiteAssociation', () => {
+  it('reads each kind into its own shape', () => {
+    expect(parseSiteAssociation('domain', ' *.Example.com ')).toEqual({ ok: true, site: { domain: 'example.com' } })
+    expect(parseSiteAssociation('domain', 'https://app.example.com/a?b')).toEqual({
+      ok: true,
+      site: { domain: 'app.example.com' },
+    })
+    expect(parseSiteAssociation('prefix', 'https://example.com/a/')).toEqual({
+      ok: true,
+      site: { origin: 'https://example.com', pathPrefix: '/a' },
+    })
+    expect(parseSiteAssociation('exact', 'https://Example.com/a/?b#c')).toEqual({
+      ok: true,
+      site: { exact: 'https://example.com/a' },
+    })
+    expect(parseSiteAssociation('regex', ' ^https://[^/]+\\.example\\.com/ ')).toEqual({
+      ok: true,
+      site: { regex: '^https://[^/]+\\.example\\.com/' },
+    })
+  })
+
+  it('refuses what a kind cannot hold', () => {
+    expect(parseSiteAssociation('domain', '').ok).toBe(false)
+    expect(parseSiteAssociation('domain', 'not a domain').ok).toBe(false)
+    expect(parseSiteAssociation('exact', 'example.com').ok).toBe(false)
+    expect(parseSiteAssociation('regex', '(').ok).toBe(false)
+    expect(parseSiteAssociation('regex', 'a'.repeat(501)).ok).toBe(false)
+  })
+})
+
 describe('siteAssociationsSchema', () => {
   it('accepts only the canonical form', () => {
     expect(siteAssociationsSchema.safeParse([{ origin: 'https://example.com', pathPrefix: '/a' }]).success).toBe(true)
+    expect(
+      siteAssociationsSchema.safeParse([
+        { domain: 'example.com' },
+        { exact: 'https://example.com/' },
+        { regex: 'example' },
+      ]).success,
+    ).toBe(true)
     for (const site of [
+      { domain: 'Example.com' },
+      { domain: 'https://example.com' },
+      { exact: 'https://example.com/a/' },
+      { exact: 'https://example.com/a?b' },
+      { regex: '(' },
+      { domain: 'example.com', regex: 'x' },
       { origin: 'https://Example.com', pathPrefix: '/' },
       { origin: 'https://example.com/', pathPrefix: '/' },
       { origin: 'https://example.com', pathPrefix: '/a/' },
@@ -76,6 +121,28 @@ describe('siteMatches', () => {
     expect(siteMatches(local, 'https://localhost:5173/')).toBe(false)
     expect(siteMatches(docs, 'https://www.example.com/docs')).toBe(false)
     expect(siteMatches(docs, 'not an address')).toBe(false)
+  })
+})
+
+describe('associationMatches', () => {
+  it('covers a domain and its subdomains on any scheme and port', () => {
+    const site = { domain: 'example.com' }
+    expect(associationMatches(site, 'https://example.com/a')).toBe(true)
+    expect(associationMatches(site, 'http://app.example.com:8080/')).toBe(true)
+    expect(associationMatches(site, 'https://badexample.com/')).toBe(false)
+    expect(associationMatches(site, 'https://example.com.evil.test/')).toBe(false)
+  })
+
+  it('covers one exact page, whatever its query', () => {
+    const site = { exact: 'https://example.com/a' }
+    expect(associationMatches(site, 'https://example.com/a/?b=1#c')).toBe(true)
+    expect(associationMatches(site, 'https://example.com/a/b')).toBe(false)
+  })
+
+  it('tests a pattern against the whole address', () => {
+    const site = { regex: '/pull/\\d+' }
+    expect(associationMatches(site, 'https://github.com/acme/runn/pull/482')).toBe(true)
+    expect(associationMatches(site, 'https://github.com/acme/runn/issues/482')).toBe(false)
   })
 })
 

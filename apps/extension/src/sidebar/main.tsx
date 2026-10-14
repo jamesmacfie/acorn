@@ -5,13 +5,18 @@ import { PROVIDER_MARKS } from '@acorn/plugin-agents/contract/providerMarks.ts'
 import { browserApi } from '../browser'
 import { App } from './App'
 import { followAppearance } from './appearance'
-// The app's own token sheets, as they are. A pack's fonts load only when its rules use them.
+// The app's own token sheets and the kit's, in the desktop's order (infra/styles/styles.css). A
+// pack's fonts load only when its rules use them.
 import '@acorn/client-core/infra/styles/fonts.css'
+import '@acorn/client-core/infra/styles/tokens-invariant.css'
 import '@acorn/client-core/infra/styles/tokens-style.css'
 import '@acorn/client-core/infra/styles/tokens-theme.css'
+import '@acorn/client-core/infra/styles/primitives.css'
 import '@acorn/client-core/infra/styles/style-modern.css'
 import '@acorn/client-core/infra/styles/style-cozy.css'
 import '@acorn/client-core/infra/styles/style-cute.css'
+import '@acorn/client-core/infra/styles/overlays.css'
+import '@acorn/client-core/infra/styles/tabs.css'
 import './sidebar.css'
 
 // The agents plugin's provider logos, which the agent rows draw as the desktop does.

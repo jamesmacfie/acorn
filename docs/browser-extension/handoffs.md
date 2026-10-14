@@ -20,7 +20,7 @@ chips to draw. The same script draws the [branch marker](./task-pages.md#the-bra
 a plugin published for a task, under the same access rules. The browser reports a tab's address only when the extension may read the tab, so a
 tab gets a chip only on:
 
-- **A granted site.** **Site access** in the sidebar's Settings lists each site its handoffs, project
+- **A granted site.** **Permissions** in the sidebar's Settings lists each site its handoffs, project
   associations, and tasks' apps are on, what access is for there (buttons on its pages, handoffs in
   the sidebar, [project suggestions](./project-sites.md), or the branch marker on its pages), and
   **Allow** or **Remove**. **Allow** calls

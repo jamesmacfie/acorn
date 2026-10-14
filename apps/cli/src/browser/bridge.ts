@@ -24,10 +24,10 @@ import {
 } from '@acorn/protocol/api.ts'
 import {
   SITE_ASSOCIATIONS_MAX,
+  associationMatches,
   matchingSiteProjects,
   sameSite,
   siteAssociationsSchema,
-  siteMatches,
   type ProjectSite,
   type SiteAssociation,
 } from '@acorn/protocol/siteAssociations.ts'
@@ -715,7 +715,7 @@ export function createBridge(options: {
         )
         if (!item) throw new BridgeFailure('not_found', 'The page no longer resolves to that item. Open it again.')
         const siteProject = (await sitesOrNone(request.nodeId, request.projectId)).some((site) =>
-          siteMatches(site, request.url),
+          associationMatches(site, request.url),
         )
         if (!creatableProjects(item, siteProject ? [request.projectId] : []).includes(request.projectId))
           throw new BridgeFailure(
