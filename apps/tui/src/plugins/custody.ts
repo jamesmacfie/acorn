@@ -82,7 +82,7 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
     },
     install: async (raw) => {
       const { source, expectedPluginId } = installSchema.parse(raw)
-      const result = await bundles.putFromSource(source, expectedPluginId)
+      const result = await bundles.putFromSource(source, 'terminal', expectedPluginId)
       if ('hash' in result)
         store.recordDevAccept({
           pluginId: result.pluginId,

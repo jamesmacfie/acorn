@@ -2,6 +2,7 @@ import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import { registerCommands, type CommandOutcome } from '@acorn/client-core/host/registries/commands'
 import {
+  clientApp,
   installPluginOnDevice,
   readPluginHostState,
   removePluginFromDevice,
@@ -21,6 +22,7 @@ import {
 } from '@acorn/client-core/host/registries/extensionPoints'
 import { configPluginOffers } from '@acorn/client-core/infra/persistence/deviceConfigSync.ts'
 import { describePluginSource } from '@acorn/protocol/plugin/source.ts'
+import { clientsNote, runsIn } from '@acorn/protocol/plugin/clients.ts'
 
 const GROUP = 'core.device-plugins'
 const status = (message: string): CommandOutcome => ({ effect: 'stay', status: message })
@@ -41,7 +43,11 @@ const available = (query: string, predicate: (id: string) => boolean = () => tru
     .map((entry) => ({
       id: entry.row.name,
       title: entry.row.name,
-      subtitle: `${entry.row.installed?.version ?? '?'} · ${entry.sourceLabel}`,
+      subtitle: [
+        entry.row.installed?.version ?? '?',
+        entry.sourceLabel,
+        ...(runsIn(entry.row.installed, clientApp()) ? [] : [clientsNote(entry.row.installed?.clients ?? [])]),
+      ].join(' · '),
     }))
 
 const settle = async (): Promise<void> => reconcileDevicePluginChange()

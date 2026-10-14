@@ -160,14 +160,14 @@ describe('installing a device bundle', () => {
   it('hashes a folder bundle and re-reads it on update', async () => {
     const folder = packageFolder()
     const store = cache()
-    expect(await store.putFromSource({ path: folder })).toEqual({
+    expect(await store.putFromSource({ path: folder }, 'desktop')).toEqual({
       hash: sha256(BUNDLE),
       pluginId: 'sparkline',
       version: '1.2.0',
     })
     expect(store.list()[sha256(BUNDLE)]).toMatchObject({ source: { kind: 'device' }, installSource: { path: folder } })
     writeFileSync(join(folder, 'client.js'), 'export default 2')
-    const updated = await store.putFromSource({ path: folder })
+    const updated = await store.putFromSource({ path: folder }, 'desktop')
     expect(updated).toMatchObject({ hash: sha256('export default 2') })
     expect(store.has(sha256(BUNDLE))).toBe(false)
     store.removeDevice('sparkline')
@@ -181,21 +181,36 @@ describe('installing a device bundle', () => {
     writeFileSync(join(folder, 'acorn-plugin.json'), JSON.stringify(manifest))
     writeFileSync(join(folder, 'node.js'), 'export default {}')
     const store = cache()
-    expect(await store.putFromSource({ path: folder })).toEqual({ error: 'has-node-half' })
+    expect(await store.putFromSource({ path: folder }, 'desktop')).toEqual({ error: 'has-node-half' })
     expect(store.list()).toEqual({})
+  })
+
+  it('refuses a plugin for another app and keeps the installed version', async () => {
+    const folder = packageFolder()
+    const store = cache()
+    expect(await store.putFromSource({ path: folder }, 'terminal')).toMatchObject({ pluginId: 'sparkline' })
+    const before = store.list()
+    const manifest = JSON.parse(readFileSync(join(folder, 'acorn-plugin.json'), 'utf8')) as Record<string, unknown>
+    manifest.clients = ['desktop']
+    writeFileSync(join(folder, 'acorn-plugin.json'), JSON.stringify(manifest))
+    writeFileSync(join(folder, 'client.js'), 'export default "desktop only"')
+
+    expect(await store.putFromSource({ path: folder }, 'terminal')).toEqual({ error: 'other-app' })
+    expect(store.list()).toEqual(before)
+    expect(await store.putFromSource({ path: folder }, 'desktop')).toMatchObject({ pluginId: 'sparkline' })
   })
 
   it('checks a config offer or update identity before changing the cache', async () => {
     const folder = packageFolder()
     const store = cache()
-    expect(await store.putFromSource({ path: folder }, 'sparkline')).toMatchObject({ pluginId: 'sparkline' })
+    expect(await store.putFromSource({ path: folder }, 'desktop', 'sparkline')).toMatchObject({ pluginId: 'sparkline' })
     const before = store.list()
     const manifest = JSON.parse(readFileSync(join(folder, 'acorn-plugin.json'), 'utf8')) as Record<string, unknown>
     manifest.id = 'different-plugin'
     writeFileSync(join(folder, 'acorn-plugin.json'), JSON.stringify(manifest))
     writeFileSync(join(folder, 'client.js'), 'export default "different-plugin"')
 
-    expect(await store.putFromSource({ path: folder }, 'sparkline')).toEqual({ error: 'plugin-id-mismatch' })
+    expect(await store.putFromSource({ path: folder }, 'desktop', 'sparkline')).toEqual({ error: 'plugin-id-mismatch' })
     expect(store.list()).toEqual(before)
     expect(store.has(sha256('export default "different-plugin"'))).toBe(false)
   })
@@ -209,18 +224,18 @@ describe('installing a device bundle', () => {
     }
     writeFileSync(file, JSON.stringify(manifest))
     const store = cache()
-    expect(await store.putFromSource({ path: folder })).toMatchObject({ pluginId: 'sparkline' })
+    expect(await store.putFromSource({ path: folder }, 'desktop')).toMatchObject({ pluginId: 'sparkline' })
     manifest.contributions = {
       sources: [{ id: 'sparkline', label: 'Sparkline', order: 50, items: '/v1/p/sparkline/items' }],
     }
     writeFileSync(file, JSON.stringify(manifest))
-    expect(await store.putFromSource({ path: folder })).toEqual({ error: 'has-node-half' })
+    expect(await store.putFromSource({ path: folder }, 'desktop')).toEqual({ error: 'has-node-half' })
   })
 
   it('reports a manifest parse failure to the install caller', async () => {
     const folder = packageFolder()
     writeFileSync(join(folder, 'acorn-plugin.json'), '{ broken json')
-    await expect(cache().putFromSource({ path: folder })).rejects.toThrow()
+    await expect(cache().putFromSource({ path: folder }, 'desktop')).rejects.toThrow()
   })
 
   it('shares archive special-file refusal before adding a device bundle', async () => {
@@ -235,7 +250,9 @@ describe('installing a device bundle', () => {
     )
     const store = cache()
     try {
-      await expect(store.putFromSource({ url: 'https://example.test/special.tgz' })).rejects.toThrow(/unsupported/)
+      await expect(store.putFromSource({ url: 'https://example.test/special.tgz' }, 'desktop')).rejects.toThrow(
+        /unsupported/,
+      )
       expect(store.list()).toEqual({})
       expect(readdirSync(dir).filter((name) => name.startsWith('.staging-'))).toEqual([])
     } finally {
@@ -247,14 +264,14 @@ describe('installing a device bundle', () => {
     const folder = packageFolder()
     writeFileSync(join(folder, 'acorn-plugin.json'), ' '.repeat(256 * 1024 + 1))
     const store = cache()
-    await expect(store.putFromSource({ path: folder })).rejects.toThrow(/byte limit/)
+    await expect(store.putFromSource({ path: folder }, 'desktop')).rejects.toThrow(/byte limit/)
     expect(store.list()).toEqual({})
   })
 
   it('refuses a client bundle over the size limit', async () => {
     const folder = packageFolder()
     writeFileSync(join(folder, 'client.js'), Buffer.alloc(MAX_BUNDLE_BYTES + 1))
-    expect(await cache().putFromSource({ path: folder })).toEqual({ error: 'too-large' })
+    expect(await cache().putFromSource({ path: folder }, 'desktop')).toEqual({ error: 'too-large' })
   })
 })
 

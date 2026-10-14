@@ -13,11 +13,15 @@ The rule is that unknown input is kept or skipped and reported, never dropped si
   ([the compatibility promise](./publishing.md#the-compatibility-promise)).
 - An unknown `permissions.node.core` facet is skipped, and an unknown manifest key is stripped by the
   schema. Rejecting either would make a manifest from a later build fail to load.
+- An app in `clients` that this build doesn't have is kept in the list and reported. It never
+  matches, so the known apps in the list still apply, and a list with no known app runs in neither
+  app on this build. A Node from before `clients` existed strips the key and reports it, and the
+  plugin runs in every app.
 - An unknown settings `category`, `settingsScope`, or `railSourceVisibility` source leaves the page in
   its default place and is reported.
 
 `parsePluginManifest` returns an `unknown` list beside the manifest: unknown top-level keys, unknown
-contribution kinds, and unknown core facets. It compares the raw JSON with what came out of the
+contribution kinds, unknown core facets, and unknown apps in `clients`. It compares the raw JSON with what came out of the
 schema, so there's no key list to keep in step. The list rides the roster row to the device, which
 raises one attention row per entry. The wording says this version of acorn doesn't recognize the
 entry, so it was ignored, and that the plugin didn't fail.

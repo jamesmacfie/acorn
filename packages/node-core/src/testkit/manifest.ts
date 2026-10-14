@@ -66,6 +66,7 @@ export async function validatePluginConfig(configPath: string): Promise<PluginMa
       version,
       baseline: ACORN_BASELINE,
       apiVersion: PLUGIN_API_MAJOR,
+      ...(spec.clients ? { clients: spec.clients } : {}),
       node: './dist/node.js',
       ...(client ? { client: './dist/client.js' } : {}),
       ...(spec.migrations ? { migrations: './migrations' } : {}),

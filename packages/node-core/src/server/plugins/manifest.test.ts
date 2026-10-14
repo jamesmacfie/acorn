@@ -3258,3 +3258,42 @@ describe('derived data sources', () => {
     expect(source({ inputs: nine }).success).toBe(false)
   })
 })
+
+describe('the apps a manifest lists', () => {
+  const parse = (clients?: unknown) =>
+    parsePluginManifest({
+      id: 'board',
+      name: 'Board',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '1',
+      ...(clients === undefined ? {} : { clients }),
+      contributions: { frames: [] },
+    })
+
+  it('runs everywhere when the list is left out', () => {
+    const result = parse()
+    expect(result.ok && result.manifest.clients).toBeUndefined()
+  })
+
+  it('accepts each list of known apps', () => {
+    for (const clients of [['desktop'], ['terminal'], ['desktop', 'terminal']]) {
+      expect(parse(clients)).toMatchObject({ ok: true, manifest: { clients }, unknown: [] })
+    }
+  })
+
+  it('refuses an empty list', () => {
+    expect(parse([])).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('clients: must name at least one app'),
+    })
+  })
+
+  it('keeps and reports an app this build does not know', () => {
+    expect(parse(['desktop', 'web'])).toMatchObject({
+      ok: true,
+      manifest: { clients: ['desktop', 'web'] },
+      unknown: ['clients: web'],
+    })
+  })
+})

@@ -31,6 +31,7 @@ editor completes and checks the file.
 | `client` | No | Relative path to the single client file. Leave it out for a plugin with only descriptors and document surfaces. It then has no bytes to trust and no trust prompt |
 | `migrations` | No | Relative path to the Drizzle chain ([storage](./storage.md)) |
 | `$schema` | No | The editor schema URL. The loader doesn't fetch it |
+| `clients` | No | The client apps the plugin runs in: `"desktop"`, `"terminal"`, or both. Leaving it out means every app. See below |
 | `emits` | Defaulted | Up to 32 `{ verb, description }` entries. Other plugins subscribe to `plugin:<id>:<verb>` ([events](../plugins/events.md#hearing-another-plugin)) |
 | `requires` | Defaulted | `{ plugins: [{ id, version? }] }`, up to 16 entries. See below |
 | `permissions` | Defaulted | [Permissions](./permissions.md). Leaving it out means an empty declaration, not a full one |
@@ -46,6 +47,32 @@ acorn still loads ([forward compatibility](../plugins/forward-compatibility.md))
 closed lists inside a known key. A release older than a menu location, a point field such as `mounts`,
 or a `documentServices` language may refuse the entry or ignore the field. The API major alone
 doesn't promise that an older release draws it.
+
+### Which apps it runs in
+
+`clients` lists the client apps that load the plugin's client half. An app the list leaves out never
+downloads the bundle, never shows the approval prompt, and registers none of the manifest's panes,
+commands, rail sources, settings pages, slots, menus, or toolbar actions. The plugin list in that app
+shows a note such as "Runs in the desktop app only." instead of a status that asks for anything.
+
+| Value | Meaning |
+| --- | --- |
+| Left out | Every app |
+| `["desktop"]` | The desktop app only |
+| `["terminal"]` | The terminal app only |
+| `["desktop", "terminal"]` | Both, the same as leaving it out |
+| `[]` | A manifest error |
+
+The list covers the client half only. The node half runs on the Node either way, and the Node grants
+skills and data source reads, so the terminal still approves a plugin's skills
+(`terminalAnswersSkills` in `packages/client-core/src/host/plugins/distribution.ts`). An app keeps an
+approval it already gave while the list leaves it out, and uses it again if a later version adds that
+app back. Installing the plugin onto a device from an app it leaves out fails with "This plugin
+doesn't run in the terminal app." and leaves any installed version in place.
+
+Each app states which one it is once at startup, as `app` in `startClientRuntime`
+(`packages/client-core/src/host/clientRuntime.ts`). The check itself is `runsIn` in
+`packages/protocol/src/plugin/clients.ts`.
 
 ### Requiring another plugin
 
@@ -89,7 +116,7 @@ leaves out `entry` and `factory`, and removing a node entry also removes the old
 Solid tree that uses the published SDK sets `client.treeModule: 'acorn-plugin-sdk/remote'`, so the
 JSX transform targets the runtime the plugin imports.
 
-The builder copies `name`, `icon`, `icons`, `emits`, `permissions`, and `contributions` from the
+The builder copies `name`, `icon`, `icons`, `emits`, `clients`, `permissions`, and `contributions` from the
 config unchanged, so a repository config is a faithful example of those blocks. It doesn't write
 `requires`, so a repository plugin can't declare one through its config.
 `plugins/http/acorn-plugin.config.mjs` is the widest one that owns tables, and

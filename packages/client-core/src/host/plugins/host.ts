@@ -6,6 +6,7 @@ import {
   type PluginTrustDecision,
 } from '../../infra/platform'
 import type { PluginInstallSource } from '@acorn/protocol/api.ts'
+import { clientApp } from './clientApp'
 
 // The client's platform adapter for third-party plugin bundles
 // (docs/plugins.md).
@@ -49,6 +50,7 @@ export const installPluginOnDevice = async (source: PluginInstallSource, expecte
   const result = await host.install({ source, ...(expectedPluginId ? { expectedPluginId } : {}) })
   if ('error' in result) {
     if (result.error === 'plugin-id-mismatch') throw new Error(`The source does not contain ${expectedPluginId}.`)
+    if (result.error === 'other-app') throw new Error(`This plugin doesn’t run in the ${clientApp()} app.`)
     throw new Error(`Plugin install failed: ${result.error}`)
   }
   return result

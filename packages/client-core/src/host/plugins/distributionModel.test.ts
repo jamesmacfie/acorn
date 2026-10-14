@@ -446,3 +446,59 @@ describe('input approval requests', () => {
     expect(pending([both], host(['bundle-hash'])).map((request) => request.hash)).toEqual(['bundle-hash'])
   })
 })
+
+describe('the apps a plugin lists', () => {
+  const desktopOnly = (hash: string): PluginRuntimeIdentity => ({ ...identity('1.0.0', hash), clients: ['desktop'] })
+  const derive = (
+    byNode: Map<string, NodePluginObservation>,
+    state: PluginHostState,
+    app: 'desktop' | 'terminal',
+    device: DevicePluginEntry[] = [],
+  ) => derivePluginDistribution(byNode, state, 1, PLUGIN_API_MAJOR, device, app)
+
+  it('offers a node plugin only in an app it lists', () => {
+    const runtime = desktopOnly('h')
+    const byNode = new Map([['a', observation('a', [row('markup', runtime, installed(runtime))])]])
+    const asked = host(['h'])
+    expect(derive(byNode, asked, 'desktop').pendingTrust.map((request) => request.row.name)).toEqual(['markup'])
+    expect(derive(byNode, asked, 'terminal').pendingTrust).toEqual([])
+
+    const approved = host(['h'], [{ pluginId: 'markup', hash: 'h', decision: 'accepted' }])
+    expect(selected(derive(byNode, approved, 'desktop'), 'a', 'markup')).toBe('h')
+    const terminal = derive(byNode, approved, 'terminal')
+    expect(selected(terminal, 'a', 'markup')).toBeUndefined()
+    // The approval stays on file, ready for a version that lists this app again.
+    expect(terminal.decisionsByKey.get(decisionKey('markup', 'h'))).toBe('accepted')
+  })
+
+  it('offers a device plugin only in an app it lists', () => {
+    const device: DevicePluginEntry = {
+      hash: 'd',
+      sourceLabel: 'github:owner/markup',
+      nodeIds: [],
+      sameHashNodeIds: [],
+      row: { ...row('markup', null, installed(desktopOnly('d'))), running: true, state: 'active' },
+    }
+    const asked = host(['d'])
+    expect(derive(new Map(), asked, 'desktop', [device]).pendingTrust).toHaveLength(1)
+    const terminal = derive(new Map(), asked, 'terminal', [device])
+    expect(terminal.pendingTrust).toEqual([])
+    expect(terminal.selectedDevice.has('markup')).toBe(false)
+  })
+
+  it('treats a row with no list the same as one listing both apps', () => {
+    const plain = identity('1.0.0', 'h')
+    const both: PluginRuntimeIdentity = { ...plain, clients: ['desktop', 'terminal'] }
+    const state = host(['h'], [{ pluginId: 'p', hash: 'h', decision: 'accepted' }])
+    for (const app of ['desktop', 'terminal'] as const) {
+      const of = (runtime: PluginRuntimeIdentity) =>
+        selected(
+          derive(new Map([['a', observation('a', [row('p', runtime, installed(runtime))])]]), state, app),
+          'a',
+          'p',
+        )
+      expect(of(plain)).toBe('h')
+      expect(of(both)).toBe('h')
+    }
+  })
+})

@@ -60,6 +60,7 @@
     "./plugin/bundles.ts": "./src/plugin/bundles.ts",
     "./plugin/handoffs.ts": "./src/plugin/handoffs.ts",
     "./plugin/cliCommands.ts": "./src/plugin/cliCommands.ts",
+    "./plugin/clients.ts": "./src/plugin/clients.ts",
     "./plugin/contract.ts": "./src/plugin/contract.ts",
     "./plugin/declaration.ts": "./src/plugin/declaration.ts",
     "./plugin/grants.ts": "./src/plugin/grants.ts",
