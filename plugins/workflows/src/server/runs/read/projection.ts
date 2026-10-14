@@ -1,7 +1,7 @@
 import { getProfile, resolveCommand, type PluginDatabase } from '@acorn/plugin-api/node'
 import { and, ne, desc, eq, inArray, isNotNull, or, sql, sum } from 'drizzle-orm'
 import type { WorkflowRunner } from '../runner'
-import type { WorkflowStepProjection } from '../../../shared/api'
+import type { WorkflowStepProjection } from '../../../contract/wire.ts'
 import { RUN_LIST_LIMIT, TERMINAL_WORKFLOW_STATUSES, toRunStatus } from '../../../shared/runStatus'
 import { workflowDispatches, workflowRuns, workflowTurnAdmissions } from '../../../node/schema'
 

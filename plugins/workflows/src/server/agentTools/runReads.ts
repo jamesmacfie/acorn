@@ -11,7 +11,7 @@ import { scanSecretText, ToolError, type ToolContext } from '@acorn/plugin-api/n
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { AgentRequestsCapability } from '@acorn/plugin-agents/contract/lifecycle.ts'
 import { workflowRuns, workflowSteps } from '../../node/schema'
-import type { WorkflowChildRunSummary } from '../../shared/api'
+import type { WorkflowChildRunSummary } from '../../contract/wire.ts'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { rowIdentity } from '../../shared/workflowIdentity'
 import { workflowContentFingerprint } from '../definitions/fingerprint'

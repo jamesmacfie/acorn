@@ -1,3 +1,8 @@
+import type {
+  WorkflowDefSummary,
+  WorkflowRunProjection,
+  WorkflowStepProjection,
+} from '@acorn/plugin-workflows/contract/wire.ts'
 import type { ParsedArgs } from './args'
 import { CliError } from './error'
 import { readJsonFile, rejectDoubleStdin, requestKey, requireOption, typedId } from './input'
@@ -7,33 +12,13 @@ import { workspaceForProject } from './projectWorkspace'
 const base = '/v1/p/workflows'
 const version = 'acorn.cli/v1'
 const terminal = new Set(['done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'])
-type Run = {
-  id: string
-  taskId: string
-  name: string
-  status: string
-  error?: string | null
-  createdAt: number
-  updatedAt: number
-  [key: string]: unknown
-}
-type Step = { id: string; runId: string; name: string; status: string; [key: string]: unknown }
-type Definition = {
-  id: string
-  source: string
-  name: string
-  inputs?: unknown[]
-  publishedRevision?: number | null
-  problems?: string[]
-  [key: string]: unknown
-}
 const runPath = (id: string) => `${base}/workflows/runs/${encodeURIComponent(id)}`
 const taskPath = (id: string) => `${base}/tasks/${encodeURIComponent(id)}/workflows`
 
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
-function runResource(node: CliNode, row: Run) {
+function runResource(node: CliNode, row: WorkflowRunProjection) {
   return {
     apiVersion: version,
     kind: 'WorkflowRun',
@@ -55,7 +40,7 @@ function runResource(node: CliNode, row: Run) {
     usage: row.usage ?? null,
   }
 }
-function stepResource(node: CliNode, row: Step) {
+function stepResource(node: CliNode, row: WorkflowStepProjection) {
   return {
     apiVersion: version,
     kind: 'WorkflowStep',
@@ -73,21 +58,18 @@ function stepResource(node: CliNode, row: Step) {
     costUsd: row.costUsd ?? null,
     iteration: row.iteration ?? 0,
     childRuns: Array.isArray(row.children)
-      ? row.children.map((child) => {
-          const item = child as Record<string, unknown>
-          return {
-            taskId: item.taskId,
-            runId: item.runId,
-            runStatus: item.runStatus,
-            dispatchState: item.dispatchState,
-          }
-        })
+      ? row.children.map((child) => ({
+          taskId: child.taskId,
+          runId: child.runId,
+          runStatus: child.runStatus,
+          dispatchState: child.dispatchState,
+        }))
       : [],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
 }
-function validRun(value: unknown): value is Run {
+function validRun(value: unknown): value is WorkflowRunProjection {
   return (
     object(value) &&
     typeof value.id === 'string' &&
@@ -98,12 +80,12 @@ function validRun(value: unknown): value is Run {
     Number.isInteger(value.updatedAt)
   )
 }
-async function readRun(node: CliNode, id: string): Promise<Run> {
+async function readRun(node: CliNode, id: string): Promise<WorkflowRunProjection> {
   const row = await node.get(runPath(id))
   if (!validRun(row)) throw new CliError('invalid_response', 'The Workflows plugin returned an invalid run.', 1)
   return row
 }
-async function readSteps(node: CliNode, id: string): Promise<Step[]> {
+async function readSteps(node: CliNode, id: string): Promise<WorkflowStepProjection[]> {
   const rows = await node.get(`${runPath(id)}/steps`)
   if (
     !Array.isArray(rows) ||
@@ -122,7 +104,7 @@ async function readSteps(node: CliNode, id: string): Promise<Step[]> {
   ) {
     throw new CliError('invalid_response', 'The Workflows plugin returned invalid steps.', 1)
   }
-  return rows as Step[]
+  return rows as WorkflowStepProjection[]
 }
 async function readStepStatuses(
   node: CliNode,
@@ -146,7 +128,7 @@ function timeout(value: string | undefined): number {
   if (!Number.isSafeInteger(ms) || ms > 86_400_000) throw new CliError('usage', '--timeout must be at most 24h.', 2)
   return ms
 }
-function waitMet(run: Run, steps: { status: string }[], until: string): boolean {
+function waitMet(run: WorkflowRunProjection, steps: { status: string }[], until: string): boolean {
   if (until === 'finished') return terminal.has(run.status)
   return (
     run.status === 'gated' ||
@@ -279,7 +261,7 @@ export async function runWorkflowCommand(node: CliNode, args: ParsedArgs): Promi
       (error): error is { source: string; message: string } =>
         object(error) && typeof error.source === 'string' && typeof error.message === 'string',
     )
-    const definitions = (result.workflows as Definition[]).map((row) => {
+    const definitions = (result.workflows as WorkflowDefSummary[]).map((row) => {
       if (
         !row ||
         typeof row.id !== 'string' ||
@@ -318,7 +300,7 @@ export async function runWorkflowCommand(node: CliNode, args: ParsedArgs): Promi
         id: source,
         taskId,
         name: match[2]!,
-        source: match[1]!,
+        source: match[1] as 'repo' | 'user',
         publishedRevision: null,
         inputs: [],
         valid: false,

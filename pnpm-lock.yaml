@@ -80,6 +80,9 @@ importers:
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../../plugins/agents
+      '@acorn/plugin-workflows':
+        specifier: workspace:*
+        version: link:../../plugins/workflows
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0

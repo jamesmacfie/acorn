@@ -14,7 +14,7 @@ import {
   setRouteTestCapability,
   viaBridge,
 } from '@acorn/plugin-api/node'
-import type { WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
+import type { WorkflowRunProjection, WorkflowStepProjection } from '../../contract/wire.ts'
 import type { WorkflowRecordFilter } from '../../shared/workflowProcessing'
 
 // Workflow control (docs/workflows.md): declared workflows for a task, start a run, list runs/steps,

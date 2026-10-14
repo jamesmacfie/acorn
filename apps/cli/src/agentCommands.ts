@@ -1,31 +1,18 @@
+import type {
+  AgentEventPage,
+  AgentProviderDescriptor,
+  AgentSession,
+  AgentSessionList,
+  AgentSessionSnapshot,
+  AgentTurn,
+} from '@acorn/plugin-agents/contract/wire.ts'
 import type { ParsedArgs } from './args'
 import { CliError } from './error'
 import { operationKey, readBounded, rejectDoubleStdin, requestKey, requireOption, typedId } from './input'
 import type { CliNode } from './node'
-import { agentEventResource, agentSessionResource, agentTurnAck, type AgentSessionRow } from './projection'
+import { agentEventResource, agentSessionResource, agentTurnAck } from './projection'
 import { workspaceForProject } from './projectWorkspace'
 
-type Provider = {
-  id: string
-  profileId: string
-  label: string
-  installed: boolean
-  authenticated: boolean | null
-  driverKind: string
-  diagnostics: string[]
-}
-type Turn = { id: string; sessionId: string; ordinal: number; status: string }
-type Snapshot = { session: AgentSessionRow; turns: Turn[]; events: EventRow[]; requests: { status: string }[] }
-type EventRow = {
-  id: string
-  sessionId: string
-  turnId: string | null
-  seq: number
-  event: { type: string }
-  createdAt: number
-  foldedThroughSeq?: number
-}
-type EventPage = { events: EventRow[]; nextCursor: number | null }
 const base = '/v1/p/agents'
 const sessionPath = (id: string) => `${base}/sessions/${encodeURIComponent(id)}`
 const numberOption = (value: string | undefined, name: string, fallback: number, min: number, max: number) => {
@@ -46,15 +33,15 @@ async function prompt(options: Record<string, string>): Promise<string> {
   return value
 }
 
-const sessionResource = (node: CliNode, snapshot: Snapshot) =>
+const sessionResource = (node: CliNode, snapshot: AgentSessionSnapshot) =>
   agentSessionResource(node.nodeId, snapshot.session, {
     lastTurnId: snapshot.turns.at(-1)?.id ?? null,
     lastTurnStatus: snapshot.turns.at(-1)?.status ?? null,
     pendingRequests: snapshot.requests.filter((request) => request.status === 'pending').length,
   })
 
-async function eventPage(node: CliNode, id: string, afterSeq: number, limit: number): Promise<EventPage> {
-  const page = (await node.get(`${sessionPath(id)}/events?afterSeq=${afterSeq}&limit=${limit}`)) as EventPage
+async function eventPage(node: CliNode, id: string, afterSeq: number, limit: number): Promise<AgentEventPage> {
+  const page = (await node.get(`${sessionPath(id)}/events?afterSeq=${afterSeq}&limit=${limit}`)) as AgentEventPage
   if (!Array.isArray(page?.events))
     throw new CliError('invalid_response', 'The Agents plugin returned an invalid event page.', 1)
   return page
@@ -73,7 +60,7 @@ async function events(node: CliNode, args: ParsedArgs, id: string): Promise<unkn
   if (follow) process.on('SIGINT', stop)
   try {
     do {
-      let page: EventPage
+      let page: AgentEventPage
       try {
         page = await eventPage(node, id, cursor, limit)
       } catch (error) {
@@ -104,7 +91,7 @@ async function events(node: CliNode, args: ParsedArgs, id: string): Promise<unkn
   return stream ? undefined : collected
 }
 
-function waitMet(snapshot: Snapshot, until: string): boolean {
+function waitMet(snapshot: AgentSessionSnapshot, until: string): boolean {
   if (until === 'ready') return snapshot.session.runtimeState === 'ready'
   if (until === 'attention') return !['none', 'unread'].includes(snapshot.session.attention)
   if (until === 'stopped') return ['stopped', 'failed', 'archived'].includes(snapshot.session.runtimeState)
@@ -119,14 +106,14 @@ async function wait(node: CliNode, args: ParsedArgs, id: string): Promise<unknow
   const routeUntil = until.replace('-', '_')
   const timeoutSeconds = numberOption(args.options.timeout, 'timeout', 300, 0, 86400)
   const deadline = Date.now() + timeoutSeconds * 1000
-  let snapshot = (await node.get(sessionPath(id))) as Snapshot
+  let snapshot = (await node.get(sessionPath(id))) as AgentSessionSnapshot
   if (waitMet(snapshot, until)) return checkedResult(node, args, id, until, snapshot)
   const afterSeq = until === 'turn-completed' ? snapshot.session.lastEventSeq : 0
   while (true) {
     const remaining = Math.max(0, deadline - Date.now())
     snapshot = (await node.get(
       `${sessionPath(id)}/wait?afterSeq=${afterSeq}&until=${routeUntil}&timeoutMs=${Math.min(remaining, 30000)}`,
-    )) as Snapshot
+    )) as AgentSessionSnapshot
     if (waitMet(snapshot, until)) break
     if (remaining === 0 || Date.now() >= deadline) {
       const resource = sessionResource(node, snapshot)
@@ -143,7 +130,13 @@ async function wait(node: CliNode, args: ParsedArgs, id: string): Promise<unknow
   return checkedResult(node, args, id, until, snapshot)
 }
 
-function checkedResult(node: CliNode, args: ParsedArgs, id: string, until: string, snapshot: Snapshot): unknown {
+function checkedResult(
+  node: CliNode,
+  args: ParsedArgs,
+  id: string,
+  until: string,
+  snapshot: AgentSessionSnapshot,
+): unknown {
   const resource = sessionResource(node, snapshot)
   if (
     args.options.check === 'true' &&
@@ -166,7 +159,7 @@ export async function runAgentCommand(node: CliNode, args: ParsedArgs): Promise<
   const [, verb, rawId] = args.positionals
   const o = args.options
   if (verb === 'providers') {
-    const providers = (await node.get(`${base}/providers`)) as Provider[]
+    const providers = (await node.get(`${base}/providers`)) as AgentProviderDescriptor[]
     if (!Array.isArray(providers))
       throw new CliError('invalid_response', 'The Agents plugin returned an invalid provider roster.', 1)
     return providers.map((provider) => ({
@@ -195,19 +188,15 @@ export async function runAgentCommand(node: CliNode, args: ParsedArgs): Promise<
       ...(workspaceId ? { workspaceId } : {}),
       limit: String(numberOption(o.limit, 'limit', 100, 1, 100)),
     })
-    const rows = (await node.get(`${base}/sessions?${query}`)) as {
-      sessions: AgentSessionRow[]
-      nextCursor: string | null
-    }
+    const rows = (await node.get(`${base}/sessions?${query}`)) as AgentSessionList
     if (!Array.isArray(rows?.sessions))
       throw new CliError('invalid_response', 'The Agents plugin returned an invalid session list.', 1)
     const all = [...rows.sessions]
     let cursor = rows.nextCursor
     while (cursor) {
-      const page = (await node.get(`${base}/sessions?${query}&cursor=${encodeURIComponent(cursor)}`)) as {
-        sessions: AgentSessionRow[]
-        nextCursor: string | null
-      }
+      const page = (await node.get(
+        `${base}/sessions?${query}&cursor=${encodeURIComponent(cursor)}`,
+      )) as AgentSessionList
       if (!Array.isArray(page?.sessions))
         throw new CliError('invalid_response', 'The Agents plugin returned an invalid session page.', 1)
       all.push(...page.sessions)
@@ -219,7 +208,7 @@ export async function runAgentCommand(node: CliNode, args: ParsedArgs): Promise<
     rejectDoubleStdin([o.task, o['prompt-file']])
     const taskId = await typedId(o.task, 'Task', node, 'task')
     const text = await prompt(o)
-    const providers = (await node.get(`${base}/providers`)) as Provider[]
+    const providers = (await node.get(`${base}/providers`)) as AgentProviderDescriptor[]
     const profileId = requireOption(o, 'profile')
     const candidates = providers.filter(
       (provider) => provider.profileId === profileId && (!o.provider || provider.id === o.provider),
@@ -239,7 +228,7 @@ export async function runAgentCommand(node: CliNode, args: ParsedArgs): Promise<
       )
     const existing = (await node.get(
       `${base}/sessions?taskId=${encodeURIComponent(taskId)}&archived=false&limit=1`,
-    )) as { sessions: AgentSessionRow[] }
+    )) as AgentSessionList
     if (!Array.isArray(existing?.sessions))
       throw new CliError('invalid_response', 'The Agents plugin returned an invalid session list.', 1)
     if (existing.sessions.length)
@@ -250,14 +239,14 @@ export async function runAgentCommand(node: CliNode, args: ParsedArgs): Promise<
       `${base}/sessions`,
       { taskId, providerId: provider.id, profileId, kind: 'interactive', config: {} },
       operationKey(requestId, 'agent-session'),
-    )) as AgentSessionRow
+    )) as AgentSession
     try {
       const turn = (await node.mutate(
         'POST',
         `${sessionPath(session.id)}/turns`,
         { input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: {} },
         operationKey(requestId, 'agent-first-turn'),
-      )) as Turn
+      )) as AgentTurn
       return agentSessionResource(node.nodeId, session, { firstTurnId: turn.id, firstTurnStatus: turn.status })
     } catch (error) {
       throw new CliError(
@@ -272,7 +261,7 @@ export async function runAgentCommand(node: CliNode, args: ParsedArgs): Promise<
   }
   if (verb === 'send') rejectDoubleStdin([rawId ?? o.session, o['prompt-file']])
   const id = await typedId(rawId ?? o.session, 'AgentSession', node, 'session')
-  if (verb === 'show') return sessionResource(node, (await node.get(sessionPath(id))) as Snapshot)
+  if (verb === 'show') return sessionResource(node, (await node.get(sessionPath(id))) as AgentSessionSnapshot)
   if (verb === 'send') {
     const text = await prompt(o)
     const turn = (await node.mutate(
@@ -280,7 +269,7 @@ export async function runAgentCommand(node: CliNode, args: ParsedArgs): Promise<
       `${sessionPath(id)}/turns`,
       { input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: {} },
       requestKey(o['request-id']),
-    )) as Turn
+    )) as AgentTurn
     return agentTurnAck(node.nodeId, turn)
   }
   if (verb === 'events') return events(node, args, id)

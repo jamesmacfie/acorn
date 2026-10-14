@@ -284,6 +284,101 @@ describe('architecture boundaries', () => {
     expect([...new Set(appToApp)].sort()).toEqual([])
   })
 
+  it("an app imports a plugin's contract/ only through a listed edge", () => {
+    // Each entry is an app depending on one specific plugin, with the reason. The same list is in
+    // docs/first-party-plugins.md § What the apps import from plugins. Activation entrypoints
+    // (`node/index.ts`, `client/index.ts`) aren't listed, because composition roots exist to import them.
+    const APP_CONTRACT_IMPORTS = new Map([
+      // The CLI's built-in `agent` and `workflow` commands read these plugins' route shapes.
+      [
+        'apps/cli/src/agentCommands.ts -> plugins/agents/src/contract/wire.ts',
+        'agent session, turn, and event responses',
+      ],
+      ['apps/cli/src/projection.ts -> plugins/agents/src/contract/wire.ts', 'projects agent rows into CLI resources'],
+      [
+        'apps/cli/src/workflowCommands.ts -> plugins/workflows/src/contract/wire.ts',
+        'workflow run, step, and definition responses',
+      ],
+      // The browser extension's native bridge relays managed agent sessions.
+      ['apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/wire.ts', 'agent session shapes it relays'],
+      [
+        'apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/appApproval.ts',
+        'app approval wording and targets',
+      ],
+      ['apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/lifecycle.ts', 'agent lifecycle socket frames'],
+      [
+        'apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/sessionModel.ts',
+        'the session model summary line',
+      ],
+      ['apps/cli/src/browser/bridge.ts -> plugins/agents/src/contract/wire.ts', 'agent shapes in bridge messages'],
+      // The desktop task header opens a terminal profile.
+      [
+        'apps/desktop/src/client/TaskView.tsx -> plugins/terminal/src/contract/sessionsClient.ts',
+        'creates a terminal session',
+      ],
+      // The extension sidebar draws agent sessions.
+      [
+        'apps/extension/src/sidebar/Home.tsx -> plugins/agents/src/contract/runtimeState.ts',
+        'session state icon and tone',
+      ],
+      ['apps/extension/src/sidebar/main.tsx -> plugins/agents/src/contract/providerMarks.ts', 'harness brand marks'],
+      // The Node composition root runs startup work through these capabilities.
+      [
+        'apps/node/src/composition/composition.ts -> plugins/agents/src/contract/runtime.ts',
+        'agents reconcile at boot',
+      ],
+      [
+        'apps/node/src/composition/composition.ts -> plugins/github/src/contract/mirror.ts',
+        'storage footprint at boot',
+      ],
+      [
+        'apps/node/src/composition/composition.ts -> plugins/terminal/src/contract/runtime.ts',
+        'tmux reconcile at boot',
+      ],
+      [
+        'apps/node/src/composition/composition.ts -> plugins/workflows/src/contract/runner.ts',
+        'workflow reconcile at boot',
+      ],
+      // The terminal client draws the terminal drawer itself, and hosts the workflow launch dialog.
+      [
+        'apps/tui/src/chrome/Sessions.tsx -> plugins/terminal/src/contract/hostClient.ts',
+        'terminal sessions and their PTYs',
+      ],
+      [
+        'apps/tui/src/chrome/Sessions.tsx -> plugins/terminal/src/contract/wire.ts',
+        'terminal session and profile rows',
+      ],
+      [
+        'apps/tui/src/chrome/Sessions.tsx -> plugins/terminal/src/contract/toolbarActions.ts',
+        'the drawer toolbar point',
+      ],
+      [
+        'apps/tui/src/chrome/Sessions.tsx -> plugins/agents/src/contract/handoffClient.ts',
+        'hands a session back to managed mode',
+      ],
+      ['apps/tui/src/chrome/sessionPty.ts -> plugins/terminal/src/contract/wire.ts', 'PTY stream messages'],
+      ['apps/tui/src/chrome/Shell.tsx -> plugins/workflows/src/contract/gitLaunch.ts', 'the launch-from-commit dialog'],
+    ])
+    const found = [
+      ...new Set(
+        EDGES.filter(
+          (e) => e.fromPkg.kind === 'app' && !isTestCode(e.fromFile) && isContract(e.target.pkg, e.target.file),
+        ).map((e) => `${rel(e.fromFile)} -> ${rel(e.target.file!)}`),
+      ),
+    ].sort()
+    expect(found, 'anti-vacuity: the scan sees a listed edge').toContain(
+      'apps/cli/src/projection.ts -> plugins/agents/src/contract/wire.ts',
+    )
+    expect(
+      found.filter((edge) => !APP_CONTRACT_IMPORTS.has(edge)),
+      'List each new edge in APP_CONTRACT_IMPORTS with its reason, and on docs/first-party-plugins.md.',
+    ).toEqual([])
+    expect(
+      [...APP_CONTRACT_IMPORTS.keys()].filter((edge) => !found.includes(edge)),
+      'These listed edges are gone. Remove them here and on docs/first-party-plugins.md.',
+    ).toEqual([])
+  })
+
   it('protocol is a pure sink: zod only, no first-party imports, no node/electron', () => {
     const proto = EDGES.filter((e) => e.fromPkg.name === '@acorn/protocol')
     const allowed = new Set(['zod', 'vitest'])

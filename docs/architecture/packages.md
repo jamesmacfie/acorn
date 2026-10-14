@@ -103,6 +103,10 @@ to depend on something that was never meant to be public. A plugin declares only
 `linear` and `rollbar` also declare `./server/index.ts`, because a `vi.mock` has to name the module
 the code under test imports. The test holds that list at two.
 
+An app's production import from a plugin's `contract/` folder is a dependency on that one plugin, so
+each is listed with its reason on [first-party plugins](../first-party-plugins.md#what-the-apps-import-from-plugins),
+and the boundary test fails on one that isn't.
+
 No production file imports any package's `testkit/`. That's how a temporary-directory SQLite factory
 would end up shipped.
 

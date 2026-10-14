@@ -1,5 +1,5 @@
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
-import type { WorkflowChildRunSummary } from '../shared/api'
+import type { WorkflowChildRunSummary } from './wire.ts'
 
 export type WorkflowRunStatus =
   | 'running'
