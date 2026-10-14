@@ -275,6 +275,31 @@ describe('conversation', () => {
     ])
   })
 
+  it('renders messages as Markdown and a tool call as a state dot', async () => {
+    const subject = mount()
+    subject.say('s1', 'Run **the** tests')
+    const tool = (seq: number, status: string) =>
+      subject.state.events.get('s1')!.push({
+        id: `s1-t${seq}`,
+        seq,
+        turnId: 'turn',
+        createdAt: seq,
+        event: { type: 'tool', toolId: `tool-${seq}`, title: `pnpm test ${seq}`, status },
+      })
+    tool(2, 'completed')
+    tool(3, 'running')
+    subject.state.sessions[0]!.lastEventSeq = 3
+    await openSession(subject)
+    expect(subject.root.querySelector('.transcript li.agent strong + .ui-markdown strong')!.textContent).toBe('the')
+    // A finished call is its dot alone; any other state is written beside it.
+    expect(transcript(subject.root).slice(1)).toEqual(['pnpm test 2', 'pnpm test 3 · running'])
+    const dots = [...subject.root.querySelectorAll('.transcript li.tool .dot')]
+    expect(dots.map((dot) => [dot.getAttribute('data-tone'), dot.getAttribute('aria-label')])).toEqual([
+      ['ok', 'completed'],
+      ['active', 'running'],
+    ])
+  })
+
   it('keeps an unsent draft and the destination when the sidebar closes and opens again', async () => {
     const subject = mount()
     await openSession(subject)

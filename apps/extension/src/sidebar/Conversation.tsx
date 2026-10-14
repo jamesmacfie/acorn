@@ -1,5 +1,6 @@
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
 import type { BridgeAgentHint, BridgeAgentSession, BridgeAttachmentRef } from '@acorn/protocol/extensionBridge.ts'
+import { renderMarkdown } from '@acorn/client-core/kit/lib/markdown'
 import type { BrowserApi } from '../browser'
 import { CallFailure } from '../messages'
 import { conversationLink } from '../acornLinks'
@@ -12,7 +13,7 @@ import { conversationItems, conversationReader, type ConversationWindow } from '
 import { errorGuidance } from './guidance'
 import type { DraftTarget } from '../localState'
 import { Requests } from './Requests'
-import { State, agentName, agentState } from './state'
+import { State, agentName, agentState, toolTone } from './state'
 
 // One conversation: a window of its messages and tool calls, and a composer whose draft belongs to
 // this conversation alone. The parent mounts one per session, so every reply and write here is bound
@@ -128,14 +129,22 @@ export function Conversation(props: {
                 {(item) =>
                   item.kind === 'tool' ? (
                     <li class="tool">
-                      {item.title}
-                      <Show when={item.status}>{(status) => <span class="quiet"> · {status()}</span>}</Show>
+                      <span class="dot" data-tone={toolTone(item.status)} role="img" aria-label={item.status ?? 'unknown'} />
+                      <span>
+                        {item.title}
+                        {/* The dot says done on its own; any other state is written out too. */}
+                        <Show when={item.status !== 'completed' && item.status}>
+                          {(status) => <span class="quiet"> · {status()}</span>}
+                        </Show>
+                      </span>
                     </li>
                   ) : (
                     <li class={item.kind}>
                       <strong>{item.kind === 'you' ? 'You' : item.kind === 'agent' ? 'Agent' : 'Error'}</strong>
                       <Show when={item.text}>
-                        <p>{item.text}</p>
+                        <Show when={item.kind !== 'error'} fallback={<p>{item.text}</p>}>
+                          <Markdown text={item.text} />
+                        </Show>
                       </Show>
                       <Show when={item.kind === 'you' && item.attachments}>
                         {(attachments) => <Attachments attachments={attachments()} url={previews.url} />}
@@ -149,7 +158,7 @@ export function Conversation(props: {
                   <li class="you queued">
                     <strong>You · queued</strong>
                     <Show when={turn.text}>
-                      <p>{turn.text}</p>
+                      <Markdown text={turn.text} />
                     </Show>
                     <Attachments attachments={turn.attachments} url={previews.url} />
                   </li>
@@ -177,6 +186,12 @@ export function Conversation(props: {
       />
     </div>
   )
+}
+
+// A message as the desktop renders it: the shared renderer's escaped and sanitized HTML. A remote image
+// shows as its alt text, so a message can't make the browser fetch an address it names.
+function Markdown(props: { text: string }) {
+  return <div class="ui-markdown" innerHTML={renderMarkdown(props.text, { images: 'placeholder' })} />
 }
 
 // The attachments a turn sent: a picture for each screenshot, read through the bridge, and the name of

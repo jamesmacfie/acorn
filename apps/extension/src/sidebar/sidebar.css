@@ -80,7 +80,9 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .view-head .title { font-weight: var(--heading-weight); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subhead { display: flex; align-items: center; gap: var(--gap-inline); padding: var(--space-3) var(--space-6); border-bottom: var(--divider); }
-.view > section, .conversation-body, .composer { display: grid; gap: var(--gap-row); padding: var(--space-6); }
+/* One column no wider than the panel: an auto column grows to its longest unbroken word, so a long
+ * command in the transcript widened the conversation past the composer and the panel. */
+.view > section, .conversation-body, .composer { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-row); padding: var(--space-6); }
 .view > section { border-bottom: var(--chrome-divider); }
 /* A lone button in a section or form keeps its own width rather than the column's. */
 :is(.view > section, form) > button { justify-self: start; }
@@ -129,6 +131,9 @@ h2, h3 {
 .dot[data-tone='ok'] { background: var(--state-ok); border-color: var(--state-ok); }
 .dot[data-tone='warn'] { background: var(--state-warn); border-color: var(--state-warn); }
 .dot[data-tone='bad'] { background: var(--state-bad); border-color: var(--state-bad); }
+.dot[data-tone='active'] { background: var(--accent); border-color: var(--accent); animation: dot-pulse 1s var(--ease-in-out) infinite; }
+@keyframes dot-pulse { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .dot[data-tone='active'] { animation: none; } }
 
 /* ── Controls: 32 px buttons, inputs on the same rung ───────────────────────────────────────── */
 /* An `acorn://` link is an anchor, so the browser hands it to the desktop app, drawn as a button. */
@@ -200,11 +205,42 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .request ul.asked { list-style: disc; padding-left: var(--space-8); }
 
 /* ── Conversation ───────────────────────────────────────────────────────────────────────────── */
-/* Messages read top to bottom: the speaker as a label, then the text as written. */
-.transcript { display: grid; gap: var(--gap-stack); }
-.transcript li > strong { font-size: var(--label-size); font-weight: var(--label-weight); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); color: var(--text-muted); }
-.transcript li.tool { color: var(--text-muted); font-size: var(--fs-sm); }
-.transcript p { margin-top: var(--space-1); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Messages read top to bottom: each a card with the speaker as a label, striped like the desktop's,
+ * accent for you and green for the agent. A tool call is one muted line behind its state dot. */
+.transcript { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-stack); margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
+.transcript > li:not(.tool) {
+  padding: var(--space-4);
+  background: var(--card-bg);
+  border: var(--surface-border);
+  border-left-width: var(--stripe-w);
+  border-radius: var(--radius-surface);
+}
+.transcript > li.you { border-left-color: var(--accent); }
+.transcript > li.agent { border-left-color: var(--state-ok); }
+.transcript > li.error { border-left-color: var(--danger); }
+.transcript > li > strong { font-size: var(--label-size); font-weight: var(--label-weight); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); color: var(--text-muted); }
+.transcript > li.tool { display: flex; align-items: flex-start; gap: var(--space-3); color: var(--text-muted); font-size: var(--fs-sm); }
+.transcript > li.tool .dot { margin-top: calc((1lh - 8px) / 2); }
+.transcript > li.error p { margin-top: var(--space-1); white-space: pre-wrap; }
+
+/* Rendered Markdown: the desktop's .ui-markdown rules (client-core primitives.css), which the panel
+ * can't load whole. Lists get their markers back from the reset at the top. */
+.ui-markdown { font-size: var(--fs-sm); line-height: var(--lh); }
+.ui-markdown > :first-child { margin-top: var(--space-1); }
+.ui-markdown > :last-child { margin-bottom: 0; }
+.ui-markdown p { margin: var(--space-3) 0; }
+.ui-markdown ul { list-style: disc; }
+.ui-markdown ol { list-style: decimal; }
+.ui-markdown :is(ul, ol) { margin: var(--space-3) 0; padding-left: var(--space-8); }
+.ui-markdown :is(pre, code) { font-family: var(--font-mono); background: var(--bg-subtle); border-radius: var(--radius); }
+.ui-markdown pre { margin: var(--space-3) 0; padding: var(--space-4); overflow-x: auto; border: var(--surface-border); }
+.ui-markdown pre code { background: none; }
+.ui-markdown :is(h1, h2, h3, h4, h5, h6) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); font-weight: var(--fw-semibold); color: var(--text); text-transform: none; letter-spacing: normal; }
+.ui-markdown a { color: var(--accent); }
+.ui-markdown blockquote { margin: var(--space-4) 0; padding-left: var(--space-5); border-left: var(--surface-bw) solid var(--border); color: var(--text-muted); }
+.ui-markdown table { display: block; width: max-content; max-width: 100%; overflow-x: auto; margin: var(--space-4) 0; border-collapse: collapse; overflow-wrap: break-word; }
+.ui-markdown :is(th, td) { padding: var(--space-3) var(--space-6); border: var(--chrome-divider); text-align: start; vertical-align: top; }
+.ui-markdown th { background: var(--bg-subtle); font-weight: var(--fw-semibold); }
 .attachments { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); }
 .attachments img { display: block; max-width: 100%; max-height: 160px; object-fit: contain; border: var(--divider); border-radius: var(--radius-control); }
 .composer { position: sticky; bottom: 0; background: var(--bg); border-top: var(--chrome-divider); }
