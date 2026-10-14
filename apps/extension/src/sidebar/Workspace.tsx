@@ -29,7 +29,7 @@ import { Waiting } from './Waiting'
 // so a slow reply can't fill the wrong list.
 export function Workspace(props: {
   client: BridgeClient
-  storage: BrowserApi['storage']
+  api: BrowserApi
   nodeId: string
   online: boolean
   // Whether Open in Acorn may open the desktop app, or copies its link.
@@ -43,6 +43,8 @@ export function Workspace(props: {
   pageUrl: string | undefined
   handoffs: readonly BridgeHandoff[]
   sites: readonly ProjectSite[]
+  // The apps plugins published for tasks, which Home offers to allow with the other sites.
+  apps: readonly SiteAssociation[]
   sitesChanged(projectId: string, sites: SiteAssociation[]): void
   // The tasks the page belongs to, matched in the browser, and a task chip's click asking to show
   // the page's task, with a new chat about the page for `chat`.
@@ -86,7 +88,7 @@ export function Workspace(props: {
     setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
   }
   // Only the person's own choices are remembered, so a restore that stops part-way loses nothing.
-  const remember = () => void saveDestination(props.storage.local, nodeId, current())
+  const remember = () => void saveDestination(props.api.storage.local, nodeId, current())
 
   const loadProjects = async () => {
     setProblem(null)
@@ -156,7 +158,7 @@ export function Workspace(props: {
     const capture = props.waitingContext
     if (capture) {
       try {
-        await changeDraft(props.storage.local, { nodeId, taskId: forTask, sessionId: id }, (draft) => {
+        await changeDraft(props.api.storage.local, { nodeId, taskId: forTask, sessionId: id }, (draft) => {
           const captures = draft.captures ?? []
           // The same item handed off twice is one capture.
           if (captures.some((other) => other.kind === 'context' && other.url === capture.url)) return draft
@@ -220,7 +222,7 @@ export function Workspace(props: {
   ) {
     props.dismissHandoff()
     try {
-      await changeDraft(props.storage.local, { nodeId, taskId, sessionId }, (stored) => ({
+      await changeDraft(props.api.storage.local, { nodeId, taskId, sessionId }, (stored) => ({
         ...stored,
         text: stored.text || draft.text,
         captures: withCapture(stored.captures ?? [], draft.capture),
@@ -236,7 +238,7 @@ export function Workspace(props: {
 
   // Opens a request's conversation, as a remembered one is restored.
   const openConversation = (target: Destination & { projectId: string; taskId: string }) => {
-    void saveDestination(props.storage.local, nodeId, target)
+    void saveDestination(props.api.storage.local, nodeId, target)
     void restore(target.projectId, target.taskId, (list) => {
       if (list.some((session) => session.id === target.sessionId)) showSession(target.sessionId!)
     })
@@ -313,12 +315,12 @@ export function Workspace(props: {
     if (id === plain) delete next[key]
     else next[key] = id ?? ''
     setSiteChoices(next)
-    void saveSiteChoices(props.storage.local, nodeId, next)
+    void saveSiteChoices(props.api.storage.local, nodeId, next)
   }
 
   onMount(async () => {
-    const remembered = await loadDestination(props.storage.local, nodeId)
-    setSiteChoices(await loadSiteChoices(props.storage.local, nodeId))
+    const remembered = await loadDestination(props.api.storage.local, nodeId)
+    setSiteChoices(await loadSiteChoices(props.api.storage.local, nodeId))
     await loadProjects()
     // A request opened from a notification while this loaded chose already.
     if (chosen || !remembered.projectId || !remembered.taskId) return
@@ -392,8 +394,11 @@ export function Workspace(props: {
               nodeId={nodeId}
               online={props.online}
               opensLinks={props.opensLinks}
+              api={props.api}
               pageUrl={props.pageUrl}
               handoffs={props.handoffs}
+              sites={props.sites}
+              apps={props.apps}
               pageTasks={props.pageTasks}
               markerHidden={props.markerHidden}
               showMarker={props.showMarker}
@@ -452,19 +457,37 @@ export function Workspace(props: {
         }
       >
         {(sessionId) => (
-          <Conversation
-            client={props.client}
-            storage={props.storage}
-            target={{ nodeId, taskId: current().taskId!, sessionId }}
-            session={session()!}
-            taskTitle={task()?.title ?? ''}
-            back={back}
-            online={props.online}
-            opensLinks={props.opensLinks}
-            hint={props.hint}
-            reconnects={props.reconnects}
-            capture={props.capture}
-          />
+          <>
+            {/* The page beside the panel belongs to another task. The conversation stays, because pages
+                are often visited to capture them into it; Switch opens that task, and drafts are kept. */}
+            <Show when={pageTask() && pageTask()!.task.id !== current().taskId ? pageTask() : null}>
+              {(other) => (
+                <div class="banner notice row" role="status">
+                  <span class="grow">This page is in task {other().task.title}.</span>
+                  <button
+                    type="button"
+                    class="quiet"
+                    onClick={() => chatInTask(other().task.projectId, other().task.id)}
+                  >
+                    Switch
+                  </button>
+                </div>
+              )}
+            </Show>
+            <Conversation
+              client={props.client}
+              storage={props.api.storage}
+              target={{ nodeId, taskId: current().taskId!, sessionId }}
+              session={session()!}
+              taskTitle={task()?.title ?? ''}
+              back={back}
+              online={props.online}
+              opensLinks={props.opensLinks}
+              hint={props.hint}
+              reconnects={props.reconnects}
+              capture={props.capture}
+            />
+          </>
         )}
       </Show>
     </>

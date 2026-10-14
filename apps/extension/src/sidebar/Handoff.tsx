@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createSignal, onMount } from 'solid-js'
+import { For, Show, createEffect, createSignal, on, onMount } from 'solid-js'
 import type { BridgeHandoffItem } from '@acorn/protocol/extensionBridge.ts'
 import { TURN_TEXT_MAX_CHARS } from '@acorn/protocol/extensionBridge.ts'
 import { CallFailure, isUncertain } from '../messages'
@@ -32,6 +32,8 @@ export function Handoff(props: {
   client: BridgeClient
   nodeId: string
   handoff: PageHandoff
+  // Whether the tab still shows the item, as a pull request's other tabs do.
+  onPage: boolean
   online: boolean
   // Whether Open in Acorn may open the desktop app, or copies its link.
   opensLinks: boolean
@@ -130,11 +132,29 @@ export function Handoff(props: {
     }
   }
 
+  // The person changed Start task's first message, which leaving the page mustn't throw away.
+  const edited = () => {
+    const current = item()
+    return !!current && message() !== firstMessage(current)
+  }
+  // Leaving the item's page closes the card, unless closing it would lose that message or a start
+  // under way.
+  createEffect(
+    on(
+      () => props.onPage,
+      (here) => !here && !edited() && !creating() && props.dismiss(),
+      { defer: true },
+    ),
+  )
+
   const projectName = (id: string) => item()?.projects.find((project) => project.id === id)?.name
 
   return (
     <div class="handoff" role="group" aria-label="Handoff">
       <p class="quiet">{props.handoff.url}</p>
+      <Show when={!props.onPage && edited()}>
+        <p class="notice">This is about a page you've left. It stays open so your message isn't lost.</p>
+      </Show>
       <Show when={problem()}>
         {(message) => (
           <p class="problem" role="alert">

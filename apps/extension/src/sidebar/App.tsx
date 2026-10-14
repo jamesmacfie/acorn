@@ -64,6 +64,11 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     nodeId: null,
     tasks: [],
   })
+  // The apps plugins published for the selected Node's tasks, for site access.
+  const apps = () =>
+    taskPages().nodeId === fleet()?.activeNodeId
+      ? taskPages().tasks.flatMap((task) => task.pages.filter((page) => page.status))
+      : []
   const [showTask, setShowTask] = createSignal<{ chat: { url: string; title: string } | null } | null>(null)
   // A handed-off item's context, waiting for the conversation the person opens next.
   const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
@@ -286,7 +291,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
               {(nodeId) => (
                 <Workspace
                   client={client}
-                  storage={props.api.storage}
+                  api={props.api}
                   nodeId={nodeId}
                   online={online()}
                   opensLinks={props.opensLinks ?? false}
@@ -297,6 +302,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   pageUrl={pageUrl()}
                   handoffs={handoffs()}
                   sites={sites()}
+                  apps={apps()}
                   sitesChanged={(projectId, changed) => sitesChanged(nodeId, projectId, changed)}
                   pageTasks={pageTasks(taskPages().nodeId === nodeId ? taskPages().tasks : [], pageUrl())}
                   markerHidden={(origin) => hiddenMarkers().includes(origin)}
@@ -330,11 +336,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
             forget={(nodeId) => void forget(nodeId)}
             handoffs={handoffs()}
             sites={sites()}
-            apps={
-              taskPages().nodeId === fleet()?.activeNodeId
-                ? taskPages().tasks.flatMap((task) => task.pages.filter((page) => page.status))
-                : []
-            }
+            apps={apps()}
             pageUrl={pageUrl()}
             sitesChanged={(projectId, changed) => {
               const nodeId = fleet()?.activeNodeId

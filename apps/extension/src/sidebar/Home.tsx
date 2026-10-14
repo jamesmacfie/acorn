@@ -7,9 +7,10 @@ import type {
   BridgeSessionRead,
   BridgeTask,
 } from '@acorn/protocol/extensionBridge.ts'
-import { parseSiteAddress, type SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
+import { parseSiteAddress, type ProjectSite, type SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import { itemTaskLink, projectLink } from '../acornLinks'
-import { pageHandoffs, type PageHandoff } from '../handoffs'
+import type { BrowserApi } from '../browser'
+import { onHandoffPage, pageHandoffs, type PageHandoff } from '../handoffs'
 import { CallFailure } from '../messages'
 import type { PageTask } from '../taskPages'
 import { AgentSelect, agentChoice } from './agentChoice'
@@ -19,6 +20,7 @@ import { conversationItems } from './conversationWindow'
 import { errorGuidance } from './guidance'
 import { Handoff } from './Handoff'
 import { OpenInAcorn } from './OpenInAcorn'
+import { SiteAccess } from './SiteAccess'
 import { State, agentName, agentState } from './state'
 
 // Home's sections below Waiting for you. Workspace owns the state they draw.
@@ -31,8 +33,12 @@ export function ThisPage(props: {
   nodeId: string
   online: boolean
   opensLinks: boolean
+  api: BrowserApi
   pageUrl: string | undefined
   handoffs: readonly BridgeHandoff[]
+  // The sites access is for, which a page Acorn can't read offers to allow.
+  sites: readonly ProjectSite[]
+  apps: readonly SiteAssociation[]
   // The tasks the page belongs to, matched in the browser.
   pageTasks: readonly PageTask[]
   markerHidden(origin: string): boolean
@@ -81,6 +87,7 @@ export function ThisPage(props: {
               client={props.client}
               nodeId={props.nodeId}
               handoff={handoff}
+              onPage={onHandoffPage(props.handoffs, handoff, props.pageUrl)}
               online={props.online}
               opensLinks={props.opensLinks}
               openTask={props.openHandoffTask}
@@ -94,6 +101,9 @@ export function ThisPage(props: {
             Your browser hides this page's address from Acorn. Click the Acorn icon in the browser toolbar to find tasks
             for this page.
           </p>
+          {/* The browser hides the address of a page Acorn can't read, so every site still to allow is
+              offered, not just this one. */}
+          <SiteAccess api={props.api} handoffs={props.handoffs} sites={props.sites} apps={props.apps} notAllowedOnly />
         </Match>
         <Match when={props.pageTasks.length}>
           <ul class="rows" aria-label="Page tasks">

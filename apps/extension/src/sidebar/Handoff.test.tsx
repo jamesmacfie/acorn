@@ -286,6 +286,28 @@ describe('a handoff in the sidebar', () => {
     expect(root.textContent).toContain('acme/widget#42')
   })
 
+  it("closes the card when the tab leaves the item, unless the person edited Start task's message", async () => {
+    const { fake, root } = mount()
+    await settle(20)
+    await clickSiteButton(fake)
+    const card = () => root.querySelector('[aria-label="Handoff"]')
+    expect(card()).not.toBeNull()
+    fake.navigate('https://tracker.example/items/43')
+    await settle(20)
+    expect(card()).toBeNull()
+
+    await clickSiteButton(fake)
+    const message = root.querySelector<HTMLTextAreaElement>('textarea[name="first-message"]')!
+    message.value = 'Find why the test is flaky.'
+    message.dispatchEvent(new Event('input', { bubbles: true }))
+    fake.navigate('https://elsewhere.example/')
+    await settle(20)
+    expect(card()!.textContent).toContain("This is about a page you've left.")
+    expect(root.querySelector<HTMLTextAreaElement>('textarea[name="first-message"]')!.value).toBe(
+      'Find why the test is flaky.',
+    )
+  })
+
   it('takes the offer back when the tab moves to a page it may not read', async () => {
     const { fake, root } = mount({ url: PAGE })
     await settle(30)
@@ -308,6 +330,19 @@ describe('a handoff in the sidebar', () => {
     fake.clickAction()
     await settle(20)
     expect(button(root, 'Look up in Acorn')).toBeDefined()
+  })
+
+  it('offers the sites still to allow on a page it may not read', async () => {
+    const { fake, root } = mount()
+    fake.activeTab = { ...fake.activeTab, url: undefined }
+    fake.activate()
+    await settle(30)
+    const toAllow = () => root.querySelector('[aria-label="Sites to allow"]')
+    expect(toAllow()?.textContent).toContain('tracker.example')
+    button(toAllow() as HTMLElement, 'Allow')!.click()
+    await settle(20)
+    expect(fake.granted.has('https://tracker.example/*')).toBe(true)
+    expect(toAllow()).toBeNull()
   })
 
   it('asks for site access from a click, and says when an item has no project here', async () => {

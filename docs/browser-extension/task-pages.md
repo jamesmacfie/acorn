@@ -73,7 +73,9 @@ states:
 **Current task** stays pinned below on a page whose task isn't the current one, and on a page that
 matches nothing, so a capture always has somewhere to go. The sidebar reads the page again when the
 tab finishes loading, so the section follows the tab, and says so when the page is one it may not
-read.
+read. Then it also lists each site under **Site access** that isn't allowed yet, with **Allow**. The
+browser hides the address of a page the extension may not read, so the panel can't tell which of
+those sites the page is on, and offers them all.
 
 ## The branch marker
 
