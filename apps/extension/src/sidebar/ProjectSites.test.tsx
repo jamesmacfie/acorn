@@ -79,7 +79,7 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
         state.active = request.nodeId as string
         return nodes()
       case 'handoffs.list':
-        return { nodeId, handoffs: nodeId === 'n1' ? state.handoffs : [] }
+        return { nodeId, handoffs: nodeId === 'n1' ? state.handoffs : [], panels: [] }
       case 'tasks.pages':
         return { nodeId, tasks: nodeId === 'n1' ? state.taskPages : [] }
       case 'sites.list':

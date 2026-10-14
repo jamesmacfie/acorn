@@ -1,4 +1,5 @@
-// A loaded plugin's node half that serves one browser handoff and its tasks' app addresses, written
+// A loaded plugin's node half that serves one browser handoff, its tasks' app addresses, and a sidebar
+// panel for one task, written
 // against the public contract alone: no browser code and no core import. browserHandoffs.test.ts runs
 // it in its real worker.
 export default {
@@ -42,6 +43,32 @@ export default {
           ],
         }),
       { prefix: '/task-addresses' },
+    )
+    // task-1 has a panel; every other task answers 404, so the extension shows no nav item for it.
+    ctx.routes.fetch(
+      async (request) => {
+        const query = new URL(request.url).searchParams
+        if (query.get('taskId') !== 'task-1') return new Response(null, { status: 404 })
+        const source = query.get('source') ?? 'web'
+        return Response.json({
+          blocks: [
+            { kind: 'status', label: 'Tracker app', state: 'running', severity: 'info' },
+            { kind: 'links', title: 'Links', links: [{ label: 'App', url: 'https://tracker-app.localhost:5104' }] },
+            { kind: 'rows', title: 'Services', rows: [{ label: 'web', state: 'healthy', severity: 'info' }] },
+            {
+              kind: 'logs',
+              title: 'Logs',
+              sources: [
+                { id: 'web', label: 'web' },
+                { id: 'worker', label: 'worker' },
+              ],
+              source,
+              lines: [`${source} ready`],
+            },
+          ],
+        })
+      },
+      { prefix: '/browser-panel' },
     )
   },
 }

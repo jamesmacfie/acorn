@@ -327,3 +327,5 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .chip .thumb { height: var(--icon-box); width: auto; border-radius: var(--radius-xs); }
 .chip .quiet { display: block; overflow-wrap: anywhere; font-size: var(--fs-xs); }
 .chip blockquote, .chip pre.context { margin: var(--space-2) 0 0; padding-left: var(--space-4); border-left: var(--bw-strong) solid var(--border); white-space: pre-wrap; font: inherit; max-height: 8.5em; overflow: auto; }
+/* A plugin panel's status detail and log lines, as the plugin wrote them. */
+.panel-block pre { margin: 0; font: var(--fs-sm) / var(--lh-tight) var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24em; overflow: auto; }

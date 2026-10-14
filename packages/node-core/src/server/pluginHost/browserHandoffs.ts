@@ -1,6 +1,6 @@
-// The browser handoffs and task address routes each running plugin declares, for the extension's
-// discovery route (docs/plugin-authoring/browser-handoffs.md). Filled by the host from a loaded
-// manifest's `contributions.browserHandoffs` and `contributions.taskAddresses`, or a built-in's
+// The browser handoffs, task address routes, and sidebar panels each running plugin declares, for the
+// extension's discovery route (docs/plugin-authoring/browser-handoffs.md). Filled by the host from a
+// loaded manifest's `contributions.browserHandoffs`, `taskAddresses`, and `browserPanel`, or a built-in's
 // `NodePlugin.browserHandoffs`, and emptied with the plugin's other registrations. A package waiting
 // for review or a restart has no binding yet, so its declarations aren't here until it runs.
 import { z } from 'zod'
@@ -8,10 +8,17 @@ import {
   browserHandoffDescriptor,
   type BrowserHandoff,
   type BrowserHandoffDescriptor,
+  type BrowserPanel,
+  type BrowserPanelDescriptor,
   type TaskAddressesRoute,
 } from '@acorn/protocol/plugin/handoffs.ts'
 
-const declared = new Map<string, { handoffs: readonly BrowserHandoff[]; taskAddresses: string | undefined }>()
+type Declaration = {
+  handoffs: readonly BrowserHandoff[]
+  taskAddresses: string | undefined
+  panel: BrowserPanelDescriptor | undefined
+}
+const declared = new Map<string, Declaration>()
 
 // Both tiers pass this, so a compiled declaration meets the rules a manifest does: the descriptor
 // schema, a resolve route inside the plugin's own namespace, and IDs unique within the plugin. A loaded
@@ -35,13 +42,18 @@ function validated(pluginId: string, descriptors: readonly BrowserHandoffDescrip
 }
 
 /** Record what `pluginId` declares. Returns the undo for the plugin's registration list. Only a loaded
- *  manifest declares `taskAddresses`, and its parse already confined the route to the plugin. */
+ *  manifest declares `taskAddresses` and `browserPanel`, and its parse already confined their routes to
+ *  the plugin. */
 export function declareBrowserHandoffs(
   pluginId: string,
   descriptors: readonly BrowserHandoffDescriptor[],
-  taskAddresses?: string,
+  loaded: { taskAddresses?: string; browserPanel?: BrowserPanelDescriptor } = {},
 ): () => void {
-  const declaration = { handoffs: validated(pluginId, descriptors), taskAddresses }
+  const declaration = {
+    handoffs: validated(pluginId, descriptors),
+    taskAddresses: loaded.taskAddresses,
+    panel: loaded.browserPanel,
+  }
   declared.set(pluginId, declaration)
   return () => {
     if (declared.get(pluginId) === declaration) declared.delete(pluginId)
@@ -57,4 +69,11 @@ export const taskAddressRoutes = (): TaskAddressesRoute[] =>
   [...declared.keys()].sort().flatMap((pluginId) => {
     const route = declared.get(pluginId)!.taskAddresses
     return route === undefined ? [] : [{ pluginId, route }]
+  })
+
+/** Every running plugin's sidebar panel, ordered by plugin. */
+export const browserPanels = (): BrowserPanel[] =>
+  [...declared.keys()].sort().flatMap((pluginId) => {
+    const panel = declared.get(pluginId)!.panel
+    return panel === undefined ? [] : [{ pluginId, ...panel }]
   })

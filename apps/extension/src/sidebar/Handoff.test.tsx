@@ -81,7 +81,7 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
           status: { nodeId: 'n1', state: 'online' },
         }
       case 'handoffs.list':
-        return { nodeId: 'n1', handoffs: [handoff] }
+        return { nodeId: 'n1', handoffs: [handoff], panels: [] }
       case 'handoff.resolve':
         return { nodeId: 'n1', url: request.url, items: state.items }
       case 'handoff.create': {

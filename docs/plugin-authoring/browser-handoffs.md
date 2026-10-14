@@ -167,10 +167,10 @@ for it, and the person still decides which sites the extension may read.
 
 ## Discovery and activation
 
-`GET /v1/core/browser-handoffs` lists every running plugin's handoffs, each with its `pluginId`, and
-its task address routes as `taskAddresses: [{ pluginId, route }]`. It is device-only. A package waiting for review isn't listed until it runs, a disabled or
-failed plugin isn't listed, and a reload replaces the list with the new version's. The host
-broadcasts `plugins:changed` on each of these, and the extension reads the list again.
+`GET /v1/core/browser-handoffs` lists every running plugin's handoffs, each with its `pluginId`, its
+task address routes as `taskAddresses: [{ pluginId, route }]`, and its [sidebar panel](./browser-panel.md) under `panels`.
+It is device-only. A package waiting for review isn't listed until it runs, a disabled or failed plugin isn't listed,
+and a reload replaces the list with the new version's. The host broadcasts `plugins:changed` on each of these, and the extension reads the list again.
 
 ## Ship a handoff
 

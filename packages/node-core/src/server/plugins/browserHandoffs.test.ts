@@ -3,10 +3,16 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { browserHandoffResolution, matchHandoffPage, taskAddressList } from '@acorn/protocol/plugin/handoffs.ts'
+import {
+  browserHandoffResolution,
+  browserPanelView,
+  matchHandoffPage,
+  taskAddressList,
+} from '@acorn/protocol/plugin/handoffs.ts'
 import { isolateNodePlugin } from './isolation'
 import { installedPluginInfo, loadExternalPlugins, loadedPluginBinding, pluginInstallDir } from './loader'
 import { PLUGIN_API_MAJOR, pluginManifestSchema } from './manifest'
+import { browserPanels, declareBrowserHandoffs } from '../pluginHost/browserHandoffs'
 import type { CompiledNodePluginContext, PluginFetchHandler } from '../pluginHost/types'
 
 // The browser handoff contract from a stranger's side: a package on disk declares a site button and
@@ -25,6 +31,8 @@ const handoff = {
   resolve: `/v1/p/${ID}/handoff/resolve`,
 }
 const taskAddresses = `/v1/p/${ID}/task-addresses`
+const browserPanel = { label: 'Tracker', glyph: 'kanban', pane: 'board', route: `/v1/p/${ID}/browser-panel` }
+const pane = { target: 'pane', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' } }
 
 const manifest = (over: Record<string, unknown> = {}) => ({
   id: ID,
@@ -33,7 +41,7 @@ const manifest = (over: Record<string, unknown> = {}) => ({
   baseline: 'acorn-1',
   apiVersion: PLUGIN_API_MAJOR,
   node: './dist/node.js',
-  contributions: { browserHandoffs: [handoff], taskAddresses },
+  contributions: { browserHandoffs: [handoff], taskAddresses, browserPanel, frames: [pane] },
   ...over,
 })
 
@@ -65,6 +73,11 @@ describe('a loaded plugin declaring a browser handoff', () => {
     expect(result.failures).toEqual([])
     expect(loadedPluginBinding(result.loaded[0]!).browserHandoffs).toEqual([handoff])
     expect(loadedPluginBinding(result.loaded[0]!).taskAddresses).toBe(taskAddresses)
+    expect(loadedPluginBinding(result.loaded[0]!).browserPanel).toEqual(browserPanel)
+    // Discovery lists what the binding declares.
+    const undo = declareBrowserHandoffs(ID, [], loadedPluginBinding(result.loaded[0]!))
+    expect(browserPanels()).toEqual([{ pluginId: ID, ...browserPanel }])
+    undo()
     expect(installedPluginInfo(result.installed[0]!).contributions.browserHandoffs).toEqual([handoff])
   })
 
@@ -90,6 +103,24 @@ describe('a loaded plugin declaring a browser handoff', () => {
     ])
   })
 
+  it.each([
+    ['a route outside its namespace', { route: '/v1/core/tasks' }, /route must be inside \/v1\/p\/tracker\//],
+    ['an unknown pane', { pane: 'missing' }, /pane names 'missing'/],
+  ])('refuses a browser panel with %s', async (_name, change, reason) => {
+    const result = await load(
+      manifest({ contributions: { browserPanel: { ...browserPanel, ...change }, frames: [pane] } }),
+    )
+    expect(result.installed).toEqual([])
+    expect(result.failures[0]!.reason).toMatch(reason)
+  })
+
+  it('refuses a browser panel with no node half to serve it', () => {
+    const parsed = pluginManifestSchema.safeParse(manifest({ node: undefined, contributions: { browserPanel } }))
+    expect(parsed.error?.issues.map((issue) => issue.message)).toContain(
+      'a browser panel comes from a node route; declare `node` in the manifest',
+    )
+  })
+
   it('refuses a duplicate id, too many handoffs, and a handoff with no node half to serve it', async () => {
     const duplicate = await load(manifest({ contributions: { browserHandoffs: [handoff, handoff] } }))
     expect(duplicate.failures[0]!.reason).toMatch(/duplicate contribution id 'item'/)
@@ -106,7 +137,7 @@ describe('a loaded plugin declaring a browser handoff', () => {
   it('serves a resolution and task addresses from its own worker that pass the shared schemas', async () => {
     const parsed = pluginManifestSchema.parse(manifest())
     const routes = new Map<string, PluginFetchHandler>()
-    // The fixture registers two routes; everything else the worker projects is inert here.
+    // The fixture registers three routes; everything else the worker projects is inert here.
     const ctx = {
       routes: {
         fetch: (handler: PluginFetchHandler, options: { prefix: string }) => void routes.set(options.prefix, handler),
@@ -147,6 +178,15 @@ describe('a loaded plugin declaring a browser handoff', () => {
           severity: 'info',
         },
       ])
+      const panel = routes.get('/browser-panel')!
+      const view = await panel(new Request('https://acorn.invalid/?taskId=task-1&source=worker'), asOwner)
+      expect(browserPanelView.parse(await view.json()).blocks.map((block) => block.kind)).toEqual([
+        'status',
+        'links',
+        'rows',
+        'logs',
+      ])
+      expect((await panel(new Request('https://acorn.invalid/?taskId=task-2'), asOwner)).status).toBe(404)
     } finally {
       await plugin.dispose?.()
     }
