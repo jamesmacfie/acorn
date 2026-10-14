@@ -118,6 +118,8 @@ export type LoadedPluginBinding = {
   contextSections?: readonly PluginContextSectionDescriptor[]
   // Buttons the browser extension draws, replayed into the handoff registry (./browserHandoffs.ts).
   browserHandoffs?: readonly BrowserHandoffDescriptor[]
+  // The route listing its tasks' app addresses for the browser extension, kept beside the handoffs.
+  taskAddresses?: string
   destinations?: readonly NonNullable<PluginFrameSurface['destinations']>[number][]
   // The plugin's installed package directory, for resolving a manifest path the host hands on as an
   // absolute one. Host-side only: this is a path on the node's filesystem and must never reach a route

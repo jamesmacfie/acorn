@@ -12,8 +12,8 @@ export function extensionManifest(browser: BridgeBrowser, version: string) {
     action: { default_title: 'Open Acorn' },
     // Private windows stay out of reach in this release.
     incognito: 'not_allowed',
-    // Page capture reads the tab the toolbar button was clicked on (`activeTab`), or a site the person
-    // has granted. Nothing is granted at install.
+    // Page capture reads the tab the toolbar button or the right-click entry was clicked on
+    // (`activeTab`), or a site the person has granted. Nothing is granted at install.
     optional_host_permissions: ['https://*/*', 'http://*/*'],
     // OS notifications of waiting requests are the person's opt-in, asked for from the sidebar.
     optional_permissions: ['notifications'],
@@ -23,13 +23,13 @@ export function extensionManifest(browser: BridgeBrowser, version: string) {
       ...shared,
       key: CHROME_EXTENSION_KEY,
       minimum_chrome_version: '116',
-      permissions: ['nativeMessaging', 'storage', 'sidePanel', 'activeTab', 'scripting'],
+      permissions: ['nativeMessaging', 'storage', 'sidePanel', 'activeTab', 'scripting', 'contextMenus'],
       background: { service_worker: 'background.js', type: 'module' },
       side_panel: { default_path: 'sidebar.html' },
     }
   return {
     ...shared,
-    permissions: ['nativeMessaging', 'storage', 'activeTab', 'scripting'],
+    permissions: ['nativeMessaging', 'storage', 'activeTab', 'scripting', 'contextMenus'],
     background: { scripts: ['background.js'], type: 'module' },
     sidebar_action: { default_title: 'Acorn', default_panel: 'sidebar.html', open_at_install: false },
     browser_specific_settings: {

@@ -46,7 +46,7 @@ const shortcuts: SearchDeclaration = {
     {
       id: 'global',
       label: 'Global',
-      rows: ['Open settings', 'Toggle rail', 'Switch to the last workspace', 'Show keyboard shortcuts'],
+      rows: ['Open settings', 'Switch to the last workspace', 'Show keyboard shortcuts'],
     },
     { id: 'panes', label: 'Panes', rows: ['Maximize or restore the focused pane', 'Toggle terminal drawer'] },
     { id: 'tasks', label: 'Tasks', rows: ['New task'] },

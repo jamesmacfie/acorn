@@ -1,4 +1,4 @@
-import type { BrowserApi } from '../browser'
+import type { BrowserApi } from './browser'
 import type { PageCapture } from './capture'
 
 // What the sidebar keeps in this browser profile's storage: unsent drafts, and the destination it
@@ -44,6 +44,17 @@ export async function saveDraft(storage: Storage, target: DraftTarget, draft: Dr
   }
   if (!rest.text && !rest.pending) await storage.remove([draftKey(target)])
   else await storage.set({ [draftKey(target)]: rest })
+}
+
+// The captures a storage change stored for `target`, or undefined when it left them alone. The
+// background stores one this way when the page's right-click menu adds a selection.
+export function changedCaptures(
+  target: DraftTarget,
+  changes: Record<string, { newValue?: unknown }>,
+): PageCapture[] | undefined {
+  if (!(capturesKey(target) in changes)) return undefined
+  const captures = changes[capturesKey(target)]?.newValue
+  return Array.isArray(captures) ? (captures as PageCapture[]) : []
 }
 
 // Changes the stored draft of a conversation the sidebar no longer shows, for an operation that

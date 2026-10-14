@@ -125,7 +125,7 @@ const step = (): void => {
   if (counting) visited += 1
 }
 // How many times a region has come or gone, as a signal, because the footer's answers depend on the
-// list and not only on where the keys are: the rail hides on Ctrl+B, the pane strip draws only while
+// list and not only on where the keys are: the rail hides on `/`, the pane strip draws only while
 // a task is open, and neither has to move focus to change what Tab can reach. A counter rather than a
 // signal holding the list, because nothing reads the list reactively: the questions are "how many"
 // and "which columns" (§ regionsInScope, ../chrome/bindings.ts § activeHints).
@@ -355,7 +355,7 @@ export function registerRegion(
     registryChanged()
     if (lastByColumn.get(group.x) === group) lastByColumn.delete(group.x)
     setMounted((count) => count + 1)
-    // A conditional region can go while it holds the keys: the rail hides on Ctrl+B, the pane strip
+    // A conditional region can go while it holds the keys: the rail hides on `/`, the pane strip
     // draws only while a task is open, and Browse registers nothing without a list. Look again, or
     // the keys sit inside a subtree the reader can no longer see.
     scheduleSettle()

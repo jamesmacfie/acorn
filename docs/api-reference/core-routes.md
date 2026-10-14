@@ -14,6 +14,8 @@ Every route in this table is device-only.
 | --- | --- | --- |
 | `POST` | `/v1/core/pair/start` | Open or replace the ten-minute pairing window |
 | `DELETE` | `/v1/core/pair` | Close the pairing window |
+| `GET` | `/v1/core/pair/requests` | Read the pairing request waiting for an answer |
+| `POST` | `/v1/core/pair/requests/:id` | Allow or deny that request |
 | `GET` | `/v1/core/devices` | List paired devices, without token material |
 | `DELETE` | `/v1/core/devices/:id` | Revoke a device and close its sockets |
 | `GET` | `/v1/core/plugins` | The plugin roster, install state, and pending agent install requests |

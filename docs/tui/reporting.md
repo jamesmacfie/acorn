@@ -40,7 +40,7 @@ keeps the marks for the `[acorn:boot]` account it prints on exit, and `App.tsx` 
 trace the first time the preference reads yes.
 
 Three files print to the terminal on purpose: the pairing banner and instructions in
-`apps/tui/src/node/pair.ts` and `apps/tui/src/node/open.ts`, which print before any renderer exists,
+`packages/custody/src/local/pair.ts` and `apps/tui/src/node/open.ts`, which print before any renderer exists,
 and the data-root path in `apps/tui/src/platform.ts`, which is what "open the data folder" means here.
 `tools/arch/boundaries.test.ts` holds those three as a baseline that may only shrink.
 

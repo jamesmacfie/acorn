@@ -6,6 +6,7 @@ import { QueryClient } from '@tanstack/solid-query'
 import { persistQueryClientRestore } from '@tanstack/query-persist-client-core'
 import { lockedBy } from '@acorn/node-core/server/storage'
 import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
+import { runningNode } from '@acorn/custody/local'
 import { cacheKeyFor, clientFor, setCacheStorage } from '@acorn/client-core/infra/node/fleet.ts'
 import { PERSISTED_SNAPSHOT_MAX_AGE_MS } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
 import { tasksKey, type Task } from '@acorn/protocol/api.ts'
@@ -120,12 +121,31 @@ describe('acorn against a node it started', () => {
     expect(custody(join(root, 'config')).fleet.get(opened.nodeId)?.endpoint).toBeDefined()
   }, 30_000)
 
-  it('reports a token the node refuses as revoked, and stops retrying', async () => {
-    // A second device with its own config directory and a token that was never issued. The node's
-    // answer at the upgrade is a 401, which is the state the footer reads.
+  it('forgets a saved token the node refuses, and asks to pair instead', async () => {
+    // A second device with its own config directory and a token that was never issued, which is what
+    // a revoked token or one from a reset data root looks like to the node.
     const stranger = custody(join(root, 'stranger'))
     stranger.tokens.write(LOCAL_TOKEN_SCOPE, 'acorn_dt_00000000-0000-4000-8000-000000000000_notatoken')
-    const attached = await openNode(undefined, stranger)
+    // Pairing turned off, so the test reads the refusal instead of waiting on a prompt.
+    await expect(openNode(undefined, stranger, false)).rejects.toThrow(/no token for the local node/)
+    expect(stranger.tokens.read(LOCAL_TOKEN_SCOPE)).toBeUndefined()
+  }, 30_000)
+
+  it('reports a token the node revokes while attached as revoked, and stops retrying', async () => {
+    // Past the start-up check, as when the owner revokes this device mid-session. The node's answer at
+    // the upgrade is a 401, which is the state the footer reads.
+    const stranger = custody(join(root, 'revoked'))
+    const { pid: _pid, ...record } = runningNode(dataDir())!
+    stranger.fleet.remember(
+      { ...record, label: 'This computer', local: true },
+      'acorn_dt_00000000-0000-4000-8000-000000000000_notatoken',
+    )
+    const attached: OpenedNode = {
+      nodeId: record.nodeId,
+      fleet: stranger.fleet,
+      supervised: false,
+      stop: async () => {},
+    }
     const strangerPlatform = installPlatform(attached, () => {})
     try {
       await waitFor(

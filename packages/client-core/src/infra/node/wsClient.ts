@@ -49,6 +49,9 @@ const pluginsSubs = new Set<() => void>()
 const fleetWorkspaceSubs = new Set<(nodeId: string, event: WorkspaceChangedEvent) => void>()
 const fleetWorkspacesModeSubs = new Set<(nodeId: string, event: WorkspacesModeChangedEvent) => void>()
 const fleetPluginsSubs = new Set<(nodeId: string) => void>()
+// Any paired Node, not only the active one: the Node a client is asking to pair with is usually this
+// computer's, whichever Node the window is showing.
+const fleetPairingSubs = new Set<(nodeId: string) => void>()
 const tasksSubs = new Set<(event: TaskChangedEvent) => void>()
 const connectionSubs = new Set<(event: ConnectionChangedEvent) => void>()
 // The node events after the first three, keyed by channel. One registry rather than one Set per event,
@@ -131,6 +134,10 @@ function connect(): void {
   transport.onFrame((nodeId, raw) => {
     if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'plugins:changed') {
       for (const cb of fleetPluginsSubs) cb(nodeId)
+    }
+    if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'pairing:requested') {
+      for (const cb of fleetPairingSubs) cb(nodeId)
+      return
     }
     if (
       raw &&
@@ -290,6 +297,7 @@ export function _resetWsClient(): void {
   statusSubs.clear()
   pluginsSubs.clear()
   fleetPluginsSubs.clear()
+  fleetPairingSubs.clear()
   fleetWorkspaceSubs.clear()
   fleetWorkspacesModeSubs.clear()
   tasksSubs.clear()
@@ -331,6 +339,14 @@ export function wsOnFleetWorkspacesModeChanged(
   fleetWorkspacesModeSubs.add(cb)
   connect()
   return () => void fleetWorkspacesModeSubs.delete(cb)
+}
+
+/** A client on some paired Node's computer asked to pair with it. Content-free: read the request from
+ *  that Node's device-only route. */
+export function wsOnFleetPairingRequested(cb: (nodeId: string) => void): () => void {
+  fleetPairingSubs.add(cb)
+  connect()
+  return () => void fleetPairingSubs.delete(cb)
 }
 
 /** A content-free plugin change from any paired node, carrying the broker's authenticated source id. */

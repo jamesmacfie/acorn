@@ -202,22 +202,28 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // The stacked file set: one staging area at a time.
   const stack = createMemo(() => stackFor(groups(), selected()))
   const scope = (): LocalScope => (selected()?.staged ? 'staged' : 'unstaged')
-  const [dependencies] = createResource(
-    () =>
-      pane.shown() &&
-      project()?.vcs === 'git' &&
-      !isArchiving(task.id) &&
-      status().changes.some(
-        (change) =>
-          change.staged === (scope() === 'staged') &&
-          /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|package-lock\.json|npm-shrinkwrap\.json|\.npmrc|\.pnpmrc|\.pnpmfile\.cjs|npm\.config\.js|\.yarnrc(?:\.yml)?|yarn\.lock|bun\.lockb?|requirements\.txt|pyproject\.toml|uv\.lock|Pipfile\.lock)$/.test(
-            change.path,
-          ),
-      )
-        ? { scope: scope(), revision: statusRevision() }
-        : undefined,
-    async ({ scope }) => localGitApi.dependencies(task.id, scope),
+  const dependencySource = createMemo(() =>
+    pane.shown() &&
+    project()?.vcs === 'git' &&
+    !isArchiving(task.id) &&
+    status().changes.some(
+      (change) =>
+        change.staged === (scope() === 'staged') &&
+        /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|package-lock\.json|npm-shrinkwrap\.json|\.npmrc|\.pnpmrc|\.pnpmfile\.cjs|npm\.config\.js|\.yarnrc(?:\.yml)?|yarn\.lock|bun\.lockb?|requirements\.txt|pyproject\.toml|uv\.lock|Pipfile\.lock)$/.test(
+          change.path,
+        ),
+    )
+      ? { scope: scope(), revision: statusRevision() }
+      : undefined,
   )
+  const [dependencies, { mutate: setDependencies }] = createResource(dependencySource, async ({ scope }) =>
+    localGitApi.dependencies(task.id, scope),
+  )
+  // A resource keeps its last answer when its source goes away, so committing the lockfile would
+  // leave the old review up under an empty list.
+  createEffect(() => {
+    if (!dependencySource()) setDependencies(undefined)
+  })
 
   // The stack as a document (docs/diff-rendering/document.md § The document). The node diffs, cuts
   // and keys every file's patch; it is asked again whenever the stack or any file's status key moves,

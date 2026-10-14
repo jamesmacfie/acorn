@@ -1,10 +1,11 @@
 import { createServer, type Server } from 'node:https'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { custody } from '@acorn/custody/local'
 import { ensureCert } from '@acorn/node-core/server/transport'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
@@ -35,6 +36,8 @@ afterEach(async () => {
 async function fakeNode(nodeId: string, options: { protocolVersion?: number } = {}) {
   const state = {
     revoked: false,
+    // Whether the owner has allowed the pairing ask.
+    allowed: false,
     projectsDelay: null as Promise<void> | null,
     // Accept the next turn, then drop the connection before answering.
     dropTurnReply: false,
@@ -71,13 +74,19 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     ] as Record<string, unknown>[],
     resolution: null as unknown,
     resolveRequests: [] as unknown[],
+    // The task address routes discovery declares, and what each answers.
+    taskAddresses: [] as { pluginId: string; route: string }[],
+    addressAnswers: new Map<string, unknown>(),
     createdTasks: [] as { key: string; body: Record<string, unknown> }[],
     projects: [{ id: 'p1', name: `${nodeId} project`, path: '/src/p1', workspaceId: 'w', sort: 0, hidden: false }],
     // Each project's site associations, as its config holds them, and every config write.
     sites: new Map<string, unknown[]>(),
     configWrites: [] as { projectId: string; patch: unknown }[],
+    // Every path the host asked for, in order.
+    paths: [] as string[],
   }
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
+    state.paths.push(req.url ?? '')
     const reply = (status: number, body: unknown) => {
       res.writeHead(status, { 'content-type': 'application/json' })
       res.end(JSON.stringify(body))
@@ -101,6 +110,21 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         device: { id: 'device-1', name: 'browser', createdAt: 1, lastSeenAt: null, revokedAt: null },
       })
     }
+    if (req.url === '/v1/pair/requests')
+      return reply(200, { secret: 'ask-secret', phrase: 'maple river stone', expiresInMs: 1 })
+    if (req.url === '/v1/pair/requests/claim') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      if ((JSON.parse(body) as { secret: string }).secret !== 'ask-secret')
+        return reply(401, { error: { code: 'pairing_failed', message: 'no' } })
+      if (!state.allowed) return reply(202, { status: 'pending' })
+      return reply(200, {
+        baseline: ACORN_BASELINE,
+        deviceToken: TOKEN,
+        nodeId,
+        device: { id: 'device-1', name: 'browser', createdAt: 1, lastSeenAt: null, revokedAt: null },
+      })
+    }
     if (req.url?.startsWith('/v1/core/') || req.url?.startsWith('/v1/p/agents/')) {
       if (state.revoked || req.headers.authorization !== `Bearer ${TOKEN}`)
         return reply(401, { error: { code: 'unauthenticated', message: 'Unauthenticated.' } })
@@ -117,7 +141,12 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       return reply(200, task)
     }
     if (url.pathname === '/v1/core/tasks') return reply(200, state.tasks)
-    if (url.pathname === '/v1/core/browser-handoffs') return reply(200, { handoffs: state.handoffs })
+    if (url.pathname === '/v1/core/browser-handoffs')
+      return reply(200, { handoffs: state.handoffs, taskAddresses: state.taskAddresses })
+    if (state.addressAnswers.has(url.pathname)) {
+      const answer = state.addressAnswers.get(url.pathname)
+      return answer instanceof Error ? reply(500, { error: { message: answer.message } }) : reply(200, answer)
+    }
     if (url.pathname === '/v1/p/tracker/handoff') {
       let body = ''
       for await (const chunk of req) body += chunk
@@ -375,6 +404,116 @@ describe('browser bridge pairing', () => {
   })
 })
 
+// A data root as a running Node leaves it: its lock, `node.json` with the port, and `tls/cert.pem`.
+// This test process holds the lock, so it reads as running.
+function dataRoot(
+  files: { nodeId?: string; port?: number; certPem?: string } = {},
+  root = mkdtempSync(join(tmpdir(), 'acorn-bridge-root-')),
+) {
+  mkdirSync(root, { recursive: true })
+  cleanup.push(() => rmSync(root, { recursive: true, force: true }))
+  writeFileSync(join(root, 'node.lock'), `${process.pid}\n`)
+  if (files.port)
+    writeFileSync(
+      join(root, 'node.json'),
+      JSON.stringify({ baseline: ACORN_BASELINE, nodeId: files.nodeId, createdAt: 1, port: files.port }),
+    )
+  mkdirSync(join(root, 'tls'))
+  writeFileSync(join(root, 'tls', 'cert.pem'), files.certPem ?? certA.certPem)
+  return root
+}
+
+describe('browser bridge local discovery', () => {
+  const nodeId = randomUUID()
+  const portOf = (endpoint: string) => Number(new URL(endpoint).port)
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('finds the Node in the data root acorn reads, and pairs it with a code over the file certificate', async () => {
+    const node = await fakeNode(nodeId)
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot({ nodeId, port: portOf(node.endpoint) }))
+    const { call } = bridge()
+    const found = await call({ op: 'node.local' })
+    expect(found).toEqual({
+      nodeId,
+      endpoint: node.endpoint,
+      fingerprint: certA.fingerprint,
+      protocolVersion: NODE_PROTOCOL_VERSION,
+      baseline: ACORN_BASELINE,
+      compatible: true,
+    })
+    await expect(call({ op: 'node.pair', code: 'WRONG', label: 'x' })).rejects.toMatchObject({ code: 'pairing_failed' })
+    expect(await call({ op: 'node.pair', code: CODE, label: 'This computer' })).toMatchObject({
+      nodeId,
+      fingerprint: certA.fingerprint,
+    })
+    await call({ op: 'node.select', nodeId })
+    expect(await call({ op: 'projects.list', nodeId })).toMatchObject({ nodeId })
+  })
+
+  it('pairs the Node on this computer once the owner allows the ask', async () => {
+    const node = await fakeNode(nodeId)
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot({ nodeId, port: portOf(node.endpoint) }))
+    const { call } = bridge()
+    await expect(call({ op: 'node.ask' })).rejects.toMatchObject({ code: 'no_probe' })
+    await call({ op: 'node.local' })
+    // The secret stays in the host. The sidebar gets the words the owner's dialog shows.
+    expect(await call({ op: 'node.ask' })).toEqual({ phrase: 'maple river stone' })
+    expect(await call({ op: 'node.collect', label: 'This computer' })).toBeNull()
+    node.state.allowed = true
+    expect(await call({ op: 'node.collect', label: 'This computer' })).toMatchObject({ nodeId, label: 'This computer' })
+    await call({ op: 'node.select', nodeId })
+    expect(await call({ op: 'projects.list', nodeId })).toMatchObject({ nodeId })
+  })
+
+  it('asks only the Node on this computer, never one typed in', async () => {
+    const node = await fakeNode(nodeId)
+    const { call } = bridge()
+    await call({ op: 'node.probe', endpoint: node.endpoint })
+    await expect(call({ op: 'node.ask' })).rejects.toMatchObject({ code: 'no_probe' })
+  })
+
+  it('finds nothing when no Node holds the data root', async () => {
+    vi.stubEnv('ACORN_DATA_DIR', mkdtempSync(join(tmpdir(), 'acorn-bridge-empty-')))
+    const { call } = bridge()
+    expect(await call({ op: 'node.local' })).toBeNull()
+    await expect(call({ op: 'node.pair', code: CODE, label: 'x' })).rejects.toMatchObject({ code: 'no_probe' })
+  })
+
+  it('refuses a held data root with no node.json, or a certificate it cannot read', async () => {
+    const { call } = bridge()
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot())
+    await expect(call({ op: 'node.local' })).rejects.toMatchObject({ code: 'node_error' })
+    const node = await fakeNode(nodeId)
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot({ nodeId, port: portOf(node.endpoint), certPem: 'not a certificate' }))
+    await expect(call({ op: 'node.local' })).rejects.toMatchObject({ code: 'node_error' })
+  })
+
+  it('refuses a Node whose address presents another certificate than its files, and keeps no probe', async () => {
+    const node = await fakeNode(nodeId)
+    const { call } = bridge()
+    await call({ op: 'node.probe', endpoint: node.endpoint })
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot({ nodeId, port: portOf(node.endpoint), certPem: certB.certPem }))
+    await expect(call({ op: 'node.local' })).rejects.toMatchObject({ code: 'identity_mismatch' })
+    await expect(call({ op: 'node.pair', code: CODE, label: 'x' })).rejects.toMatchObject({ code: 'no_probe' })
+  })
+
+  it("reads only the data root acorn would, never the desktop's when another is set", async () => {
+    const node = await fakeNode(nodeId)
+    // The desktop app's root, under a stand-in home folder, holds a running Node.
+    const home = dataRoot({}, mkdtempSync(join(tmpdir(), 'acorn-bridge-home-')))
+    dataRoot({ nodeId, port: portOf(node.endpoint) }, join(home, 'Library/Application Support/com.acorn.desktop/node'))
+    vi.stubEnv('HOME', home)
+    const { call } = bridge()
+
+    vi.stubEnv('ACORN_DATA_DIR', mkdtempSync(join(tmpdir(), 'acorn-bridge-empty-')))
+    expect(await call({ op: 'node.local' })).toBeNull()
+    vi.stubEnv('ACORN_DATA_DIR', '')
+    expect(await call({ op: 'node.local' })).toMatchObject({ nodeId })
+  })
+})
+
 describe('browser bridge selection', () => {
   it('lists the selected Node projects and refuses an unselected Node', async () => {
     const { call } = await paired()
@@ -593,6 +732,137 @@ describe('browser bridge agent operations', () => {
     })
     await call({ op: 'node.select', nodeId: null })
     await expect(call({ op: 'requests.pending', nodeId: 'node-a' })).rejects.toMatchObject({ code: 'not_selected' })
+  })
+
+  it("lists each active task's page addresses from the Node's task list alone", async () => {
+    const { call, node } = await selected()
+    const task = { branch: null, status: 'active', github: null, pullNumber: null, links: [] }
+    node.state.tasks = [
+      // A pull request is the project's repository and the task's number.
+      {
+        ...task,
+        id: 'pr',
+        title: 'Fix rounding',
+        projectId: 'p1',
+        github: { owner: 'acme', name: 'runn' },
+        pullNumber: 482,
+      },
+      {
+        ...task,
+        id: 'issue',
+        title: 'Linear issue',
+        projectId: 'p1',
+        branch: 'eng-42',
+        links: [
+          {
+            connectionId: 'c1',
+            providerId: 'linear',
+            identifier: 'ENG-42',
+            ref: {
+              providerId: 'linear',
+              connectionId: 'c1',
+              displayId: 'ENG-42',
+              url: 'https://linear.app/acme/issue/ENG-42/fix/',
+            },
+          },
+          // A link whose provider stamped no address, and one that isn't a web address.
+          { connectionId: 'c2', providerId: 'rollbar', identifier: '7' },
+          { connectionId: 'c3', providerId: 'other', identifier: 'x', ref: { url: 'mailto:someone@example.com' } },
+        ],
+      },
+      // The project's repository alone names no page, and an archived task is never listed.
+      { ...task, id: 'plain', title: 'No item', projectId: 'p1', github: { owner: 'acme', name: 'runn' } },
+      {
+        ...task,
+        id: 'old',
+        title: 'Old',
+        projectId: 'p1',
+        status: 'archived',
+        github: { owner: 'acme', name: 'runn' },
+        pullNumber: 1,
+      },
+    ]
+    node.state.paths = []
+    expect(await call({ op: 'tasks.pages', nodeId: 'node-a' })).toEqual({
+      nodeId: 'node-a',
+      tasks: [
+        {
+          id: 'pr',
+          title: 'Fix rounding',
+          branch: null,
+          projectId: 'p1',
+          pages: [{ origin: 'https://github.com', pathPrefix: '/acme/runn/pull/482', source: 'github' }],
+        },
+        {
+          id: 'issue',
+          title: 'Linear issue',
+          branch: 'eng-42',
+          projectId: 'p1',
+          pages: [{ origin: 'https://linear.app', pathPrefix: '/acme/issue/ENG-42/fix', source: 'linear' }],
+        },
+      ],
+    })
+    // One read of the Node's active tasks and one of its plugins' declarations, besides the broker's own
+    // connection checks, and nothing that reaches a provider.
+    expect(node.state.paths.filter((path) => !['/v1/node', '/v1/events'].includes(path)).sort()).toEqual([
+      '/v1/core/browser-handoffs',
+      '/v1/core/tasks',
+    ])
+    await call({ op: 'node.select', nodeId: null })
+    await expect(call({ op: 'tasks.pages', nodeId: 'node-a' })).rejects.toMatchObject({ code: 'not_selected' })
+  })
+
+  it('adds the exact origins plugins publish for active tasks, and skips a plugin that fails', async () => {
+    const { call, node } = await selected()
+    const task = { branch: null, status: 'active', github: null, pullNumber: null, links: [], projectId: 'p1' }
+    node.state.tasks = [
+      { ...task, id: 'stack', title: 'Fix rounding', branch: 'fix/rounding' },
+      { ...task, id: 'old', title: 'Old', status: 'archived' },
+    ]
+    const address = { label: 'Runn stack', state: 'running', severity: 'info' }
+    node.state.taskAddresses = [
+      { pluginId: 'runn', route: '/v1/p/runn/task-addresses' },
+      { pluginId: 'broken', route: '/v1/p/broken/addresses' },
+      { pluginId: 'odd', route: '/v1/p/odd/addresses' },
+      // A route outside the plugin's own namespace is never called.
+      { pluginId: 'sneaky', route: '/v1/core/tasks' },
+    ]
+    node.state.addressAnswers.set('/v1/p/runn/task-addresses', {
+      addresses: [
+        { ...address, taskId: 'stack', origin: 'https://runn-05ea41.runn.localhost:5104' },
+        { ...address, taskId: 'old', origin: 'https://runn-0ld.runn.localhost:5104' },
+        { ...address, taskId: 'gone', origin: 'https://runn-g0ne.runn.localhost:5104' },
+      ],
+    })
+    node.state.addressAnswers.set('/v1/p/broken/addresses', new Error('boom'))
+    // Another site's host isn't a task's app, so the whole answer is refused.
+    node.state.addressAnswers.set('/v1/p/odd/addresses', {
+      addresses: [
+        { ...address, taskId: 'stack', origin: 'https://runn-0dd.runn.localhost:5104' },
+        { ...address, taskId: 'stack', origin: 'https://github.com' },
+      ],
+    })
+    node.state.paths = []
+    expect(await call({ op: 'tasks.pages', nodeId: 'node-a' })).toEqual({
+      nodeId: 'node-a',
+      tasks: [
+        {
+          id: 'stack',
+          title: 'Fix rounding',
+          branch: 'fix/rounding',
+          projectId: 'p1',
+          pages: [
+            {
+              origin: 'https://runn-05ea41.runn.localhost:5104',
+              pathPrefix: '/',
+              source: 'runn',
+              status: { label: 'Runn stack', state: 'running', tone: 'ok' },
+            },
+          ],
+        },
+      ],
+    })
+    expect(node.state.paths.filter((path) => path === '/v1/core/tasks')).toHaveLength(1)
   })
 
   it('passes captured context and screenshots to the Node as the turn input', async () => {

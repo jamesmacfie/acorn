@@ -48,7 +48,7 @@ export function SourceSurface(props: { source: SourceContribution }) {
           <ListColumn scrollKey={sidebarKey()}>
             <SourceRegion source={props.source} component={regions().list} />
           </ListColumn>
-          <DetailColumn scroll={regions().scroll} measure={regions().measure}>
+          <DetailColumn scroll={regions().scroll}>
             <SourceRegion source={props.source} component={regions().detail} />
           </DetailColumn>
         </ListDetail>

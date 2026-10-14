@@ -41,12 +41,16 @@ describe('plugin route registry', () => {
 // table below, this file verifies the current mount shape: core answers under /v1/core and plugins under
 // /v1/p/<plugin>.
 const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
-  // The two pre-auth pairing routes, outside /v1/core because that namespace is the gated one. They
+  // The pre-auth pairing routes, outside /v1/core because that namespace is the gated one. They
   // are how an unpaired client gets a credential at all (docs/api-reference/transport.md § Request processing).
   ['GET', '/v1/node'],
   ['POST', '/v1/pair'],
+  ['POST', '/v1/pair/requests'],
+  ['POST', '/v1/pair/requests/claim'],
   ['POST', '/v1/core/pair/start'],
   ['DELETE', '/v1/core/pair'],
+  ['GET', '/v1/core/pair/requests'],
+  ['POST', '/v1/core/pair/requests/:id'],
   ['GET', '/v1/core/devices'],
   ['DELETE', '/v1/core/devices/:id'],
   ['PUT', '/v1/core/prefs'],

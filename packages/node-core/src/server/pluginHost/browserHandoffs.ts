@@ -1,16 +1,17 @@
-// The browser handoffs each running plugin declares, for the extension's discovery route
-// (docs/plugin-authoring/browser-handoffs.md). Filled by the host from a loaded manifest's
-// `contributions.browserHandoffs` or a built-in's `NodePlugin.browserHandoffs`, and emptied with the
-// plugin's other registrations. A package waiting for review or a restart has no binding yet, so its
-// declarations aren't here until it runs.
+// The browser handoffs and task address routes each running plugin declares, for the extension's
+// discovery route (docs/plugin-authoring/browser-handoffs.md). Filled by the host from a loaded
+// manifest's `contributions.browserHandoffs` and `contributions.taskAddresses`, or a built-in's
+// `NodePlugin.browserHandoffs`, and emptied with the plugin's other registrations. A package waiting
+// for review or a restart has no binding yet, so its declarations aren't here until it runs.
 import { z } from 'zod'
 import {
   browserHandoffDescriptor,
   type BrowserHandoff,
   type BrowserHandoffDescriptor,
+  type TaskAddressesRoute,
 } from '@acorn/protocol/plugin/handoffs.ts'
 
-const declared = new Map<string, { handoffs: readonly BrowserHandoff[] }>()
+const declared = new Map<string, { handoffs: readonly BrowserHandoff[]; taskAddresses: string | undefined }>()
 
 // Both tiers pass this, so a compiled declaration meets the rules a manifest does: the descriptor
 // schema, a resolve route inside the plugin's own namespace, and IDs unique within the plugin. A loaded
@@ -33,9 +34,14 @@ function validated(pluginId: string, descriptors: readonly BrowserHandoffDescrip
   return parsed.map((handoff) => ({ ...handoff, pluginId }))
 }
 
-/** Record what `pluginId` declares. Returns the undo for the plugin's registration list. */
-export function declareBrowserHandoffs(pluginId: string, descriptors: readonly BrowserHandoffDescriptor[]): () => void {
-  const declaration = { handoffs: validated(pluginId, descriptors) }
+/** Record what `pluginId` declares. Returns the undo for the plugin's registration list. Only a loaded
+ *  manifest declares `taskAddresses`, and its parse already confined the route to the plugin. */
+export function declareBrowserHandoffs(
+  pluginId: string,
+  descriptors: readonly BrowserHandoffDescriptor[],
+  taskAddresses?: string,
+): () => void {
+  const declaration = { handoffs: validated(pluginId, descriptors), taskAddresses }
   declared.set(pluginId, declaration)
   return () => {
     if (declared.get(pluginId) === declaration) declared.delete(pluginId)
@@ -45,3 +51,10 @@ export function declareBrowserHandoffs(pluginId: string, descriptors: readonly B
 /** Every running plugin's handoffs, ordered by plugin and then declaration. */
 export const browserHandoffs = (): BrowserHandoff[] =>
   [...declared.keys()].sort().flatMap((pluginId) => declared.get(pluginId)!.handoffs)
+
+/** Every running plugin's task address route, ordered by plugin. */
+export const taskAddressRoutes = (): TaskAddressesRoute[] =>
+  [...declared.keys()].sort().flatMap((pluginId) => {
+    const route = declared.get(pluginId)!.taskAddresses
+    return route === undefined ? [] : [{ pluginId, route }]
+  })

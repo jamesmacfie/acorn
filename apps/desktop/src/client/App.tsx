@@ -134,8 +134,6 @@ import Topbar from '@acorn/client-core/host/chrome/Topbar.tsx'
 import ExclusiveSlotHost from '@acorn/client-core/host/plugins/ExclusiveSlotHost.tsx'
 import { mintSlotRef } from '@acorn/client-core/host/plugins/NestedChromeSlot.tsx'
 import { registerCoreExclusiveSlot } from '@acorn/client-core/host/registries/extensionPoints'
-import { PrefKeys } from '@acorn/client-core/infra/persistence'
-import { savePref } from '@acorn/client-core/features/settings/savePref.ts'
 import type { SettingsRequest } from '@acorn/client-core/features/settings/SettingsView.tsx'
 import { isPanelStudioOpen } from '@acorn/client-core/features/dashboards/studio/studioOpen.ts'
 
@@ -271,7 +269,6 @@ export default function App() {
           if (mode) void addProjectFromFolder(queryClient, mode, mode === 'on' ? activeWorkspace()?.id : undefined)
         },
       },
-      { id: 'core.rail.toggle', title: 'Toggle rail', category: 'navigation', run: () => toggleRail() },
       {
         id: 'core.surface.toggle-maximize',
         title: 'Toggle focused surface maximize',
@@ -302,14 +299,6 @@ export default function App() {
         description: 'Open settings',
         category: 'Global',
         defaultChord: 'meta+,',
-        when: 'global',
-      },
-      {
-        id: 'core.rail.toggle',
-        command: 'core.rail.toggle',
-        description: 'Toggle rail',
-        category: 'Global',
-        defaultChord: 'meta+b',
         when: 'global',
       },
       {
@@ -489,8 +478,6 @@ export default function App() {
     settingsOpen: () => !!settingsRequest(),
     openProject: openAddedProject,
   })
-  const railCollapsed = () => prefs.data?.[PrefKeys.leftCollapsed] === 'true'
-  const toggleRail = () => void savePref(queryClient, PrefKeys.leftCollapsed, String(!railCollapsed()))
 
   const startup = createAppStartupRestore({
     queryClient,

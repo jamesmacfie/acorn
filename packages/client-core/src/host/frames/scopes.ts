@@ -220,6 +220,12 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v1/core/nodes/${SEG}`), scopes: {}, note: 'Every node lifecycle verb, including destroy.' },
   { path: shape('/v1/core/pair/start'), scopes: {}, note: 'A pairing code grants a new device full owner authority.' },
   { path: shape('/v1/core/pair'), scopes: {}, note: 'Pairing window administration belongs to the owner.' },
+  { path: shape('/v1/core/pair/requests'), scopes: {}, note: 'Pairing requests belong to the owner.' },
+  {
+    path: shape(`/v1/core/pair/requests/${SEG}`),
+    scopes: {},
+    note: 'Allowing a pairing request grants a new device full owner authority.',
+  },
   { path: shape('/v1/core/devices'), scopes: {}, note: 'Pairing administration.' },
   { path: shape(`/v1/core/devices/${SEG}`), scopes: {} },
   {

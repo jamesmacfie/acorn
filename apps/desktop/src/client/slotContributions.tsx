@@ -7,6 +7,7 @@ const WorkspacePalette = lazy(() => import('@acorn/client-core/host/palette/Work
 const ConfigTrustDialog = lazy(() => import('@acorn/client-core/features/settings/trust/ConfigTrustDialog.tsx'))
 const PluginTrustDialog = lazy(() => import('@acorn/client-core/host/trust/PluginTrustDialog.tsx'))
 const PluginApprovalDialog = lazy(() => import('@acorn/client-core/host/trust/PluginApprovalDialog.tsx'))
+const PairingRequestDialog = lazy(() => import('@acorn/client-core/host/trust/PairingRequestDialog.tsx'))
 
 export const shellSlotContributions: UiSlotContribution[] = [
   { id: 'security.config-trust', slot: 'overlay', order: 5, component: () => <ConfigTrustDialog /> },
@@ -16,6 +17,8 @@ export const shellSlotContributions: UiSlotContribution[] = [
   // Ahead of both, because it is the only one the owner opened themselves: the other two arrive on their
   // own, and this one is the answer to a notification they just clicked.
   { id: 'security.plugin-approval', slot: 'overlay', order: 4, component: () => <PluginApprovalDialog /> },
+  // First of all: someone is at a terminal or a browser on this computer, waiting on this answer.
+  { id: 'security.pairing-request', slot: 'overlay', order: 3, component: () => <PairingRequestDialog /> },
   {
     id: 'notifications.bell',
     slot: 'topbar.right',

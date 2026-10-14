@@ -164,7 +164,9 @@ const specs = (): Spec[] => {
       // (../keys/regions.ts § Scopes).
       when: () => says.cross !== 'column' || regionsInScope() > 1,
     },
-    { probe: bare('search', 1), keys: '/', label: 'filter' },
+    // Probed on `ctrl+f`, because `/` is also the rail toggle and so is live everywhere. Only a source
+    // list binds `ctrl+f`, and while its filter is being typed into, `/` types a `/`.
+    { probe: bare('search'), keys: '/', label: 'filter', when: () => !isTyping() },
     { probe: bare('menu'), keys: 'menu', label: 'menu' },
     { probe: bare('delete'), keys: 'del', label: 'delete' },
     { probe: bare('commit'), keys: keys.commit[0] ?? '', label: says.commit, detail: 'send what is in the box' },
@@ -234,7 +236,7 @@ export function activeHints(): Hint[] {
   const node = focusedRenderable()
   const overlays = openOverlays()
   // And how many regions the keys can reach, which changes without focus moving: the rail hides on
-  // Ctrl+B and the pane strip draws only while a task is open. Read here rather than only inside the
+  // `/` and the pane strip draws only while a task is open. Read here rather than only inside the
   // Tab hint's own probe, because that probe short-circuits — so on a render where the key is not
   // live the footer would take no dependency at all and keep whatever it last said
   // (../keys/regions.ts § regionsInScope).

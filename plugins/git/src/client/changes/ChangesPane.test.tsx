@@ -160,7 +160,7 @@ const drawHeader = (changes: LocalChange[], chosen: Partial<ChangeView> = {}) =>
   return host
 }
 
-it('shows dependency read failures and bounded finding details in the expanded review', () => {
+it('shows dependency read failures and bounded finding details in the expanded review', async () => {
   const failed = model([change('package.json', false)])
   failed.dependencies = Object.assign(() => undefined, { loading: false, error: new Error('read failed') }) as never
   disposers.push(render(() => <ChangesList task={{ id: 't1' } as unknown as Task} model={failed} />, host))
@@ -192,9 +192,29 @@ it('shows dependency read failures and bounded finding details in the expanded r
     { loading: false, error: undefined },
   ) as never
   disposers.push(render(() => <ChangesList task={{ id: 't1' } as unknown as Task} model={reviewed} />, host))
-  const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.includes('Dependencies:'))
-  button?.click()
-  expect(host.textContent).toContain('lockfile entry has no integrity metadata')
+  host.querySelector('details')!.open = true
+  await vi.waitFor(() => expect(host.textContent).toContain('lockfile entry has no integrity metadata'))
+  expect(host.textContent).toContain('partly checked')
+})
+
+it('says nothing about dependencies when the review read everything and found nothing', () => {
+  const quiet = model([change('package.json', true)])
+  quiet.dependencies = Object.assign(
+    () => ({
+      scope: 'staged',
+      revision: 'r',
+      analyzerVersion: 2,
+      manager: 'pnpm',
+      managerVersion: '11.0.0',
+      coverage: 'complete',
+      packageCount: 0,
+      findings: [],
+      limits: ['Installed dependency scripts are unknown.'],
+    }),
+    { loading: false, error: undefined },
+  ) as never
+  disposers.push(render(() => <ChangesList task={{ id: 't1' } as unknown as Task} model={quiet} />, host))
+  expect(host.textContent).not.toContain('Dependencies')
 })
 
 it('runs the secret check on request and lists findings by rule and position', () => {

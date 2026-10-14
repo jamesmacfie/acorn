@@ -3,8 +3,8 @@
 // switch).
 //
 // Why it exists. The facade's real half is a grammar per language and a stylesheet built from CSS
-// custom properties, and neither means anything in cells: this host's `editor` rectangle draws the
-// file read-only and hands the reader's own `$EDITOR` a PTY when they want to type (./rectangle.tsx,
+// custom properties, and neither means anything in cells: on this host the editor pane opens a file
+// in the reader's own `$EDITOR` in a PTY instead (./rectangle.tsx,
 // docs/editor/editor-pane.md § Editing in your own editor). Left unaliased, the editor pane reaches the
 // real module and the terminal client carries every CodeMirror grammar and a colour theme it has no
 // way to draw.

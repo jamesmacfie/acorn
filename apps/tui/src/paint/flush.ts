@@ -131,11 +131,6 @@ const EMPTY: Flush = { text: '', runs: 0 }
  */
 export function flush(front: Buffer, back: Buffer, erase = false): Flush {
   if (back.cols <= 0 || back.rows <= 0) return erase ? { text: BEGIN + ERASE + END, runs: 0 } : EMPTY
-  // Worked out here and written last, after the cells, because moving the caret is the point of it
-  // and a run written afterwards would move it again. `2J` neither moves nor hides the caret, so an
-  // erasing frame compares against the same previous state as any other.
-  const caret = cursorMove(front.cursor, back.cursor)
-
   let out = ''
   let runs = 0
   let written: Written = START
@@ -175,6 +170,14 @@ export function flush(front: Buffer, back: Buffer, erase = false): Flush {
       x = end
     }
   }
+
+  // Written last, after the cells, because every run leaves the terminal's caret at its own end. So a
+  // frame that wrote cells puts a shown caret back on its field even when the field's caret did not
+  // move. Otherwise a spinner ticking in a list drags the caret out of the composer on every frame.
+  // `2J` neither moves nor hides the caret, so an erasing frame compares against the same previous
+  // state as any other.
+  const caret =
+    out !== '' && back.cursor ? moveTo(back.cursor.x, back.cursor.y) + SHOW : cursorMove(front.cursor, back.cursor)
 
   if (out === '' && caret === '') return erase ? { text: BEGIN + ERASE + END, runs: 0 } : EMPTY
   const reset = sameStyle(written, START) ? '' : RESET

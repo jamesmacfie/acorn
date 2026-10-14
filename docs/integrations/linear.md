@@ -102,7 +102,7 @@ mapping on that connection of the issue's Linear project or its team, covering t
 workspace or naming the project. That is the rail's rule read the other way. Nothing is guessed from
 the workspace in the address. A project with no folder on disk isn't offered, as with GitHub's
 handoff. An issue in no mapped project or team has no projects, and the person can still pick a task
-with **Choose another task**.
+with **Add to a task**.
 
 The seed is the one the rail's **+Task** uses (`linearTaskFields` in `plugins/linear/src/shared/rail.ts`):
 origin `linear`, `<key> <title>`, and Linear's suggested branch. It adds the issue as one

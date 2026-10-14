@@ -5,7 +5,9 @@
     "--accent": "#242424",
     "--add-marker": "#1a7f37",
     "--warn": "#9a6700",
-    "--del-marker": "#cf222e"
+    "--del-marker": "#cf222e",
+    "--bg-hover": "#f6f6f6",
+    "--bg-selected": "#eeeeee"
   },
   "dark": {
     "--text": "#dddddd",
@@ -13,7 +15,9 @@
     "--accent": "#dddddd",
     "--add-marker": "#3fb950",
     "--warn": "#d29922",
-    "--del-marker": "#f85149"
+    "--del-marker": "#f85149",
+    "--bg-hover": "#202020",
+    "--bg-selected": "#262626"
   },
   "solarized-light": {
     "--text": "#586e75",
@@ -21,7 +25,9 @@
     "--accent": "#268bd2",
     "--add-marker": "#859900",
     "--warn": "#b58900",
-    "--del-marker": "#dc322f"
+    "--del-marker": "#dc322f",
+    "--bg-hover": "#eee8d5",
+    "--bg-selected": "#e3ddc8"
   },
   "solarized-dark": {
     "--text": "#93a1a1",
@@ -29,7 +35,9 @@
     "--accent": "#268bd2",
     "--add-marker": "#859900",
     "--warn": "#b58900",
-    "--del-marker": "#dc322f"
+    "--del-marker": "#dc322f",
+    "--bg-hover": "#0a3f4d",
+    "--bg-selected": "#0e4653"
   },
   "monokai": {
     "--text": "#f8f8f2",
@@ -37,7 +45,9 @@
     "--accent": "#f92672",
     "--add-marker": "#a6e22e",
     "--warn": "#e6db74",
-    "--del-marker": "#f92672"
+    "--del-marker": "#f92672",
+    "--bg-hover": "#34352f",
+    "--bg-selected": "#3e3d32"
   },
   "nord": {
     "--text": "#eceff4",
@@ -45,7 +55,9 @@
     "--accent": "#88c0d0",
     "--add-marker": "#a3be8c",
     "--warn": "#ebcb8b",
-    "--del-marker": "#bf616a"
+    "--del-marker": "#bf616a",
+    "--bg-hover": "#3b4252",
+    "--bg-selected": "#434c5e"
   },
   "catppuccin-latte": {
     "--text": "#4c4f69",
@@ -53,7 +65,9 @@
     "--accent": "#1e66f5",
     "--add-marker": "#40a02b",
     "--warn": "#df8e1d",
-    "--del-marker": "#d20f39"
+    "--del-marker": "#d20f39",
+    "--bg-hover": "#dce0e8",
+    "--bg-selected": "#ccd0da"
   },
   "catppuccin-frappe": {
     "--text": "#c6d0f5",
@@ -61,7 +75,9 @@
     "--accent": "#8caaee",
     "--add-marker": "#a6d189",
     "--warn": "#e5c890",
-    "--del-marker": "#e78284"
+    "--del-marker": "#e78284",
+    "--bg-hover": "#414559",
+    "--bg-selected": "#51576d"
   },
   "catppuccin-macchiato": {
     "--text": "#cad3f5",
@@ -69,7 +85,9 @@
     "--accent": "#8aadf4",
     "--add-marker": "#a6da95",
     "--warn": "#eed49f",
-    "--del-marker": "#ed8796"
+    "--del-marker": "#ed8796",
+    "--bg-hover": "#363a4f",
+    "--bg-selected": "#494d64"
   },
   "catppuccin-mocha": {
     "--text": "#cdd6f4",
@@ -77,7 +95,9 @@
     "--accent": "#89b4fa",
     "--add-marker": "#a6e3a1",
     "--warn": "#f9e2af",
-    "--del-marker": "#f38ba8"
+    "--del-marker": "#f38ba8",
+    "--bg-hover": "#313244",
+    "--bg-selected": "#45475a"
   },
   "one-dark": {
     "--text": "#abb2bf",
@@ -85,7 +105,9 @@
     "--accent": "#61afef",
     "--add-marker": "#98c379",
     "--warn": "#e5c07b",
-    "--del-marker": "#e06c75"
+    "--del-marker": "#e06c75",
+    "--bg-hover": "#333842",
+    "--bg-selected": "#3a3f4b"
   },
   "dracula": {
     "--text": "#f8f8f2",
@@ -93,6 +115,8 @@
     "--accent": "#bd93f9",
     "--add-marker": "#50fa7b",
     "--warn": "#f1fa8c",
-    "--del-marker": "#ff5555"
+    "--del-marker": "#ff5555",
+    "--bg-hover": "#343746",
+    "--bg-selected": "#44475a"
   }
 }
