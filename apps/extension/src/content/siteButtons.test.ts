@@ -148,16 +148,43 @@ describe('task chips in the page', () => {
     expect(menu()!.hidden).toBe(true)
     press(chip().querySelector('.more')!)
     expect(menu()!.hidden).toBe(false)
-    expect(items()).toEqual(['Show in side panel', 'Open in Acorn ↗', 'New chat about this page', 'Copy Acorn link'])
+    expect(items()).toEqual([
+      'Show in side panel',
+      'Open in Acorn ↗',
+      'New chat about this page',
+      'Ask about an element',
+      'Copy Acorn link',
+    ])
     expect(item('Open in Acorn ↗').getAttribute('href')).toBe('acorn://n1/t/t1?pane=pr')
     press(item('New chat about this page'))
     expect(sent.at(-1)).toEqual({ type: 'acorn:chip', key: 'tracker:item', action: 'chat' })
     expect(menu()!.hidden).toBe(true)
   })
 
+  it("starts the element picker from the chip's and the marker's menus, in the page", () => {
+    const picker = vi.fn()
+    ;(globalThis as Record<string, unknown>).acornPicker = picker
+    show([button(task)], {
+      marker: { branch: 'fix/billing', state: { label: 'running', tone: 'ok' }, link: null },
+    })
+    press(item('Ask about an element'))
+    const marker = roots.get(document.querySelector('[data-acorn-marker]')!)!
+    press(
+      [...marker.querySelector('[role="menu"]')!.children].find((each) => each.textContent === 'Ask about an element')!,
+    )
+    expect(picker.mock.calls).toEqual([['hover'], ['hover']])
+    expect(sent).toEqual([])
+    delete (globalThis as Record<string, unknown>).acornPicker
+  })
+
   it('copies the Acorn link in place of opening it in a development build', () => {
     show([button(task)], { opensLinks: false })
-    expect(items()).toEqual(['Show in side panel', 'New chat about this page', 'Copy Acorn link'])
+    expect(items()).toEqual([
+      'Show in side panel',
+      'New chat about this page',
+      'Ask about an element',
+      'Copy Acorn link',
+    ])
   })
 
   it('reads Start task with no task, and opens the Start task form from the click', () => {
@@ -177,6 +204,7 @@ describe('task chips in the page', () => {
     expect(menu()!.hidden).toBe(false)
     expect(items()).toEqual([
       'Open in Acorn ↗',
+      'Ask about an element',
       'Copy Acorn link',
       'To open the panel on this task, click Acorn in the toolbar.',
     ])
@@ -227,7 +255,13 @@ describe('the branch marker on a local app', () => {
     press(pillMain())
     expect(sent).toEqual([{ type: 'acorn:marker', action: 'show' }])
     press(pill().querySelector('.more')!)
-    expect(pillItems()).toEqual(['Show in side panel', 'Open in Acorn ↗', 'Copy Acorn link', 'Hide on this site'])
+    expect(pillItems()).toEqual([
+      'Show in side panel',
+      'Open in Acorn ↗',
+      'Ask about an element',
+      'Copy Acorn link',
+      'Hide on this site',
+    ])
     expect(pillItem('Open in Acorn ↗').getAttribute('href')).toBe('acorn://n1/t/t1?pane=runn')
     press(pillItem('Hide on this site'))
     expect(sent.at(-1)).toEqual({ type: 'acorn:marker', action: 'hide' })
@@ -240,6 +274,7 @@ describe('the branch marker on a local app', () => {
     expect(sent).toEqual([])
     expect(pillItems()).toEqual([
       'Open in Acorn ↗',
+      'Ask about an element',
       'Copy Acorn link',
       'Hide on this site',
       'To open the panel on this task, click Acorn in the toolbar.',

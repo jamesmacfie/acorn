@@ -370,4 +370,91 @@ describe('site buttons', () => {
     const firefox = await started({ flavor: 'firefox' })
     expect(lastMessage(firefox.fake)).toMatchObject({ opensLinks: true, opensPanel: false })
   })
+
+  describe('ask about an element', () => {
+    const ASK = 'ask-acorn-about-element'
+    const picks = (fake: ReturnType<typeof fakeBrowser>) =>
+      fake.tabMessages
+        .map(({ message }) => message)
+        .filter((message) => (message as { type: string }).type === 'acorn:pick')
+
+    it('adds the right-click entry at install, for an element of any kind', () => {
+      const fake = fakeBrowser()
+      startBackground(fake.api, 'com.acorn.browser_bridge')
+      fake.install()
+      expect(fake.menus.get(ASK)).toEqual({
+        title: 'Ask Acorn about this element',
+        contexts: ['page', 'link', 'image', 'video', 'audio'],
+      })
+    })
+
+    it('picks the right-clicked element on a task page that already has the picker', async () => {
+      const { fake } = await started()
+      expect(fake.injectedFiles.at(-1)).toEqual(['content.js', 'picker.js'])
+      // The picker answers its own message.
+      fake.pageAnswer = (message) => (message as { type: string }).type === 'acorn:pick'
+      const injections = fake.injectedFiles.length
+      fake.clickMenu(ASK)
+      await settle()
+      expect(picks(fake)).toEqual([{ type: 'acorn:pick', mode: 'target' }])
+      expect(fake.injectedFiles).toHaveLength(injections)
+      expect(fake.panelOpens).toEqual([])
+    })
+
+    it("injects the picker on a page that has only the chip's script, which answers nothing", async () => {
+      const { fake } = await started()
+      const injections = fake.injectedFiles.length
+      fake.clickMenu(ASK)
+      await settle()
+      expect(fake.injectedFiles.slice(injections)).toEqual([['picker.js']])
+      expect(picks(fake)).toEqual([
+        { type: 'acorn:pick', mode: 'target' },
+        { type: 'acorn:pick', mode: 'hover' },
+      ])
+    })
+
+    it('injects the picker on a task page without it, and lets the person point at the element', async () => {
+      const app = 'https://app.example'
+      const { fake, host } = await started({ url: `${app}/planner` })
+      host.taskPages = [{ ...pageTask, pages: [{ origin: app, pathPrefix: '/', source: 'runn' }] }]
+      fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'a' })
+      await settle()
+      expect(fake.injectedFiles).toEqual([])
+      fake.clickMenu(ASK)
+      await settle()
+      expect(fake.injectedFiles).toEqual([['picker.js']])
+      expect(picks(fake)).toEqual([{ type: 'acorn:pick', mode: 'hover' }])
+    })
+
+    it('refuses in one line, with the panel open, off a task page, in a frame, or with no Node', async () => {
+      const notices = (panel: ReturnType<typeof sidebar>) =>
+        panel.messages.filter((message) => message.type === 'notice').map((message) => message.notice)
+
+      const { fake, panel } = await started({ url: 'https://tracker.example/items/43' })
+      fake.clickMenu(ASK)
+      fake.activeTab = { ...fake.activeTab, url: 'https://tracker.example/items/42' }
+      fake.clickMenu(ASK, 3)
+      await settle()
+      expect(fake.panelOpens).toEqual([1, 1])
+      expect(notices(panel)).toEqual([
+        "This page doesn't belong to a task, so there is no agent to ask about it. Open a task's pull request, issue, or app, then try again.",
+        "That element is inside a frame, which Acorn can't pick from. Right-click outside the frame, then try again.",
+      ])
+
+      const unselected = fakeBrowser()
+      scriptedHost(unselected, ['a'])
+      startBackground(unselected.api, 'com.acorn.browser_bridge')
+      await settle()
+      unselected.clickMenu(ASK)
+      // A panel the click opened connects a moment later, and gets the notice then.
+      const opened = sidebar(unselected)
+      await settle()
+      expect(unselected.panelOpens).toEqual([1])
+      expect(notices(opened)).toEqual([
+        'No Node is selected, so there is no agent to ask. Choose or pair a Node, then try again.',
+      ])
+      expect(picks(fake)).toEqual([])
+      expect(picks(unselected)).toEqual([])
+    })
+  })
 })

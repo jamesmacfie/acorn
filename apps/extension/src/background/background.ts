@@ -9,6 +9,7 @@ import type { BrowserApi, Port, Tab } from '../browser'
 import type { PageHandoff } from '../handoffs'
 import { CallFailure, type BackgroundMessage, type BridgeCall, type HostState, type SidebarMessage } from '../messages'
 import { appTask, pageTasks } from '../taskPages'
+import { askElement } from './askElement'
 import { nativeBridge } from './nativeBridge'
 import { requestBadge } from './requestBadge'
 import { selectionMenu } from './selectionMenu'
@@ -218,6 +219,12 @@ export function startBackground(api: BrowserApi, hostName: string): void {
     },
     read,
     added: (target) => offer({ type: 'open', target }),
+    refused: (notice) => offer({ type: 'notice', notice }),
+  })
+  askElement(api, {
+    open: openPanel,
+    selectedNode: () => buttons.nodeId,
+    onTaskPage: (url) => pageTasks(pages.tasks, url).length > 0,
     refused: (notice) => offer({ type: 'notice', notice }),
   })
 

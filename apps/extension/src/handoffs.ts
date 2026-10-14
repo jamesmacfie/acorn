@@ -58,3 +58,6 @@ export type ButtonClick =
   | { type: 'acorn:handoff'; key: string }
   | { type: 'acorn:chip'; key: string; action: 'show' | 'chat' }
   | { type: 'acorn:marker'; action: 'show' | 'hide' }
+// From the background to the element picker on a task's page: pick the element the person last
+// right-clicked, or let them point at one and click it.
+export type PickerMessage = { type: 'acorn:pick'; mode: 'hover' | 'target' }

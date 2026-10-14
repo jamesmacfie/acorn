@@ -59,7 +59,8 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
   const storage = new Map<string, unknown>()
   const onConnect = listeners<(port: Port) => void>()
   const onClicked = listeners<(tab: Tab) => void>()
-  const onMessage = listeners<(message: unknown, sender: MessageSender) => void>()
+  const onMessage =
+    listeners<(message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => true | void>()
   const onUpdated = listeners<(tabId: number, change: { url?: string; status?: string }, tab: Tab) => void>()
   const onActivated = listeners<(info: { tabId: number; windowId: number }) => void>()
   const onAdded = listeners<(permissions: { origins?: string[]; permissions?: string[] }) => void>()
@@ -67,14 +68,14 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
   const onStorageChanged = listeners<(changes: Record<string, { newValue?: unknown }>, area: string) => void>()
   const onNotificationClicked = listeners<(id: string) => void>()
   const onInstalled = listeners<() => void>()
-  const onMenuClicked = listeners<(info: { menuItemId: string | number }, tab?: Tab) => void>()
+  const onMenuClicked = listeners<(info: { menuItemId: string | number; frameId?: number }, tab?: Tab) => void>()
   const runtime: BrowserApi['runtime'] = {
     lastError: null,
     getURL: (path) => `chrome-extension://fake/${path}`,
     onConnect,
     onMessage,
     onInstalled,
-    sendMessage: async (message) => void onMessage.emit(structuredClone(message), {}),
+    sendMessage: async (message) => void onMessage.emit(structuredClone(message), {}, () => {}),
     connect({ name }) {
       const close = (end: FakePort) => {
         for (const side of [end, end.peer!]) side.closed = true
@@ -128,8 +129,8 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     // The extension was installed, and the right-click entries it made then, by ID.
     install: () => onInstalled.emit(),
     menus: new Map<string, { title: string; contexts: string[] }>(),
-    // A right-click entry, clicked on the active tab.
-    clickMenu: (menuItemId: string) => onMenuClicked.emit({ menuItemId }, { ...fake.activeTab }),
+    // A right-click entry, clicked on the active tab, in its top frame unless `frameId` says otherwise.
+    clickMenu: (menuItemId: string, frameId = 0) => onMenuClicked.emit({ menuItemId, frameId }, { ...fake.activeTab }),
     // Whether the browser refuses to open the panel, as it does outside a gesture it counts.
     refusePanel: false,
     // The tab beside the sidebar. Without `url` the extension may not read it, as without activeTab.
@@ -143,12 +144,20 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     notified: [] as string[],
     clickNotification: (id: string): void => onNotificationClicked.emit(id),
     selection: '',
-    // Messages the background sent to a page's content script, and the tabs it injected one into.
+    // Replaced by a test to script what a page's content scripts answer. By default, nothing.
+    pageAnswer: (_message: unknown): unknown => undefined,
+    // Messages the background sent to a page's content scripts, the tabs it injected scripts into, and
+    // the files it injected.
     tabMessages: [] as { tabId: number; message: unknown }[],
     injected: [] as number[],
+    injectedFiles: [] as string[][],
     // A message from the content script in the active tab, as the browser delivers it.
     sendFromPage: (message: unknown): void =>
-      onMessage.emit(structuredClone(message), { tab: { ...fake.activeTab }, url: fake.activeTab.url, frameId: 0 }),
+      onMessage.emit(
+        structuredClone(message),
+        { tab: { ...fake.activeTab }, url: fake.activeTab.url, frameId: 0 },
+        () => {},
+      ),
     // The active tab navigated, as `tabs.onUpdated` reports it.
     navigate: (url: string | undefined): void => {
       fake.activeTab = { ...fake.activeTab, url }
@@ -206,8 +215,13 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
             ? [{ ...fake.activeTab, active: true, url: undefined }]
             : [{ ...fake.activeTab, active: true }, ...fake.otherTabs.map((tab) => ({ ...tab, active: false }))],
         captureVisibleTab: (windowId: number): Promise<string> => fake.onCapture(windowId),
-        sendMessage: async (tabId: number, message: unknown) =>
-          void fake.tabMessages.push({ tabId, message: structuredClone(message) }),
+        // As in a browser, a tab with no script injected has nothing to take the message.
+        sendMessage: async (tabId: number, message: unknown): Promise<unknown> => {
+          if (!fake.injected.includes(tabId))
+            throw new Error('Could not establish connection. Receiving end does not exist.')
+          fake.tabMessages.push({ tabId, message: structuredClone(message) })
+          return fake.pageAnswer(message)
+        },
         onUpdated,
         onActivated,
       },
@@ -221,6 +235,7 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
           if (fake.activeTab.url === undefined) throw new Error('Missing host permission for the tab')
           if (injection.files) {
             fake.injected.push(injection.target.tabId)
+            fake.injectedFiles.push(injection.files)
             return [{}]
           }
           return [{ result: fake.selection }]
