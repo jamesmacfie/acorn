@@ -20,7 +20,7 @@ import { isProviderOperationError, ProviderOperationError } from '../../integrat
 import { isTaskConfined, mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { integrationProviderRegistry } from '../../integrations/registry'
 import { warmItemDetails } from '../../integrations/itemDetail'
-import { getProject, type ProjectRow } from '../../projects/projects'
+import { getProject, githubFacet, projectRepository, type ProjectRow } from '../../projects/projects'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
@@ -43,8 +43,8 @@ const cleanIcon = (v: unknown): string | null => (typeof v === 'string' && ICON_
 
 function rowToTask(row: Row, links: TaskLink[], project: Awaited<ReturnType<typeof getProject>>): Task | null {
   const projectId = row.projectId
-  const github =
-    project?.githubOwner && project.githubName ? { owner: project.githubOwner, name: project.githubName } : null
+  const repository = project ? projectRepository(project) : null
+  const github = githubFacet(repository)
   return {
     id: row.id,
     title: row.title,
@@ -52,7 +52,8 @@ function rowToTask(row: Row, links: TaskLink[], project: Awaited<ReturnType<type
     origin: row.origin as Task['origin'],
     projectId,
     branch: row.branch,
-    github,
+    repository,
+    github: github && { owner: github.owner, name: github.name },
     worktreePath: row.worktreePath,
     pullNumber: row.pullNumber,
     status: row.status as Task['status'],

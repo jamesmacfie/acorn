@@ -123,8 +123,15 @@ export const projects = sqliteTable(
     // VCS facet: 'git' when a .git entry was detected at `path`, null for a plain folder.
     vcs: text('vcs'),
     defaultBranch: text('default_branch'), // cached from origin/HEAD or the GitHub API; null when unknown
-    // GitHub facet: parsed from the origin remote and, or stamped by the GitHub import flow.
     remoteUrl: text('remote_url'),
+    // Repository facet (docs/plugins/code-hosts.md): the origin remote's host and path, lowercased, and
+    // the code host plugin that claimed the host. `repo_external_id` is that plugin's own id for the
+    // repository. Written only through `repositoryColumns`, which keeps the GitHub columns in step.
+    repoProvider: text('repo_provider'),
+    repoHost: text('repo_host'),
+    repoPath: text('repo_path'),
+    repoExternalId: text('repo_external_id'),
+    // The GitHub facet's old columns, derived from the repository facet for readers that still use them.
     githubOwner: text('github_owner'),
     githubName: text('github_name'),
     githubRepoId: integer('github_repo_id'),
@@ -151,6 +158,7 @@ export const projects = sqliteTable(
     index('projects_workspace_idx').on(t.workspaceId),
     // Non-unique on purpose: two clones of one GitHub repo are legal, each its own project.
     index('projects_github_idx').on(t.githubOwner, t.githubName),
+    index('projects_repo_idx').on(t.repoPath),
   ],
 )
 

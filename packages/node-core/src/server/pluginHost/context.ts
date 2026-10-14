@@ -53,7 +53,7 @@ import type { CapabilityRegistry, Disposable } from './capabilities'
 import type { ExtensionPointId } from './extensionPoints'
 import type { HostPluginContext, NodePluginContext, PluginFetchHandler, PluginStorage } from './types'
 import { parsePluginChannel, pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
+import type { CodeHostDescriptor, PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import { onWsBroadcast, registerWsChannelHandler, setStreamHandlers, wsBroadcast } from '../transport/wsHub'
 import { isNodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import { assertSubscribableVerb } from './emits'
@@ -120,6 +120,8 @@ export type LoadedPluginBinding = {
   browserHandoffs?: readonly BrowserHandoffDescriptor[]
   // The route listing its tasks' app addresses for the browser extension, kept beside the handoffs.
   taskAddresses?: string
+  // The Git hosts it claims, replayed into the code host registry (./codeHosts.ts).
+  codeHost?: CodeHostDescriptor
   destinations?: readonly NonNullable<PluginFrameSurface['destinations']>[number][]
   // The plugin's installed package directory, for resolving a manifest path the host hands on as an
   // absolute one. Host-side only: this is a path on the node's filesystem and must never reach a route

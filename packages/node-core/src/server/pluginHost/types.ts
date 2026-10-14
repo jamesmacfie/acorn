@@ -24,7 +24,7 @@ import type { StreamHandlers, WsChannelHandler } from '../transport/wsHub'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { NodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'
-import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
+import type { CodeHostDescriptor, PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import type { BrowserHandoffDescriptor } from '@acorn/protocol/plugin/handoffs.ts'
 import type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
 import type { PluginTelemetry } from '../telemetry/collector'
@@ -545,6 +545,9 @@ export type NodePlugin = {
   // browser extension draws on a website, each resolved by a route this plugin serves. A loaded plugin
   // declares them in its manifest and this field is ignored for it.
   browserHandoffs?: readonly BrowserHandoffDescriptor[]
+  // The compiled tier's code host (docs/plugins/code-hosts.md): the Git hosts whose repositories this
+  // plugin names. A loaded plugin declares it in its manifest and this field is ignored for it.
+  codeHost?: CodeHostDescriptor
   // Awaited before the listener binds. Init may open plugin storage, migrate rows, or prepare route
   // state that must be complete before requests are served.
   init(ctx: CompiledNodePluginContext): void | Promise<void>

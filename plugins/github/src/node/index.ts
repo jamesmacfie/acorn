@@ -38,6 +38,8 @@ export const githubPlugin = (): NodePlugin => {
     // This module's own URL, so the host can walk from here for the migration chain
     // (docs/plugins/data-ownership.md § Data ownership).
     migrationsModule: import.meta.url,
+    // Projects whose remote is on github.com are GitHub's (docs/plugins/code-hosts.md).
+    codeHost: { label: 'GitHub', hosts: ['github.com'] },
     // The pull request button on github.com
     // (docs/github-integration/tasks-and-references.md § Browser handoff). Its route below loads on
     // the first handoff.

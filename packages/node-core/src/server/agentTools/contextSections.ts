@@ -2,7 +2,13 @@ import { taskScripts } from '../taskScripts/service'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
-import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } from '@acorn/protocol/api.ts'
+import type {
+  ContextBudget,
+  ContextItem,
+  ContextSectionResult,
+  ProjectRepository,
+  TaskContext,
+} from '@acorn/protocol/api.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import type { Disposable } from '../pluginHost/capabilities'
@@ -12,6 +18,7 @@ import { integrationProviderRegistry } from '../integrations/registry'
 import type { IntegrationProviderContribution } from '../integrations/types'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
+import { projectRepository } from '../projects/projects'
 
 type TaskRow = typeof schema.tasks.$inferSelect
 type AssembleArgs = {
@@ -19,7 +26,8 @@ type AssembleArgs = {
   userLogin: string
   task: TaskRow
   repo: string
-  github: { owner: string; name: string } | null
+  // The task's project remote (docs/plugins/code-hosts.md). A code host's section checks `provider`.
+  repository: ProjectRepository | null
   workflowRunId?: string
 }
 type ContextDraft = {
@@ -328,9 +336,8 @@ export async function assembleContext(
     .then((rows) => rows[0] ?? null)
   if (!project) return null
   const projectId = project.id
-  const github =
-    project.githubOwner && project.githubName ? { owner: project.githubOwner, name: project.githubName } : null
-  const repo = github ? `${github.owner}/${github.name}` : ''
+  const repository = projectRepository(project)
+  const repo = repository?.path ?? ''
   const ctx: TaskContext = {
     task: {
       id: task.id,
@@ -359,7 +366,7 @@ export async function assembleContext(
     if (!included.has(contribution.id)) continue
     let draft: ContextDraft
     try {
-      draft = await contribution.assemble({ db, userLogin, task, repo, github, workflowRunId: opts.workflowRunId })
+      draft = await contribution.assemble({ db, userLogin, task, repo, repository, workflowRunId: opts.workflowRunId })
     } catch (error) {
       draft = {
         items: [],

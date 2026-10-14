@@ -91,6 +91,7 @@ const modes = {
     projects: {
       byId: 'async',
       byGithub: 'async',
+      byRepository: 'async',
       checkouts: 'async',
       byWorkspace: 'async',
       externalProjects: 'async',

@@ -33,8 +33,9 @@ rule for which project would inherit them.
 
 A project belongs to one workspace. It's a folder on the Node's machine, either a plain folder or a
 Git checkout. The project row in `packages/node-core/src/server/db/schema.ts` holds a stable opaque
-ID, a display name, an optional folder path, an optional color, and optional Git and GitHub facets.
-The facets are cached observations that the Node refreshes. The project ID is the identity. Project
+ID, a display name, an optional folder path, an optional color, and optional Git and repository
+facets. The repository facet is the remote's host and path and the plugin that claims the host
+([code hosts](./plugins/code-hosts.md)). The facets are cached observations that the Node refreshes. The project ID is the identity. Project
 membership changes publish `project:changed`.
 
 [Projects and workspaces](./workspaces-and-tasks/projects.md) covers registering, arranging, and

@@ -368,7 +368,7 @@ Each plugin landing page above has topic pages in a folder of the same name:
   plugin](./plugins/client-half.md), [Collaboration rules](./plugins/collaboration.md), [Commands and
   keybindings](./plugins/commands.md), [Cooperative extension
   points](./plugins/cooperative-extension-points.md), [Data ownership](./plugins/data-ownership.md),
-  [Descriptors](./plugins/descriptors.md), [Detail regions](./plugins/detail-regions.md), [The dev loop](./plugins/dev-loop.md),
+  [Code hosts](./plugins/code-hosts.md), [Descriptors](./plugins/descriptors.md), [Detail regions](./plugins/detail-regions.md), [The dev loop](./plugins/dev-loop.md),
   [Distribution](./plugins/distribution.md), [Document surfaces and
   webviews](./plugins/document-surfaces.md), [Events](./plugins/events.md), [Forward
   compatibility](./plugins/forward-compatibility.md), [Frames](./plugins/frames.md), [Keeping a

@@ -2,17 +2,19 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
 import { and, asc, eq, max, sql } from 'drizzle-orm'
+import type { ProjectRepository } from '@acorn/protocol/api.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { git } from '../core/git'
 import { broadcastProjectChanged, broadcastWorkspaceChanged } from '../notify'
+import { codeHostFor } from '../pluginHost/codeHosts'
 import { nodeWorkspacesMode, settleWorkspacesMode, WORKSPACES_OFF_MESSAGE } from './workspacesMode'
 
 // A project is a folder on this machine (server/db/schema.ts `projects`; docs/workspaces-and-tasks.md
 // § Workspace and project covers facets generally). Adding one needs only an absolute existing
-// directory: a `.git` entry sets the git facet, and an origin remote that parses as
-// `github.com/<owner>/<name>` sets the GitHub facet. `detectProject` refreshes both whenever the
-// folder changes underneath us.
+// directory: a `.git` entry sets the git facet, and an origin remote sets the repository facet, with the
+// code host plugin that claims its host (docs/plugins/code-hosts.md). `detectProject` refreshes both
+// whenever the folder changes underneath us.
 
 export type ProjectRow = typeof schema.projects.$inferSelect
 
@@ -47,6 +49,7 @@ export type ProjectRef = {
   name: string
   path: string | null
   workspaceId: string
+  repository: ProjectRepository | null
   github: { owner: string; name: string; repoId: number | null } | null
 }
 
@@ -54,32 +57,32 @@ export type ProjectCreateRefInput = {
   name: string
   path?: string | null
   workspaceId?: string
+  repository?: { host: string; path: string; externalId?: string | null }
   github?: { owner: string; name: string; repoId?: number | null }
 }
 
 export type ProjectUpdateRefInput = {
   path?: string | null
+  repositoryExternalId?: string | null
   githubRepoId?: number | null
 }
 
 export function toProjectRef(row: ProjectRow): ProjectRef {
+  const repository = projectRepository(row)
   return {
     id: row.id,
     name: row.name,
     path: row.path,
     workspaceId: row.workspaceId,
-    github:
-      row.githubOwner && row.githubName
-        ? { owner: row.githubOwner, name: row.githubName, repoId: row.githubRepoId }
-        : null,
+    repository,
+    github: githubFacet(repository),
   }
 }
 
 type ProjectFacets = {
   vcs: 'git' | null
   remoteUrl: string | null
-  githubOwner: string | null
-  githubName: string | null
+  repository: ProjectRepository | null
   defaultBranch: string | null
 }
 
@@ -87,19 +90,89 @@ type ProjectFacets = {
 // new facets, while lookup remains case-insensitive for rows written with mixed case.
 export const normalizeGithubPart = (value: string): string => value.trim().toLowerCase()
 
-// Accept the https, ssh, and scp-like forms Git emits, with an optional .git suffix, case-insensitively
-// (GitHub owners and repos are case-insensitive). The host is anchored so a URL such as
-// https://example.com/github.com/acme/web cannot become a GitHub facet.
-export function parseGithubRemote(url: string): { owner: string; name: string } | null {
-  const match =
-    /^(?:(?:https?|ssh):\/\/(?:[^@/\s]+@)?github\.com\/|git@github\.com:\/?)([^/\s?#]+)\/([^/\s?#]+?)(?:\.git)?$/i.exec(
-      url.trim(),
-    )
-  return match ? { owner: match[1]!, name: match[2]! } : null
+// Read any remote Git emits as a host and a path: https, ssh, and git URLs, and the scp-like
+// `user@host:path`. Both come back lowercased, without a port, a user, or a `.git` suffix. GitHub,
+// GitLab, and Bitbucket all match repository paths case-insensitively. A local path has no host and
+// returns null.
+export function parseGitRemote(url: string): { host: string; path: string } | null {
+  const remote = url.trim()
+  if (!remote || /\s/.test(remote)) return null
+  let host: string
+  let path: string
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(remote)) {
+    if (!/^(?:https?|ssh|git|git\+ssh):\/\//i.test(remote)) return null
+    let parsed: URL
+    try {
+      parsed = new URL(remote)
+    } catch {
+      return null
+    }
+    if (parsed.search || parsed.hash) return null
+    host = parsed.hostname
+    path = parsed.pathname
+  } else {
+    const scp = /^(?:[^@/]+@)?([^:/]+):(.+)$/.exec(remote)
+    if (!scp) return null
+    host = scp[1]!
+    path = scp[2]!
+  }
+  const repositoryPath = normalizeRepositoryPath(path)
+  return host && repositoryPath ? { host: host.toLowerCase(), path: repositoryPath } : null
+}
+
+// `group/subgroup/repo`, lowercased, without one outer slash or a `.git` suffix. Null when a segment is
+// empty, which also refuses `//group/repo`.
+function normalizeRepositoryPath(raw: string): string | null {
+  const path = raw
+    .trim()
+    .replace(/^\/|\/$/g, '')
+    .replace(/\.git$/i, '')
+    .toLowerCase()
+  return path && path.split('/').every(Boolean) ? path : null
+}
+
+// The repository facet, with the live claim ahead of the stored provider. The stored one stands in only
+// while no running plugin claims the host, so turning a code host off doesn't orphan its projects, and
+// a provider stamped while another plugin held the host doesn't outlive that.
+export function projectRepository(row: ProjectRow): ProjectRepository | null {
+  if (!row.repoHost || !row.repoPath) return null
+  return {
+    provider: codeHostFor(row.repoHost) ?? row.repoProvider,
+    host: row.repoHost,
+    path: row.repoPath,
+    externalId: row.repoExternalId,
+  }
+}
+
+// The GitHub facet, read off a `github.com` repository whose path is an owner and a name. Kept for
+// readers of the GitHub-named fields until the next plugin API major.
+export function githubFacet(
+  repository: { host: string; path: string; externalId?: string | null } | null,
+): { owner: string; name: string; repoId: number | null } | null {
+  if (repository?.host !== 'github.com') return null
+  const [owner, name, ...rest] = repository.path.split('/')
+  if (!owner || !name || rest.length) return null
+  const repoId = Number(repository.externalId ?? NaN)
+  return { owner, name, repoId: Number.isSafeInteger(repoId) ? repoId : null }
+}
+
+// Every column the repository facet owns, including the GitHub columns derived from it, so the two
+// can't drift. Every write of the facet goes through here.
+function repositoryColumns(repository: ProjectRepository | null) {
+  const github = githubFacet(repository)
+  return {
+    repoProvider: repository?.provider ?? null,
+    repoHost: repository?.host ?? null,
+    repoPath: repository?.path ?? null,
+    repoExternalId: repository?.externalId ?? null,
+    githubOwner: github?.owner ?? null,
+    githubName: github?.name ?? null,
+    githubRepoId: github?.repoId ?? null,
+  }
 }
 
 async function detectFacets(path: string): Promise<ProjectFacets> {
-  const none: ProjectFacets = { vcs: null, remoteUrl: null, githubOwner: null, githubName: null, defaultBranch: null }
+  const none: ProjectFacets = { vcs: null, remoteUrl: null, repository: null, defaultBranch: null }
   // A `.git` entry, not a directory: a linked worktree holds a `.git` file and is still a git
   // checkout.
   if (!existsSync(join(path, '.git'))) return none
@@ -107,7 +180,7 @@ async function detectFacets(path: string): Promise<ProjectFacets> {
   // Exit code as data (`git` in core): a repo with no origin remote is a git project, not an error.
   const remote = await git(['remote', 'get-url', 'origin'], { cwd: path, timeoutMs: 5_000 })
   const remoteUrl = remote.code === 0 ? remote.stdout.trim() || null : null
-  const github = remoteUrl ? parseGithubRemote(remoteUrl) : null
+  const parsed = remoteUrl ? parseGitRemote(remoteUrl) : null
 
   // origin/HEAD is only set once something resolved it (clone does; git init + remote add doesn't).
   const head = await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], { cwd: path, timeoutMs: 5_000 })
@@ -116,8 +189,7 @@ async function detectFacets(path: string): Promise<ProjectFacets> {
   return {
     vcs: 'git',
     remoteUrl,
-    githubOwner: github ? normalizeGithubPart(github.owner) : null,
-    githubName: github ? normalizeGithubPart(github.name) : null,
+    repository: parsed ? { ...parsed, provider: codeHostFor(parsed.host), externalId: null } : null,
     defaultBranch,
   }
 }
@@ -227,11 +299,12 @@ export async function createProject(
   const already = await projectAtPath(db, input.path)
   if (already) return { ok: true, project: already }
 
-  const facets = await detectFacets(input.path)
+  const { repository, ...facets } = await detectFacets(input.path)
   const project: NewProject = {
-    name: input.name?.trim() || facets.githubName || basename(input.path),
+    name: input.name?.trim() || repository?.path.split('/').pop() || basename(input.path),
     path: input.path,
     ...facets,
+    ...repositoryColumns(repository),
   }
   try {
     return insertProject(db, ownerId, project, input.workspaceId)
@@ -274,22 +347,42 @@ export async function projectByGithub(db: AppDatabase, owner: string, name: stri
   return row ?? null
 }
 
-// Re-probe the folder and refresh the cached facets. Never clears the GitHub facet on a vanished
-// remote if a task or pull history hangs off it: a remote can be temporarily re-pointed, and
-// losing the facet would orphan the github surfaces for no gain. It does clear when the whole
-// .git directory goes away.
+// The oldest project whose remote is `path` on a host `provider` claims, matching projectByGithub's
+// rule for two clones of one repository: the oldest row wins, with id as a stable tie-breaker.
+export async function projectByRepository(db: AppDatabase, provider: string, path: string): Promise<ProjectRow | null> {
+  const rows = await db
+    .select()
+    .from(schema.projects)
+    .where(eq(schema.projects.repoPath, path.trim().toLowerCase()))
+    .orderBy(asc(schema.projects.createdAt), asc(schema.projects.id))
+  return rows.find((row) => projectRepository(row)?.provider === provider) ?? null
+}
+
+// Re-probe the folder and refresh the cached facets. Never clears the repository facet on a vanished
+// remote if a task or pull history hangs off it: a remote can be temporarily re-pointed, and losing
+// the facet would orphan the code host's surfaces for no gain. It does clear when the whole .git
+// directory goes away. The same repository keeps its provider and external id, even while the plugin
+// that claimed it is off.
 export async function detectProject(db: AppDatabase, id: string): Promise<ProjectRow | null> {
   const project = await getProject(db, id)
   if (!project?.path || !isDir(project.path)) return project
   const facets = await detectFacets(project.path)
+  const stored = projectRepository(project)
+  const detected = facets.repository
+  const repository = !detected
+    ? facets.vcs
+      ? stored
+      : null
+    : stored?.host === detected.host && stored.path === detected.path
+      ? { ...detected, provider: detected.provider ?? stored.provider, externalId: stored.externalId }
+      : detected
   await db
     .update(schema.projects)
     .set({
       vcs: facets.vcs,
       remoteUrl: facets.remoteUrl,
       defaultBranch: facets.defaultBranch ?? project.defaultBranch,
-      githubOwner: facets.githubOwner ?? (facets.vcs ? project.githubOwner : null),
-      githubName: facets.githubName ?? (facets.vcs ? project.githubName : null),
+      ...repositoryColumns(repository),
       updatedAt: Date.now(),
     })
     .where(eq(schema.projects.id, id))
@@ -376,46 +469,48 @@ export async function createProjectRef(
   if (!name) throw new Error('Project name cannot be blank.')
   if (input.github && (!input.github.owner.trim() || !input.github.name.trim()))
     throw new Error('GitHub owner and name cannot be blank.')
+  const repository = inputRepository(input)
   if (input.path !== undefined && input.path !== null) {
     const result = await createProject(db, { path: input.path, workspaceId: input.workspaceId, name }, ownerId)
     if (!result.ok) throw result.code === 'workspaces_off' ? new WorkspacesOffError() : new Error(result.reason)
-    if (input.github) {
+    if (repository) {
       await db
         .update(schema.projects)
-        .set({
-          githubOwner: normalizeGithubPart(input.github.owner),
-          githubName: normalizeGithubPart(input.github.name),
-          githubRepoId: input.github.repoId ?? null,
-          updatedAt: Date.now(),
-        })
+        .set({ ...repositoryColumns(repository), updatedAt: Date.now() })
         .where(eq(schema.projects.id, result.project.id))
       broadcastProjectChanged({ projectId: result.project.id })
     }
     return toProjectRef((await getProject(db, result.project.id))!)
   }
 
-  if (!input.github?.owner.trim() || !input.github.name.trim())
-    throw new Error('Deferred projects need a GitHub facet.')
-  const result = insertProject(
-    db,
-    ownerId,
-    {
-      name,
-      path: null,
-      githubOwner: normalizeGithubPart(input.github.owner),
-      githubName: normalizeGithubPart(input.github.name),
-      githubRepoId: input.github.repoId ?? null,
-    },
-    input.workspaceId,
-  )
+  if (!repository) throw new Error('Deferred projects need a repository facet.')
+  const result = insertProject(db, ownerId, { name, path: null, ...repositoryColumns(repository) }, input.workspaceId)
   if (!result.ok) throw new Error(result.reason)
   return toProjectRef(result.project)
 }
 
+// The repository an importer names, in the generic form or GitHub's, normalized like a parsed remote.
+function inputRepository(input: ProjectCreateRefInput): ProjectRepository | null {
+  const given =
+    input.repository ??
+    (input.github && {
+      host: 'github.com',
+      path: `${input.github.owner.trim()}/${input.github.name.trim()}`,
+      externalId: input.github.repoId == null ? null : String(input.github.repoId),
+    })
+  if (!given) return null
+  const host = given.host.trim().toLowerCase()
+  const path = normalizeRepositoryPath(given.path)
+  if (!host || !path) throw new Error('A repository needs a host and a path.')
+  return { provider: codeHostFor(host), host, path, externalId: given.externalId ?? null }
+}
+
+// `holder` is set for a loaded plugin's call: it may set an external id only on a host it holds.
 export async function updateProjectRef(
   db: AppDatabase,
   id: string,
   patch: ProjectUpdateRefInput,
+  holder?: string,
 ): Promise<ProjectRef | null> {
   const current = await getProject(db, id)
   if (!current) return null
@@ -425,27 +520,43 @@ export async function updateProjectRef(
     } else {
       const result = await patchProject(db, id, { path: patch.path })
       if (!result.ok) throw new Error(result.reason)
-      // A deferred importer project may be mapped to a plain folder before its GitHub remote is
-      // available. `detectProject` clears disk-derived facets for that folder; preserve the explicit
-      // importer facet until a later Git-backed probe can replace it.
-      if (current.githubOwner && current.githubName && !result.project.githubOwner) {
+      // A deferred importer project may be mapped to a plain folder before its remote is available.
+      // `detectProject` clears disk-derived facets for that folder; preserve the explicit importer
+      // facet until a later Git-backed probe can replace it.
+      const imported = projectRepository(current)
+      if (imported && !result.project.repoHost) {
         await db
           .update(schema.projects)
-          .set({
-            githubOwner: current.githubOwner,
-            githubName: current.githubName,
-            githubRepoId: current.githubRepoId,
-            updatedAt: Date.now(),
-          })
+          .set({ ...repositoryColumns(imported), updatedAt: Date.now() })
           .where(eq(schema.projects.id, id))
       }
     }
   }
-  if (patch.githubRepoId !== undefined) {
-    await db
-      .update(schema.projects)
-      .set({ githubRepoId: patch.githubRepoId, updatedAt: Date.now() })
-      .where(eq(schema.projects.id, id))
+  const externalId =
+    patch.repositoryExternalId !== undefined
+      ? patch.repositoryExternalId
+      : patch.githubRepoId == null
+        ? patch.githubRepoId
+        : String(patch.githubRepoId)
+  if (externalId !== undefined) {
+    const row = await getProject(db, id)
+    const repository = row && projectRepository(row)
+    if (repository) {
+      if (holder !== undefined && codeHostFor(repository.host) !== holder)
+        throw new Error(`Only the code host that holds ${repository.host} can set its external id.`)
+      // Only onto the repository just checked: a path change in this call or a concurrent one may have
+      // re-pointed the project, and that repository's id isn't ours to write.
+      await db
+        .update(schema.projects)
+        .set({ ...repositoryColumns({ ...repository, externalId }), updatedAt: Date.now() })
+        .where(
+          and(
+            eq(schema.projects.id, id),
+            eq(schema.projects.repoHost, repository.host),
+            eq(schema.projects.repoPath, repository.path),
+          ),
+        )
+    }
   }
   const updated = await getProject(db, id)
   if (updated) broadcastProjectChanged({ projectId: id })

@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { assembleContext, parseInclude } from '../../agentTools/contextSections'
 import { getDb, schema } from '../../db'
+import { githubFacet, projectRepository } from '../../projects/projects'
 import { projectForTask } from '../../worktrees/taskWorktree'
 import type { AppEnv } from '../../middleware/auth'
 import { ownerId } from '../../middleware/requireUser'
@@ -14,8 +15,9 @@ import { respondError } from '../../respond'
 // for the repo_info tool.
 
 export const taskContext = new Hono<AppEnv>()
-  // Project facts for the repo_info tool (docs/mcp.md): GitHub owner/name comes from the optional
-  // project facet, while branch/worktree and the default branch remain task/project state.
+  // Project facts for the repo_info tool (docs/mcp.md): the repository comes from the optional project
+  // facet, with GitHub's owner and name read off it, while branch/worktree and the default branch
+  // remain task/project state.
   .get('/:id/repo-info', async (c) => {
     ownerId(c)
     const db = getDb(c.env)
@@ -26,9 +28,12 @@ export const taskContext = new Hono<AppEnv>()
     if (!t) return respondError(c, 404, 'not_found')
     const project = await projectForTask(db, t)
     const defaultBranch = project?.defaultBranch ?? null
+    const repository = project ? projectRepository(project) : null
+    const github = githubFacet(repository)
     return c.json({
-      owner: project?.githubOwner ?? null,
-      name: project?.githubName ?? null,
+      repository,
+      owner: github?.owner ?? null,
+      name: github?.name ?? null,
       projectId: project?.id ?? t.projectId,
       projectName: project?.name ?? null,
       defaultBranch,

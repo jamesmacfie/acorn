@@ -83,6 +83,26 @@ const customAgentDescriptor = z.object({
   maxToolRisk: z.enum(['read', 'write', 'execute']).optional(),
 })
 
+// The Git hosts whose repositories this plugin names, such as `gitlab.com` (docs/plugins/code-hosts.md).
+// The provider is the plugin's own id, so two providers can't collide. Hosts are bare lowercase names,
+// with no scheme or port, because core compares them with the host it parses from a remote.
+export const codeHostDescriptor = z.object({
+  label: z.string().min(1).max(64),
+  hosts: z
+    .array(
+      z
+        .string()
+        .max(253)
+        .regex(
+          /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/,
+          'a host is a bare lowercase name',
+        ),
+    )
+    .min(1)
+    .max(16),
+})
+export type CodeHostDescriptor = z.infer<typeof codeHostDescriptor>
+
 // `api` and `events` are enforced by client-core's frame broker. `contributions` stays loose: a manifest
 // written for a newer acorn should contribute less on an older one rather than fail to parse.
 //
@@ -135,6 +155,8 @@ const contributionsShape = z.looseObject({
   // A GET route on this plugin's node half listing the exact origins its tasks' apps answer at now, for
   // the browser extension (./handoffs.ts `taskAddressList`).
   taskAddresses: pluginRoute.optional(),
+  // Compiled plugins declare the same thing on `NodePlugin.codeHost`.
+  codeHost: codeHostDescriptor.optional(),
 })
 
 // Every contribution kind a manifest may declare, as a runtime list.
@@ -479,4 +501,5 @@ export type PluginContributions = {
   cliCommands?: import('./cliCommands.ts').PluginCliCommandDescriptor[]
   browserHandoffs?: Omit<import('./handoffs.ts').BrowserHandoff, 'pluginId'>[]
   taskAddresses?: string
+  codeHost?: CodeHostDescriptor
 } & Record<string, unknown>

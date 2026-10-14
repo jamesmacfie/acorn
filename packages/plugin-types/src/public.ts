@@ -92,6 +92,7 @@ export type {
   CoreTaskService,
 } from './contracts/coreTasks.js'
 export type {
+  ProjectRepository,
   ProjectRef,
   ProjectCreateRefInput,
   ProjectUpdateRefInput,

@@ -18,6 +18,7 @@ import type { SecretService } from '../core/secrets.ts'
 import type { Env } from '../bindings.ts'
 import { discoverDataSources, invokeDataSource, listDataSources } from '../dataSources/runtime.ts'
 import { broadcastPluginApprovalNotice } from '../notify.ts'
+import { githubFacet, projectRepository } from '../projects/projects.ts'
 import { loadTask, projectForTask } from '../worktrees/taskWorktree.ts'
 import { datasetWriteSchema } from '@acorn/protocol/datasets.ts'
 
@@ -313,7 +314,8 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
     },
     {
       name: 'repo_info',
-      description: "The current task's repo: owner, name, default branch, task branch and worktree path.",
+      description:
+        "The current task's repo: its remote host and path, the code host that owns it, default branch, task branch and worktree path. owner and name are set for a github.com remote.",
       input: empty,
       scope: 'task',
       risk: 'read',
@@ -322,9 +324,12 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
         if (!t) throw new ToolError('not_found', 'no such task')
         const project = await projectForTask(db, t)
         const defaultBranch = project?.defaultBranch ?? null
+        const repository = project ? projectRepository(project) : null
+        const github = githubFacet(repository)
         return {
-          owner: project?.githubOwner ?? null,
-          name: project?.githubName ?? null,
+          repository,
+          owner: github?.owner ?? null,
+          name: github?.name ?? null,
           defaultBranch,
           branch: t.branch,
           worktreePath: t.worktreePath,

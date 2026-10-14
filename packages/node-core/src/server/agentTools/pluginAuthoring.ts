@@ -43,6 +43,7 @@ type JsonSchema = {
   enum?: string[]
   const?: string
   maxItems?: number
+  type?: string | string[]
 }
 
 let cached: JsonSchema | null = null
@@ -139,6 +140,8 @@ export type PluginAuthoringVocabulary = {
     contributionCaps: Record<string, number>
     // Contributions that are one route on the plugin's node half rather than a list.
     contributionRoutes: string[]
+    // Contributions that are one object rather than a list, such as `codeHost`.
+    contributionObjects: string[]
     frameTargets: string[]
     slots: string[]
     contextMenuLocations: string[]
@@ -177,7 +180,8 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
         .filter((key) => !required.includes(key))
         .sort(),
       contributionCaps: Object.fromEntries(caps),
-      contributionRoutes: kinds.filter(([, value]) => value.maxItems === undefined).map(([key]) => key),
+      contributionRoutes: kinds.filter(([, value]) => value.type === 'string').map(([key]) => key),
+      contributionObjects: kinds.filter(([, value]) => value.type === 'object').map(([key]) => key),
       frameTargets: at(contributions, 'frames')?.items?.properties?.target?.enum ?? [],
       slots: at(contributions, 'slots')?.items?.properties?.slot?.enum ?? [],
       // Read off the schema, not hand-typed. A guessed member is a contribution that parses on a newer
@@ -389,6 +393,7 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
       .map(([key, cap]) => `- \`${key}\` — max ${cap}`)
       .join('\n'),
     ...manifest.contributionRoutes.map((key) => `- \`${key}\` — one route in your namespace`),
+    ...manifest.contributionObjects.map((key) => `- \`${key}\` — one object`),
     '',
     '**Loaded agent tools and context.** `agentTools` entries are task scoped and become',
     '`<pluginId>_<localId>`. They carry `{ id, description, inputSchema, risk, handler, scope?,',

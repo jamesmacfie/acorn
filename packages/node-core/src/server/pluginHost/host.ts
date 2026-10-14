@@ -14,6 +14,7 @@ import { disposeUnstartedPlugin } from '../plugins/isolation'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import { declareEmits } from './emits'
 import { declareBrowserHandoffs } from './browserHandoffs'
+import { declareCodeHost } from './codeHosts'
 import type { HostPluginContext, NodePlugin, PluginStorage } from './types'
 import { createLogger, describeError } from '../telemetry/logger'
 import { registerManifestRuntimeContributions } from './runtimeContributions'
@@ -208,10 +209,10 @@ export async function initPlugins(
     }
   }
 
-  // What a plugin declares rather than registers: its `emits`, its browser handoffs, and its task
-  // address route. A loaded plugin's come from its binding, a built-in's from its own fields. The host owns these undos
-  // alongside context registrations; declarations follow the binding generation and are removed with
-  // that instance.
+  // What a plugin declares rather than registers: its `emits`, its browser handoffs, its task address
+  // route, and its code host. A loaded plugin's come from its binding, a built-in's from its own fields.
+  // The host owns these undos alongside context registrations; declarations follow the binding
+  // generation and are removed with that instance.
   const registerDeclarations = (
     plugin: NodePlugin,
     binding: LoadedPluginBinding | undefined,
@@ -225,6 +226,7 @@ export async function initPlugins(
         binding?.taskAddresses,
       ),
     )
+    onUndo(declareCodeHost(plugin.name, binding ? binding.codeHost : plugin.codeHost, !binding))
   }
 
   // Roll a contained plugin back to its pre-init state: undo everything it registered, let it release

@@ -825,10 +825,7 @@ describe('architecture boundaries', () => {
       ['packages/dashboards-core/src/outline.ts', 'context is a binding address; database is a Lucide icon name'],
       ['packages/node-core/src/server/dashboards/run.ts', 'context is a binding address and preview is a run mode'],
       ['packages/node-core/src/server/dataSources/coreTasks.ts', 'context is a binding address in a starter plan'],
-      [
-        'packages/node-core/src/server/queries/sourceContext.ts',
-        'context is a host binding; github names the core-owned project repository facet',
-      ],
+      ['packages/node-core/src/server/queries/sourceContext.ts', 'context is a host binding'],
       ['packages/node-core/src/server/queries/validation.ts', 'context is a binding address'],
       ['packages/protocol/src/dashboards/panels.ts', 'preview is a dashboard run mode'],
       ['packages/protocol/src/data/queries/contextTime.ts', 'context is a binding address'],
