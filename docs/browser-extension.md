@@ -52,8 +52,11 @@ injects `content.js` and `picker.js` into a page it may read that matches a plug
 [task chip](./browser-extension/handoffs.md#task-chips) or is an app a plugin published for a task,
 which gets the [branch marker](./browser-extension/task-pages.md#the-branch-marker). A right-click on
 [Ask Acorn about this element](./browser-extension/element-picker.md) injects `picker.js` alone. The manifests
-(`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, `scripting`, and
-`contextMenus`, plus `sidePanel` in Chrome. The browser grants them at install without a prompt. They list `http://*/*` and `https://*/*` as optional host access, and
+(`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, `scripting`, `contextMenus`,
+and `tabs`, plus `sidePanel` in Chrome. `tabs` gives the extension every tab's address and title, but
+no page content, so Home's [task list](./browser-extension/task-pages.md#homes-task-list) can switch to
+a task's open tab. The browser grants these at install, and for `tabs` the install prompt reads "Read
+your browsing history". They list `http://*/*` and `https://*/*` as optional host access, and
 `notifications` as an optional permission, which only the person can grant, and turn off private
 windows.
 
@@ -92,7 +95,7 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `node.collect` | `label` | The paired Node's record once the owner allows the ask, or `null` while they haven't. A denial or an expiry fails with `pairing_failed` |
 | `node.select` | `nodeId` or `null` | `{ nodes, activeNodeId, status }` |
 | `node.forget` | `nodeId` | `{ nodes, activeNodeId, status }` |
-| `projects.list` | `nodeId` | `{ nodeId, projects }`, each `{ id, name, path, hidden }` |
+| `projects.list` | `nodeId` | `{ nodeId, projects, workspaces }`, each project `{ id, name, path, hidden, workspaceId }` and each workspace `{ id, name }`, in the rail's order |
 | `tasks.list` | `nodeId`, `projectId` | `{ nodeId, projectId, tasks }`: that project's active tasks, each `{ id, title, branch }` |
 | `tasks.pages` | `nodeId` | `{ nodeId, tasks }`: every active task with a page address, each `{ id, title, branch, projectId, pages }`, including the app origins plugins publish; see [pages that belong to a task](./browser-extension/task-pages.md#pages-that-belong-to-a-task) |
 | `agents.choices` | `nodeId`, `refresh` (optional) | `{ nodeId, choices }`: the desktop's New picker rows; see [agent conversations](./browser-extension/conversations.md) |
@@ -111,7 +114,7 @@ A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, 
 also sends `{ v, event: 'status', status }` when the selected Node's connection changes, and
 `{ v, event: 'agent', nodeId, sessions, tasks, missed, requests }` as a change hint, and
 `{ v, event: 'handoffs', nodeId }` when the selected Node's plugins change, and
-`{ v, event: 'projects', nodeId }` when one of its projects changes, and `{ v, event: 'tasks', nodeId }`
+`{ v, event: 'projects', nodeId }` when one of its projects or workspaces changes, and `{ v, event: 'tasks', nodeId }`
 when one of its tasks is created, changed, or archived, its links change, or a plugin that publishes
 task addresses reports a change. [Agent conversations](./browser-extension/conversations.md) covers the agent
 operations, hints, and what the sidebar keeps in browser storage. `turn.submit`'s `input` is the

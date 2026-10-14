@@ -66,6 +66,7 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     listeners<(message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => true | void>()
   const onUpdated = listeners<(tabId: number, change: { url?: string; status?: string }, tab: Tab) => void>()
   const onActivated = listeners<(info: { tabId: number; windowId: number }) => void>()
+  const onTabRemoved = listeners<(tabId: number) => void>()
   const onAdded = listeners<(permissions: { origins?: string[]; permissions?: string[] }) => void>()
   const onRemoved = listeners<(permissions: { origins?: string[]; permissions?: string[] }) => void>()
   const onStorageChanged = listeners<(changes: Record<string, { newValue?: unknown }>, area: string) => void>()
@@ -172,6 +173,15 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
       onUpdated.emit(fake.activeTab.id!, { url, status: 'complete' }, { ...fake.activeTab, active: true })
     },
     activate: (): void => void onActivated.emit({ tabId: fake.activeTab.id!, windowId: fake.activeTab.windowId }),
+    // A background tab closed.
+    closeTab: (tabId: number): void => {
+      fake.otherTabs = fake.otherTabs.filter((tab) => tab.id !== tabId)
+      onTabRemoved.emit(tabId)
+    },
+    // Tabs the extension brought forward, windows it focused, and addresses it opened in new tabs.
+    shownTabs: [] as number[],
+    focusedWindows: [] as number[],
+    createdTabs: [] as string[],
     // Optional host access the person granted. `answerRequest` is the person's answer to the prompt.
     granted: new Set<string>(),
     answerRequest: true,
@@ -230,8 +240,14 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
           fake.tabMessages.push({ tabId, message: structuredClone(message) })
           return fake.pageAnswer(message)
         },
+        update: async (tabId: number) => void fake.shownTabs.push(tabId),
+        create: async ({ url }: { url: string }) => void fake.createdTabs.push(url),
         onUpdated,
         onActivated,
+        onRemoved: onTabRemoved,
+      },
+      windows: {
+        update: async (windowId: number) => void fake.focusedWindows.push(windowId),
       },
       contextMenus: {
         create: ({ id, title, contexts }: { id: string; title: string; contexts: string[] }) =>

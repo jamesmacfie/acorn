@@ -1,8 +1,9 @@
 import type { BrowserApi } from './browser'
 import type { PageCapture } from './capture'
 
-// What the sidebar keeps in this browser profile's storage: unsent drafts, and the destination it
-// last showed on each Node. Neither leaves the browser until the person sends.
+// What the sidebar keeps in this browser profile's storage: unsent drafts, the destination it last
+// showed on each Node, and the workspace Home lists. None of it leaves the browser until the person
+// sends.
 
 type Storage = BrowserApi['storage']['local']
 
@@ -88,3 +89,14 @@ export async function loadDestination(storage: Storage, nodeId: string): Promise
 
 export const saveDestination = (storage: Storage, nodeId: string, destination: Destination): Promise<void> =>
   storage.set({ [destinationKey(nodeId)]: destination })
+
+// The workspace whose tasks Home lists, as the person last chose it on each Node.
+const homeWorkspaceKey = (nodeId: string) => `homeWorkspace:${nodeId}`
+
+export async function loadHomeWorkspace(storage: Storage, nodeId: string): Promise<string | null> {
+  const stored = (await storage.get([homeWorkspaceKey(nodeId)]))[homeWorkspaceKey(nodeId)]
+  return typeof stored === 'string' ? stored : null
+}
+
+export const saveHomeWorkspace = (storage: Storage, nodeId: string, workspaceId: string): Promise<void> =>
+  storage.set({ [homeWorkspaceKey(nodeId)]: workspaceId })

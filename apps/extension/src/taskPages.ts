@@ -10,7 +10,7 @@ export type PageTask = { task: BridgePageTask; page: BridgeTaskPage }
 
 // GitHub reads owner and repository names in any case, so `/Acme/Runn/pull/482` is the same pull
 // request as `/acme/runn/pull/482`. Other sites' paths are matched as they are.
-const pageMatches = (page: BridgeTaskPage, url: string): boolean =>
+export const pageMatches = (page: BridgeTaskPage, url: string): boolean =>
   page.source === 'github'
     ? siteMatches({ origin: page.origin, pathPrefix: page.pathPrefix.toLowerCase() }, url.toLowerCase())
     : siteMatches(page, url)

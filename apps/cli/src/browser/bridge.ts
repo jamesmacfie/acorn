@@ -17,10 +17,12 @@ import {
   projectConfigRoute,
   projectsRoute,
   tasksRoute,
+  workspacesRoute,
   type Project,
   type ProjectConfigResponse,
   type ProjectsResponse,
   type Task,
+  type Workspace,
 } from '@acorn/protocol/api.ts'
 import {
   SITE_ASSOCIATIONS_MAX,
@@ -147,7 +149,8 @@ export function createBridge(options: {
       hints.note(nodeId, frame)
       const channel = (frame as { channel?: unknown } | null)?.channel
       if (channel === 'plugins:changed') options.handoffsChanged?.(nodeId)
-      if (channel === 'project:changed') options.projectsChanged?.(nodeId)
+      // A workspace rename or a project moved between workspaces changes Home's task list too.
+      if (channel === 'project:changed' || channel === 'workspace:changed') options.projectsChanged?.(nodeId)
       if (channel === 'tasks:changed') options.tasksChanged?.(nodeId)
       // A plugin that publishes task addresses asks clients to read its status again when its state
       // changes, such as a stack coming up, so its addresses may have changed too.
@@ -373,15 +376,21 @@ export function createBridge(options: {
     return readList<Project>(nodeId, projectsRoute, (body) => (body as ProjectsResponse | null)?.projects)
   }
 
+  // Workspaces in the order the desktop's rail shows them.
   async function listProjects(nodeId: string): Promise<BridgeResults['projects.list']> {
-    const rows = await listProjectRows(nodeId)
+    const [rows, groups] = await Promise.all([
+      listProjectRows(nodeId),
+      readList<Workspace>(nodeId, workspacesRoute, (body) => body),
+    ])
     const projects: BridgeProject[] = rows.map((row) => ({
       id: row.id,
       name: row.name,
       path: row.path,
       hidden: row.hidden,
+      workspaceId: row.workspaceId,
     }))
-    return { nodeId, projects }
+    const workspaces = groups.toSorted((a, b) => a.sort - b.sort).map((group) => ({ id: group.id, name: group.name }))
+    return { nodeId, projects, workspaces }
   }
 
   // Active tasks only, in the Node's order. The route lists every project's, so this keeps one.

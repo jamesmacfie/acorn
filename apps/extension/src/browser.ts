@@ -55,15 +55,21 @@ export type BrowserApi = {
     setBadgeText(details: { tabId?: number; text: string }): Promise<void>
     setBadgeBackgroundColor(details: { color: string }): Promise<void>
   }
-  // `url` and `title` are present only for a tab this extension may read: the one the toolbar button
-  // was just clicked on (`activeTab`), or a site the person granted.
+  // `url` and `title` are present for every tab, through the `tabs` permission. Reading or scripting a
+  // page still needs host access: the toolbar button's `activeTab`, or a site the person granted.
   tabs: {
     query(query: { active?: true; currentWindow?: true; windowId?: number }): Promise<Tab[]>
+    update(tabId: number, change: { active: true }): Promise<unknown>
+    create(properties: { url: string }): Promise<unknown>
     captureVisibleTab(windowId: number, options: { format: 'jpeg'; quality: number }): Promise<string>
     sendMessage(tabId: number, message: unknown): Promise<unknown>
     // `change.url` is reported only for a tab this extension may read.
     onUpdated: Listeners<(tabId: number, change: { url?: string; status?: string }, tab: Tab) => void>
     onActivated: Listeners<(info: { tabId: number; windowId: number }) => void>
+    onRemoved: Listeners<(tabId: number) => void>
+  }
+  windows: {
+    update(windowId: number, change: { focused: true }): Promise<unknown>
   }
   scripting: {
     executeScript<Result>(injection: { target: { tabId: number }; func: () => Result }): Promise<{ result?: Result }[]>

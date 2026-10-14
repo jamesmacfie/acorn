@@ -15,7 +15,8 @@ export function extensionManifest(browser: BridgeBrowser, version: string) {
     // Private windows stay out of reach in this release.
     incognito: 'not_allowed',
     // Page capture reads the tab the toolbar button or the right-click entry was clicked on
-    // (`activeTab`), or a site the person has granted. Nothing is granted at install.
+    // (`activeTab`), or a site the person has granted. No host access is granted at install.
+    // `tabs` reads every tab's address, so Home can tell which task links are open.
     optional_host_permissions: ['https://*/*', 'http://*/*'],
     // OS notifications of waiting requests are the person's opt-in, asked for from the sidebar.
     optional_permissions: ['notifications'],
@@ -25,13 +26,13 @@ export function extensionManifest(browser: BridgeBrowser, version: string) {
       ...shared,
       key: CHROME_EXTENSION_KEY,
       minimum_chrome_version: '116',
-      permissions: ['nativeMessaging', 'storage', 'sidePanel', 'activeTab', 'scripting', 'contextMenus'],
+      permissions: ['nativeMessaging', 'storage', 'sidePanel', 'activeTab', 'scripting', 'contextMenus', 'tabs'],
       background: { service_worker: 'background.js', type: 'module' },
       side_panel: { default_path: 'sidebar.html' },
     }
   return {
     ...shared,
-    permissions: ['nativeMessaging', 'storage', 'activeTab', 'scripting', 'contextMenus'],
+    permissions: ['nativeMessaging', 'storage', 'activeTab', 'scripting', 'contextMenus', 'tabs'],
     background: { scripts: ['background.js'], type: 'module' },
     sidebar_action: {
       default_title: 'Acorn',

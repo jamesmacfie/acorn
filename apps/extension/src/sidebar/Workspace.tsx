@@ -4,11 +4,13 @@ import type {
   BridgeAgentHint,
   BridgeAgentSession,
   BridgeHandoff,
+  BridgePageTask,
   BridgePendingRequest,
   BridgeProject,
   BridgeTask,
   BridgeWorkflowRun,
   BridgeWorkflowStep,
+  BridgeWorkspace,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
 import { pageHandoffs, type PageHandoff } from '../handoffs'
@@ -20,15 +22,23 @@ import { CaptureFailure, withCapture, type PageCapture } from '../capture'
 import { Conversation } from './Conversation'
 import type { Heading } from './Header'
 import { errorGuidance } from './guidance'
-import { Agents, CurrentTask, ThisPage } from './Home'
-import { changeDraft, loadDestination, saveDestination, type Destination } from '../localState'
+import { Agents, CurrentTask, Tasks, ThisPage } from './Home'
+import {
+  changeDraft,
+  loadDestination,
+  loadHomeWorkspace,
+  saveDestination,
+  saveHomeWorkspace,
+  type Destination,
+} from '../localState'
 import { Waiting } from './Waiting'
 import { Workflows } from './Workflows'
 
 // The work on one Node: the current task, the page beside the panel, and the conversations and
-// workflow runs of the page's task, or of the current task on its project's site. Home shows the page
-// and the current task; Agents lists the conversations, and Workflows the runs and their steps. Opening a conversation makes its task current, shows Agents, and
-// replaces the list until the person goes back. The parent mounts one
+// workflow runs of the page's task, or of the current task on its project's site. Home shows the page,
+// the current task, and one workspace's tasks; Agents lists the conversations, and Workflows the runs
+// and their steps. Opening a conversation makes its task current, shows Agents, and replaces the list
+// until the person goes back. The parent mounts one
 // per selected Node, and again each time Settings closes, so it restores the current task from
 // storage. Each list read checks on its return that the choice it was made for is still the choice,
 // so a slow reply can't fill the wrong list.
@@ -56,8 +66,10 @@ export function Workspace(props: {
   pageUrl: string | undefined
   handoffs: readonly BridgeHandoff[]
   sites: readonly ProjectSite[]
-  // The tasks the page belongs to, matched in the browser, and a task chip's click asking to show
-  // the page's task, with a new chat about the page for `chat`.
+  // Every active task on the Node with its links, the tasks the page belongs to, matched in the
+  // browser, and a task chip's click asking to show the page's task, with a new chat about the page
+  // for `chat`.
+  tasks: readonly BridgePageTask[]
   pageTasks: readonly PageTask[]
   // Whether the person hid the branch marker on an origin, and showing it there again.
   markerHidden(origin: string): boolean
@@ -80,6 +92,9 @@ export function Workspace(props: {
 }) {
   const nodeId = props.nodeId
   const [projects, setProjects] = createSignal<BridgeProject[] | null>(null)
+  const [workspaces, setWorkspaces] = createSignal<BridgeWorkspace[] | null>(null)
+  // The workspace the person chose for Home's task list, if any.
+  const [workspaceChoice, setWorkspaceChoice] = createSignal<string | null>(null)
   const [taskLists, setTaskLists] = createSignal<Record<string, BridgeTask[]>>({})
   const [current, setCurrent] = createSignal<Destination>({ projectId: null, taskId: null, sessionId: null })
   // Each task's conversations, as last read. Keyed by task, so a slow reply fills only its own list.
@@ -113,8 +128,10 @@ export function Workspace(props: {
     try {
       const result = await props.client.call({ op: 'projects.list', nodeId })
       setProjects(result.projects.filter((project) => !project.hidden))
+      setWorkspaces(result.workspaces)
     } catch (error) {
       setProjects(null)
+      setWorkspaces(null)
       report(error)
     }
   }
@@ -371,9 +388,23 @@ export function Workspace(props: {
     void saveSiteChoices(props.api.storage.local, nodeId, next)
   }
 
+  // Home lists the workspace the person chose, or else the current task's, or else the first.
+  const homeWorkspace = () => {
+    const list = workspaces() ?? []
+    const choice = workspaceChoice()
+    if (choice && list.some((workspace) => workspace.id === choice)) return choice
+    const currentProject = projects()?.find((project) => project.id === current().projectId)
+    return currentProject?.workspaceId ?? list[0]?.id ?? null
+  }
+  const pickWorkspace = (id: string) => {
+    setWorkspaceChoice(id)
+    void saveHomeWorkspace(props.api.storage.local, nodeId, id)
+  }
+
   onMount(async () => {
     const remembered = await loadDestination(props.api.storage.local, nodeId)
     setSiteChoices(await loadSiteChoices(props.api.storage.local, nodeId))
+    setWorkspaceChoice(await loadHomeWorkspace(props.api.storage.local, nodeId))
     await loadProjects()
     // A request opened from a notification while this loaded chose already.
     if (chosen || !remembered.projectId || !remembered.taskId) return
@@ -453,15 +484,7 @@ export function Workspace(props: {
             online={props.online}
             open={(request) => openConversation(request)}
           />
-          {/* A page tied to no task, item, or project shows only the Acorn mark. */}
-          <Show
-            when={pageMatched()}
-            fallback={
-              <div class="idle">
-                <img src="icon-128.png" alt="Acorn" />
-              </div>
-            }
-          >
+          <Show when={pageMatched()}>
             <ThisPage
               client={props.client}
               nodeId={nodeId}
@@ -474,6 +497,7 @@ export function Workspace(props: {
               showMarker={props.showMarker}
               projectName={projectName}
               chat={chatInTask}
+              showAgents={props.showAgents}
               handoff={props.handoff}
               startHandoff={props.startHandoff}
               dismissHandoff={props.dismissHandoff}
@@ -497,6 +521,20 @@ export function Workspace(props: {
               <CurrentTask task={task()} projectName={current().projectId ? projectName(current().projectId!) : null} />
             </Show>
           </Show>
+          <Tasks
+            api={props.api}
+            nodeId={nodeId}
+            opensLinks={props.opensLinks}
+            workspaces={workspaces()}
+            workspaceId={homeWorkspace()}
+            pickWorkspace={pickWorkspace}
+            projects={(projects() ?? []).filter((project) => project.workspaceId === homeWorkspace())}
+            tasks={props.tasks}
+            pageTaskIds={props.pageTasks.map(({ task }) => task.id)}
+            currentTaskId={current().taskId}
+            showAgents={props.showAgents}
+            chat={chatInTask}
+          />
         </div>
       </Show>
       <Show when={props.tab === 'agents'}>

@@ -44,7 +44,7 @@ const session: BridgeAgentSession = {
   updatedAt: 1,
 }
 
-// Two paired Nodes, n1 selected, with three projects each. Site associations are whatever the test
+// Two paired Nodes, n1 selected, with three projects each, two in the Main workspace and one in Other. Site associations are whatever the test
 // puts in `state.sites`; a test can hold `sites.list` replies to answer them late.
 function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
   const fake = fakeBrowser()
@@ -58,7 +58,7 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
     // What the Node's agents are waiting on, as `requests.pending` answers.
     pending: [] as Record<string, unknown>[],
     // Projects another client adds after the sidebar opened.
-    addedProjects: [] as { id: string; name: string; path: null; hidden: boolean }[],
+    addedProjects: [] as { id: string; name: string; path: null; hidden: boolean; workspaceId: string }[],
     // Open tasks in p1 besides Fix login.
     addedTasks: [] as { id: string; title: string; branch: string | null }[],
     // Each Node's tasks with their page addresses, and its handoffs.
@@ -99,10 +99,14 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
         return {
           nodeId,
           projects: [
-            { id: 'p1', name: 'Web', path: null, hidden: false },
-            { id: 'p2', name: 'Docs', path: null, hidden: false },
-            { id: 'p3', name: 'Everything', path: null, hidden: false },
+            { id: 'p1', name: 'Web', path: null, hidden: false, workspaceId: 'w1' },
+            { id: 'p2', name: 'Docs', path: null, hidden: false, workspaceId: 'w1' },
+            { id: 'p3', name: 'Everything', path: null, hidden: false, workspaceId: 'w2' },
             ...state.addedProjects,
+          ],
+          workspaces: [
+            { id: 'w1', name: 'Main' },
+            { id: 'w2', name: 'Other' },
           ],
         }
       case 'tasks.list':
@@ -159,7 +163,7 @@ describe('project suggestions for a site', () => {
       [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
     expect(options()).not.toContain('Admin')
 
-    state.addedProjects.push({ id: 'p4', name: 'Admin', path: null, hidden: false })
+    state.addedProjects.push({ id: 'p4', name: 'Admin', path: null, hidden: false, workspaceId: 'w1' })
     fake.hosts[0]!.send({ v: 1, event: 'projects', nodeId: 'n1' })
     await settle(20)
     expect(options()).toContain('Admin')
@@ -194,7 +198,7 @@ describe('project suggestions for a site', () => {
     expect(suggestedOptions(root)).toEqual(['Web', 'Everything'])
     expect(root.textContent).toContain('Several projects match this page. Choose one.')
 
-    // An unmatched page shows only the Acorn mark.
+    // An unmatched page shows only the task list.
     await pick(root, 'project', 'p3')
     fake.navigate('https://elsewhere.example/')
     await settle(20)
@@ -460,7 +464,7 @@ describe('This page', () => {
     await settle(30)
     expect(conversationTitle(root)).toBe('Chat s1')
     await back(root)
-    // A page that matches nothing lists no conversations, and Home shows only the Acorn mark. The task
+    // A page that matches nothing lists no conversations, and Home shows only the task list. The task
     // stays current for captures.
     fake.navigate('https://example.com/')
     await settle(20)
@@ -583,5 +587,96 @@ describe('This page', () => {
 
     await openSettings(root)
     expect(siteAccess(root)).toEqual(['runn-05ea41.runn.localhost: Branch marker on its pages · Not allowed'])
+  })
+})
+
+describe('Home task list', () => {
+  const task = (id: string, title: string, projectId: string, pages: BridgePageTask['pages'] = []) => ({
+    id,
+    title,
+    branch: null,
+    projectId,
+    pages,
+  })
+  const tasks = (root: HTMLElement) => root.querySelector('section[aria-label="Tasks"]')!
+  const rows = (root: HTMLElement) =>
+    [...tasks(root).querySelectorAll('li.task > .row-button strong')].map((row) => row.textContent)
+  const row = (root: HTMLElement, title: string) =>
+    [...tasks(root).querySelectorAll<HTMLButtonElement>('li.task > .row-button')].find(
+      (element) => element.querySelector('strong')!.textContent === title,
+    )!
+
+  it("lists one workspace's tasks by project, and remembers the workspace chosen", async () => {
+    const { state, root } = mount({ url: 'https://example.com/' })
+    state.taskPages = [task('t1', 'Fix login', 'p1'), task('t2', 'Write guide', 'p2'), task('t3', 'Tidy', 'p3')]
+    await settle(30)
+    expect(selected(root, 'workspace')).toBe('w1')
+    expect([...tasks(root).querySelectorAll('h3')].map((heading) => heading.textContent)).toEqual(['Web', 'Docs'])
+    expect(rows(root)).toEqual(['Fix login', 'Write guide'])
+
+    await pick(root, 'workspace', 'w2')
+    expect(rows(root)).toEqual(['Tidy'])
+    // Settings remounts Home, which reads the choice back.
+    await openSettings(root)
+    await back(root)
+    expect(selected(root, 'workspace')).toBe('w2')
+    expect(rows(root)).toEqual(['Tidy'])
+  })
+
+  it("shows a task's links, switching to an open tab or opening a new one, and the page's task opens Agents", async () => {
+    const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
+    state.taskPages = [
+      task('t1', 'Fix login', 'p1', [
+        { origin: 'https://github.com', pathPrefix: '/acme/web/pull/7', source: 'github' },
+      ]),
+      task('t2', 'Write guide', 'p2', [
+        { origin: 'https://linear.app', pathPrefix: '/acme/issue/ENG-1', source: 'linear' },
+        {
+          origin: 'https://runn-1.runn.localhost:5104',
+          pathPrefix: '/',
+          source: 'runn',
+          status: { label: 'Runn stack', state: 'running', tone: 'ok' },
+        },
+      ]),
+      task('t3', 'Tidy docs', 'p2'),
+    ]
+    fake.otherTabs = [{ id: 9, windowId: 2, url: 'https://linear.app/acme/issue/ENG-1/fix-it' }]
+    await settle(30)
+    const links = () =>
+      [...tasks(root).querySelectorAll('.task-links li')].map((item) => item.textContent?.replace(/\s+/g, ' ').trim())
+
+    row(root, 'Write guide').click()
+    await settle(20)
+    expect(links()).toEqual([
+      'linear.app/acme/issue/ENG-1Switch to tab',
+      'Runn stack runningOpen',
+      'Copy Acorn linkChat',
+    ])
+    button(tasks(root), 'Switch to tab')!.click()
+    button(tasks(root), 'Open')!.click()
+    await settle(20)
+    expect(fake.shownTabs).toEqual([9])
+    expect(fake.focusedWindows).toEqual([2])
+    expect(fake.createdTabs).toEqual(['https://runn-1.runn.localhost:5104/'])
+    // The tab closed, so its link opens a new one.
+    fake.closeTab(9)
+    await settle(20)
+    expect(links()[0]).toBe('linear.app/acme/issue/ENG-1Open')
+
+    // One task's links at a time, and a task with none says so.
+    row(root, 'Tidy docs').click()
+    await settle(20)
+    expect(links()).toEqual(['No links for this task.Copy Acorn linkChat'])
+
+    // The page's own task, in the list or under This page, opens Agents.
+    row(root, 'Fix login').click()
+    await settle(30)
+    expect(
+      [...root.querySelectorAll('[aria-label="Agents"] .row-button strong')].map((item) => item.textContent),
+    ).toEqual(['Chat s1'])
+    await tab(root, 'Home')
+    root.querySelector<HTMLButtonElement>('[aria-label="This page"] .row-button')!.click()
+    await settle(30)
+    expect(root.querySelector('[aria-label="Agents"]')).not.toBeNull()
   })
 })

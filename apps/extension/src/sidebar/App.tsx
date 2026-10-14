@@ -330,6 +330,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   pageUrl={pageUrl()}
                   handoffs={handoffs()}
                   sites={sites()}
+                  tasks={taskPages().nodeId === nodeId ? taskPages().tasks : []}
                   pageTasks={pageTasks(taskPages().nodeId === nodeId ? taskPages().tasks : [], pageUrl())}
                   markerHidden={(origin) => hiddenMarkers().includes(origin)}
                   showMarker={(origin) =>
