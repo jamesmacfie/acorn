@@ -203,6 +203,9 @@ const manifestShape = z.object({
   version: z.string().min(1).max(64),
   baseline: z.literal(ACORN_BASELINE),
   emits: z.array(pluginEmitSchema).max(32).default([]),
+  // The client apps this plugin runs in. Absent means every app. Any string is kept, so an app a later
+  // build adds is reported as unknown instead of failing the manifest (./clients.ts).
+  clients: z.array(z.string().min(1).max(32)).min(1, 'must name at least one app, or be left out').max(8).optional(),
   // A range over plugin API majors, not a single number: '3', '2 || 3', '2-4'. Held to the shape
   // here so a typo fails the manifest with a reason instead of loading nowhere (./apiVersion.ts).
   apiVersion: z

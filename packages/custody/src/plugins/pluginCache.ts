@@ -15,6 +15,7 @@ import {
 import { hasNodeHalf, bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
 import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import { describePluginSource } from '@acorn/protocol/plugin/source.ts'
+import { runsIn, type PluginClient } from '@acorn/protocol/plugin/clients.ts'
 import { installSchema } from './pluginRequests'
 import { NodeResponseTooLargeError } from '../broker/nodeRequest'
 
@@ -69,6 +70,7 @@ export type PutFailure =
   | 'has-node-half'
   | 'invalid-manifest'
   | 'plugin-id-mismatch'
+  | 'other-app'
 export type PutResult = { hash: string } | { error: PutFailure }
 
 type BundledClientBundle = { pluginId: string; version: string; read: () => Uint8Array }
@@ -230,6 +232,7 @@ export class PluginCache {
   /** Validate the package before any entry is added. A folder is re-read for every update. */
   async putFromSource(
     source: PluginInstallSource,
+    app: PluginClient,
     expectedPluginId?: string,
   ): Promise<{ hash: string; pluginId: string; version: string } | { error: PutFailure }> {
     try {
@@ -240,6 +243,8 @@ export class PluginCache {
         )
         if (expectedPluginId && manifest.id !== expectedPluginId) return { error: 'plugin-id-mismatch' as const }
         if (hasNodeHalf(rawManifest)) return { error: 'has-node-half' as const }
+        // Refused before anything is written, so an update for another app leaves the installed version.
+        if (!runsIn(manifest, app)) return { error: 'other-app' as const }
         if (!manifest.client) return { error: 'invalid-manifest' as const }
         const bytes = readPluginFile(root, manifest.client, MAX_BUNDLE_BYTES)
         const hash = createHash('sha256').update(bytes).digest('hex')

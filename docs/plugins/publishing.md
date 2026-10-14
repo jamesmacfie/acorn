@@ -103,6 +103,9 @@ The host reads these top-level keys:
   lexically and through symbolic links.
 - `requires` orders init and refuses a package whose dependency is absent.
 - `emits` names the event verbs other plugins may subscribe to.
+- `clients` lists the client apps that load the client half. Leave it out unless the plugin only makes
+  sense in one app, such as a full-screen editor that the terminal can't draw
+  ([which apps it runs in](../plugin-authoring/the-manifest.md#which-apps-it-runs-in)).
 - `permissions` and `contributions` are what the trust dialog renders and the registries read.
 - `icon` and `icons` register brand marks, and `$schema` is ignored.
 

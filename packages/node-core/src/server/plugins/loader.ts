@@ -126,6 +126,7 @@ export type InstalledPluginInfo = {
   apiVersion: string
   permissions: PluginManifest['permissions']
   emits: PluginManifest['emits']
+  clients?: PluginManifest['clients']
   // What the manifest declared for the device to render (docs/plugins.md).
   // Passed through untouched: the node neither renders nor validates these beyond the schema, and the
   // device binds each one to this plugin's id.
@@ -201,6 +202,7 @@ export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo
   apiVersion: entry.manifest.apiVersion,
   permissions: entry.manifest.permissions,
   emits: entry.manifest.emits,
+  ...(entry.manifest.clients === undefined ? {} : { clients: entry.manifest.clients }),
   contributions: entry.manifest.contributions,
   ...(entry.manifest.icon === undefined ? {} : { icon: entry.manifest.icon }),
   ...(entry.manifest.icons === undefined ? {} : { icons: entry.manifest.icons }),

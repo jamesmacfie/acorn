@@ -62,6 +62,7 @@ export function statusWord(status: PluginStatus): string {
   if (status.line === 'waiting' || status.needsYou) return 'Needs you'
   if (status.line === 'disabled') return 'Off'
   if (status.line === 'offline') return 'Offline'
+  if (status.text.startsWith('Runs ')) return 'Other app'
   return status.text.startsWith('Not installed') ? 'Not installed' : 'Unknown'
 }
 

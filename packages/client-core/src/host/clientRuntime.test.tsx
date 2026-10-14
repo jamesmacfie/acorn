@@ -40,6 +40,7 @@ describe('the shared client start', () => {
     let pluginsReady!: () => void
     const stop = await startClientRuntime({
       runtime: 'tui',
+      app: 'terminal',
       client: () => {
         throw new Error('unused')
       },

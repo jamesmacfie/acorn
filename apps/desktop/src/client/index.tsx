@@ -28,7 +28,7 @@ const noop = () => null
 // device config sync (client-core/host/clientRuntime.ts). First, so a seam that fires during boot has
 // somewhere to put its record (docs/telemetry/renderer.md § The emitter). Nothing here waits on it, and
 // it lives as long as the window does.
-void startClientRuntime({ runtime: 'renderer', client: () => clientFor(activeCacheId()).client })
+void startClientRuntime({ runtime: 'renderer', app: 'desktop', client: () => clientFor(activeCacheId()).client })
 const stopResponsiveness = startResponsivenessMonitor(reportResponsiveness)
 window.addEventListener('pagehide', stopResponsiveness, { once: true })
 // Counts about the page every thirty seconds while collecting, read against the memory the shell
