@@ -409,6 +409,17 @@ Each plugin landing page above has topic pages in a folder of the same name:
   copy](./first-party-plugins/examples.md), [First-party plugins in the
   terminal](./first-party-plugins/terminal.md).
 
+## Node, client, and plugin split proposal
+
+- [Keep the Node, client, and plugin splits honest](./future/split/README.md), with phases for
+  [standalone plugins](./future/split/01-standalone-plugins.md), [a remote test
+  rig](./future/split/02-remote-test-rig.md), [Node paths and
+  addresses](./future/split/03-node-paths-and-addresses.md), [version skew](./future/split/04-version-skew.md),
+  [repository identity](./future/split/05-repository-identity.md), [change
+  requests](./future/split/06-change-requests.md), [a plugin API audit](./future/split/07-plugin-api-audit.md),
+  [app plugin imports](./future/split/08-app-plugin-imports.md), and [remote
+  preview](./future/split/09-remote-preview.md).
+
 ## Plugin rail and artwork proposal
 
 - [Dynamic plugin rail presentation and artwork](./future/plugin-rail-artwork.md).
