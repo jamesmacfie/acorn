@@ -1,4 +1,4 @@
-import { normalizeWebviewHost } from './webview'
+import { normalizeWebviewHost } from './webview.ts'
 
 export const CONTENT_LINK_PATTERN_MAX_LENGTH = 512
 export const CONTENT_LINK_PATTERN_MAX_CAPTURES = 8
