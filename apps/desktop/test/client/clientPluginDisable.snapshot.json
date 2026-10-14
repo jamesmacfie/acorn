@@ -86,6 +86,7 @@
       "docker:container",
       "editor:document",
       "editor:file",
+      "editor:line",
       "github:diff-line",
       "github:summary-badges",
       "git:diff-line",
@@ -100,6 +101,8 @@
       "agents.loop-coverage",
       "github.push-actions",
       "changes.tool-card",
+      "changes.diff-fence",
+      "line-blame",
       "memory.tool-card",
       "workflows.tool-card"
     ],
@@ -120,6 +123,7 @@
     "railMarkers": [
       "agents",
       "docker",
+      "pr-status",
       "changes",
       "workflows.task-groups"
     ],
@@ -229,7 +233,8 @@
       ],
       "extensionPoints": [
         "editor:document",
-        "editor:file"
+        "editor:file",
+        "editor:line"
       ],
       "persistedStateSlices": [
         "editor.open-files"
@@ -257,6 +262,9 @@
       ],
       "refPanels": [
         "github-pull"
+      ],
+      "railMarkers": [
+        "pr-status"
       ],
       "persistedStateSlices": [
         "github.pr-filters"
@@ -288,7 +296,9 @@
         "git:push-actions"
       ],
       "extensions": [
-        "changes.tool-card"
+        "changes.tool-card",
+        "changes.diff-fence",
+        "line-blame"
       ],
       "railMarkers": [
         "changes"

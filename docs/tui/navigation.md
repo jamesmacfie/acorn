@@ -52,7 +52,7 @@ that can expand, or a narrow `list-detail` that can switch groups, uses the key 
 Spatial movement is off while an input has the keys.
 
 No digit jumps to a region. The set of regions changes with the screen: Browse registers nothing
-without a list, `Ctrl+B` hides the rail, the strip draws only with a task open, and a pane's regions
+without a list, `/` hides the rail, the strip draws only with a task open, and a pane's regions
 are its layout's. So `3` would name a different region on nearly every screen, and the footer has no
 room to say what each digit does. `Ctrl+1` to `Ctrl+9` belong to the `tabs` layout.
 
@@ -67,7 +67,7 @@ These keys work at the screen's own depth:
 | `w` | Switch workspace |
 | `p` | Switch project |
 | `;` | Switch to the last workspace |
-| `Ctrl+B` | Hide or show the rail |
+| `/` | Hide or show the rail. Inside a source list, `/` filters the list instead |
 | `n` | Open the notification inbox |
 | `t` | Open the open task's terminal sessions |
 | `q` | Quit, asking first when this client started the Node |

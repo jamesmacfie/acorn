@@ -1,15 +1,16 @@
 # Browser handoffs
 
-This page covers `browserHandoffs`, the contribution that puts a button on a website. The
-[browser extension](../browser-extension.md) draws it, and a click brings the page's item into an
-Acorn task. It's part of [plugin authoring](../plugin-authoring.md). The extension's side is in
+This page covers `browserHandoffs`, the contribution that puts a task chip on a website, and
+`taskAddresses`, which tells the extension where a task's app answers. The
+[browser extension](../browser-extension.md) draws it: on a page that belongs to a task it shows the
+task and its agents, and on any other page a click brings the page's item into an Acorn task. It's part of [plugin authoring](../plugin-authoring.md). The extension's side is in
 [handoffs in the browser extension](../browser-extension/handoffs.md).
 
 ## What a plugin declares
 
-A plugin declares data only: the pages, the button's label, where the button goes, and one route on
-its own Node half. It ships no browser code. The extension owns the button's markup, its look, when
-it appears, and what a click does. A click never sends anything to an agent: it puts the item in
+A plugin declares data only: the pages, the chip's label, where the chip goes, and one route on its
+own Node half. It ships no browser code. The extension owns the chip's markup, its look, when it
+appears, and what a click does. A click never sends anything to an agent: it puts the item in
 front of the person, who picks a task and reviews a draft.
 
 Put this descriptor inside `contributions.browserHandoffs` in `acorn-plugin.json`, or in
@@ -29,9 +30,9 @@ route. This is one array element:
 | Field | Rule |
 | --- | --- |
 | `id` | Lowercase letters, digits, and hyphens, at most 64 characters, unique among this plugin's contributions. |
-| `label` | The button's text, 1 to 40 characters. The extension draws it as text, never as markup. |
+| `label` | 1 to 40 characters. The chip shows the task's name or **Start task**, and keeps the label in its accessible name. The extension uses it as text, never as markup. |
 | `match` | 1 to 8 page addresses in the [content-link grammar](../plugins/descriptors.md#content-links): `https://` only, a literal host or one `*.` level, and literal or `{capture}` path segments. The page must have exactly as many segments as the pattern, and one trailing slash is allowed. Declare one pattern per arity. |
-| `anchors` | Up to 4 CSS selectors, each at most 200 characters. The button goes at the end of the first element that matches and is drawn. A selector can't contain `{`, `}`, `;`, `<`, or a control character. Leave it empty to offer the handoff in the sidebar only. |
+| `anchors` | Up to 4 CSS selectors, each at most 200 characters. The chip goes at the end of the first element that matches and is drawn. A selector can't contain `{`, `}`, `;`, `<`, or a control character. Leave it empty to offer the handoff in the sidebar only. |
 | `resolve` | A route inside this plugin's own `/v1/p/<pluginId>/` namespace. |
 
 A plugin may declare up to 4. The Node refuses the whole manifest when a rule fails, as it does for
@@ -102,7 +103,7 @@ The extension never sees the route or the seed. The host:
 - Shows the projects by name, dropping any the Node no longer has. When the seed has no `pullNumber`,
   it adds every project whose site associations cover the page. A pull number names a pull request
   only in its own repository, so an item with one keeps to your `projects`.
-- On **Create linked task**, resolves the page again, finds the chosen item by `identifier` and
+- On **Start task**, resolves the page again, finds the chosen item by `identifier` and
   connection, refuses a project that is neither in its `projects` nor covered by that project's site
   associations, and answers an already-linked task in that
   project instead of creating another. Otherwise it sends `POST /v1/core/tasks` with the seed, the
@@ -111,10 +112,63 @@ The extension never sees the route or the seed. The host:
 Core stamps each link's provider from its connection and refuses a connection the caller doesn't
 own, as it does for any task created with links.
 
+## How a page finds its task
+
+The extension knows which task a page belongs to without calling your route. The Node's task list
+already holds each task's items, and the bridge's `tasks.pages` read turns them into addresses the
+extension matches in the browser ([pages that belong to a
+task](../browser-extension/task-pages.md#pages-that-belong-to-a-task)). For your items to match:
+
+- Give each link in the seed a `ref.url`, the item's own `https://` address, as Linear and Rollbar
+  do. A link with no address can still be found by `resolve`, but no page shows its task's chip.
+- Use the address people land on. The match is exact on the origin and by whole path segments, so the
+  item's address covers its sub-pages, and nothing covers a second spelling of it.
+
+A pull request needs no link: core records it as the project's repository and the task's pull
+number, and the bridge builds its GitHub address.
+
+## Task addresses
+
+A plugin that runs something for a task, such as a local stack or a dev server, can say which exact
+origin that app answers at while it runs. The extension then knows the app's tabs belong to the task:
+**This page** shows the task with your state line, and the page gets a
+[branch marker](../browser-extension/task-pages.md#the-branch-marker). Runn is the example: it
+publishes `RUNN_APP_URL` from each worktree's `.runn/project.env` while the stack is up.
+
+Declare one route in the manifest. The manifest also needs a `node` entry:
+
+```json
+{ "contributions": { "taskAddresses": "/v1/p/devserver/task-addresses" } }
+```
+
+The route must be inside your own `/v1/p/<pluginId>/` namespace. Only a loaded plugin declares one.
+The browser's native host calls it with `GET` and a device credential whenever it reads the Node's
+task pages, so refuse a task-scoped caller. Answer with `{ addresses }`, at most 64, each with:
+
+| Field | Meaning |
+| --- | --- |
+| `taskId` | An active task. An address for any other task is dropped. |
+| `origin` | An exact `http` or `https` origin on a loopback host (`localhost`, a `*.localhost` name, `127.x.x.x`, or `[::1]`), in the form a browser reports it, port included and no path, such as `https://runn-05ea41.runn.localhost:5104`. `https://github.com`, `https://app.localhost:443`, and `https://app.localhost/x` are refused. |
+| `label` | What answers there, 1 to 40 characters, such as `Runn stack`. |
+| `state` | Its state, 1 to 40 characters, read after the label as one line: `Runn stack running`. The marker shows it alone, so write it in lower case. |
+| `severity` | `info` for a healthy state, `warn` for one to check, `danger` for a failure, as [annotations](../plugins/rows-and-annotations.md#annotations) use them. |
+
+Parse your answer with `taskAddressList` from `@acorn/protocol/plugin/handoffs.ts`, the schema the
+host applies. The host refuses the whole answer when one entry fails, keeps it under 64 KiB, and
+skips your plugin when the route fails, so other plugins' addresses still show.
+
+List an address only while the app answers, and leave it out once it stops. The extension never
+polls. It reads your route again when a task changes and when you call `ctx.events.status()`, so call
+it when your app comes up or goes down. Runn calls it when a command changes the stack, and a few
+seconds later while health checks are still settling.
+
+The extension matches pages against an address in the browser, so no page address goes to the Node
+for it, and the person still decides which sites the extension may read.
+
 ## Discovery and activation
 
-`GET /v1/core/browser-handoffs` lists every running plugin's handoffs, each with its `pluginId`. It is
-device-only. A package waiting for review isn't listed until it runs, a disabled or
+`GET /v1/core/browser-handoffs` lists every running plugin's handoffs, each with its `pluginId`, and
+its task address routes as `taskAddresses: [{ pluginId, route }]`. It is device-only. A package waiting for review isn't listed until it runs, a disabled or
 failed plugin isn't listed, and a reload replaces the list with the new version's. The host
 broadcasts `plugins:changed` on each of these, and the extension reads the list again.
 
@@ -128,7 +182,7 @@ Node:
    bundles some loaded packages, Linear and Rollbar among them, but a standalone Node runs a loaded
    package only after it is installed there.
 3. Check discovery: `GET /v1/core/browser-handoffs` from a paired client lists your descriptor.
-4. Check the page in a browser with [the development loop](../local-development/extension-dev-loop.md#check-site-buttons),
+4. Check the page in a browser with [the development loop](../local-development/extension-dev-loop.md#check-task-chips),
    including the sidebar's offer when no anchor matches.
 
 Choose anchors you have seen on the live site, signed in, at more than one window width. Sites hide
@@ -141,5 +195,6 @@ can trust, leave `anchors` empty, and the sidebar offers the handoff instead.
   `@acorn/protocol/plugin/handoffs.ts`, the schema the host applies.
 - Check your patterns with `matchHandoffPage` from the same module.
 - `packages/node-core/src/server/plugins/browserHandoffs.test.ts` loads a package from disk, runs its
-  route in the real plugin worker, and parses the answer. Copy it for a loaded plugin.
-- In a browser, use [the extension development loop](../local-development/extension-dev-loop.md#check-site-buttons).
+  resolve and task address routes in the real plugin worker, and parses both answers. Copy it for a
+  loaded plugin.
+- In a browser, use [the extension development loop](../local-development/extension-dev-loop.md#check-task-chips).

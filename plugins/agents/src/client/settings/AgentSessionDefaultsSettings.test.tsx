@@ -96,7 +96,7 @@ describe('the harnesses and defaults page', () => {
   it('says which harnesses this machine can run', async () => {
     await settle()
     expect(row('Claude Code')?.textContent).toContain('Version 2.1.0.')
-    expect(row('Codex')?.textContent).toContain('Not installed')
+    expect(row('Codex')?.querySelector('[aria-label="Not installed"]')).not.toBeNull()
   })
 
   it("shows a signed-out account's sign-in command", async () => {

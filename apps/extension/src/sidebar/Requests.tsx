@@ -3,7 +3,7 @@ import type { BridgeAgentRequest, BridgeRequestResolution } from '@acorn/protoco
 import { CallFailure, isUncertain } from '../messages'
 import type { BridgeClient } from './bridgeClient'
 import { errorGuidance } from './guidance'
-import type { DraftTarget } from './localState'
+import type { DraftTarget } from '../localState'
 
 const KIND_LABELS: Record<string, string> = {
   permission: 'Permission request',

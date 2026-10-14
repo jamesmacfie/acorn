@@ -41,9 +41,9 @@ lines have no blank row between them.
   socket, and the in-process broker hands the bytes straight to the client. A `pty` rectangle takes
   `hidden`, which keeps the box and takes it off screen, so a tab strip over several keeps every
   emulator and channel alive.
-- **`editor` draws its box and says the file opens there.** The editor pane's terminal mode runs your
-  own editor in a PTY on the Node, so in cells it draws
-  ([the editor pane](../editor/editor-pane.md) § Editing in your own editor).
+- **`editor` draws its box and says the file opens there.** The editor pane doesn't use it on this
+  host: a picked file always opens in your own editor in a PTY on the Node, and between files the
+  pane says so ([the editor pane](../editor/editor-pane.md) § Editing in your own editor).
 - **`webview` and `frame` draw their `<Fallback>` child**, or a line naming what's missing.
 
 `Rectangle` is `absent` in the support matrix, because this host recognizes the kind and draws it

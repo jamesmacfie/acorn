@@ -104,7 +104,8 @@ export type UsageGroup = { provider: string; label: string; readings: AgentProvi
 
 /** The tab a reading sits under. The CLI's own login has no account name. */
 export const usageTabId = (reading: AgentProviderUsage): string => reading.accountName ?? 'default'
-export const usageTabLabel = (reading: AgentProviderUsage): string => reading.accountName ?? 'Usual sign-in'
+export const usageTabLabel = (reading: AgentProviderUsage): string =>
+  reading.accountLabel ?? reading.accountName ?? 'Usual sign-in'
 
 // Account labels carry a suffix, while the group names only the harness. The Node omits the usual
 // sign-in once named accounts exist, so a group cannot rely on that reading for its label.
@@ -117,7 +118,7 @@ export function usageGroups(snapshot: AgentUsageSnapshot | null): UsageGroup[] {
   }
   for (const group of groups.values()) {
     const reading = group.readings.find((candidate) => !candidate.accountName) ?? group.readings[0]!
-    const suffix = ` · ${reading.accountName}`
+    const suffix = ` · ${reading.accountLabel ?? reading.accountName}`
     group.label =
       reading.accountName && reading.label.endsWith(suffix) ? reading.label.slice(0, -suffix.length) : reading.label
   }

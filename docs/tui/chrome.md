@@ -45,7 +45,7 @@ routes; a task route has no project segment to validate against the workspace ro
 With no explicit task or source, the screen opens on the first available Menu source once its
 provider and workspace-link gates have loaded, with focus on that row. Switching workspace clears the
 old task and source. A workspace this session hasn't visited repeats that default, and one it has
-opens on what you left. An explicit `--task` path opens in Tasks. `Ctrl+B` hides the column.
+opens on what you left. An explicit `--task` path opens in Tasks. `/` hides the column.
 
 `acorn` restores the open workspace and, from that, what was open in it. It uses two Node
 preferences: `core.workspace-views`, which the desktop writes too, and `last_workspace`, which only

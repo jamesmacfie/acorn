@@ -137,6 +137,39 @@ it('refreshes dependency evidence on scope and status edits and ignores an earli
   await vi.waitFor(() => expect(model.dependencies()?.revision).toBe('edited'))
 })
 
+it('drops the dependency review once no dependency file is left in the scope', async () => {
+  projects.data = [{ id: 'p1', vcs: 'git' }]
+  let changes = [
+    { path: 'package.json', status: 'modified', staged: false, additions: 1, deletions: 0, contentKey: 'a' },
+  ]
+  api.status.mockImplementation(async () => ({
+    branch: 'main',
+    upstream: null,
+    ahead: null,
+    behind: null,
+    operation: null,
+    changes,
+  }))
+  api.document.mockResolvedValue({ files: [] })
+  api.dependencies.mockResolvedValue({
+    scope: 'unstaged',
+    revision: FIRST,
+    findings: [],
+    limits: [],
+    packageCount: 0,
+    coverage: 'complete',
+    manager: 'npm',
+  })
+  const model = createRoot((dispose) => {
+    disposers.push(dispose)
+    return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+  })
+  await vi.waitFor(() => expect(model.dependencies()?.revision).toBe(FIRST))
+  changes = []
+  await model.refresh()
+  await vi.waitFor(() => expect(model.dependencies()).toBeUndefined())
+})
+
 it.each(['.pnpmfile.cjs', 'npm.config.js', 'requirements.txt', 'pyproject.toml', 'uv.lock', 'Pipfile.lock'])(
   'requests an advisory review for %s',
   async (path) => {

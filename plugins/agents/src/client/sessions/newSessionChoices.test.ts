@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import type { CustomAgent } from '../../shared/customAgents'
-import { choiceAvailable, choiceDescription, choiceLabel, choiceStart, newSessionChoices } from './newSessionChoices'
+import {
+  choiceAccountIcon,
+  choiceAvailable,
+  choiceDescription,
+  choiceLabel,
+  choiceStart,
+  choiceText,
+  newSessionChoices,
+} from './newSessionChoices'
 
 const provider = (id: string, installed = true) =>
   ({
@@ -50,5 +58,24 @@ describe('new session choices', () => {
     expect(choices.map(choiceAvailable)).toEqual([true, false, true])
     expect(choiceStart(choices[0]!)).toEqual({ account: 'work' })
     expect(choiceDescription(choices[1]!)).toMatch(/Not signed in/)
+  })
+
+  it("draws an account's icon in place of its name only when the harness shows icons", () => {
+    const claude = {
+      ...provider('claude'),
+      accounts: [
+        { name: 'work', icon: 'briefcase', authenticated: true, loginCommand: null },
+        { name: 'home', authenticated: true, loginCommand: null },
+      ],
+    }
+    const named = newSessionChoices([claude], [])
+    expect(named.map(choiceText)).toEqual(['Claude Code · work', 'Claude Code · home'])
+    expect(named.map(choiceAccountIcon)).toEqual([undefined, undefined])
+    const iconed = newSessionChoices([{ ...claude, accountDisplay: 'icon' }], [])
+    expect(iconed.map(choiceText)).toEqual(['Claude Code', 'Claude Code · home'])
+    expect(iconed.map(choiceAccountIcon)).toEqual(['briefcase', undefined])
+    expect(iconed.map(choiceLabel)).toEqual(['Claude Code · work', 'Claude Code · home'])
+    const renamed = newSessionChoices([{ ...claude, accounts: [{ ...claude.accounts[0]!, label: 'Acme' }] }], [])
+    expect(renamed.map(choiceLabel)).toEqual(['Claude Code · Acme'])
   })
 })

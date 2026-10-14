@@ -674,13 +674,27 @@ const CASES: Case[] = [
   },
   {
     node: 'DescriptionList',
-    draws: 'one pair per line',
+    draws: 'one pair per line, values in one column',
     render: () => (
       <DescriptionList>
         <DescriptionList.Item label="size">21 B</DescriptionList.Item>
+        <DescriptionList.Item
+          label={
+            <Inline>
+              <Text>Claude Code</Text>
+              <Text>refresh</Text>
+            </Inline>
+          }
+        >
+          personal
+        </DescriptionList.Item>
       </DescriptionList>
     ),
-    check: (frame) => expect(lineWith(frame, 'size')).toContain('21 B'),
+    check: (frame) => {
+      expect(lineWith(frame, 'size')).toContain('21 B')
+      // Padded to the widest label, a tree included, so the values line up.
+      expect(lineWith(frame, 'size').indexOf('21 B')).toBe(lineWith(frame, 'personal').indexOf('personal'))
+    },
   },
   {
     node: 'Table',

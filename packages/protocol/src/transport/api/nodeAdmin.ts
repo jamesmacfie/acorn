@@ -8,6 +8,8 @@ export const prefValueRoute = (key: string) => `${prefsRoute}?key=${encodeURICom
 // this is node administration.
 export const corePairStartRoute = '/v1/core/pair/start'
 export const corePairRoute = '/v1/core/pair'
+export const corePairRequestsRoute = '/v1/core/pair/requests'
+export const corePairRequestRoute = (requestId: string) => `${corePairRequestsRoute}/${encodeURIComponent(requestId)}`
 export const coreDevicesRoute = '/v1/core/devices'
 export const coreDeviceRoute = (deviceId: string) => `/v1/core/devices/${encodeURIComponent(deviceId)}`
 

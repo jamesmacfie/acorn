@@ -109,3 +109,26 @@ export type PairResult = z.infer<typeof pairResultSchema>
 export type DevicesResponse = { devices: PairedDevice[] }
 // POST /v1/core/pair/start: the code the node displays (QR + text) and how long it lives.
 export type PairingWindow = { code: string; expiresInMs: number }
+
+// Pairing by approval (docs/api-reference/transport.md § Pairing by approval). A client on the Node's
+// own computer asks, the owner allows it from a paired client, and the asker collects its token.
+//
+// POST /v1/pair/requests. Strict and bounded like `pairRequestSchema`: an unpaired caller sends it.
+export const pairingAskSchema = z.strictObject({ deviceName: z.string().min(1).max(120) })
+// Its answer. `secret` is what collects the token, so it travels only in bodies, never in a path a
+// log could keep. `phrase` is what the owner's dialog shows too.
+export type PairingAsk = { secret: string; phrase: string; expiresInMs: number }
+
+// POST /v1/pair/requests/claim.
+export const pairingClaimSchema = z.strictObject({ secret: z.string().min(1).max(256) })
+// 202 while the owner hasn't answered. An approval answers 200 with a `PairResult`, and a refusal,
+// an expiry, and a secret the Node doesn't know all answer the same 401 `pairing_failed`.
+export type PairingClaimPending = { status: 'pending' }
+
+// GET /v1/core/pair/requests: what the owner's dialog shows. One request at a time, like a code.
+export type PairingRequest = { id: string; deviceName: string; phrase: string; expiresAt: number }
+export type PairingRequestResponse = { request: PairingRequest | null }
+
+// POST /v1/core/pair/requests/:id.
+export const pairingDecisionSchema = z.strictObject({ decision: z.enum(['allow', 'deny']) })
+export type PairingDecision = z.infer<typeof pairingDecisionSchema>

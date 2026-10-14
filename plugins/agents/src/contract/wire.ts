@@ -176,10 +176,18 @@ export type AgentProviderDescriptor = {
   accounts?: AgentAccountDescriptor[]
   /** The account a new session starts on when it names none. Absent is the CLI's own login. */
   defaultAccount?: string
+  /** Whether surfaces name an account or draw its icon. One choice for every harness, present with
+   *  `accounts`. */
+  accountDisplay?: 'name' | 'icon'
 }
 
 export type AgentAccountDescriptor = {
+  /** The folder's name, which never changes. Sessions and routes name the account by it. */
   name: string
+  /** What the person calls it, shown in place of `name`. */
+  label?: string
+  /** The icon the person chose for it, drawn in place of the name when `accountDisplay` is `icon`. */
+  icon?: string
   authenticated: boolean | null
   /** The shell line that signs this account in, for the person to run on the Node. Null when the CLI
    *  isn't installed. */

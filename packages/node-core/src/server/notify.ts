@@ -73,6 +73,13 @@ export function broadcastPluginApprovalNotice(taskId: string, action: 'install' 
   broadcastStatus()
 }
 
+// A client on this computer asked to pair (docs/api-reference/transport.md § Pairing by approval).
+// Content-free, like the plugin request above: the asker's name and phrase come from the device-only
+// route, so a task-scoped socket that hears this learns only that someone asked.
+export function broadcastPairingRequested(): void {
+  wsBroadcast({ channel: 'pairing:requested' })
+}
+
 // This node's plugin set moved under a running client. A reload swapped a plugin's node half, so its
 // roster row, its routes, and the bundle hash behind its UI may all differ (docs/plugins/dev-loop.md § The
 // dev loop). Content-free, like `term:status`: the roster is a fetchable route, and putting it on

@@ -81,6 +81,8 @@ export type AgentProviderUsage = {
   /** The harness login this row reads: one of the Node's extra accounts, or absent for the default
    *  (docs/managed-agents/accounts.md). Stamped on by the usage service, like the label. */
   accountName?: string
+  /** The display name the person gave that account, when they gave one. */
+  accountLabel?: string
   availability: AgentUsageAvailability
   health: AgentUsageHealth
   plan: string | null
@@ -95,7 +97,7 @@ export type AgentProviderUsage = {
 
 // What a collector answers: the reading, never the naming. The service stamps on the label and glyph
 // from the registration (`createAgentUsageService`), so a probe never repeats its own id.
-export type AgentProviderUsageReading = Omit<AgentProviderUsage, 'label' | 'glyph' | 'accountName'>
+export type AgentProviderUsageReading = Omit<AgentProviderUsage, 'label' | 'glyph' | 'accountName' | 'accountLabel'>
 
 export type AgentUsageSnapshot = {
   providers: AgentProviderUsage[]

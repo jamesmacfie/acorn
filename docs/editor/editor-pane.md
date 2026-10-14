@@ -179,9 +179,10 @@ focused graphical commands.
 
 The pane can hold your own editor instead of CodeMirror. The device preference `editor_mode` set to
 `terminal` makes the pane mount a PTY rectangle running `$EDITOR <file>`, then `$VISUAL`, then `vi`,
-in the task's worktree. Graphical is the default. In the terminal client, the same preference gives
-you your editor inside the terminal. With it off, the terminal client draws a box saying the file
-opens there.
+in the task's worktree. Graphical is the default on the desktop. The terminal client has no
+CodeMirror, so it ignores the preference, hides the switch, and always opens a file in your editor.
+Between files it shows a note saying so, and picking the same file again after you quit starts your
+editor again.
 
 The PTY is short-lived. It uses its own channel on the authenticated socket (`editor:pty:*`,
 `plugins/editor/src/shared/editorPty.ts`) with a client-made ID, and the process ends with the panel.

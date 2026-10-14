@@ -7,13 +7,18 @@ Read it before you change the extension, the bridge, or an operation between the
 Topic pages:
 
 - [Set up and troubleshoot](./browser-extension/setup.md): install the bridge and the development
-  builds, pair, repair or remove them, and what each sidebar state means.
+  builds, pair, repair or remove them, the panel's views and appearance, and what each sidebar state
+  means.
 - [Agent conversations](./browser-extension/conversations.md): the agent operations, change hints,
   the conversation window, send retries, and browser storage.
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
-  page access, sending them, and the attachment operations.
-- [Handoffs](./browser-extension/handoffs.md): the buttons plugins put on websites, the handoff card,
-  and the operations that resolve a page and create a linked task.
+  the page's **Add to Acorn chat** entry, page access, sending them, and the attachment operations.
+- [Handoffs](./browser-extension/handoffs.md): the task chip on websites, the handoff card, the
+  panel's verbs and its `acorn://` links, and the operations that resolve a page and create a linked
+  task.
+- [Pages matched to tasks](./browser-extension/task-pages.md): the `tasks.pages` read, the app
+  addresses plugins publish, matching the page to its task in the browser, Home's **This page**
+  section, and the branch marker on a local app.
 - [Project sites](./browser-extension/project-sites.md): the web addresses tied to a project, the
   sidebar's project suggestions and overrides, and the site operations.
 - [Request notifications](./browser-extension/notifications.md): the toolbar badge, the waiting list,
@@ -23,8 +28,10 @@ Topic pages:
 
 Three pieces carry a request from the sidebar to a Node:
 
-1. The extension, `apps/extension/`. Its sidebar page (`src/sidebar/`) draws pairing, the Node list,
-   and a chosen task's agent conversation. Its background (`src/background/`) owns the one native port. Chrome runs the
+1. The extension, `apps/extension/`. Its sidebar page (`src/sidebar/`) has three views: Home, about
+   the page beside it and the current task, a conversation that opens over Home, and Settings, behind
+   the gear, for Nodes, pairing, and site access ([the panel's views](./browser-extension/setup.md#the-panels-views)).
+   Its background (`src/background/`) owns the one native port. Chrome runs the
    background as a module service worker and shows the page in its side panel. Firefox runs it as a
    background script and shows the page in its sidebar. `src/browser.ts` types the slice of the
    extension API both use.
@@ -40,9 +47,10 @@ connects on its own, so the desktop can stay closed.
 
 The extension declares no content scripts and holds no host access at install. The background
 injects one, `content.js`, into a page it may read that matches a plugin's
-[site button](./browser-extension/handoffs.md#site-buttons). The manifests
-(`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, and `scripting`, plus
-`sidePanel` in Chrome. They list `http://*/*` and `https://*/*` as optional host access, and
+[task chip](./browser-extension/handoffs.md#task-chips) or an app a plugin published for a task, which
+gets the [branch marker](./browser-extension/task-pages.md#the-branch-marker). The manifests
+(`src/manifest.ts`) ask for `nativeMessaging`, `storage`, `activeTab`, `scripting`, and
+`contextMenus`, plus `sidePanel` in Chrome. The browser grants them at install without a prompt. They list `http://*/*` and `https://*/*` as optional host access, and
 `notifications` as an optional permission, which only the person can grant, and turn off private
 windows.
 
@@ -75,11 +83,15 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | --- | --- | --- |
 | `nodes.list` | none | `{ nodes, activeNodeId, status }` |
 | `node.probe` | `endpoint` | The probe result: endpoint, fingerprint, protocol, baseline, `compatible` |
+| `node.local` | none | The Node on this computer as a probe result with its `nodeId`, or `null` when none is running |
 | `node.pair` | `code`, `label` | The paired Node's record |
+| `node.ask` | none | `{ phrase }`: the words the owner's dialog shows. Only after `node.local` |
+| `node.collect` | `label` | The paired Node's record once the owner allows the ask, or `null` while they haven't. A denial or an expiry fails with `pairing_failed` |
 | `node.select` | `nodeId` or `null` | `{ nodes, activeNodeId, status }` |
 | `node.forget` | `nodeId` | `{ nodes, activeNodeId, status }` |
 | `projects.list` | `nodeId` | `{ nodeId, projects }`, each `{ id, name, path, hidden }` |
 | `tasks.list` | `nodeId`, `projectId` | `{ nodeId, projectId, tasks }`: that project's active tasks, each `{ id, title, branch }` |
+| `tasks.pages` | `nodeId` | `{ nodeId, tasks }`: every active task with a page address, each `{ id, title, branch, projectId, pages }`, including the app origins plugins publish; see [pages that belong to a task](./browser-extension/task-pages.md#pages-that-belong-to-a-task) |
 | `agents.profiles` | `nodeId` | `{ nodeId, profiles }`: the agents plugin's providers, each with `installed`, `authenticated`, and `diagnostics` |
 | `sessions.list` | `nodeId`, `taskId` | `{ nodeId, taskId, sessions }`: the task's newest 100 unarchived sessions |
 | `session.read` | `nodeId`, `sessionId`, `afterSeq`, `limit` (at most 500) | `{ nodeId, sessionId, session, records, reach, queued }` |
@@ -95,7 +107,9 @@ A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, 
 also sends `{ v, event: 'status', status }` when the selected Node's connection changes, and
 `{ v, event: 'agent', nodeId, sessions, tasks, missed, requests }` as a change hint, and
 `{ v, event: 'handoffs', nodeId }` when the selected Node's plugins change, and
-`{ v, event: 'projects', nodeId }` when one of its projects changes. [Agent conversations](./browser-extension/conversations.md) covers the agent
+`{ v, event: 'projects', nodeId }` when one of its projects changes, and `{ v, event: 'tasks', nodeId }`
+when one of its tasks is created, changed, or archived, its links change, or a plugin that publishes
+task addresses reports a change. [Agent conversations](./browser-extension/conversations.md) covers the agent
 operations, hints, and what the sidebar keeps in browser storage. `turn.submit`'s `input` is the
 agents plugin's turn input, limited to the parts [page capture](./browser-extension/page-capture.md)
 sends: at most one `text` part of 60,000 characters, eight `context` parts, and eight `image` parts. A request
@@ -120,14 +134,26 @@ repeats an index, or changes its count. When the port closes, it fails every wai
 ## Pairing and custody
 
 Pairing reuses `probeNode` and `pairWithNode` from `@acorn/custody`, the same steps the desktop helper
-takes:
+takes. The host keeps one probe, certificate included, and `node.pair` completes it over a pinned
+connection. `node.pair` takes no endpoint or fingerprint of its own, so it can only pair the Node the
+person just chose. A probe comes from one of two operations:
 
-1. The sidebar sends the address, and the host probes it. The host keeps the probe, certificate
-   included, and returns the fingerprint.
-2. The sidebar shows the fingerprint as words. The code field appears only after the person ticks
-   **The words match**.
-3. `node.pair` completes the kept probe over a pinned connection. It takes no endpoint or fingerprint
-   of its own.
+- **`node.local`** finds the Node on this computer the way `acorn` does
+  ([reaching a node with acorn](./node-distribution.md#reaching-a-node-with-acorn)). It reads the data
+  root `acorn` would open, through the CLI's own `dataRootDir` and `runningNode`: the lock, the endpoint
+  from `node.json`, and the certificate from `tls/cert.pem`. It reads no token, and never the desktop's.
+  It then probes that endpoint and refuses it with `identity_mismatch` unless it presents the same
+  certificate. The kept probe pins the file's certificate. Nobody on the network could have chosen
+  it, so the sidebar shows no identity words. With no Node holding the root, it answers `null`. A
+  held root with no `node.json`, or a certificate that doesn't read, is `node_error`.
+- **`node.probe`** probes an address the person typed. The sidebar shows the fingerprint as six words,
+  and asks for the code only after the person ticks **The words match**.
+
+The local probe can also pair by approval
+([pairing by approval](./api-reference/transport.md#pairing-by-approval)). `node.ask` asks the Node
+over the kept probe and keeps the secret in the host, so the extension never holds it. The sidebar
+shows the phrase and calls `node.collect` once a second until the owner allows it in the desktop. A
+typed address can't ask, because the Node answers an ask only from its own computer.
 
 Each browser keeps its own custody, apart from the CLI's and the desktop's: a `FleetStore` and token
 files under `~/Library/Application Support/acorn/browser-bridge/<browser>/`. The folder is mode 0700
@@ -142,7 +168,7 @@ The sidebar also drops a reply whose `nodeId` is no longer selected. A slow read
 Node's list either way.
 
 The host keeps the selection only while it runs. The background stores `selectedNodeId` in
-`storage.local`, beside the selected Node's site buttons and the sidebar's drafts, listed in
+`storage.local`, beside the selected Node's handoffs and the sidebar's drafts, listed in
 [browser storage](./browser-extension/conversations.md#browser-storage). Each time the background starts the host, it
 sends `node.select` with the stored ID before any other call. The background starts the host itself
 as it starts, when an ID is stored, so the [toolbar badge](./browser-extension/notifications.md#the-toolbar-badge)

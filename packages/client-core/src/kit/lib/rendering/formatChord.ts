@@ -46,3 +46,21 @@ function formatStep(step: string): string {
 export function formatChord(chord: string): string {
   return chord.trim().split(/\s+/).map(formatStep).join(' ')
 }
+
+// A written chord as the caps that draw it: one list per step, one entry per key. Each leading
+// modifier symbol is its own key and the rest of the step is one key, so `⇧⌘G` is three and `⌘Esc` two.
+export function chordKeys(display: string): string[][] {
+  return display
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((step) => {
+      const keys: string[] = []
+      let rest = step
+      while (rest.length > 1 && ORDER.includes(rest.charAt(0))) {
+        keys.push(rest.charAt(0))
+        rest = rest.slice(1)
+      }
+      return rest ? [...keys, rest] : keys
+    })
+}

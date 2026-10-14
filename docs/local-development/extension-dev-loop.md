@@ -18,8 +18,10 @@ The launcher does these steps:
    `acorn browser install --development`. The host runs this checkout's `apps/cli/dist/native-host.js`
    and keeps its pairings in the session folder.
 2. Seeds a Node with its own data root and this checkout as a project, then starts it from source,
-   as `pnpm dev:agent` does. Its banner, with the pairing code, prints to the terminal. Pass
-   `--node https://HOST:PORT` to use a running Node instead.
+   as `pnpm dev:agent` does. Its banner, with the pairing code, prints to the terminal. The browser
+   starts with `ACORN_DATA_DIR` set to that Node's data, so the sidebar offers it as the Node on this
+   Mac. Pass `--node https://HOST:PORT` to use a running Node instead. The sidebar then offers whatever
+   Node `acorn` would find, such as the desktop's.
 3. Builds the extension in watch mode, pointed at the development host.
 4. Opens the browser through web-ext on the session's profile, with the extension loaded and an
    automation port open. web-ext reloads the extension after each rebuild.
@@ -41,11 +43,10 @@ From a second terminal:
 
 ```sh
 pnpm dev:extension:ui -- --session my-change open
-pnpm dev:extension:ui -- --session my-change click "Pair a Node"
-pnpm dev:extension:ui -- --session my-change fill address https://127.0.0.1:62361
-pnpm dev:extension:ui -- --session my-change check confirm
+pnpm dev:extension:ui -- --session my-change click Continue
 pnpm dev:extension:ui -- --session my-change pairing-code
 pnpm dev:extension:ui -- --session my-change fill pairing-code CODE
+pnpm dev:extension:ui -- --session my-change click Pair
 pnpm dev:extension:ui -- --session my-change text
 pnpm dev:extension:ui -- --session my-change stop
 ```
@@ -77,22 +78,33 @@ from it reads the sidebar itself. Capture checks need the real panel beside the 
   `extensions.webextOptionalPermissionPrompts` to `false` in the profile's `user.js` and press a
   button that calls `browser.permissions.request()`. Firefox doesn't take a screenshot on a site
   grant alone, so a Firefox screenshot needs a person's toolbar click.
+- **Add to Acorn chat.** A driver can't click the browser's own menu. After `Extensions.triggerAction`,
+  run `chrome.contextMenus.onClicked.dispatch({ menuItemId: 'add-to-acorn-chat' }, tab)` in the
+  service worker ([what it covers](../browser-extension/page-capture.md#gaps)).
 
-## Check site buttons
+## Check task chips
 
-[Site buttons](../browser-extension/handoffs.md) need a page the extension may read and a plugin that
-declares one:
+[Task chips](../browser-extension/handoffs.md#task-chips) need a page the extension may read and a
+plugin that declares a handoff for it:
 
 - **Chrome.** Open the page, then run `Extensions.triggerAction` on its `tab` target as above.
-  `Target.getTargets` lists `tab` targets only with `filter: [{}]`. The click grants `activeTab`, the
-  background draws the page's buttons, and CDP's `Input.dispatchMouseEvent` at a button's centre is a
-  trusted click. A driver can't grant a site in Chrome.
+  `Target.getTargets` lists `tab` targets only with `filter: [{}]`. The click grants `activeTab`, and
+  the background draws the page's chip. The chip sits in a closed shadow root, which page scripts
+  can't reach, but CDP's `DOM.getDocument` with `depth: -1` and `pierce: true` lists it, and
+  `DOM.getBoxModel` gives a button's box. `Input.dispatchMouseEvent` at its centre is a trusted click.
+  A driver can't grant a site in Chrome.
+- **A pull request with a task.** Make a scratch git repository outside the checkout with a GitHub
+  remote, such as `git remote add origin https://github.com/cli/cli.git` and one empty commit, add it
+  as a project from a second paired device (`POST /v1/core/projects` with its `path`), then create a
+  task there with `origin: 'github-pr'` and a real `pullNumber`. The project's GitHub facet comes from
+  the remote, so `tasks.pages` lists the pull request's address, and archiving the task
+  (`POST /v1/core/tasks/<id>/archive`) checks the chip's live refresh.
 - **Firefox.** With `extensions.webextOptionalPermissionPrompts` set to `false`, press **Allow** in the
-  sidebar's site list with `input.performActions`, and the buttons appear on open pages. A click on a
-  page's button doesn't open the sidebar in Firefox; open it first with the `sidebarAction.open()`
-  button above.
+  sidebar's site list with `input.performActions`, and the chips appear on open pages. A click on a
+  page's chip opens its menu, not the sidebar, in Firefox; open the sidebar with the
+  `sidebarAction.open()` button above.
 - **GitHub.** The session's Node has no GitHub connection, and connecting one takes a person, so a
-  pull request resolves only to "Connect GitHub". Its buttons, anchors, and client-side navigation can
+  pull request resolves only to "Connect GitHub". Its chips, anchors, and client-side navigation can
   still be checked on any public pull request.
 - **Linear.** Linear ships as a loaded package, so the session's Node doesn't have it until you build
   it into the Node's data root with
@@ -115,6 +127,25 @@ declares one:
   you add with `POST /v1/core/projects`, because a task in a git project makes a branch in the
   repository. `packages/node-core/src/server/plugins/__fixtures__/handoffPlugin.mjs` is a starting
   point.
+
+## Check the branch marker
+
+The [branch marker](../browser-extension/task-pages.md#the-branch-marker) needs a plugin that
+publishes a task address, and a page served at that origin:
+
+1. Serve any page on a free port, such as `python3 -m http.server 5199` in a scratch folder.
+2. Write a loaded package with no client bundle whose manifest declares
+   `"taskAddresses": "/v1/p/<id>/task-addresses"` and `"permissions": { "node": { "core": ["tasks"] } }`,
+   and whose route answers each active task you choose with `origin: 'http://localhost:5199'`.
+   Install it from a second paired device with `POST /v1/core/plugins/install`. It starts without a
+   restart.
+3. Add a plain-folder project with `POST /v1/core/projects` and a task in it.
+4. In Chrome, open `http://localhost:5199/` and run `Extensions.triggerAction` on its `tab` target,
+   as for task chips. The marker draws in the page's corner, and **This page** shows the task with
+   the plugin's state line.
+5. Read the marker with `DOM.getDocument` and `pierce: true`, and press its menu items with
+   `Input.dispatchMouseEvent`. **Hide on this site** writes `hiddenMarkers`, and **This page** offers
+   it back. Archiving the task takes the marker off.
 
 ## Check an installed build
 

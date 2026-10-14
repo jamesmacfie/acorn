@@ -1,21 +1,22 @@
 # Page capture in the browser extension
 
 This page covers how the [browser extension](../browser-extension.md) captures a page's link, its
-selected text, or a screenshot into a conversation's draft, and sends them with a message. It also
-covers the attachment operations on the native bridge and how a sent screenshot shows in the
-conversation. The sidebar code is in `apps/extension/src/sidebar/`: `capture.ts` reads the page,
-`Composer.tsx` owns the draft and the send, and `attachmentPreviews.ts` draws sent screenshots. The host
-side is in `apps/cli/src/browser/bridge.ts`.
+selected text, or a screenshot into a conversation's draft, and sends them with a message, and the
+page's right-click entry. It also covers the attachment operations on the native bridge and how a
+sent screenshot shows in the conversation. The code is in `apps/extension/src/`: `capture.ts` reads
+the page, `localState.ts` stores drafts, `sidebar/Composer.tsx` owns the draft and the send,
+`sidebar/attachmentPreviews.ts` draws sent screenshots, and `background/selectionMenu.ts` runs the
+right-click entry. The host side is in `apps/cli/src/browser/bridge.ts`.
 
 ## What a capture is
 
-The composer under each conversation has three buttons:
+The composer's toolbar has three **Add to chat** icon buttons, named by these labels:
 
 | Button | What it keeps | What the agent receives |
 | --- | --- | --- |
-| **Add page link** | The tab's address and title | A `context` part labelled `Page: <title>`, holding the title and address |
-| **Add selected text** | The page's selected text, with its address and title | A `context` part labelled `Selected text from <title>`, holding the address and the text |
-| **Add screenshot** | A JPEG of the visible tab at quality 90, with its address and title | An `image` part naming the attachment the Node holds for it |
+| **Add page link to chat** | The tab's address and title | A `context` part labelled `Page: <title>`, holding the title and address |
+| **Add selected text to chat** | The page's selected text, with its address and title | A `context` part labelled `Selected text from <title>`, holding the address and the text |
+| **Add screenshot to chat** | A JPEG of the visible tab at quality 90, with its address and title | An `image` part naming the attachment the Node holds for it |
 
 The parts are the agents plugin's own turn input ([attachments](../managed-agents/attachments.md)).
 The Node hands a `context` part to the agent inside an `<acorn-context source="browser-extension">` block, with
@@ -23,18 +24,49 @@ its content escaped so page text can't close the block and read as the person's 
 read the top frame of the active tab in the sidebar's window, and nothing else: no full page, no
 form contents, no other tabs.
 
-Each capture shows in the draft with its address, its selected text or screenshot, and the
-conversation it will go to. **Remove** drops one. Capturing and reviewing send nothing to the Node.
+Each capture shows as a chip in the draft, with a thumbnail for a screenshot. Opening a chip shows its
+address and its selected text or item context, and **×** removes it. A line under the composer names
+the conversation and task the message goes to. Capturing and reviewing send nothing to the Node.
+
+## Add to Acorn chat
+
+Right-clicking selected text on a page offers **Add to Acorn chat**. It takes the same selection
+capture as the composer's **Add selected text to chat** button, with the same limits and the same
+chip, and puts it in a draft without the person opening the panel first:
+
+1. The click opens the panel, inside the click, where both browsers allow it: Chrome's
+   `sidePanel.open` and Firefox's `sidebarAction.open`.
+2. The background reads the selected Node and the current task from `selectedNodeId` and
+   `destination:<nodeId>` ([browser storage](./conversations.md#browser-storage)). The draft is the
+   conversation the panel would open for that task: the one it last showed, or else the task's
+   newest, as **Chat** opens.
+3. It reads the selection from the clicked tab's window, adds it to that conversation's stored
+   draft, and remembers the conversation as the one open over Home.
+4. The panel opens the conversation. A composer already showing it picks the capture up from storage,
+   so the next save there keeps it.
+
+Nothing goes to the agent until the person presses **Send**. When the browser refuses to open the
+panel, the draft is filled anyway, and the conversation shows with the capture when the person opens
+the panel. The entry adds nothing, and the panel says why in one line, when no Node is selected, no
+task is current, the task has no conversation yet, the Node can't be reached, the selection is empty,
+or a limit would be passed.
+
+The entry is always on the menu for selected text, whatever the panel's state. An entry that came and
+went with the current task would change with state the page doesn't show, and the panel's line says
+what to do when there's nowhere for the text to go. The menu is made once at install, and both
+browsers keep it across background restarts.
 
 ## Page access
 
-The extension asks for `activeTab` and `scripting`, and lists `http://*/*` and `https://*/*` as
-optional host access, so it holds no site at install. A capture works when the browser lets the
-extension read the active tab:
+The extension asks for `activeTab`, `scripting`, and `contextMenus`, and lists `http://*/*` and
+`https://*/*` as optional host access, so it holds no site at install. A capture works when the browser
+lets the extension read the active tab:
 
 - **The toolbar button.** Clicking the Acorn button opens the sidebar and grants `activeTab` for that
   tab, until it navigates. The background handles the click itself, because Chrome's own
   open-on-click opens the panel without granting `activeTab`.
+- **The right-click entry.** Clicking **Add to Acorn chat** grants `activeTab` for the tab it was
+  clicked in, as the toolbar button does, so it reads a selection on a site the person never granted.
 - **A granted site.** A site the person granted reads without the toolbar button. In Firefox this
   covers the link and the selection, but not a screenshot: Firefox takes one only with `activeTab` or
   `<all_urls>`.
@@ -114,6 +146,15 @@ read that answers after that makes none.
 - In Firefox, `activeTab` from the toolbar button wasn't checked, because a driver can't click the
   toolbar. Firefox screenshots therefore weren't taken in a browser.
 - A screenshot over 5 MiB wasn't produced in a browser; the largest was 3.7 MB.
+- A selection inside a frame reads as empty, because captures read the top frame only.
+- **Add to Acorn chat** wasn't clicked from a real menu, because neither CDP nor WebDriver BiDi can
+  click a browser's own context menu. In Chrome, the background's click listener was run through
+  `contextMenus.onClicked.dispatch` from the service worker, after the toolbar button granted
+  `activeTab`: with the panel closed, the browser refused to open it and the draft was filled anyway,
+  and with the panel open, the open composer showed the new chip. In Firefox, only the install was
+  checked: the entry exists through the `contextMenus` alias. The `activeTab` grant from a menu click,
+  the panel opening from it, and Firefox keeping the entry across a background restart rest on the
+  browsers' documentation.
 
 ## Why
 

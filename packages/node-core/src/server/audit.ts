@@ -19,6 +19,9 @@ type CoreAuditAction =
   // the one moment this node will hand full owner authority to a stranger who knows a code.
   | 'pairing.window.opened'
   | 'pairing.window.closed'
+  // The owner allowed or denied a pairing request from a client on this computer. An allowed one is
+  // followed by `device.paired` when the client collects its token.
+  | 'pairing.request.decided'
   | 'device.paired'
   | 'device.revoked'
   // Credentials, write side only. `secret.used` is not recorded (docs/security/audit.md § Audit explains

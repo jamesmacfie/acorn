@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatChord } from './formatChord'
+import { chordKeys, formatChord } from './formatChord'
 
 describe('formatChord', () => {
   it('writes the registry and the keymap spellings the same way', () => {
@@ -22,5 +22,19 @@ describe('formatChord', () => {
 
   it('formats each step of a sequence', () => {
     expect(formatChord('ctrl+k ctrl+s')).toBe('⌃K ⌃S')
+  })
+})
+
+describe('chordKeys', () => {
+  it('gives each modifier its own cap and keeps a named key whole', () => {
+    expect(chordKeys('⇧⌘G')).toEqual([['⇧', '⌘', 'G']])
+    expect(chordKeys('⌘Esc')).toEqual([['⌘', 'Esc']])
+    expect(chordKeys('⌘⇧N')).toEqual([['⌘', '⇧', 'N']])
+  })
+
+  it('splits a sequence into steps and leaves a lone modifier as a key', () => {
+    expect(chordKeys('G G')).toEqual([['G'], ['G']])
+    expect(chordKeys('⌘')).toEqual([['⌘']])
+    expect(chordKeys('Unbound')).toEqual([['Unbound']])
   })
 })

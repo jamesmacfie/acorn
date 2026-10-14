@@ -53,6 +53,7 @@ import { isHostOwnedSurface, paneLayoutFor, remoteRegionEntry } from './layouts'
 import { closePluginOverlay, pluginOverlayOpen } from './overlays'
 import { paneAvailability } from './paneAvailability'
 import { suppliedDocumentSurface } from './documentSurface'
+import { suppliedFrameSurface } from './frameSurface'
 import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('plugins')
@@ -89,7 +90,9 @@ const log = createLogger('plugins')
 // JSX file can't be imported at all. So every component below is behind `lazy`, and the two surfaces
 // needing real host markup are their own components rather than JSX here.
 
-const PluginFrame = lazy(() => import('./PluginFrame'))
+// Host-supplied, with the DOM's iframe as the fallback, for the reason `RemoteTree` below is: this pass
+// runs on every host, and a terminal has no iframe to put a plugin's page in.
+const PluginFrame = lazy(async () => ({ default: suppliedFrameSurface() ?? (await import('./PluginFrame')).default }))
 const PluginWebview = lazy(() => import('./PluginWebview'))
 const PluginRefPanel = lazy(() => import('./PluginRefPanel'))
 const PluginOverlay = lazy(() => import('./PluginOverlay'))

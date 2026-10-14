@@ -15,6 +15,7 @@ table is everything that changes, one row per cooperative extension kind and hos
 | `annotation` | Marks in the diff row under the code. `core:task` marks become rail markers. | Diff marks below the code. Task rows show a count and offer `Shift+F10` for the full legend. | `apps/tui/src/kit/showing/diffRows.tsx` § `AnnotatedDiffLine`, and [task markers](./chrome.md#task-markers) |
 | `remote` (a `Slot`) | The contributor's tree in the owner's view | The same tree in the same place, from the same batch | `apps/tui/src/kit/host.tsx` § `Slot` |
 | `rectangle` (`pane.inline-*`) | Another plugin's iframe | One muted line naming the point | [Rectangles](./rectangles.md#rectangles) |
+| A `frame` region, or a frame-only page, slot, or importer | The plugin's own web page in an iframe | One muted line naming the plugin and pointing at the desktop app | `apps/tui/src/plugins/FrameStandIn.tsx`, through the `setFrameSurface` seam |
 | `hook` | Runs on the Node | Runs on the Node | Nothing to draw on either host |
 | `pane.aside` | A dashboard grid beside the pane | One muted line naming the point | [Dashboards](../dashboards.md) |
 | `rail.taskList` (exclusive slot) | The replacement draws instead of core's list | The same, through the same arbitration | `apps/tui/src/chrome/slot.tsx` |

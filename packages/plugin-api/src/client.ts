@@ -211,6 +211,8 @@ export type { SessionSummary } from '@acorn/client-core/features/tasks'
 export { runApi } from '@acorn/client-core/features/tasks'
 export { cachedTaskScripts } from '@acorn/client-core/features/tasks'
 export { taskStatus, taskStatusRevision } from '@acorn/client-core/features/tasks'
+// One task by id from module-level code, such as a rail marker that is handed only the id. Not reactive.
+export { taskById } from '@acorn/client-core/features/tasks'
 
 // ── Workspaces and projects ───────────────────────────────────────────────────────────────────
 export { workspaceForProject } from '@acorn/client-core/features/workspaces'
