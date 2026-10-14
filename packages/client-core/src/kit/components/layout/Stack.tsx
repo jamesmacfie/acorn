@@ -1,20 +1,12 @@
 import type { JSX } from 'solid-js'
+import type { StackProps } from '@acorn/protocol/tree/nodes.ts'
 import { roleVar } from '../../tokens/roles'
-import type { Space } from '../../tokens/tokens'
 
 /* Stack: children in sequence, one per line, separated by a space role, in place of a raw grouping
    `div`.
 
    At 80×24: children on successive lines, the gap as blank lines. */
-export function Stack(props: {
-  gap?: Space
-  /** This stack IS the region rather than a run of content inside one: it fills the box it was given
-   *  and its children divide that, which is what lets one of them scroll or hold a canvas. The same
-   *  word `Textarea` uses for the same idea. Without it a stack is as tall as what is in it, so a
-   *  scroller inside it never has a height to scroll against. */
-  grow?: boolean
-  children: JSX.Element
-}) {
+export function Stack(props: StackProps<JSX.Element>) {
   return (
     <div
       class="ui-stack"

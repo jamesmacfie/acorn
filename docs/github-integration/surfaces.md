@@ -23,6 +23,18 @@ keyed by file, line and side, the same shape the Changes tab opens over the work
 `github:summary-badges` is a `stack` slot on the overview, so github's own facts stay and up to four
 contributors are added beside them ([plugins.md](../plugins.md) § Cooperative extension points).
 
+## Linked issues
+
+The **Linked issues** section also reads ticket identifiers from the pull's head branch. A branch
+such as `dayna/fast-6529-bug-right-clicking` supplies the candidate `FAST-6529`. Matching ignores case
+and accepts separators around the identifier. The registered Linear resolver must confirm a candidate
+and supply its canonical URL before the section shows it. The base branch is excluded, and references
+from the branch and conversation are deduplicated by identifier.
+
+Branch references are derived when the pull is read, so tasks already created receive them too.
+They do not write task links. The resolver searches connected Linear workspaces in connection order;
+if several workspaces have the same identifier, the first match wins.
+
 ## Searching pull requests
 
 The pull list's **Search** field narrows the loaded tab at once by number, title, author, or branch.

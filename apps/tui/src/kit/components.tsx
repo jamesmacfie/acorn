@@ -18,6 +18,7 @@ import {
   SettingRow,
   SettingsSection,
   SplitHandle,
+  Pane,
   Stack,
   TabPanel,
   Tabs,
@@ -101,6 +102,7 @@ import { HistoryMark } from './historyMark'
 // `RemoteTree` loads this table lazily, so its components are outside the startup graph. The
 // `showing` facade preserves the kit's public names while its implementations live by behavior.
 export const KIT_COMPONENTS: KitTable = {
+  Pane,
   Stack,
   Inline,
   Section,

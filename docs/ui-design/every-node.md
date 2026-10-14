@@ -58,6 +58,12 @@ Every row has a case in `apps/tui/src/kit/kit.test.tsx` that draws the node and 
 Every node the focus column calls a stop, a collection, or a conditional stop also has a case that
 presses it, or a reason in `NOT_DRIVEN_HERE` in that file for why another suite drives it.
 
+A sentence names a node's edges as well as its contents: the rules it draws, and whether it scrolls
+its own content. A desktop node gets those from its stylesheet, so a terminal node that leaves them
+out still passes its own case and draws a pane with no structure in it.
+`apps/tui/src/kit/composition.test.tsx` draws nodes together the way a plugin pane does, a bar over
+a list beside a detail, and holds those edges.
+
 ### Grouping
 
 The desktop `Fold` mounts its body on first open and keeps it, so hidden transcripts and code blocks
@@ -75,6 +81,7 @@ paint containment would clip a card's focus ring.
 
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
+| `Pane` | none | A bounded column filling its region. Headers, tabs, and footers keep their height; the body receives the remaining rows. Use `TabPanel scroll={false}` when its child owns scrolling |
 | `Stack` | none | Children on successive lines, `gap` as 0 or 1 blank lines. `grow` means the stack is the region rather than a run of content in one: it takes what is left of the box, so a scroller or a canvas inside it has a height to work against |
 | `Inline` | none | Children on one line separated by a space. Wraps to a `Stack` when too wide. `even` is ignored, because the desktop's equal columns have no use in a row of cells |
 | `Section` | conditional | Label in grey uppercase, children below. `help` is a grey line under the label, because this host has no hover |
@@ -82,21 +89,21 @@ paint containment would clip a card's focus ring.
 | `Card` | conditional | A box-drawing frame that fits its pane. A toned card uses a coloured `▍` left edge for its full height while the other edges stay neutral. Compact density keeps that left edge without the frame |
 | `Timeline` | collection | Cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it. Without `follow` it is a plain column and whatever is around it scrolls. `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`: the reader is not put back on the turn they left, because a viewport here knows its own offset and nothing about where each turn sits, so a redrawn list opens at the newest turn. `hidden` draws the same **Show earlier** button above the turns, `reveal` and `onTrim` are ignored, and a `near` child is told it is near at once. `Timeline.Turn` is a node of its own on both hosts |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. Its text label carries the meaning; `icon` is omitted and `title` has nowhere to hover |
-| `Toolbar` | none | Children on one line where they fit and wrapped onto the next where they do not. `variant="status"` has named `primary`, `essential`, `secondary`, and `actions` slots: the first two facts stay before optional details at narrow widths, while terminal rows wrap rather than silently drop supplied facts |
+| `Toolbar` | none | Children on one line where they fit and wrapped onto the next where they do not. `variant="status"` has named `primary`, `essential`, `secondary`, and `actions` slots: the first two facts stay before optional details at narrow widths, while terminal rows wrap rather than silently drop supplied facts. A rule under the bar, except for `variant="actions"`, as the desktop draws one |
 | `Modal` | trap | A centred box with its title; Escape dismisses, which `keys/keys.test.tsx` drives. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
 | `ModalBody` | none | The lines between the title rule and the actions line |
 | `ModalActions` | none | The buttons on one line, right-aligned inside the box |
 | `Menu` | trap | A vertical list in a box. A choice item prints `(•)` or `( )` for a radio and `[x]` or `[ ]` for a checkbox before its label, and `Menu.Separator` is a rule |
 | `Popover` | none | Reduced: the panel opens as a block under its anchor, not floating. Open, the anchor and its panel take a line of their own, because a row shares its width between its children and a panel laid out in a trigger's few cells reads as nothing |
-| `ListDetail` | none | Reduced: two columns above 80 cells. Below it, the `list` form draws the detail alone and the `split` form stacks its two column children, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read. `collapseKey` is ignored: a rail of marks reads only because the names it drops come back on hover, and this host has neither hover nor `tip`, so narrowing by region is the answer here |
-| `ListColumn` | none | Reduced: the left column, or the whole width when the split has collapsed |
+| `ListDetail` | none | Reduced: two columns above 80 cells, the list 20, 32, or 48 cells wide for `listWidth` `narrow`, `default`, or `wide`, with a rule down its full height. The `split` form's first child is the list. Below 80 cells both forms stack the list over the detail, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read. `collapseKey` is ignored: a rail of marks reads only because the names it drops come back on hover, and this host has neither hover nor `tip`, so narrowing by region is the answer here |
+| `ListColumn` | none | Reduced: the left column, or the whole width when the split has collapsed. It scrolls its own rows, as the desktop column does. `label` is the column's accessible name and isn't drawn |
 | `DetailColumn` | none | The right column, or the whole width. `measure` is ignored, since the column is already no wider than a readable line |
 | `Sections` | collection | Reduced: a strip of tabs over one panel: the header first, then each section, then `main` below 120 cells, where a diff in half the width is a diff wrapped at 45 columns. `h` and `l` walk the strip. A section's `meta` is not drawn: a strip has room for a label and a count |
 | `SplitHandle` | stop | Absent: a terminal split moves by a key, not a grip |
 | `DocumentTabs` | collection | One line of tab labels with a `×` on the current one |
 | `SectionHeader` | none | A bold heading with actions on the next line, so a long action label cannot erase the heading. `help` is a grey line between them, because this host has no hover |
-| `TabPanel` | none | The rows under the tab strip |
-| `FilterBar` | none | An inset row containing an input or dropdown and optional filter actions; controls wrap onto the next line when they do not fit |
+| `TabPanel` | none | In a `Pane` or `Stack grow`,  The rows under the tab strip |
+| `FilterBar` | none | An inset row containing an input or dropdown and optional filter actions; controls wrap onto the next line when they do not fit. |
 | `ToolbarSpacer` | none | The padding that pushes what follows to the right edge |
 | `SettingsSection` | none | The label in bold, the description in grey under it, then `help` as a grey line, because this host has no hover, then its rows. The danger zone's label is in the danger colour instead of a frame. `actions` draw on the line under the label |
 | `SettingRow` | none | Reduced: one line, the label then the control, and `stacked` puts the control on the next line. The description in grey under it, then `help` as a grey line, because this host has no hover, **Saved** in green or the error in red. `onReset` adds `•` to the label and a `Reset` button. A row with `from` draws `From <where>` and no control, so the value this machine holds is not shown. A row with `scope="device"` draws `(this device)` after its label |

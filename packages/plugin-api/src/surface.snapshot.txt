@@ -621,6 +621,7 @@ ui/tree: ModalBody
 ui/tree: ModelBackendPicker
 ui/tree: NonCodeRow
 ui/tree: Only
+ui/tree: Pane
 ui/tree: Picker
 ui/tree: PickerRow
 ui/tree: Popover
@@ -724,6 +725,7 @@ ui: ModalBody
 ui: ModelBackendPicker
 ui: NonCodeRow
 ui: Only
+ui: Pane
 ui: Picker
 ui: PickerRow
 ui: Popover

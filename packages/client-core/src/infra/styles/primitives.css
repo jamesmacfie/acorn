@@ -1880,6 +1880,7 @@ a.ui-row:hover { background: var(--bg-hover); }
    whatever surface placed the slot, so a contributed card lays out exactly like a compiled one. */
 .remote-tree { display: contents; }
 
+.ui-pane { display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; min-height: 0; overflow: hidden; gap: var(--kit-gap); }
 .ui-stack { display: flex; flex-direction: column; min-width: 0; gap: var(--kit-gap); }
 /* `grow`: the stack IS the region. Same pair of values, and the same reason, as
    `textarea[data-grow]`: without a definite height nothing inside a stack can scroll, because a

@@ -57,14 +57,19 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
         if (box) measure(box)
       }}
     >
-      {/* Two named regions, two frames, no rule between them (../panel.tsx). Only the stacked axis
-          can set a row count; across the axis the width is the box's own and the frame takes what it
-          is given. */}
-      <box flexDirection="column" {...(axis === 'x' ? { width: split.size() } : {})}>
+      {/* Two frames, no rule between them (../panel.tsx). Only the stacked axis can set a row count;
+          across the axis the width is the box's own and the frame takes what it is given.
+
+          The stacked document does not `grow`. A growing panel's basis is nought (../panel.tsx), and
+          in this column that basis wins over its row count, so the document drew as two borders with
+          nothing between them. Side by side, `grow` is what fills the column's height.
+
+          No titles. The DOM layout names neither region, and "Document" and "Frame" are this file's
+          words for them, not anything a reader of the pane would call them. */}
+      <box flexDirection="column" flexShrink={0} {...(axis === 'x' ? { width: split.size() } : {})}>
         <Panel
-          grow
+          grow={axis === 'x'}
           scroll
-          title="Document"
           {...(axis === 'y' ? { rows: split.size() } : {})}
           onBox={regionFocus({ paneId: props.stateKey, regionId: 'document' }, 0)}
         >
@@ -74,7 +79,6 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
       <Panel
         grow
         scroll
-        title="Frame"
         onBox={regionFocus({ paneId: props.stateKey, regionId: 'frame' }, 1, axis === 'x' ? { x: SECOND_COLUMN } : {})}
       >
         {props.regions.frame?.()}

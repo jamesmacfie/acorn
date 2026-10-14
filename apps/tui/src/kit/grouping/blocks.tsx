@@ -1,14 +1,32 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createSignal, Show, type JSX } from 'solid-js'
+import type { PaneProps, StackProps } from '@acorn/protocol/tree/nodes.ts'
 import type { Renderable } from '../../tree/compat'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens'
 import type { FilterBarProps, SectionProps } from '@acorn/client-core/kit/components/layout'
 import { slotColor } from '../../appearance'
-import { Line, slot } from '../cells'
+import { Line, Rule, slot } from '../cells'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from '../roles'
 import { stop } from '../../keys/stops'
 
-export function Stack(props: { gap?: Space; grow?: boolean; children: JSX.Element }) {
+export function Pane(props: PaneProps<JSX.Element>) {
+  return (
+    <box
+      flexDirection="column"
+      flexGrow={1}
+      flexShrink={1}
+      flexBasis={0}
+      minWidth={0}
+      minHeight={0}
+      overflow="hidden"
+      gap={spaceLines(props.gap ?? 'stack')}
+    >
+      {props.children}
+    </box>
+  )
+}
+
+export function Stack(props: StackProps<JSX.Element>) {
   // `grow`: the stack is the region and takes what is left of it, so a scroller or a canvas inside
   // it has a height to work against. Still `flexShrink={0}`, by the rule above: what does not fit
   // is clipped by the region, never squeezed into the line above.
@@ -191,17 +209,24 @@ type ToolbarProps =
 
 export function Toolbar(props: ToolbarProps) {
   return (
-    <box flexDirection="row" flexWrap="wrap" columnGap={spaceCells('inline')}>
-      {props.variant === 'status' ? (
-        <>
-          {props.primary}
-          {props.essential}
-          {props.actions}
-          {props.secondary}
-        </>
-      ) : (
-        props.children
-      )}
+    <box flexDirection="column" flexShrink={0}>
+      <box flexDirection="row" flexWrap="wrap" columnGap={spaceCells('inline')}>
+        {props.variant === 'status' ? (
+          <>
+            {props.primary}
+            {props.essential}
+            {props.actions}
+            {props.secondary}
+          </>
+        ) : (
+          props.children
+        )}
+      </box>
+      {/* A rule under the bar, as the DOM's `.ui-toolbar` draws one, so the bar reads as the edge of
+          what follows. An `actions` footer has no strip there and none here. */}
+      <Show when={props.variant !== 'actions'}>
+        <Rule />
+      </Show>
     </box>
   )
 }

@@ -68,6 +68,7 @@ import { KeyValueEditor } from '../../kit/components/inputs/KeyValueEditor'
 import { Modal } from '../../kit/components/overlays/Modal'
 import { Tabs } from '../../kit/components/layout/Tabs'
 import { UserAvatar } from '../../kit/components/content/UserAvatar'
+import { Pane } from '../../kit/components/layout/Pane'
 import { Stack } from '../../kit/components/layout/Stack'
 import { Text } from '../../kit/components/content/Text'
 import { Link } from '../../kit/components/content/Link'
@@ -99,6 +100,7 @@ import { Rectangle } from '../../kit/components/content/Rectangle'
 const load = (loader: () => Promise<{ default: AnyKitComponent }>): KitEntry => ({ load: loader })
 
 export const KIT_COMPONENTS: KitTable = {
+  Pane,
   Stack,
   Inline,
   Section,

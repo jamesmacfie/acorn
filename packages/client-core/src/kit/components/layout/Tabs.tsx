@@ -1,3 +1,4 @@
+import type { TabPanelProps } from '@acorn/protocol/tree/nodes.ts'
 import { children, createEffect, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import Icon from '../content/Icon'
 import { createCollection } from '../../keys/collection'
@@ -106,17 +107,7 @@ export function Tabs(props: {
  *
  *  A name of its own as well as `Tabs.Panel`, because a remote tree names one type per node and has
  *  nowhere to put the dot. */
-export const TabPanel = (props: {
-  idPrefix: string
-  id: string
-  active: string
-  children: JSX.Element
-  /** The panel viewport's reading place, owned by the feature showing it. */
-  scrollOffset?: number
-  /** Inset document content while keeping the strip and footer at the pane edges. */
-  padding?: 'pane'
-  onChange?: (offset: number) => void
-}) => {
+export const TabPanel = (props: TabPanelProps<JSX.Element>) => {
   let panel: HTMLElement | undefined
   let restoration: ReturnType<typeof setTimeout> | undefined
   let restoreDeadline: ReturnType<typeof setTimeout> | undefined
@@ -131,7 +122,7 @@ export const TabPanel = (props: {
     restorePending = false
   }
   const restore = () => {
-    if (!panel || props.active !== props.id) return
+    if (!panel || props.scroll === false || props.active !== props.id) return
     const desired = lastVisibleOffset || props.scrollOffset || 0
     panel.scrollTop = desired
     if (panel.scrollTop >= desired || desired === 0) {
@@ -148,18 +139,18 @@ export const TabPanel = (props: {
   }
   createEffect(
     on(
-      () => [props.active === props.id, props.scrollOffset] as const,
-      ([active, offset], previous) => {
-        if (previous && active === previous[0] && offset === previous[1]) return
+      () => [props.active === props.id, props.scrollOffset, props.scroll] as const,
+      ([active, offset, scroll], previous) => {
+        if (previous && active === previous[0] && offset === previous[1] && scroll === previous[2]) return
         stopRestore()
-        if (!active && previous?.[0]) {
+        if (scroll !== false && !active && previous?.[0]) {
           if (panel?.scrollTop) lastVisibleOffset = panel.scrollTop
           props.onChange?.(lastVisibleOffset)
         }
         // Remote props can arrive after active. The retained offset is part of the source,
         // so a panel that mounted before receiving it still restores its reading place.
-        restorePending = !!active && offset !== undefined
-        if (active && offset !== undefined) restoration = setTimeout(restore, 0)
+        restorePending = scroll !== false && !!active && offset !== undefined
+        if (scroll !== false && active && offset !== undefined) restoration = setTimeout(restore, 0)
       },
     ),
   )
@@ -170,11 +161,12 @@ export const TabPanel = (props: {
       id={`${props.idPrefix}-panel-${props.id}`}
       class="ui-tab-panel"
       data-padding={props.padding}
+      data-scroll={props.scroll === false ? 'child' : undefined}
       role="tabpanel"
       aria-labelledby={`${props.idPrefix}-tab-${props.id}`}
       hidden={props.active !== props.id}
       onScroll={(event) => {
-        if (props.active !== props.id || event.currentTarget.hidden || restorePending) return
+        if (props.scroll === false || props.active !== props.id || event.currentTarget.hidden || restorePending) return
         lastVisibleOffset = event.currentTarget.scrollTop
         props.onChange?.(lastVisibleOffset)
       }}

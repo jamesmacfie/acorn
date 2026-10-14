@@ -202,6 +202,8 @@ function viewportBox(props: ViewportProps): JSX.Element {
   // Geometry changes must not reinterpret a previously bottom-following reader as having
   // scrolled away: a growing transcript still follows, while a shrinking menu clamps its offset.
   const clampCurrent = (): void => {
+    // Hidden tabs have no laid-out rows. Keep their reading place until they receive a viewport again.
+    if (!fits()) return
     setOffset(clamp(offset()))
     restoreIfReady()
   }

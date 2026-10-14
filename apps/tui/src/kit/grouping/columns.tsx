@@ -1,7 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createSignal, Show, type JSX } from 'solid-js'
+import { children, createSignal, Show, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
-import { Line } from '../cells'
+import { Rule } from '../cells'
 import { ScrollViewport } from '../scrolling'
 import { regionFocus } from '../../keys/regions'
 import { paneIdForFocus } from '../paneContext'
@@ -10,7 +10,9 @@ import { paneIdForFocus } from '../paneContext'
 // the same reason: below it there is no room for a list and a document side by side. A node asks its
 // parent box how wide it turned out; nothing here reads the terminal.
 const NARROW_AT = 80
-const LIST_CELLS = 32
+// The list's width for each of the DOM's three column genres, in about the proportions of their
+// pixel widths (client-core/infra/styles/tokens-style.css § --listdetail-w).
+const LIST_CELLS = { narrow: 20, default: 32, wide: 48 } as const
 
 /** Two columns above 80 cells; below it the list stays reachable above the detail.
  *
@@ -22,7 +24,7 @@ export function ListDetail(props: {
   split?: boolean
   listLabel?: string
   listWidth?: 'narrow' | 'default' | 'wide'
-  /** The list here is a fixed 32 cells with no grip to resize it, so there is no width to keep. */
+  /** The list here is a fixed width with no grip to resize it, so there is no width to keep. */
   widthKey?: string
   scrollDetail?: boolean
   detailAs?: 'div' | 'main'
@@ -33,9 +35,13 @@ export function ListDetail(props: {
 }) {
   const paneId = paneIdForFocus()
   // JSX props can be getters. Hold each subtree once so a width update cannot recreate its
-  // document and discard an armed file action while the dialog takes focus.
+  // document and discard an armed file action while the dialog takes focus. `children()` holds them
+  // the same way and lets the `split` form take its first column apart from the rest, which is what
+  // the DOM's grid does with the same two children.
   const list = props.list
-  const detail = props.children
+  const columns = children(() => props.children)
+  const listSide = () => (list !== undefined ? list : props.split ? columns.toArray()[0] : undefined)
+  const detailSide = () => (list === undefined && props.split ? columns.toArray().slice(1) : columns())
   let box: Renderable | undefined
   const [width, setWidth] = createSignal(NARROW_AT)
   const narrow = () => width() < NARROW_AT
@@ -51,34 +57,32 @@ export function ListDetail(props: {
       }}
       onSizeChange={() => setWidth(box?.parent?.width ?? box?.width ?? NARROW_AT)}
     >
-      {/* `split` is the form where both columns are children — a `ListColumn` and a `DetailColumn` —
-          rather than one of them arriving in `list`. The DOM hands those straight to its grid; this
-          gated on `list ?? split` and so drew an empty 32-cell gutter beside the pr pane's navigator
-          for a `list` nobody passed (docs/tui.md).
-          Below 80 cells the two stack instead of sitting side by side. */}
+      {/* Both forms draw the same two columns: the list in `list`, or the first of the `split` form's
+          children (a `ListColumn` beside a `DetailColumn`). With neither there is no list to draw,
+          and no empty 32-cell gutter for one (docs/tui.md). Below 80 cells the two stack instead of
+          sitting side by side. */}
       <Show
-        when={list !== undefined}
+        when={listSide() !== undefined}
         fallback={
           <box flexDirection={narrow() ? 'column' : 'row'} flexGrow={1}>
-            {detail}
+            {columns()}
           </box>
         }
       >
         <box flexDirection={narrow() ? 'column' : 'row'} flexGrow={1} minWidth={0}>
           <box
             flexDirection="column"
-            width={narrow() ? '100%' : LIST_CELLS}
+            width={narrow() ? '100%' : LIST_CELLS[props.listWidth ?? 'default']}
             height={narrow() ? 12 : undefined}
             flexShrink={0}
             minWidth={0}
             ref={paneId ? regionFocus({ paneId, regionId: 'list' }, 0) : undefined}
           >
-            {list}
+            {listSide()}
           </box>
+          {/* The divider runs the columns' full height, as the DOM's 1px middle track does. */}
           <Show when={!narrow()}>
-            <box width={1}>
-              <Line>│</Line>
-            </box>
+            <Rule axis="y" />
           </Show>
           <box
             flexDirection="column"
@@ -86,7 +90,7 @@ export function ListDetail(props: {
             minWidth={0}
             ref={paneId ? regionFocus({ paneId, regionId: 'detail' }, 1) : undefined}
           >
-            {detail}
+            {detailSide()}
           </box>
         </box>
       </Show>
@@ -95,25 +99,22 @@ export function ListDetail(props: {
 }
 
 /** reduced: the left column, or the whole width when the split has collapsed. The width is the
- *  parent's; this node draws the label and the scroll.
+ *  parent's; this node draws the scroll.
  *
- *  `scrollKey` is ignored: this host keeps no scroll position for a column that is drawn again. */
+ *  The column always scrolls, because the DOM's does (`.ui-listdetail-list` is `overflow-y: auto`): a
+ *  column of 200 rows scrolls its own rows rather than pushing the pane taller. A list with a viewport
+ *  of its own still owns its scrolling, because a viewport takes the room left over rather than the
+ *  room its content wants (../scrolling.tsx), so this one never has anything to move. `scroll` is the
+ *  DOM's padding choice and changes nothing here.
+ *
+ *  `label` is not drawn. On the DOM it is the column's accessible name and nothing on screen, so a
+ *  caller that wants a visible heading writes a `SectionHeader`, and drawing the label as well showed
+ *  the name twice. `scrollKey` is ignored: this host keeps no scroll position for a column that is
+ *  drawn again. */
 export function ListColumn(props: { label?: string; scroll?: boolean; scrollKey?: string; children: JSX.Element }) {
   return (
-    <box flexDirection="column" flexGrow={1}>
-      {/* In a box of its own so the deficit a taller-than-the-screen column creates cannot be taken out
-          of the label: a one-line run given half a line lands on the line above it, which draws this
-          column's own name over the heading under it
-          (docs/tui.md). */}
-      <Show when={props.label}>
-        <box flexShrink={0}>
-          <Line role="eyebrow">{props.label!}</Line>
-        </box>
-      </Show>
-      {/* The label sits above the viewport and not inside it. It is the column's own name, so it
-          stays put while the rows under it move; scrolling a heading off its own list leaves a
-          reader looking at rows that belong to nothing. */}
-      {props.scroll ? <ScrollViewport>{props.children}</ScrollViewport> : props.children}
+    <box flexDirection="column" flexGrow={1} minHeight={0}>
+      <ScrollViewport>{props.children}</ScrollViewport>
     </box>
   )
 }

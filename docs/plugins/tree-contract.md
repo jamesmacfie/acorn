@@ -39,6 +39,27 @@ The sandbox copies JSON data out of framework proxies before posting, leaves out
 and drops a prop holding a function, a cycle, or a class instance. The host validates props one at a
 time and draws the node without the ones it refused, so a kit node reads its props defensively.
 
+### Pane layout
+
+Use `Pane` for a whole region containing a header, tabs, and a body. It fills the available height
+on both hosts. Use `Stack` for ordinary content inside that region; `Stack grow` also fills a region.
+A `TabPanel` needs a bounded parent to allocate its viewport height.
+
+```tsx
+<Pane>
+  <Stack>{/* Header and controls */}</Stack>
+  <Tabs tabs={tabs} active={active()} onChange={setActive} idPrefix="stack" ariaLabel="Stack" />
+  <TabPanel idPrefix="stack" id={active()} active={active()} scroll={active() !== 'logs'}>
+    {/* Tables scroll with the panel. A Log owns its own scrolling. */}
+  </TabPanel>
+</Pane>
+```
+
+`TabPanel` scrolls by default. Set `scroll={false}` for a body containing its own viewport, such as
+`Log`, `DiffPane`, or virtual `Rows`. The panel keeps tab visibility and keyboard ownership while
+its child handles scrolling. `scrollOffset` and `onChange` apply only when the panel owns scrolling.
+The SDK types these layout props; the host still validates every prop crossing the worker boundary.
+
 ### Mutations
 
 There are five mutation kinds, sent in a coalesced batch: `insert(parent, index, node)`, `remove(id)`,
