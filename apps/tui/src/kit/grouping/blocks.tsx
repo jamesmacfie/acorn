@@ -43,6 +43,8 @@ export function Inline(props: {
   wrap?: boolean
   spread?: boolean
   even?: boolean
+  // No line in a terminal row, where a column of `│` costs cells the readings need; the gap separates.
+  divided?: boolean
   children: JSX.Element
 }) {
   return (

@@ -4,6 +4,8 @@ import AgentUsageSection from './AgentUsageSection'
 import { usageSummaryEntries } from './usageModel'
 import { usageTone } from '../sessions/stateTone'
 import { agentUsageStore } from './usageStore'
+import { accountIcon, accountLabel } from '../../shared/accounts'
+import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 
 // How much of each harness's plan is gone, in the pane header, with the full readout behind it.
 //
@@ -11,7 +13,11 @@ import { agentUsageStore } from './usageStore'
 // numbers in it, so it has to be reachable from the keyboard and stay open while it is read.
 // `defaultAccounts` names the account to show for each harness. The selected session's account
 // takes precedence over the account used for new sessions (docs/managed-agents/accounts.md § Plan usage).
-export default function AgentUsageIndicator(props: { defaultAccounts?: Readonly<Record<string, string | undefined>> }) {
+// `providers` carries each harness's "Show accounts as" choice and its accounts' icons.
+export default function AgentUsageIndicator(props: {
+  defaultAccounts?: Readonly<Record<string, string | undefined>>
+  providers?: readonly AgentProviderDescriptor[]
+}) {
   // The button is the always-mounted reader, so it starts the load itself. A Popover does not render
   // its content until it opens, so with the panel as the only caller the button would sit on "reading
   // usage…" forever. The panel calls init() too, which is fine: the store counts consumers.
@@ -30,30 +36,46 @@ export default function AgentUsageIndicator(props: { defaultAccounts?: Readonly<
       role="dialog"
       trigger={({ toggle, open }) => (
         <Button label="Agent utilization" size="sm" expanded={open()} onPress={toggle}>
-          <Icon name="gauge" />
-          {/* The placeholder names no harness, because only the node knows which ones exist. */}
-          <Show when={entries().length} fallback={<Text emphasis="muted">reading usage…</Text>}>
-            {/* The pairs sit a step further apart than the dot sits from its own label, which is
-                what keeps "Claude Code 48%" and "Codex —" reading as two readings rather than one
-                run of words. Gap `none` on the inner one puts the dot against the first letter. */}
-            <Inline gap="stack">
+          {/* A line after the gauge and between harnesses, so "Claude Code · personal 92%" and
+              "Codex 13%" read as two readings rather than one run of words. */}
+          <Inline gap="stack" divided>
+            <Icon name="gauge" />
+            {/* The placeholder names no harness, because only the node knows which ones exist. */}
+            <Show when={entries().length} fallback={<Text emphasis="muted">reading usage…</Text>}>
               <For each={entries()}>
-                {(entry) => (
-                  <Inline>
-                    {/* How much of the window is still to run, as a pie that empties toward the
-                        reset. Muted, because time passing is not a warning; the dot says that. */}
-                    <Show when={entry.timeLeft != null}>
-                      <Meter shape="pie" tone="muted" value={entry.timeLeft!} label={entry.timeLeftLabel} />
-                    </Show>
-                    <StatusDot tone={usageTone(entry.health)} size="sm" />
-                    <Text emphasis="muted">
-                      {entry.label} {entry.value}
-                    </Text>
-                  </Inline>
-                )}
+                {(entry) => {
+                  const provider = () => props.providers?.find((candidate) => candidate.id === entry.provider)
+                  const icon = () => accountIcon(provider(), entry.account)
+                  return (
+                    <Inline>
+                      {/* How much of the window is still to run, as a pie that empties toward the
+                          reset. Muted, because time passing is not a warning; the dot says that. */}
+                      <Show when={entry.timeLeft != null}>
+                        <Meter shape="pie" tone="muted" value={entry.timeLeft!} label={entry.timeLeftLabel} />
+                      </Show>
+                      <StatusDot tone={usageTone(entry.health)} size="sm" />
+                      <Show
+                        when={icon()}
+                        fallback={
+                          <Text emphasis="muted">
+                            {entry.label} {entry.value}
+                          </Text>
+                        }
+                      >
+                        {(name) => (
+                          <>
+                            <Text emphasis="muted">{entry.harness}</Text>
+                            <Icon name={name()} title={accountLabel(provider(), entry.account!)} />
+                            <Text emphasis="muted">{entry.value}</Text>
+                          </>
+                        )}
+                      </Show>
+                    </Inline>
+                  )
+                }}
               </For>
-            </Inline>
-          </Show>
+            </Show>
+          </Inline>
         </Button>
       )}
     >

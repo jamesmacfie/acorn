@@ -1891,6 +1891,8 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-inline[data-wrap] { flex-wrap: wrap; }
 /* Push the last child to the far edge: a label on the left, its one action on the right. */
 .ui-inline[data-spread] { justify-content: space-between; }
+/* The line sits in the middle of the gap: the gap on its left, the same again as padding on its right. */
+.ui-inline[data-divided] > * + * { padding-inline-start: var(--kit-gap); border-inline-start: var(--bw) solid var(--border); }
 /* `even`: equal columns that wrap when a column would drop below 12rem. A grid, not flex shares,
    so a wrapped child keeps the same width as the ones above it. Children sit at the top, so a
    field's error line does not move its neighbour. Cards stretch, so a row of choices lines up. */

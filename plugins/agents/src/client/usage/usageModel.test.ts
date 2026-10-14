@@ -58,8 +58,26 @@ describe('agent usage health and tooltip', () => {
   it('summarizes every harness the node reported, in the order it reported them', () => {
     const snapshot: AgentUsageSnapshot = { providers: [provider('codex', 34), provider('claude', 82)], refreshedAt: 1 }
     expect(usageSummaryEntries(snapshot)).toEqual([
-      { health: 'warning', label: 'Codex', value: '34%', timeLeft: null, timeLeftLabel: 'Codex Session' },
-      { health: 'healthy', label: 'Claude Code', value: '82%', timeLeft: null, timeLeftLabel: 'Claude Code Session' },
+      {
+        health: 'warning',
+        label: 'Codex',
+        provider: 'codex',
+        harness: 'Codex',
+        account: null,
+        value: '34%',
+        timeLeft: null,
+        timeLeftLabel: 'Codex Session',
+      },
+      {
+        health: 'healthy',
+        label: 'Claude Code',
+        provider: 'claude',
+        harness: 'Claude Code',
+        account: null,
+        value: '82%',
+        timeLeft: null,
+        timeLeftLabel: 'Claude Code Session',
+      },
     ])
   })
 
@@ -67,7 +85,16 @@ describe('agent usage health and tooltip', () => {
     expect(usageSummaryEntries(null)).toEqual([])
     expect(usageSummaryEntries({ providers: [], refreshedAt: 1 })).toEqual([])
     expect(usageSummaryEntries({ providers: [provider('codex', 0)], refreshedAt: 1 })).toEqual([
-      { health: 'depleted', label: 'Codex', value: '0%', timeLeft: null, timeLeftLabel: 'Codex Session' },
+      {
+        health: 'depleted',
+        label: 'Codex',
+        provider: 'codex',
+        harness: 'Codex',
+        account: null,
+        value: '0%',
+        timeLeft: null,
+        timeLeftLabel: 'Codex Session',
+      },
     ])
   })
 

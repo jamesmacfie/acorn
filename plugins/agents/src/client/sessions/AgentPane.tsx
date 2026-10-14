@@ -236,7 +236,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           )
         }}
       </Show>
-      <AgentUsageIndicator defaultAccounts={usageAccounts()} />
+      <AgentUsageIndicator defaultAccounts={usageAccounts()} providers={model.providers()} />
       {/* An archived task has no worktree to start a session in (docs/panes/contributions.md § Contributions). */}
       <Show when={props.task.status === 'active'}>
         <Picker<NewSessionChoice>

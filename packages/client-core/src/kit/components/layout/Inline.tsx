@@ -9,12 +9,17 @@ import type { Space } from '../../tokens/tokens'
    `even` gives every child an equal share of the row, for a row of choices or fields that should
    match. A child narrower than about 12rem wraps to a new line, so a narrow window stacks them.
 
-   At 80×24: children on one line separated by a space, wrapping to a Stack when too wide. */
+   `divided` draws a thin vertical line between the children, for a row of separate readings that
+   would otherwise run together as one line of words.
+
+   At 80×24: children on one line separated by a space, wrapping to a Stack when too wide. `divided`
+   draws no line there; the space does the separating. */
 export function Inline(props: {
   gap?: Space
   wrap?: boolean
   spread?: boolean
   even?: boolean
+  divided?: boolean
   children: JSX.Element
 }) {
   return (
@@ -23,6 +28,7 @@ export function Inline(props: {
       data-wrap={props.wrap ? '' : undefined}
       data-spread={props.spread ? '' : undefined}
       data-even={props.even ? '' : undefined}
+      data-divided={props.divided ? '' : undefined}
       style={{ '--kit-gap': roleVar('space', props.gap ?? 'inline') }}
     >
       {props.children}

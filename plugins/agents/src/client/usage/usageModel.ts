@@ -10,6 +10,11 @@ export type UsageDetailRow = { label: string; value: string; meter?: UsageMeter 
 export type UsageSummaryEntry = {
   health: AgentUsageHealth
   label: string
+  /** The harness alone, and the account the reading is for, so a surface can draw the account's
+   *  icon beside the harness in place of the account's name. */
+  provider: string
+  harness: string
+  account: string | null
   value: string
   timeLeft: number | null
   timeLeftLabel: string
@@ -143,6 +148,9 @@ export function usageSummaryEntries(
     return {
       health: quota?.health ?? 'unknown',
       label: reading.label,
+      provider: group.provider,
+      harness: group.label,
+      account: reading.accountName ?? null,
       value: quota ? formatPercent(quota.percentRemaining) : '—',
       timeLeft: quota ? quotaPace(quota, now) : null,
       timeLeftLabel: `${reading.label} ${quota?.label ?? 'window'}${reset ? `, ${reset}` : ''}`,
