@@ -494,8 +494,8 @@ describe('moving between task pages', () => {
     pages: [{ origin: 'https://tracker.example', pathPrefix: path, source: 'tracker' }],
   })
   // Two tasks, each with a tracker item open in its own tab. t-new has a workflow run.
-  function twoTasks() {
-    const mounted = mount({ url: ITEM_1 })
+  function twoTasks(url = ITEM_1) {
+    const mounted = mount({ url })
     const { state } = mounted
     state.tasks.p1 = [
       { id: 't1', title: 'Existing work', branch: null },
@@ -551,6 +551,48 @@ describe('moving between task pages', () => {
     await tab(root, 'Home')
     await switchTo(fake, ITEM_1)
     expect(root.querySelector('header h1')!.textContent).toBe('Home')
+  })
+
+  it("shows the page's task on Agents, not a conversation left open in another task", async () => {
+    const { fake, root } = twoTasks()
+    await settle(30)
+    await openChat(root, 'Chat s0')
+    // Home is the person's choice, so switching tabs leaves t1's conversation open behind it.
+    await tab(root, 'Home')
+    await switchTo(fake, PAGE)
+    expect(root.querySelector('header h1')!.textContent).toBe('Home')
+    await tab(root, 'Agents')
+    expect(conversationTitle(root)).toBe('Chat s2')
+    // The page's own row on Home asks for the same thing.
+    await openChat(root, 'Chat w1')
+    await switchTo(fake, ITEM_1)
+    expect(conversationTitle(root)).toBe('Chat s0')
+    await tab(root, 'Home')
+    await switchTo(fake, PAGE)
+    root.querySelector<HTMLButtonElement>('[aria-label="Page tasks"] .row-button')!.click()
+    await settle(40)
+    expect(conversationTitle(root)).toBe('Chat w1')
+  })
+
+  it.each([
+    ['its own task', ITEM_1, 'Chat s0'],
+    ["another task's", PAGE, null],
+  ])("reopens the last conversation when the panel opens on %s page, or doesn't", async (_name, url, shown) => {
+    const { fake, root } = twoTasks(url)
+    fake.storage.set('destination:n1', { projectId: 'p1', taskId: 't1', sessionId: 's0' })
+    await settle(40)
+    expect(conversationTitle(root)).toBe(shown)
+  })
+
+  it('closes Workflows on moving to a task with no runs, as its tab goes', async () => {
+    const { fake, root } = twoTasks(PAGE)
+    await settle(30)
+    // A conversation left open under Agents doesn't pull the sidebar there.
+    await openChat(root, 'Chat s2')
+    await tab(root, 'Workflows')
+    await switchTo(fake, ITEM_1)
+    expect(root.querySelector('header h1')!.textContent).toBe('Home')
+    expect(button(root.querySelector('nav')!, 'Workflows')).toBeUndefined()
   })
 
   it("reopens a workflow step's conversation on coming back to its task", async () => {

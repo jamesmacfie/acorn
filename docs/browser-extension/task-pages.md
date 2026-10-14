@@ -78,9 +78,11 @@ tab. Sites to allow are under Settings → **Permissions**.
 ## Moving between pages
 
 The sidebar remembers what it showed for each task: the tab, and the conversation or workflow run
-open in it. When the page moves to another task's page, by navigating or by switching tabs, the
-sidebar shows what it last showed for that task. A task with nothing remembered keeps the tab, and an
-open conversation moves to that task's newest conversation.
+open in it. It keeps that as it changes, and skips Home, which belongs to no task. When the page
+moves to another task's page, by navigating or by switching tabs, the sidebar shows what it last
+showed for that task. With nothing remembered, **Agents** over an open conversation moves to that
+task's newest conversation, **Workflows** gives way to Home when the task has no runs, and anything
+else stays.
 
 When the page moves to one no task holds, even on a project's site, **Agents**, **Workflows**, or a
 [plugin panel](./plugin-panels.md) gives way to Home. An open conversation waits under **Agents**, so
@@ -89,6 +91,12 @@ what the sidebar last showed for it.
 
 Home stays on Home as pages change, unless the sidebar went there by itself. The task list arriving,
 or a plugin publishing the page's address, moves nothing.
+
+**Agents** in the bottom bar, the page's own task row on Home, and **Switch** on the banner over
+another task's conversation all show the page's task. A conversation left open in another task gives
+way to what the sidebar last showed in the page's task, or its newest conversation. A conversation
+the person opens from another task's row stays, with the banner, until they ask for the page's task.
+The panel reopens the last conversation only when the page doesn't belong to another task.
 
 ## Home's task list
 

@@ -66,6 +66,8 @@ export function Workspace(props: {
   showAgents(): void
   showWorkflows(): void
   showTab(tab: 'home' | TaskView['tab']): void
+  // Counts the person's picks in the bottom bar.
+  tabPicks: number
   hasWorkflows(has: boolean): void
   // The Node's plugin panels, and which plugins have one for the task Agents shows.
   panels: readonly BridgePanel[]
@@ -135,6 +137,8 @@ export function Workspace(props: {
   // moved, rather than the person choosing Home.
   let taskViews: Record<string, TaskView> = {}
   let wentHome = false
+  // A task the page moved to while Workflows was open, whose runs, once read, say whether it stays.
+  let runsCheck: string | null = null
 
   const report = (error: unknown) => {
     // A reply refused because the Node changed under it is expected, and a missing bridge has its banner.
@@ -194,6 +198,10 @@ export function Workspace(props: {
     try {
       const result = await props.client.call({ op: 'workflow.runs', nodeId, taskId: forTask })
       setRunLists((lists) => ({ ...lists, [forTask]: result.runs }))
+      if (runsCheck === forTask) {
+        runsCheck = null
+        if (!result.runs.length) leaveEmptyWorkflows(forTask)
+      }
     } catch {
       // Without the runs there is no Workflows tab; everything else still works.
     }
@@ -398,6 +406,11 @@ export function Workspace(props: {
     wentHome = true
     props.showTab('home')
   }
+  // Workflows for a task with no runs has no tab, so after a page move it closes, as a plugin panel the
+  // task doesn't have does.
+  const leaveEmptyWorkflows = (taskId: string) => {
+    if (props.tab === 'workflows' && agentsTask().taskId === taskId) goHome()
+  }
   createEffect(
     on(
       () => props.tab,
@@ -406,10 +419,34 @@ export function Workspace(props: {
     ),
   )
 
-  // Keeps what the sidebar shows for a task, for coming back to its page. Home belongs to no task.
+  // Agents for the page's task, as the bottom bar and the page's own task rows ask for it. A
+  // conversation left open in another task gives way to what the sidebar last showed in the page's
+  // task, or that task's newest conversation. One the person opened from another task's row stays
+  // until they ask for Agents this way.
+  const showPageAgents = () => {
+    props.showAgents()
+    const task = pageTask()?.task
+    if (!task || !current().sessionId || current().taskId === task.id) return
+    const view = taskViews[task.id]
+    if (view?.tab === 'agents') showView(task, view)
+    else chatInTask(task.projectId, task.id)
+  }
+  // A pick is the person's choice, so the sidebar no longer counts as having gone Home by itself.
+  createEffect(
+    on(
+      () => props.tabPicks,
+      () => {
+        wentHome = false
+        if (props.tab === 'agents') showPageAgents()
+      },
+      { defer: true },
+    ),
+  )
+
   const keepView = (taskId: string) => {
     const tab = props.tab
-    if (tab === 'home') return
+    // A conversation open in another task shows nothing of this one.
+    if (tab === 'home' || (tab === 'agents' && current().sessionId && current().taskId !== taskId)) return
     // An open step needs nothing kept here. It stays open for its task until a step opens in another.
     const open = openStep()?.taskId === taskId ? openStep() : null
     const run = selectedRun()?.taskId === taskId ? selectedRun()!.runId : null
@@ -420,11 +457,6 @@ export function Workspace(props: {
     })
     void saveTaskViews(props.api.storage.local, nodeId, taskViews)
   }
-  onCleanup(() => {
-    const taskId = pageTask()?.task.id
-    if (taskId) keepView(taskId)
-  })
-
   // Shows a task's remembered view, or says it can't, when its plugin panel is gone. A conversation
   // open in another task closes, unless the view is a conversation of its own. Drafts stay with the
   // conversation they were written in.
@@ -448,24 +480,41 @@ export function Workspace(props: {
   }
 
   // Where the sidebar goes when the page beside it moves, by navigating or switching tabs. A page of
-  // another task shows what the sidebar last showed for that task, or, over an open conversation, that
-  // task's newest conversation. A page no task holds shows Home, even on a project's site, and an open
+  // another task shows what the sidebar last showed for that task. With nothing remembered, Agents
+  // over an open conversation moves to that task's newest, Workflows closes when the task has no runs,
+  // and anything else stays. A page no task holds shows Home, even on a project's site, and an open
   // conversation waits under Agents. Home stays put, unless the sidebar went there by itself. The
   // tasks arriving, or a plugin publishing the page's address, moves nothing.
   const pageTaskId = createMemo(() => pageTask()?.task.id ?? null)
   createEffect(
     on(
       [() => props.pageUrl, pageTaskId],
-      ([url, taskId], previous) => {
+      ([url], previous) => {
         const [lastUrl, left] = previous ?? [undefined, null]
-        if (left && left !== taskId) keepView(left)
         if (url === lastUrl || (props.tab === 'home' && !wentHome)) return
         const task = pageTask()?.task
         if (!task) return props.tab === 'home' ? undefined : goHome()
         if (task.id === left) return
         const view = taskViews[task.id]
         if (view && showView(task, view)) return
-        if (current().sessionId && current().taskId !== task.id) chatInTask(task.projectId, task.id)
+        if (props.tab === 'agents' && current().sessionId && current().taskId !== task.id)
+          chatInTask(task.projectId, task.id)
+        if (props.tab !== 'workflows') return
+        const runs = runLists()[task.id]
+        if (!runs) runsCheck = task.id
+        else if (!runs.length) leaveEmptyWorkflows(task.id)
+      },
+      { defer: true },
+    ),
+  )
+  // What the sidebar shows for the page's task is kept each time it changes, never at the moment the
+  // page moves, when what shows still belongs to the task left behind. Home belongs to no task.
+  createEffect(
+    on(
+      [() => props.tab, current, selectedRun, openStep],
+      () => {
+        const taskId = pageTaskId()
+        if (taskId) keepView(taskId)
       },
       { defer: true },
     ),
@@ -542,6 +591,9 @@ export function Workspace(props: {
     if (chosen || !remembered.projectId || !remembered.taskId) return
     void restore(remembered.projectId, remembered.taskId, (list) => {
       if (!list.some((session) => session.id === remembered.sessionId)) return
+      // The page belongs to another task, so its conversation isn't the one to open.
+      const page = pageTask()?.task
+      if (page && page.id !== remembered.taskId) return
       showSession(remembered.sessionId!)
       props.resumed()
     })
@@ -631,7 +683,7 @@ export function Workspace(props: {
               showMarker={props.showMarker}
               projectName={projectName}
               chat={chatInTask}
-              showAgents={props.showAgents}
+              showAgents={showPageAgents}
               handoff={props.handoff}
               startHandoff={props.startHandoff}
               dismissHandoff={props.dismissHandoff}
@@ -666,7 +718,7 @@ export function Workspace(props: {
             tasks={props.tasks}
             pageTaskIds={props.pageTasks.map(({ task }) => task.id)}
             currentTaskId={current().taskId}
-            showAgents={props.showAgents}
+            showAgents={showPageAgents}
             chat={chatInTask}
           />
         </div>
@@ -715,11 +767,7 @@ export function Workspace(props: {
                 {(other) => (
                   <div class="banner notice row" role="status">
                     <span class="grow">This page is in task {other().task.title}.</span>
-                    <button
-                      type="button"
-                      class="quiet"
-                      onClick={() => chatInTask(other().task.projectId, other().task.id)}
-                    >
+                    <button type="button" class="quiet" onClick={showPageAgents}>
                       Switch
                     </button>
                   </div>

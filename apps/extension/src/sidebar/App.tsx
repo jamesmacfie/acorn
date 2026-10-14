@@ -112,8 +112,10 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     if (shown.startsWith('panel:') && !panels().some((panel) => shown === `panel:${panel.pluginId}`)) setView('home')
   })
   // Whether the person has picked a tab since the panel opened. Until then, a remembered conversation
-  // reopens on Agents; after, it waits there without moving them.
+  // reopens on Agents; after, it waits there without moving them. Each pick is counted for the
+  // Workspace too, which shows the page's task when the pick is Agents.
   let picked = false
+  const [tabPicks, setTabPicks] = createSignal(0)
   // What Agents or Workflows names in the top bar: the list and its count, or the open conversation.
   const [agentsHeading, setAgentsHeading] = createSignal<Heading | null>(null)
   const heading = (): Heading => {
@@ -351,6 +353,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   showAgents={() => setView('agents')}
                   showWorkflows={() => setView('workflows')}
                   showTab={setView}
+                  tabPicks={tabPicks()}
                   hasWorkflows={setHasWorkflows}
                   panels={panels()}
                   panelsShown={setPanelsShown}
@@ -414,6 +417,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                 picked = true
                 setPairing(false)
                 setView(tab.id)
+                setTabPicks((count) => count + 1)
               }}
             />
           )}

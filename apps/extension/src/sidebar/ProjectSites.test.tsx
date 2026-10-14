@@ -506,6 +506,35 @@ describe('This page', () => {
     expect(agentRows(root)).toEqual(['Chat s1'])
   })
 
+  it("keeps a conversation opened from another task's row, until Switch shows the page's task", async () => {
+    const { root, state } = mount({ url: 'https://github.com/acme/web/pull/9' })
+    state.taskPages = [
+      pullTask,
+      {
+        ...pullTask,
+        id: 't2',
+        title: 'Speed up search',
+        pages: [{ origin: 'https://github.com', pathPrefix: '/acme/web/pull/9', source: 'github' }],
+      },
+    ]
+    state.addedTasks.push({ id: 't2', title: 'Speed up search', branch: null })
+    await settle(30)
+    const row = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Tasks"] .row-button')].find(
+      (each) => each.querySelector('strong')!.textContent === 'Fix login',
+    )!
+    row.click()
+    await settle(20)
+    button(root.querySelector('[aria-label="Fix login links"]')!, 'Chat')!.click()
+    await settle(30)
+    expect(conversationTitle(root)).toBe('Chat s1')
+    expect(root.textContent).toContain('This page is in task Speed up search.')
+    button(root, 'Switch')!.click()
+    await settle(30)
+    // Speed up search has no conversation, so Agents opens on its new-chat picker.
+    expect(root.querySelector('[aria-label="Conversation"]')).toBeNull()
+    expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'New chat')).toBeDefined()
+  })
+
   it('reads the list again when the Node says a task changed', async () => {
     const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
     await settle(30)
