@@ -18,7 +18,12 @@ type Request = { id: string; op: string; nodeId?: string | null; endpoint?: stri
 // A host that answers like the real one, except that project reads wait until the test releases them.
 function mount(
   known: string[],
-  options: { refuseLateReads?: boolean; local?: { nodeId: string; endpoint: string } } = {},
+  options: {
+    refuseLateReads?: boolean
+    local?: { nodeId: string; endpoint: string }
+    // A Node that takes an ask. Without one, the ask fails and only the code works.
+    approval?: { allowed: boolean }
+  } = {},
 ) {
   const fake = fakeBrowser()
   const held: { nodeId: string; release(): void }[] = []
@@ -52,6 +57,15 @@ function mount(
           ? { ...options.local, fingerprint: FINGERPRINT, protocolVersion: 1, baseline: 'b', compatible: true }
           : null,
       )
+    if (request.op === 'node.ask')
+      return options.approval
+        ? reply({ phrase: 'maple river stone' })
+        : host.send({ v: 1, id: request.id, ok: false, error: { code: 'pairing_failed', message: 'no ask' } })
+    if (request.op === 'node.collect') {
+      if (!options.approval?.allowed) return reply(null)
+      known.push('new')
+      return reply({ nodeId: 'new', label: request.label, endpoint: 'https://new.test', local: false })
+    }
     if (request.op === 'node.probe')
       return reply({
         endpoint: request.endpoint,
@@ -169,6 +183,22 @@ describe('sidebar', () => {
     button(root, 'Done')!.click()
     await settle()
     expect(root.querySelector('[aria-label="Home"]')).not.toBeNull()
+  })
+
+  it('pairs the Node on this Mac once Acorn allows it, with no code', async () => {
+    const approval = { allowed: false }
+    const { root } = mount([], { local: { nodeId: 'new', endpoint: 'https://127.0.0.1:4317' }, approval })
+    await settle()
+    button(root.querySelector('[aria-label="Choose a Node"]')!, 'Continue')!.click()
+    await settle()
+    // The words the owner's dialog shows, with the code form still there.
+    expect(root.querySelector('[data-testid="request-words"]')!.getAttribute('aria-label')).toBe('maple river stone')
+    expect(input(root, 'pairing-code')).not.toBeNull()
+
+    approval.allowed = true
+    await new Promise((resolve) => setTimeout(resolve, 1_100))
+    await settle()
+    expect(root.querySelector('[aria-label="Paired"]')!.textContent).toContain('Paired with This computer')
   })
 
   it('shows another address its identity words, and asks for the code only once they match', async () => {

@@ -84,6 +84,11 @@ Ordinary failures get one `401 pairing_failed` with no detail. The 4 KiB body ce
 window or issues a token. [Pairing](./api-reference/transport.md#pairing) owns the byte and deadline
 limits.
 
+A client on the Node's own computer can skip the code. The terminal client, the CLI, and the browser
+extension ask the Node, the desktop opens a dialog with the three words the asker prints, and one
+click on **Allow** pairs it. The code prompt stays open beside the wait.
+[Pairing by approval](./api-reference/transport.md#pairing-by-approval) owns the steps and limits.
+
 The bundled local Node is the exception: the helper spawned it, so the service handshake returns a device
 token without a typed code. It's still stored and checked as a normal device token.
 
@@ -93,6 +98,8 @@ Device administration is device-only:
 | --- | --- |
 | `POST /v1/core/pair/start` | Open or replace the pairing window |
 | `DELETE /v1/core/pair` | Close the pairing window |
+| `GET /v1/core/pair/requests` | Read the pairing request waiting for an answer |
+| `POST /v1/core/pair/requests/:id` | Allow or deny that request |
 | `GET /v1/core/devices` | List paired devices without token material |
 | `DELETE /v1/core/devices/:id` | Revoke a device |
 

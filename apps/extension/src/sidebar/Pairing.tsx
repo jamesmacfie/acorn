@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createSignal, onMount } from 'solid-js'
+import { For, Match, Show, Switch, createSignal, onCleanup, onMount } from 'solid-js'
 import type { NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import type { BridgeHandoff, BridgeNodes, BridgeResults } from '@acorn/protocol/extensionBridge.ts'
 import { fingerprintPhrase, fingerprintWords } from '@acorn/protocol/fingerprintWords.ts'
@@ -273,12 +273,48 @@ function Address(props: { client: BridgeClient; confirmed(probe: NodeProbeResult
   )
 }
 
+// How often the sidebar asks whether the owner has allowed this browser.
+const COLLECT_EVERY_MS = 1_000
+
 // The code, and the name this browser shows for the Node. `node.pair` completes the probe the bridge
 // kept, so nothing here names the Node again.
+//
+// The Node on this computer also gets an ask (docs/api-reference/transport.md § Pairing by approval):
+// Acorn shows a dialog, and this waits for the owner to allow it. The code form stays beside it, for a
+// Node no paired app is watching.
 function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: boolean; paired(node: NodeRecord): void }) {
   const [code, setCode] = createSignal('')
   const [label, setLabel] = createSignal(props.local ? LOCAL_NAME : new URL(props.probe.endpoint).host)
+  const [phrase, setPhrase] = createSignal<string | null>(null)
+  const [refused, setRefused] = createSignal(false)
   const work = action()
+
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let stopped = false
+  onCleanup(() => {
+    stopped = true
+    clearTimeout(timer)
+  })
+  const collect = async () => {
+    if (stopped) return
+    try {
+      const node = await props.client.call({ op: 'node.collect', label: label().trim() || LOCAL_NAME })
+      if (stopped) return
+      if (node) return props.paired(node)
+      timer = setTimeout(() => void collect(), COLLECT_EVERY_MS)
+    } catch {
+      if (!stopped) setRefused(true)
+    }
+  }
+  onMount(async () => {
+    if (!props.local) return
+    try {
+      setPhrase((await props.client.call({ op: 'node.ask' })).phrase)
+    } catch {
+      return // A Node that can't take an ask still takes a code.
+    }
+    void collect()
+  })
 
   const pair = (event: SubmitEvent) => {
     event.preventDefault()
@@ -293,6 +329,27 @@ function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: bool
       <State tone="ok">
         {props.local ? "Checked against this Mac's own certificate" : 'You confirmed the identity words'}
       </State>
+      <Show when={phrase()}>
+        {(words) => (
+          <section aria-label="Allow in Acorn">
+            <h2>Allow in Acorn</h2>
+            <Show
+              when={!refused()}
+              fallback={
+                <p class="problem" role="alert">
+                  The request was denied or has expired. Pair with a code instead.
+                </p>
+              }
+            >
+              <p>Acorn on this Mac asks whether to allow this browser. Allow it if it shows these words:</p>
+              <ul class="chips" data-testid="request-words" aria-label={words()}>
+                <For each={words().split(' ')}>{(word) => <li class="chip">{word}</li>}</For>
+              </ul>
+              <p class="quiet">Or pair with a code.</p>
+            </Show>
+          </section>
+        )}
+      </Show>
       <form onSubmit={pair}>
         <label>
           Pairing code

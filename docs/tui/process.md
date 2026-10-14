@@ -56,9 +56,16 @@ A second `acorn` finds the lock, attaches, and leaves the Node running when it q
 started the Node owns its lifetime, as on the desktop.
 
 Attaching needs a device token, and a Node the desktop started holds the desktop's token. So the first
-`acorn` against it asks for a pairing code. For a desktop-supervised Node, open **Settings → Nodes →
-Pair another client** in the desktop. For a standalone Node, run `kill -USR1 <pid>` and read the code
-from its terminal. The client then pairs over loopback.
+`acorn` against it asks to pair. It prints three words, and the desktop opens a dialog with the same
+words. Click **Allow** there, and the client carries on
+([pairing by approval](../api-reference/transport.md#pairing-by-approval)). The code prompt stays open
+beside the wait. For a code from a desktop-supervised Node, open **Settings → Nodes → Pair another
+client**. For a standalone Node, run `kill -USR1 <pid>` and read the code from its terminal. The client
+pairs over loopback either way.
+
+Before attaching, the client checks its saved token against the running Node. If the Node refuses it,
+because the device was revoked or the data root was reset, the client deletes the token and asks for a
+pairing code. A Node it can't reach keeps the token. The headless `acorn` commands make the same check.
 
 The selected cache partition joins the shared query-cache lifecycle after file storage is installed.
 The restore finishes before the shell draws, and quitting releases the lease and writes the pending

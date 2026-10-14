@@ -137,9 +137,14 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('nodes.list') }),
   z.strictObject({ ...envelope, op: z.literal('node.probe'), endpoint: z.string().url().max(2048) }),
   // The Node this computer's data root holds, the one `acorn` itself attaches to, kept as the probe
-  // `node.pair` completes. Its certificate comes from the Node's own files, so there are no words to
-  // compare, and pairing still takes a code.
+  // `node.pair` or `node.ask` completes. Its certificate comes from the Node's own files, so there are
+  // no words to compare.
   z.strictObject({ ...envelope, op: z.literal('node.local') }),
+  // Pairing by approval, for that local probe only (docs/api-reference/transport.md § Pairing by
+  // approval). The host asks the Node and keeps the secret. The sidebar gets the phrase the owner's
+  // dialog shows, then calls `node.collect` until the owner answers.
+  z.strictObject({ ...envelope, op: z.literal('node.ask') }),
+  z.strictObject({ ...envelope, op: z.literal('node.collect'), label: z.string().trim().min(1).max(120) }),
   // No endpoint or fingerprint: pairing completes the probe the person just confirmed.
   z.strictObject({
     ...envelope,
@@ -392,6 +397,9 @@ export type BridgeResults = {
   // Null when no Node holds this computer's data root.
   'node.local': (NodeProbeResult & { nodeId: string }) | null
   'node.pair': NodeRecord
+  'node.ask': { phrase: string }
+  // Null while the owner hasn't answered. A denial or an expiry is a `pairing_failed` failure.
+  'node.collect': NodeRecord | null
   'node.select': BridgeNodes
   'node.forget': BridgeNodes
   'projects.list': { nodeId: string; projects: BridgeProject[] }

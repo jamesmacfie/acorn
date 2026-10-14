@@ -271,6 +271,14 @@ describe('wsClient', () => {
     expect(fleet).toEqual(['n2', 'n1'])
   })
 
+  it('hears a pairing request from any paired node, not only the active one', () => {
+    const asked: string[] = []
+    client.wsOnFleetPairingRequested((nodeId) => asked.push(nodeId))
+    bridge.emitFrame({ channel: 'pairing:requested' }, 'n2')
+    bridge.emitFrame({ channel: 'pairing:requested' }, 'n1')
+    expect(asked).toEqual(['n2', 'n1'])
+  })
+
   it('replays each channel owner only on a genuine reconnect of the active node', () => {
     const reconnects: number[] = []
     const owner = registerWsChannel(

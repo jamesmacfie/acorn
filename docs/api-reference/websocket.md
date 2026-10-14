@@ -61,13 +61,16 @@ commands and removes its desired state.
 ## Channels
 
 A frame's channel is `<owner>:<verb>`, and the token before the first `:` is the registered prefix on
-both ends. Core sends `term:`, `workflow:`, and `ws:` frames and the eleven events in
+both ends. Core sends `term:`, `workflow:`, `ws:`, and `pairing:` frames and the eleven events in
 `NODE_EVENT_CHANNELS`. Every other prefix belongs to the plugin that registered it.
 
 `term:` is terminal transport. `workflow:` carries the bell's notices, per-step stream events, and
 `workflow:step-changed`, which names one step whose status moved. The workflows plugin's own
 invalidations are `plugin:workflows:run-changed`, `plugin:workflows:gate-changed`, and
 `plugin:workflows:child-changed`. The child frame uses `ownerTaskId` to reach the parent's surface.
+`pairing:requested` says a client on the Node's computer asked to pair
+([pairing by approval](./transport.md#pairing-by-approval)). It's content-free, and plugins can't
+subscribe to it. The client hears it from every paired Node, not only the active one.
 `ws:shed` is the hub saying it dropped frames because a socket fell too far behind
 ([backpressure](../terminal/activity.md#backpressure)).
 

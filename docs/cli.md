@@ -29,9 +29,11 @@ or an incompatible protocol exits with a connection error, and a command never f
 Node. The terminal client's `--node` and `--task` switches still open that client when no command
 follows them.
 
-To pair with a local Node, open **Settings → Nodes → Pair another client** in the desktop that started
-it. For a standalone Node, run `kill -USR1 PID` and read the code from its terminal. Then run the
-command in an interactive terminal and enter the code.
+To pair with a local Node, run the command in an interactive terminal. It prints three words, and the
+desktop that started the Node opens a dialog with the same words. Click **Allow** there
+([pairing by approval](./api-reference/transport.md#pairing-by-approval)). To use a code instead, get
+one from **Settings → Nodes → Pair another client**, or for a standalone Node, run `kill -USR1 PID` and
+read it from its terminal. Then type it at the prompt.
 
 ## Commands
 

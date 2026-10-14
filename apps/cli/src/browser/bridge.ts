@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { NodeBroker, toNodeRecord, type FleetStore } from '@acorn/custody/broker'
-import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
+import { askToPair, collectPairing, pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
 import { dataRootDir, runningNode } from '@acorn/custody/local'
 import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
 import {
@@ -108,10 +108,14 @@ export function createBridge(options: {
   tasksChanged?(nodeId: string): void
   probe?: typeof probeNode
   pair?: typeof pairWithNode
+  ask?: typeof askToPair
+  collect?: typeof collectPairing
 }) {
   const { fleet } = options
   const probe = options.probe ?? probeNode
   const pair = options.pair ?? pairWithNode
+  const ask = options.ask ?? askToPair
+  const collect = options.collect ?? collectPairing
   let activeNodeId: string | null = null
   // The selected Node presented a certificate other than its pin. Its connection is closed until the
   // person pairs it again, and its status says why rather than reading as an ordinary outage.
@@ -119,6 +123,10 @@ export function createBridge(options: {
   // The probe is held here rather than returned, so pairing can only complete the endpoint whose
   // fingerprint the person was shown, or this computer's Node, pinned to the certificate in its files.
   let pending: Probe | null = null
+  // Whether `pending` is this computer's Node, the only one `node.ask` may ask.
+  let pendingLocal = false
+  // An ask the owner hasn't answered. The secret stays in this process; the sidebar sees the phrase.
+  let asking: { probe: Probe; secret: string } | null = null
   // The plugins whose task addresses the last `tasks.pages` read asked for.
   let addressPlugins = new Set<string>()
   const hints = agentHints(options.hint ?? (() => {}))
@@ -198,6 +206,34 @@ export function createBridge(options: {
     }
   }
 
+  // A pairing that worked, by code or by approval: keep the pin and token, and reconnect if it's the
+  // selected Node.
+  function remember(confirmed: Probe, result: Awaited<ReturnType<typeof pairWithNode>>, label: string) {
+    pending = null
+    pendingLocal = false
+    asking = null
+    // Pairing again replaces the pin and token. A selected node reconnects on the new credential.
+    if (activeNodeId === result.nodeId) broker.remove(activeNodeId)
+    const node = fleet.remember(
+      {
+        nodeId: result.nodeId,
+        label,
+        endpoint: confirmed.endpoint,
+        fingerprint: confirmed.fingerprint,
+        certPem: confirmed.certPem,
+        deviceId: result.device.id,
+        local: false,
+      },
+      result.deviceToken,
+    )
+    if (identityChanged === result.nodeId) identityChanged = null
+    if (activeNodeId === result.nodeId) {
+      activeNodeId = null
+      select(result.nodeId)
+    }
+    return toNodeRecord(node)
+  }
+
   // The Node in the data root `acorn` itself would open, found the way `openCliNode` finds it: the
   // endpoint from `node.json` and the certificate from `tls/cert.pem`. Only those files are read, never
   // a token. The address must present that same certificate, and the pin is the file's, so no one on
@@ -217,6 +253,7 @@ export function createBridge(options: {
         'The Node on this computer presented a certificate other than the one in its data folder.',
       )
     pending = { ...probed, certPem: running.certPem }
+    pendingLocal = true
     const { certPem: _certPem, ...result } = pending
     return { ...result, nodeId: running.nodeId }
   }
@@ -458,12 +495,16 @@ export function createBridge(options: {
       }
       case 'node.probe': {
         pending = null
+        pendingLocal = false
+        asking = null
         pending = await probeEndpoint(request.endpoint)
         const { certPem: _certPem, ...result } = pending
         return result
       }
       case 'node.local':
         pending = null
+        pendingLocal = false
+        asking = null
         return probeLocalNode()
       case 'node.pair': {
         const confirmed = pending
@@ -476,27 +517,33 @@ export function createBridge(options: {
         } catch (error) {
           throw new BridgeFailure('pairing_failed', messageOf(error))
         }
-        pending = null
-        // Pairing again replaces the pin and token. A selected node reconnects on the new credential.
-        if (activeNodeId === result.nodeId) broker.remove(activeNodeId)
-        const node = fleet.remember(
-          {
-            nodeId: result.nodeId,
-            label: request.label,
-            endpoint: confirmed.endpoint,
-            fingerprint: confirmed.fingerprint,
-            certPem: confirmed.certPem,
-            deviceId: result.device.id,
-            local: false,
-          },
-          result.deviceToken,
-        )
-        if (identityChanged === result.nodeId) identityChanged = null
-        if (activeNodeId === result.nodeId) {
-          activeNodeId = null
-          select(result.nodeId)
+        return remember(confirmed, result, request.label)
+      }
+      case 'node.ask': {
+        const local = pending
+        if (!local || !pendingLocal)
+          throw new BridgeFailure('no_probe', 'Find the Node on this computer before asking it to pair.')
+        if (!local.compatible) throw new BridgeFailure('incompatible', 'That Node speaks a different protocol version.')
+        const asked = await ask(local, options.deviceName).catch(() => null)
+        if (!asked)
+          throw new BridgeFailure(
+            'pairing_failed',
+            'The Node on this computer could not take a request. Use a pairing code.',
+          )
+        asking = { probe: local, secret: asked.secret }
+        return { phrase: asked.phrase }
+      }
+      case 'node.collect': {
+        const current = asking
+        if (!current) throw new BridgeFailure('no_probe', 'Ask the Node on this computer to pair first.')
+        let result: Awaited<ReturnType<typeof collectPairing>>
+        try {
+          result = await collect(current.probe, current.secret)
+        } catch (error) {
+          asking = null
+          throw new BridgeFailure('pairing_failed', messageOf(error))
         }
-        return toNodeRecord(node)
+        return result ? remember(current.probe, result, request.label) : null
       }
       case 'node.select':
         return select(request.nodeId)

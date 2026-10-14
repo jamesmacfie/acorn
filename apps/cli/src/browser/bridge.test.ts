@@ -36,6 +36,8 @@ afterEach(async () => {
 async function fakeNode(nodeId: string, options: { protocolVersion?: number } = {}) {
   const state = {
     revoked: false,
+    // Whether the owner has allowed the pairing ask.
+    allowed: false,
     projectsDelay: null as Promise<void> | null,
     // Accept the next turn, then drop the connection before answering.
     dropTurnReply: false,
@@ -101,6 +103,21 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       for await (const chunk of req) body += chunk
       const { code } = JSON.parse(body) as { code: string }
       if (code !== CODE) return reply(401, { error: { code: 'pairing_failed', message: 'no' } })
+      return reply(200, {
+        baseline: ACORN_BASELINE,
+        deviceToken: TOKEN,
+        nodeId,
+        device: { id: 'device-1', name: 'browser', createdAt: 1, lastSeenAt: null, revokedAt: null },
+      })
+    }
+    if (req.url === '/v1/pair/requests')
+      return reply(200, { secret: 'ask-secret', phrase: 'maple river stone', expiresInMs: 1 })
+    if (req.url === '/v1/pair/requests/claim') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      if ((JSON.parse(body) as { secret: string }).secret !== 'ask-secret')
+        return reply(401, { error: { code: 'pairing_failed', message: 'no' } })
+      if (!state.allowed) return reply(202, { status: 'pending' })
       return reply(200, {
         baseline: ACORN_BASELINE,
         deviceToken: TOKEN,
@@ -433,6 +450,28 @@ describe('browser bridge local discovery', () => {
     })
     await call({ op: 'node.select', nodeId })
     expect(await call({ op: 'projects.list', nodeId })).toMatchObject({ nodeId })
+  })
+
+  it('pairs the Node on this computer once the owner allows the ask', async () => {
+    const node = await fakeNode(nodeId)
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot({ nodeId, port: portOf(node.endpoint) }))
+    const { call } = bridge()
+    await expect(call({ op: 'node.ask' })).rejects.toMatchObject({ code: 'no_probe' })
+    await call({ op: 'node.local' })
+    // The secret stays in the host. The sidebar gets the words the owner's dialog shows.
+    expect(await call({ op: 'node.ask' })).toEqual({ phrase: 'maple river stone' })
+    expect(await call({ op: 'node.collect', label: 'This computer' })).toBeNull()
+    node.state.allowed = true
+    expect(await call({ op: 'node.collect', label: 'This computer' })).toMatchObject({ nodeId, label: 'This computer' })
+    await call({ op: 'node.select', nodeId })
+    expect(await call({ op: 'projects.list', nodeId })).toMatchObject({ nodeId })
+  })
+
+  it('asks only the Node on this computer, never one typed in', async () => {
+    const node = await fakeNode(nodeId)
+    const { call } = bridge()
+    await call({ op: 'node.probe', endpoint: node.endpoint })
+    await expect(call({ op: 'node.ask' })).rejects.toMatchObject({ code: 'no_probe' })
   })
 
   it('finds nothing when no Node holds the data root', async () => {

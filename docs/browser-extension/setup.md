@@ -64,9 +64,12 @@ menu, or **Pair a Node** under **Nodes** in Settings.
    Node's own files. For another address, enter its HTTPS address and click **Check identity**. Compare
    the six words with the ones the Node shows: the code panel in the desktop's **Settings → Nodes**, or
    a standalone Node's banner. Tick **The words match** only if they do, then click **Continue**.
-3. **Code.** Paste a pairing code. The desktop shows one in **Settings → Nodes → Pair a browser**. A
-   standalone Node prints one at start, and `kill -USR1 <pid>` prints another. The name fills in as
-   **This computer** for the Node on this Mac, or the address for another. Click **Pair**.
+3. **Allow or code.** For the Node on this Mac, the panel asks the Node and shows three words under
+   **Allow in Acorn**. The desktop opens a dialog with the same words. Click **Allow** there, and the
+   panel moves on by itself. Otherwise, paste a pairing code. The desktop shows one in **Settings →
+   Nodes → Pair a browser**. A standalone Node prints one at start, and `kill -USR1 <pid>` prints
+   another. The name fills in as **This computer** for the Node on this Mac, or the address for
+   another. Click **Pair**.
 4. **Done.** The panel names the Node it paired with. It offers **Allow** for each site where the Node's
    plugins put buttons, such as `github.com`, and a box for notifications. Both are optional, and both
    stay in Settings.

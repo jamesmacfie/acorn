@@ -1,8 +1,8 @@
 import type { NodePairRequest, NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import { canPairNodes, fleetBridge } from '../platform'
-import type { PairingWindow } from '@acorn/protocol/node.ts'
-import { corePairRoute, corePairStartRoute } from '@acorn/protocol/api.ts'
-import { sendJson } from './apiClient'
+import type { PairingDecision, PairingRequestResponse, PairingWindow } from '@acorn/protocol/node.ts'
+import { corePairRequestRoute, corePairRequestsRoute, corePairRoute, corePairStartRoute } from '@acorn/protocol/api.ts'
+import { readJson, sendJson } from './apiClient'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { selectActiveNode } from './activeNode'
 import { refreshFleet } from './fleet'
@@ -76,3 +76,20 @@ export const openNodePairingWindow = (nodeId: string): Promise<PairingWindow> =>
 
 export const closeNodePairingWindow = (nodeId: string): Promise<void> =>
   sendJson(corePairRoute, { method: 'DELETE', nodeId })
+
+// Pairing by approval: the request a client on that Node's computer is waiting on, and the owner's
+// answer to it (docs/api-reference/transport.md § Pairing by approval).
+export const readPairingRequest = (nodeId: string): Promise<PairingRequestResponse> =>
+  readJson<PairingRequestResponse>(corePairRequestsRoute, { nodeId })
+
+export const answerPairingRequest = (
+  nodeId: string,
+  requestId: string,
+  decision: PairingDecision['decision'],
+): Promise<void> =>
+  sendJson(corePairRequestRoute(requestId), {
+    method: 'POST',
+    nodeId,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ decision }),
+  })

@@ -1,15 +1,22 @@
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import { NODE_PROTOCOL_VERSION, nodeInfoSchema, pairResultSchema, type PairResult } from '@acorn/protocol/node.ts'
+import {
+  NODE_PROTOCOL_VERSION,
+  nodeInfoSchema,
+  pairResultSchema,
+  type PairingAsk,
+  type PairResult,
+} from '@acorn/protocol/node.ts'
 import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { normalizeFingerprint, pinnedTlsOptions } from './nodeBroker'
 import { nodeRequest, readBoundedResponse } from './nodeRequest'
 
-// The two requests that turn a URL into a fleet member. See docs/api-reference.md, "Pairing".
+// The requests that turn a URL into a fleet member. See docs/api-reference.md, "Pairing".
 //
 // They cannot go through the broker. The broker's job is to attach a device token to a pinned
 // connection, and pairing exists because there is no token and no pin yet. So this is the one place
-// in the app that talks to a node outside the broker, and it is two functions long on purpose.
+// in the app that talks to a node outside the broker, and it stays this small on purpose: a probe,
+// then a code, or an ask and its collection.
 //
 // Shell-free, like nodeBroker.ts, so it can be exercised against a real TLS server.
 
@@ -83,18 +90,71 @@ export async function probeNode(
   }
 }
 
+type PinnedProbe = {
+  endpoint: string
+  fingerprint: string
+  certPem: string
+  baseline?: string | null
+  compatible?: boolean
+}
+
 // Step 3: spend the owner's pairing code, this time over a pinned connection. The fingerprint they
 // just confirmed is now the identity, so the code cannot be handed to an impostor.
 export async function pairWithNode(
-  probe: { endpoint: string; fingerprint: string; certPem: string; baseline?: string | null; compatible?: boolean },
+  probe: PinnedProbe,
   request: { code: string; deviceName: string },
 ): Promise<PairResult> {
+  const { status, body } = await pinnedPost(probe, '/v1/pair', request)
+  if (status !== 200) {
+    // The node answers every pairing failure identically on purpose. See pairing.ts.
+    throw new Error(
+      status === 429
+        ? 'Too many pairing attempts. Try again shortly.'
+        : 'Pairing failed. Check the code and try again.',
+    )
+  }
+  return pairResult(body)
+}
+
+// Pairing by approval (docs/api-reference/transport.md § Pairing by approval), for the Node on this
+// computer: ask, and show the phrase so the owner can match it in their dialog. Null when the Node
+// can't take an ask, such as one that isn't on this computer or one that is answering too many,
+// which leaves the code as the way in.
+export async function askToPair(probe: PinnedProbe, deviceName: string): Promise<PairingAsk | null> {
+  const { status, body } = await pinnedPost(probe, '/v1/pair/requests', { deviceName })
+  if (status !== 200) return null
+  const ask = JSON.parse(body) as Partial<PairingAsk>
+  return typeof ask.secret === 'string' && typeof ask.phrase === 'string' ? (ask as PairingAsk) : null
+}
+
+// The token, once the owner allows the ask. Null while they haven't answered. Throws when the Node
+// refuses: denied, expired, or replaced by a newer ask.
+export async function collectPairing(probe: PinnedProbe, secret: string): Promise<PairResult | null> {
+  const { status, body } = await pinnedPost(probe, '/v1/pair/requests/claim', { secret })
+  if (status === 202) return null
+  if (status !== 200) throw new Error('The pairing request was denied or has expired.')
+  return pairResult(body)
+}
+
+function pairResult(body: string): PairResult {
+  const result = pairResultSchema.safeParse(JSON.parse(body))
+  if (!result.success) throw new Error('The node returned an unusable pairing result.')
+  return result.data
+}
+
+// Over a pinned connection: the fingerprint the owner just confirmed, or read from the Node's own
+// files, is the identity from here on, so nothing sent can reach an impostor.
+async function pinnedPost(
+  probe: PinnedProbe,
+  path: string,
+  request: unknown,
+): Promise<{ status: number; body: string }> {
   if (probe.baseline !== ACORN_BASELINE || probe.compatible === false)
     throw new Error(`Node baseline or protocol does not match ${ACORN_BASELINE}; pairing was refused.`)
   const agent = new HttpsAgent(pinnedTlsOptions(probe.fingerprint, probe.certPem))
   try {
     const response = await nodeRequest({
-      url: new URL('/v1/pair', probe.endpoint),
+      url: new URL(path, probe.endpoint),
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify(request)) },
@@ -102,18 +162,7 @@ export async function pairWithNode(
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
       maxResponseBytes: MAX_PAIR_RESPONSE_BYTES,
     })
-    const text = new TextDecoder().decode(response.body)
-    if (response.status !== 200) {
-      // The node answers every pairing failure identically on purpose. See pairing.ts.
-      throw new Error(
-        response.status === 429
-          ? 'Too many pairing attempts. Try again shortly.'
-          : 'Pairing failed. Check the code and try again.',
-      )
-    }
-    const result = pairResultSchema.safeParse(JSON.parse(text))
-    if (!result.success) throw new Error('The node returned an unusable pairing result.')
-    return result.data
+    return { status: response.status, body: new TextDecoder().decode(response.body) }
   } finally {
     agent.destroy()
   }

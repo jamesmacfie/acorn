@@ -85,6 +85,8 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `node.probe` | `endpoint` | The probe result: endpoint, fingerprint, protocol, baseline, `compatible` |
 | `node.local` | none | The Node on this computer as a probe result with its `nodeId`, or `null` when none is running |
 | `node.pair` | `code`, `label` | The paired Node's record |
+| `node.ask` | none | `{ phrase }`: the words the owner's dialog shows. Only after `node.local` |
+| `node.collect` | `label` | The paired Node's record once the owner allows the ask, or `null` while they haven't. A denial or an expiry fails with `pairing_failed` |
 | `node.select` | `nodeId` or `null` | `{ nodes, activeNodeId, status }` |
 | `node.forget` | `nodeId` | `{ nodes, activeNodeId, status }` |
 | `projects.list` | `nodeId` | `{ nodeId, projects }`, each `{ id, name, path, hidden }` |
@@ -142,10 +144,16 @@ person just chose. A probe comes from one of two operations:
   from `node.json`, and the certificate from `tls/cert.pem`. It reads no token, and never the desktop's.
   It then probes that endpoint and refuses it with `identity_mismatch` unless it presents the same
   certificate. The kept probe pins the file's certificate. Nobody on the network could have chosen
-  it, so the sidebar shows no words, and pairing still takes a code. With no Node holding the root, it
-  answers `null`. A held root with no `node.json`, or a certificate that doesn't read, is `node_error`.
+  it, so the sidebar shows no identity words. With no Node holding the root, it answers `null`. A
+  held root with no `node.json`, or a certificate that doesn't read, is `node_error`.
 - **`node.probe`** probes an address the person typed. The sidebar shows the fingerprint as six words,
   and asks for the code only after the person ticks **The words match**.
+
+The local probe can also pair by approval
+([pairing by approval](./api-reference/transport.md#pairing-by-approval)). `node.ask` asks the Node
+over the kept probe and keeps the secret in the host, so the extension never holds it. The sidebar
+shows the phrase and calls `node.collect` once a second until the owner allows it in the desktop. A
+typed address can't ask, because the Node answers an ask only from its own computer.
 
 Each browser keeps its own custody, apart from the CLI's and the desktop's: a `FleetStore` and token
 files under `~/Library/Application Support/acorn/browser-bridge/<browser>/`. The folder is mode 0700
