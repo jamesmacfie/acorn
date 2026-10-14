@@ -373,6 +373,14 @@
   max-width: var(--pane-measure);
   margin-inline: auto;
 }
+/* A section beside a transcript, such as the Agent pane's queued follow-ups, grows to 40% of the
+   column and then scrolls. The transcript's scroller only gets the height left over, and this column
+   clips what overflows it. An uncapped queue took all of that height, so neither one could scroll. */
+.layout-region-detail:has(> .ui-timeline-scroll) > .ui-section {
+  max-height: 40%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 /* Two children are edge-to-edge by nature and opt the whole column out: a split, whose divider is its
    columns' shared edge and whose columns pad themselves, and a diff, which is a canvas. */
 .layout-region-detail:has(> .ui-listdetail, > .remote-tree > .ui-listdetail),
