@@ -21,6 +21,10 @@ export const prPaneContribution: PaneLayoutContribution = {
   order: 10,
   defaultChord: 'meta+shift+r',
   when: (task) => task.pullNumber != null,
+  url: (task) =>
+    task.github && task.pullNumber != null
+      ? `https://github.com/${task.github.owner}/${task.github.name}/pull/${task.pullNumber}`
+      : undefined,
   minWidth: 520,
   layout: 'single',
   regions: { body: PrPane },
