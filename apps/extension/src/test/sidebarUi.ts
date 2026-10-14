@@ -59,6 +59,8 @@ export async function openChat(root: ParentNode, title: string) {
 }
 
 // The current task and conversation, as the panel names them.
+// Home on a page that matches nothing: the Acorn mark alone.
+export const idle = (root: ParentNode) => root.querySelector('[aria-label="Home"] .idle') !== null
 export const currentTask = (root: ParentNode) =>
   root.querySelector('[aria-label="Current task"] strong')?.textContent ?? null
 export const conversationTitle = (root: ParentNode) =>

@@ -9,6 +9,7 @@ import {
   button,
   conversationTitle,
   currentTask,
+  idle,
   openChat,
   openSettings,
   pick,
@@ -149,11 +150,10 @@ const site = (projectId: string, origin: string, pathPrefix = '/'): ProjectSite 
 
 describe('project suggestions for a site', () => {
   it('reads the project list again when the Node says a project changed', async () => {
-    const { fake, state, root } = mount({ url: 'https://example.com/' })
+    const { fake, state, root } = mount({ url: 'https://example.com/', sites: [site('p1', 'https://example.com')] })
     await settle(30)
-    // The page matches nothing, so This page offers to tie its site to a project.
     const options = () =>
-      [...root.querySelectorAll('select[name="tie-project"] option')].map((option) => option.textContent)
+      [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
     expect(options()).not.toContain('Admin')
 
     state.addedProjects.push({ id: 'p4', name: 'Admin', path: null, hidden: false })
@@ -191,12 +191,12 @@ describe('project suggestions for a site', () => {
     expect(suggestedOptions(root)).toEqual(['Web', 'Everything'])
     expect(root.textContent).toContain('Several projects match this page. Choose one.')
 
-    // An unmatched page suggests nothing, and says so.
+    // An unmatched page shows only the Acorn mark.
     await pick(root, 'project', 'p3')
     fake.navigate('https://elsewhere.example/')
     await settle(20)
     expect(suggestedOptions(root)).toEqual([])
-    expect(root.textContent).toContain('Nothing in Acorn matches this page.')
+    expect(idle(root)).toBe(true)
   })
 
   it('remembers an override for the Node and site, until the page suggests other projects', async () => {
@@ -243,8 +243,8 @@ describe('project suggestions for a site', () => {
     // Another port on localhost is another site, which matches nothing and moves nothing.
     fake.navigate('http://localhost:5174/admin')
     await settle(20)
-    expect(root.textContent).toContain('Nothing in Acorn matches this page.')
-    expect(currentTask(root)).toBe('Fix login')
+    expect(idle(root)).toBe(true)
+    expect(fake.storage.get('destination:n1')).toMatchObject({ taskId: 't1' })
     expect(fake.storage.get('draft:n1:t1:s1')).toEqual({ text: 'Half a thought' })
   })
 
@@ -259,7 +259,7 @@ describe('project suggestions for a site', () => {
     await settle(20)
     expect(state.active).toBe('n2')
     expect(root.querySelector('select[name="project"]')).toBeNull()
-    expect(root.textContent).toContain('Nothing in Acorn matches this page.')
+    expect(idle(root)).toBe(true)
     await openSettings(root)
     expect(siteAccess(root)).toEqual([])
   })
@@ -427,12 +427,12 @@ describe('This page', () => {
     await settle(30)
     expect(conversationTitle(root)).toBe('Claude · Chat s1')
     await back(root)
-    // A page that matches nothing keeps the task last used pinned, but none of its conversations.
+    // A page that matches nothing shows only the Acorn mark. The task stays current for captures.
     fake.navigate('https://example.com/')
     await settle(20)
-    expect(thisPage(root).textContent).toContain('Nothing in Acorn matches this page.')
-    expect(currentTask(root)).toBe('Fix login')
+    expect(idle(root)).toBe(true)
     expect(agentRows(root)).toEqual([])
+    expect(fake.storage.get('destination:n1')).toMatchObject({ taskId: 't1' })
   })
 
   it("says over an open conversation when the page is another task's", async () => {
@@ -462,7 +462,7 @@ describe('This page', () => {
   it('reads the list again when the Node says a task changed', async () => {
     const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
     await settle(30)
-    expect(thisPage(root).textContent).toContain('Nothing in Acorn matches this page.')
+    expect(idle(root)).toBe(true)
     state.taskPages = [pullTask]
     fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'n1' })
     await settle(20)
@@ -488,20 +488,6 @@ describe('This page', () => {
     ])
     // New task opens the project in the desktop app; a development build copies that link.
     expect(button(thisPage(root), 'Copy Acorn link')!.title).toBe('acorn://n1/p/p1')
-  })
-
-  it("ties a page's site to a project when nothing matches it", async () => {
-    const { state, root } = mount({ url: 'https://elsewhere.example/docs/intro' })
-    await settle(30)
-    expect(thisPage(root).textContent).toContain('Nothing in Acorn matches this page.')
-    await pick(root, 'tie-project', 'p2')
-    button(thisPage(root), 'Tie https://elsewhere.example to it')!.click()
-    await settle(20)
-    expect(state.requests.find((request) => request.op === 'site.add')).toMatchObject({
-      projectId: 'p2',
-      site: { origin: 'https://elsewhere.example', pathPrefix: '/' },
-    })
-    expect(selected(root, 'project')).toBe('p2')
   })
 
   it("opens on the page's task from a chip, with a new chat about the page when asked", async () => {

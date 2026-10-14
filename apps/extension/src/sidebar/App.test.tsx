@@ -85,6 +85,12 @@ function mount(
       known.push('new')
       return reply({ nodeId: 'new', label: request.label, endpoint: 'https://new.test', local: false })
     }
+    // Each Node ties the test page's site to its one project.
+    if (request.op === 'sites.list')
+      return reply({
+        nodeId: request.nodeId,
+        sites: [{ projectId: `${request.nodeId}-p`, origin: 'https://example.test', pathPrefix: '/' }],
+      })
     if (request.op === 'projects.list') {
       const nodeId = request.nodeId!
       held.push({
@@ -128,8 +134,8 @@ describe('sidebar', () => {
     held[0]!.release()
     await settle()
     expect(nodeChip(root)).toContain('Node b')
-    // The page matches nothing, so This page offers to tie its site to one of b's projects.
-    const options = [...root.querySelectorAll('select[name="tie-project"] option')].map((option) => option.textContent)
+    // The page is on b's project's site, which This page suggests only from b's project list.
+    const options = [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
     expect(options).toEqual(['Choose a project', 'b project'])
   })
 

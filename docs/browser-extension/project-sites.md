@@ -52,9 +52,8 @@ shows the project picker in Home's **This page** section:
 - **One candidate** is chosen in the picker, under **Suggested for this page**.
 - **Several candidates** are listed first in the picker. A project they leave out is cleared, and the
   sidebar asks the person to choose one.
-- **No candidate** shows no picker. **This page** says nothing matches and offers to tie the page's
-  site to a project: choosing one and pressing **Tie <origin> to it** adds the whole origin to that
-  project's associations with `site.add`, and the page then has that project as its candidate.
+- **No candidate** shows no picker, and Home shows only the Acorn mark. To tie the page's site to a
+  project, add it under **Project sites** in Settings.
 
 Under the picker, **This page** lists the chosen project's open tasks, and clicking one makes it the
 current task. **New task in Acorn** opens the project in the desktop app. A page on a project's site

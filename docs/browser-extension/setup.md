@@ -115,14 +115,15 @@ Home lists, top to bottom:
 1. **Waiting for you**, only while an agent waits on a request, across every project on the Node.
    Each request answers in place with the same buttons the conversation uses
    ([request notifications](./notifications.md#the-waiting-list)).
-2. **This page**: what Acorn knows about the page, in one of four states: the task it belongs to, an
-   item no task holds with its handoff, the project its site suggests with that project's open tasks,
-   or nothing, with an offer to tie the site to a project ([This page](./task-pages.md#this-page)).
+2. **This page**: what Acorn knows about the page, in one of three states: the task it belongs to, an
+   item no task holds with its handoff, or the project its site suggests with that project's open
+   tasks ([This page](./task-pages.md#this-page)). A page that matches none of them, or one the
+   browser hides from Acorn, shows only the Acorn mark under **Waiting for you**.
 3. **Agents**: every conversation in the page's task, or in the current task when the page is on its
    project's site, grouped as **Managed chats**, **Inline chats**, and **Workflows**, each with its
    agent, title, state, and last line. A page tied to no task or project shows none. A row opens the
    conversation and makes its task current. **New chat** starts another.
-4. **Current task**: the task you last used, pinned whenever the page isn't its own.
+4. **Current task**: the task you last used, pinned whenever the page has a match but isn't its own.
 
 A conversation opens over Home, with a back arrow and the task's name above the conversation's own,
 and **Open in Acorn** and **Copy Acorn link** for that conversation ([the panel's

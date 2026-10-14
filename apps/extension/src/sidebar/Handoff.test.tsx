@@ -3,7 +3,7 @@ import { render } from 'solid-js/web'
 import type { BridgeAgentSession, BridgeHandoffItem } from '@acorn/protocol/extensionBridge.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
-import { back, button, conversationTitle, currentTask, openChat, openSettings } from '../test/sidebarUi'
+import { back, button, conversationTitle, idle, openChat, openSettings } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -332,17 +332,13 @@ describe('a handoff in the sidebar', () => {
     expect(button(root, 'Look up in Acorn')).toBeDefined()
   })
 
-  it('offers the sites still to allow on a page it may not read', async () => {
+  it('shows only the Acorn mark on a page it may not read', async () => {
     const { fake, root } = mount()
     fake.activeTab = { ...fake.activeTab, url: undefined }
     fake.activate()
     await settle(30)
-    const toAllow = () => root.querySelector('[aria-label="Sites to allow"]')
-    expect(toAllow()?.textContent).toContain('tracker.example')
-    button(toAllow() as HTMLElement, 'Allow')!.click()
-    await settle(20)
-    expect(fake.granted.has('https://tracker.example/*')).toBe(true)
-    expect(toAllow()).toBeNull()
+    expect(idle(root)).toBe(true)
+    expect(root.querySelector('[aria-label="This page"]')).toBeNull()
   })
 
   it('asks for site access from a click, and says when an item has no project here', async () => {

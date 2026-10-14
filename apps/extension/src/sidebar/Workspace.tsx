@@ -1,5 +1,5 @@
 import { Show, batch, createEffect, createMemo, createSignal, on, onMount } from 'solid-js'
-import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
+import type { ProjectSite } from '@acorn/protocol/siteAssociations.ts'
 import type {
   BridgeAgentHint,
   BridgeAgentSession,
@@ -9,7 +9,7 @@ import type {
   BridgeTask,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserApi } from '../browser'
-import type { PageHandoff } from '../handoffs'
+import { pageHandoffs, type PageHandoff } from '../handoffs'
 import { CallFailure, type RequestTarget } from '../messages'
 import { loadSiteChoices, pageScope, saveSiteChoices, type SiteChoices } from '../pageScope'
 import type { PageTask } from '../taskPages'
@@ -43,9 +43,6 @@ export function Workspace(props: {
   pageUrl: string | undefined
   handoffs: readonly BridgeHandoff[]
   sites: readonly ProjectSite[]
-  // The apps plugins published for tasks, which Home offers to allow with the other sites.
-  apps: readonly SiteAssociation[]
-  sitesChanged(projectId: string, sites: SiteAssociation[]): void
   // The tasks the page belongs to, matched in the browser, and a task chip's click asking to show
   // the page's task, with a new chat about the page for `chat`.
   pageTasks: readonly PageTask[]
@@ -296,6 +293,10 @@ export function Workspace(props: {
     pageScope(props.sites, new Set((projects() ?? []).map((project) => project.id)), siteChoices(), props.pageUrl),
   )
   const pageProjects = createMemo((): string[] => scope().projects, [], { equals: (a, b) => a.join() === b.join() })
+  const onSite = () => scope().suggested.length > 0 || pageProjects().length > 0
+  // The page belongs to a task, carries an item a handoff can look up, or is on a project's site.
+  const pageMatched = () =>
+    Boolean(props.handoff || pageTask() || pageHandoffs(props.handoffs, props.pageUrl).length || onSite())
   const showProject = (id: string | null) => {
     setPageProject(id)
     if (id) void loadTasks(id)
@@ -394,69 +395,78 @@ export function Workspace(props: {
               online={props.online}
               open={(request) => openConversation(request)}
             />
-            <ThisPage
-              client={props.client}
-              nodeId={nodeId}
-              online={props.online}
-              opensLinks={props.opensLinks}
-              api={props.api}
-              pageUrl={props.pageUrl}
-              handoffs={props.handoffs}
-              sites={props.sites}
-              apps={props.apps}
-              pageTasks={props.pageTasks}
-              markerHidden={props.markerHidden}
-              showMarker={props.showMarker}
-              projectName={projectName}
-              chat={chatInTask}
-              handoff={props.handoff}
-              startHandoff={props.startHandoff}
-              dismissHandoff={props.dismissHandoff}
-              openHandoffTask={openHandoffTask}
-              startedHandoffTask={(...args) => void startedHandoffTask(...args)}
-              waitingContext={props.waitingContext}
-              dropWaitingContext={() => props.setWaitingContext(null)}
-              projects={projects()}
-              suggested={scope().suggested}
-              onSite={scope().suggested.length > 0 || pageProjects().length > 0}
-              sitesChanged={props.sitesChanged}
-              several={!pageProject() && pageProjects().length > 1}
-              project={pageProject()}
-              pickProject={pickProject}
-              tasks={pageProject() ? (taskLists()[pageProject()!] ?? null) : null}
-              currentTaskId={current().taskId}
-              pickTask={pickTask}
-            />
-            <Show when={agentsTask().taskId} keyed>
-              {(taskId) => {
-                const target = () => ({ projectId: agentsTask().projectId!, taskId })
-                return (
-                  <Agents
-                    client={props.client}
-                    nodeId={nodeId}
-                    taskId={taskId}
-                    online={props.online}
-                    sessions={sessionLists()[taskId] ?? null}
-                    requests={props.requests}
-                    lines={lines}
-                    open={(id) => void openSession(target(), id)}
-                    newChat={newChat()}
-                    setNewChat={setNewChat}
-                    started={(started) => {
-                      setSessionLists((lists) => ({
-                        ...lists,
-                        [taskId]: [started, ...(lists[taskId] ?? []).filter((row) => row.id !== started.id)],
-                      }))
-                      setNewChat(false)
-                      void openSession(target(), started.id)
-                    }}
-                  />
-                )
-              }}
-            </Show>
-            {/* The task the person last used stays pinned when the page is not its own. */}
-            <Show when={!pageTask() || (current().taskId && current().taskId !== pageTask()!.task.id)}>
-              <CurrentTask task={task()} projectName={current().projectId ? projectName(current().projectId!) : null} />
+            {/* A page tied to no task, item, or project shows only the Acorn mark. */}
+            <Show
+              when={pageMatched()}
+              fallback={
+                <div class="idle">
+                  <img src="icon-128.png" alt="Acorn" />
+                </div>
+              }
+            >
+              <ThisPage
+                client={props.client}
+                nodeId={nodeId}
+                online={props.online}
+                opensLinks={props.opensLinks}
+                pageUrl={props.pageUrl}
+                handoffs={props.handoffs}
+                pageTasks={props.pageTasks}
+                markerHidden={props.markerHidden}
+                showMarker={props.showMarker}
+                projectName={projectName}
+                chat={chatInTask}
+                handoff={props.handoff}
+                startHandoff={props.startHandoff}
+                dismissHandoff={props.dismissHandoff}
+                openHandoffTask={openHandoffTask}
+                startedHandoffTask={(...args) => void startedHandoffTask(...args)}
+                waitingContext={props.waitingContext}
+                dropWaitingContext={() => props.setWaitingContext(null)}
+                projects={projects()}
+                suggested={scope().suggested}
+                onSite={onSite()}
+                several={!pageProject() && pageProjects().length > 1}
+                project={pageProject()}
+                pickProject={pickProject}
+                tasks={pageProject() ? (taskLists()[pageProject()!] ?? null) : null}
+                currentTaskId={current().taskId}
+                pickTask={pickTask}
+              />
+              <Show when={agentsTask().taskId} keyed>
+                {(taskId) => {
+                  const target = () => ({ projectId: agentsTask().projectId!, taskId })
+                  return (
+                    <Agents
+                      client={props.client}
+                      nodeId={nodeId}
+                      taskId={taskId}
+                      online={props.online}
+                      sessions={sessionLists()[taskId] ?? null}
+                      requests={props.requests}
+                      lines={lines}
+                      open={(id) => void openSession(target(), id)}
+                      newChat={newChat()}
+                      setNewChat={setNewChat}
+                      started={(started) => {
+                        setSessionLists((lists) => ({
+                          ...lists,
+                          [taskId]: [started, ...(lists[taskId] ?? []).filter((row) => row.id !== started.id)],
+                        }))
+                        setNewChat(false)
+                        void openSession(target(), started.id)
+                      }}
+                    />
+                  )
+                }}
+              </Show>
+              {/* The task the person last used stays pinned when the page is not its own. */}
+              <Show when={!pageTask() || (current().taskId && current().taskId !== pageTask()!.task.id)}>
+                <CurrentTask
+                  task={task()}
+                  projectName={current().projectId ? projectName(current().projectId!) : null}
+                />
+              </Show>
             </Show>
           </div>
         }

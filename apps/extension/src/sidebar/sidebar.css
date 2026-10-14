@@ -107,6 +107,9 @@ h2, h3 {
 .rows > li:last-child { border-bottom: 0; }
 .rows > li > div, .row-button { display: grid; min-width: 0; }
 .rows span, .rows strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Home on a page that matches nothing: the Acorn mark alone, in the middle of the panel. */
+.idle { display: grid; place-items: center; min-height: 70vh; }
+.idle img { width: 64px; opacity: 0.4; }
 .row-button {
   flex: 1;
   width: 100%;
