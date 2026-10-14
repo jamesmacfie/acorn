@@ -58,8 +58,10 @@ UPDATE_PLUGIN_GOLDENS=1 pnpm --filter @acorn/desktop --filter @acorn/node test
   every rail source with its order (`parity.test.ts`).
 - `apps/desktop/test/client/clientPluginDisable.snapshot.json`: every client registry entry and which
   optional plugin owns it (`clientPluginDisable.test.ts`).
-- `apps/node/test/integration/routeRegistry.snapshot.json`: every `/v1/p/<plugin>/` route the compiled
-  plugins mount (`routeRegistry.test.ts`).
+- `apps/node/test/integration/routeRegistry.snapshot.json`: every `/v1` route the Node mounts, core
+  and compiled plugins alike (`routeRegistry.test.ts`). Regenerating it never drops a route on its
+  own. A removal also needs a line in the removal file beside it, as
+  [Removing a route](../api-reference/versioning.md#removing-a-route) describes.
 - `apps/node/test/integration/pluginSystem/pluginDisable.snapshot.json`: the full Node boot's routes,
   tools, context sections, providers, and databases, and which optional plugin owns each
   (`pluginDisable.test.ts`).

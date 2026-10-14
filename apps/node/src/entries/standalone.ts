@@ -134,7 +134,7 @@ const previousToken = background ? readPrivateToken() : process.env.ACORN_DEVICE
 const handshake = JSON.stringify({
   baseline: ACORN_BASELINE,
   nodeId: root.nodeId,
-  // The handshake's protocol number (docs/api-reference/transport.md § Versioning): a launcher can refuse a
+  // The handshake's protocol number (docs/api-reference/versioning.md § Versioning): a launcher can refuse a
   // node it cannot drive without pairing to it first.
   protocolVersion: NODE_PROTOCOL_VERSION,
   endpoint: listener.endpoint.origin,

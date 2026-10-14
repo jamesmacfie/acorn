@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Hono } from 'hono'
 import type { ApiError } from '@acorn/protocol/api.ts'
+import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
@@ -37,52 +39,8 @@ describe('plugin route registry', () => {
   })
 })
 
-// One representative route per core router mounted by name in createApp(). Together with the plugin
-// table below, this file verifies the current mount shape: core answers under /v1/core and plugins under
-// /v1/p/<plugin>.
-const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
-  // The pre-auth pairing routes, outside /v1/core because that namespace is the gated one. They
-  // are how an unpaired client gets a credential at all (docs/api-reference/transport.md § Request processing).
-  ['GET', '/v1/node'],
-  ['POST', '/v1/pair'],
-  ['POST', '/v1/pair/requests'],
-  ['POST', '/v1/pair/requests/claim'],
-  ['POST', '/v1/core/pair/start'],
-  ['DELETE', '/v1/core/pair'],
-  ['GET', '/v1/core/pair/requests'],
-  ['POST', '/v1/core/pair/requests/:id'],
-  ['GET', '/v1/core/devices'],
-  ['DELETE', '/v1/core/devices/:id'],
-  ['PUT', '/v1/core/prefs'],
-  ['GET', '/v1/core/workspaces'],
-  // Linear/Rollbar projects linked to a workspace, not acorn projects, which live under
-  // /v1/core/projects.
-  ['GET', '/v1/core/workspaces/:id/external-projects'],
-  ['GET', '/v1/core/tasks'],
-  ['PATCH', '/v1/core/tasks/:id'],
-  ['POST', '/v1/core/tasks/:id/links'],
-  ['GET', '/v1/core/tasks/:id/config-trust'],
-  ['GET', '/v1/core/task-statuses'],
-  ['GET', '/v1/core/projects'],
-  ['GET', '/v1/core/projects/:id/config'],
-  ['PUT', '/v1/core/projects/:id/config'],
-  ['PUT', '/v1/core/projects/:id/run-targets'],
-  ['GET', '/v1/core/projects/:id/mcp'],
-  ['POST', '/v1/core/projects/:id/mcp/starter'],
-  ['POST', '/v1/core/tasks/:id/preview-url'],
-  ['POST', '/v1/core/tasks/:id/on-created'],
-  ['POST', '/v1/core/tasks/:id/archive'],
-  ['GET', '/v1/core/tasks/:id/context'], // taskContext
-  ['GET', '/v1/core/tasks/:id/run'], // harness
-  ['GET', '/v1/core/tasks/:id/tools'], // agentTools — the MCP/harness projection
-  ['POST', '/v1/core/tasks/:id/renderer-tools/:name'],
-  ['GET', '/v1/core/agent-tools'],
-  ['GET', '/v1/core/integrations'],
-  ['POST', '/v1/core/telemetry'], // the batch route every runtime that is not the node posts to
-  ['GET', '/v1/core/telemetry/summary'], // what Settings → Telemetry draws (docs/telemetry.md)
-]
-
-// Every route the compiled plugins mount, as a golden snapshot in routeRegistry.snapshot.json;
+// Every route the Node mounts under /v1, core and compiled plugins alike, as a golden snapshot in
+// routeRegistry.snapshot.json, with the protocol version it was written under;
 // docs/plugins/adding-a-contribution.md § The golden lists covers the mechanism and why it's exact
 // equality rather than a representative `some()` check per contribution. The segment doubling is visible here too
 // (docs/api-reference/plugin-routes.md § Plugin routes): a router that names its own top-level segment repeats it
@@ -96,7 +54,21 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 // fetch carrier (docs/plugins/loaded-plugins.md § Loaded plugins), which this suite
 // doesn't assemble. `pluginLoader.test.ts` exercises a loaded plugin's routes, `httpLoaded.test.ts`
 // drives http's through that carrier, and `linear.test.ts` drives linear's router directly.
-const PLUGIN_ROUTES = join(import.meta.dirname, 'routeRegistry.snapshot.json')
+const ROUTES = join(import.meta.dirname, 'routeRegistry.snapshot.json')
+type RouteGolden = { protocolVersion: number; routes: string[] }
+
+// A client of the golden's protocol version may still call any route in it, so a route leaves only with
+// a dated line in routeRegistry.removals.txt or with a new protocol version
+// (docs/api-reference/versioning.md § Removing a route).
+const REMOVALS = join(import.meta.dirname, 'routeRegistry.removals.txt')
+const REMOVAL =
+  /^(?<route>[A-Z]+ \/\S+) (?<removed>\d{4}-\d{2}-\d{2}) (?<clientBuild>\d{4}-\d{2}-\d{2}) [0-9a-f]{7,40}$/
+// The same window as mixed-version paths (docs/api-reference/versioning.md § Mixed builds).
+const SUPPORTED_CLIENT_DAYS = 90
+const removalLines = () =>
+  readFileSync(REMOVALS, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim() && !line.startsWith('#'))
 
 describe('assembled routes', () => {
   let plugins: { dispose(): Promise<void> }
@@ -107,21 +79,40 @@ describe('assembled routes', () => {
 
   const routes = () => createApp().routes
 
-  it.each(MOUNTED_CORE_ROUTES)('mounts %s %s', (method, path) => {
-    expect(routes().some((route) => route.method === method && route.path === path)).toBe(true)
-  })
-
-  it('mounts exactly the plugin routes in the golden list', () => {
+  it('mounts exactly the routes in the golden list, and loses one only through a removal line', () => {
     const actual = routes()
-      .filter((route) => route.path.startsWith('/v1/p/'))
+      .filter((route) => route.path.startsWith('/v1/'))
       .map((route) => `${route.method} ${route.path}`)
       .sort()
-    writeGolden(PLUGIN_ROUTES, actual)
+    const golden = readGolden<RouteGolden>(ROUTES)
+    const recorded = new Set(removalLines().map((line) => REMOVAL.exec(line)?.groups?.route))
+    const unrecorded =
+      golden.protocolVersion === NODE_PROTOCOL_VERSION
+        ? [...new Set(golden.routes)].filter((route) => !actual.includes(route) && !recorded.has(route))
+        : []
+    // Rewriting the golden keeps an unrecorded removal, so regenerating can't hide one. Deleting its
+    // line from the golden by hand still can, and that shows in review.
+    writeGolden(ROUTES, { protocolVersion: NODE_PROTOCOL_VERSION, routes: [...actual, ...unrecorded].sort() })
+    expect(
+      unrecorded,
+      `These routes are gone, and a client of protocol version ${NODE_PROTOCOL_VERSION} may still call them. ` +
+        `Add a line for each to routeRegistry.removals.txt once no client has called it for ${SUPPORTED_CLIENT_DAYS} ` +
+        'days, or bump NODE_PROTOCOL_VERSION.',
+    ).toEqual([])
     // Anti-vacuity: the assertion below is an exact match against a file, so a boot that mounted
     // nothing would pass against an empty golden. A floor, not a count: the compiled tier shrinks by
     // design, so this comes down as plugins ship loaded instead.
-    expect(actual.length).toBeGreaterThanOrEqual(30)
-    expect(actual).toEqual(readGolden<string[]>(PLUGIN_ROUTES))
+    expect(actual.length).toBeGreaterThanOrEqual(100)
+    expect(actual).toEqual(readGolden<RouteGolden>(ROUTES).routes)
+  })
+
+  it(`dates every removal ${SUPPORTED_CLIENT_DAYS} days after the client build that stopped calling it`, () => {
+    for (const line of removalLines()) {
+      const removal = REMOVAL.exec(line)?.groups
+      expect(removal, `"${line}" should read <METHOD> <path> <removed on> <client build date> <commit>`).toBeDefined()
+      const days = (Date.parse(removal!.removed!) - Date.parse(removal!.clientBuild!)) / 86_400_000
+      expect(days, line).toBeGreaterThanOrEqual(SUPPORTED_CLIENT_DAYS)
+    }
   })
 
   // The GitHub mirror is one lazy mount (plugins/github/src/node/index.ts), so the golden above shows

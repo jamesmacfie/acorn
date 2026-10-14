@@ -67,7 +67,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 ## Retired folders
 
 `cleanup/` shipped all seventeen proposals and was deleted on October 12, 2026. The reference
-pages each proposal touched own the result: [mixed builds](../api-reference/transport.md#mixed-builds) for the
+pages each proposal touched own the result: [mixed builds](../api-reference/versioning.md#mixed-builds) for the
 version policy, [formatting](../local-development/formatting.md) for the formatter, and
 [conventions](../conventions.md) for the comment and staleness rules. Each proposal's completion
 note remains in Git history.

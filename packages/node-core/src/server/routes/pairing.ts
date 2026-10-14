@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import {
+  ACORN_BUILD,
   NODE_PROTOCOL_VERSION,
   pairingAskSchema,
   pairingClaimSchema,
@@ -91,7 +92,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
         // This is the one response that must stay readable by every client forever, so the bar for a
         // field on it is a real consumer, not a plausible use. Adding one back is one line and always
         // safe, because the schema is additive forever (`nodeInfoSchema`).
-        ...(authenticated ? { nodeId: c.env.NODE_ID } : {}),
+        ...(authenticated ? { nodeId: c.env.NODE_ID, buildVersion: ACORN_BUILD } : {}),
         ...(authenticated && c.env.SERVICE_INSTANCE_ID ? { serviceInstanceId: c.env.SERVICE_INSTANCE_ID } : {}),
       }
       return c.json(info)

@@ -664,7 +664,7 @@ describe('broker WebSocket', () => {
   })
 })
 
-// The version gate (docs/api-reference/transport.md § Versioning). Without it, a node that upgraded
+// The version gate (docs/api-reference/versioning.md § Versioning). Without it, a node that upgraded
 // past the client keeps connecting, and the mismatch surfaces as an undefined deep inside a component.
 describe('broker protocol version', () => {
   const nodeInfo = (protocolVersion: number) => ({

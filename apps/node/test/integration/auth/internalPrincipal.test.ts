@@ -24,7 +24,6 @@ beforeEach(() => {
   env = {
     DB: harness.db,
     NODE_ID: 'node-1',
-    APP_VERSION: 'test',
     NODE_FINGERPRINT: 'ff'.repeat(32),
     ...testSecretEnv(ENC_KEY),
     GITHUB_CLIENT_ID: 'client-id',

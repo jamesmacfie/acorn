@@ -2,8 +2,15 @@ import { z } from 'zod'
 import { ACORN_BASELINE } from '../baseline.ts'
 
 // The current wire protocol version, and the whole of the client to node compatibility contract. See
-// docs/api-reference/transport.md § Versioning.
+// docs/api-reference/versioning.md § Versioning.
 export const NODE_PROTOCOL_VERSION = 1
+
+declare const __ACORN_BUILD__: string | undefined
+// Which build this bundle is, stamped by its bundler (scripts/buildVersion.mts). The Node reports its
+// own at GET /v1/node, and Settings → Nodes compares it with the client's. Source run from a checkout,
+// as `pnpm dev:node` and the test runners do, has no stamp.
+export const SOURCE_BUILD = 'development'
+export const ACORN_BUILD: string = typeof __ACORN_BUILD__ === 'undefined' ? SOURCE_BUILD : __ACORN_BUILD__
 
 // The attachment record: who this node enrolled with, when, and under which enrollment token. One
 // optional object on `node.json`, and the only thing a control plane leaves behind on a node
@@ -53,7 +60,7 @@ export const nodeIdentitySchema = z.object({
 
 export type NodeIdentity = z.infer<typeof nodeIdentitySchema>
 
-// GET /v1/node. See docs/api-reference/transport.md § Versioning for why this is the most tolerant surface in
+// GET /v1/node. See docs/api-reference/versioning.md § Versioning for why this is the most tolerant surface in
 // the system and stays additive-forever.
 //
 // `fingerprint` is the sha256 of the node's self-signed certificate (lowercase hex) and is always
@@ -65,6 +72,9 @@ export const nodeInfoSchema = z.object({
   protocolVersion: z.number().int().positive(),
   fingerprint: z.string().min(1),
   nodeId: z.string().optional(),
+  // The Node's `ACORN_BUILD`, for an authenticated caller only, so an unpaired caller can't read which
+  // build to attack. A client shows it rather than acting on it: builds within one major interoperate.
+  buildVersion: z.string().optional(),
   // Additive opt-in, rather than a protocol major change. Absence means the raw event transport.
   eventTransport: z.object({ viewers: z.number().int().positive().optional() }).optional().catch(undefined),
   // Present only on a CLI-owned background process and only to an authenticated caller. This
@@ -96,7 +106,7 @@ const pairedDeviceSchema = z.object({
 })
 export type PairedDevice = z.infer<typeof pairedDeviceSchema>
 
-// The other half of the handshake. See docs/api-reference/transport.md § Versioning for why it is tolerant: a
+// The other half of the handshake. See docs/api-reference/versioning.md § Versioning for why it is tolerant: a
 // client that pairs successfully and then refuses the answer because it grew a field is a client that
 // cannot be upgraded past.
 export const pairResultSchema = z.object({

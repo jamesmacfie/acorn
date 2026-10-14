@@ -29,7 +29,8 @@ the whole plugin system in one page.
 | [architecture/control-plane.md](./architecture/control-plane.md) | The three parties, and what a control plane may hold. |
 | [conventions.md](./conventions.md) | The naming rules: files, folders, exports, state, contributions, packages. |
 | [api-reference.md](./api-reference.md) | The map of the `/v1` API and which page owns each route, header, and frame. |
-| [api-reference/transport.md](./api-reference/transport.md) | Namespaces, the broker deadline, pairing, protocol versioning, request processing, idempotency, and the error envelope. |
+| [api-reference/transport.md](./api-reference/transport.md) | Namespaces, the broker deadline, pairing, request processing, idempotency, and the error envelope. |
+| [api-reference/versioning.md](./api-reference/versioning.md) | The protocol major, the tolerant handshake, mixed builds and their 90-day window, and how a route is removed. |
 | [api-reference/core-routes.md](./api-reference/core-routes.md) | Every `/v1/core` route with its gate. |
 | [api-reference/plugin-routes.md](./api-reference/plugin-routes.md) | Each first-party plugin's route families, and the GitHub and Changes diff contracts. |
 | [api-reference/editor.md](./api-reference/editor.md) | Editor file reads, guarded writes, task-addressed file actions, and mixed-version behavior. |

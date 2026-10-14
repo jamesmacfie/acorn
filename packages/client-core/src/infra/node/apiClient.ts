@@ -279,7 +279,7 @@ const raise = (res: ApiResponse, fallback: string): never => {
 type ReadOptions = { signal?: AbortSignal; nodeId?: string | null; owner?: string }
 
 // A cast, not a parse. Within a protocol major every change is additive, so a read tolerates fields it
-// does not know about (docs/api-reference/transport.md § Versioning).
+// does not know about (docs/api-reference/versioning.md § Versioning).
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
   const res = await send(url, {
     signal: options.signal,

@@ -2,6 +2,7 @@ import { createSignal, For, Match, Show, Switch, type JSX } from 'solid-js'
 import type { NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import { nodes, nodeStatus } from '../../../infra/node/fleet'
 import { attachmentOf, createAttachments, detachNode } from '../../../infra/node/attachment'
+import { buildLabel, buildOf, compareBuild, createNodeBuilds } from '../../../infra/node/nodeBuild'
 import ProvidedNodes from './ProvidedNodes'
 import {
   fleetMutable,
@@ -12,7 +13,7 @@ import {
   renameNode,
 } from '../../../infra/node/fleetActions'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
-import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
+import { ACORN_BUILD, NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../../fleet/NodeChip'
 import { createNodePairing, NodePairingButtons, NodePairingPanel } from './NodePairingCode'
 import '../../fleet/nodes.css'
@@ -64,6 +65,7 @@ export default function NodesSettings() {
   // Who each node is attached to, if anyone (docs/node-enrollment.md). Fanned out, so the row for a
   // node that cannot answer simply has no attachment line.
   const [attachments, { refetch: refetchAttachments }] = createAttachments()
+  const [builds] = createNodeBuilds()
 
   const fail = (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause))
   const run = async (work: () => Promise<void>) => {
@@ -195,6 +197,7 @@ export default function NodesSettings() {
               const status = () => nodeStatus(node().nodeId)
               const mismatch = () => status()?.error?.code === 'identity_mismatch'
               const mine = () => renamed() === node().nodeId
+              const build = () => buildOf(builds(), node().nodeId)
               const pairing = createNodePairing(() => node().nodeId)
               // A plain box around the kit row, because a row takes no class: it carries the red border
               // an identity mismatch draws, and the rows' dividers (../../fleet/nodes.css).
@@ -332,6 +335,29 @@ export default function NodesSettings() {
                         </Alert>
                       )}
                     </Show>
+
+                    {/* The node's build beside this app's (docs/api-reference/versioning.md § Mixed builds).
+                        Builds of one protocol version work together, so a difference is a warning and
+                        not an error. A side run from source has no stamp to compare, so that
+                        difference is a plain line (`compareBuild`). */}
+                    <Switch>
+                      <Match when={compareBuild(build()) === 'same'}>
+                        <Text emphasis="muted" wrap>
+                          Build {ACORN_BUILD}, the same as this app.
+                        </Text>
+                      </Match>
+                      <Match when={compareBuild(build()) === 'unstamped'}>
+                        <Text emphasis="muted" wrap>
+                          This node runs {buildLabel(build() ?? null)}, and this app runs {buildLabel(ACORN_BUILD)}.
+                        </Text>
+                      </Match>
+                      <Match when={compareBuild(build()) === 'different'}>
+                        <Alert tone="warn">
+                          This node runs {buildLabel(build() ?? null)}, and this app runs {buildLabel(ACORN_BUILD)}.
+                          Plugins that came with the node's build will ask for your trust again.
+                        </Alert>
+                      </Match>
+                    </Switch>
 
                     {/* Unpair and revoke stay on the row rather than in a danger zone: this page is the
                         whole fleet, and each node's own actions belong beside its name. */}
