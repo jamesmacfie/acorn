@@ -9,6 +9,7 @@ import type {
 import { SELECTED_NODE_KEY, startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
 import { back, button, conversationTitle, openChat, rememberTask, tab } from '../test/sidebarUi'
+import { reportResize } from '../test/sidebarSetup'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -147,26 +148,46 @@ function node() {
               })),
           },
         }
-      case 'agents.profiles':
+      case 'agents.choices':
         return {
           result: {
             nodeId: 'n1',
-            profiles: [
+            choices: [
               {
                 providerId: 'codex',
                 profileId: 'codex',
+                customAgentId: null,
+                account: null,
                 label: 'Codex',
-                installed: false,
-                authenticated: null,
-                diagnostics: ['codex not found'],
+                text: 'Codex',
+                description: 'codex not found',
+                glyph: null,
+                accountIcon: null,
+                available: false,
               },
               {
                 providerId: 'claude',
                 profileId: 'claude-code',
+                customAgentId: null,
+                account: null,
                 label: 'Claude Code',
-                installed: true,
-                authenticated: true,
-                diagnostics: [],
+                text: 'Claude Code',
+                description: 'Available',
+                glyph: 'brand:agents/claude',
+                accountIcon: null,
+                available: true,
+              },
+              {
+                providerId: 'claude',
+                profileId: 'claude-code',
+                customAgentId: 'reviewer',
+                account: null,
+                label: 'Reviewer',
+                text: 'Reviewer',
+                description: 'Claude Code · opus',
+                glyph: 'rocket',
+                accountIcon: null,
+                available: true,
               },
             ],
           },
@@ -279,6 +300,35 @@ describe('conversation', () => {
       'AgentHi',
       'AgentA reply another client caused',
     ])
+  })
+
+  it('opens on the newest message and follows new ones until the reader scrolls up', async () => {
+    // jsdom lays nothing out, so the page's heights are set by hand as the transcript grows.
+    const page = document.scrollingElement ?? document.documentElement
+    const grow = (height: number) => {
+      Object.defineProperty(page, 'scrollHeight', { configurable: true, value: height })
+      reportResize()
+    }
+    const scrollTo = (top: number) => {
+      page.scrollTop = top
+      dispatchEvent(new Event('scroll'))
+    }
+    Object.defineProperty(page, 'clientHeight', { configurable: true, value: 500 })
+    const subject = mount()
+    scrollTo(0)
+    await openSession(subject)
+    grow(2000)
+    expect(page.scrollTop).toBe(2000)
+    // Reading history stops the following.
+    scrollTo(300)
+    grow(2600)
+    expect(page.scrollTop).toBe(300)
+    // Back at the bottom, within a little slack, it follows again.
+    scrollTo(2080)
+    grow(3000)
+    expect(page.scrollTop).toBe(3000)
+    delete (page as { scrollHeight?: number }).scrollHeight
+    delete (page as { clientHeight?: number }).clientHeight
   })
 
   it('renders messages as Markdown and a tool call as a state dot', async () => {
@@ -418,28 +468,47 @@ describe('conversation', () => {
     expect(draft(subject.root)).toBe('Still here')
   })
 
-  it('starts a chat with an installed profile and names the ones that cannot start', async () => {
+  it("starts a chat from the desktop's New picker, custom agents included, and says why a row can't start", async () => {
     const subject = mount()
     await openSession(subject)
     await back(subject.root)
-    button(subject.root, 'New chat')!.click()
-    await settle()
-    const options = [...subject.root.querySelectorAll('select[name="profile"] option')] as HTMLOptionElement[]
-    expect(options.map((option) => [option.textContent, option.disabled])).toEqual([
-      ['Codex (codex not found)', true],
-      ['Claude Code', false],
+    // The kit Picker draws its list in a portal on the page's body.
+    const rows = () => [...document.querySelectorAll<HTMLElement>('.repo-picker-row')]
+    const row = (name: string) =>
+      rows().find((each) => each.querySelector('.repo-picker-name > span')?.textContent === name)!
+    const open = async () => {
+      if (rows().length) return
+      button(subject.root, 'New chat')!.click()
+      await settle()
+    }
+    const pick = async (name: string) => {
+      await open()
+      row(name).querySelector('button')!.click()
+      await settle()
+    }
+    await open()
+    expect(
+      rows().map((each) => [each.querySelector('button')!.textContent, each.classList.contains('disabled')]),
+    ).toEqual([
+      ['Codexcodex not found', true],
+      ['Claude CodeAvailable', false],
+      ['ReviewerClaude Code · opus', false],
     ])
-    subject.state.answers.set('session.create', () => ({ error: { code: 'ambiguous_mutation', message: 'lost' } }))
-    button(subject.root, 'Start chat')!.click()
+    button(document.body, 'Refresh provider health')!.click()
     await settle()
+    expect(subject.state.requests.filter((request) => request.op === 'agents.choices').at(-1)).toMatchObject({
+      refresh: true,
+    })
+
+    subject.state.answers.set('session.create', () => ({ error: { code: 'ambiguous_mutation', message: 'lost' } }))
+    await pick('Reviewer')
     expect(subject.root.textContent).toContain("didn't confirm the new chat")
     subject.state.answers.delete('session.create')
-    button(subject.root, 'Start chat')!.click()
-    await settle()
+    await pick('Reviewer')
     const creates = subject.state.requests.filter((request) => request.op === 'session.create')
-    expect(creates.map((request) => [request.providerId, request.profileId])).toEqual([
-      ['claude', 'claude-code'],
-      ['claude', 'claude-code'],
+    expect(creates.map((request) => [request.providerId, request.customAgentId])).toEqual([
+      ['claude', 'reviewer'],
+      ['claude', 'reviewer'],
     ])
     expect(new Set(creates.map((request) => request.key)).size).toBe(1)
     expect(conversationTitle(subject.root)).toBe('New chat')

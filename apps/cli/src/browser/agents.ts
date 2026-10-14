@@ -17,9 +17,19 @@ import {
 } from '@acorn/plugin-agents/contract/appApproval.ts'
 import type { AgentLifecycleFrame } from '@acorn/plugin-agents/contract/lifecycle.ts'
 import { sessionModelSummary } from '@acorn/plugin-agents/contract/sessionModel.ts'
+import {
+  choiceAccountIcon,
+  choiceAvailable,
+  choiceDescription,
+  choiceGlyph,
+  choiceLabel,
+  choiceText,
+  newSessionChoices,
+  type CustomAgent,
+} from '@acorn/plugin-agents/contract/newSessionChoices.ts'
 import type {
   BridgeAgentHint,
-  BridgeAgentProfile,
+  BridgeAgentChoice,
   BridgeAgentRequest,
   BridgeAttachment,
   BridgeAttachmentRef,
@@ -30,8 +40,9 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 
 // The agents plugin's route bodies, narrowed to what the sidebar draws. The types are that plugin's
-// contract. The only code the CLI bundle takes from it is the app-access wording and the model line in
-// its contract, so the sidebar describes a grant and a session in the same words as the desktop.
+// contract. The only code the CLI bundle takes from it is the app-access wording, the model line, and
+// the New picker's rows in its contract, so the sidebar describes a grant, a session, and an agent to
+// start in the same words as the desktop.
 
 export const agentsRoute = '/v1/p/agents'
 export const sessionRoute = (sessionId: string) => `${agentsRoute}/sessions/${encodeURIComponent(sessionId)}`
@@ -62,14 +73,23 @@ const withoutAttachmentLines = (text: string): string =>
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 
-export const bridgeProfile = (provider: AgentProviderDescriptor): BridgeAgentProfile => ({
-  providerId: provider.id,
-  profileId: provider.profileId,
-  label: provider.label,
-  installed: provider.installed,
-  authenticated: provider.authenticated,
-  diagnostics: provider.diagnostics,
-})
+// The desktop's New rows, from the Node's harnesses and custom agents.
+export const bridgeChoices = (
+  providers: readonly AgentProviderDescriptor[],
+  agents: readonly CustomAgent[],
+): BridgeAgentChoice[] =>
+  newSessionChoices(providers, agents).map((choice) => ({
+    providerId: choice.provider.id,
+    profileId: choice.provider.profileId,
+    customAgentId: choice.agent?.id ?? null,
+    account: choice.account ?? null,
+    label: choiceLabel(choice),
+    text: choiceText(choice),
+    description: choiceDescription(choice),
+    glyph: choiceGlyph(choice) ?? null,
+    accountIcon: choiceAccountIcon(choice) ?? null,
+    available: choiceAvailable(choice),
+  }))
 
 export const bridgeSession = (session: AgentSession): BridgeAgentSession => ({
   id: session.id,

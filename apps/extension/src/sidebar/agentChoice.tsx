@@ -1,50 +1,42 @@
-import { For, Show, createSignal } from 'solid-js'
-import type { BridgeAgentProfile, BridgeAgentSession } from '@acorn/protocol/extensionBridge.ts'
+import { Show, createSignal } from 'solid-js'
+import type { BridgeAgentChoice, BridgeAgentSession } from '@acorn/protocol/extensionBridge.ts'
+import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import { CallFailure, isUncertain } from '../messages'
 import type { BridgeClient } from './bridgeClient'
 import { errorGuidance } from './guidance'
 
-// The profile a person may start a chat with, or why not.
-const unavailableReason = (profile: BridgeAgentProfile): string | null => {
-  if (!profile.installed) return profile.diagnostics[0] ?? 'Not installed on this Node'
-  if (profile.authenticated === false) return 'Not signed in on this Node'
-  return null
-}
+// Which row a start came from: the harness, the login, and the custom agent.
+const choiceKey = (choice: BridgeAgentChoice) =>
+  [choice.providerId, choice.account ?? '', choice.customAgentId ?? ''].join(':')
 
-// The agents a new conversation can start with on one Node, one per provider on its default account,
-// and the start itself. New chat and Start task both use it.
+// What a new conversation can start from on one Node, as the desktop's New picker lists it: each
+// harness or its named logins, then each custom agent. And the start itself.
 export function agentChoice(client: BridgeClient, nodeId: string) {
-  const [profiles, setProfiles] = createSignal<BridgeAgentProfile[] | null>(null)
-  const [choice, setChoice] = createSignal('')
+  const [choices, setChoices] = createSignal<BridgeAgentChoice[] | null>(null)
   const [starting, setStarting] = createSignal(false)
   const [problem, setProblem] = createSignal<string | null>(null)
   // An unconfirmed start keeps its key, so starting the same chat again can't make a second one.
   let pending: { key: string; taskId: string; choice: string } | null = null
 
-  const load = async () => {
-    if (profiles()) return
+  // `refresh` asks the Node to check its harnesses again, as the desktop's Refresh does.
+  const load = async (refresh = false) => {
+    if (choices() && !refresh) return
     setProblem(null)
     try {
-      const result = await client.call({ op: 'agents.profiles', nodeId })
-      setProfiles(result.profiles)
-      setChoice(result.profiles.find((profile) => !unavailableReason(profile))?.providerId ?? '')
+      const result = await client.call({ op: 'agents.choices', nodeId, ...(refresh ? { refresh } : {}) })
+      setChoices(result.choices)
     } catch (error) {
       setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
     }
   }
 
-  const chosen = () => {
-    const profile = profiles()?.find((candidate) => candidate.providerId === choice())
-    return profile && !unavailableReason(profile) ? profile : null
-  }
-
   // The new conversation, or null with `problem` saying why there isn't one.
-  const start = async (taskId: string): Promise<BridgeAgentSession | null> => {
-    const profile = chosen()
-    if (!profile || starting()) return null
-    const same = pending?.taskId === taskId && pending.choice === profile.providerId
+  const start = async (taskId: string, choice: BridgeAgentChoice): Promise<BridgeAgentSession | null> => {
+    if (!choice.available || starting()) return null
+    const same = pending?.taskId === taskId && pending.choice === choiceKey(choice)
     const key = same ? pending!.key : crypto.randomUUID()
-    pending = { key, taskId, choice: profile.providerId }
+    pending = { key, taskId, choice: choiceKey(choice) }
     setStarting(true)
     setProblem(null)
     try {
@@ -52,8 +44,10 @@ export function agentChoice(client: BridgeClient, nodeId: string) {
         op: 'session.create',
         nodeId,
         taskId,
-        providerId: profile.providerId,
-        profileId: profile.profileId,
+        providerId: choice.providerId,
+        profileId: choice.profileId,
+        ...(choice.customAgentId ? { customAgentId: choice.customAgentId } : {}),
+        ...(choice.account ? { account: choice.account } : {}),
         key,
       })
       pending = null
@@ -71,43 +65,54 @@ export function agentChoice(client: BridgeClient, nodeId: string) {
     }
   }
 
-  return { profiles, choice, setChoice, chosen, starting, problem, load, start }
+  return { choices, starting, problem, load, start }
 }
 
-// The agent picker, or why no agent can start.
-export function AgentSelect(props: { agents: ReturnType<typeof agentChoice> }) {
+// The desktop's New picker, in the kit's own Picker: a filter, each row's mark and account icon over
+// its name and what it runs, and a refresh that checks the harnesses again. A pick starts the chat.
+export function AgentPicker(props: {
+  agents: ReturnType<typeof agentChoice>
+  disabled: boolean
+  pick(choice: BridgeAgentChoice): void
+}) {
   return (
-    <Show
-      when={props.agents.profiles()}
-      fallback={<p class="quiet">{props.agents.problem() ? '' : 'Loading agents…'}</p>}
-    >
-      {(loaded) => (
-        <Show
-          when={loaded().some((profile) => !unavailableReason(profile))}
-          fallback={
-            <p class="notice">
-              No agent can start on this Node.{' '}
-              {loaded()
-                .map((profile) => `${profile.label}: ${unavailableReason(profile)}`)
-                .join('. ')}
-            </p>
-          }
-        >
-          <select name="profile" class="grow" onChange={(event) => props.agents.setChoice(event.currentTarget.value)}>
-            <For each={loaded()}>
-              {(profile) => (
-                <option
-                  value={profile.providerId}
-                  disabled={unavailableReason(profile) !== null}
-                  selected={profile.providerId === props.agents.choice()}
-                >
-                  {unavailableReason(profile) ? `${profile.label} (${unavailableReason(profile)})` : profile.label}
-                </option>
-              )}
-            </For>
-          </select>
-        </Show>
+    <Picker<BridgeAgentChoice>
+      label={props.agents.starting() ? 'Starting…' : 'New chat'}
+      ariaLabel="New chat"
+      size="sm"
+      placeholder="Filter agents…"
+      emptyText={
+        props.agents.choices() ? 'No managed providers available.' : 'Checking which agents this Node can run…'
+      }
+      results={(query) =>
+        (props.agents.choices() ?? []).filter((choice) =>
+          choice.label.toLowerCase().includes(query.trim().toLowerCase()),
+        )
+      }
+      leading={(choice) => (
+        <span class="agent-marks">
+          {/* An unmatched name draws as text, which is how a harness with no mark shows its initial. */}
+          <Icon name={choice.glyph ?? choice.label.slice(0, 1).toUpperCase()} tone="brand" />
+          <Show when={choice.accountIcon}>{(icon) => <Icon name={icon()} title={choice.label} />}</Show>
+        </span>
       )}
-    </Show>
+      rowLabel={(choice) => choice.text}
+      rowDescription={(choice) => choice.description}
+      isActive={() => false}
+      isDisabled={(choice) => !choice.available || props.agents.starting()}
+      disabled={props.disabled}
+      onSelect={props.pick}
+      tools={
+        <button
+          type="button"
+          class="icon"
+          aria-label="Refresh provider health"
+          title="Refresh provider health"
+          onClick={() => void props.agents.load(true)}
+        >
+          <Icon name="refresh-cw" />
+        </button>
+      }
+    />
   )
 }

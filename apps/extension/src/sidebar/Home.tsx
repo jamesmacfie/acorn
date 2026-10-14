@@ -1,5 +1,6 @@
-import { For, Match, Show, Switch, createEffect } from 'solid-js'
+import { For, Match, Show, Switch, onMount } from 'solid-js'
 import type {
+  BridgeAgentChoice,
   BridgeAgentSession,
   BridgeHandoff,
   BridgePendingRequest,
@@ -12,7 +13,7 @@ import { runtimeIcon, runtimeTone } from '@acorn/plugin-agents/contract/runtimeS
 import { itemTaskLink, projectLink } from '../acornLinks'
 import { onHandoffPage, pageHandoffs, type PageHandoff } from '../handoffs'
 import type { PageTask } from '../taskPages'
-import { AgentSelect, agentChoice } from './agentChoice'
+import { AgentPicker, agentChoice } from './agentChoice'
 import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { Handoff } from './Handoff'
@@ -43,12 +44,8 @@ export function ThisPage(props: {
   startHandoff(handoff: PageHandoff): void
   dismissHandoff(): void
   openHandoffTask(projectId: string, taskId: string, capture: PageCapture): void
-  startedHandoffTask(
-    projectId: string,
-    taskId: string,
-    sessionId: string,
-    draft: { text: string; capture: PageCapture },
-  ): void
+  createdHandoffTask(projectId: string, taskId: string, capture: PageCapture): void
+  startedHandoffWorkflow(projectId: string, taskId: string, runId: string): void
   waitingContext: PageCapture | null
   dropWaitingContext(): void
   projects: readonly BridgeProject[] | null
@@ -83,7 +80,8 @@ export function ThisPage(props: {
               online={props.online}
               opensLinks={props.opensLinks}
               openTask={props.openHandoffTask}
-              startedTask={props.startedHandoffTask}
+              createdTask={props.createdHandoffTask}
+              startedWorkflow={props.startedHandoffWorkflow}
               dismiss={props.dismissHandoff}
             />
           )}
@@ -290,7 +288,7 @@ const providerMark = (providerId: string) =>
 
 // Every conversation in the Agents task, grouped by kind. A row is the desktop's: the state as an icon,
 // the title, and the provider, model, and state in words, with a mark when the agent waits on the
-// person. A row opens it, and New chat starts another.
+// person. A row opens it, and New chat's picker starts another.
 export function Agents(props: {
   client: BridgeClient
   nodeId: string
@@ -299,8 +297,6 @@ export function Agents(props: {
   sessions: readonly BridgeAgentSession[] | null
   requests: readonly BridgePendingRequest[]
   open(sessionId: string): void
-  newChat: boolean
-  setNewChat(open: boolean): void
   started(session: BridgeAgentSession): void
 }) {
   const waiting = (sessionId: string) => props.requests.some((request) => request.sessionId === sessionId)
@@ -363,54 +359,33 @@ export function Agents(props: {
         nodeId={props.nodeId}
         taskId={props.taskId}
         online={props.online}
-        open={props.newChat}
-        setOpen={props.setNewChat}
         started={props.started}
       />
     </section>
   )
 }
 
-// Starts a conversation in one task with the agent the person picks.
+// Starts a conversation in one task from the agent the person picks.
 function NewChat(props: {
   client: BridgeClient
   nodeId: string
   taskId: string
   online: boolean
-  open: boolean
-  setOpen(open: boolean): void
   started(session: BridgeAgentSession): void
 }) {
   const agents = agentChoice(props.client, props.nodeId)
-  createEffect(() => props.open && void agents.load())
+  onMount(() => void agents.load())
 
-  const start = async () => {
-    const session = await agents.start(props.taskId)
+  const start = async (choice: BridgeAgentChoice) => {
+    const session = await agents.start(props.taskId, choice)
     if (session) props.started(session)
   }
 
   return (
     <>
-      <Show
-        when={props.open}
-        fallback={
-          <button type="button" class="quiet" onClick={() => props.setOpen(true)}>
-            New chat
-          </button>
-        }
-      >
-        <div class="row">
-          <AgentSelect agents={agents} />
-          <Show when={agents.chosen()}>
-            <button type="button" disabled={agents.starting() || !props.online} onClick={() => void start()}>
-              {agents.starting() ? 'Starting…' : 'Start chat'}
-            </button>
-          </Show>
-          <button type="button" class="quiet" onClick={() => props.setOpen(false)}>
-            Cancel
-          </button>
-        </div>
-      </Show>
+      <div class="row">
+        <AgentPicker agents={agents} disabled={!props.online} pick={(choice) => void start(choice)} />
+      </div>
       <Show when={agents.problem()}>
         {(message) => (
           <p class="problem" role="alert">

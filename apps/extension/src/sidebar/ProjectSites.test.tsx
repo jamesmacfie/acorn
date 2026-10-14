@@ -488,7 +488,7 @@ describe('This page', () => {
     fake.navigate('https://github.com/acme/web/pull/9')
     await settle(30)
     expect(root.querySelector('[aria-label="Conversation"]')).toBeNull()
-    expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'Cancel')).toBeDefined()
+    expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'New chat')).toBeDefined()
     expect(fake.storage.get('destination:n1')).toMatchObject({ taskId: 't2' })
     await tab(root, 'Home')
     expect(thisPage(root).querySelector('strong')!.textContent).toBe('Speed up search')
@@ -540,7 +540,7 @@ describe('This page', () => {
     await settle(30)
     expect(root.querySelector('.view[aria-label="Settings"]')).toBeNull()
     // The new-chat picker is Agents'; Home names the page waiting for the chat.
-    expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'Cancel')).toBeDefined()
+    expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'New chat')).toBeDefined()
     await tab(root, 'Home')
     expect(thisPage(root).querySelector('strong')!.textContent).toBe('Fix login')
     expect(root.querySelector('[aria-label="Waiting context"]')!.textContent).toContain('Page goes into the draft')

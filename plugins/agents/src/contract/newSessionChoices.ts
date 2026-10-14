@@ -1,6 +1,11 @@
-import type { AgentProviderDescriptor } from '../../contract/wire.ts'
-import { accountIcon, accountLabel } from '../../shared/accounts'
-import type { CustomAgent } from '../../shared/customAgents'
+import type { AgentProviderDescriptor } from './wire.ts'
+import { accountIcon, accountLabel } from '../shared/accounts'
+import type { CustomAgent } from '../shared/customAgents'
+
+export type { CustomAgent }
+
+// The rows of New: the desktop's pane picker and palette, and the browser extension's new-chat picker,
+// whose native host builds them from the same two lists.
 
 /** One row of New: a harness on its own, one of its extra accounts, or a custom agent and the harness
  *  it runs on. */

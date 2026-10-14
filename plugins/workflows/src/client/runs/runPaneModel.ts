@@ -27,6 +27,7 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { activeNodeId, queryOwner } from '@acorn/plugin-api/client'
 import { createWorkflowApi } from '../workflowsClient'
 import { workflowRefreshQueue } from '../refreshQueue'
+import { runIsLive } from '../../contract/statusDisplay.ts'
 
 export const WORKFLOWS_PANE_ID = 'workflows'
 
@@ -58,8 +59,7 @@ const parseDef = (raw: string | undefined): WorkflowDef | null => {
   }
 }
 
-const LIVE_RUN = new Set(['running', 'gated', 'cancelling'])
-export const isLiveRun = (run: WorkflowRunRow | undefined): boolean => !!run && LIVE_RUN.has(run.status)
+export const isLiveRun = (run: WorkflowRunRow | undefined): boolean => !!run && runIsLive(run.status)
 
 export function createRunPaneModel(task: Task) {
   const queryClient = useQueryClient()

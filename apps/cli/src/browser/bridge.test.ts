@@ -84,6 +84,14 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     configWrites: [] as { projectId: string; patch: unknown }[],
     // Every path the host asked for, in order.
     paths: [] as string[],
+    // The body of the last session start.
+    lastSessionBody: null as unknown,
+    // A task's sessions, where a test names them. Any other task lists s1.
+    taskSessions: new Map<string, Record<string, unknown>[]>(),
+    // The workflows plugin's definitions, the runs it answers, and every start with its key.
+    workflowDefs: [] as Record<string, unknown>[],
+    workflowStartAnswer: { runId: 'run-1' } as Record<string, unknown>,
+    workflowStarts: [] as { key: string; body: unknown }[],
   }
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
     state.paths.push(req.url ?? '')
@@ -175,13 +183,80 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
       })
     if (url.pathname === '/v1/p/agents/sessions' && req.method === 'GET') {
       state.lastQuery = url.search
-      return reply(200, { sessions: [agentSession('s1')], delegations: [], nextCursor: null })
+      const sessions = state.taskSessions.get(url.searchParams.get('taskId')!) ?? [agentSession('s1')]
+      return reply(200, { sessions, delegations: [], nextCursor: null })
     }
+    if (url.pathname === '/v1/p/workflows/defs' && url.searchParams.get('workspaceId') === 'w')
+      return reply(200, { workflows: state.workflowDefs, errors: [] })
+    if (url.pathname === '/v1/p/workflows/tasks/t1/workflows' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      state.workflowStarts.push({ key: String(req.headers['idempotency-key']), body: JSON.parse(body) })
+      return reply(200, state.workflowStartAnswer)
+    }
+    if (url.pathname === '/v1/p/workflows/tasks/t1/workflows/runs')
+      return reply(200, [
+        { id: 'run-old', taskId: 't1', name: 'Older', status: 'done', createdAt: 1, updatedAt: 2, posture: 'gated' },
+        { id: 'run-1', taskId: 't1', name: 'Review', status: 'running', createdAt: 5, updatedAt: 6, posture: 'gated' },
+      ])
+    if (url.pathname === '/v1/p/workflows/workflows/runs/run-1/steps')
+      return reply(200, [
+        {
+          id: 'step-1',
+          name: 'Explain',
+          status: 'done',
+          agentSessionId: 'w1',
+          inputsJson: null,
+          createdAt: 1,
+          updatedAt: 9,
+        },
+        {
+          id: 'step-2',
+          name: 'Check',
+          status: 'running',
+          agentSessionId: null,
+          inputsJson: null,
+          createdAt: 9,
+          updatedAt: 9,
+        },
+        {
+          id: 'step-3',
+          name: 'Elsewhere',
+          status: 'running',
+          agentSessionId: null,
+          inputsJson: JSON.stringify({ childTaskId: 't-child' }),
+          createdAt: 9,
+          updatedAt: 9,
+        },
+        {
+          id: 'step-4',
+          name: 'Gate',
+          status: 'pending',
+          agentSessionId: null,
+          inputsJson: null,
+          createdAt: 9,
+          updatedAt: 9,
+        },
+      ])
     if (url.pathname === '/v1/p/agents/sessions' && req.method === 'POST') {
       let body = ''
       for await (const chunk of req) body += chunk
+      state.lastSessionBody = JSON.parse(body)
       return reply(200, { ...agentSession('s2'), ...JSON.parse(body), config: {} })
     }
+    if (url.pathname === '/v1/p/agents/custom-agents')
+      return reply(200, [
+        {
+          id: 'reviewer',
+          name: 'Reviewer',
+          providerId: 'claude',
+          options: { model: 'opus' },
+          glyph: 'rocket',
+          instructions: '',
+          source: { kind: 'user' },
+        },
+        { id: 'orphan', name: 'Orphan', providerId: 'gone', options: {}, instructions: '', source: { kind: 'user' } },
+      ])
     if (url.pathname === '/v1/p/agents/sessions/s1')
       return reply(200, {
         session: agentSession('s1'),
@@ -593,19 +668,38 @@ describe('browser bridge agent operations', () => {
       projectId: 'p1',
       tasks: [{ id: 't1', title: 'Fix it', branch: 'fix' }],
     })
-    expect(await call({ op: 'agents.profiles', nodeId: 'node-a' })).toEqual({
+    // The desktop's New rows: the harness, then each custom agent on a harness this Node registers.
+    expect(await call({ op: 'agents.choices', nodeId: 'node-a' })).toEqual({
       nodeId: 'node-a',
-      profiles: [
+      choices: [
         {
           providerId: 'claude',
           profileId: 'claude-code',
+          customAgentId: null,
+          account: null,
           label: 'Claude Code',
-          installed: true,
-          authenticated: false,
-          diagnostics: ['Not signed in'],
+          text: 'Claude Code',
+          description: 'Available',
+          glyph: null,
+          accountIcon: null,
+          available: true,
+        },
+        {
+          providerId: 'claude',
+          profileId: 'claude-code',
+          customAgentId: 'reviewer',
+          account: null,
+          label: 'Reviewer',
+          text: 'Reviewer',
+          description: 'Claude Code · opus',
+          glyph: 'rocket',
+          accountIcon: null,
+          available: true,
         },
       ],
     })
+    await call({ op: 'agents.choices', nodeId: 'node-a', refresh: true })
+    expect(node.state.paths).toContain('/v1/p/agents/providers?force=true')
     const listed = await call({ op: 'sessions.list', nodeId: 'node-a', taskId: 't1' })
     expect(listed.sessions.map((session: { id: string }) => session.id)).toEqual(['s1'])
     expect(listed.sessions[0]).not.toHaveProperty('config')
@@ -625,7 +719,7 @@ describe('browser bridge agent operations', () => {
   })
 
   it('starts a session with the normal defaults', async () => {
-    const { call } = await selected()
+    const { call, node } = await selected()
     const created = await call({
       op: 'session.create',
       nodeId: 'node-a',
@@ -635,6 +729,19 @@ describe('browser bridge agent operations', () => {
       key: 'create-key-1',
     })
     expect(created).toMatchObject({ nodeId: 'node-a', session: { id: 's2', taskId: 't1', kind: 'interactive' } })
+    expect(node.state.lastSessionBody).not.toHaveProperty('customAgentId')
+    // A custom agent's or a named login's row names it, and the Node applies it.
+    await call({
+      op: 'session.create',
+      nodeId: 'node-a',
+      taskId: 't1',
+      providerId: 'claude',
+      profileId: 'claude-code',
+      customAgentId: 'reviewer',
+      account: 'work',
+      key: 'create-key-2',
+    })
+    expect(node.state.lastSessionBody).toMatchObject({ customAgentId: 'reviewer', account: 'work', config: {} })
   })
 
   it('reports an unanswered write as uncertain, and a retry with the same key makes no second turn', async () => {
@@ -881,6 +988,85 @@ describe('browser bridge agent operations', () => {
     ]
     await call({ op: 'turn.submit', nodeId: 'node-a', sessionId: 's1', input, key: 'turn-key-2' })
     expect(node.state.lastTurnInput).toEqual(input)
+  })
+})
+
+describe('browser bridge workflows', () => {
+  async function selected() {
+    const subject = await paired()
+    await subject.call({ op: 'node.select', nodeId: 'node-a' })
+    return subject
+  }
+  const definition = (over: Record<string, unknown>) => ({ id: 'd', name: 'D', source: 'repo', steps: [], ...over })
+
+  it("lists what a task in the project can run, by the desktop's rule, with each one's inputs", async () => {
+    const { call, node } = await selected()
+    node.state.workflowDefs = [
+      definition({ id: 'review', name: 'Review', projectId: 'p1', inputs: [{ name: 'issue', required: true }] }),
+      definition({ id: 'shared', name: 'Shared', source: 'database', projectId: null, publishedRevision: 2 }),
+      definition({ id: 'draft', source: 'database', publishedRevision: null }),
+      definition({ id: 'broken', problems: ['Step 2 names no profile.'] }),
+      definition({ id: 'other', projectId: 'p2' }),
+    ]
+    expect(await call({ op: 'workflows.list', nodeId: 'node-a', projectId: 'p1' })).toEqual({
+      nodeId: 'node-a',
+      projectId: 'p1',
+      workflows: [
+        { id: 'review', name: 'Review', inputs: [{ name: 'issue', required: true }] },
+        { id: 'shared', name: 'Shared', inputs: [] },
+      ],
+    })
+    await expect(call({ op: 'workflows.list', nodeId: 'node-a', projectId: 'gone' })).rejects.toMatchObject({
+      code: 'not_found',
+    })
+  })
+
+  it('starts a run with its key and inputs, and passes on a refusal in words', async () => {
+    const { call, node } = await selected()
+    const start = { op: 'workflow.start', nodeId: 'node-a', taskId: 't1', defId: 'review', key: 'start-key-1' }
+    expect(await call({ ...start, inputs: { issue: 'Flaky test' } })).toEqual({
+      nodeId: 'node-a',
+      taskId: 't1',
+      runId: 'run-1',
+    })
+    expect(node.state.workflowStarts).toEqual([
+      { key: 'start-key-1', body: { defId: 'review', inputs: { issue: 'Flaky test' } } },
+    ])
+    node.state.workflowStartAnswer = { error: 'needs-trust' }
+    await expect(call(start)).rejects.toMatchObject({ code: 'node_error', message: expect.stringContaining('trust') })
+    node.state.workflowStartAnswer = {}
+    await expect(call(start)).rejects.toMatchObject({ code: 'ambiguous_mutation' })
+  })
+
+  it("lists a task's runs newest first, and finds each step's conversation in its own task", async () => {
+    const { call, node } = await selected()
+    expect(await call({ op: 'workflow.runs', nodeId: 'node-a', taskId: 't1' })).toEqual({
+      nodeId: 'node-a',
+      taskId: 't1',
+      runs: [
+        { id: 'run-1', name: 'Review', status: 'running', createdAt: 5, updatedAt: 6 },
+        { id: 'run-old', name: 'Older', status: 'done', createdAt: 1, updatedAt: 2 },
+      ],
+    })
+    // The finished step names its session; a running one is found by the step the agents plugin wrote
+    // on it, here and in the task the runner gave a step of its own.
+    node.state.taskSessions.set('t1', [
+      { ...agentSession('w1'), kind: 'workflow' },
+      { ...agentSession('w2'), kind: 'workflow', config: { workflowStepId: 'step-2' } },
+    ])
+    node.state.taskSessions.set('t-child', [
+      { ...agentSession('w3'), taskId: 't-child', config: { workflowStepId: 'step-3' } },
+    ])
+    const read = await call({ op: 'workflow.steps', nodeId: 'node-a', taskId: 't1', runId: 'run-1' })
+    expect(
+      read.steps.map((step: { id: string; session: { id: string } | null }) => [step.id, step.session?.id ?? null]),
+    ).toEqual([
+      ['step-1', 'w1'],
+      ['step-2', 'w2'],
+      ['step-3', 'w3'],
+      ['step-4', null],
+    ])
+    expect(read.steps[0]).toMatchObject({ name: 'Explain', status: 'done', createdAt: 1, updatedAt: 9 })
   })
 })
 

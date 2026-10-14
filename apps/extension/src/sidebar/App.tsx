@@ -28,11 +28,13 @@ const BRIDGE_RECHECK_MS = 3_000
 // Online, or online with live updates paused: either way the Node answers requests.
 const connected = (status: NodeStatus | null) => status?.state === 'online' || status?.state === 'degraded'
 
-const TABS = [
+type View = 'home' | 'agents' | 'workflows' | 'settings'
+const TABS: { id: View; label: string; glyph: string }[] = [
   { id: 'home', label: 'Home', glyph: 'house' },
   { id: 'agents', label: 'Agents', glyph: 'bot' },
+  { id: 'workflows', label: 'Workflows', glyph: 'workflow' },
   { id: 'settings', label: 'Settings', glyph: 'settings' },
-] as const
+]
 
 // `opensLinks` says whether this build runs beside a desktop that opens `acorn://` links.
 export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
@@ -79,18 +81,24 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [showTask, setShowTask] = createSignal<{ chat: { url: string; title: string } | null } | null>(null)
   // A handed-off item's context, waiting for the conversation the person opens next.
   const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
-  // The bottom bar's choice. Home and Agents share one Workspace; Settings replaces it, and the
-  // Workspace restores from storage when Settings closes.
-  const [view, setView] = createSignal<'home' | 'agents' | 'settings'>('home')
+  // The bottom bar's choice. Home, Agents, and Workflows share one Workspace; Settings replaces it, and
+  // the Workspace restores from storage when Settings closes. Workflows shows only for a task with runs.
+  const [view, setView] = createSignal<View>('home')
+  const [hasWorkflows, setHasWorkflows] = createSignal(false)
+  const tabs = () => TABS.filter((tab) => tab.id !== 'workflows' || hasWorkflows() || view() === 'workflows')
+  const workspaceTab = () => {
+    const shown = view()
+    return shown === 'settings' ? 'home' : shown
+  }
   // Whether the person has picked a tab since the panel opened. Until then, a remembered conversation
   // reopens on Agents; after, it waits there without moving them.
   let picked = false
-  // What Agents names in the top bar: the list and its count, or the open conversation.
+  // What Agents or Workflows names in the top bar: the list and its count, or the open conversation.
   const [agentsHeading, setAgentsHeading] = createSignal<Heading | null>(null)
   const heading = (): Heading => {
     if (view() === 'settings') return { title: 'Settings' }
     if (view() === 'home') return { title: 'Home' }
-    return agentsHeading() ?? { title: 'Agents' }
+    return agentsHeading() ?? { title: view() === 'workflows' ? 'Workflows' : 'Agents' }
   }
   // The origins the branch marker is hidden on. Its own menu hides it, and This page shows it again.
   const [hiddenMarkers, setHiddenMarkers] = createSignal<string[]>([])
@@ -313,8 +321,10 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   hint={hint()}
                   reconnects={reconnects()}
                   projectChanges={projectChanges()}
-                  tab={view() === 'agents' ? 'agents' : 'home'}
+                  tab={workspaceTab()}
                   showAgents={() => setView('agents')}
+                  showWorkflows={() => setView('workflows')}
+                  hasWorkflows={setHasWorkflows}
                   resumed={() => !picked && setView('agents')}
                   heading={setAgentsHeading}
                   pageUrl={pageUrl()}
@@ -363,7 +373,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
       </Show>
       {/* The desktop rail's controls, laid along the bottom edge, Settings apart at the far end. */}
       <nav class="rail" aria-label="Navigation">
-        <For each={TABS}>
+        <For each={tabs()}>
           {(tab) => (
             <RailTab
               glyph={tab.glyph}

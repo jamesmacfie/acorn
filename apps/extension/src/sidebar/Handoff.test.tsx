@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'solid-js/web'
-import type { BridgeAgentSession, BridgeHandoffItem } from '@acorn/protocol/extensionBridge.ts'
+import type {
+  BridgeAgentSession,
+  BridgeHandoffItem,
+  BridgePageTask,
+  BridgeWorkflowStep,
+} from '@acorn/protocol/extensionBridge.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
-import { back, button, conversationTitle, idle, openChat, openSettings } from '../test/sidebarUi'
+import { back, button, conversationTitle, idle, openSettings, pick, selected } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -62,6 +67,9 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
     tasks: { p1: [{ id: 't1', title: 'Existing work', branch: null }], p2: [] } as Record<string, unknown[]>,
     sessions: { t1: [session('s1', 't1')] } as Record<string, BridgeAgentSession[]>,
     requests: [] as Request[],
+    // The tasks the page belongs to. A new task holds the item, so the page becomes its page.
+    pageTasks: [] as BridgePageTask[],
+    steps: [] as BridgeWorkflowStep[],
   }
   const answer = (request: Request): unknown => {
     switch (request.op) {
@@ -77,10 +85,36 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
       case 'handoff.resolve':
         return { nodeId: 'n1', url: request.url, items: state.items }
       case 'handoff.create': {
-        const task = { id: 't-new', title: 'Fix the flaky test', branch: 'fix', projectId: request.projectId }
+        const task = { id: 't-new', title: 'Fix the flaky test', branch: 'fix', projectId: request.projectId as string }
         state.tasks[request.projectId as string] = [...state.tasks[request.projectId as string]!, task]
+        state.pageTasks = [
+          { ...task, pages: [{ origin: 'https://tracker.example', pathPrefix: '/items/42', source: 'tracker' }] },
+        ]
         return { nodeId: 'n1', task, created: true }
       }
+      case 'tasks.pages':
+        return { nodeId: 'n1', tasks: state.pageTasks }
+      case 'workflows.list':
+        return {
+          nodeId: 'n1',
+          projectId: request.projectId,
+          workflows: [
+            { id: 'review', name: 'PR review', inputs: [{ name: 'issue', required: true }, { name: 'focus' }] },
+          ],
+        }
+      case 'workflow.start':
+        return { nodeId: 'n1', taskId: request.taskId, runId: 'run-1' }
+      case 'workflow.runs':
+        return {
+          nodeId: 'n1',
+          taskId: request.taskId,
+          runs:
+            request.taskId === 't-new'
+              ? [{ id: 'run-1', name: 'PR review', status: 'done', createdAt: 1, updatedAt: 2 }]
+              : [],
+        }
+      case 'workflow.steps':
+        return { nodeId: 'n1', runId: request.runId, steps: state.steps }
       case 'projects.list':
         return {
           nodeId: 'n1',
@@ -107,17 +141,21 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
           requests: [],
         }
       }
-      case 'agents.profiles':
+      case 'agents.choices':
         return {
           nodeId: 'n1',
-          profiles: [
+          choices: [
             {
               providerId: 'claude',
               profileId: 'claude-code',
+              customAgentId: null,
+              account: null,
               label: 'Claude Code',
-              installed: true,
-              authenticated: true,
-              diagnostics: [],
+              text: 'Claude Code',
+              description: 'Available',
+              glyph: null,
+              accountIcon: null,
+              available: true,
             },
           ],
         }
@@ -133,6 +171,8 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
     const request = raw as Request
     state.requests.push(request)
     host.send({ v: 1, id: request.id, ok: true, result: answer(request) })
+    // As the Node announces a new task, so the page's task list is read again.
+    if (request.op === 'handoff.create') host.send({ v: 1, event: 'tasks', nodeId: 'n1' })
   }
   startBackground(fake.api, 'com.acorn.browser_bridge')
   const root = document.createElement('div')
@@ -148,12 +188,13 @@ const siteAccess = (root: HTMLElement) =>
 const captures = (root: HTMLElement) =>
   [...root.querySelectorAll('[data-testid="capture"]')].map((row) => row.textContent)
 
-// A task chip's Start task click, as the background reports it once the panel is open.
-async function clickSiteButton(fake: ReturnType<typeof fakeBrowser>) {
+// A choice from the task chip's Start task menu, as the background reports it once the panel is open.
+async function clickSiteButton(fake: ReturnType<typeof fakeBrowser>, start: 'task' | 'workflow' = 'task') {
   fake.activeTab = { ...fake.activeTab, url: PAGE }
+  fake.activate()
   fake.storage.set('handoffs', { nodeId: 'n1', handoffs: [handoff] })
   await settle()
-  fake.sendFromPage({ type: 'acorn:handoff', key: 'tracker:item' })
+  fake.sendFromPage({ type: 'acorn:handoff', key: 'tracker:item', start })
   await settle(20)
 }
 
@@ -167,7 +208,7 @@ describe('a handoff in the sidebar', () => {
     expect(root.textContent).toContain('acme/widget#42')
     expect(state.requests.find((request) => request.op === 'handoff.resolve')).toMatchObject({ url: PAGE })
     // A task holds the item, so there is nothing to start.
-    expect(button(root, 'Start task')).toBeUndefined()
+    expect(button(root, 'Create task')).toBeUndefined()
     button(root, 'Chat')!.click()
     await settle(30)
     expect(root.querySelector('header .eyebrow')!.textContent).toBe('Existing work')
@@ -178,19 +219,14 @@ describe('a handoff in the sidebar', () => {
     expect(state.requests.some((request) => request.op === 'turn.submit')).toBe(false)
   })
 
-  it('starts a task with a chat whose draft holds the first message and the item, and sends nothing', async () => {
+  it('creates the task and shows it on Home, with the item waiting for its first conversation', async () => {
     const { fake, root, state } = mount()
     await settle(20)
     await clickSiteButton(fake)
-    expect(root.textContent).toContain('Nothing goes to the agent until you press Send.')
-    const project = root.querySelector<HTMLSelectElement>('select[name="handoff-project"]')!
-    project.value = 'p2'
-    project.dispatchEvent(new Event('change', { bubbles: true }))
-    const message = root.querySelector<HTMLTextAreaElement>('textarea[name="first-message"]')!
-    expect(message.value).toBe('Read acme/widget#42 (Fix the flaky test) and list what is left to do.')
-    message.value = 'Find why the test is flaky.'
-    message.dispatchEvent(new Event('input', { bubbles: true }))
-    button(root, 'Start task')!.click()
+    expect(selected(root, 'handoff-start')).toBe('task')
+    expect(root.textContent).toContain('The item waits for the first conversation you open.')
+    await pick(root, 'handoff-project', 'p2')
+    button(root, 'Create task')!.click()
     await settle(40)
     expect(state.requests.find((request) => request.op === 'handoff.create')).toMatchObject({
       identifier: 'acme/widget#42',
@@ -198,43 +234,88 @@ describe('a handoff in the sidebar', () => {
       projectId: 'p2',
       url: PAGE,
     })
-    expect(state.requests.find((request) => request.op === 'session.create')).toMatchObject({
-      taskId: 't-new',
-      providerId: 'claude',
-      profileId: 'claude-code',
-    })
-    expect(root.querySelector('header .eyebrow')!.textContent).toBe('Fix the flaky test')
-    expect(conversationTitle(root)).toBe('Chat s-new')
-    expect(root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!.value).toBe(
-      'Find why the test is flaky.',
+    expect(root.querySelector('[aria-label="Handoff"]')).toBeNull()
+    expect(root.querySelector('header h1')!.textContent).toBe('Home')
+    expect(root.querySelector('[aria-label="Page tasks"]')!.textContent).toContain('Fix the flaky test')
+    expect(root.querySelector('[aria-label="Waiting context"]')!.textContent).toContain('Fix the flaky test')
+    // No conversation was started, and nothing went to an agent.
+    expect(state.requests.some((request) => request.op === 'session.create' || request.op === 'turn.submit')).toBe(
+      false,
     )
-    expect(captures(root)).toEqual([expect.stringContaining('Item · Fix the flaky test')])
-    expect(state.requests.some((request) => request.op === 'turn.submit')).toBe(false)
   })
 
-  it('starts the task again with the same keys after the Node left the chat unconfirmed', async () => {
+  it("starts a workflow in a new task with what the item fills in, then opens a step's conversation", async () => {
     const { fake, root, state } = mount()
-    let failChat = true
+    state.steps = [
+      {
+        id: 'step-1',
+        name: 'Explain the PR',
+        status: 'done',
+        createdAt: 0,
+        updatedAt: 88_000,
+        session: session('w1', 't-new'),
+      },
+      { id: 'step-2', name: 'Final analysis', status: 'pending', createdAt: 0, updatedAt: 0, session: null },
+    ]
+    state.sessions['t-new'] = [{ ...session('w1', 't-new'), kind: 'workflow' }]
+    await settle(20)
+    await clickSiteButton(fake, 'workflow')
+    await settle(20)
+    expect(selected(root, 'handoff-start')).toBe('workflow')
+    expect(state.requests.find((request) => request.op === 'workflows.list')).toMatchObject({ projectId: 'p1' })
+    // The item's title and context fill `issue` by the desktop's rule; `focus` is left to the person.
+    const input = (name: string) => root.querySelector<HTMLTextAreaElement>(`textarea[name="input-${name}"]`)!
+    expect(input('issue').value).toBe('Fix the flaky test\n\nThe test waits on a timer.')
+    expect(input('focus').value).toBe('')
+    expect(root.textContent).toContain('The workflow starts its agents straight away.')
+    button(root, 'Start workflow')!.click()
+    await settle(60)
+    expect(state.requests.find((request) => request.op === 'workflow.start')).toMatchObject({
+      taskId: 't-new',
+      defId: 'review',
+      inputs: { issue: 'Fix the flaky test\n\nThe test waits on a timer.' },
+    })
+    expect(root.querySelector('header h1')!.textContent).toBe('Workflows')
+    expect(button(root.querySelector('nav')!, 'Workflows')).toBeDefined()
+    // The kit's own header and rows, as the desktop draws them.
+    expect(root.querySelector('.section-header')!.textContent).toBe('Runs1')
+    expect(root.querySelector('[aria-label="Runs"] .ui-row[data-selected]')!.textContent).toContain('PR review')
+    const steps = () => [...root.querySelectorAll<HTMLElement>('[aria-label="Steps"] .ui-row')]
+    expect(steps().map((row) => row.textContent)).toEqual(['Explain the PR1m28s', 'Final analysis'])
+    // A step that hasn't run has no conversation to open.
+    expect(steps().map((row) => row.getAttribute('role'))).toEqual(['button', null])
+    steps()[0]!.click()
+    await settle(30)
+    expect(conversationTitle(root)).toBe('Explain the PR')
+    expect(root.querySelector('header .eyebrow')!.textContent).toBe('PR review')
+    await back(root)
+    expect(root.querySelector('[aria-label="Steps"]')).not.toBeNull()
+  })
+
+  it('starts the task and its workflow again with the same keys after the Node left the run unconfirmed', async () => {
+    const { fake, root, state } = mount()
+    let failStart = true
     const answer = fake.onNativeMessage
     fake.onNativeMessage = (raw, host) => {
       const request = raw as Request
-      if (request.op !== 'session.create' || !failChat) return answer(raw, host)
-      failChat = false
+      if (request.op !== 'workflow.start' || !failStart) return answer(raw, host)
+      failStart = false
       state.requests.push(request)
       host.send({ v: 1, id: request.id, ok: false, error: { code: 'ambiguous_mutation', message: 'lost' } })
     }
     await settle(20)
-    await clickSiteButton(fake)
-    button(root, 'Start task')!.click()
+    await clickSiteButton(fake, 'workflow')
+    await settle(20)
+    button(root, 'Start workflow')!.click()
     await settle(30)
-    expect(root.textContent).toContain("The Node didn't confirm the new chat.")
-    button(root, 'Start task')!.click()
+    expect(root.textContent).toContain("The Node didn't confirm the run.")
+    button(root, 'Start workflow')!.click()
     await settle(40)
     const keys = (op: string) => state.requests.filter((request) => request.op === op).map((request) => request.key)
     expect(new Set(keys('handoff.create')).size).toBe(1)
-    expect(keys('session.create')).toHaveLength(2)
-    expect(new Set(keys('session.create')).size).toBe(1)
-    expect(conversationTitle(root)).toBe('Chat s-new')
+    expect(keys('workflow.start')).toHaveLength(2)
+    expect(new Set(keys('workflow.start')).size).toBe(1)
+    expect(root.querySelector('header h1')!.textContent).toBe('Workflows')
   })
 
   it('opens the item and its task in Acorn through acorn:// links in a release build', async () => {
@@ -287,7 +368,7 @@ describe('a handoff in the sidebar', () => {
     expect(root.textContent).toContain('acme/widget#42')
   })
 
-  it("closes the card when the tab leaves the item, unless the person edited Start task's message", async () => {
+  it("closes the card when the tab leaves the item, unless the person typed a workflow's input", async () => {
     const { fake, root } = mount()
     await settle(20)
     await clickSiteButton(fake)
@@ -297,16 +378,15 @@ describe('a handoff in the sidebar', () => {
     await settle(20)
     expect(card()).toBeNull()
 
-    await clickSiteButton(fake)
-    const message = root.querySelector<HTMLTextAreaElement>('textarea[name="first-message"]')!
-    message.value = 'Find why the test is flaky.'
-    message.dispatchEvent(new Event('input', { bubbles: true }))
+    await clickSiteButton(fake, 'workflow')
+    await settle(20)
+    const focus = root.querySelector<HTMLTextAreaElement>('textarea[name="input-focus"]')!
+    focus.value = 'The retry loop'
+    focus.dispatchEvent(new Event('input', { bubbles: true }))
     fake.navigate('https://elsewhere.example/')
     await settle(20)
     expect(card()!.textContent).toContain("This is about a page you've left.")
-    expect(root.querySelector<HTMLTextAreaElement>('textarea[name="first-message"]')!.value).toBe(
-      'Find why the test is flaky.',
-    )
+    expect(root.querySelector<HTMLTextAreaElement>('textarea[name="input-focus"]')!.value).toBe('The retry loop')
   })
 
   it('takes the offer back when the tab moves to a page it may not read', async () => {
@@ -365,6 +445,6 @@ describe('a handoff in the sidebar', () => {
     expect(button(root, 'Look up in Acorn')).toBeUndefined()
     await clickSiteButton(fake)
     expect(root.textContent).toContain('No project on this Node tracks acme/widget#42.')
-    expect(button(root, 'Start task')).toBeUndefined()
+    expect(button(root, 'Create task')).toBeUndefined()
   })
 })
