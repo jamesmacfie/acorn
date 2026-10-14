@@ -298,6 +298,8 @@ export type WorkflowCatalog = {
   kinds: { id: string; pluginId: string | null; describe: StepKindDescription | null }[]
   policies: { id: string; pluginId: string | null; describe?: PolicyDescription }[]
   profiles: { id: string; label: string; managed: boolean; structured: boolean }[]
+  /** The profile a step that names none runs on. Absent when no plugin supplies one. */
+  defaultProfileId?: string
   /** Saved workflows that the selected project can resolve. This metadata contains no definition
    *  body, input default, credential, or runtime value. */
   workflows?: WorkflowCatalogTarget[]

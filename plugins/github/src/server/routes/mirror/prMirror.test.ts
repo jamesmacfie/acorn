@@ -1,6 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestPluginDb, patchBlobKey, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import { patchBlobKey } from '../../blobKeys'
 import { filesResource, prResource } from '../../resourceKeys'
 import { prFiles, reviewThreads, syncState } from '../../../node/schema'
 import { refreshPullDetail, refreshPullFiles } from '../pulls/pullRefresh'

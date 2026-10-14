@@ -1,6 +1,6 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { randomUUID } from 'node:crypto'
-import { DEFAULT_PROFILE_ID, type PluginDatabase } from '@acorn/plugin-api/node'
+import type { PluginDatabase } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
 import * as schema from '../../node/schema'
 import type {
@@ -69,6 +69,7 @@ export async function persistWorkflowStart(
   taskId: string,
   def: WorkflowDef,
   options?: WorkflowStartOptions,
+  defaultProfileId?: string,
 ): Promise<PersistedWorkflowStart> {
   assertInvocationIdentity(options)
   let invocationParent: WorkflowRunRow | undefined
@@ -200,7 +201,7 @@ export async function persistWorkflowStart(
           name: step.name,
           kind: step.kind ?? 'agent',
           mode: step.kind === 'decide' ? 'ai' : 'headless',
-          profileId: step.profileId ?? DEFAULT_PROFILE_ID,
+          profileId: step.profileId ?? defaultProfileId ?? null,
           model: step.model ?? null,
           status: 'pending',
           createdAt: at,

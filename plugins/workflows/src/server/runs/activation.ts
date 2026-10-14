@@ -2,6 +2,7 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { homedir } from 'node:os'
 import { formatContextBlock } from '@acorn/plugin-context/contract/contextBlock.ts'
 import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
+import { AGENTS_DEFAULT_PROFILE } from '@acorn/plugin-agents/contract/defaultProfile.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
 import {
@@ -94,6 +95,7 @@ export const createWorkflowExecution = (
       },
       hooks: ctx.hooks,
       telemetry: ctx.telemetry,
+      defaultProfileId: () => ctx.capabilities.get(AGENTS_DEFAULT_PROFILE)?.id,
       runStep: async (taskId, def, opts) => {
         // `opts.profileId`, never `def.profileId`: the runner has already resolved "the workflow
         // default" and both paths below have to name the same harness. Reading the def here would run a

@@ -94,7 +94,7 @@ export type RuntimeBindings = {
 export type Env = RuntimeBindings & Partial<HttpBindings>
 
 // Immutable file and patch bodies keyed by content (docs/caching.md § Immutable blob cache). One
-// file per key under `dir`; keys are `filebody:<sha>` and `patch:sha256:<hex>` (server/blobs.ts),
+// file per key under `dir`; keys are `filebody:<sha>` and `patch:sha256:<hex>` (plugins/github/src/server/blobKeys.ts),
 // with each colon sanitized for a safe filename.
 export type BlobCache = {
   get(key: string): Promise<string | null>

@@ -47,6 +47,7 @@ or unaccepted runtime leaves nothing visible ([distribution](./plugins/distribut
 | Webviews | Both | — / `frames` (`target: 'webview'`) | A pane showing external web content |
 | Rail sources | Both | `ctx.sources` / `contributions.sources` | The left rail ([rail source visibility](./frontend/rail-and-routing.md#rail-source-visibility)) |
 | Session sources | Compiled | `ctx.sessionSources` | Node-scoped session summaries and send and focus actions for shared pickers, quit concerns, and navigation. **Direction: stays compiled.** Loaded plugins use commands and attention, and no loaded session carrier is needed without a consumer |
+| Reference targets | Compiled | `ctx.referenceTargets` | Where **Add to agent** drops a file reference from the editor or the Changes tab. Targets are tried from the highest `priority` down, and the first that answers takes it. Core's fallback is the task's latest running agent session, at priority 0. **Direction: stays compiled.** A target is an in-process function |
 | Slots | Both | `ctx.slots` / `contributions.slots` | See [the slot vocabulary](#the-slot-vocabulary) |
 | Commands | Both | `ctx.commands` / `contributions.commands` | The command palette and chords, in five shapes: action, group, search, input, and setting ([commands](./plugins/commands.md)) |
 | Keybindings | Both | `ctx.keybindings` / `contributions.keybindings` | The chord dispatcher |

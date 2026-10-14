@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkStatusWord, checksSummary } from './displayMeta'
+import { checkStatusWord, checksSummary } from './checkStatus'
 
 describe('check status words', () => {
   it('names every status GitHub sends, in any case', () => {

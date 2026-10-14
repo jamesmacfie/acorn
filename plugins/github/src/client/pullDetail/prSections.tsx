@@ -1,14 +1,13 @@
 import { For, Show } from 'solid-js'
+import { clientEvents, railDotProps } from '@acorn/plugin-api/client'
 import {
   CHECK_TONE,
+  FAILED_STATUSES,
   checkStatusTone,
   checkStatusWord,
   checksState,
   checksSummary,
-  clientEvents,
-  FAILED_STATUSES,
-  railDotProps,
-} from '@acorn/plugin-api/client'
+} from '../checks/checkStatus'
 import {
   Button,
   Chip,

@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { agentProfileRegistry, DEFAULT_PROFILE_ID } from './index'
+import { agentProfileRegistry } from './index'
 import { parseStreamJson, parseStreamLine, textAdapter } from './streamJson'
 
 describe('agent profiles', () => {
-  it('keeps the shell fallback and default profile policy explicit', () => {
+  it('keeps the shell fallback explicit', () => {
     expect(agentProfileRegistry.get('shell')).toMatchObject({ id: 'shell', kind: 'shell', command: '$SHELL' })
-    expect(DEFAULT_PROFILE_ID).toBe('claude-code')
     expect(agentProfileRegistry.get('missing')).toBeUndefined()
     expect(() => agentProfileRegistry.require('missing')).toThrow("Unknown agent profile 'missing'.")
   })

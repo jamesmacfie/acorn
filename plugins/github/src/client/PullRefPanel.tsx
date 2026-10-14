@@ -1,15 +1,8 @@
 import { createMemo, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
-import {
-  CHECK_TONE,
-  checksState,
-  checksSummary,
-  formatRelativeTime,
-  openInAppUrl,
-  railDotProps,
-  type RefPanelProps,
-} from '@acorn/plugin-api/client'
+import { formatRelativeTime, openInAppUrl, railDotProps, type RefPanelProps } from '@acorn/plugin-api/client'
+import { CHECK_TONE, checksState, checksSummary } from './checks/checkStatus'
 import { Button, EmptyState, Facts, Heading, Inline, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { RefPanelBox, RefPanelTaskLink } from '@acorn/plugin-api/ui/host'
 import { parsePullRef } from '../shared/pullRef'

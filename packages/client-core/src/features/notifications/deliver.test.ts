@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WorkflowNotice } from '../../infra/node/wsClient'
+import type { NoticeFrame } from '@acorn/protocol/notices.ts'
 
 // The socket, so `initWorkflowNotices` can be driven a frame at a time. Nothing else in this file
 // touches it, and deliver.ts imports exactly this one function from it.
-let onNotice: ((notice: WorkflowNotice) => void) | undefined
+let onNotice: ((notice: NoticeFrame) => void) | undefined
 vi.mock('../../infra/node/wsClient', () => ({
-  wsOnNotice: (cb: (notice: WorkflowNotice) => void) => {
+  wsOnNotice: (cb: (notice: NoticeFrame) => void) => {
     onNotice = cb
     return () => {
       onNotice = undefined
@@ -327,7 +327,7 @@ describe('the system channel', () => {
 // A workflow notice names the run it came from, and that is what gives the bell row somewhere to go
 // (docs/notifications/rows-and-targets.md § What a row points at).
 describe('workflow notices', () => {
-  const frame = (over: Partial<WorkflowNotice>): WorkflowNotice => ({
+  const frame = (over: Partial<NoticeFrame>): NoticeFrame => ({
     taskId: 't1',
     kind: 'gate',
     title: 'a gate',
@@ -360,7 +360,7 @@ describe('workflow notices', () => {
 // Any plugin can raise a row and say where it goes (docs/notifications/rows-and-targets.md § What a row
 // points at).
 describe('a plugin notice', () => {
-  const frame = (over: Partial<WorkflowNotice>): WorkflowNotice => ({ title: 'something happened', ...over })
+  const frame = (over: Partial<NoticeFrame>): NoticeFrame => ({ title: 'something happened', ...over })
 
   it('carries the target its raiser named', () => {
     const stop = initWorkflowNotices()

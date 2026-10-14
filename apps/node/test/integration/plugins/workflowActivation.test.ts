@@ -11,6 +11,7 @@ import {
   type AgentSessionExecute,
   type AgentSessionExecuteRequest,
 } from '@acorn/plugin-agents/contract/sessionExecute.ts'
+import { AGENTS_DEFAULT_PROFILE } from '@acorn/plugin-agents/contract/defaultProfile.ts'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { NotesStore } from '@acorn/plugin-notes/testkit'
@@ -115,6 +116,7 @@ it('activates route capabilities and runs managed execution through a late-bound
     }),
   )
   ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, execute)
+  ctx.capabilities.provide(AGENTS_DEFAULT_PROFILE, { id: 'claude-code' })
   const pendingStart = route!.start(
     'task',
     {

@@ -150,6 +150,7 @@ describe('workflow task acceptance', () => {
       ],
       policies: [],
       profiles: [{ id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: true }],
+      defaultProfileId: DEFAULT_PROFILE_ID,
       workflows: [
         {
           ref: { source: 'database', id: child.id },
@@ -227,6 +228,7 @@ binding_json = '{"address":{"from":"item","pointer":"/number"}}'
           }),
           writeHandoff: async () => undefined,
           assembleContext: async () => '',
+          defaultProfileId: () => DEFAULT_PROFILE_ID,
           notify: vi.fn(),
           dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
           dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),

@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import { workflowToolCalls } from '../../node/schema'
 import { createDef, getDef, updateDef } from '../definitions/store'
 import { createPublishedDef } from '../../testkit/publishedDefinition'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { z } from 'zod'
 import { bootWorkflowTools, managed, workflowDef as def, type WorkflowToolHarness } from './test/helpers/toolHarness'
+
+// What the agents plugin publishes as its default profile, which these tests stand in for.
+const DEFAULT_PROFILE_ID = 'claude-code'
 
 let harness: WorkflowToolHarness | null = null
 const boot = bootWorkflowTools

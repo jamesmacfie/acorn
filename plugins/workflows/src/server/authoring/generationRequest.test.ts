@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DEFAULT_PROFILE_ID, ProviderOperationError } from '@acorn/plugin-api/node'
+import { ProviderOperationError } from '@acorn/plugin-api/node'
 import type { WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from '../steps/builtins'
 import { catalogValidation, GENERATE_MAX_OUTPUT_TOKENS, GENERATE_MAX_REPAIR_PROBLEMS } from './generate'
 import { generateWorkflowRequest, type GenerateWorkflowText } from './generationRequest'
 import { validateWorkflow, type WorkflowValidationCatalog } from '../validation/definition'
+
+// What the agents plugin publishes as its default profile, which these tests stand in for.
+const DEFAULT_PROFILE_ID = 'claude-code'
 
 // The orchestrator's whole job is how many times it calls a model and which answer it keeps, so the
 // provider is a vi.fn and every assertion here is about calls and choices. What goes into a prompt

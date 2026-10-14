@@ -225,6 +225,7 @@ export class WorkflowRunner {
           .filter((profile) => profile.managedProvider)
           .map((profile) => profile.id),
       ),
+      defaultProfileId: this.deps.defaultProfileId?.(),
       // A contributed kind joins the agent kinds by saying so in its description, which is the only
       // place `isolation`, `inputs` and `configOptions` are ever allowed from.
       agentStepKinds: new Set(kinds.filter((kind) => kind.contribution.describe?.runsAgent).map((kind) => kind.id)),
@@ -257,6 +258,7 @@ export class WorkflowRunner {
         managed: !!profile.managedProvider,
         structured: !!profile.aiArgv,
       })),
+      defaultProfileId: this.deps.defaultProfileId?.(),
     }
   }
 
@@ -299,7 +301,7 @@ export class WorkflowRunner {
     if (opts?.resolvedGraph && JSON.stringify(opts.resolvedGraph.root) !== JSON.stringify(def)) {
       throw new Error('The frozen resolved definition graph does not match the workflow being started.')
     }
-    const persist = () => persistWorkflowStart(this.db, taskId, def, opts)
+    const persist = () => persistWorkflowStart(this.db, taskId, def, opts, this.deps.defaultProfileId?.())
     const { runId, created, deadlineAt, invocationParent } = this.deps.admitWork
       ? await this.deps.admitWork(taskId, persist)
       : await persist()

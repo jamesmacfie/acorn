@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import type { StepKindDescription, WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from '../steps/builtins'
@@ -23,6 +22,9 @@ import {
   selectExamples,
   type WorkflowExample,
 } from './generate'
+
+// What the agents plugin publishes as its default profile, which these tests stand in for.
+const DEFAULT_PROFILE_ID = 'claude-code'
 
 // The prompt is the product here, so these are assertions about what a model is told, not about how
 // the strings are built. The catalog is a fixture rather than a runner, because the module is pure.
@@ -61,6 +63,7 @@ const catalog = (over: Partial<WorkflowCatalog> = {}): WorkflowCatalog => ({
   kinds: [...builtinKinds, { id: 'http:request', pluginId: 'http', describe: httpKind }],
   policies: [{ id: 'checks-green', pluginId: null }],
   profiles: [{ id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: true }],
+  defaultProfileId: DEFAULT_PROFILE_ID,
   ...over,
 })
 

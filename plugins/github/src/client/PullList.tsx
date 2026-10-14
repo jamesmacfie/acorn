@@ -3,9 +3,6 @@ import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/soli
 import { useNavigate, useParams } from '@solidjs/router'
 import {
   activateTaskSignals,
-  CHECK_TONE,
-  checksState,
-  checksSummary,
   clientEvents,
   contextMenuItems,
   formatRelativeTime,
@@ -20,6 +17,7 @@ import {
   workspacesOptions,
   type ItemRowTarget,
 } from '@acorn/plugin-api/client'
+import { CHECK_TONE, checksState, checksSummary } from './checks/checkStatus'
 import {
   Alert,
   Button,

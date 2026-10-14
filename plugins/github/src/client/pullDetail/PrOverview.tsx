@@ -1,13 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
-import {
-  CHECK_TONE,
-  checksState,
-  checksSummary,
-  clientEvents,
-  formatRelativeTime,
-  railDotProps,
-  splitRefTokens,
-} from '@acorn/plugin-api/client'
+import { clientEvents, formatRelativeTime, railDotProps, splitRefTokens } from '@acorn/plugin-api/client'
+import { CHECK_TONE, checksState, checksSummary } from '../checks/checkStatus'
 import {
   Alert,
   Badge,

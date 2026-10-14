@@ -17,7 +17,6 @@
     "./server/auth/credentialFile.ts": "./src/server/auth/credentialFile.ts",
     "./server/background.ts": "./src/server/background.ts",
     "./server/bindings.ts": "./src/server/bindings.ts",
-    "./server/blobs.ts": "./src/server/blobs.ts",
     "./server/bridge.ts": "./src/server/bridge.ts",
     "./server/core": "./src/server/core/public.ts",
     "./server/core/fs.ts": "./src/server/core/fs.ts",

@@ -107,6 +107,7 @@
     "capabilities": [
       "agents.activity.v1",
       "agents.customAgentRegistry",
+      "agents.defaultProfile",
       "agents.draftAttachments",
       "agents.harnessRegistry",
       "agents.instructionReviewRoute",

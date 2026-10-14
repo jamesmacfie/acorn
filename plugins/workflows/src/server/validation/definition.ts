@@ -3,7 +3,6 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { workflowDataProblems } from './dataSteps'
 import { gateFormDefinitionProblems } from '../workflowGateForm'
 import { declaredOutputSchema } from '../../shared/gateForm'
-import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import { MAX_AGENT_GOAL_CHARS } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { BUILTIN_AGENT_STEP_KINDS, readStepField } from '../../shared/stepFields'
 import { policyWaitProblems } from './policyGate'
@@ -94,6 +93,8 @@ export type WorkflowValidationCatalog = {
   structuredProfiles: ReadonlySet<string>
   // Profiles that name a managed session driver: the only ones a map step's `agent` can run on.
   managedProfiles: ReadonlySet<string>
+  // What a step that names no profile runs on. Absent when no plugin supplies a default.
+  defaultProfileId?: string
   // Every kind whose description says it runs an agent, built-in or contributed. Absent means the
   // built-ins alone, which is what a catalog assembled without descriptions knows.
   agentStepKinds?: ReadonlySet<string>
@@ -150,7 +151,7 @@ function templatedStrings(step: WorkflowStepDef): (string | undefined)[] {
 function goalProblems(
   label: string,
   goal: unknown,
-  profileId: string,
+  profileId: string | undefined,
   catalog: Pick<WorkflowValidationCatalog, 'profiles' | 'managedProfiles' | 'structuredProfiles'>,
 ): string[] {
   if (goal === undefined) return []
@@ -158,7 +159,7 @@ function goalProblems(
     return [`${label} goal must be text that says when the step is finished`]
   if (goal.trim().length > MAX_AGENT_GOAL_CHARS)
     return [`${label} goal is longer than ${MAX_AGENT_GOAL_CHARS} characters`]
-  if (!catalog.profiles.has(profileId)) return []
+  if (!profileId || !catalog.profiles.has(profileId)) return []
   if (!catalog.managedProfiles.has(profileId))
     return [`${label} goal needs a managed harness, and '${profileId}' has no managed session driver`]
   if (!catalog.structuredProfiles.has(profileId))
@@ -312,8 +313,10 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     if (!narrowsToolCeiling(def.tools, step.tools)) errors.push(`${label} tool ceiling widens the workflow ceiling`)
     errors.push(...validateBudget(`${label} budget`, step.budget))
     if (!budgetNarrows(def.budget, step.budget)) errors.push(`${label} budget widens the workflow budget`)
-    if (step.agent) {
-      const profile = step.agent.profileId ?? DEFAULT_PROFILE_ID
+    // A step that names no profile, on a Node where no plugin publishes a default, has nothing to check
+    // here. Execution refuses it.
+    const profile = step.agent?.profileId ?? catalog.defaultProfileId
+    if (step.agent && profile) {
       if (!catalog.profiles.has(profile)) errors.push(`${label} agent names unknown profile '${profile}'`)
       else if (!catalog.managedProfiles.has(profile))
         errors.push(`${label} agent profile '${profile}' has no managed session driver`)
@@ -321,11 +324,11 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     }
     // Other kinds finish on rules of their own, so only the plain agent step takes a goal.
     if (step.goal !== undefined && kind !== 'agent') errors.push(`${label} is a '${kind}' step, which cannot take goal`)
-    else errors.push(...goalProblems(label, step.goal, step.profileId ?? DEFAULT_PROFILE_ID, catalog))
+    else errors.push(...goalProblems(label, step.goal, step.profileId ?? catalog.defaultProfileId, catalog))
     if ((catalog.agentStepKinds ?? BUILTIN_AGENT_STEP_KINDS).has(kind)) {
-      const profileId = step.profileId ?? DEFAULT_PROFILE_ID
-      if (!catalog.profiles.has(profileId)) errors.push(`${label} names unknown profile '${profileId}'`)
-      else if (kind === 'decide' && !catalog.structuredProfiles.has(profileId)) {
+      const profileId = step.profileId ?? catalog.defaultProfileId
+      if (profileId && !catalog.profiles.has(profileId)) errors.push(`${label} names unknown profile '${profileId}'`)
+      else if (profileId && kind === 'decide' && !catalog.structuredProfiles.has(profileId)) {
         errors.push(`${label} profile '${profileId}' has no one-shot structured mode (decide requires one)`)
       }
     }
