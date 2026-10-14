@@ -29,7 +29,9 @@ A self-hoster can use this on its own. It is the first cloud-shaped thing acorn 
 - The standalone tarball carries the bundled loaded plugins in its `plugins` folder, and the Node
   reconciles them on boot.
 - [The bundle design](../../bundle.md#build-the-container-image) records the container requirements
-  and release dependencies. No Dockerfile exists for acorn.
+  and release dependencies. `apps/node/Dockerfile` is step 1's local half, built for the
+  [remote Node rig](../../../local-development/remote-node.md). It installs a tarball packed on the
+  host rather than running `pnpm pack:node` in a build stage.
 
 ## In scope
 

@@ -24,8 +24,11 @@ pnpm db:check
 1. Install the signed artifact on a clean host. Launch it, finish onboarding, open a local project,
    create a task, and confirm that the local Node reaches online. Quit and relaunch. The task and
    pairing are still there.
-2. Pair a second Node by code. Confirm the fingerprint words, switch between Nodes, and open a task on
-   each. Disconnect and reconnect the second Node. The first Node's task data stays scoped to it.
+2. Pair a second Node by code: the container Node from
+   [remote Node](../local-development/remote-node.md#pair-another-client-by-hand), not a second
+   process on this Mac, which shares its filesystem and hides path bugs. Confirm the fingerprint
+   words, switch between Nodes, and open a task on each, including the seeded `/srv/projects/sample`
+   project. Disconnect and reconnect the second Node. The first Node's task data stays scoped to it.
 3. Start a managed agent with an installed CLI, approve or deny one tool request, and reopen its
    transcript after a restart. Open a terminal session, send a command, and confirm that it survives a
    task switch.

@@ -15,6 +15,7 @@ desktop's three processes are `apps/desktop/src/client/`, `src/shell/`, and `src
 | [Extension development loop](./local-development/extension-dev-loop.md) | Opening Chrome or Firefox with the browser extension loaded and reloading, and driving its sidebar. |
 | [Profiling](./local-development/profiling.md) | Timing a cold start and a task switch. |
 | [Packaged stacks](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
+| [Remote Node](./local-development/remote-node.md) | Starting a Node in a Linux container and pairing a desktop window to it, for every remote Node check. |
 | [Formatting](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, making `git blame` skip formatting commits with `blame.ignoreRevsFile`, and carrying a branch across one. |
 
 The agent-driven desktop and terminal sections, native control, and the large-surface flow moved to
@@ -50,6 +51,7 @@ Other ways to run it:
 | `pnpm dev:agent -- --session <name>` | Starts an isolated desktop session you can drive. See [agent drivers](./local-development/agent-drivers.md). |
 | `pnpm dev:tui:agent -- --session <name>` | Starts an isolated terminal client you can drive. |
 | `pnpm dev:extension -- --browser chrome --session <name>` | Opens an isolated browser with the extension loaded and reloading. See [the extension loop](./local-development/extension-dev-loop.md). |
+| `pnpm dev:remote -- --session <name>` | Starts a Node in a Linux container and pairs a desktop session to it. See [remote Node](./local-development/remote-node.md). |
 
 Pass `--workspaces on` or `--workspaces off` to either agent launcher to seed its workspace mode
 before it adds a project. See [agent drivers](./local-development/agent-drivers.md).

@@ -10,6 +10,9 @@ dist/
 .acorn/
 apps/node/.acorn-shell/
 
+# The standalone tarball `pnpm pack:node` writes
+apps/node/release/
+
 # The Rust build tree, and the Node runtime the staging script copies in
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/binaries/
