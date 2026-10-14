@@ -131,7 +131,8 @@ core page may name none, and a loaded frame's foreign ID is dropped by `host/fra
 ## Node management
 
 **Settings → Nodes** (`features/settings/nodes/NodesSettings.tsx`) adds, renames, reconnects, unpairs,
-and revokes Nodes. Unpair and revoke are labeled differently on purpose. Unpairing can be undone with the same
+and revokes Nodes. Each Node's **Pair another client** and **Pair a browser** show a one-time pairing
+code (`NodePairingCode.tsx`); the browser one words it for the extension's panel. Unpair and revoke are labeled differently on purpose. Unpairing can be undone with the same
 pairing code. Revoking means the Node tears up this client's credential, and confusing the two is how
 an owner loses access to a remote Node
 ([Node enrollment](../node-enrollment.md)).

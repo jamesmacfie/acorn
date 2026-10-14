@@ -137,6 +137,8 @@ export type PluginAuthoringVocabulary = {
     required: string[]
     optional: string[]
     contributionCaps: Record<string, number>
+    // Contributions that are one route on the plugin's node half rather than a list.
+    contributionRoutes: string[]
     frameTargets: string[]
     slots: string[]
     contextMenuLocations: string[]
@@ -164,9 +166,8 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
   const schema = manifestJsonSchema()
   const contributions = at(schema, 'contributions')
   const required = schema.required ?? []
-  const caps = Object.entries(contributions?.properties ?? {}).map(
-    ([key, value]) => [key, value.maxItems ?? 0] as const,
-  )
+  const kinds = Object.entries(contributions?.properties ?? {})
+  const caps = kinds.flatMap(([key, value]) => (value.maxItems === undefined ? [] : [[key, value.maxItems] as const]))
   return {
     apiMajor: PLUGIN_API_MAJOR,
     manifest: {
@@ -176,6 +177,7 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
         .filter((key) => !required.includes(key))
         .sort(),
       contributionCaps: Object.fromEntries(caps),
+      contributionRoutes: kinds.filter(([, value]) => value.maxItems === undefined).map(([key]) => key),
       frameTargets: at(contributions, 'frames')?.items?.properties?.target?.enum ?? [],
       slots: at(contributions, 'slots')?.items?.properties?.slot?.enum ?? [],
       // Read off the schema, not hand-typed. A guessed member is a contribution that parses on a newer
@@ -386,6 +388,7 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     Object.entries(manifest.contributionCaps)
       .map(([key, cap]) => `- \`${key}\` — max ${cap}`)
       .join('\n'),
+    ...manifest.contributionRoutes.map((key) => `- \`${key}\` — one route in your namespace`),
     '',
     '**Loaded agent tools and context.** `agentTools` entries are task scoped and become',
     '`<pluginId>_<localId>`. They carry `{ id, description, inputSchema, risk, handler, scope?,',

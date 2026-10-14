@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { browserHandoffResolution, matchHandoffPage } from '@acorn/protocol/plugin/handoffs.ts'
+import { browserHandoffResolution, matchHandoffPage, taskAddressList } from '@acorn/protocol/plugin/handoffs.ts'
 import { isolateNodePlugin } from './isolation'
 import { installedPluginInfo, loadExternalPlugins, loadedPluginBinding, pluginInstallDir } from './loader'
 import { PLUGIN_API_MAJOR, pluginManifestSchema } from './manifest'
@@ -24,6 +24,7 @@ const handoff = {
   anchors: ['.item-header > .actions'],
   resolve: `/v1/p/${ID}/handoff/resolve`,
 }
+const taskAddresses = `/v1/p/${ID}/task-addresses`
 
 const manifest = (over: Record<string, unknown> = {}) => ({
   id: ID,
@@ -32,7 +33,7 @@ const manifest = (over: Record<string, unknown> = {}) => ({
   baseline: 'acorn-1',
   apiVersion: PLUGIN_API_MAJOR,
   node: './dist/node.js',
-  contributions: { browserHandoffs: [handoff] },
+  contributions: { browserHandoffs: [handoff], taskAddresses },
   ...over,
 })
 
@@ -63,6 +64,7 @@ describe('a loaded plugin declaring a browser handoff', () => {
     const result = await load()
     expect(result.failures).toEqual([])
     expect(loadedPluginBinding(result.loaded[0]!).browserHandoffs).toEqual([handoff])
+    expect(loadedPluginBinding(result.loaded[0]!).taskAddresses).toBe(taskAddresses)
     expect(installedPluginInfo(result.installed[0]!).contributions.browserHandoffs).toEqual([handoff])
   })
 
@@ -79,6 +81,15 @@ describe('a loaded plugin declaring a browser handoff', () => {
     expect(result.failures[0]!.reason).toMatch(reason)
   })
 
+  it('refuses a task address route outside its namespace, or with no node half to serve it', async () => {
+    const outside = await load(manifest({ contributions: { taskAddresses: '/v1/core/tasks' } }))
+    expect(outside.failures[0]!.reason).toMatch(/route must be inside \/v1\/p\/tracker\//)
+    const parsed = pluginManifestSchema.safeParse(manifest({ node: undefined, contributions: { taskAddresses } }))
+    expect(parsed.error?.issues.map((issue) => issue.message)).toEqual([
+      'task addresses come from a node route; declare `node` in the manifest',
+    ])
+  })
+
   it('refuses a duplicate id, too many handoffs, and a handoff with no node half to serve it', async () => {
     const duplicate = await load(manifest({ contributions: { browserHandoffs: [handoff, handoff] } }))
     expect(duplicate.failures[0]!.reason).toMatch(/duplicate contribution id 'item'/)
@@ -92,12 +103,14 @@ describe('a loaded plugin declaring a browser handoff', () => {
     )
   })
 
-  it('serves a resolution from its own worker that passes the shared schema', async () => {
+  it('serves a resolution and task addresses from its own worker that pass the shared schemas', async () => {
     const parsed = pluginManifestSchema.parse(manifest())
-    let route: PluginFetchHandler | undefined
-    // The fixture registers one route; everything else the worker projects is inert here.
+    const routes = new Map<string, PluginFetchHandler>()
+    // The fixture registers two routes; everything else the worker projects is inert here.
     const ctx = {
-      routes: { fetch: (handler: PluginFetchHandler) => void (route = handler) },
+      routes: {
+        fetch: (handler: PluginFetchHandler, options: { prefix: string }) => void routes.set(options.prefix, handler),
+      },
       schedules: {},
       providers: {},
       events: {},
@@ -115,13 +128,24 @@ describe('a loaded plugin declaring a browser handoff', () => {
       const url = 'https://tracker.example/items/42/'
       const captures = matchHandoffPage(parsed.contributions.browserHandoffs[0]!, url)
       expect(captures).toEqual({ id: '42' })
-      const response = await route!(
+      const asOwner = { userId: 'owner', principal: { kind: 'device', userId: 'owner' }, providers: {} } as never
+      const response = await routes.get('/handoff')!(
         new Request('https://acorn.invalid/resolve', { method: 'POST', body: JSON.stringify({ url, captures }) }),
-        { userId: 'owner', principal: { kind: 'device', userId: 'owner' }, providers: {} } as never,
+        asOwner,
       )
       const resolution = browserHandoffResolution.parse(await response.json())
       expect(resolution.items).toMatchObject([
         { identifier: 'TRK-42', projects: ['project-1'], seed: { origin: 'tracker' } },
+      ])
+      const addresses = await routes.get('/task-addresses')!(new Request('https://acorn.invalid/'), asOwner)
+      expect(taskAddressList.parse(await addresses.json()).addresses).toEqual([
+        {
+          taskId: 'task-1',
+          origin: 'https://tracker-app.localhost:5104',
+          label: 'Tracker app',
+          state: 'running',
+          severity: 'info',
+        },
       ])
     } finally {
       await plugin.dispose?.()

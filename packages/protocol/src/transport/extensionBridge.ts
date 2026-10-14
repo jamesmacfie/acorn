@@ -136,6 +136,10 @@ const handoffTarget = {
 export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('nodes.list') }),
   z.strictObject({ ...envelope, op: z.literal('node.probe'), endpoint: z.string().url().max(2048) }),
+  // The Node this computer's data root holds, the one `acorn` itself attaches to, kept as the probe
+  // `node.pair` completes. Its certificate comes from the Node's own files, so there are no words to
+  // compare, and pairing still takes a code.
+  z.strictObject({ ...envelope, op: z.literal('node.local') }),
   // No endpoint or fingerprint: pairing completes the probe the person just confirmed.
   z.strictObject({
     ...envelope,
@@ -148,6 +152,9 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   // Bound to the node it was asked of. The host refuses it once that node is no longer selected.
   z.strictObject({ ...envelope, op: z.literal('projects.list'), nodeId }),
   z.strictObject({ ...envelope, op: z.literal('tasks.list'), nodeId, projectId: rowId }),
+  // Every active task's page addresses, so the browser matches the page to its task itself and no
+  // page address goes to the Node for it (docs/browser-extension/task-pages.md).
+  z.strictObject({ ...envelope, op: z.literal('tasks.pages'), nodeId }),
   z.strictObject({ ...envelope, op: z.literal('agents.profiles'), nodeId }),
   z.strictObject({ ...envelope, op: z.literal('sessions.list'), nodeId, taskId: rowId }),
   z.strictObject({
@@ -240,6 +247,17 @@ export type BridgeProject = { id: string; name: string; path: string | null; hid
 export type BridgeNodes = { nodes: NodeRecord[]; activeNodeId: string | null; status: NodeStatus | null }
 
 export type BridgeTask = { id: string; title: string; branch: string | null }
+
+// An address a task is known by, in the project sites' grammar: an exact origin and a path prefix
+// matched by whole segments, so a pull request's address covers its tabs and one at `/` covers the
+// origin. `source` is the plugin or provider that knows the address, such as `github` or `linear`.
+// `status` is set on an address a plugin published for the task, such as its local stack's app.
+export type BridgeTaskPage = SiteAssociation & { source: string; status?: BridgePageStatus }
+// What a plugin says answers at an address it published, and its state, read together as one line
+// ("Runn stack running"), with the state's tone.
+type BridgePageStatus = { label: string; state: string; tone: 'ok' | 'warn' | 'bad' }
+// An active task with the addresses it is known by. Tasks with none are left out.
+export type BridgePageTask = BridgeTask & { projectId: string; pages: BridgeTaskPage[] }
 
 // An agent harness the Node can start a session with, from the agents plugin's provider roster.
 export type BridgeAgentProfile = {
@@ -371,11 +389,14 @@ export type BridgeHandoffItem = {
 export type BridgeResults = {
   'nodes.list': BridgeNodes
   'node.probe': NodeProbeResult
+  // Null when no Node holds this computer's data root.
+  'node.local': (NodeProbeResult & { nodeId: string }) | null
   'node.pair': NodeRecord
   'node.select': BridgeNodes
   'node.forget': BridgeNodes
   'projects.list': { nodeId: string; projects: BridgeProject[] }
   'tasks.list': { nodeId: string; projectId: string; tasks: BridgeTask[] }
+  'tasks.pages': { nodeId: string; tasks: BridgePageTask[] }
   'agents.profiles': { nodeId: string; profiles: BridgeAgentProfile[] }
   'sessions.list': { nodeId: string; taskId: string; sessions: BridgeAgentSession[] }
   'session.read': BridgeSessionRead
@@ -439,3 +460,5 @@ export type BridgeHostMessage =
   | { v: 1; event: 'handoffs'; nodeId: string }
   // A project on the selected Node changed, so its site associations may have too.
   | { v: 1; event: 'projects'; nodeId: string }
+  // A task on the selected Node was created, changed, or archived, or its links changed.
+  | { v: 1; event: 'tasks'; nodeId: string }

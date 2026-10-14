@@ -11,27 +11,29 @@ import { Stack } from '../../../kit/components/layout/Stack'
 // Settings → Nodes is already an owner-authenticated client. It asks the selected Node for a
 // one-time code and shows that Node's pinned identity beside it for the other client to compare.
 //
-// Three parts, because the button sits in the node's row of actions and the code opens under them:
-// the state, the button, and the panel.
+// Three parts, because the buttons sit in the node's row of actions and the code opens under them:
+// the state, the buttons, and the panel. Both buttons open the same pairing window; the browser one
+// only words the code for the Acorn browser panel, which takes it by paste.
 
 export type NodePairing = ReturnType<typeof createNodePairing>
+type PairingFor = 'client' | 'extension'
 
 export function createNodePairing(nodeId: () => string) {
-  const [pairing, setPairing] = createSignal<PairingWindow | null>(null)
+  const [pairing, setPairing] = createSignal<(PairingWindow & { for: PairingFor }) | null>(null)
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   let expiryTimer: ReturnType<typeof setTimeout> | undefined
 
   onCleanup(() => clearTimeout(expiryTimer))
 
-  const open = async () => {
+  const open = async (target: PairingFor) => {
     setBusy(true)
     setError('')
     setPairing(null)
     clearTimeout(expiryTimer)
     try {
       const opened = await openNodePairingWindow(nodeId())
-      setPairing(opened)
+      setPairing({ ...opened, for: target })
       expiryTimer = setTimeout(() => setPairing(null), opened.expiresInMs)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -57,11 +59,17 @@ export function createNodePairing(nodeId: () => string) {
   return { pairing, busy, error, open, close }
 }
 
-export function NodePairingButton(props: { pairing: NodePairing }) {
-  return (
-    <Button size="sm" disabled={props.pairing.busy()} onPress={() => void props.pairing.open()}>
-      {props.pairing.pairing() ? 'New pairing code' : 'Pair another client'}
+export function NodePairingButtons(props: { pairing: NodePairing }) {
+  const button = (target: PairingFor, label: string) => (
+    <Button size="sm" disabled={props.pairing.busy()} onPress={() => void props.pairing.open(target)}>
+      {props.pairing.pairing()?.for === target ? 'New pairing code' : label}
     </Button>
+  )
+  return (
+    <>
+      {button('client', 'Pair another client')}
+      {button('extension', 'Pair a browser')}
+    </>
   )
 }
 
@@ -75,7 +83,10 @@ export function NodePairingPanel(props: { node: NodeRecord; pairing: NodePairing
           <Card>
             <div class="integration-device">
               <Text wrap>
-                Enter this code on the other computer within {Math.ceil(active().expiresInMs / 60_000)} minutes.
+                {active().for === 'extension'
+                  ? 'Open the Acorn panel in your browser and paste this code'
+                  : 'Enter this code on the other computer'}{' '}
+                within {Math.ceil(active().expiresInMs / 60_000)} minutes.
               </Text>
               <div class="integration-device-code copyable">
                 <code>{active().code}</code>

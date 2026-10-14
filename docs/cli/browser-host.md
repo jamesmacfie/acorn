@@ -37,6 +37,19 @@ launcher whose runtime or entry no longer exists.
 browser's pairings and tokens, and names it. Delete that folder to remove the pairings. Removing them
 here doesn't revoke the devices on their Nodes.
 
+## The Node on this computer
+
+The host offers the extension the Node this computer runs, so pairing it takes only a code. It looks
+where `acorn` with no `--node` looks: `ACORN_DATA_DIR`, else the desktop app's data root, else the
+development root ([reaching a node with acorn](../node-distribution.md#reaching-a-node-with-acorn)).
+The browser starts the host with its own environment, so `ACORN_DATA_DIR` counts only when the browser
+was started with it set.
+
+From that root the host reads the lock, `node.json`, and `tls/cert.pem`, and nothing else. It never
+reads a device token, the desktop's included. It pins the certificate from the file, checks that the
+Node's address presents the same one, and still pairs with a code from the Node.
+[Pairing and custody](../browser-extension.md#pairing-and-custody) covers the operation.
+
 ## Development options
 
 These options serve [the development loop](../local-development/extension-dev-loop.md). They need

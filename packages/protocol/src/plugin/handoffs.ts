@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../content/contentLinkPattern.ts'
+import { parseSiteAddress } from '../projects/siteAssociations.ts'
 import { pluginRoute } from './manifest/manifestFields.ts'
 
 // Browser handoffs: a plugin's button on a website, which the browser extension draws and which hands
@@ -53,9 +54,10 @@ export type BrowserHandoffDescriptor = z.input<typeof browserHandoffDescriptor>
 // One declared handoff as discovery advertises it: the descriptor, bound to the plugin that serves it.
 export type BrowserHandoff = z.output<typeof browserHandoffDescriptor> & { pluginId: string }
 
-// The Node's list of handoffs its active plugins declare. Device-only: it describes the plugin surface.
+// The Node's list of handoffs its active plugins declare, and the task address route each declares.
+// Device-only: it describes the plugin surface.
 export const browserHandoffsRoute = '/v1/core/browser-handoffs'
-export type BrowserHandoffsResponse = { handoffs: BrowserHandoff[] }
+export type BrowserHandoffsResponse = { handoffs: BrowserHandoff[]; taskAddresses: TaskAddressesRoute[] }
 
 // What the resolve route receives: the page address, and the captures the caller matched from one of
 // the handoff's own patterns. The plugin still reads its identity from these, not from page text.
@@ -126,3 +128,49 @@ export function matchHandoffPage(handoff: Pick<BrowserHandoff, 'match'>, url: st
   }
   return null
 }
+
+// Task addresses: a plugin's word that a task's app answers at an exact origin right now, such as a
+// local stack it started. A plugin declares one GET route on its own Node half as
+// `contributions.taskAddresses`; the browser's native host reads it beside the Node's task list, and
+// the extension matches pages against the result in the browser, so no page address goes to the Node.
+// docs/plugin-authoring/browser-handoffs.md owns the contract.
+export type TaskAddressesRoute = { pluginId: string; route: string }
+
+// A loopback host: `localhost`, a `*.localhost` name, `127.x.x.x`, or `[::1]`. A task's app runs on the
+// person's own machine, and a plugin that could name any host could tie every page of someone else's
+// site, such as github.com, to one of its tasks.
+const isLoopback = (hostname: string): boolean =>
+  hostname === 'localhost' ||
+  hostname.endsWith('.localhost') ||
+  hostname === '[::1]' ||
+  /^127(\.\d{1,3}){3}$/.test(hostname)
+
+// An exact loopback origin, scheme and port included, in the form a browser reports it, as project
+// sites store theirs. No path, so the address covers the app and nothing else on the host's other ports.
+const exactOrigin = z
+  .string()
+  .max(300)
+  .refine((value) => {
+    const parsed = parseSiteAddress(value)
+    return (
+      parsed.ok && parsed.site.origin === value && parsed.site.pathPrefix === '/' && isLoopback(new URL(value).hostname)
+    )
+  }, 'an address is an exact http or https origin on a loopback host with no path, such as https://app.localhost:5104')
+
+export const taskAddressList = z.strictObject({
+  addresses: z
+    .array(
+      z.strictObject({
+        taskId: rowId,
+        origin: exactOrigin,
+        // What answers at the address and its state, read together as one line: "Runn stack running".
+        label: z.string().trim().min(1).max(40),
+        state: z.string().trim().min(1).max(40),
+        // The annotation severities: `info` is a healthy state, `warn` one to check, `danger` a failure.
+        severity: z.enum(['info', 'warn', 'danger']),
+      }),
+    )
+    .max(64),
+})
+export type TaskAddressList = z.infer<typeof taskAddressList>
+export const TASK_ADDRESSES_MAX_BYTES = 64 * 1024

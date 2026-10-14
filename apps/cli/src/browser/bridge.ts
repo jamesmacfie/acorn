@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { NodeBroker, toNodeRecord, type FleetStore } from '@acorn/custody/broker'
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
+import { dataRootDir, runningNode } from '@acorn/custody/local'
 import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
 import {
   ATTACHMENT_MAX_BYTES,
@@ -39,6 +40,8 @@ import {
   type BrowserHandoffResolution,
   type BrowserHandoffResolveRequest,
   type BrowserHandoffsResponse,
+  TASK_ADDRESSES_MAX_BYTES,
+  taskAddressList,
 } from '@acorn/protocol/plugin/handoffs.ts'
 import type {
   AgentAttachment,
@@ -62,7 +65,15 @@ import {
   bridgeSessionRead,
   sessionRoute,
 } from './agents'
-import { bridgeHandoff, bridgeHandoffItem, creatableProjects, linkedTasks, ownsRoute } from './handoffs'
+import {
+  bridgeHandoff,
+  bridgeHandoffItem,
+  creatableProjects,
+  linkedTasks,
+  ownsRoute,
+  taskPages,
+  type PublishedAddresses,
+} from './handoffs'
 
 export class BridgeFailure extends Error {
   constructor(
@@ -93,6 +104,8 @@ export function createBridge(options: {
   handoffsChanged?(nodeId: string): void
   // A project on the selected Node changed, so its site associations may have.
   projectsChanged?(nodeId: string): void
+  // A task on the selected Node changed, so its page addresses may have.
+  tasksChanged?(nodeId: string): void
   probe?: typeof probeNode
   pair?: typeof pairWithNode
 }) {
@@ -104,8 +117,10 @@ export function createBridge(options: {
   // person pairs it again, and its status says why rather than reading as an ordinary outage.
   let identityChanged: string | null = null
   // The probe is held here rather than returned, so pairing can only complete the endpoint whose
-  // fingerprint the person was shown.
+  // fingerprint the person was shown, or this computer's Node, pinned to the certificate in its files.
   let pending: Probe | null = null
+  // The plugins whose task addresses the last `tasks.pages` read asked for.
+  let addressPlugins = new Set<string>()
   const hints = agentHints(options.hint ?? (() => {}))
   const broker = new NodeBroker({
     frame(nodeId, frame) {
@@ -114,6 +129,12 @@ export function createBridge(options: {
       const channel = (frame as { channel?: unknown } | null)?.channel
       if (channel === 'plugins:changed') options.handoffsChanged?.(nodeId)
       if (channel === 'project:changed') options.projectsChanged?.(nodeId)
+      if (channel === 'tasks:changed') options.tasksChanged?.(nodeId)
+      // A plugin that publishes task addresses asks clients to read its status again when its state
+      // changes, such as a stack coming up, so its addresses may have changed too.
+      const pluginId = (frame as { pluginId?: unknown }).pluginId
+      if (channel === 'term:status' && typeof pluginId === 'string' && addressPlugins.has(pluginId))
+        options.tasksChanged?.(nodeId)
     },
     bytes() {},
     status(status) {
@@ -163,6 +184,41 @@ export function createBridge(options: {
     } catch {
       return false
     }
+  }
+
+  // A probe whose failure the sidebar can explain. It sends no token and grants nothing.
+  async function probeEndpoint(endpoint: string): Promise<Probe> {
+    try {
+      return await probe(endpoint)
+    } catch (error) {
+      const message = messageOf(error)
+      if (/baseline|protocol/.test(message)) throw new BridgeFailure('incompatible', message)
+      if (/certificate|fingerprint|intercept/.test(message)) throw new BridgeFailure('identity_mismatch', message)
+      throw new BridgeFailure('node_unreachable', message)
+    }
+  }
+
+  // The Node in the data root `acorn` itself would open, found the way `openCliNode` finds it: the
+  // endpoint from `node.json` and the certificate from `tls/cert.pem`. Only those files are read, never
+  // a token. The address must present that same certificate, and the pin is the file's, so no one on
+  // the network could have chosen it.
+  async function probeLocalNode(): Promise<BridgeResults['node.local']> {
+    let running: ReturnType<typeof runningNode>
+    try {
+      running = runningNode(dataRootDir())
+    } catch (error) {
+      throw new BridgeFailure('node_error', `The Node on this computer could not be read: ${messageOf(error)}`)
+    }
+    if (!running) return null
+    const probed = await probeEndpoint(running.endpoint)
+    if (probed.fingerprint !== running.fingerprint)
+      throw new BridgeFailure(
+        'identity_mismatch',
+        'The Node on this computer presented a certificate other than the one in its data folder.',
+      )
+    pending = { ...probed, certPem: running.certPem }
+    const { certPem: _certPem, ...result } = pending
+    return { ...result, nodeId: running.nodeId }
   }
 
   // Stops at a changed certificate: the Node's connection closes until the person pairs it again.
@@ -334,7 +390,7 @@ export function createBridge(options: {
   async function declaredHandoff(nodeId: string, pluginId: string, handoffId: string): Promise<BrowserHandoff> {
     const body = (await nodeRequest(nodeId, { method: 'GET', path: browserHandoffsRoute })) as BrowserHandoffsResponse
     const handoff = body?.handoffs?.find((entry) => entry.pluginId === pluginId && entry.id === handoffId)
-    if (!handoff || !ownsRoute(handoff))
+    if (!handoff || !ownsRoute(handoff.pluginId, handoff.resolve))
       throw new BridgeFailure('not_found', 'The Node no longer offers that handoff. Reload the page and try again.')
     return handoff
   }
@@ -364,6 +420,31 @@ export function createBridge(options: {
     return parsed.data
   }
 
+  // Where each plugin that publishes task addresses says its tasks' apps answer now. A plugin whose
+  // route fails or answers something unusable adds nothing, so one broken plugin can't take every
+  // task's pages with it; the task list read beside this reports a Node that is gone.
+  async function publishedAddresses(nodeId: string): Promise<PublishedAddresses[]> {
+    const body = (await nodeRequest(nodeId, { method: 'GET', path: browserHandoffsRoute })) as BrowserHandoffsResponse
+    const routes = (body?.taskAddresses ?? []).filter(({ pluginId, route }) => ownsRoute(pluginId, route))
+    addressPlugins = new Set(routes.map((route) => route.pluginId))
+    const answers = await Promise.all(
+      routes.map(async ({ pluginId, route }): Promise<PublishedAddresses[]> => {
+        try {
+          const answer = await nodeRequest(nodeId, {
+            method: 'GET',
+            path: route,
+            maxResponseBytes: TASK_ADDRESSES_MAX_BYTES,
+          })
+          const parsed = taskAddressList.safeParse(answer)
+          return parsed.success ? [{ pluginId, addresses: parsed.data.addresses }] : []
+        } catch {
+          return []
+        }
+      }),
+    )
+    return answers.flat()
+  }
+
   async function handle(request: BridgeRequest): Promise<BridgeResults[BridgeRequest['op']]> {
     switch (request.op) {
       case 'nodes.list': {
@@ -377,20 +458,16 @@ export function createBridge(options: {
       }
       case 'node.probe': {
         pending = null
-        try {
-          pending = await probe(request.endpoint)
-        } catch (error) {
-          const message = messageOf(error)
-          if (/baseline|protocol/.test(message)) throw new BridgeFailure('incompatible', message)
-          if (/certificate|fingerprint|intercept/.test(message)) throw new BridgeFailure('identity_mismatch', message)
-          throw new BridgeFailure('node_unreachable', message)
-        }
+        pending = await probeEndpoint(request.endpoint)
         const { certPem: _certPem, ...result } = pending
         return result
       }
+      case 'node.local':
+        pending = null
+        return probeLocalNode()
       case 'node.pair': {
         const confirmed = pending
-        if (!confirmed) throw new BridgeFailure('no_probe', 'Check the Node address and its identity before pairing.')
+        if (!confirmed) throw new BridgeFailure('no_probe', 'Choose a Node and check its identity before pairing.')
         if (!confirmed.compatible)
           throw new BridgeFailure('incompatible', 'That Node speaks a different protocol version.')
         let result: Awaited<ReturnType<typeof pairWithNode>>
@@ -432,6 +509,13 @@ export function createBridge(options: {
         return listProjects(request.nodeId)
       case 'tasks.list':
         return listTasks(request.nodeId, request.projectId)
+      case 'tasks.pages': {
+        const [tasks, published] = await Promise.all([
+          readList<Task>(request.nodeId, tasksRoute, (body) => body),
+          publishedAddresses(request.nodeId),
+        ])
+        return { nodeId: request.nodeId, tasks: taskPages(tasks, published) }
+      }
       case 'agents.profiles': {
         const rows = await readList<AgentProviderDescriptor>(request.nodeId, `${agentsRoute}/providers`, (b) => b)
         return { nodeId: request.nodeId, profiles: rows.map(bridgeProfile) }
@@ -559,7 +643,10 @@ export function createBridge(options: {
         })) as BrowserHandoffsResponse | null
         if (!Array.isArray(body?.handoffs))
           throw new BridgeFailure('node_error', 'The Node returned an unreadable list of handoffs.')
-        return { nodeId: request.nodeId, handoffs: body.handoffs.filter(ownsRoute).map(bridgeHandoff) }
+        return {
+          nodeId: request.nodeId,
+          handoffs: body.handoffs.filter((handoff) => ownsRoute(handoff.pluginId, handoff.resolve)).map(bridgeHandoff),
+        }
       }
       case 'handoff.resolve': {
         const resolution = await resolveHandoff(request.nodeId, request)

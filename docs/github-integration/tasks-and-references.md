@@ -69,12 +69,14 @@ which opens **Settings > Workspaces and projects > Overview > Projects**.
 
 ## Browser handoff
 
-GitHub declares the pull request button the [browser extension](../browser-extension/handoffs.md)
+GitHub declares the pull request chip the [browser extension](../browser-extension/handoffs.md)
 draws on github.com, as `browserHandoffs` on its compiled plugin (`plugins/github/src/node/index.ts`).
 The route loads on the first handoff, from `plugins/github/src/server/browserHandoff.ts`. It matches a pull request's conversation and its
-tabs, `github.com/<owner>/<repo>/pull/<n>` and `…/pull/<n>/<tab>`. The button goes in the header's
+tabs, `github.com/<owner>/<repo>/pull/<n>` and `…/pull/<n>/<tab>`. The chip goes in the header's
 action row in a wide window, and in the state line under the title when GitHub hides that row in a
-narrower one.
+narrower one. On a pull request a task holds, the chip shows that task without calling this route:
+the task's pull number and the project's repository give its address
+([pages that belong to a task](../browser-extension/task-pages.md#pages-that-belong-to-a-task)).
 
 `POST /v1/p/github/browser/pull-request` reads the pull request through the same composite read as
 the PR pane, once for each connected GitHub account, with that account's credential. Each account

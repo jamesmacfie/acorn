@@ -34,8 +34,9 @@ describe('Acorn addresses', () => {
     { kind: 'project', projectId: 'project/one', rest: ['x', 'plugin-id', 'item 1'] },
     { kind: 'settings', pageId: 'agents', sectionId: 'general' },
     { kind: 'source', sourceId: 'pulls' },
+    { kind: 'open', url: 'https://example.com/a b?q=1+2&r=%2F#top' },
   ])('round trips $kind', (place) => {
-    if (place.kind === 'open' || place.kind === 'new-task') return
+    if (place.kind === 'new-task') return
     expect(parseLink(buildLink('node-a', place))).toEqual({ kind: 'address', address: { nodeId: 'node-a', ...place } })
   })
 
@@ -75,5 +76,6 @@ describe('Acorn addresses', () => {
       buildLink('node-a', { kind: 'task', taskId: 'x'.repeat(MAX_LINK_LENGTH - prefix.length + 1) }),
     ).toThrow(`Acorn link exceeds ${MAX_LINK_LENGTH} characters`)
     expect(() => buildLink('node-a', { kind: 'task', taskId: 'task', item: 'item' })).toThrow('needs a pane')
+    expect(() => buildLink('node-a', { kind: 'open', url: 'javascript:alert(1)' })).toThrow('http or https')
   })
 })

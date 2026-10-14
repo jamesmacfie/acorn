@@ -4,12 +4,17 @@ import type { CallError, HostState } from '../messages'
 // What each failure means for the person, with the next thing to do. One place, so the pairing
 // form, the Node list, and the project list say the same thing about the same state.
 
+export const INSTALL_COMMAND = 'acorn browser install'
+
+// The bridge states that installing it fixes. The panel shows the command for them, and checks again.
+export const installFixes = (host: HostState): boolean => host.state === 'missing' || host.state === 'forbidden'
+
 export function hostGuidance(host: HostState): string | null {
   switch (host.state) {
     case 'missing':
-      return 'The Acorn browser bridge is not installed. Run `acorn browser install` in a terminal, then reopen this panel.'
+      return 'The Acorn browser bridge is not installed. Run this in a terminal:'
     case 'forbidden':
-      return 'The installed bridge does not allow this extension. Run `acorn browser install` to repair it.'
+      return 'The installed bridge does not allow this extension. Run this in a terminal to repair it:'
     case 'exited':
       return `${host.message ?? 'The bridge stopped.'} Retry, or run \`acorn browser status\` to check the install.`
     default:

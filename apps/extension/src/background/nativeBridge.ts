@@ -31,6 +31,7 @@ export function nativeBridge(
     agents(hint: BridgeAgentHint): void
     handoffs(nodeId: string): void
     projects(nodeId: string): void
+    tasks(nodeId: string): void
     host(state: Pick<HostState, 'state' | 'message'>): void
   },
   options: { firstReplyMs?: number } = {},
@@ -60,6 +61,7 @@ export function nativeBridge(
     }
     if (value.event === 'handoffs' && typeof value.nodeId === 'string') return events.handoffs(value.nodeId)
     if (value.event === 'projects' && typeof value.nodeId === 'string') return events.projects(value.nodeId)
+    if (value.event === 'tasks' && typeof value.nodeId === 'string') return events.tasks(value.nodeId)
     if (typeof value.id !== 'string') return
     if (value.chunk) return receiveChunk(value.id, value.chunk as { index: number; count: number; data: string })
     if (value.ok === true) settle(value.id, { result: value.result })

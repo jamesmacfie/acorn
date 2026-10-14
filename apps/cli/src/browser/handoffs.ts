@@ -1,21 +1,28 @@
-import type { BridgeHandoff, BridgeHandoffItem } from '@acorn/protocol/extensionBridge.ts'
-import type { BrowserHandoff, BrowserHandoffItem } from '@acorn/protocol/plugin/handoffs.ts'
+import type {
+  BridgeHandoff,
+  BridgeHandoffItem,
+  BridgePageTask,
+  BridgeTaskPage,
+} from '@acorn/protocol/extensionBridge.ts'
+import type { BrowserHandoff, BrowserHandoffItem, TaskAddressList } from '@acorn/protocol/plugin/handoffs.ts'
 import type { Project, Task } from '@acorn/protocol/api.ts'
+import { parseSiteAddress } from '@acorn/protocol/siteAssociations.ts'
 
 // Browser handoffs on the host side (docs/browser-extension/handoffs.md): what discovery shows the
-// browser, and which tasks already hold a resolved item. Both are plain functions over the Node's own
-// answers; `createBridge` makes the calls.
+// browser, which tasks already hold a resolved item, and the page addresses each task is known by
+// (docs/browser-extension/task-pages.md). All are plain functions over the Node's own answers;
+// `createBridge` makes the calls.
 
 // Discovery without the route. The browser never names a route; the host looks it up again for each
 // call, so a stale or forged list can't send a request anywhere the Node didn't declare.
 export const bridgeHandoff = ({ resolve: _resolve, ...handoff }: BrowserHandoff): BridgeHandoff => handoff
 
-// The Node validated this when the plugin loaded. Checked again here because it is the one value that
-// decides where the host sends the page address.
-export const ownsRoute = (handoff: BrowserHandoff): boolean => {
+// The Node validated a declared route when the plugin loaded. Checked again here because it decides
+// where the host sends a request, a handoff's with the page address in it.
+export const ownsRoute = (pluginId: string, route: string): boolean => {
   try {
-    const url = new URL(handoff.resolve, 'https://acorn.invalid')
-    return url.origin === 'https://acorn.invalid' && url.pathname.startsWith(`/v1/p/${handoff.pluginId}/`)
+    const url = new URL(route, 'https://acorn.invalid')
+    return url.origin === 'https://acorn.invalid' && url.pathname.startsWith(`/v1/p/${pluginId}/`)
   } catch {
     return false
   }
@@ -66,4 +73,47 @@ export function bridgeHandoffItem(
     })),
     context: item.context ?? null,
   }
+}
+
+// What one plugin's task address route answered, parsed.
+export type PublishedAddresses = { pluginId: string; addresses: TaskAddressList['addresses'] }
+
+const TONES = { info: 'ok', warn: 'warn', danger: 'bad' } as const
+
+// The addresses each active task is known by. Most come from the Node's task list alone, so finding a
+// page's task costs no provider call: a task's links carry their item's address when the provider
+// stamped one, and core records a pull request as the project's GitHub repository and the task's pull
+// number rather than as a link, so its address is built here, as the GitHub plugin builds it. The
+// rest are exact origins plugins published for their tasks, such as a running local stack's app.
+export function taskPages(tasks: readonly Task[], published: readonly PublishedAddresses[] = []): BridgePageTask[] {
+  return tasks.flatMap((task) => {
+    if (task.status !== 'active') return []
+    const addresses: { url: string | undefined; source: string }[] = [
+      ...(task.github && task.pullNumber
+        ? [
+            {
+              url: `https://github.com/${task.github.owner}/${task.github.name}/pull/${task.pullNumber}`,
+              source: 'github',
+            },
+          ]
+        : []),
+      ...task.links.map((link) => ({ url: link.ref?.url, source: link.providerId })),
+    ]
+    const pages = addresses.flatMap(({ url, source }): BridgeTaskPage[] => {
+      const parsed = url ? parseSiteAddress(url) : null
+      return parsed?.ok ? [{ ...parsed.site, source }] : []
+    })
+    for (const { pluginId, addresses: answered } of published)
+      for (const address of answered)
+        if (address.taskId === task.id)
+          pages.push({
+            origin: address.origin,
+            pathPrefix: '/',
+            source: pluginId,
+            status: { label: address.label, state: address.state, tone: TONES[address.severity] },
+          })
+    return pages.length
+      ? [{ id: task.id, title: task.title, branch: task.branch, projectId: task.projectId, pages }]
+      : []
+  })
 }

@@ -264,6 +264,9 @@ async function main() {
   log(`registered ${installed.hostName} at ${installed.registration}`)
 
   const node = options.node ? { endpoint: options.node } : await startNode()
+  // The browser hands its environment to the native host, which then finds this session's Node as the
+  // Node on this computer, the way `acorn` would with the same variable.
+  if (node.pid) env.ACORN_DATA_DIR = paths.node
   await startWatchBuild()
   const port = await freePort()
   startBrowser(port)

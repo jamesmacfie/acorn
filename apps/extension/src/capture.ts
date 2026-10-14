@@ -1,10 +1,10 @@
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 import { TURN_MAX_ATTACHMENTS, TURN_MAX_CONTEXTS, type BridgeInputPart } from '@acorn/protocol/extensionBridge.ts'
-import type { BrowserApi, Tab } from '../browser'
+import type { BrowserApi, Tab } from './browser'
 
-// Page capture: the link, the selected text, or a screenshot of the tab showing beside the sidebar.
-// A capture stays in the draft, in this browser, until the person sends it. Nothing here talks to the
-// Node.
+// Page capture: the link, the selected text, or a screenshot of the tab showing beside the sidebar, or
+// of the tab a right-click came from. A capture stays in the draft, in this browser, until the person
+// sends it. Nothing here talks to the Node.
 
 export type CaptureKind = 'link' | 'selection' | 'screenshot'
 
@@ -47,9 +47,12 @@ const NO_ACCESS_GUIDANCE =
 const SCREENSHOT_ACCESS_GUIDANCE =
   'The browser takes a screenshot only of a page you clicked the Acorn button in the toolbar on. Click it while the page is showing, then try again.'
 
-// The tab beside the sidebar, if this extension may read it.
-async function readableTab(api: BrowserApi): Promise<Tab & { id: number; url: string }> {
-  const [tab] = await api.tabs.query({ active: true, currentWindow: true })
+// The tab beside the sidebar, or the active tab of `windowId`, if this extension may read it. The
+// background names the window, because it has no window of its own.
+async function readableTab(api: BrowserApi, windowId?: number): Promise<Tab & { id: number; url: string }> {
+  const [tab] = await api.tabs.query(
+    windowId === undefined ? { active: true, currentWindow: true } : { active: true, windowId },
+  )
   if (tab?.id === undefined || !tab.url) throw new CaptureFailure('no_access', NO_ACCESS_GUIDANCE)
   return tab as Tab & { id: number; url: string }
 }
@@ -58,10 +61,11 @@ async function readableTab(api: BrowserApi): Promise<Tab & { id: number; url: st
 // a navigation while it ran would label one page's content with another page's address.
 async function fromActiveTab<Result>(
   api: BrowserApi,
+  windowId: number | undefined,
   read: (tab: Tab & { id: number }) => Promise<Result>,
   refused = NO_ACCESS_GUIDANCE,
 ) {
-  const before = await readableTab(api)
+  const before = await readableTab(api, windowId)
   let result: Result
   try {
     result = await read(before)
@@ -71,22 +75,22 @@ async function fromActiveTab<Result>(
       throw new CaptureFailure('no_access', refused)
     throw new CaptureFailure('failed', `The browser couldn't capture this page: ${message}`)
   }
-  const after = await readableTab(api).catch(() => null)
+  const after = await readableTab(api, windowId).catch(() => null)
   if (after?.id !== before.id || after.url !== before.url)
     throw new CaptureFailure('changed', 'The page changed while it was being captured, so nothing was kept. Try again.')
   return { tab: before, result }
 }
 
-export async function capturePage(api: BrowserApi, kind: CaptureKind): Promise<PageCapture> {
+export async function capturePage(api: BrowserApi, kind: CaptureKind, windowId?: number): Promise<PageCapture> {
   const source = (tab: Tab & { url: string }): CaptureSource => ({
     id: crypto.randomUUID(),
     url: tab.url,
     title: tab.title?.trim() || tab.url,
     capturedAt: Date.now(),
   })
-  if (kind === 'link') return { ...source(await readableTab(api)), kind }
+  if (kind === 'link') return { ...source(await readableTab(api, windowId)), kind }
   if (kind === 'selection') {
-    const { tab, result } = await fromActiveTab(api, async (target) => {
+    const { tab, result } = await fromActiveTab(api, windowId, async (target) => {
       const [frame] = await api.scripting.executeScript({
         target: { tabId: target.id },
         func: () => globalThis.getSelection?.()?.toString() ?? '',
@@ -99,6 +103,7 @@ export async function capturePage(api: BrowserApi, kind: CaptureKind): Promise<P
   }
   const { tab, result: dataUrl } = await fromActiveTab(
     api,
+    windowId,
     (target) => api.tabs.captureVisibleTab(target.windowId, { format: 'jpeg', quality: SCREENSHOT_QUALITY }),
     SCREENSHOT_ACCESS_GUIDANCE,
   )

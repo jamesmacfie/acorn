@@ -25,17 +25,19 @@ left out.
 
 ## Which page a request belongs to
 
-A tab's projects are the ones the sidebar's project picker would choose for that page
-([project sites](./project-sites.md#suggestions-in-the-sidebar)). `pageScope` in `src/pageScope.ts`
-decides it for both the sidebar and the background:
+A request belongs to a tab when its task is one the page belongs to
+([pages that belong to a task](./task-pages.md#pages-that-belong-to-a-task)), or its project is one of
+the tab's projects. A tab's projects are the ones the project picker in the sidebar's **This page**
+section would choose for that page ([project sites](./project-sites.md#suggestions-in-the-sidebar)).
+`pageScope` in `src/pageScope.ts` decides them for both the sidebar and the background:
 
 - The person's choice for the page's site, kept in `siteChoices:<nodeId>`, wins. A choice of no
   project means the page has none.
 - Otherwise, every visible project whose associations cover the page. Hidden projects don't count.
 - A page that reports no address, because the extension may not read it, has none.
 
-Matching runs in the browser. `requests.pending` names only the Node, so no page address goes to the
-Node for the badge. A project the person explicitly chose for a conversation doesn't move the badge.
+Matching runs in the browser, against lists the Node already sent. `requests.pending` names only the
+Node, so no page address goes to the Node for the badge. A project the person explicitly chose for a conversation doesn't move the badge.
 A conversation stays bound across navigation, and the badge follows the page.
 
 ## The toolbar badge
@@ -59,7 +61,7 @@ The badge reads the requests again when:
 - A hint has `missed` set, or the selected Node's connection returns.
 
 It reads the visible projects and their associations on selection, on reconnect, and on the `projects`
-event. It draws again when a tab navigates, a site grant is added or removed, and the person's site
+event, and draws again whenever the list of task addresses changes. It draws again when a tab navigates, a site grant is added or removed, and the person's site
 choices change in `storage.local`.
 
 The count goes to zero at once when the host stops, the selected Node goes offline, a read fails, or
@@ -67,14 +69,20 @@ the selection moves to another Node. A count is never older than the Node's own 
 
 ## The waiting list
 
-The sidebar's **Waiting for you** card lists the same requests for the page beside it. When the page
-belongs to no project, it lists the project chosen in the picker instead. **Open** chooses the
-request's project, task, and conversation, where the request card answers it. The list follows the
-page and doesn't move a chosen conversation.
+**Waiting for you** sits at the top of the sidebar's Home view, and shows only while a request waits.
+It lists every waiting request on the selected Node, across its projects, not only the page's: the
+badge says what waits for this page, and the list says what waits anywhere.
+
+The requests are grouped by conversation, under the task's name. `requests.pending` names a request
+without its buttons or questions, so for each conversation the list reads `session.read` with an
+`afterSeq` past the end, which carries the conversation's requests and no events. Each request then
+answers in place with the conversation's own request card, keys and settling included
+([answering the agent](./conversations.md#answering-the-agent)). **Open** makes the request's task
+current and opens its conversation. A conversation's group goes once nothing in it waits.
 
 ## OS notifications
 
-OS notifications are off until the person ticks **Notify me when an agent waits on the projects of the
+OS notifications are off until the person ticks, in the sidebar's Settings, **Notify me when an agent waits on the projects of the
 page I'm on**. The tick asks the browser for the optional `notifications` permission, and unticking it
 removes the permission. The permission is the only setting, so turning it off in the browser's
 settings turns it off here too. It's local to the browser profile and separate from the Node's
@@ -85,7 +93,7 @@ active tab of any window. The text names only the kind of request: "An agent is 
 permission." or "An agent has a question for you.", then "Open Acorn to answer." It never carries the
 request's title, its detail, a project or task name, an answer, or a page address.
 
-Clicking a notification opens the sidebar and its request's conversation. The background clears the
+Clicking a notification opens the sidebar and its request's conversation, leaving Settings if it was open. The background clears the
 notification once its request stops waiting.
 
 ## Browser storage

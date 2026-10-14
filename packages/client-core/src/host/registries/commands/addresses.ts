@@ -113,12 +113,12 @@ export function parseLink(href: string): LinkResult {
   return { kind: 'address', address: { nodeId: authority, ...place } }
 }
 
-/** Build the stable, copyable navigation forms. Node IDs are written explicitly.
- * See docs/frontend/acorn-links.md § Address forms.
+/** Build the stable, copyable navigation forms, and `open` for an outside item. Node IDs are written
+ * explicitly. See docs/frontend/acorn-links.md § Address forms.
  */
 export function buildLink(
   nodeId: string,
-  place: Extract<Place, { kind: 'task' | 'project' | 'settings' | 'source' }>,
+  place: Extract<Place, { kind: 'task' | 'project' | 'settings' | 'source' | 'open' }>,
 ): string {
   if (!hostPattern.test(nodeId)) throw new Error('Invalid Node ID')
   const values =
@@ -128,7 +128,9 @@ export function buildLink(
         ? [place.projectId, ...place.rest]
         : place.kind === 'settings'
           ? [place.pageId, place.sectionId]
-          : [place.sourceId]
+          : place.kind === 'source'
+            ? [place.sourceId]
+            : []
   if (values.some((value) => value !== undefined && segment(encodeURIComponent(value)) !== value)) {
     throw new Error('Invalid address segment')
   }
@@ -149,6 +151,10 @@ export function buildLink(
       break
     case 'source':
       path = `/source/${encodeURIComponent(place.sourceId)}`
+      break
+    case 'open':
+      if (!outsideUrl(place.url)) throw new Error('Expected an http or https URL')
+      path = `/open?${new URLSearchParams({ url: place.url })}`
       break
   }
   const href = `acorn://${nodeId}${path}`

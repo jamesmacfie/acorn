@@ -53,15 +53,16 @@ export function ProjectSites(props: {
   }
 
   return (
-    <details class="sites">
-      <summary>Sites for this project ({props.sites.length})</summary>
-      <p class="quiet">The sidebar suggests this project on these pages. They give Acorn no access to a site.</p>
+    <div class="sites">
+      <p class="quiet">The panel suggests this project on these pages. They give Acorn no access to a site.</p>
       <Show when={props.sites.length}>
-        <ul>
+        <ul class="rows">
           <For each={props.sites}>
             {(site) => (
               <li>
-                <span data-testid="project-site">{display(site)}</span>
+                <span class="grow" data-testid="project-site">
+                  {display(site)}
+                </span>
                 <button
                   type="button"
                   class="quiet"
@@ -105,6 +106,6 @@ export function ProjectSites(props: {
           </p>
         )}
       </Show>
-    </details>
+    </div>
   )
 }
