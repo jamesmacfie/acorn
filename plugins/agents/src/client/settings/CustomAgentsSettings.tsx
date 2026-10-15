@@ -308,10 +308,7 @@ function AgentEditor(props: {
             />
           </Field>
           <Show when={accountChoices().length}>
-            <Field
-              label="Account"
-              hint="The login this agent's sessions start on. Default account uses the one chosen under Harnesses and defaults, and so does an account that has since been removed."
-            >
+            <Field label="Account">
               <Select
                 label="Account"
                 value={draft().account ?? ''}
