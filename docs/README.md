@@ -429,6 +429,11 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 - [Dynamic plugin rail presentation and artwork](./future/plugin-rail-artwork.md).
 
+## Browser extension panels proposal
+
+- [Pull request panel in the browser extension](./future/extension-github-panel.md) and [Docker
+  panel in the browser extension](./future/extension-docker-panel.md).
+
 ## Lessons from OpenCode proposal
 
 - [Lessons from OpenCode](./future/opencode/README.md), with phases for [a tool result
