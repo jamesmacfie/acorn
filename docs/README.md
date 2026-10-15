@@ -429,3 +429,10 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 - [Dynamic plugin rail presentation and artwork](./future/plugin-rail-artwork.md).
 
+## Lessons from OpenCode proposal
+
+- [Lessons from OpenCode](./future/opencode/README.md), with phases for [a tool result
+  cap](./future/opencode/01-tool-result-cap.md), [memory updates](./future/opencode/02-memory-updates.md),
+  [the script tool spike](./future/opencode/03-script-tool-spike.md), [the script
+  tool](./future/opencode/04-script-tool.md), and [the OpenCode
+  harness](./future/opencode/05-opencode-harness.md).

@@ -9,8 +9,8 @@ ships `opencode acp`, an Agent Client Protocol (ACP) server, so the work is one 
 conformance run, and two small doc fixes. If you find yourself writing driver code, stop and report
 the gap against its owner instead.
 
-Owning docs win where this disagrees with them. [Harness authoring](../plugin-authoring/harnesses.md#harnesses)
-holds the manifest contract, and [managed-agents harnesses](../managed-agents/harnesses.md) holds the
+Owning docs win where this disagrees with them. [Harness authoring](../../plugin-authoring/harnesses.md#harnesses)
+holds the manifest contract, and [managed-agents harnesses](../../managed-agents/harnesses.md) holds the
 driver. Neither is restated here.
 
 ## Outcome
@@ -88,7 +88,7 @@ The authoring doc's example passes `OPENCODE_*`. OpenCode reads several credenti
 `OPENCODE_API_KEY`, `OPENCODE_AUTH_CONTENT`, `OPENCODE_CONSOLE_TOKEN`, and `OPENCODE_SERVER_PASSWORD`.
 If the Node's environment held any of them, the glob would hand them to the child. Acorn's rule is that
 passthrough carries tool configuration and never credentials. For the rule, see
-[credential handling](../security/credentials.md).
+[credential handling](../../security/credentials.md).
 
 OpenCode keeps its logins under `~/.local/share/opencode`, so it needs no key from the environment. The
 two names in the manifest let an owner point OpenCode at a different config. The narrow list also keeps
@@ -129,7 +129,7 @@ into one path if it has several.
 4. Install it in a dev session. Run `pnpm dev:agent -- --session opencode`, then use
    **Settings > Plugins > Install…** with the folder, or post the folder path to
    `POST /v1/core/plugins/install`. For the route, see
-   [installing a hand-written package](../plugin-authoring/installing-a-hand-written-package.md).
+   [installing a hand-written package](../../plugin-authoring/installing-a-hand-written-package.md).
 5. Restart the Node and approve the trust prompt. It shows two lines: the ACP spawn, and
    `opencode run --model MODEL` to generate text.
 6. Run [the conformance checks](#conformance).
