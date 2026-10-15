@@ -1,7 +1,104 @@
 # Phase 17: write the Node, agent, data, and browser guides
 
-Date: October 15, 2026. Status: proposed. Needs phase 15. Runs beside phase 16 and shares its guide
+Date: October 15, 2026. Status: done. Needs phase 15. Runs beside phase 16 and shares its guide
 shape and example harness.
+
+## Completion note
+
+October 16, 2026. All 22 guides in the table below are written and published. Every code block comes from a tested example file or passes phase 15's manifest
+check, and every "Wrong" manifest fails for the reason its guide gives. [Plugin guides and their
+examples](../../site/plugin-guides.md) is the reference for the examples and the harness.
+
+What landed:
+
+- **Five examples** in `examples/plugins/`: `acme-agent`, `acme-harness`, `acme-data`, and
+  `acme-browser` as planned, and `acme-readiness`, a derived source in the scaffold's `--data-source`
+  form. All but `acme-readiness` are hand-written with no build.
+- **`test/nodeExamples.test.ts`**, 13 cases, each answer parsed with the schema the host applies. It
+  drives a stand-in `acme-code` over the Agent Client Protocol with the published SDK, runs the
+  harness conformance script, summarizes notes through a fake model provider and a real model grant,
+  and builds `acme-readiness` outside the repository from the packed SDK, running its own test.
+- **The harness** passes the manifest's migrations and event grants, binds an owner on request, and
+  calls a route as any principal, such as an agent's task credential. `NodeHalf.ctx` exposes the
+  context for seeding core's rows.
+- **The testkit** takes `events`, the manifest's `permissions.events`. Without it, a loaded plugin that
+  calls `ctx.events.on` can't start in a test.
+- **`acme-tracker`** hears `plugin:acme-data:deploys-changed` and reads the `acme-data.deploys`
+  capability, so its task mark names the latest deploy. Its pictures are unchanged.
+- **A sidebar picture**, `sidebar-plugin-panel`, from a new scene in
+  `apps/extension/src/sidebar/pictures.test.tsx`.
+- **`ExampleCode`** shows `.sql` and `.md` files, extensionless files with a `lang` override, and the
+  examples' own tests in `examples/plugins/test/`.
+- **`acme-review/node.js`** gained `hover` and `diagnostics` regions, with no change in behavior.
+
+The checks: the examples suite passes, 55 cases, and the scaffold's 24. A production build writes 203
+pages, and the site's tests pass with 231 Playwright tests. `astro check` and the examples package's
+`tsc` find no errors, and knip is clean. The architecture suite fails six checks, none in a file this
+phase touched. Phase 16 recorded eight on its base.
+
+### The walk
+
+In a `dev:agent` session, a scratch plugin written from "Give agents tools" alone, outside the
+repository, installed from its folder. Its tool was listed under **Tools and permissions**, and a
+Claude Code session loaded and called it as `mcp__acorn-dev__echo-notes_shout`. Fixed on the way:
+
+- **A plugin with no client gets no trust prompt.** It goes active on install. A device asks only for
+  a client bundle, skills, or a derived source's inputs. The guides that promised a prompt now say the
+  plugin's **Permissions** tab lists the grant, and the prompt shows it when a device asks.
+- **The tool's MCP name** is `mcp__acorn__…` in a packaged app and `mcp__acorn-dev__…` in a
+  development build. The guide gives both.
+
+`dev:agent` still fails the Node service budget on the base commit, 1,855,253 bytes against 1,820,500.
+The walk ran the rest of `pnpm run stage` by hand and started with `--prepared`.
+
+### Decisions
+
+- **A fifth example for the derived source.** A derived source needs `acorn-plugin-sdk/data`, which
+  a no-build Node half can't import. `acme-readiness` is what `npm create acorn-plugin -- --data-source`
+  writes, reading core's tasks and `acme-data:deploys`. Mixing a bundled source into `acme-data` would
+  have made the other eight features a build example too.
+- **A no-build plugin uses `$client` for SQL.** `ctx.storage.open()` is a Drizzle handle, and a plugin
+  with no build can't import Drizzle, so `acme-data` uses the SQLite driver under it with `?`
+  parameters. The guide says to use Drizzle's query builder with a bundler.
+- **The harness conformance run is a script in the example**, `acme-harness/test/conformance.mjs`.
+  acorn has no conformance command. The script reads the manifest, makes the driver's calls, and runs
+  the one-shot argv. An author runs it against their own command line.
+- **The fake model is a real provider registration.** The test registers a connection provider and a
+  model adapter through a test context, stores a connection and a grant in core's tables, and calls
+  the route, so the grant path is the Node's own.
+- **Cross-plugin capability isn't tested end to end.** Each testkit context has its own capability
+  registry, so `acme-tracker` can't see `acme-data`'s in one test. The provider side is tested through
+  `acme-data`'s routes, and the tracker's absent path through its own tests.
+- **Results without a picture are text.** A transcript line, a trust prompt line, command-line output,
+  or a dialog's text, in a `text` block. Existing snapshots and specimens are reused where they fit:
+  the Context pane, a workflow run, the handoff card, and the permissions page.
+
+### Deviations
+
+- **"Match your app's pages to tasks" had no draft page.** It's new, after the sidebar panel guide, in
+  the sidebar and the site map, and the `taskAddresses` reference page links to it.
+- **`acme-data` records an audit verb.** The `auditActions` reference names "Log and measure" as its
+  guide, so that guide covers `ctx.audit`.
+- **A workflow file block isn't from an example.** "Add a workflow step" shows the step in a TOML file,
+  the person's usage rather than the plugin's code.
+
+### Problems for their owners
+
+- **A harness-only plugin shows its program nowhere before it runs.** With no client, skills, or
+  inputs, no prompt appears, and the plugin page's **Permissions** tab lists no harness, task check,
+  context section, or custom agent line. `docs/plugin-authoring/harnesses.md` says the owner approves
+  "the two lines the trust prompt shows".
+- **A connection provider's `toPublic`** must match the host's projection exactly, and a hand-written
+  plugin has to write it out. A host default would remove the trap.
+- **An unknown `permissions.node.core` facet is skipped silently.** A typo such as `model` parses, and
+  the first call throws a `TypeError`. The guide warns about it.
+
+### What later phases need to know
+
+- Phase 18 and 19: the Node guides link to reference pages and to user docs, and use the snapshots
+  and specimens listed above. `sidebar-plugin-panel` is new.
+- Phase 20: a person walking these guides with the published packages, and the harness and model
+  steps against a real agent and key, are still yours. The walk used `dev:agent` and a scratch folder.
 
 ## Goal
 

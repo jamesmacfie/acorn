@@ -1,0 +1,79 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-data",
+  "name": "Acme deploys",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "node": "./node/index.js",
+  "migrations": "./migrations",
+  "emits": [{ "verb": "deploys-changed", "description": "A deploy was recorded or changed" }],
+  "permissions": {
+    "api": [],
+    "events": ["head:changed"],
+    "node": { "core": ["tasks"], "capabilities": [], "secrets": false, "exec": false, "net": ["api.acme.example"] }
+  },
+  "contributions": {
+    "dataSources": [
+      {
+        "sourceId": "deploys",
+        "name": "Acme deploys",
+        "singular": "Deploy",
+        "plural": "Deploys",
+        "identityScope": "A deploy id is unique on this Node.",
+        "handler": "/v1/p/acme-data/source"
+      }
+    ],
+    "schedules": [
+      {
+        "id": "sync",
+        "name": "Sync deploys from Acme Cloud",
+        "run": "/v1/p/acme-data/schedules/sync",
+        "cadence": { "every": 900 },
+        "timeout": 60
+      }
+    ],
+    "auditActions": [{ "id": "sync", "label": "Synced deploys from Acme Cloud" }],
+    "taskChecks": [
+      { "id": "running-deploys", "check": "/v1/p/acme-data/archive/check", "apply": "/v1/p/acme-data/archive/apply" }
+    ],
+    "cliCommands": [
+      {
+        "name": "deploys",
+        "title": "List deploys",
+        "summary": "List the Acme deploys recorded for a task, newest first.",
+        "risk": "read",
+        "scope": "task",
+        "capability": "tasks",
+        "route": { "method": "POST", "path": "/cli/deploys" },
+        "inputSchema": {
+          "type": "object",
+          "properties": { "nodeId": { "type": "string" }, "taskId": { "type": "string" } },
+          "required": ["nodeId", "taskId"],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "deploys": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "environment": { "type": "string" },
+                  "status": { "type": "string" },
+                  "sha": { "type": "string" },
+                  "at": { "type": "number" }
+                },
+                "required": ["environment", "status", "sha", "at"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["deploys"],
+          "additionalProperties": false
+        }
+      }
+    ]
+  }
+}

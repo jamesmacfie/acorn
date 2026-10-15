@@ -1,0 +1,121 @@
+---
+title: Show a panel in the browser sidebar
+description: Add a read-only view of a task to the browser extension's panel, built from fixed blocks your Node half answers, with no code in the browser.
+sources:
+  - docs/plugin-authoring/browser-panel.md
+  - docs/browser-extension/plugin-panels.md
+  - packages/protocol/src/plugin/handoffs.ts
+  - examples/plugins/acme-browser/acorn-plugin.json
+  - examples/plugins/acme-browser/node.js
+  - apps/extension/src/sidebar/pictures.test.tsx
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import SidebarPicture from '../../../../../components/SidebarPicture.astro'
+
+You'll add a view of the page's task to the browser extension's panel, such as the state of the app
+the task runs and links into it, answered as JSON by your Node half.
+
+## The result
+
+On a page that belongs to a task with the Acme app running, the panel's navigation gains **Acme app**:
+
+<SidebarPicture id="sidebar-plugin-panel" />
+
+**Open in Acorn** opens the task in the desktop app. **Refresh** reads the panel again.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/), and
+[Match your app's pages to tasks](/docs/build-plugins/node/match-your-apps-pages-to-tasks/) if your
+panel is about an app the task runs. The code is from
+[`examples/plugins/acme-browser`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-browser).
+
+## Steps
+
+<Steps>
+
+1. **Declare the panel.** `label` names it in the navigation, and `route` answers it. `pane` is optional:
+   one of your task panes, which **Open in Acorn** opens.
+
+   <ExampleCode file="acme-browser/acorn-plugin.json" pick={['contributions.browserPanel']} />
+
+2. **Answer the route.** The extension calls `GET <route>?taskId=…` for the panel's task. Answer 404 for
+   a task with nothing to show, and the navigation item hides. Otherwise answer `{ blocks }`:
+
+   <ExampleCode file="acme-browser/node.js" region="panel" />
+
+3. **Tell the extension when it changes.** The extension never polls. It reads your route when the
+   task changes, when the connection comes back, and when someone presses **Refresh**. Call
+   `ctx.events.status()` when your state changes:
+
+   <ExampleCode file="acme-browser/node.js" region="run-target" />
+
+4. **Check it.** Start the task's `web` run target, then open the app's page with the extension's panel
+   open. **Acme app** is in the navigation.
+
+</Steps>
+
+## The blocks
+
+| Block | Fields |
+| --- | --- |
+| `status` | `label`, `state`, `severity`, and an optional `detail`, drawn as preformatted text |
+| `links` | `title`, and up to 16 `{ label, url }`, each with an optional `ready` |
+| `rows` | `title`, and up to 64 `{ label, state, severity }` |
+| `logs` | `title`, up to 32 `sources`, the `source` shown or `null`, and up to 200 `lines` |
+
+`severity` is `info`, `warn`, `danger`, or `pending` for a state on its way to healthy. The extension
+opens an `http` or `https` link in a new tab and offers every link to copy, so a database address is
+still useful. `ready: false` shows a link that isn't answering yet without opening it. When the person
+picks a log source, the extension adds `&source=<id>` to the read.
+
+Everything is drawn as plain text, never as markup.
+
+## Mistakes
+
+- Putting a button in the panel. It's read-only by design: anything that changes state, such as
+  restarting a service, belongs in your pane in the desktop app, which **Open in Acorn** reaches.
+- A slow route. Every read runs it, while the person waits.
+- A block kind or field acorn doesn't know. The whole view is refused, the panel shows an error, and it
+  keeps the last view it had.
+- Answering a caller whose credential is bound to one task. The extension calls with the device's.
+
+`pane` names one of your own task panes, so a panel with no client can't name one:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "browserPanel": { "label": "Acme app", "pane": "acme-app", "route": "/v1/p/acme/browser-panel" }
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "browserPanel": { "label": "Acme app", "route": "/v1/p/acme/browser-panel" }
+  }
+}
+```
+
+## In the terminal
+
+This is a browser extension feature. The desktop pane that **Open in Acorn** opens draws in the
+terminal client too.
+
+## Limits
+
+- One panel per plugin, and 12 blocks per view.
+- Labels, titles, and states are 1 to 40 characters, and a row's label up to 80. A `detail` is at most
+  2,000 characters, and a log line 1,000. A view is at most 512 KiB.
+
+## Reference
+
+[browserPanel](/docs/build-plugins/reference/contributions/browser-panel/) has every field.
+[Workflows and plugin panels](/docs/browser-extension/workflows-and-plugin-panels/) is what the person
+sees.

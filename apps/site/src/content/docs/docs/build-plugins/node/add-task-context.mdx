@@ -1,0 +1,127 @@
+---
+title: Add task context
+description: Add a section to the context every agent gets about its task, within a byte and token budget, and see what the person sees before they send it.
+sources:
+  - docs/agent-tools/context-sections.md
+  - docs/agent-tools/loaded-tools.md
+  - packages/protocol/src/plugin/runtimeContributions.ts
+  - examples/plugins/acme-agent/acorn-plugin.json
+  - examples/plugins/acme-agent/node.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Snapshot from '../../../../../components/Snapshot.astro'
+
+You'll add a section to the task context: the facts acorn hands an agent about its task, beside the
+pull request, the linked issues, and the notes.
+
+## The result
+
+The Context pane lists **Acme notes** as a section, with its size, its share of the budget, and a box
+to include it. A new agent session gets it with its first message, and **Send context** sends it to a
+session that's already running:
+
+<Snapshot id="context" />
+
+The section's text, as the agent reads it:
+
+```text
+## Acme notes
+- Retry webhooks with backoff for up to an hour
+- Cap retries at one hour
+```
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-agent`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-agent).
+
+## Steps
+
+<Steps>
+
+1. **Declare the section.** `order` places it among the others, lower first. acorn's own sections are
+   spaced by 10, so a section can sit between two. `defaultIncluded` decides whether the box starts
+   ticked. After that, the person's
+   choice wins.
+
+   <ExampleCode file="acme-agent/acorn-plugin.json" pick={['contributions.contextSections']} />
+
+   - `maxBytes` and `maxTokens` are the section's share. acorn cuts what you send to fit.
+   - `timeoutMs` is how long acorn waits. A slow section is marked unavailable, and the rest still go.
+
+2. **Answer the read.** acorn posts `{ origin: { taskId }, scope: "task" }` under a credential for that
+   task. Answer with `items`, which the Context pane draws, and `compact`, the text the agent reads.
+
+   <ExampleCode file="acme-agent/node.js" region="context" />
+
+   - `items` is a list of `{ id, kind, label, body }`, with optional `details` and `sources`.
+   - `compact` must not depend on which other sections are included. The Context pane builds the exact
+     text a send delivers from each section on its own.
+   - `omitted` counts items you left out, and `unavailable` says why the section is partial.
+
+3. **Check it.** Open a task, then the Context pane with ⇧⌘X. Your section is listed with its size.
+   Tick it, and **What the agent gets** shows your `compact` text where the agent will read it.
+
+</Steps>
+
+## What the person sees and controls
+
+- The section's label, its size, and how much of its share it uses, before anything is sent.
+- **Include Acme notes in the agent's context**, saved on their device.
+- The exact text a send delivers, under **What the agent gets**, and a **Task context** chip with its
+  size in the message box of a new session.
+
+acorn treats your answer as data: it checks the shape, cuts it to the budget, and never runs anything
+in it. The agent still reads `compact` as written, so keep it to facts about the task.
+
+## Mistakes
+
+- Returning instructions in `compact`, such as "Always run the tests". Put a standing procedure in a
+  [skill](/docs/build-plugins/node/ship-custom-agents-and-skills/) instead, which an agent loads when a
+  task calls for it.
+- A slow read. The person waits for it whenever they open the Context pane. Answer from your own
+  database.
+- Naming the section the same as your plugin when you mean a second section. A section whose `id`
+  equals the plugin's id is named `<pluginId>`, and any other is `<pluginId>:<id>`.
+
+A section's budget is capped:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "contextSections": [{ "id": "notes", "label": "Acme notes", "order": 70,
+      "read": "/v1/p/acme/context/notes", "maxBytes": 1048576, "maxTokens": 2048 }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "contextSections": [{ "id": "notes", "label": "Acme notes", "order": 70,
+      "read": "/v1/p/acme/context/notes", "maxBytes": 16384, "maxTokens": 2048 }]
+  }
+}
+```
+
+## In the terminal
+
+Agent sessions in the terminal client get the same task context, your section included.
+
+## Limits
+
+- Up to 8 sections per plugin.
+- `maxBytes` is at most 65,536, `maxTokens` at most 16,384, and `timeoutMs` at most 15,000.
+- The whole bundle stays under 512 KiB, filled in `order`. A section past the budget is cut or left out.
+- A timeout, a failed route, or an answer that isn't the shape above marks only your section
+  unavailable.
+
+## Reference
+
+[contextSections](/docs/build-plugins/reference/contributions/context-sections/) has every field.
+[Task context](/docs/using/task-context/) is what the person reads about it.

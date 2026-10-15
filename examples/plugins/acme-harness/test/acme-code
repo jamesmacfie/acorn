@@ -1,0 +1,46 @@
+#!/usr/bin/env node
+// A stand-in for the `acme-code` command line, so the harness test runs without the real agent.
+// `acme-code acp` speaks the Agent Client Protocol on stdin and stdout, one JSON-RPC message per line.
+// `acme-code ask [--model <id>] <prompt>` prints one answer and exits, which is what `oneShot` runs.
+const args = process.argv.slice(2)
+
+if (args[0] === 'ask') {
+  const model = args[1] === '--model' ? args[2] : 'default'
+  const prompt = args[args.length - 1]
+  process.stdout.write(`Acme Code (${model}) read ${prompt.split(/\s+/).length} words.\n`)
+  process.exit(0)
+}
+if (args[0] !== 'acp') {
+  process.stderr.write('usage: acme-code acp | acme-code ask [--model <id>] <prompt>\n')
+  process.exit(2)
+}
+
+const send = (message) => process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...message })}\n`)
+const answers = {
+  initialize: () => ({ protocolVersion: 1, agentCapabilities: {}, authMethods: [] }),
+  'session/new': () => ({ sessionId: 'acme-session-1' }),
+  'session/prompt': ({ sessionId, prompt }) => {
+    const text = prompt.filter((block) => block.type === 'text').map((block) => block.text).join(' ')
+    send({
+      method: 'session/update',
+      params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `You said: ${text}` } } },
+    })
+    return { stopReason: 'end_turn' }
+  },
+}
+
+let buffered = ''
+process.stdin.on('data', (chunk) => {
+  buffered += chunk
+  let end
+  while ((end = buffered.indexOf('\n')) >= 0) {
+    const line = buffered.slice(0, end).trim()
+    buffered = buffered.slice(end + 1)
+    if (!line) continue
+    const { id, method, params } = JSON.parse(line)
+    if (id === undefined) continue
+    const answer = answers[method]
+    if (answer) send({ id, result: answer(params) })
+    else send({ id, error: { code: -32601, message: `acme-code has no ${method}` } })
+  }
+})

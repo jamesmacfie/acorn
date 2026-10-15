@@ -1,0 +1,160 @@
+---
+title: Write the Node half
+description: The default export, init, ready, and dispose, the order plugins start in, the worker your code runs in, and loading a route on first use.
+sources:
+  - docs/plugin-authoring/the-node-half.md
+  - docs/plugins/activation.md
+  - docs/plugin-authoring/installing-a-hand-written-package.md
+  - examples/plugins/hello-pane/node/index.js
+  - examples/plugins/acme-data/node/index.js
+  - examples/plugins/acme-data/server/routes.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll write the part of your plugin that runs on the Node: the code that serves your routes, keeps
+your data, and does work when no window is open.
+
+## The result
+
+Nothing new draws. The Node starts your code when it starts, or as soon as you install the plugin,
+and its log lines reach the Node's output with your plugin's id in front:
+
+```text
+[acme-data] synced deploys count=1
+```
+
+If your code throws, the plugin's page under **Settings** > **Plugins** and the inbox say why, and the
+Node and every other plugin keep running.
+
+## Before you start
+
+Finish [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/). The code is from
+[`examples/plugins/hello-pane`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/hello-pane)
+and [`examples/plugins/acme-data`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-data).
+
+## Steps
+
+<Steps>
+
+1. **Name the file in the manifest.** `node` is a path inside your folder. A plugin that only declares
+   data, such as a harness, needs none.
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['node']} />
+
+2. **Export the plugin.** The default export is an object with `name`, which must equal the manifest's
+   `id`, and `init`. `ready` and `dispose` are optional.
+
+   <ExampleCode file="hello-pane/node/index.js" />
+
+   - `init(ctx)` registers everything: routes, providers, listeners. It may be `async`.
+   - `ready(ctx)` runs after every plugin's `init` has finished. Read another plugin's contributions
+     there, never in `init`.
+   - `dispose()` runs when the plugin stops. Close anything you opened yourself. The host already undoes
+     everything you registered through `ctx`, and closes the database it opened for you.
+
+3. **Register what the plugin does.** Most of a Node half is a list of registrations in `init`, each a
+   line or two. acme-data opens its database, serves its routes, provides a capability, listens to a
+   core event, adds a connection, and adds a workflow step:
+
+   <ExampleCode file="acme-data/node/index.js" />
+
+   `ctx.routes.fetch` takes a function from a `Request` to a `Response`. The host strips the mount, so a
+   request to `/v1/p/acme-data/source` arrives as `/source`. The second argument tells you who's
+   calling: the person's device, the Node itself, or an agent's credential for one task.
+
+4. **Load a heavy route on first use.** Code your Node half imports at the top loads when the Node
+   starts. A module only one route needs can wait for that route's first request:
+
+   <ExampleCode file="acme-data/server/routes.js" region="lazy" />
+
+   Keep at the top anything `init` must finish: opening the database, and every registration. A
+   registration that only happens when a module loads is lost if the module waits.
+
+5. **Check it.** Save, then turn the plugin's **Enabled** switch off and on in **Settings** > **Plugins**
+   to load your change, or turn on **Development mode** on its page so the Node reloads it whenever a
+   file changes. Call one of your routes, and look for your log lines in the Node's output or on the
+   plugin's **Logs** tab.
+
+</Steps>
+
+## How plugins start
+
+The Node runs every plugin's `init` at the same time, then every plugin's `ready`, before it answers a
+request. The order of `init` calls isn't something to rely on, with one exception: a plugin that names
+another in `requires.plugins` starts after it.
+
+```json manifest title="acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "requires": { "plugins": [{ "id": "workflows" }] }
+}
+```
+
+So when `init` needs something another plugin provides, read it when you need it, inside the route or
+the listener, with `ctx.capabilities.get`. That also keeps working when the other plugin restarts.
+
+## Where your code runs
+
+Your Node half runs in its own worker, under Node.js's permission model, with only what your manifest
+asks for:
+
+- **Imports.** Only relative files and `node:` built-ins. An installed plugin is a bare folder with no
+  `node_modules`, so a package import that works on your machine, found in a parent folder, fails on
+  everyone else's. Bundle a dependency into your own files first, or use the SDK's bundled form.
+- **Network.** Only the hosts in `permissions.node.net`.
+- **Files and processes.** Only what `permissions.node.core`, `exec`, and `secrets` grant. Your own
+  database file is the one file you always get.
+- **Node.js release.** The Node refuses to load plugins on a release below
+  `>=22.23.2 <23 || >=24.18.1 <25 || >=26.5.1 <27`, and every plugin's page says so.
+
+The worker is a fence around resources, not a sandbox against hostile code. The person who installs
+your plugin is trusting you.
+
+## Mistakes
+
+- A `name` that differs from the manifest's `id` fails the load. The host binds every route and
+  registration to the id, so the package would contradict itself.
+- Calling `setInterval` for periodic work. Declare a [schedule](/docs/build-plugins/node/run-work-on-a-schedule/)
+  instead, so the person can see it, pause it, and retune it.
+- Reaching for `ctx.routes.register`, `ctx.tools`, or `ctx.contextSections`. Those belong to plugins
+  compiled into acorn. A plugin you install declares tools and context in its manifest instead.
+
+A manifest that declares work the Node half must answer, such as a task check, needs a `node` entry:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "contributions": {
+    "taskChecks": [{ "id": "deploys", "check": "/v1/p/acme/archive/check" }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "taskChecks": [{ "id": "deploys", "check": "/v1/p/acme/archive/check" }]
+  }
+}
+```
+
+## In the terminal
+
+The terminal client talks to the same Node, so it uses your Node half as it is. Nothing to do.
+
+## Limits
+
+- A route's code runs once per request. Keep work that takes longer than a few seconds in a schedule or
+  a workflow step.
+- Your log lines and telemetry are scrubbed, and records reach a sink only when the person turned
+  telemetry on ([Log and measure](/docs/build-plugins/node/log-and-measure/)).
+
+## Reference
+
+[The Node context](/docs/build-plugins/reference/the-node-context/) lists every `ctx` member, and
+[Permissions](/docs/build-plugins/reference/permissions/) lists every grant and the line the person
+sees for it. [routes](/docs/build-plugins/reference/contributions/routes/) covers the routes a
+manifest names.

@@ -643,6 +643,9 @@ importers:
 
   examples/plugins:
     devDependencies:
+      '@acorn/dashboards-core':
+        specifier: workspace:*
+        version: link:../../packages/dashboards-core
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
@@ -652,6 +655,9 @@ importers:
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@agentclientprotocol/sdk':
+        specifier: ^1.3.0
+        version: 1.3.0(zod@4.6.7)
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
@@ -8447,6 +8453,10 @@ snapshots:
   '@agentclientprotocol/sdk@1.3.0(zod@4.4.3)':
     dependencies:
       zod: 4.4.3
+
+  '@agentclientprotocol/sdk@1.3.0(zod@4.6.7)':
+    dependencies:
+      zod: 4.6.7
 
   '@antfu/install-pkg@2.1.0':
     dependencies:

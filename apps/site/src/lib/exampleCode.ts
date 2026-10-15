@@ -63,5 +63,5 @@ export function pick(manifest: string, paths: string[]): string {
 /** The language a code block highlights a file as. */
 export function language(file: string): string {
   const extension = file.split('.').at(-1)!
-  return { js: 'js', mjs: 'js', json: 'json', ts: 'ts', tsx: 'tsx', md: 'md' }[extension] ?? 'text'
+  return { js: 'js', mjs: 'js', json: 'json', ts: 'ts', tsx: 'tsx', md: 'md', sql: 'sql' }[extension] ?? 'text'
 }

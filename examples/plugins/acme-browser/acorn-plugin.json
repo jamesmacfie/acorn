@@ -1,0 +1,27 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-browser",
+  "name": "Acme in the browser",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "node": "./node.js",
+  "permissions": {
+    "api": [],
+    "events": ["run:changed"],
+    "node": { "core": [], "capabilities": [], "secrets": false, "exec": false, "net": ["api.acme.example"] }
+  },
+  "contributions": {
+    "browserHandoffs": [
+      {
+        "id": "issue",
+        "label": "Open in Acorn",
+        "match": ["https://example.com/issues/{key}"],
+        "anchors": ["body > div > h1", "h1"],
+        "resolve": "/v1/p/acme-browser/browser/issue"
+      }
+    ],
+    "taskAddresses": "/v1/p/acme-browser/task-addresses",
+    "browserPanel": { "label": "Acme app", "glyph": "app-window", "route": "/v1/p/acme-browser/browser-panel" }
+  }
+}

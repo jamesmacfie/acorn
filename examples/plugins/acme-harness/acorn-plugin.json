@@ -1,0 +1,23 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-harness",
+  "name": "Acme Code",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "permissions": { "api": [], "events": [] },
+  "contributions": {
+    "harnesses": [
+      {
+        "id": "acme",
+        "label": "Acme Code",
+        "glyph": "terminal",
+        "spawn": { "command": "acme-code", "args": ["acp"] },
+        "envPassthrough": ["ACME_*"],
+        "quirks": { "manualCompaction": false, "sessionPersistence": false },
+        "terminal": { "command": "acme-code" },
+        "oneShot": { "args": ["ask"], "modelFlag": "--model", "output": "text" }
+      }
+    ]
+  }
+}

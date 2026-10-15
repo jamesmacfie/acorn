@@ -303,6 +303,7 @@ export default defineConfig({
             'docs/build-plugins/node/add-hover-and-diagnostics-for-a-language',
             'docs/build-plugins/node/bring-a-websites-item-into-a-task',
             'docs/build-plugins/node/show-a-panel-in-the-browser-sidebar',
+            'docs/build-plugins/node/match-your-apps-pages-to-tasks',
             'docs/build-plugins/node/log-and-measure',
             'docs/build-plugins/node/test-your-plugin',
             'docs/build-plugins/node/install-update-and-share',

@@ -53,6 +53,9 @@ export type TestNodeContextOptions = {
   // Omit for the built-in tier, the full context exactly as the host builds it. `ctx.storage` is
   // present in both tiers.
   permissions?: Partial<NodePermissions>
+  /** The manifest's `permissions.events`: the core events and declared plugin verbs `ctx.events.on` may
+   *  hear. Loaded tier only. */
+  events?: readonly string[]
   /** Manifest-declared cooperative destinations for loaded-tier notice tests. */
   destinations?: readonly NonNullable<PluginFrameSurface['destinations']>[number][]
   // Where ctx.storage.open() migrates from. Defaults to this checkout's `plugins/<id>/migrations`, which
@@ -146,7 +149,14 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     // Both tiers get storage passed the same way as in production: the caller derives the handle and
     // the binding carries the loader's raw one (server/pluginHost/context.ts).
     ...(permissions
-      ? { loaded: { permissions, storage, ...(options.destinations ? { destinations: options.destinations } : {}) } }
+      ? {
+          loaded: {
+            permissions,
+            storage,
+            ...(options.events ? { events: [...options.events] } : {}),
+            ...(options.destinations ? { destinations: options.destinations } : {}),
+          },
+        }
       : {}),
     storage,
   })

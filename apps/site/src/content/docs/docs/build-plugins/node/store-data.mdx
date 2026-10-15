@@ -1,0 +1,127 @@
+---
+title: Store data
+description: Keep your plugin's data in its own SQLite database, with migrations the Node applies, and never touch another plugin's file.
+sources:
+  - docs/plugin-authoring/storage.md
+  - docs/plugins/data-ownership.md
+  - examples/plugins/acme-data/acorn-plugin.json
+  - examples/plugins/acme-data/migrations/0000_init.sql
+  - examples/plugins/acme-data/migrations/meta/_journal.json
+  - examples/plugins/acme-data/node/index.js
+  - examples/plugins/acme-data/server/store.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll give your plugin its own SQLite database, with tables your migrations create, that the Node
+opens for you and keeps across restarts and updates.
+
+## The result
+
+A file named for your plugin under the Node's data folder, `plugins/acme-data.sqlite`, with your tables
+in it. acme-data keeps one row per deploy, and its data source, task check, and command-line command
+all read the same table.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-data`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-data).
+
+## Steps
+
+<Steps>
+
+1. **Write the first migration.** One SQL file per change, in a folder of its own. Separate statements
+   with `--> statement-breakpoint`, the line Drizzle writes.
+
+   <ExampleCode file="acme-data/migrations/0000_init.sql" />
+
+2. **Write the journal.** `meta/_journal.json` lists the migrations in order. The Node applies nothing
+   from a folder without one. Each entry's `tag` is the SQL file's name without `.sql`.
+
+   <ExampleCode file="acme-data/migrations/meta/_journal.json" />
+
+3. **Name the folder in the manifest.**
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['migrations']} />
+
+4. **Open the database in `init`.** The Node opens your file, applies any migration it hasn't run yet,
+   and hands back a handle. Call `open()` as often as you like: it's one handle per start.
+
+   <ExampleCode file="acme-data/node/index.js" region="open" />
+
+5. **Read and write.** The handle is a Drizzle handle. With no build step there's no Drizzle to import,
+   so use the SQLite driver underneath it, with `?` parameters:
+
+   <ExampleCode file="acme-data/server/store.js" region="store" />
+
+   With a bundler, declare `drizzle-orm` as your own dependency and use its query builder on the same
+   handle.
+
+6. **Check it.** Install or reload the plugin. A migration that fails marks the plugin failed with the
+   reason, and leaves its database as it was.
+
+</Steps>
+
+## Change the schema later
+
+Add a migration. Never edit one that has run:
+
+1. Write `0001_<name>.sql` beside the first.
+2. Add its entry to the journal, after the last one, with a later `when`.
+3. Bump your plugin's `version`, and install the update.
+
+Before it runs new SQL, the Node checks every applied migration against the journal: its position, its
+time, and a hash of its file. An edited, reordered, or removed migration fails the plugin and leaves
+the database untouched. Put the original back and add a new migration instead.
+
+Migrations only go forward. Installing an older version doesn't undo one, so a downgrade can leave your
+code facing tables it doesn't know.
+
+## Mistakes
+
+- Renaming the plugin's `id`. The file is named for it, so a new id starts an empty database and leaves
+  the old rows behind.
+- Building SQL by joining strings with a value someone typed. Pass values as `?` parameters.
+- Opening another plugin's database, or `core.sqlite`. Your worker can't reach them. Ask the other
+  plugin for a [capability](/docs/build-plugins/node/use-events-and-talk-to-other-plugins/), or read its
+  [data source](/docs/build-plugins/node/add-a-data-source/).
+- Calling `ctx.storage.open()` with no `migrations` in the manifest. It throws rather than handing you an
+  empty database.
+
+`migrations` names a folder inside your package:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "migrations": "../shared/migrations"
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "migrations": "./migrations"
+}
+```
+
+## In the terminal
+
+The terminal client reads your data through your routes, from the same Node. Nothing to do.
+
+## Limits
+
+- One database per plugin. A transaction never spans two files.
+- The worker refuses the SQLite features that reach outside the file, such as loading an extension or
+  attaching another database.
+- Uninstalling keeps the file unless the person picks **Uninstall and delete its data**. Reinstalling
+  with the same id picks the rows up again.
+- A failed update can't be rolled back by acorn. Restore a backup of the Node, or reinstall and delete
+  the data.
+
+## Reference
+
+[Manifest reference](/docs/build-plugins/reference/manifest-reference/) has `migrations`, and
+[The Node context](/docs/build-plugins/reference/the-node-context/) has `ctx.storage`.

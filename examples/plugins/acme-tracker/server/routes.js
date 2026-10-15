@@ -16,9 +16,10 @@ const seed = () => [
 
 /**
  * @param {import('acorn-plugin-types').NodePluginContext['events']} events
+ * @param {(taskId: string) => { environment: string, status: string } | null} deployOf The task's latest Acme deploy, from acme-data.
  * @returns {(request: Request) => Promise<Response>}
  */
-export function createTracker(events) {
+export function createTracker(events, deployOf = () => null) {
   const issues = seed()
   /** Issue ids linked to each task, by task id. */
   const links = new Map()
@@ -90,7 +91,7 @@ export function createTracker(events) {
         return Response.json({
           items: keys(body)
             .filter((key) => links.get(key.task)?.length)
-            .map((key) => ({ key, severity: 'info', text: `${links.get(key.task).length} Acme issue(s)`, icon: 'list-todo' })),
+            .map((key) => ({ key, severity: 'info', text: `${links.get(key.task).length} Acme issue(s)${deployed(deployOf(key.task))}`, icon: 'list-todo' })),
         })
       // `core:source`: rail source icons whose owner consented with `statusAnnotations`.
       case 'POST /marks/sources':
@@ -146,6 +147,9 @@ export function createTracker(events) {
     }
   }
 }
+
+/** `, staging deploy succeeded` for a task acme-data has a deploy for, and nothing otherwise. */
+const deployed = (deploy) => (deploy ? `, ${deploy.environment} deploy ${deploy.status}` : '')
 
 /** The keys an annotation request asks about. Anything else in the body is ignored. */
 const keys = (body) => (Array.isArray(body.keys) ? body.keys : [])

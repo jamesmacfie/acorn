@@ -1,0 +1,164 @@
+---
+title: Add a harness
+description: Add an agent that speaks the Agent Client Protocol with a manifest and no code, give it a one-shot mode for generating text, and check it before you install it.
+sources:
+  - docs/plugin-authoring/harnesses.md
+  - docs/plugins/harnesses.md
+  - docs/managed-agents/harnesses.md
+  - packages/protocol/src/plugin/grants.ts
+  - examples/plugins/acme-harness/acorn-plugin.json
+  - examples/plugins/acme-harness/test/conformance.mjs
+  - examples/plugins/acme-harness/test/acme-code
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll add an agent to acorn, beside Claude Code and Codex, by describing how to start its command
+line. acorn runs the rest: the session, the transcript, permission prompts, and the terminal.
+
+## The result
+
+**Acme Code** is listed under **New** in the Agent pane, in a task terminal's agent menu, and in every
+Generate control, such as the commit message. Its sessions draw like any other: the transcript, tool
+calls, permission cards, and plans.
+
+## Before you start
+
+You need an agent command line that speaks the [Agent Client Protocol](https://agentclientprotocol.com)
+(ACP) on stdin and stdout, such as `opencode acp` or `gemini --experimental-acp`. The ACP project lists
+each agent's launch arguments in its registry. The code is from
+[`examples/plugins/acme-harness`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-harness),
+for an imaginary `acme-code` command line. A harness needs no Node half, no client, and no build.
+
+## Steps
+
+<Steps>
+
+1. **Describe the agent.** This is the whole plugin:
+
+   <ExampleCode file="acme-harness/acorn-plugin.json" />
+
+   - `spawn` is the command acorn starts for a session, with its arguments. acorn finds it on the
+     Node's `PATH`, owns the process, and stops it.
+   - `envPassthrough` lists the environment variables the agent gets from the Node, as names or
+     `PREFIX_*` patterns. acorn never passes a credential it holds.
+   - `quirks` covers what the protocol can't say: `manualCompaction` offers **Compact** in the pane, and
+     `sessionPersistence` says sessions outlive the process.
+   - `terminal` adds the agent to task terminals, run interactively with the same command.
+
+2. **Add the one-shot mode.** `oneShot` is how the command line answers one prompt and exits. With it,
+   the agent is offered wherever acorn generates text. acorn builds the arguments in fixed places: your
+   `args`, then `modelFlag` and the model when someone picked one, then the prompt. A system prompt goes
+   in front of the prompt with a blank line between. There are no placeholders.
+
+   `output` is `text` when stdout is the answer, or `json-lines` for a stream with a `result` event, the
+   shape `claude -p --output-format stream-json` writes. Run your command with stdout on a pipe before
+   you choose: many command lines print differently to a terminal.
+
+3. **Run the check.** Before you install, run the example's conformance script from your plugin's
+   folder, with your command line on `PATH`. It reads your manifest and makes the calls acorn makes:
+
+   <ExampleCode file="acme-harness/test/conformance.mjs" region="session" />
+
+   Then it runs the one-shot mode the way a Generate control does, in an empty folder:
+
+   <ExampleCode file="acme-harness/test/conformance.mjs" region="one-shot" />
+
+   ```text
+   $ node test/conformance.mjs
+   ok Acme Code: protocol 1, said "You said: Reply with one word.", stopped: end_turn
+   ok Acme Code one-shot: "Acme Code (default) read 4 words."
+   ```
+
+4. **Install it.** acorn describes each program it will run in the person's words, under **Enforced**,
+   marked as wide reach:
+
+   ```text
+   Run “acme-code acp” as the “Acme Code” agent and pass it ACME_* from this node’s environment
+   Runs “acme-code ask --model MODEL” to generate text
+   ```
+
+   A device shows these lines in its trust prompt when it asks about the plugin, which it does for a
+   package with a client bundle or skills. A harness on its own has neither, so it's active as soon as
+   it's installed. Read what a harness runs before you install it.
+
+5. **Check it.** Open a task, click **New** in the Agent pane, and pick **Acme Code**. Send a message.
+
+</Steps>
+
+## Test it without the real agent
+
+The example's tests start a stand-in for `acme-code`, found on `PATH` ahead of the real one. It answers
+`initialize`, `session/new`, and `session/prompt`, and prints one line for `ask`:
+
+<ExampleCode file="acme-harness/test/acme-code" lang="js" />
+
+## What acorn does for you
+
+acorn owns the ACP connection, the event log, the transcript, permission prompts, attachments, plans,
+reconnecting, and replay. It tells the agent about acorn's MCP server on every start, so the agent gets
+acorn's tools and any you [add with a plugin](/docs/build-plugins/node/give-agents-tools/). It declines
+the protocol's `fs` and `terminal` client capabilities, so the agent edits files and runs commands with
+its own tools, in the task's worktree.
+
+A one-shot run is contained: an empty temporary folder, no acorn token, no MCP server, no key acorn
+holds, and 60 seconds. The command line uses its own login.
+
+## Mistakes
+
+- Renaming the harness `id`. acorn saves `<pluginId>:<id>`, here `acme-harness:acme`, on every session
+  and workflow step, so a new id orphans them.
+- Putting an approval-skipping flag in `args`, such as `--auto-approve`. acorn's permission cards stop
+  working for that agent.
+- Choosing `output: "json-lines"` for a stream without a `result` event. acorn reads the answer as
+  missing.
+
+A harness with a terminal runs one program, so `oneShot` can't name another:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "contributions": {
+    "harnesses": [{
+      "id": "acme", "label": "Acme Code",
+      "spawn": { "command": "acme-code", "args": ["acp"] },
+      "terminal": { "command": "acme-code" },
+      "oneShot": { "command": "acme-ask", "args": [], "output": "text" }
+    }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "contributions": {
+    "harnesses": [{
+      "id": "acme", "label": "Acme Code",
+      "spawn": { "command": "acme-code", "args": ["acp"] },
+      "terminal": { "command": "acme-code" },
+      "oneShot": { "args": ["ask"], "output": "text" }
+    }]
+  }
+}
+```
+
+## In the terminal
+
+The terminal client lists the agent in the same places, and runs it in task terminals when you declare
+`terminal`.
+
+## Limits
+
+- Up to 4 harnesses per plugin.
+- A workflow's `decide` step needs a JSON verdict, which a manifest can't ask a command line for, so a
+  `text` one-shot fails there. An agent step works, as a managed session.
+- An agent that doesn't speak ACP needs an adapter: `spawn.entry` names a JavaScript file in your
+  package, run with the Node's own `node`. That's your code in a child process, and its permission line
+  says so.
+- Usage and sign-in checks, `probes.usage` and `probes.auth`, are routes on a Node half.
+
+## Reference
+
+[harnesses](/docs/build-plugins/reference/contributions/harnesses/) has every field.
+[Harnesses and defaults](/docs/agents/harnesses-and-defaults/) is what the person sees.

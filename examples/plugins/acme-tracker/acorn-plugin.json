@@ -9,8 +9,8 @@
   "client": "./client.js",
   "permissions": {
     "api": [],
-    "events": [],
-    "node": { "core": [], "capabilities": [], "secrets": false, "exec": false, "net": [] }
+    "events": ["plugin:acme-data:deploys-changed"],
+    "node": { "core": [], "capabilities": ["acme-data.deploys"], "secrets": false, "exec": false, "net": [] }
   },
   "contributions": {
     "frames": [

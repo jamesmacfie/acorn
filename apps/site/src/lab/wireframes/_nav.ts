@@ -125,7 +125,7 @@ export const buildSidebar: Group[] = [
       'Notify the person',
     ],
   },
-  { label: 'Node, agents, data, and the browser', base: 'build-plugins/node', count: 21 },
+  { label: 'Node, agents, data, and the browser', base: 'build-plugins/node', count: 22 },
   {
     label: 'Reference',
     base: 'build-plugins/reference',

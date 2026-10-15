@@ -1,0 +1,134 @@
+---
+title: Test your plugin
+description: Test a derived source with the SDK, check a harness with its script, and run the example harness and the testkit on your plugin in a checkout of acorn.
+sources:
+  - docs/plugin-authoring/testing.md
+  - docs/plugin-authoring/derived-sources.md
+  - docs/site/plugin-guides.md
+  - examples/plugins/acme-readiness/src/source.test.ts
+  - examples/plugins/test/examples.test.ts
+  - examples/plugins/test/nodeExamples.test.ts
+  - examples/plugins/test/harness.ts
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll test your plugin the way acorn will run it: its manifest through the Node's own parser, its Node
+half on the Node's own context, and a derived source against realistic records.
+
+## The result
+
+```text
+$ npm test
+ ✓ src/source.test.ts (1 test)
+   ✓ names the furthest environment each task has shipped to
+```
+
+And in a checkout of acorn, with your plugin beside the examples:
+
+```text
+$ pnpm --filter @acorn/plugin-examples test
+ ✓ test/examples.test.ts > acme-data > answers every route its manifest names
+ ✓ test/nodeExamples.test.ts > acme-agent > names its tools <pluginId>_<id> and serves them to an agent on the task
+```
+
+## Before you start
+
+Have a plugin with a Node half. The code is from
+[`examples/plugins/acme-readiness`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-readiness)
+and the examples' own tests in
+[`examples/plugins/test`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/test).
+
+## Steps: outside the repository
+
+<Steps>
+
+1. **Test a derived source with the SDK.** `acorn-plugin-sdk/testing` runs your `query` against fake
+   inputs, with the checks acorn applies to every record, under any test runner:
+
+   <ExampleCode file="acme-readiness/src/source.test.ts" region="test" />
+
+   - `fixtures('<pluginId>:<sourceId>', records)` builds records from a built-in source's real fields.
+     A field the source doesn't have throws, with a guess at the one you meant.
+   - Another plugin's source has no field list in the SDK, so write its records as `{ ref, data }`.
+   - `testDerivedSource` returns `rows`, the records it `dropped` with each reason, and the
+     `completeness` a panel would show.
+
+2. **Type-check the Node half.** `npm i -D acorn-plugin-types`, annotate `ctx` with
+   `import('acorn-plugin-types').NodePluginContext` in a JSDoc comment, and run `tsc`. A member you
+   reach for that a plugin you install doesn't get, such as `ctx.tools`, is an error.
+
+3. **Check a harness** with the [conformance script](/docs/build-plugins/node/add-a-harness/), against
+   a stand-in for your command line.
+
+4. **Run it for real.** Install the folder on a Node, turn on **Development mode**, and call your routes.
+   A Node half that throws shows the reason on the plugin's page, and its log lines are on the **Logs**
+   tab.
+
+</Steps>
+
+## Steps: in a checkout of acorn
+
+The examples on these pages run on a harness that does what the Node and the desktop app do, without
+either. It's private to the acorn repository, so use it from a checkout.
+
+<Steps>
+
+1. **Put your plugin beside the examples.** Copy its folder into `examples/plugins/`. Every folder
+   there with an `acorn-plugin.json` is picked up.
+
+2. **Run the checks every example gets.** The manifest parses with the Node's own parser, every route
+   the manifest names answers, and every tree it names mounts and draws through the same handshake the
+   desktop app uses:
+
+   <ExampleCode file="test/examples.test.ts" region="every-example" />
+
+   Run them with `pnpm --filter @acorn/plugin-examples test`.
+
+3. **Write cases for what your plugin promises.** `startNode` starts your Node half on the testkit's
+   context, `makeTestNodeContext`, which is the context the Node builds, not a mock, with your manifest's
+   own grants and migrations. `call` reaches a route the way the Node's dispatcher does, as the person's
+   device or as an agent's task credential:
+
+   <ExampleCode file="test/nodeExamples.test.ts" region="tool-test" />
+
+4. **Assert on telemetry without a sink.** The context records everything your plugin emits, newest
+   last, in `ctx.recorded`, so `expect(ctx.recorded.filter((record) => record.kind === 'span'))` checks
+   a span ended the way you meant.
+
+</Steps>
+
+## The two test environments
+
+A plugin in the acorn repository gets two Vitest projects:
+
+- `.test.ts` files run in Node.js, for logic and the Node half.
+- `.test.tsx` files run under jsdom with Solid, for a test that draws a tree or a component.
+
+Keep logic in a `.ts` module of its own, away from components. A `.ts` test loads everything a module
+imports, and one component on that path touches `window` and fails in Node.js.
+
+## Mistakes
+
+- A forged context, such as `{ routes: { fetch } } as never`. It keeps passing after acorn's context
+  changes. Use the testkit's, which can't drift.
+- A test that only calls your route functions directly. Call them through the dispatcher, with the
+  caller acorn sends, so a check on `context.principal` is tested too.
+- Testing against your own copy of a source's fields. `fixtures` holds the real ones.
+
+## In the terminal
+
+Tests don't draw. The example harness records each tree's batches, and the site draws them in both
+apps, so a test that mounts a tree covers the terminal client too.
+
+## Limits
+
+- `@acorn/plugin-api/testkit` and the example harness ship only in the acorn repository. A package
+  outside it can't import them.
+- The harness answers your client's requests with success and records them. It doesn't draw pixels.
+
+## Reference
+
+[The Node context](/docs/build-plugins/reference/the-node-context/) lists what a test context has.

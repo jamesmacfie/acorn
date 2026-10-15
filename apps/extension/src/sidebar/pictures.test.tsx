@@ -107,9 +107,26 @@ const handoffItem: BridgeHandoffItem = {
   context: null,
 }
 
+// The Acme app a task runs, and the panel the acme-browser example plugin answers for it
+// (examples/plugins/acme-browser/node.js).
+const ACME_APP = 'https://acme-5b0d7c39.localhost:5173'
+const acmePanel = {
+  blocks: [
+    { kind: 'status', label: 'Acme app', state: 'running', severity: 'info' },
+    {
+      kind: 'links',
+      title: 'Open',
+      links: [
+        { label: 'App', url: ACME_APP },
+        { label: 'Health', url: `${ACME_APP}/health` },
+      ],
+    },
+  ],
+}
+
 // One Node, Fernwood, with the site fixture's project and tasks: a scripted host like the other
 // sidebar tests', answering only what these scenes read.
-function mount(options: { url: string; title: string; paired?: boolean; waiting?: boolean }) {
+function mount(options: { url: string; title: string; paired?: boolean; waiting?: boolean; panel?: boolean }) {
   const fake = fakeBrowser()
   fake.activeTab = { id: 1, windowId: 1, url: options.url, title: options.title }
   const sessions = [
@@ -159,7 +176,17 @@ function mount(options: { url: string; title: string; paired?: boolean; waiting?
           tasks: pageTasks.map(({ id, title, branch }) => ({ id, title, branch })),
         }
       case 'tasks.pages':
-        return { nodeId: 'n1', tasks: pageTasks }
+        // With the panel, the task's app also answers at its own address.
+        return {
+          nodeId: 'n1',
+          tasks: options.panel
+            ? pageTasks.map((task) =>
+                task.id === 't1'
+                  ? { ...task, pages: [...task.pages, { origin: ACME_APP, pathPrefix: '/', source: 'acme-browser' }] }
+                  : task,
+              )
+            : pageTasks,
+        }
       case 'sites.list':
         return { nodeId: 'n1', sites: [] }
       case 'handoffs.list':
@@ -174,8 +201,10 @@ function mount(options: { url: string; title: string; paired?: boolean; waiting?
               anchors: [],
             },
           ],
-          panels: [],
+          panels: options.panel ? [{ pluginId: 'acme-browser', label: 'Acme app', glyph: 'app-window' }] : [],
         }
+      case 'plugin.panel':
+        return { nodeId: 'n1', pluginId: request.pluginId, taskId: request.taskId, view: acmePanel }
       case 'handoff.resolve':
         return { nodeId: 'n1', url: request.url, items: [handoffItem] }
       case 'sessions.list':
@@ -293,5 +322,14 @@ describe('the sidebar pictures on the site', () => {
     await settle(40)
     expect(button(root, 'Create task')).toBeDefined()
     picture('sidebar-handoff', root)
+  })
+
+  it("a plugin's panel for the page's task", async () => {
+    const { root } = mount({ url: `${ACME_APP}/`, title: 'Acme', paired: true, panel: true })
+    await settle(40)
+    button(root.querySelector('nav')!, 'Acme app')!.click()
+    await settle(20)
+    expect(root.querySelector('.view[aria-label="Acme app"] .state')?.textContent).toBe('Acme app running')
+    picture('sidebar-plugin-panel', root)
   })
 })

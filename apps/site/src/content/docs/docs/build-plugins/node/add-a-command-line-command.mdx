@@ -1,0 +1,146 @@
+---
+title: Add a command-line command
+description: Give your plugin a command under acorn plugin, with a checked JSON input and output, a scope the Node verifies, and safe retries for writes.
+sources:
+  - docs/plugin-authoring/cli-commands.md
+  - docs/cli/plugin-commands.md
+  - packages/protocol/src/plugin/cliCommands.ts
+  - examples/plugins/acme-data/acorn-plugin.json
+  - examples/plugins/acme-data/server/routes.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll add a command people and scripts can run with `acorn plugin <your id> <command>`, answered by
+your Node half, with its input and output checked against schemas you declare.
+
+## The result
+
+```text
+$ acorn plugin acme-data deploys --input-file task.json --output json
+{"pluginId":"acme-data","command":"deploys","result":{"deploys":[{"environment":"staging","status":"succeeded","sha":"a1b2c3d","at":1792195200000}]}}
+```
+
+`task.json` holds `{ "nodeId": "…", "taskId": "…" }`. `acorn plugin acme-data commands` lists the
+command, and `--help` after it prints its title, summary, scope, and both schemas.
+
+## Before you start
+
+Read [Store data](/docs/build-plugins/node/store-data/). The code is from
+[`examples/plugins/acme-data`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-data).
+
+## Steps
+
+<Steps>
+
+1. **Declare the command.**
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['contributions.cliCommands']} />
+
+   - `name` is lowercase kebab case, and `route.path` is `/cli/<name>`. acorn mounts it under your
+     plugin, at `/v1/p/acme-data/cli/deploys`.
+   - `scope` is `node`, `workspace`, `project`, or `task`. The input must require `nodeId` and, for any
+     scope but `node`, that scope's id, as strings.
+   - `capability` names the core facet the command needs, such as `tasks`. It grants nothing: ask for
+     the same facet in `permissions.node.core`.
+   - `inputSchema` and `outputSchema` use the same small JSON Schema language as an agent tool's.
+
+2. **Ask for the facet.**
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['permissions.node.core']} />
+
+3. **Answer the route.** By the time your route runs, acorn has checked the device, that `nodeId` is
+   this Node, that the task exists, and that the input fits your schema.
+
+   <ExampleCode file="acme-data/server/routes.js" region="cli" />
+
+4. **Check it.** Install the plugin, then run `acorn plugin acme-data commands`. Your command is listed
+   once the plugin is running.
+
+</Steps>
+
+## Commands that write
+
+Set `risk` to `write` and say what changes in `effects`, which `--help` prints. Each run then carries an
+idempotency key: the command line makes one, or takes `--request-id` for a retry, and the Node replays
+the first answer to a retry with the same key and input, so your route runs once.
+
+```json manifest title="acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "permissions": { "node": { "core": ["tasks"] } },
+  "contributions": {
+    "cliCommands": [{
+      "name": "record", "title": "Record a deploy", "summary": "Record a deploy of a task's commit.",
+      "effects": "Adds a deploy to the task's history.", "risk": "write", "scope": "task", "capability": "tasks",
+      "route": { "method": "POST", "path": "/cli/record" },
+      "inputSchema": { "type": "object", "properties": { "nodeId": { "type": "string" },
+        "taskId": { "type": "string" }, "sha": { "type": "string" } },
+        "required": ["nodeId", "taskId", "sha"], "additionalProperties": false },
+      "outputSchema": { "type": "object", "properties": { "deployId": { "type": "string" } },
+        "required": ["deployId"], "additionalProperties": false }
+    }]
+  }
+}
+```
+
+Don't offer anything destructive this way. A command has no confirmation.
+
+## Mistakes
+
+- A route that doesn't exist. The manifest can't prove your handler serves `/cli/<name>`, so it fails
+  when someone runs it. Run it once before you ship.
+- An answer that doesn't fit `outputSchema`. The Node refuses it rather than printing it.
+- Changing what an input means and keeping the name. A script that worked keeps running, and does the
+  wrong thing. Add a new command instead.
+
+A write command says what it changes:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "permissions": { "node": { "core": ["tasks"] } },
+  "contributions": {
+    "cliCommands": [{
+      "name": "prune", "title": "Prune deploys", "summary": "Remove old deploys.", "risk": "write",
+      "scope": "node", "capability": "tasks", "route": { "method": "POST", "path": "/cli/prune" },
+      "inputSchema": { "type": "object", "properties": { "nodeId": { "type": "string" } }, "required": ["nodeId"] },
+      "outputSchema": { "type": "object", "properties": {} }
+    }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "permissions": { "node": { "core": ["tasks"] } },
+  "contributions": {
+    "cliCommands": [{
+      "name": "prune", "title": "Prune deploys", "summary": "Remove old deploys.", "risk": "write",
+      "effects": "Deletes deploys older than 30 days.",
+      "scope": "node", "capability": "tasks", "route": { "method": "POST", "path": "/cli/prune" },
+      "inputSchema": { "type": "object", "properties": { "nodeId": { "type": "string" } }, "required": ["nodeId"] },
+      "outputSchema": { "type": "object", "properties": {} }
+    }]
+  }
+}
+```
+
+## In the terminal
+
+This is the command line, not the terminal client: `acorn` with a subcommand, for scripts and agents.
+It talks to whichever Node you choose with `--node`.
+
+## Limits
+
+- Up to 16 commands per plugin.
+- An input is at most 64 KiB, and an answer at most 256 KiB.
+- A command never receives the device's token in its input.
+
+## Reference
+
+[cliCommands](/docs/build-plugins/reference/contributions/cli-commands/) has every field.
+[The command line](/docs/automation/the-command-line/) is how people run it.

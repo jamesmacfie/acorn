@@ -111,10 +111,13 @@ afterEach(async () => {
   node = undefined
 })
 
+// #region every-example
 describe.each(PATHS)('%s', (path) => {
   const example = readExample(path)
 
-  it.runIf(example.manifest.node)('answers every route its manifest names', async () => {
+  // A Node half that's built, such as a derived source's, is checked by its example's own build test.
+  const handWritten = example.manifest.node !== undefined && existsSync(join(example.dir, example.manifest.node))
+  it.runIf(handWritten)('answers every route its manifest names', async () => {
     node = await startNode(example)
     // A route is served when GET or POST answers differently from a path nobody names. Comparing
     // with that, not with a 404, lets a served route answer 404 for an item it doesn't know.
@@ -148,6 +151,7 @@ describe.each(PATHS)('%s', (path) => {
     },
   )
 })
+// #endregion
 
 /** Mounts one entry of one example against its own Node half. */
 async function mount(path: string, entry: string, options: { props?: object; context?: object } = {}) {

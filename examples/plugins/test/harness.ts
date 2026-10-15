@@ -12,7 +12,7 @@ import { build } from 'vite'
 import solid from 'vite-plugin-solid'
 import { parsePluginManifest } from '@acorn/node-core/server/plugins'
 import { resolvePluginFetch } from '@acorn/node-core/server/routes/registry.ts'
-import { makeTestNodeContext, makeTestRequestContext } from '@acorn/plugin-api/testkit'
+import { makeTestNodeContext, makeTestRequestContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import { sandboxMessage, type TreeMutation, type TreeNode } from '@acorn/protocol/tree/messages.ts'
 
 export const EXAMPLES = resolve(import.meta.dirname, '..')
@@ -30,18 +30,27 @@ export function readExample(path: string): Example {
   return { path, dir, manifest: result.manifest }
 }
 
+type Principal = Parameters<typeof makeTestRequestContext>[0]['principal']
+
 export type NodeHalf = {
-  /** Calls a route by its full path, `/v1/p/<id>/...`, as the host's dispatcher does. */
-  call(path: string, init?: { method?: string; body?: unknown }): Promise<Response>
+  /** Calls a route by its full path, `/v1/p/<id>/...`, as the host's dispatcher does. The caller is the
+   *  owner's device unless `principal` says otherwise, such as an agent's task credential. */
+  call(
+    path: string,
+    init?: { method?: string; body?: unknown; headers?: Record<string, string>; principal?: Principal },
+  ): Promise<Response>
+  /** The context the Node half was started with, for seeding core's rows or reading what it registered. */
+  ctx: TestNodeContext
   cleanup(): Promise<void>
 }
 
 let loads = 0
 
-/** Starts the example's Node half with the testkit's context, which is the one the host builds, and
- *  the manifest's own Node permissions. */
-export async function startNode(example: Example): Promise<NodeHalf> {
-  const { id, node, permissions } = example.manifest
+/** Starts the example's Node half with the testkit's context, which is the one the host builds, the
+ *  manifest's own Node permissions and event grants, and its own migrations. `userId` binds the Node to an owner, which
+ *  `ctx.core.identity.active()` then answers. */
+export async function startNode(example: Example, options: { userId?: string } = {}): Promise<NodeHalf> {
+  const { id, node, permissions, migrations } = example.manifest
   if (!node) throw new Error(`${example.path} has no Node half`)
   // A fresh module per start, so in-memory state from one test doesn't leak into the next.
   const url = `${pathToFileURL(join(example.dir, node)).href}?load=${++loads}`
@@ -51,11 +60,18 @@ export async function startNode(example: Example): Promise<NodeHalf> {
     ready?(ctx: unknown): unknown
     dispose?(): unknown
   }
-  const ctx = makeTestNodeContext({ plugin, permissions: permissions.node })
+  const ctx = makeTestNodeContext({
+    plugin,
+    permissions: permissions.node,
+    events: permissions.events,
+    ...(migrations ? { migrations: join(example.dir, migrations) } : {}),
+    ...(options.userId ? { userId: options.userId } : {}),
+  })
   await plugin.init(ctx)
   await plugin.ready?.(ctx)
-  const request = await makeTestRequestContext({ plugin: id, env: ctx.env })
+  const device = await makeTestRequestContext({ plugin: id, env: ctx.env })
   return {
+    ctx,
     async call(path, init = {}) {
       const target = new URL(path, 'https://node.invalid')
       const match = resolvePluginFetch(id, target.pathname)
@@ -63,7 +79,10 @@ export async function startNode(example: Example): Promise<NodeHalf> {
       target.pathname = target.pathname.slice(match.mount.length) || '/'
       const method = init.method ?? 'GET'
       const body = init.body === undefined ? {} : { body: JSON.stringify(init.body) }
-      return match.fetch(new Request(target, { method, ...body }), request)
+      const request = init.principal
+        ? await makeTestRequestContext({ plugin: id, env: ctx.env, principal: init.principal })
+        : device
+      return match.fetch(new Request(target, { method, headers: init.headers, ...body }), request)
     },
     async cleanup() {
       await plugin.dispose?.()

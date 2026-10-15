@@ -256,6 +256,7 @@ Guides for the Node half, agents, data, and the browser, in [phase 17](./17-plug
 | Add hover and diagnostics for a language | `docs/editor/document-surface.md` |
 | Bring a website's item into a task | `docs/plugin-authoring/browser-handoffs.md` |
 | Show a panel in the browser sidebar | `docs/plugin-authoring/browser-panel.md` |
+| Match your app's pages to tasks | `docs/plugin-authoring/browser-handoffs.md`, `docs/browser-extension/task-pages.md` |
 | Log and measure | `docs/plugin-authoring/telemetry.md` |
 | Test your plugin | `docs/plugin-authoring/testing.md` |
 | Install, update, and share | `docs/plugin-authoring/installing-a-hand-written-package.md`, `docs/plugins/publishing.md`, `docs/plugins/distribution.md` |

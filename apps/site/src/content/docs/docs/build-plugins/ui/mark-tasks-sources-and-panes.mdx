@@ -7,7 +7,7 @@ sources:
   - docs/tui/plugin-losses.md
   - examples/plugins/acme-tracker/acorn-plugin.json
   - examples/plugins/acme-tracker/server/routes.js
-checked: dfb0bd69b
+checked: f7af12472
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -52,7 +52,9 @@ Marks need no client bundle. The code is from
    <ExampleCode file="acme-tracker/server/routes.js" region="marks" />
 
    A mark is `{ key, severity, text, icon? }`. `severity` is `info`, `warn`, or `danger`, and acorn
-   picks the color from it. `text` is up to 200 characters.
+   picks the color from it. `text` is up to 200 characters. The task's mark also names its latest
+   deploy when the acme-data example is installed, read from that plugin
+   ([Use events and talk to other plugins](/docs/build-plugins/node/use-events-and-talk-to-other-plugins/)).
 
 3. **Check it.** Save. Use **Link an Acme issue** on a task's menu: the task gains a mark, and the
    **Tracker** button in that task's pane switcher does too. The **Acme issues** icon on the left rail

@@ -83,17 +83,22 @@ export default {
         // #endregion
         case 'GET /issue':
           return Response.json({ status: ISSUES.get(query.get('item') ?? '') ?? 'No review yet' })
+        // #region hover
+        // Editor posts the live buffer, the caret, and its edit counter. Answer null for nothing to say.
         case 'POST /hover': {
           const hit = todos(body.text).find(({ start, end }) =>
             start.line === body.position.line && start.column <= body.position.column && body.position.column <= end.column)
           if (!hit) return Response.json(null)
           return Response.json({ revision: body.revision, range: hit, contents: { kind: 'markdown', value: 'Resolve before **merge**.' } })
         }
+        // #endregion
+        // #region diagnostics
         case 'POST /diagnostics':
           return Response.json({
             revision: body.revision,
             items: todos(body.text).map((range) => ({ range, severity: 'warning', message: 'Unresolved TODO', source: 'acme' })),
           })
+        // #endregion
         default:
           return new Response('not found', { status: 404 })
       }
