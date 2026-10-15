@@ -1,0 +1,84 @@
+{
+  "meta": {
+    "title": "Who reaches a Node",
+    "caption": "Your devices, your agents, and your plugins each reach the Node with a different grant.",
+    "terminal": {
+      "columns": 60,
+      "rows": 4
+    },
+    "width": 680
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Graph",
+          "props": {
+            "id": "trust-model",
+            "ariaLabel": "Who reaches a Node",
+            "nodes": [
+              {
+                "id": "devices",
+                "label": "Your devices",
+                "detail": "Paired, with full owner access"
+              },
+              {
+                "id": "agents",
+                "label": "Agents",
+                "detail": "A token for one task"
+              },
+              {
+                "id": "plugins",
+                "label": "Plugins",
+                "detail": "The permissions you accepted"
+              },
+              {
+                "id": "node",
+                "label": "Node",
+                "detail": "Your data and keys",
+                "tone": "accent"
+              }
+            ],
+            "edges": [
+              {
+                "from": "devices",
+                "to": "node"
+              },
+              {
+                "from": "agents",
+                "to": "node"
+              },
+              {
+                "from": "plugins",
+                "to": "node"
+              }
+            ],
+            "positions": {
+              "devices": {
+                "x": 0,
+                "y": 0
+              },
+              "agents": {
+                "x": 210,
+                "y": 0
+              },
+              "plugins": {
+                "x": 420,
+                "y": 0
+              },
+              "node": {
+                "x": 210,
+                "y": 130
+              }
+            }
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

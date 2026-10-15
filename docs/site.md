@@ -185,7 +185,7 @@ Every docs page takes these frontmatter fields, on top of Starlight's own:
 | `sources` | Required. At least one repository path the page was written from. |
 | `checked` | Required. The commit at which the page last matched its sources. |
 | `draft` | Optional, `false` by default. A draft builds in development and on preview deploys, never in production. |
-| `covers` | Optional. The Settings page IDs the page documents. |
+| `covers` | Optional. The Settings page IDs the page documents. `apps/site/scripts/settingsPages.test.mjs` fails when a Settings page that ships is in no page's `covers`, or `covers` names one that doesn't ship. |
 
 To add a marketing page, create an Astro file under `apps/site/src/pages/`. It exports a `meta` object
 with the same `description`, `sources`, and `checked`, typed as `PageMeta` from `apps/site/src/meta.ts`,

@@ -1,0 +1,102 @@
+---
+title: The trust model
+description: Who acorn trusts, with what, and the mechanism behind each line.
+sources:
+  - docs/security.md
+  - docs/security/transport-and-auth.md
+  - docs/security/credentials.md
+  - docs/security/node-plugin-security.md
+  - docs/security/plugin-client-sandbox.md
+  - docs/security/plugin-node-realm.md
+checked: 52225e24f
+---
+
+import Specimen from '../../../../components/Specimen.astro'
+
+This page covers who acorn trusts and with what: you, your devices, your Nodes, your agents, and your
+plugins. Read it before you pair a device, run agents unattended, or install a plugin. Each claim names
+the mechanism that enforces it, and the other Security pages hold the detail.
+
+acorn is built for one owner. It has no accounts, no roles, and no second user. Everything it protects
+is protected for you, from code you run.
+
+<Specimen id="trust-model" />
+
+## You and your devices
+
+A device is a desktop app, a terminal client, the command line, or a browser extension you paired with
+a Node. A paired device has full owner authority on that Node: it can read every task, change every
+setting, and approve every request.
+
+- **Pairing** uses a one-time code from **Settings** > **Machines** > **Nodes**. The device keeps a
+  token for that Node.
+- **The connection** is TLS 1.3 to a certificate the Node made for itself. The desktop pins it by
+  fingerprint, and a changed fingerprint stops the connection.
+- **In the desktop app**, the window that draws acorn never holds the device token. A separate helper
+  process holds it and makes every request. A plugin's code, or a web page in the preview, never sees
+  it.
+- **Unpairing** removes the token from the device. **Revoking** makes the Node refuse it, closes its
+  open connections, and fails its requests in flight.
+
+## Your Nodes
+
+A Node holds your data and runs your agents. It owns the database, the worktrees, the stored
+credentials, and the processes it starts.
+
+- A Node listens on `127.0.0.1` unless you set it up to accept other machines.
+- It runs developer tools on purpose: your shell, your Git, your agent CLIs. A compromised Node can
+  harm the computer it runs on.
+- A device still treats a Node's answers as untrusted. A plugin a Node offers runs on a device only
+  after you approve its exact bytes on that device.
+
+## Your agents
+
+An agent runs as your own user on the Node's computer, with your shell. acorn gives it a token for one
+task, not your device's authority.
+
+- **The token** is signed by the Node and names one task, one session, and the most the session's
+  tools may do. A call can't reach another task.
+- **The token can't** pair devices, manage plugins, read the audit log, make backups, change
+  connections, or spend a stored provider credential.
+- **The environment** an agent starts with is built from a list of allowed variables. It doesn't
+  inherit acorn's keys or your GitHub token.
+- **acorn's tools** are in three tiers. Execute tools are off until you turn them on
+  ([Permissions and approvals](/docs/agents/permissions-and-approvals/)).
+- **Requests** for permission come to you. An agent's token can't answer its own request.
+
+The token limits what an agent can do through acorn. It doesn't limit what an agent does with its
+shell. [What acorn doesn't protect against](/docs/security/what-acorn-doesnt-protect-against/) says
+what that means.
+
+## Your plugins
+
+acorn ships built-in plugins, and you can install more. A built-in plugin compiled into the app is part
+of acorn and isn't sandboxed. An installed plugin, called a loaded plugin, runs in two halves, each
+behind its own boundary:
+
+- **On your device**, its code runs in a Web Worker with no page to touch, or in a sandboxed frame. It
+  draws only with acorn's components, so it can't restyle or cover acorn's own controls.
+- **On the Node**, its code runs in a worker under Node.js's permission model. It can read and write
+  only its own database, reach only the hosts it declared, and start processes only if it declared
+  that. Opening `core.sqlite` or another plugin's database is refused.
+
+Each device decides for itself whether to run a plugin's device half, after a prompt that lists what it
+asks for. A new version that changes the bytes or the permissions asks again
+([Plugin trust and permissions](/docs/security/plugin-trust-and-permissions/)).
+
+Nothing about a plugin is reviewed, signed, or vetted by anyone but you.
+
+## Web pages and provider content
+
+Text from GitHub, Linear, a pull request, or a web page is treated as untrusted:
+
+- The preview pane loads pages in a separate webview, with no access to acorn's window
+  ([The preview and webviews](/docs/security/the-preview-and-webviews/)).
+- Text that reaches an agent from a pull request, another session, or a child agent is wrapped as
+  pasted content, so the agent reads it as material, not as your instruction.
+
+## In the terminal
+
+The terminal client is one process, so the window and the helper share it. The device token stays in
+one module, which an architecture rule keeps away from any code that draws. A loaded plugin still runs
+in its own worker thread there.

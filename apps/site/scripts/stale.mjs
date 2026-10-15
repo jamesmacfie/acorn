@@ -30,21 +30,29 @@ const SNAPSHOT_SOURCES = {
 
 const CHECKED = /^(\s*checked:\s*['"]?)([0-9a-f]{7,40})/m
 const SOURCES = /^\s*sources:\s*(\[[^\]]*\]|(?:\n\s*-\s.*)+)/m
+const COVERS = /^\s*covers:\s*(\[[^\]]*\]|(?:\n\s*-\s.*)+)/m
 // The commit a snapshot was captured at, near the top of the file: `<!-- commit 3f9a2c1, … -->` in the
 // HTML, and `"commit": "3f9a2c1"` in the cells.
 const SNAPSHOT_COMMIT = /\bcommit\W+([0-9a-f]{7,40})\b/
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim()
 
-/** `sources` and `checked` from a page's header: Markdown frontmatter, or an Astro page's `meta` export. */
-export function readMeta(text) {
-  const header = text.split(/^---$/m)[1] ?? ''
-  const list = header.match(SOURCES)?.[1] ?? ''
-  const sources = list.startsWith('[')
+// A YAML list of strings, written inline as `[a, b]` or as `- a` lines.
+const listItems = (list = '') =>
+  list.startsWith('[')
     ? [...list.matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1])
     : [...list.matchAll(/^\s*-\s+['"]?(.+?)['"]?\s*$/gm)].map((match) => match[1])
-  return { sources, checked: header.match(CHECKED)?.[2] }
+
+const headerOf = (text) => text.split(/^---$/m)[1] ?? ''
+
+/** `sources` and `checked` from a page's header: Markdown frontmatter, or an Astro page's `meta` export. */
+export function readMeta(text) {
+  const header = headerOf(text)
+  return { sources: listItems(header.match(SOURCES)?.[1]), checked: header.match(CHECKED)?.[2] }
 }
+
+/** The Settings page IDs a docs page's frontmatter says it documents. */
+export const readCovers = (text) => listItems(headerOf(text).match(COVERS)?.[1])
 
 export const snapshotCommit = (text) => text.slice(0, 1024).match(SNAPSHOT_COMMIT)?.[1]
 

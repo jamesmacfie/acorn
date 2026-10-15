@@ -1,0 +1,6 @@
+{"columns":60,"rows":4,"lines":[
+[{"text":" ","fg":"accent"},{"text":"  Your devices               "},{"text":"Paired, with full owner access","fg":"muted"}],
+[{"text":" ","fg":"accent"},{"text":"  Agents                               "},{"text":"A token for one task","fg":"muted"}],
+[{"text":" ","fg":"accent"},{"text":"  Plugins                      "},{"text":"The permissions you accepted","fg":"muted"}],
+[{"text":"  "},{"text":" ","fg":"accent"},{"text":"  Node                           [⇐ 3] "},{"text":"Your data and keys","fg":"muted"}]
+]}

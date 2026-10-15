@@ -1,7 +1,85 @@
 # Phase 12: write the agents, security, and settings docs
 
-Date: October 15, 2026. Status: proposed. Needs phases 2 and 4. Follows the page rules in
+Date: October 15, 2026. Status: done. Needs phases 2 and 4. Follows the page rules in
 [phase 11](./11-docs-start-and-core.md#how-every-docs-page-is-written).
+
+## Completion note
+
+October 16, 2026. All 32 pages are written, published, and marked checked: 13 Agents pages, nine
+Security pages, and the Settings overview with its nine group pages. The settings coverage check
+lands with them. Every label was read from the code or seen in a `dev:agent` session, and every default
+in a settings table comes from the code that declares it, which the page cites in `sources`.
+
+What landed:
+
+- The pages, in `apps/site/src/content/docs/docs/agents/`, `security/`, and `settings/`. The trust
+  model and plugin trust pages are `.mdx`, because they draw a picture.
+- A `Graph` diagram for the trust model, `apps/site/specimens/docs/trust-model.tsx`, laid out as phase
+  11's `clients-and-node`.
+- The coverage check. `apps/site/scripts/settingsPages.mjs` lists every shipped Settings page ID, 36 of
+  them, and `apps/site/scripts/settingsPages.test.mjs` fails when a shipped page is in no page's
+  `covers`, when `covers` names a page that doesn't ship, and, against a fixture, when a page registers
+  with no docs page covering it. `apps/site/scripts/stale.mjs` gained `readCovers`. The test runs with
+  the site's other script tests.
+- Links phase 11 asked for: the quick start and Concepts link to Agent sessions, Harnesses and
+  defaults, and The trust model, and the docs home's **Use acorn** card lists Agents, Security, and
+  Settings.
+- A line in `docs/site.md` and `docs/frontend/settings.md` that a new Settings page needs a `covers`
+  entry.
+
+The acceptance checks: a production build and a preview build both pass the site's tests, 27 script
+tests with 89 and 256 Playwright tests. `astro check` finds no errors, the specimen comparison passes
+on both hosts, and the link validator finds every internal link and anchor valid.
+
+### Decisions
+
+- **Where the list of shipped pages comes from.** Core's IDs are read from
+  `packages/client-core/src/features/settings/corePages.ts` as text, because plain Node can't load
+  client-core and the architecture rules refuse a relative import into another package. Compiled
+  plugins' IDs come from the golden list in `apps/desktop/test/client/clientPluginDisable.snapshot.json`,
+  which the desktop's own test derives by activating every compiled plugin. Loaded plugins' IDs come
+  from the settings frames in each `acorn-plugin.config.mjs`. Exporting a constant from each plugin
+  would have repeated every ID beside its registration.
+- **Plugin pages are listed, not tabled**, as this phase's out-of-scope line says, except the agents
+  plugin's four pages, which get full tables because the Agents section depends on them. Features and
+  the Sentry export entry on Machines list each page with what it holds and where it's stored.
+- **The plugin trust prompt is shown through the `permissions` shell snapshot.** The prompt is shell
+  chrome, not a kit tree, so it can't be a specimen. The plugin's **Permissions** tab lists the same
+  grants, and the page says so.
+- **The style gallery** is the one exclusion, named in `EXCLUDED` with its reason.
+
+### Deviations
+
+- **No transcript import in the app.** `docs/managed-agents/client-surfaces.md` says Agent Center
+  gathers transcript import, but nothing in a client calls it. Only the Node's HTTP route does. Agent
+  sessions says so in its limits.
+- **The terminal client draws the agents plugin's Settings pages.** `docs/first-party-plugins/terminal.md`
+  says the terminal loses them. A `dev:tui:agent` session drew **Harnesses and defaults** in full,
+  and `docs/tui/sources-and-settings.md` agrees.
+- **A plugin's page has three tabs**, **Overview**, **Permissions**, and **Versions**, plus **Logs** in
+  development mode. `docs/frontend/settings-groups.md` names a **Settings** tab that doesn't exist, and
+  says the Agents group has six pages. It has five.
+- **The terminal client doesn't list loaded plugins' settings frames**, **API requests** and **Sentry
+  export**. The pages say so.
+- **Delegation needs the Execute tier.** The five `agent_` delegation tools are execute-tier, which is
+  off by default. Delegation and subagents leads with turning it on.
+- **Claude Code has no Compact context.** The session menu offers it only on Codex.
+
+These need fixing in the internal docs by their owners.
+
+### What later phases need to know
+
+- Phase 13: each plugin page's **Settings** part should link to its row on the Features, Machines, or
+  Automation settings page, and document the rows those pages only list.
+- A new Settings page needs its ID in a group page's `covers`, or the site's tests fail.
+- A `Graph` three cards wide clips its third card when the docs column is narrower than its 680-pixel
+  width: it clips in a 1,200-pixel window and fits in a 1,440-pixel one. Phase 11's diagrams do the
+  same. Fixing it means teaching the
+  specimen generator to fit a graph, or a narrower card.
+- Pages here link to no draft page. Agents pages could link to the Nodes, command line, and Agents
+  plugin pages once those publish.
+- The architecture checks fail on this base as earlier phases recorded, with nothing from this change.
+- Nothing here needs a deploy, so nothing is left for phase 20.
 
 ## Goal
 

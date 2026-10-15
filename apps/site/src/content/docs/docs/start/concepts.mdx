@@ -33,6 +33,8 @@ clients paired with one Node show the same tasks.
 
 A **device** is one paired client install. Each holds its own token for each Node it's paired with,
 and you approve that pairing once. A token lets a device talk to a Node, and nothing else.
+[The trust model](/docs/security/the-trust-model/) says what a device, an agent, and a plugin can each
+reach.
 
 With more than one Node paired, the left rail adds **Fleet home**, a card for each Node with its task
 count, and lists such as agent sessions and the inbox gather every Node's rows. Each Node keeps its own data. Nodes don't share anything with each other.
@@ -47,8 +49,8 @@ group them into workspaces. With projects kept separate, each project has a work
 named after it, and the app says **Project** wherever it would say workspace. You can switch to
 grouped workspaces later, but not back.
 
-A **task** is one piece of work on one project. It holds a title, an optional branch, its agent
-sessions, terminals, and notes, and a link to a pull request or an issue if it came from one.
+A **task** is one piece of work on one project. It holds a title, an optional branch, its
+[agent sessions](/docs/agents/agent-sessions/), terminals, and notes, and a link to a pull request or an issue if it came from one.
 
 <Specimen id="task-parts" />
 

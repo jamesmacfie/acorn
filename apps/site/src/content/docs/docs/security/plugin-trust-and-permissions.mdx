@@ -1,0 +1,126 @@
+---
+title: Plugin trust and permissions
+description: How a plugin gets onto a Node, how each device decides to run it, what its permissions enforce, and how to take trust back.
+sources:
+  - docs/security/node-plugin-security.md
+  - docs/security/plugin-bundles.md
+  - docs/security/plugin-install.md
+  - docs/security/plugin-node-realm.md
+  - docs/security/plugin-client-sandbox.md
+  - packages/client-core/src/host/trust/PluginTrustDialog.tsx
+  - packages/client-core/src/host/trust/trustModel.ts
+  - packages/client-core/src/features/settings/plugins/PluginPage.tsx
+checked: 52225e24f
+---
+
+import Snapshot from '../../../../components/Snapshot.astro'
+
+This page covers how a plugin you install comes to run: installing it on a Node, trusting it on each
+device, what the trust prompt shows, which permissions acorn enforces and which it can only describe,
+and how to take trust back. Read it before you install a plugin someone else wrote.
+
+Plugins acorn ships come with the app and are already trusted. Everything here is about plugins you
+install.
+
+## Install a plugin on a Node
+
+1. Open **Settings** > **Plugins** > **Installed**, and click **Install…**.
+2. Choose the source: a GitHub release, an npm package, a URL, or a folder on the Node's computer.
+3. Confirm. The Node fetches the package, checks its manifest, and records the install in the audit
+   log.
+
+Only a paired device can install. An agent can ask for one with its `plugin_request` tool, which rings
+your bell with what it wants and why. The tool itself can't install anything. Approving it takes two
+screens: one for the request, and one for the real manifest the Node read back once it fetched the
+package. Until you approve the second, the package stays held and nothing in it runs.
+
+A folder install links the folder rather than copying it, so edits take effect on the next load. Point
+acorn at a folder only you can write: anyone who can write it can run code as you.
+
+## Trust it on each device
+
+Installing puts a plugin on the Node. Each device then decides for itself whether to run the plugin's
+code that draws on that device, and asks you the first time it sees it.
+
+The device fetches the code itself, computes its hash, and keeps that hash with your answer. The Node's
+own description of the plugin is never trusted on its own: a Node that changes the code, or what the
+plugin declares, under the same version gets asked about again. Pairing a new device asks again,
+because it's that device that will run the code.
+
+### What the prompt shows
+
+The prompt is titled **New plugin**, or **Plugin update** for a new version, and names the Node it came
+from. The plugin's requests are in separate groups, never in one list:
+
+| Group | What it means |
+| --- | --- |
+| **Reads your data** | What it reads. acorn blocks anything not listed. |
+| **Provides** | What it adds that other parts of acorn can use. |
+| **Enforced** | What it may do. acorn blocks anything not listed. |
+| **Declared** | Jobs and checks it runs. acorn controls when they run, not what they do. |
+| **Web pages** | Pages it shows from the internet, with their own cookies and logins. The plugin can't read them or type into them. |
+
+Requests with wide reach, such as reading every codebase's location or spending your model usage, are
+highlighted. For an update, what it gained comes first, and the rest is folded under **Everything else
+— unchanged**. A reworded line isn't a change. A new permission is.
+
+Answer with **Accept plugin** or **Reject plugin** (**Accept update** or **Reject update**). A rejection
+is remembered. **Not now** closes the prompt and records nothing, so it asks again.
+
+The plugin's **Permissions** tab in Settings lists the same grants under **What it may do**, with wide
+ones marked **Broad access**:
+
+<Snapshot id="permissions" />
+
+## Enforced and declared permissions
+
+**Enforced** permissions are fences acorn holds:
+
+- **On the Node**, a plugin's code runs in its own worker under Node.js's permission model. It reaches
+  only the hosts it named for the network, the environment variables it named, the files it was
+  granted, and processes only if it asked to start them. It can't load native code or open another
+  plugin's database or `core.sqlite`.
+- **On your device**, its code runs in a Web Worker with no page, or in a sandboxed frame. It draws only
+  with acorn's components and reaches only the acorn routes it declared.
+- **A harness** a plugin adds is listed with the exact program and arguments acorn will run. Changing
+  them asks again.
+
+**Declared** behavior is what the plugin says it does on its own: a scheduled job, a check before a
+task is archived. acorn decides when those run, but can't check what the plugin's code intends while
+running them. A plugin's skills and custom agent instructions are listed in full here, because they're
+text your agents will follow.
+
+The Node-side worker is a resource fence, not a sandbox against hostile code. Node.js's own
+documentation calls its permission model a seat belt. Installing a plugin is trusting its author.
+
+## Updates ask again
+
+A new version is a new hash, so it prompts again, leading with what it gained. acorn never updates an
+installed plugin on its own. A version that changes one byte of a skill, one word of an agent's
+instructions, or the program a harness runs asks again.
+
+A plugin in **Development mode**, which you turn on from its page, skips the prompt for new versions
+from that one Node. Its row says *In development. Bundle changes are trusted without asking*, and the
+audit log records the grant. Ending development mode drops it, and the next version prompts.
+
+## Take trust back
+
+- **Turn a plugin off** with its **Enabled** switch, at the top of its Settings page. Its pages, panes,
+  and tools go away until you turn it on.
+- **Revoke approval on this device** from the plugin's **Permissions** tab, under **Approvals on this
+  computer**. The device stops running that version and asks again next time.
+- **Uninstall** from the plugin's page, and choose whether to keep or delete its data.
+
+## In the terminal
+
+The terminal client keeps its own answers, in a folder only your user can open, and asks in its own
+prompt with the same groups. It runs a loaded plugin's code in a worker thread of its own. Installing and plugin pages open
+in the desktop app.
+
+## Limits
+
+- Nobody reviews, signs, or vets a plugin but you. acorn has no registry.
+- Plugins compiled into acorn aren't sandboxed. They're part of the app.
+- A plugin can lie about what it declares. The enforced fences bound what it can do regardless.
+- A plugin's settings frame has the same fences as its panes. It can't hide the strip acorn draws above
+  it with the plugin's name and **Enabled** switch.

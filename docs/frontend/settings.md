@@ -3,7 +3,9 @@
 This page covers the Settings layer: how it opens, its rail and groups, the page header and scope
 chip, the page context, search and deep links, and keys inside it. Read it before you add a settings
 page. It's part of [frontend](../frontend.md). [Settings pages](./settings-pages.md) covers how a page
-saves, and [settings groups](./settings-groups.md) covers the core pages.
+saves, and [settings groups](./settings-groups.md) covers the core pages. A new page that ships needs its ID in the `covers`
+list of the public site's settings reference, or the site's tests fail
+([the public site](../site.md#add-a-page)).
 
 ## Settings
 
