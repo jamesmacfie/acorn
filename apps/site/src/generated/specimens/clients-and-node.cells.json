@@ -1,0 +1,6 @@
+{"columns":60,"rows":4,"lines":[
+[{"text":" ","fg":"accent"},{"text":"  Desktop app                                "},{"text":"On your device","fg":"muted"}],
+[{"text":" ","fg":"accent"},{"text":"  Terminal client                            "},{"text":"On your device","fg":"muted"}],
+[{"text":" ","fg":"accent"},{"text":"  Command line                               "},{"text":"On your device","fg":"muted"}],
+[{"text":"  "},{"text":" ","fg":"accent"},{"text":"  Node              [⇐ 3]"},{"text":"Your data, worktrees, and agents","fg":"muted"}]
+]}

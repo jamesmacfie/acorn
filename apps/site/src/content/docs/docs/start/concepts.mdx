@@ -1,0 +1,101 @@
+---
+title: Concepts
+description: The handful of ideas everything in acorn hangs on, and where each piece of your data lives.
+sources:
+  - docs/architecture-overview.md
+  - docs/workspaces-and-tasks.md
+  - docs/workspaces-and-tasks/worktrees.md
+  - docs/state-ownership.md
+  - docs/ui-design/shell-hierarchy.md
+  - docs/architecture/fleet.md
+  - docs/features.md
+  - docs/frontend/rail-and-routing.md
+checked: 90ded85ca
+---
+
+import Specimen from '../../../../components/Specimen.astro'
+
+This page explains the ideas the rest of the docs use: Nodes and clients, workspaces, projects, and
+tasks, panes, and plugins. Read it after the [quick start](/docs/start/quick-start-first-project-first-task-first-agent/),
+so the words have something to hang on.
+
+## Node, client, and device
+
+<Specimen id="clients-and-node" />
+
+A **Node** is the process that holds your data and does the work. It keeps your workspaces, projects,
+tasks, notes, and agent history, creates Git worktrees, and runs terminals, agents, and workflows. The
+desktop app starts one on your computer. You can also run a Node on another machine and pair with it.
+
+A **client** is what you look at: the desktop app, the terminal client, the command line, or the
+browser extension. A client owns how things look and what's selected. It doesn't own the data, so two
+clients paired with one Node show the same tasks.
+
+A **device** is one paired client install. Each holds its own token for each Node it's paired with,
+and you approve that pairing once. A token lets a device talk to a Node, and nothing else.
+
+With more than one Node paired, the left rail adds **Fleet home**, a card for each Node with its task
+count, and lists such as agent sessions and the inbox gather every Node's rows. Each Node keeps its own data. Nodes don't share anything with each other.
+
+## Workspace, project, and task
+
+A **project** is a folder on the Node's machine, usually a Git checkout. acorn reads its Git and GitHub
+details from the folder, and never moves or deletes the folder itself.
+
+A **workspace** groups projects. When you set acorn up, you choose to keep each project separate or to
+group them into workspaces. With projects kept separate, each project has a workspace of its own,
+named after it, and the app says **Project** wherever it would say workspace. You can switch to
+grouped workspaces later, but not back.
+
+A **task** is one piece of work on one project. It holds a title, an optional branch, its agent
+sessions, terminals, and notes, and a link to a pull request or an issue if it came from one.
+
+<Specimen id="task-parts" />
+
+A task with a branch gets its own Git worktree, a separate copy of the project's files on that branch.
+acorn creates it the first time something needs the files, such as an agent, a terminal, or the
+editor, so a task you only look at costs nothing on disk. Two tasks never share a worktree, so two
+agents can work on the same project at once without touching each other's files. A task with no branch
+works in the project folder itself.
+
+Archiving a task stops its agents and terminals and removes its worktree. It keeps the branch, the
+notes, and the agent transcripts, so restoring the task puts it back.
+
+## Panes and the rails
+
+A task shows a row of **panes** side by side, such as Agent, Git, Notes, and Editor. Each pane is one
+view of the task. You choose which panes show, their order, and their widths, and acorn remembers the
+row for each task.
+
+The window has two rails. The **left rail** lists sources, such as Home, Git, Agents, and Memory, then
+your tasks. The **right rail** is the pane switcher for the open task. [The
+window](/docs/using/the-window-top-bar-rails-and-drawer/) covers every region, and
+[Panes](/docs/using/panes/) covers the row.
+
+## Plugins
+
+Most of what you see in acorn comes from plugins: the Agent pane, Git, Notes, the database and HTTP
+panes, Linear, and the rest. Some are built in, and some you install. An installed plugin runs in a
+sandbox, draws only with acorn's own components, and gets only the permissions its manifest asks for
+and you accept. **Settings** > **Plugins** > **Installed** lists every plugin and turns each one on or
+off.
+
+## What lives where
+
+| On the Node | On your device |
+| --- | --- |
+| Workspaces, projects, tasks, branches, and worktrees | The Nodes you've paired with, and your token for each |
+| Agent sessions, notes, memory, and workflow runs | Theme, style, keyboard shortcuts, and notification settings |
+| Each task's pane row, and its context selection | Window size, and the order of the left rail |
+| Connections to GitHub, Linear, and other services, and their secrets | A cache of what the Node last sent, so the window draws before the Node answers |
+| Installed plugins, and which are on | Which plugins you've trusted on this device |
+
+The cache on your device is only a copy. When the Node is out of reach, acorn shows what it last had,
+marked as stale, and a change you make goes to the Node or fails. It never pretends a change was saved.
+
+## Limits
+
+- A task belongs to one project and one Node. It can't move to another Node.
+- Grouping projects into workspaces can't be undone.
+- Nodes don't share data. Fleet home shows several Nodes side by side, but each task, note, and agent
+  session stays on the Node that made it.

@@ -1,0 +1,99 @@
+---
+title: The command palette
+description: Find and run any command, open any task, and change settings from the keyboard.
+sources:
+  - docs/command-palette-and-shortcuts/palette.md
+  - docs/command-palette-and-shortcuts/commands.md
+  - packages/client-core/src/host/palette/CommandPalette.tsx
+  - packages/client-core/src/host/palette/WorkspacePalette.tsx
+  - apps/desktop/src/client/App.tsx
+checked: 90ded85ca
+---
+
+import Keys from '../../../../components/Keys.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+This page covers the command palette: opening it, searching it, the kinds of command it holds, and how
+it works across more than one Node. Everything acorn and its plugins can do from a keyboard is a
+command in the palette.
+
+<Snapshot id="palette" />
+
+## Open the palette
+
+Press <Keys chord="meta+k" />. Type to search, use the arrow keys to move, press Enter to run the row
+under the cursor, or click a row. Press Esc to go back a step, and Esc at the top to close it.
+
+The palette opens on the commands that make sense where you are. In a task, it starts with the task's
+own: **Go to**, **Panes**, **Terminal**, **New agent session**, **Open Changes**, and the rest. Each
+row has a hint beside it that says what it does.
+
+## Search
+
+At the top, typing searches every command at every depth, by its title, its keywords, and its hint. A
+command inside a group shows the group it's in, such as **Settings › Appearance › Theme**, so you can
+find a command without knowing where it lives. Inside a group, typing narrows that group.
+
+Backspace edits what you typed. It never takes you back a step, so you can't lose your place by
+deleting one character too many.
+
+## The five kinds of command
+
+| Kind | What Enter does | Example |
+| --- | --- | --- |
+| Action | Runs it, and usually closes the palette | **New task**, **Copy link** |
+| Group | Opens it, to show the commands inside | **Go to**, **Panes**, **Terminal** |
+| Search | Asks for text, then lists what it found | **Find a note**, **Search memory**, the task search in **Go to** |
+| Input | Asks for text, and Enter submits it | **Create a task note** |
+| Setting | Lists the choices, with the current one marked, and Enter picks one | **Appearance › Theme** |
+
+A search waits until you've typed two characters and paused for a moment, then shows its results, an
+empty result, or an error. An input shows a pending row after Enter, and a second Enter is ignored, so
+nothing is submitted twice. If an action fails, the palette stays open with the message, and what you
+typed is kept.
+
+## Change a setting from the palette
+
+Some settings live in the palette as well as on their Settings page: the five **Appearance** choices
+and the **Notifications** switches. Pick one, and the palette shows its choices with the current value
+marked. Picking a choice saves it and keeps the list open, so you can see what was stored. An on and
+off setting offers **On** and **Off**, so a choice means the same thing however many times you pick it.
+
+Every Settings page and section has a row too, such as **Settings › Limits and cost › Claude prices**,
+which opens that page on that section.
+
+## Shortcuts that open the palette
+
+- <Keys chord="meta+k" /> opens it.
+- <Keys chord="meta+l" /> opens the project or workspace switcher.
+- <Keys chord="meta+;" /> switches straight back to the last project or workspace you had open. Press
+  it again to swap back.
+- A shortcut set on a group opens the palette inside that group.
+
+## Commands across Nodes
+
+With more than one Node paired, the searches in **Go to** look across every Node, and each row is
+labeled with its Node. Picking a task on another Node switches to that Node first. If one Node doesn't
+answer, the others' rows still show.
+
+The palette works on the place you opened it from. If the Node, workspace, project, or task changes
+while it's open, it closes.
+
+## What isn't in the palette
+
+Stopping an agent, removing a container, deleting a note, merging a pull request, and approving a
+workflow gate aren't palette commands. Each needs context and a confirmation that a short row can't
+carry, so they stay in the views that show both.
+
+## In the terminal
+
+<Keys chord="ctrl+k" /> opens the same palette, with the same commands, searches, and settings, drawn
+over the screen. It works from anywhere except inside a running terminal session. Instead of a row per
+Settings page, the terminal client has one **Open settings** row. The desktop's **Panes** group, which
+shows and moves panes by name, isn't there. Open a pane with a plugin's own command, such as **Open
+Changes**.
+
+## Limits
+
+- A command a plugin adds goes away when you turn that plugin off.
+- Free text, secrets, and settings that save several values at once stay on their Settings pages.

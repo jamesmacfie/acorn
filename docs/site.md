@@ -29,8 +29,8 @@ Starlight drops drafts from any production build, and fails on a sidebar entry w
 find. So `apps/site/astro.config.mjs` leaves draft pages out of the sidebar in a production build,
 and `apps/site/src/content.config.ts` publishes drafts with a banner in a preview build.
 
-Every build runs `starlight-links-validator`, so a broken link between pages fails the build.
-
+Every build runs `starlight-links-validator`, so a broken link between pages fails the build. It can't
+see marketing pages, so its `exclude` in `astro.config.mjs` lists those a docs page may link to.
 A build reads GitHub too, and the changelog reads a data file: see [releases](./site/releases.md).
 
 ## Check it

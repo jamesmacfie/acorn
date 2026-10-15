@@ -1,0 +1,140 @@
+---
+title: "Quick start: first project, first task, first agent"
+description: Add a project, open a task, have an agent make a change, then commit, push, and archive it.
+sources:
+  - docs/workspaces-and-tasks/projects.md
+  - docs/workspaces-and-tasks/task-creation.md
+  - docs/workspaces-and-tasks/archive.md
+  - docs/managed-agents/sessions.md
+  - docs/git-client/worktrees.md
+  - docs/diff-rendering/changes-pane.md
+  - docs/tui/chrome.md
+checked: 90ded85ca
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import Keys from '../../../../components/Keys.astro'
+
+This tutorial takes one small change from start to finish: add a project, open a task, have Claude
+Code or Codex make the change, read the diff, commit and push it, and archive the task. It takes about
+ten minutes. You need acorn [installed](/docs/start/install/), a Git repository with a remote you can
+push to, and Claude Code or Codex installed and signed in.
+
+The steps use the desktop app. [In the terminal](#in-the-terminal) has the same steps for the terminal
+client.
+
+<Steps>
+
+1. **Add a project.** If you added one in the first-run setup, skip this step. Otherwise, click the
+   picker at the left of the top bar, choose **Add project…**, and pick your repository's folder.
+
+   <Checkpoint>The picker shows the project's name, and the window shows **Home**.</Checkpoint>
+
+2. **Create a task.** Click **+** at the bottom of the left rail, or press <Keys chord="meta+shift+n" />.
+   In **New task**, keep the **New worktree** tab, type a title such as `Add a farewell function`, and
+   click **Create task**. Open **Advanced** first if you want to see the branch acorn makes from the
+   title, or the branch it starts from.
+
+   <Checkpoint>
+     The task opens on its **Agent** pane. The top bar reads your project and the task's title, and the
+     strip at the bottom of the task shows **Worktree** and the branch name, such as
+     `add-a-farewell-function`.
+   </Checkpoint>
+
+3. **Start an agent session.** Under **Start a managed coding session**, click **Claude Code** or
+   **Codex**. A harness that isn't installed is greyed out and says it isn't on your `PATH`.
+
+   <Checkpoint>
+     The session reads **This session is ready for its first turn**, with **Mode**, **Model**, and
+     **Effort** above the message box, and a **Task context** chip that says what acorn attaches to the
+     first turn.
+   </Checkpoint>
+
+4. **Ask for a small change.** Type a request into the message box, such as `Add a farewell(name)
+   function that returns "Goodbye, " + name. Don't commit.` Then click **Send**. Enter sends too, and
+   Shift+Enter starts a new line.
+
+   <Checkpoint>
+     The transcript shows your message, then each step the agent takes, such as the commands it runs,
+     then its reply. The turn ends with **Turn complete**.
+   </Checkpoint>
+
+5. **Read the diff.** In the pane switcher on the right edge of the window, click **Git**, or press
+   <Keys chord="meta+shift+g" />. The Git pane opens on its **Changes** tab. If the file list is
+   folded away, click **Expand Git list**.
+
+   <Checkpoint>
+     The list shows each changed file with its added and removed line counts, and the diff beside it.
+     **Unified** and **Split** switch the diff's layout.
+   </Checkpoint>
+
+6. **Commit and push.** Type a message into **Commit message**, then click **Commit tracked**, which
+   commits every change to a tracked file without staging first. To commit only some files, tick them
+   to stage them, and the button reads **Commit**. Then click **Publish** beside the branch name, which
+   pushes the branch and sets its upstream.
+
+   <Checkpoint>
+     The tab reads **No changes. Everything is committed.** The button beside the branch now reads
+     **Fetch**. It always names the next thing to do, so after your next commit it reads **Push**.
+   </Checkpoint>
+
+7. **Archive the task.** Click **Archive task**, the **×** at the bottom of the pane switcher. The
+   dialog says acorn stops this task's sessions and deletes its worktree. Click **Archive task**.
+
+   <Checkpoint>
+     The window goes back to **Home**. Click **Archive** in the left rail: the task is listed there, with
+     its agent session readable and **Restore task** beside it.
+   </Checkpoint>
+
+</Steps>
+
+Your branch and its commits are still in the repository, and the agent's transcript is kept with the
+task. [Archive and restore](/docs/using/archive-and-restore/) covers what comes back when you restore
+it.
+
+## In the terminal
+
+The terminal client runs the same steps from the keyboard. <Keys chord="ctrl+k" /> opens the command
+palette from anywhere, and the footer line always says what the keys do where you are.
+
+<Steps>
+
+1. Run `acorn`. If the Node has no projects, **Set up acorn** asks for a project's absolute path.
+
+2. Press <Keys chord="ctrl+k" />, type `new task`, and press Enter. Type a title, move to
+   **Create task** with Tab, and press Enter.
+
+   <Checkpoint>The form says the task was created, and the task is in the **Tasks** panel.</Checkpoint>
+
+3. Press <Keys chord="ctrl+k" />, choose **Go to task**, and pick your task.
+
+   <Checkpoint>The top bar shows `Task:` and the title, and the **Agent** pane is open.</Checkpoint>
+
+4. Press <Keys chord="ctrl+k" />, choose **New agent session**, then pick **Claude Code** or **Codex**.
+
+5. Press Tab until the footer reads **ctrl+return send**. That's the message box. Type your request
+   and press <Keys chord="ctrl+enter" />.
+
+   <Checkpoint>The transcript shows the agent's steps and reply, ending with **Turn complete**.</Checkpoint>
+
+6. Press <Keys chord="ctrl+k" /> and choose **Open Changes**.
+
+   <Checkpoint>The **Git** pane shows the changed file in its list and the diff beside it.</Checkpoint>
+
+7. The commit message box, **Commit tracked**, and **Publish** are in the pane's list column, as on
+   the desktop.
+
+</Steps>
+
+The terminal client can't archive a task. Archive it from the desktop app.
+
+Tab moves between the screen's regions, and passing over the **Menu** panel opens its source in place
+of the task. If that happens, open the task again with **Go to task**.
+
+## Limits
+
+- Adding a project with **Add project…** uses a folder picker, so it works only on the Node on this
+  computer. For a Node on another machine, add the project in **Settings** by typing its path.
+- Archiving a task is a desktop action. The terminal client and the command line can't archive.
+- **Publish** pushes to the branch's remote. acorn doesn't open a pull request for you in these steps.

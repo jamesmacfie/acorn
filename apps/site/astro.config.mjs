@@ -58,7 +58,8 @@ export default defineConfig({
       description: 'An agent workspace for developers who work with coding agents.',
       favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/jamesmacfie/acorn' }],
-      plugins: [starlightLinksValidator()],
+      // The validator sees only Starlight's pages, so it can't check a docs page's link to a marketing page.
+      plugins: [starlightLinksValidator({ exclude: ['/download/', '/download/#*', '/changelog/', '/features/**'] })],
       editLink: { baseUrl: 'https://github.com/jamesmacfie/acorn/edit/main/apps/site/' },
       lastUpdated: true,
       pagination: true,

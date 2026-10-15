@@ -1,6 +1,85 @@
 # Phase 11: write Start here and Using acorn
 
-Date: October 15, 2026. Status: proposed. Needs phases 2 and 4. Picks up the design when phase 6 lands.
+Date: October 15, 2026. Status: done. Needs phases 2 and 4. Picks up the design when phase 6 lands.
+
+## Completion note
+
+October 16, 2026. All 20 pages are written, published, and marked checked: the five Start here pages,
+with "What is acorn" at `/docs/`, and the 15 Using acorn pages. The docs home's **Use acorn** card
+links to every one of them. Every label on the pages was found in the code or seen in a `dev:agent`
+session, and every behavior was checked against the page's sources and, where a doc was thin, the
+component that draws it.
+
+What landed:
+
+- The pages, in `apps/site/src/content/docs/docs/start/` and `using/`, plus `index.mdx`. Pages that
+  draw a picture or a key cap are `.mdx`.
+- Two `Graph` diagrams for Concepts, in `apps/site/specimens/docs/`: `clients-and-node` and
+  `task-parts`. Each has three cards in two ranks, placed with `positions`, because jsdom can't fit a
+  graph and the docs column is about 760 pixels wide.
+- The Appearance page embeds the site's own `Appearance` control, inline, above a picture that follows
+  it.
+- `starlight-links-validator` skips `/download/`, `/changelog/`, and `/features/**`, which it can't
+  see. `docs/site.md` says so.
+
+The acceptance checks: a production build and a preview build both pass the site's tests, 57 and 256.
+`astro check` finds no errors. The quick start was walked end to end in a fresh `dev:agent` session on
+a throwaway repository with a local remote: add, create, Claude Code session, diff, **Commit tracked**,
+**Publish**, archive, and restore. In a fresh `dev:tui:agent` session it was walked from **New task**
+to the diff in **Open Changes**. What that walk found is below.
+
+### Decisions
+
+- **Links go only to published pages.** A production build fails on a link to a draft, so these pages
+  link to each other, to `/download/`, and to `/features/`, and not to the Agents, Settings, plugin,
+  Nodes, or extension pages. Rule 9 is met within this phase's pages.
+- **The window page's labeled picture is the hero scene and a table of regions**, each row saying where
+  the region sits in the picture. Drawing labels over a captured window would need a new component and
+  would drift with every recapture.
+- **Keyboard shortcuts lists the defaults by hand**, copied from **Settings** > **Keyboard shortcuts**
+  in the running app. Phase 14 generates the full reference, and the page cites the files that
+  register the chords, so `stale` lists it when one changes.
+- **The Build plugins card on the docs home links to `/features/plugins/`**, because every plugin docs
+  page is a draft.
+
+### Deviations
+
+- **The internal docs say a pane no plugin provides draws as a placeholder.** `TaskPaneHost.tsx` leaves
+  it out of the drawn row and keeps its ID in the saved row. The Panes page describes the code.
+  `docs/features.md` and `docs/panes/layout.md` need the same correction from their owner.
+- **The terminal client can't archive, restore, or delete a task, and nor can the command line.** No
+  source doc says this plainly. The quick start, Archive and restore, and Desktop and terminal say so.
+- **The desktop archive passes `force: true`**, so archiving discards uncommitted changes and stops
+  running sessions. The Git plugin's archive check warns first. Archive and restore says so.
+- **Three themes are light and nine are dark**, read from `--is-dark` in `tokens-theme.css`.
+
+### What the terminal quick start found
+
+These are behaviors in the terminal client, not page errors. The pages steer around them, and each
+deserves a look from whoever owns `apps/tui`:
+
+- Tab cycles through the **Menu** panel, which opens its first source, Docker, and leaves the task.
+  That made it impossible to reach the Changes tab's commit box from the keyboard.
+- **Go to task** sometimes answers **No results** for the open task, even with an empty query.
+- Enter on a row in **Tasks** previewed **Task to open** but didn't open it. **Start working** after
+  **New task** went back to Docker instead of the task.
+- `pnpm dev:tui:agent -- --reuse --link acorn://local/t/<id>` started on Docker, not the task.
+- <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> didn't switch to the Git pane in the agent driver's PTY.
+
+### What later phases need to know
+
+- Add links from these pages as later pages publish: the quick start and Concepts to Agent sessions,
+  Harnesses and defaults, and Nodes; Install to Set up the extension, Pair a device or a remote Node,
+  and Run a standalone Node; Tasks and worktrees to the GitHub, Linear, and Rollbar plugin pages;
+  Keyboard shortcuts to the keyboard reference; Notes and Task context to the Context plugin page;
+  Project configuration to the Configuration files reference.
+- The landing, feature, and download pages' link test still needs its preview-only skip, because most
+  pages they link to are still drafts.
+- Phase 14's keyboard reference should replace the tables on Keyboard shortcuts with a link.
+- A docs page that links to a marketing route other than the three above needs that route added to the
+  validator's `exclude` in `astro.config.mjs`.
+- The architecture checks fail on this base as earlier phases recorded, with nothing from this change.
+- Nothing here needs a deploy, so nothing is left for phase 20.
 
 ## Goal
 

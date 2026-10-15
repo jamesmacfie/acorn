@@ -1,0 +1,91 @@
+---
+title: What is acorn
+description: What acorn is, and what it does for a developer working with coding agents.
+sources:
+  - docs/features.md
+  - docs/architecture-overview.md
+  - docs/workspaces-and-tasks.md
+  - docs/workspaces-and-tasks/archive.md
+  - docs/tui.md
+  - docs/browser-extension/setup.md
+  - docs/future/marketing/voice.md
+checked: 90ded85ca
+---
+
+import Card from '../../../components/Card.astro'
+import Snapshot from '../../../components/Snapshot.astro'
+
+A workspace for working with coding agents, one task at a time.
+
+Open a task and acorn gives it a branch, a Git worktree, terminals, and agent sessions, with the diff
+and the pull request in the panes beside them. Use it from the desktop app or from your terminal. It's
+the same workspace either way.
+
+## The model in one picture
+
+<Snapshot id="hero" />
+
+The picture is one task, **Retry failed webhooks**, open in the desktop app. Everything in acorn hangs
+on four ideas:
+
+- A **workspace** groups projects. **Fernwood** in the top-left corner is the workspace. You can also
+  keep each project on its own, with no grouping.
+- A **project** is a folder on your machine, usually a Git checkout. Here it's **billing-api**.
+- A **task** is one piece of work on one project. It gets its own branch and its own Git worktree, so
+  two tasks never share files. Its agent sessions and terminals run in that worktree.
+- **Panes** are the views a task shows side by side: the Agent pane, Changes, Notes, the editor, and
+  more. The picture shows the Changes pane with the task's diff.
+
+Archiving a task stops what runs in it and removes its worktree, and keeps its branch, notes, and agent
+history. [Concepts](/docs/start/concepts/) has the rest of the model.
+
+## Four ways to use it
+
+| Client | What it is |
+| --- | --- |
+| Desktop app | The app for macOS and Windows. |
+| Terminal client | `acorn` with no arguments. The same panes, drawn in a terminal, anywhere Node.js runs. |
+| Command line | `acorn` with a command, such as `acorn task list`, for scripts and other agents. |
+| Browser extension | A side panel in Chrome and Firefox on macOS, for talking to an agent from a web page. |
+
+All four talk to a **Node**, the process that holds your data and runs your agents. The desktop app
+starts one on your machine. [Desktop and terminal](/docs/start/desktop-and-terminal/) covers the two
+clients you'll use most.
+
+## Where to go next
+
+<div class="cards not-content">
+  <Card title="Use acorn" href="/docs/start/install/">
+    <p>Install it, then learn the window, tasks, panes, and the tools around them.</p>
+    <ul>
+      <li><a href="/docs/start/install/">Install</a></li>
+      <li><a href="/docs/start/quick-start-first-project-first-task-first-agent/">Quick start</a></li>
+      <li><a href="/docs/start/concepts/">Concepts</a></li>
+      <li><a href="/docs/start/desktop-and-terminal/">Desktop and terminal</a></li>
+      <li><a href="/docs/using/workspaces-and-projects/">Workspaces and projects</a></li>
+      <li><a href="/docs/using/tasks-and-worktrees/">Tasks and worktrees</a></li>
+      <li><a href="/docs/using/task-scripts/">Task scripts</a></li>
+      <li><a href="/docs/using/archive-and-restore/">Archive and restore</a></li>
+      <li><a href="/docs/using/panes/">Panes</a></li>
+      <li><a href="/docs/using/the-window-top-bar-rails-and-drawer/">The window</a></li>
+      <li><a href="/docs/using/the-command-palette/">The command palette</a></li>
+      <li><a href="/docs/using/keyboard-shortcuts/">Keyboard shortcuts</a></li>
+      <li><a href="/docs/using/notifications-and-the-inbox/">Notifications and the inbox</a></li>
+      <li><a href="/docs/using/notes/">Notes</a></li>
+      <li><a href="/docs/using/memory/">Memory</a></li>
+      <li><a href="/docs/using/task-context/">Task context</a></li>
+      <li><a href="/docs/using/appearance-themes-and-styles/">Appearance</a></li>
+      <li><a href="/docs/using/links-into-acorn/">Links into acorn</a></li>
+      <li><a href="/docs/using/project-configuration/">Project configuration</a></li>
+    </ul>
+  </Card>
+  <Card title="Build plugins" href="/features/plugins/">
+    <p>
+      acorn's panes, sources, and commands come from plugins, and a plugin you write can add a pane, a
+      command, or a tool for agents. One plugin draws in the desktop app and the terminal client from the same code.
+    </p>
+  </Card>
+</div>
+
+If you're new, read the [Start here](/docs/start/install/) pages in order: install acorn, follow the
+quick start, then read Concepts.

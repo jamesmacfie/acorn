@@ -1,0 +1,102 @@
+---
+title: "The window: top bar, rails, and drawer"
+description: What each region of the acorn window is for, from the top bar to the terminal drawer.
+sources:
+  - docs/ui-design/shell-hierarchy.md
+  - docs/frontend/rail-and-routing.md
+  - docs/workspaces-and-tasks/workspace-icons.md
+  - docs/terminal.md
+  - packages/client-core/src/features/fleet/NodeChip.tsx
+  - packages/client-core/src/features/tasks/TaskPaneHost.tsx
+  - packages/client-core/src/features/settings/plugins/PluginStrip.tsx
+  - apps/desktop/src/client/TaskView.tsx
+checked: 90ded85ca
+---
+
+import Keys from '../../../../components/Keys.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+This page names each region of the desktop window and says what it's for. Read it when you want to
+know what a control is, or where to find one.
+
+<Snapshot id="hero" />
+
+| Region | Where it is in the picture | What it holds |
+| --- | --- | --- |
+| Top bar | Across the top | Where you are, the Node's state, notifications, and the app menu |
+| Left rail | Down the left edge | Sources, then your tasks, then **+** for a new task |
+| Task | The middle | The open task's panes, side by side |
+| Task strip | Along the bottom of the task | The worktree and branch, with buttons to copy each |
+| Pane switcher | Down the right edge | The task's panes, run buttons, **Terminal**, then **Archive task** at the bottom |
+| Terminal drawer | Under the panes, when it's open | Shells and other terminal sessions in the task's worktree |
+
+## The top bar
+
+From left to right:
+
+- **The first picker.** With projects separate, it's labeled **Project** and lists your projects. With
+  workspaces, it picks the workspace. Its last row, **Add project…**, adds a folder on this computer.
+- **The second picker**, with workspaces only. It picks the project inside the workspace. It shows only
+  where a project matters, such as in a task or the GitHub source, and not on Home.
+- **Where you are**, in the middle: the project, then the open task's title.
+- **The Node's state.** A dot, green while the Node is live. Hover over it to read the Node's name and
+  its state: **Live**, **Refreshing**, **Stale**, **Offline**, **Disabled**, or **Error**.
+- **Notifications**, the bell, with a count of what's unread or waiting on you.
+  [Notifications and the inbox](/docs/using/notifications-and-the-inbox/) covers it.
+- **App menu**, with **Settings**, **Clear cache**, and **Reload window**.
+
+## The left rail
+
+The left rail lists **sources** at the top: places to browse that aren't a task, such as **Home**,
+**Git**, **Agents**, **Memory**, and **Archive**. Plugins add more, such as GitHub, Linear, and Docker.
+Under the sources come your tasks, one tab each, in an order you can drag. **+** at the bottom creates a
+task.
+
+A task's tab carries small marks at its edges, such as a dot while setup runs, a spinner while it's
+being archived, or a mark for unread agent replies. Hover over the tab to read what each mark means.
+If the project has a rail colour, the tab has a strip of that color down its left side.
+
+### Choose which sources show
+
+1. Open **Settings** > **Plugins** > **Rail and surfaces**.
+2. Under **Left rail**, turn each plugin's source on or off. Home and Archive always show.
+
+A hidden source still works. The command palette offers **Open** and the source's name for each hidden
+one, and a command that opens it, such as **Open Docker**, still opens it. Each plugin's own page in
+**Settings** has the same **Show in left rail** switch.
+
+### The workspace rail
+
+Turn on **Settings** > **Appearance** > **Show workspace rail**, or **Show project rail** with projects
+separate, for a second rail of icons left of the first, one per workspace. It replaces the top bar's
+first picker while it's on. [Workspaces and projects](/docs/using/workspaces-and-projects/#give-a-workspace-an-icon)
+covers the icons.
+
+## The pane switcher
+
+The right edge lists the panes this task can show. A highlighted icon is on screen. Click one to show
+it, ⌘-click to add it beside the others, and right-click for **Open**, **Open beside**, **Pin**,
+**Copy URL**, and **Close**. Under the panes, each of the project's run targets has a button that
+starts and stops it, then **Terminal** opens the drawer. **Archive task** is at the bottom. [Panes](/docs/using/panes/) covers the
+row.
+
+## The terminal drawer
+
+The terminal drawer opens under the task's panes. Click **Terminal** in the pane switcher, press
+<Keys chord="meta+shift+t" />, or run **Show terminal drawer** from the **Terminal** group in the command
+palette, to open or close it. **New
+terminal** starts a shell in the task's worktree. The drawer also holds the setup script's session, the
+project's run targets, and Claude Code or Codex running in a terminal.
+
+## In the terminal
+
+The terminal client draws the same regions in fewer cells: a one-line top bar, a left column of three
+framed panels, **Menu**, **Browse**, and **Tasks**, then one pane with a strip of pane labels above it,
+and a footer line that says what the keys do. It has no pane switcher rail, no workspace rail, and no
+terminal drawer. Its **Menu** lists every source, whatever **Show in left rail** says. [Desktop and
+terminal](/docs/start/desktop-and-terminal/) has the rest.
+
+## Limits
+
+- Home and Archive can't be hidden.
+- The second picker doesn't show on Home, because Home isn't about one project.
