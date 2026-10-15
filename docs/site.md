@@ -35,8 +35,9 @@ Every build runs `starlight-links-validator`, so a broken link between pages fai
 
 | Command | What it checks |
 | --- | --- |
-| `pnpm --filter @acorn/site lint` | `astro check`: types in the `.astro` pages, the content config, and the tests. Root `pnpm lint` runs it too. |
-| `pnpm --filter @acorn/site test` | The budget check's own tests, the budget check, then the Playwright tests. Run a build first. |
+| `pnpm --filter @acorn/site lint` | `astro check`: types in the `.astro` pages, the content config, and the tests. Then `tsc` on the specimens, which use Solid's JSX. Root `pnpm lint` runs it too. |
+| `pnpm --filter @acorn/site specimens` | Regenerates every [specimen](./site/specimens.md) on both hosts and fails when a committed file differs. |
+| `pnpm --filter @acorn/site test` | The script tests, the budget check, then the Playwright tests. Run a build first. |
 
 The budget check, `apps/site/scripts/budget.mjs`, reads `dist`. For each page it adds up the Brotli-compressed
 size of the HTML and of every stylesheet and script the page loads, following static imports between
@@ -51,8 +52,16 @@ anything from another origin:
 
 The Playwright tests in `apps/site/tests/` load every page the build wrote and fail on a console error. They run
 axe on the landing page, the docs home, and the 404 page, one page for each template, and check that
-drafts and `/lab/` appear only in a preview build. They use the Chrome installed on the machine, so
+drafts and `/lab/` appear only in a preview build. On a preview build, they also check that the specimen
+gallery draws the site's header, sidebar, and text exactly as `/docs/` does, and run axe on the frames
+around its specimens. They use the Chrome installed on the machine, so
 install Chrome before you run them. `ACORN_SITE_PREVIEW` must match the build you're testing.
+
+## Specimens
+
+Pictures of plugin UI on the site are _specimens_: plugin tree code that both hosts draw, committed as
+HTML and as terminal cells, and checked against the kit on every change. [Specimens](./site/specimens.md)
+covers adding one, the generators, the specimen stylesheet, and what jsdom can't draw.
 
 ## Formatting
 

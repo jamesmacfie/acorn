@@ -1,0 +1,12 @@
+{
+  // Specimens are plugin tree code, so they type-check with Solid's JSX, as a plugin does, and not with
+  // the site's Astro settings.
+  "extends": "../../../tsconfig.base.json",
+  "include": ["."],
+  "compilerOptions": {
+    "paths": {
+      "acorn-plugin-sdk": ["../../../packages/plugin-sdk/src/public.ts"],
+      "acorn-plugin-sdk/remote": ["../../../packages/plugin-sdk/src/remote/public.ts"]
+    }
+  }
+}

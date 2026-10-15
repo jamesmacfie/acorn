@@ -1,0 +1,177 @@
+{
+  "meta": {
+    "title": "Badge and Chip",
+    "caption": "Badges in each tone, and a row of chips with one selected.",
+    "terminal": {
+      "columns": 60,
+      "rows": 3
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Badge",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "draft"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n5",
+                  "type": "Badge",
+                  "props": {
+                    "tone": "accent"
+                  },
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "review"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n7",
+                  "type": "Badge",
+                  "props": {
+                    "tone": "ok"
+                  },
+                  "children": [
+                    {
+                      "id": "n8",
+                      "type": "#text",
+                      "props": {
+                        "value": "passing"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n9",
+                  "type": "Badge",
+                  "props": {
+                    "tone": "warn"
+                  },
+                  "children": [
+                    {
+                      "id": "n10",
+                      "type": "#text",
+                      "props": {
+                        "value": "flaky"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n11",
+                  "type": "Badge",
+                  "props": {
+                    "tone": "danger"
+                  },
+                  "children": [
+                    {
+                      "id": "n12",
+                      "type": "#text",
+                      "props": {
+                        "value": "failing"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n13",
+              "type": "ChipRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n14",
+                  "type": "Chip",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n15",
+                      "type": "#text",
+                      "props": {
+                        "value": "frontend"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n16",
+                  "type": "Chip",
+                  "props": {
+                    "selected": true
+                  },
+                  "children": [
+                    {
+                      "id": "n17",
+                      "type": "#text",
+                      "props": {
+                        "value": "agents"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n18",
+                  "type": "Chip",
+                  "props": {
+                    "tone": "warn"
+                  },
+                  "children": [
+                    {
+                      "id": "n19",
+                      "type": "#text",
+                      "props": {
+                        "value": "needs triage"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

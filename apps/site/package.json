@@ -7,20 +7,29 @@
   "scripts": {
     "build": "astro build",
     "dev": "astro dev",
-    "lint": "astro check",
+    "lint": "astro check && tsc -p specimens",
+    "specimens": "vitest run && pnpm --filter @acorn/tui exec vitest run src/kit/specimens.test.tsx",
     "test": "node --test scripts/*.test.mjs && node scripts/budget.mjs && playwright test"
   },
   "dependencies": {
+    "@acorn/client-core": "workspace:*",
     "@astrojs/markdown-remark": "^7.3.0",
     "@astrojs/starlight": "^0.42.0",
+    "acorn-plugin-sdk": "workspace:*",
     "astro": "^7.3.0",
+    "jsdom": "^30.0.1",
+    "postcss": "^8.5.29",
+    "solid-js": "catalog:",
     "starlight-links-validator": "^0.26.0"
   },
   "devDependencies": {
+    "@acorn/protocol": "workspace:*",
     "@astrojs/check": "^0.9.10",
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.0.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.11"
   }
 }

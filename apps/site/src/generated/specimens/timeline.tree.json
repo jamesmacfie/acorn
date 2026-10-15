@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "title": "Timeline",
+    "caption": "A sequence of turns, each a card.",
+    "terminal": {
+      "columns": 60,
+      "rows": 14
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Timeline",
+          "props": {
+            "ariaLabel": "Review"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Card",
+              "props": {},
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "Opened the pull request."
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n5",
+              "type": "Card",
+              "props": {},
+              "children": [
+                {
+                  "id": "n6",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n7",
+                      "type": "#text",
+                      "props": {
+                        "value": "Asked for a test that covers the redirect."
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n8",
+              "type": "Card",
+              "props": {},
+              "children": [
+                {
+                  "id": "n9",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n10",
+                      "type": "#text",
+                      "props": {
+                        "value": "Added the test and pushed."
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

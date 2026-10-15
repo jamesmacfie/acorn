@@ -1,6 +1,76 @@
 # Phase 3: draw real UI on the site
 
-Date: October 15, 2026. Status: proposed. Needs phase 2. Phases 7, 15, 16, 17, and 18 depend on it.
+Date: October 15, 2026. Status: done. Needs phase 2. Phases 7, 15, 16, 17, and 18 depend on it.
+
+## Completion note
+
+October 15, 2026. Ten seed specimens draw on both hosts at `/lab/specimens/`, in every theme and style
+pack, from committed output that a check holds to the kit. [Specimens](../../site/specimens.md) is the
+reference for adding one, the generators, the stylesheet, and what jsdom can't draw.
+
+The spike answered yes to all three questions, with no new seam:
+
+1. The SDK's remote adapter runs in-process. `solidTree(Component)` with a mount whose root is
+   client-core's `createRemoteRoot` records the batches a worker would send. `plugins/agent-cost` tests
+   its tree the same way.
+2. Client-core's `TreeHost` mounts and settles under jsdom with a fake transport. The only change it
+   needed is a package export for `@acorn/client-core/host/tree/TreeHost.tsx`.
+3. The terminal `TreeHost` draws recorded batches through `renderCells` with no Node connection. It
+   applies a batch on the next timer turn, so the generator waits one turn before reading the frame.
+
+What landed:
+
+- `apps/site/specimens/kit/`: the ten specimens, plus `specimen.ts` for their `meta` type. They have their
+  own tsconfig, because they use Solid's JSX and the site uses Astro's.
+- `apps/site/scripts/specimens.test.ts`, run by Vitest, records each tree to `<id>.tree.json` and draws
+  `<id>.html`. `apps/tui/src/kit/specimens.test.tsx` draws `<id>.cells.json`. Both write under
+  `UPDATE_SPECIMENS=1` and compare otherwise. `pnpm --filter @acorn/site specimens` runs both, in order,
+  and `site.yml` runs it on every pull request.
+- `apps/site/scripts/acornUi.mjs` serves `virtual:acorn-ui.css`, the app's sheets scoped to `.acorn-ui`
+  and pruned to the committed specimens: 6.1 KB compressed. `acornUi.test.mjs` fails on any rule outside
+  `.acorn-ui`.
+- `apps/site/src/components/Specimen.astro`, and the gallery at `apps/site/src/lab/specimens.astro`.
+- Playwright checks, preview build only, that the gallery draws the site's header, sidebar, and text
+  the same as `/docs/`, and axe on the specimen frames.
+
+Decisions and deviations:
+
+- `tree.json` holds `{ meta, batches }`, so the terminal generator and the Astro component read the size,
+  title, and caption without importing the specimen's source.
+- The terminal view colors each palette slot with the theme token the terminal takes from a theme
+  (`--text`, `--state-ok`, `--bg-selected`, and so on), not with values from `themeCellTokens.json`.
+  That JSON is generated from the same `tokens-theme.css`, and the CSS tokens follow the theme picker,
+  and the system dark mode, with no generated CSS.
+- The generator records cells under a probe palette that gives each slot a distinct terminal color,
+  hover and selected included, and maps each color back to its slot. A run in any other color fails the
+  generator.
+- An inline style keeps custom properties and component geometry: `transform`, sizes, positions, grid
+  columns, and `visibility`. Custom properties alone broke `Graph`, which places its cards with
+  `transform`. The site-side list replaces the doc's "only the custom properties in `tokens.md`".
+- The token blocks pass through unchanged. The style packs' structural rules, such as
+  `:root[data-style='modern'] .ui-btn`, are scoped too, keeping the qualifier on the root.
+- `fonts.css` is left out. The site's fonts wait on the owner's monospace font decision.
+- The gallery is a Starlight page, so it doubles as the "page with specimens" for the isolation check.
+  The budget check skips `/lab/`, so the docs-budget acceptance was measured by hand: the gallery, with
+  ten specimens, weighs 29.9 KB compressed against the 100 KB docs budget.
+- `Rows` can't be drawn from a tree, because its children are a render function. The list specimen
+  uses `Row` nodes in a `ListColumn`, the way the Linear plugin does.
+- The graph specimen has two ranks, because `Graph` fits its view to a measured canvas and jsdom measures
+  nothing. A taller graph overflows the canvas's minimum height.
+- Running on two machines wasn't possible here. One machine with the time zone and locale changed gives
+  identical output.
+
+What later phases need to know:
+
+- The published SDK exports no named `Sections`, `Graph`, `HistoryMark`, `IconButton`, `ConfirmButton`,
+  or `Rectangle`, though all six are kit nodes. The graph specimen reaches `Graph` through
+  `KIT_NODE_COMPONENTS`. Phases 15 and 18 need the exports, and adding them changes the published API.
+- Axe finds serious issues in the kit's own markup: the timeline's `ol` holds `div` cards, the split
+  handle has no value attributes, and muted badge, chip, row meta, and inactive tab text fail contrast.
+  The gallery's axe check excludes `.acorn-ui`, so these belong to the kit.
+- `@acorn/client-core` has 194 entrypoints against the architecture test's ceiling of 189. It had 193
+  before this change, so that check already failed. The `TreeHost.tsx` export adds one.
+- To show specimens on a docs page, the page has to be `.mdx`.
 
 ## Goal
 

@@ -1,0 +1,157 @@
+---
+// One specimen, as the desktop and the terminal draw it (docs/site/specimens.md). Everything here is
+// committed generator output in src/generated/specimens/; nothing runs the specimen's code.
+import 'virtual:acorn-ui.css'
+
+interface Props {
+  id: string
+}
+
+type Recorded = { meta: { title: string; caption: string; width: number } }
+type Run = { text: string; fg?: string; bg?: string; attrs?: string[] }
+type Cells = { columns: number; rows: number; lines: Run[][] }
+
+const trees = import.meta.glob<Recorded>('../generated/specimens/*.tree.json', { eager: true, import: 'default' })
+const pages = import.meta.glob<string>('../generated/specimens/*.html', { eager: true, query: '?raw', import: 'default' })
+const frames = import.meta.glob<Cells>('../generated/specimens/*.cells.json', { eager: true, import: 'default' })
+
+const { id } = Astro.props
+const file = (extension: string) => `../generated/specimens/${id}${extension}`
+const tree = trees[file('.tree.json')]
+const html = pages[file('.html')]
+const cells = frames[file('.cells.json')]
+if (!tree || html === undefined || !cells) {
+  throw new Error(`There's no specimen "${id}". Add apps/site/specimens/<group>/${id}.tsx, then run UPDATE_SPECIMENS=1 pnpm --filter @acorn/site specimens.`)
+}
+const { meta } = tree
+
+/** A run's palette slots and attributes, as classes the styles below color for the current theme. */
+const runClass = (run: Run) =>
+  [run.fg && `fg-${run.fg}`, run.bg && `bg-${run.bg}`, ...(run.attrs ?? [])].filter(Boolean).join(' ') || undefined
+
+// shortcut: ids come from the specimen id, so one specimen shown twice on a page repeats them; count
+// per page if a page ever needs that.
+const desktop = `specimen-${id}-desktop`
+const terminal = `specimen-${id}-terminal`
+---
+
+<figure class="specimen not-content" aria-label={meta.title}>
+  <div class="tabs" role="tablist" aria-label="Host" hidden>
+    <button type="button" role="tab" aria-controls={desktop}>Desktop</button>
+    <button type="button" role="tab" aria-controls={terminal}>Terminal</button>
+  </div>
+  <div class="view" id={desktop} role="tabpanel" aria-label="Desktop">
+    <div class="acorn-ui" style={`max-inline-size: ${meta.width}px`} set:html={html} />
+  </div>
+  <div class="view" id={terminal} role="tabpanel" aria-label="Terminal">
+    <pre class="cells" style={`--columns: ${cells.columns}`}>{
+      cells.lines.map((line, row) => (
+        <Fragment>
+          {row > 0 && '\n'}
+          {line.map((run) => <span class={runClass(run)}>{run.text}</span>)}
+        </Fragment>
+      ))
+    }</pre>
+    <span class="size">{cells.columns}×{cells.rows}</span>
+  </div>
+  <figcaption>{meta.caption}</figcaption>
+</figure>
+
+<script>
+  // Tabs, once script runs. Without it the tab strip stays hidden and both views show.
+  for (const strip of document.querySelectorAll<HTMLElement>('.specimen > [role="tablist"]')) {
+    const tabs = [...strip.querySelectorAll<HTMLButtonElement>(':scope > [role="tab"]')]
+    const panels = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls')!)!)
+    const select = (index: number) =>
+      tabs.forEach((tab, at) => {
+        tab.setAttribute('aria-selected', String(at === index))
+        tab.tabIndex = at === index ? 0 : -1
+        panels[at].hidden = at !== index
+      })
+    tabs.forEach((tab, at) => {
+      tab.addEventListener('click', () => select(at))
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+        event.preventDefault()
+        const next = (at + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length
+        select(next)
+        tabs[next].focus()
+      })
+    })
+    strip.hidden = false
+    select(0)
+  }
+</script>
+
+<style>
+  .specimen {
+    margin: 1.5rem 0;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs button {
+    padding: 0.4rem 0.8rem;
+    border: 0;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    cursor: pointer;
+  }
+  .tabs button[aria-selected='true'] {
+    color: var(--text);
+    box-shadow: inset 0 -2px var(--accent);
+  }
+  .view {
+    position: relative;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  .size {
+    position: absolute;
+    inset: 0.25rem 0.5rem auto auto;
+    color: var(--text-muted);
+    font: 0.75rem var(--font-mono);
+  }
+  figcaption {
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  /* The terminal view. Each run names the palette slot the terminal drew it in, and the theme's own
+     tokens fill the slot, the same eight the terminal takes from a theme (apps/tui/src/appearance.ts). */
+  .cells {
+    --cell-fg: var(--text);
+    --cell-bg: var(--bg);
+    inline-size: calc(var(--columns) * 1ch);
+    margin: 0;
+    padding: 0;
+    color: var(--cell-fg);
+    background: var(--bg);
+    font: 13px/1.3 var(--font-mono);
+    white-space: pre;
+  }
+  .cells span {
+    color: var(--cell-fg);
+    background: var(--cell-bg);
+  }
+  .fg-muted { --cell-fg: var(--text-muted); }
+  .fg-accent { --cell-fg: var(--accent); }
+  .fg-ok { --cell-fg: var(--state-ok); }
+  .fg-warn { --cell-fg: var(--state-warn); }
+  .fg-danger { --cell-fg: var(--state-bad); }
+  .bg-hover { --cell-bg: var(--bg-hover); }
+  .bg-selected { --cell-bg: var(--bg-selected); }
+  .bold { font-weight: bold; }
+  .dim { opacity: 0.6; }
+  .underline { text-decoration: underline; }
+  .cells .inverse {
+    color: var(--cell-bg);
+    background: var(--cell-fg);
+  }
+</style>

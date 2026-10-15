@@ -428,19 +428,37 @@ importers:
 
   apps/site:
     dependencies:
+      '@acorn/client-core':
+        specifier: workspace:*
+        version: link:../../packages/client-core
       '@astrojs/markdown-remark':
         specifier: ^7.3.0
         version: 7.3.2
       '@astrojs/starlight':
         specifier: ^0.42.0
         version: 0.42.5(@astrojs/markdown-remark@7.3.2)(astro@7.3.7(@astrojs/markdown-remark@7.3.2)(@types/node@26.0.0)(idb-keyval@6.2.5)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1))(typescript@6.0.3)
+      acorn-plugin-sdk:
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
       astro:
         specifier: ^7.3.0
         version: 7.3.7(@astrojs/markdown-remark@7.3.2)(@types/node@26.0.0)(idb-keyval@6.2.5)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1)
+      jsdom:
+        specifier: ^30.0.1
+        version: 30.0.1
+      postcss:
+        specifier: ^8.5.29
+        version: 8.5.29
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       starlight-links-validator:
         specifier: ^0.26.0
         version: 0.26.0(@astrojs/starlight@0.42.5(@astrojs/markdown-remark@7.3.2)(astro@7.3.7(@astrojs/markdown-remark@7.3.2)(@types/node@26.0.0)(idb-keyval@6.2.5)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1))(typescript@6.0.3))(astro@7.3.7(@astrojs/markdown-remark@7.3.2)(@types/node@26.0.0)(idb-keyval@6.2.5)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1))
     devDependencies:
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@astrojs/check':
         specifier: ^0.9.10
         version: 0.9.10(@emnapi/runtime@1.11.3)(prettier@3.9.9)(typescript@6.0.3)
@@ -456,6 +474,12 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.3.4(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1))
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.3.4(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1))
 
   apps/tui:
     dependencies:
@@ -11272,7 +11296,7 @@ snapshots:
   css-tree@2.2.1:
     dependencies:
       mdn-data: 2.0.28
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   css-tree@3.2.1:
     dependencies:

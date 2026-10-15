@@ -1,0 +1,133 @@
+{
+  "meta": {
+    "title": "ListDetail with rows",
+    "caption": "A list of rows beside the detail of the selected one.",
+    "terminal": {
+      "columns": 100,
+      "rows": 6
+    },
+    "width": 640
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "ListDetail",
+          "props": {
+            "split": true,
+            "listWidth": "narrow"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "ListColumn",
+              "props": {
+                "label": "Issues"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Row",
+                  "props": {
+                    "density": "compact",
+                    "meta": "ACO-12",
+                    "selected": true
+                  },
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "Redirect loop"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n5",
+                  "type": "Row",
+                  "props": {
+                    "density": "compact",
+                    "meta": "ACO-14"
+                  },
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "Flaky upload"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n7",
+                  "type": "Row",
+                  "props": {
+                    "density": "compact",
+                    "meta": "ACO-15"
+                  },
+                  "children": [
+                    {
+                      "id": "n8",
+                      "type": "#text",
+                      "props": {
+                        "value": "Slow first paint"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n9",
+              "type": "DetailColumn",
+              "props": {},
+              "children": [
+                {
+                  "id": "n10",
+                  "type": "Heading",
+                  "props": {
+                    "level": 2
+                  },
+                  "children": [
+                    {
+                      "id": "n11",
+                      "type": "#text",
+                      "props": {
+                        "value": "Redirect loop"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n12",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n13",
+                      "type": "#text",
+                      "props": {
+                        "value": "Signing in from a deep link sends the browser back to the sign-in page."
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

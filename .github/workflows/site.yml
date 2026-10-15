@@ -10,10 +10,13 @@ on:
       - docs/**
       - packages/protocol/**
       - packages/client-core/src/kit/**
+      - packages/client-core/src/host/tree/**
       - packages/client-core/src/infra/styles/**
       - packages/plugin-sdk/**
       - packages/plugin-types/**
       - apps/tui/src/kit/**
+      - apps/tui/src/plugins/**
+      - apps/tui/src/paint/**
       - examples/**
       - pnpm-lock.yaml
       - .github/workflows/site.yml
@@ -49,8 +52,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      # `astro check`: types in the .astro pages, the content config, and the tests.
+      # `astro check` for the .astro pages, the content config, and the tests, then the specimens with
+      # Solid's JSX.
       - run: pnpm --filter @acorn/site lint
+
+      # Regenerates every specimen on both hosts and fails when a committed picture is stale. Run
+      # `UPDATE_SPECIMENS=1 pnpm --filter @acorn/site specimens`, then review and commit the change.
+      - run: pnpm --filter @acorn/site specimens
 
       # Each build runs the link validator. `test` runs the budget check's own tests, the budget, and the
       # Playwright tests in the runner's installed Chrome. The production build must leave out every

@@ -1,0 +1,49 @@
+---
+// Every specimen, for review in any theme and style pack. A Starlight page, so the specimens sit in the
+// same header, sidebar, and text styles a docs page has.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro'
+import appearances from 'virtual:acorn-ui/appearances'
+import Specimen from '../components/Specimen.astro'
+
+const ids = Object.keys(import.meta.glob('../generated/specimens/*.tree.json'))
+  .map((path) => path.replace(/^.*\/(.+)\.tree\.json$/, '$1'))
+  .sort()
+const { themes, styles } = appearances
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Specimens',
+    description: 'Every specimen, on both hosts.',
+    sources: ['docs/site/specimens.md'],
+    checked: '284c614aa',
+  }}
+>
+  <p>
+    Each specimen is plugin tree code, drawn by the desktop and by the terminal. Pick a theme and a style pack to
+    see them all in it.
+  </p>
+  <p class="pickers">
+    <label>Theme <select id="specimen-theme">{themes.map((id) => <option>{id}</option>)}</select></label>
+    <label>Style pack <select id="specimen-style">{styles.map((id) => <option>{id}</option>)}</select></label>
+  </p>
+  {ids.map((id) => <Specimen id={id} />)}
+</StarlightPage>
+
+<script>
+  // Sets the same two attributes acorn sets on its own <html>. Starlight's theme menu keeps working, and
+  // only knows light and dark.
+  const root = document.documentElement
+  const theme = document.querySelector<HTMLSelectElement>('#specimen-theme')!
+  const style = document.querySelector<HTMLSelectElement>('#specimen-style')!
+  theme.value = root.dataset.theme ?? 'light'
+  theme.addEventListener('change', () => (root.dataset.theme = theme.value))
+  style.addEventListener('change', () => (root.dataset.style = style.value))
+</script>
+
+<style>
+  .pickers {
+    display: flex;
+    gap: 1rem;
+  }
+</style>

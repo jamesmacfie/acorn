@@ -3,6 +3,7 @@ import { unified } from '@astrojs/markdown-remark'
 import starlight from '@astrojs/starlight'
 import { defineConfig } from 'astro/config'
 import starlightLinksValidator from 'starlight-links-validator'
+import { acornUi } from './scripts/acornUi.mjs'
 
 // Drafts and /lab/ pages show in `astro dev` and on preview deploys, and never in production.
 const previewBuild = process.env.ACORN_SITE_PREVIEW === '1'
@@ -318,6 +319,8 @@ export default defineConfig({
       ].flatMap(group),
     }),
   ],
+  // The specimen stylesheet, `virtual:acorn-ui.css`, built from the app's own sheets.
+  vite: { plugins: [acornUi()] },
   markdown: {
     // The docs are full of `--flags`, which smart typography turns into dashes.
     processor: unified({ smartypants: false }),
