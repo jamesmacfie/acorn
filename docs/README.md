@@ -451,3 +451,7 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [the script tool spike](./future/opencode/03-script-tool-spike.md), [the script
   tool](./future/opencode/04-script-tool.md), and [the OpenCode
   harness](./future/opencode/05-opencode-harness.md).
+
+## Performance measurement proposal
+
+- [Measure where slow requests spend their time](./future/performance-spans.md).
