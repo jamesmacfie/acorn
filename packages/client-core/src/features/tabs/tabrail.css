@@ -95,6 +95,9 @@
   cursor: pointer;
   line-height: 1;
   position: relative;
+  /* A Mac right-click selects the word under the pointer before `contextmenu` fires, so a text glyph
+     like `>_` would light up when the row menu opens. */
+  user-select: none;
 }
 .tabrail-tab:hover { background: var(--bg-hover); color: var(--text); }
 .tabrail-tab.active {
