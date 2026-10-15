@@ -32,6 +32,7 @@ export const ChangesToolCard: Component<AgentToolCardProps> = (props) => {
   return (
     <Fold
       label={label()}
+      level="sub"
       open={open()}
       onOpenChange={setOpen}
       meta={
