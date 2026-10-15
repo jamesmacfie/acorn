@@ -1,0 +1,60 @@
+---
+title: dataSourceDiscoveries
+description: "Routes that list data sources your plugin can offer, found when someone asks."
+sources:
+  - docs/data-sources.md
+checked: '498833615'
+---
+
+A discovery lists data sources that depend on the account or project, such as one source per board.
+acorn asks your route when someone browses sources, and each source it finds is available only in the
+scope that found it.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "dataSourceDiscoveries": [
+      {
+        "discoveryId": "boards",
+        "handler": "/v1/p/acme/sources/discover"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "dataSourceDiscoveries": [
+      {
+        "discoveryId": "boards",
+        "handler": "/v1/p/acme/sources/discover",
+        "providerId": "acme"
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+Discovery runs on the Node, the same for every client.
+
+## Mistakes
+
+- A discovery can't replace a static source with the same ID.
+
+## Guide
+
+[Add a data source](/docs/build-plugins/node/add-a-data-source/) walks through it from start to finish.

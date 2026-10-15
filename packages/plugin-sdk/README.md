@@ -99,8 +99,9 @@ your own `var(--bg)` rules resolve.
 
 ## Compatibility
 
-The host speaks loaded-plugin API major `2`. Your manifest can declare `"2"` or a range such as
-`"1 || 2"` after you test against each included host major. Removing a published name or making an
+Your manifest's `apiVersion` names the loaded-plugin API majors it works with.
+[Compatibility and versions](https://acorn.sh/docs/build-plugins/reference/compatibility-and-versions/)
+shows the major the host speaks. Declare a range of two majors only after you test against each. Removing a published name or making an
 incompatible shape change requires a new manifest API major. The npm version of `acorn-plugin-sdk`
 is separate from that major. The repository guards published names and checks the SDK declarations
 against the implementation.

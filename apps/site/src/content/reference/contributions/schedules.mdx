@@ -1,0 +1,81 @@
+---
+title: schedules
+description: "Work the Node runs for your plugin on a cadence, with no client open."
+sources:
+  - docs/schedules.md
+  - docs/plugins/client-half.md
+checked: '498833615'
+---
+
+A schedule is work the Node runs for your plugin on a cadence, whether or not a client is open. The
+Node POSTs to your route each time. The person sees each schedule in the trust prompt and in
+**Settings > Schedules**, where they can pause it or change how often it runs.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "schedules": [
+      {
+        "id": "sync",
+        "name": "Sync Acme",
+        "run": "/v1/p/acme/sync",
+        "cadence": {
+          "every": 3600
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "schedules": [
+      {
+        "id": "sync",
+        "name": "Sync Acme",
+        "run": "/v1/p/acme/sync",
+        "cadence": {
+          "every": 900
+        },
+        "timeout": 120
+      },
+      {
+        "id": "digest",
+        "name": "Weekly digest",
+        "run": "/v1/p/acme/digest",
+        "cadence": {
+          "weekly": {
+            "day": 1,
+            "at": "09:00"
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+Schedules run on the Node, so it doesn't matter which client is open, or whether one is.
+
+## Mistakes
+
+- `timeout` is in seconds, not milliseconds.
+- A plugin's schedule runs at most every 300 seconds, so `{ "every": 60 }` runs every 300.
+
+## Guide
+
+[Run work on a schedule](/docs/build-plugins/node/run-work-on-a-schedule/) walks through it from start to finish.

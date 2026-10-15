@@ -1,0 +1,63 @@
+---
+title: attention
+description: "Routes whose items appear in the notification inbox."
+sources:
+  - docs/contribution-kinds.md
+  - docs/notifications/gate.md
+  - docs/tui/chrome.md
+checked: '498833615'
+---
+
+An attention source puts items in acorn's notification inbox, under **Needs you**. acorn reads your
+route on each Node and sets each item's target itself, so a click lands on your rail source when you
+have one, or on your plugin's page in Settings.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "attention": [
+      {
+        "id": "reviews",
+        "items": "/v1/p/acme/attention"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "attention": [
+      {
+        "id": "reviews",
+        "order": 200,
+        "items": "/v1/p/acme/attention",
+        "refresh": 300
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The terminal client's inbox, `n`, lists the same items.
+
+## Mistakes
+
+- An `info` item can be acknowledged. A `warn` or `danger` item stays until your route stops answering it, so stop answering it when it's resolved.
+
+## Guide
+
+[Notify the person](/docs/build-plugins/ui/notify-the-person/) walks through it from start to finish.

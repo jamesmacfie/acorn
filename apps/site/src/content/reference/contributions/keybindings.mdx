@@ -1,0 +1,130 @@
+---
+title: keybindings
+description: "Default shortcuts for your commands."
+sources:
+  - docs/plugins/commands.md
+  - docs/command-palette-and-shortcuts/shortcuts.md
+  - docs/tui/plugin-losses.md
+checked: '498833615'
+---
+
+A keybinding gives one of your commands a default chord. The person can see it on the shortcut sheet.
+`when` says where it works: anywhere, in a task, or only in one of your panes.
+
+## A minimal example
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "acme",
+        "label": "Acme",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "acme"
+          }
+        }
+      }
+    ],
+    "commands": [
+      {
+        "id": "open",
+        "kind": "action",
+        "title": "Open Acme",
+        "action": {
+          "verb": "openPane",
+          "pane": "acme"
+        }
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "open",
+        "defaultChord": "meta+shift+a",
+        "when": "global"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "board",
+        "label": "Board",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "board"
+          }
+        }
+      }
+    ],
+    "commands": [
+      {
+        "id": "open",
+        "kind": "action",
+        "title": "Open Acme board",
+        "action": {
+          "verb": "openPane",
+          "pane": "board"
+        }
+      },
+      {
+        "id": "refresh",
+        "kind": "action",
+        "title": "Refresh the board",
+        "palette": false,
+        "action": {
+          "verb": "surfaceAction",
+          "surface": "board"
+        }
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "open",
+        "defaultChord": "meta+shift+a",
+        "when": "task"
+      },
+      {
+        "command": "refresh",
+        "defaultChord": "meta+alt+r",
+        "when": "surface",
+        "surface": "board"
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+In the terminal client, `meta` is Ctrl, because a terminal emulator keeps Cmd for itself. So
+`meta+shift+a` is Ctrl+Shift+A there, and the manifest doesn't change.
+
+## Mistakes
+
+- A chord needs meta, ctrl, or alt, with modifiers in the order meta, ctrl, alt, shift.
+- `command` is the command's own `id` in this manifest, not its qualified name.
+
+## Guide
+
+[Add commands and keybindings](/docs/build-plugins/ui/add-commands-and-keybindings/) walks through it from start to finish.

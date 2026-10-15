@@ -1,0 +1,73 @@
+---
+title: browserPanel
+description: "One read-only panel in the browser extension's sidebar for a task."
+sources:
+  - docs/plugin-authoring/browser-panel.md
+checked: '498833615'
+---
+
+`browserPanel` adds a read-only panel to the browser extension's sidebar for a task, such as a local
+stack's status and logs. Your route answers a view made of fixed blocks, and the extension draws them as
+text, so none of your code runs in the browser. One per plugin.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "browserPanel": {
+      "label": "Stack",
+      "route": "/v1/p/acme/browser-panel"
+    }
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "stack",
+        "label": "Stack",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "stack"
+          }
+        }
+      }
+    ],
+    "browserPanel": {
+      "label": "Stack",
+      "glyph": "server",
+      "pane": "stack",
+      "route": "/v1/p/acme/browser-panel"
+    }
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+This is a browser extension feature, not a client one.
+
+## Mistakes
+
+- Answer 404 for a task with no panel.
+- A block kind or field the extension doesn't know refuses the whole view.
+
+## Guide
+
+[Show a panel in the browser sidebar](/docs/build-plugins/node/show-a-panel-in-the-browser-sidebar/) walks through it from start to finish.

@@ -46,3 +46,23 @@ it('the committed manifest schema matches the contract it is generated from', ()
   expect(Object.keys(parsed.properties ?? {})).toContain('permissions')
   expect(readFileSync(SCHEMA_PATH, 'utf8')).toBe(generated)
 })
+
+// Each description is the hover help in an author's editor and a row on the site's plugin reference,
+// so a field can't land without one. Nested properties count, including those inside unions and arrays.
+it('describes every property in the manifest schema', () => {
+  const undescribed = new Set<string>()
+  const walk = (node: unknown, path: string): void => {
+    if (Array.isArray(node)) return node.forEach((child) => walk(child, path))
+    if (!node || typeof node !== 'object') return
+    for (const [key, value] of Object.entries(node)) {
+      if (key !== 'properties') walk(value, path)
+      else
+        for (const [name, property] of Object.entries(value as Record<string, { description?: string }>)) {
+          if (!property.description) undescribed.add(`${path}.${name}`)
+          walk(property, `${path}.${name}`)
+        }
+    }
+  }
+  walk(JSON.parse(generate()), '')
+  expect([...undescribed]).toEqual([])
+})

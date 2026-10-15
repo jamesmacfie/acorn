@@ -135,7 +135,7 @@ export const isKitNode = (value: string): value is KitNodeName => kitNodeSet.has
  * own keys onto the same twelve names. A prop whose name is in here carries a handler id; a prop
  * whose name starts with `on` and is not in here is dropped.
  */
-const KIT_EVENTS = [
+export const KIT_EVENTS = [
   'onPress',
   'onChange',
   'onSubmit',

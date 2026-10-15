@@ -10,15 +10,21 @@ const pointer = z.string().refine((value) => parseDataPointer(value) !== null, '
 
 export const dataSourceDescriptorSchema = z
   .object({
-    sourceId: id,
-    name: z.string().min(1).max(80),
-    singular: z.string().min(1).max(80),
-    plural: z.string().min(1).max(80),
-    identityScope: z.string().min(1).max(2048),
-    icon: z.string().max(80).optional(),
-    providerId: id.optional(),
-    titlePointer: pointer.optional(),
-    urlPointer: pointer.optional(),
+    sourceId: id.describe("The source's ID, unique in this manifest. Others name it as `<pluginId>:<sourceId>`."),
+    name: z.string().min(1).max(80).describe("The source's name, such as `Release readiness`."),
+    singular: z.string().min(1).max(80).describe('What one record is called, such as `Issue`.'),
+    plural: z.string().min(1).max(80).describe('What several are called, such as `Issues`.'),
+    identityScope: z
+      .string()
+      .min(1)
+      .max(2048)
+      .describe(
+        "A sentence saying what a record's ID is and what keeps it stable, such as `GitHub GraphQL node ID; stable across renames`.",
+      ),
+    icon: z.string().max(80).optional().describe('A Lucide icon name, or a `brand:` mark.'),
+    providerId: id.optional().describe('The integration whose connection each query picks. Not with `inputs`.'),
+    titlePointer: pointer.optional().describe('A pointer to the field that titles a record.'),
+    urlPointer: pointer.optional().describe("A pointer to the field that holds a record's web address."),
   })
   .strict()
 
@@ -30,17 +36,26 @@ const dataSourceInputSchema = z
     source: z
       .string()
       .regex(/^[^:]+:.+$/, 'Expected <pluginId>:<sourceId>')
-      .max(401),
-    label: z.string().min(1).max(80),
-    optional: z.boolean().optional(),
+      .max(401)
+      .describe(
+        'The source this input reads, as `<pluginId>:<sourceId>`. It must be registered statically, not discovered.',
+      ),
+    label: z.string().min(1).max(80).describe("The input's name where the person picks an account for it."),
+    optional: z
+      .boolean()
+      .optional()
+      .describe('Whether the person may skip it. A skipped input is `undefined` in your query.'),
   })
   .strict()
 export const dataSourceInputsSchema = z
   .record(z.string().regex(DATA_SOURCE_INPUT_NAME), dataSourceInputSchema)
   .refine((inputs) => Object.keys(inputs).length <= 8, 'A source may declare at most eight inputs')
+  .describe(
+    'For a derived source: other sources the host reads for you, by input name, at most eight. The person approves them before your plugin reads anything.',
+  )
 
 export const dataSourceRegistrationSchema = dataSourceDescriptorSchema.extend({
-  handler: z.string().min(1).max(2048),
+  handler: z.string().min(1).max(2048).describe("The route on your Node half that answers the source's operations."),
   inputs: dataSourceInputsSchema.optional(),
 })
 
@@ -54,9 +69,15 @@ export function parseDataSourceInputRef(source: string): { pluginId: string; sou
 
 export const dataSourceDiscoverySchema = z
   .object({
-    discoveryId: id,
-    handler: z.string().min(1).max(2048),
-    providerId: id.optional(),
+    discoveryId: id.describe("The discovery's ID, unique in this manifest."),
+    handler: z
+      .string()
+      .min(1)
+      .max(2048)
+      .describe(
+        'The route on your Node half that lists sources, at most 100 a page. A discovered source is available only in the scope that found it.',
+      ),
+    providerId: id.optional().describe('The integration whose connection each discovery uses.'),
   })
   .strict()
 

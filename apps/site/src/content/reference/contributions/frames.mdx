@@ -1,0 +1,124 @@
+---
+title: frames
+description: "Panes, panels, settings pages, overlays, and other surfaces your client bundle draws."
+sources:
+  - docs/plugin-authoring/contributions.md
+  - docs/plugins/frames.md
+  - docs/panes/layout.md
+  - docs/tui/plugin-losses.md
+checked: '498833615'
+---
+
+A `frames` entry is a surface your client bundle draws. `target` says which kind: a pane in a task, a
+pane beside your rail list, a reference panel, a settings page, a project importer, an overlay, a web
+page, a replacement for one of acorn's own surfaces, or a rectangle another plugin's point holds.
+
+Most panes are trees. Give the pane a `layout`, and fill each of its regions with a `remote` tree from
+your bundle, a `document` the host's editor draws, or a `frame`, a sandboxed page whose pixels are
+yours. Reach for a frame only when acorn's components can't draw what you need, such as a canvas.
+
+<Specimen id="issues-pane" />
+
+## A minimal example
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "acme",
+        "label": "Acme",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "acme"
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "board",
+        "label": "Board",
+        "glyph": "kanban",
+        "order": 300,
+        "layout": "header-body-footer",
+        "regions": {
+          "header": {
+            "kind": "remote",
+            "entry": "boardHeader"
+          },
+          "body": "frame"
+        },
+        "availability": "/v1/p/acme/board/availability",
+        "claimsKeys": [
+          "meta+shift+b"
+        ]
+      },
+      {
+        "target": "settings",
+        "id": "acme-settings",
+        "label": "Acme",
+        "category": "connections",
+        "keywords": [
+          "board",
+          "sync"
+        ],
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "settings"
+          }
+        }
+      },
+      {
+        "target": "webview",
+        "id": "docs",
+        "label": "Acme docs",
+        "url": "https://docs.acme.example/",
+        "hosts": [
+          "docs.acme.example"
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+A tree draws in the terminal client from the same code, in cells. A `frame` region, or a page,
+overlay, or importer that's only a frame, draws as one muted line naming your plugin and pointing at the
+desktop app. A webview isn't drawn. A settings page written with the kit draws in the terminal's
+Settings route.
+
+## Mistakes
+
+- A pane's `id` is stored in people's layouts the moment they open it. Renaming it loses their layout.
+- `regions` needs a `layout`, and the layout's required regions: `single` needs `body`, `list-detail` needs `list` and `detail`.
+- A project pane needs a `routes` entry and a rail source whose `onSelect` navigates to it, or nothing can reach it.
+- A webview needs `hosts`. A redirect to a host that isn't listed is blocked.
+
+## Guide
+
+[Add a pane](/docs/build-plugins/ui/add-a-pane/) walks through it from start to finish.

@@ -1,0 +1,62 @@
+---
+title: nodeStats
+description: "Numbers on a Node's card on Fleet home."
+sources:
+  - docs/contribution-kinds.md
+  - docs/plugin-authoring/contributions.md
+checked: '498833615'
+---
+
+A Node stat is a number on a Node's card on Fleet home, with your label beside it. acorn reads it from
+your route on that Node. Give the label in singular and plural, so one reads "1 card stuck", not "1 cards
+stuck".
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "nodeStats": [
+      {
+        "id": "stuck",
+        "label": [
+          "card stuck",
+          "cards stuck"
+        ],
+        "data": "/v1/p/acme/stats/stuck"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "nodeStats": [
+      {
+        "id": "stuck",
+        "order": 100,
+        "label": [
+          "card stuck",
+          "cards stuck"
+        ],
+        "data": "/v1/p/acme/stats/stuck",
+        "refresh": 600
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+Fleet home is part of the desktop app.

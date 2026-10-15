@@ -1,0 +1,88 @@
+---
+title: slots
+description: "Badges the host draws in the top bar or in a task's footer."
+sources:
+  - docs/plugin-authoring/ui-contributions.md
+  - docs/contribution-kinds.md
+  - docs/tui/plugin-losses.md
+checked: '498833615'
+---
+
+A slot is a badge in acorn's own chrome: the top bar, after the notification bell, or a task's footer.
+You declare where it goes and a route that answers its text and tone, and acorn draws it with the kit's
+`Badge`. It stays live when nothing of yours is open, because acorn reads your route itself.
+
+<Specimen id="badges-and-chips" caption="The kit's Badge in each tone. The host draws your slot's answer as one of these." />
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "slots": [
+      {
+        "id": "queue",
+        "slot": "topbar",
+        "data": "/v1/p/acme/queue/badge"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "queue",
+        "label": "Queue",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "queue"
+          }
+        }
+      }
+    ],
+    "slots": [
+      {
+        "id": "queue-badge",
+        "slot": "footer",
+        "icon": "inbox",
+        "data": "/v1/p/acme/queue/badge",
+        "onClick": {
+          "verb": "openPane",
+          "pane": "queue"
+        },
+        "refresh": 120
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The terminal client doesn't draw slots: the top bar and the task footer are host places it has no
+version of. Put anything that has to reach the terminal in a pane or a command too.
+
+## Mistakes
+
+- Answer `null` from `data` to hide the badge, rather than an empty string.
+- Don't poll with a short `refresh`. Send `ctx.events.status()` when the number changes.
+
+## Guide
+
+[Put a badge in the top bar or task footer](/docs/build-plugins/ui/put-a-badge-in-the-top-bar-or-task-footer/) walks through it from start to finish.

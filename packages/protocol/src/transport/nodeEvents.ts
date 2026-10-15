@@ -23,7 +23,7 @@ import type { WorkspacesMode } from '../projects/workspacesMode'
 //
 // A node-emitted fact reaches a frame too, so both lists name it; the split is about what the name
 // promises, not about which array it sits in.
-const NODE_EVENT_CHANNELS = [
+export const NODE_EVENT_CHANNELS = [
   'plugins:changed',
   'tasks:changed',
   'workspace:changed',

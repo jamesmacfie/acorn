@@ -1,0 +1,65 @@
+---
+title: auditActions
+description: "Verbs your Node half may write to the audit log."
+sources:
+  - docs/security/audit.md
+  - docs/plugin-authoring/the-node-half.md
+checked: '498833615'
+---
+
+An audit action is a verb your Node half may write to the Node's audit log with `ctx.audit.record`.
+Declaring it lets Settings list every action your plugin can record, and acorn refuses a verb you didn't
+declare. Record what someone reviewing the machine would want to see: work done unattended, money spent,
+or something leaving the Node.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "auditActions": [
+      {
+        "id": "deploy.started",
+        "label": "Started a deploy"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "auditActions": [
+      {
+        "id": "deploy.started",
+        "label": "Started a deploy"
+      },
+      {
+        "id": "secret.rotated",
+        "label": "Rotated a secret"
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The audit log is on the Node, the same for every client.
+
+## Mistakes
+
+- Use dots, not colons, in an ID. acorn makes it `<pluginId>:<id>`.
+
+## Guide
+
+[Log and measure](/docs/build-plugins/node/log-and-measure/) walks through it from start to finish.

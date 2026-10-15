@@ -39,15 +39,30 @@ export const browserHandoffDescriptor = z.object({
     .string()
     .min(1)
     .max(64)
-    .regex(/^[a-z0-9][a-z0-9-]*$/),
+    .regex(/^[a-z0-9][a-z0-9-]*$/)
+    .describe("The handoff's ID, in lowercase letters, digits, and dashes."),
   // The button's text. Drawn as text, never as markup.
-  label: z.string().trim().min(1).max(40),
-  match: z.array(pagePattern).min(1).max(8),
+  label: z.string().trim().min(1).max(40).describe("The button's text, drawn as plain text."),
+  match: z
+    .array(pagePattern)
+    .min(1)
+    .max(8)
+    .describe(
+      'The pages the button appears on, such as `https://github.com/{owner}/{repo}/pull/{number}`: `https`, a literal host, and literal or `{capture}` path parts.',
+    ),
   // Tried in order; the button goes at the end of the first element that matches. None matching is
   // normal after a site redesign: the sidebar still offers the handoff.
-  anchors: z.array(anchorSelector).max(4).default([]),
+  anchors: z
+    .array(anchorSelector)
+    .max(4)
+    .default([])
+    .describe(
+      'CSS selectors tried in order. The button goes at the end of the first element found. When none match, the sidebar still offers the handoff.',
+    ),
   // POST BrowserHandoffResolveRequest → BrowserHandoffResolution, on this plugin's own route namespace.
-  resolve: pluginRoute,
+  resolve: pluginRoute.describe(
+    "A POST route on your Node half, sent `{ url, captures }`, that answers the page's items.",
+  ),
 })
 export type BrowserHandoffDescriptor = z.input<typeof browserHandoffDescriptor>
 
@@ -188,13 +203,15 @@ export const TASK_ADDRESSES_MAX_BYTES = 64 * 1024
 // browser. docs/plugin-authoring/browser-panel.md owns the contract.
 export const browserPanelDescriptor = z.object({
   // The nav item's label, such as "Runn".
-  label: z.string().trim().min(1).max(40),
+  label: z.string().trim().min(1).max(40).describe("The panel's name in the sidebar's navigation."),
   // A Lucide icon name for the nav item.
-  glyph: z.string().min(1).max(64).optional(),
+  glyph: z.string().min(1).max(64).optional().describe('A Lucide icon name for the navigation item.'),
   // A task-scoped pane in the same manifest, which Open in Acorn opens.
-  pane: z.string().min(1).max(64).optional(),
+  pane: z.string().min(1).max(64).optional().describe('A task pane in this manifest that **Open in Acorn** opens.'),
   // GET ?taskId=<id>[&source=<id>] → BrowserPanelView, or 404 for a task with no panel.
-  route: pluginRoute,
+  route: pluginRoute.describe(
+    "A GET route sent `taskId` that answers the panel's blocks, or 404 for a task with no panel.",
+  ),
 })
 export type BrowserPanelDescriptor = z.output<typeof browserPanelDescriptor>
 export type BrowserPanel = BrowserPanelDescriptor & { pluginId: string }
@@ -229,7 +246,9 @@ const panelBlock = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('rows'),
     title: panelText,
-    rows: z.array(z.strictObject({ label: z.string().min(1).max(80), state: panelText, severity: panelSeverity })).max(64),
+    rows: z
+      .array(z.strictObject({ label: z.string().min(1).max(80), state: panelText, severity: panelSeverity }))
+      .max(64),
   }),
   z.strictObject({
     kind: z.literal('logs'),

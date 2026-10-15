@@ -5,13 +5,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @acorn/cli build && astro build",
-    "dev": "pnpm --filter @acorn/cli build && astro dev",
-    "lint": "astro check && tsc -p specimens",
+    "build": "pnpm --filter @acorn/cli build && node scripts/reference.mjs && astro build",
+    "dev": "pnpm --filter @acorn/cli build && node scripts/reference.mjs && astro dev",
+    "lint": "node scripts/reference.mjs && astro check && tsc -p specimens",
     "specimens": "vitest run && pnpm --filter @acorn/tui exec vitest run src/kit/specimens.test.tsx && pnpm --filter @acorn/extension exec vitest run src/sidebar/pictures.test.tsx",
     "snapshots": "node scripts/capture-shell.mjs",
+    "reference": "node scripts/reference.mjs",
     "stale": "node scripts/stale.mjs",
-    "test": "node --test scripts/*.test.mjs src/lib/*.test.ts && node scripts/budget.mjs && playwright test",
+    "test": "node --test scripts/*.test.mjs src/lib/*.test.ts && vitest run scripts/referenceExamples.test.ts && node scripts/budget.mjs && playwright test",
     "github:refresh": "node scripts/githubRefresh.ts"
   },
   "dependencies": {
@@ -27,6 +28,7 @@
     "starlight-links-validator": "^0.26.0"
   },
   "devDependencies": {
+    "@acorn/node-core": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@astrojs/check": "^0.9.10",
     "@axe-core/playwright": "^4.13.0",

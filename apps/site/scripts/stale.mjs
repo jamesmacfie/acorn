@@ -14,6 +14,10 @@ import { fileURLToPath } from 'node:url'
 export const ROOT = fileURLToPath(new URL('../../../', import.meta.url))
 const SITE = 'apps/site/src'
 const DOCS = `${SITE}/content/docs`
+// The plugin reference's pages are generated into the docs collection from written halves, which carry
+// the frontmatter, so a reference page is its written half (apps/site/scripts/reference.mjs).
+const REFERENCE = `${SITE}/content/reference`
+const GENERATED = `${DOCS}/docs/build-plugins/reference/`
 const PAGES = `${SITE}/pages`
 const SNAPSHOTS = `${SITE}/generated/snapshots`
 
@@ -66,12 +70,20 @@ function files(dir) {
 // A page at `agents/skills.md` serves `/agents/skills/`, and an `index` page serves its folder.
 const urlOf = (path) => `/${path.replace(/\.(md|mdx|astro)$/, '').replace(/(^|\/)index$/, '')}/`.replace(/\/+/g, '/')
 
-/** Every page the reports cover: docs pages, marketing pages with a `meta` export, and shell snapshots. */
+/** Every page the reports cover: docs pages, the reference's written halves, marketing pages with a `meta`
+ *  export, and shell snapshots. */
 export function pages() {
   const read = (file) => readFileSync(join(ROOT, file), 'utf8')
   const docs = files(DOCS)
-    .filter((file) => /\.mdx?$/.test(file))
+    .filter((file) => /\.mdx?$/.test(file) && !file.startsWith(GENERATED))
     .map((file) => ({ file, url: urlOf(relative(DOCS, file)), ...readMeta(read(file)) }))
+  const reference = files(REFERENCE)
+    .filter((file) => /\.mdx?$/.test(file))
+    .map((file) => ({
+      file,
+      url: urlOf(`docs/build-plugins/reference/${relative(REFERENCE, file)}`),
+      ...readMeta(read(file)),
+    }))
   const marketing = files(PAGES)
     .filter((file) => file.endsWith('.astro') && read(file).includes('export const meta'))
     .map((file) => ({ file, url: urlOf(relative(PAGES, file)), ...readMeta(read(file)) }))
@@ -79,7 +91,7 @@ export function pages() {
     const suffix = Object.keys(SNAPSHOT_SOURCES).find((ending) => file.endsWith(ending))
     return suffix ? [{ file, sources: SNAPSHOT_SOURCES[suffix], checked: snapshotCommit(read(file)) }] : []
   })
-  return [...docs, ...marketing, ...snapshots]
+  return [...docs, ...reference, ...marketing, ...snapshots]
 }
 
 /** Each page with commits to its sources after `checked`, newest first. */

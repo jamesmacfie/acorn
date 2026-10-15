@@ -1,0 +1,21 @@
+---
+title: Contributions
+description: Every kind of contribution a manifest can declare, and how many of each.
+sources:
+  - docs/contribution-kinds.md
+  - docs/plugin-authoring/contributions.md
+checked: '498833615'
+---
+
+`contributions` lists what your plugin adds to acorn, by kind. Each kind is a key holding a list, and
+each list has a cap. Past the cap, a contribution stops being an integration and becomes an app inside
+someone else's window, so acorn refuses the manifest.
+
+Leave out any kind you don't use. A key this acorn doesn't know is reported and skipped, so a manifest
+written for a newer acorn still loads here with less in it.
+
+{/* facts */}
+
+Most kinds are data acorn draws or runs: a badge, a palette entry, a menu row, a schedule. None of them
+runs your code inside acorn's window. When one needs live data, it names a route on your Node half, and
+acorn calls it. Your own UI, a pane or a panel body, is a `frames` entry drawn by your client bundle.

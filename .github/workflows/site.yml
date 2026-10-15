@@ -13,6 +13,11 @@ on:
       - packages/protocol/**
       - packages/client-core/src/kit/**
       - packages/client-core/src/host/tree/**
+      # The plugin reference reads the frame scopes, the bridge budgets, and the trust prompt's groups.
+      - packages/client-core/src/host/frames/**
+      - packages/client-core/src/host/trust/**
+      # The manifest parser the reference's examples are checked with, and the core facet list.
+      - packages/node-core/src/server/plugins/**
       - packages/client-core/src/infra/styles/**
       - packages/plugin-sdk/**
       - packages/plugin-types/**

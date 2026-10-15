@@ -1,0 +1,134 @@
+---
+title: cliCommands
+description: "Commands under acorn plugin, answered by your Node half."
+sources:
+  - docs/plugin-authoring/cli-commands.md
+checked: '498833615'
+---
+
+A command line command adds `acorn plugin <your-id> <name>` to acorn's command line. You declare its
+input and output as JSON Schemas, and acorn checks both, so a script can rely on the shape. Your
+`/cli/<name>` route does the work.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "permissions": {
+    "node": {
+      "core": [
+        "tasks"
+      ]
+    }
+  },
+  "contributions": {
+    "cliCommands": [
+      {
+        "name": "status",
+        "title": "Acme status",
+        "summary": "Show the Acme status of the Node.",
+        "risk": "read",
+        "scope": "node",
+        "capability": "tasks",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "nodeId"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "healthy": {
+              "type": "boolean"
+            }
+          }
+        },
+        "route": {
+          "method": "POST",
+          "path": "/cli/status"
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "permissions": {
+    "node": {
+      "core": [
+        "tasks"
+      ]
+    }
+  },
+  "contributions": {
+    "cliCommands": [
+      {
+        "name": "close",
+        "title": "Close an issue",
+        "summary": "Close the Acme issue linked to a task.",
+        "effects": "Closes the issue in Acme.",
+        "risk": "write",
+        "scope": "task",
+        "capability": "tasks",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "nodeId": {
+              "type": "string"
+            },
+            "taskId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "nodeId",
+            "taskId"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "closed": {
+              "type": "boolean"
+            }
+          }
+        },
+        "route": {
+          "method": "POST",
+          "path": "/cli/close"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+These are commands for `acorn plugin` on the command line, not for the terminal client's palette.
+
+## Mistakes
+
+- `inputSchema` must require `nodeId`, and the ID its `scope` names, as strings.
+- A `write` command needs `effects`.
+- `route.path` is `/cli/<name>`, matching `name`.
+
+## Guide
+
+[Add a command line command](/docs/build-plugins/node/add-a-command-line-command/) walks through it from start to finish.

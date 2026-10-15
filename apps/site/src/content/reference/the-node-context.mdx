@@ -1,0 +1,58 @@
+---
+title: The Node context
+description: Everything the Node hands your plugin's Node half, with each member's signature.
+sources:
+  - docs/plugin-authoring/the-node-half.md
+  - docs/plugins/plugin-api.md
+checked: '498833615'
+---
+
+Your Node half is one module the Node loads from your package, named by the manifest's `node` field. It
+runs in its own worker, and it reaches acorn only through `ctx`, the object the Node passes it. The types
+below come from the `acorn-plugin-types` package, so your editor can check your code against them:
+
+```ts
+import type { NodePlugin } from 'acorn-plugin-types'
+```
+
+## The lifecycle
+
+The module's default export is an object with a `name` and three functions:
+
+```js
+export default {
+  name: 'acme',
+  async init(ctx) {
+    ctx.routes.fetch(async (request) => new Response(JSON.stringify({ hello: 'world' })))
+  },
+  ready(ctx) {},
+  dispose() {},
+}
+```
+
+- **`name`** must equal the manifest's `id`, or the load fails.
+- **`init(ctx)`** runs first. Register everything here: your routes, schedules, data sources, and
+  capabilities. If it throws, the plugin's row says why, and on a reload the previous version keeps
+  serving.
+- **`ready(ctx)`** runs after every plugin's `init`. Use it for anything that reads another plugin's
+  contributions, instead of depending on load order.
+- **`dispose()`** runs when the plugin stops. Close what you opened: connections, timers, and
+  subscriptions.
+
+## Routes
+
+Your routes live at `/v1/p/<id>/`. Serve them with `ctx.routes.fetch(handler)`, where the handler takes a
+standard `Request` and returns a `Response`. acorn strips the prefix, so a request to
+`/v1/p/acme/greeting` reaches your handler as `/greeting`. Every route a manifest descriptor names, such
+as a source's `items`, is inside this namespace.
+
+## A context shaped by your manifest
+
+`ctx` holds only what your manifest asked for. A facet you left out of `permissions.node.core` isn't on
+`ctx.core`, so calling it throws at once. The registries are bound to your plugin: acorn stamps your ID
+on what you register, so nothing can be filed under another plugin's name.
+
+Agent tools and task context sections have no member here. Declare them in the manifest, as
+`contributions.agentTools` and `contributions.contextSections`.
+
+{/* facts */}

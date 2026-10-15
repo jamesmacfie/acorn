@@ -84,9 +84,13 @@ export type CommandSearchItem = z.infer<typeof commandSearchItemSchema>
 
 /** One labelled choice a `setting` command offers. */
 export const commandSettingOptionSchema = z.object({
-  value: z.string().min(1).max(200),
-  label: z.string().min(1).max(200),
-  keywords: z.array(z.string().min(1).max(80)).max(16).optional(),
+  value: z.string().min(1).max(200).describe('The value your routes read and write.'),
+  label: z.string().min(1).max(200).describe("The choice's text in the palette."),
+  keywords: z
+    .array(z.string().min(1).max(80))
+    .max(16)
+    .optional()
+    .describe('Words the palette search matches besides the label.'),
 })
 
 export type CommandSettingOption = z.infer<typeof commandSettingOptionSchema>

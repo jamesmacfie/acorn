@@ -1,0 +1,95 @@
+---
+title: harnesses
+description: "Agent programs acorn can run as managed sessions."
+sources:
+  - docs/plugin-authoring/harnesses.md
+  - docs/managed-agents/harnesses.md
+checked: '498833615'
+---
+
+A harness is an agent program acorn can run as a managed session, beside Claude Code and Codex. You
+declare the program and how to start it, and acorn runs it, holds the session, and draws the transcript.
+Your plugin never gets a process of its own, so a harness needs no `exec` permission. The program speaks
+the Agent Client Protocol (ACP), or your package ships an adapter in front of it.
+
+## A minimal example
+
+```json manifest
+{
+  "contributions": {
+    "harnesses": [
+      {
+        "id": "opencode",
+        "label": "OpenCode",
+        "spawn": {
+          "command": "opencode",
+          "args": [
+            "acp"
+          ]
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "harnesses": [
+      {
+        "id": "opencode",
+        "label": "OpenCode",
+        "glyph": "bot",
+        "spawn": {
+          "command": "opencode",
+          "args": [
+            "acp"
+          ]
+        },
+        "envPassthrough": [
+          "OPENCODE_*"
+        ],
+        "quirks": {
+          "sessionPersistence": true
+        },
+        "probes": {
+          "auth": "/v1/p/acme/harness/auth"
+        },
+        "terminal": {
+          "command": "opencode"
+        },
+        "oneShot": {
+          "args": [
+            "run"
+          ],
+          "modelFlag": "--model",
+          "output": "text"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+A managed session works in the terminal client as on the desktop. `terminal` offers the agent's own
+interactive program in a task terminal.
+
+## Mistakes
+
+- Give `spawn` a `command` or an `entry`, not both.
+- Don't rename a harness ID. Every session stores it.
+- A bare `*` in `envPassthrough` is refused.
+
+## Guide
+
+[Add a harness](/docs/build-plugins/node/add-a-harness/) walks through it from start to finish.

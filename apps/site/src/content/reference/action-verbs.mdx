@@ -1,0 +1,44 @@
+---
+title: Action verbs
+description: "The verbs a badge, a menu row, a command, or a rail row can run, and which takes which."
+sources:
+  - docs/plugin-authoring/contributions.md
+  - docs/plugins/descriptors.md
+checked: '498833615'
+---
+
+A descriptor never runs your code inside acorn's window. When someone clicks your badge, picks your
+command, or presses your menu row, acorn runs one verb from a closed set, which your manifest names. That
+keeps every click reviewable: the trust prompt and your manifest show exactly what each control does,
+and a route's answer can't change it.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "slots": [
+      {
+        "id": "queue",
+        "slot": "topbar",
+        "data": "/v1/p/acme/queue/badge",
+        "onClick": { "verb": "openUrl", "url": "https://acme.example/queue" }
+      }
+    ]
+  }
+}
+```
+
+The verbs come in three sets, because some need something only one kind of click has. `createTask` needs
+a selected rail row, and `navigate` needs a project in view, so a command or a badge, which has neither,
+takes the context-free set.
+
+{/* facts */}
+
+A verb that needs your own code, such as saving something, is `runNodeAction`: it POSTs to a route on
+your Node half, and your code runs there.
+
+## Mistakes
+
+- A verb a field doesn't take is refused when the manifest loads, so a badge can't `createTask`.
+- `openPane` must name a task pane, and `navigate` a project pane, that your own manifest declares.
+- `openUrl` opens `https` addresses only, in the person's browser.

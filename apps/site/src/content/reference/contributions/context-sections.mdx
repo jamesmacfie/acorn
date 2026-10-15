@@ -1,0 +1,66 @@
+---
+title: contextSections
+description: "Sections of a task's context, read from a route on your Node half."
+sources:
+  - docs/agent-tools/context-sections.md
+  - docs/agent-tools/loaded-tools.md
+checked: '498833615'
+---
+
+A context section adds your plugin's part to a task's context: what an agent reads about the task
+when it starts. Your route answers reference data and short text, and acorn holds it to the byte and
+token budget you declare.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "contextSections": [
+      {
+        "id": "issue",
+        "label": "Acme issue",
+        "order": 300,
+        "read": "/v1/p/acme/context",
+        "maxBytes": 8192,
+        "maxTokens": 2048
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "contextSections": [
+      {
+        "id": "issue",
+        "label": "Acme issue",
+        "order": 300,
+        "read": "/v1/p/acme/context",
+        "defaultIncluded": true,
+        "timeoutMs": 3000,
+        "maxBytes": 8192,
+        "maxTokens": 2048
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+Task context is assembled on the Node, the same for every client.
+
+## Guide
+
+[Add task context](/docs/build-plugins/node/add-task-context/) walks through it from start to finish.

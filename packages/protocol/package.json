@@ -69,6 +69,7 @@
     "./plugin/runtimeContributions.ts": "./src/plugin/runtimeContributions.ts",
     "./plugin/source.ts": "./src/plugin/source.ts",
     "./plugin/state.ts": "./src/plugin/state.ts",
+    "./plugin/vocabulary.ts": "./src/plugin/vocabulary.ts",
     "./projectColor.ts": "./src/appearance/projectColor.ts",
     "./queryPublication.ts": "./src/data/queries/queryPublication.ts",
     "./refResolvers.ts": "./src/content/refResolvers.ts",

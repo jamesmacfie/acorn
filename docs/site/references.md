@@ -2,9 +2,9 @@
 
 This page covers the public site's reference pages that read their facts from the code: the command
 line reference, the keyboard shortcuts reference, the configuration file fields, the environment
-variables, and the published JSON Schemas. Read it when one of those pages fails the build or a test,
-or when you add a command, a shortcut, a field, or an `ACORN_*` variable. It's part of
-[the public site](../site.md).
+variables, the published JSON Schemas, and the plugin reference. Read it when one of those pages fails
+the build or a test, or when you add a command, a shortcut, a field, an `ACORN_*` variable, or anything
+to the plugin contract. It's part of [the public site](../site.md).
 
 ## The command line reference
 
@@ -58,4 +58,44 @@ lists a name nothing uses. Add a variable a person might set to the page, and on
 `apps/site/src/pages/schemas/[...file].ts` serves each `*.schema.json` in `packages/plugin-types/` at
 `/schemas/<file>`, and each in `apps/cli/schemas/` at `/schemas/cli/<file>`, byte for byte. Each file's
 `$id` is the address it's served at, and a Playwright test in `apps/site/tests/site.spec.ts` checks
-both for every file.
+both for every file. `apps/site/public/_headers` sends `/schemas/*` as JSON with
+`Access-Control-Allow-Origin: *`, because editors fetch them from other origins, and
+`apps/site/scripts/headers.test.mjs` checks that block.
+
+## The plugin reference
+
+Every page under **Build plugins > Reference** except Examples and What plugins can't do is generated.
+`apps/site/scripts/reference.mjs` runs before the site's `dev`, `build`, and `lint`, and writes each page
+into the docs collection's `build-plugins/reference/` folder, which Git ignores. Run
+`pnpm --filter @acorn/site reference` to rebuild them while `astro dev` is running. A page joins two
+halves:
+
+- **The written half**, in `apps/site/src/content/reference/`, at the same path: the frontmatter, the
+  introduction, the examples, and the mistakes. Edit this file, never the generated one. It holds a
+  `{/* facts */}` line where the facts go, writes no imports, and may use the components the script
+  imports into every page, `PAGE_COMPONENTS`. `@API_MAJOR@` in a written half becomes
+  `PLUGIN_API_MAJOR`, so an example manifest never holds the number. A link to a docs page that's still a
+  draft keeps its words and loses the link until that page publishes.
+- **The facts**, from `apps/site/scripts/referenceFacts.mjs`. The manifest and contribution tables come
+  from `manifestJsonSchema()` and `pluginManifestVocabulary()` in
+  `packages/protocol/src/plugin/vocabulary.ts`, the same derivation the `plugin_authoring` tool uses.
+  Each field's text is its `.describe()` in the contract, which is also the hover help in an author's
+  editor. The Node context and the client bridge come from the published declarations, read with the
+  TypeScript compiler. Values owned where plain Node can't import them, such as the frame scopes in
+  client-core and the bridge budgets, are read from their source text, and a read that finds nothing
+  fails the build.
+
+A contribution key gets its own page, `contributions/<key-in-kebab-case>`, and the build fails until its
+written half exists. A page with facts and no written half fails the same way.
+
+Three checks hold the reference to the contract:
+
+- `packages/plugin-types/src/pluginSchema.test.ts` fails when any property in the manifest schema has no
+  description. Add `.describe()` beside the field, then regenerate with `UPDATE_PLUGIN_SCHEMA=1`.
+- `apps/site/scripts/referenceExamples.test.ts` parses every manifest example in the plugin docs with the
+  Node's own `pluginManifestSchema`, cross-field rules included. A fenced block marked `json manifest`
+  must parse, one marked `json manifest-invalid` must fail, and an unmarked JSON block holding manifest
+  keys fails the test. An example leaves out `id`, `name`, `version`, `baseline`, and `apiVersion`, and
+  the test adds them, with `acme` as the ID.
+- The same test fails when a top-level key has no example on the manifest reference, a contribution key
+  has none on its page, or a public extension point has none on Extension points.

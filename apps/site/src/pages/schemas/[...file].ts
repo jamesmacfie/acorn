@@ -29,4 +29,4 @@ const schemas = new Map([
 export const getStaticPaths = (() => [...schemas.keys()].map((file) => ({ params: { file } }))) satisfies GetStaticPaths
 
 export const GET: APIRoute = ({ params }) =>
-  new Response(schemas.get(params.file!), { headers: { 'Content-Type': 'application/schema+json' } })
+  new Response(schemas.get(params.file!), { headers: { 'Content-Type': 'application/json' } })

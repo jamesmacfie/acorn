@@ -1,0 +1,61 @@
+---
+title: agentContexts
+description: "Entries in an agent composer's context list."
+sources:
+  - docs/contribution-kinds.md
+  - docs/managed-agents/client-surfaces.md
+checked: '498833615'
+---
+
+An agent context is an entry in the composer's list of things to attach to a message. The person
+opens it, picks options your route lists, and acorn attaches the text your second route answers, stamped
+with your plugin and the time.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "agentContexts": [
+      {
+        "id": "issues",
+        "label": "Acme issues",
+        "options": "/v1/p/acme/context/options",
+        "capture": "/v1/p/acme/context/capture"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "agentContexts": [
+      {
+        "id": "issues",
+        "label": "Acme issues",
+        "description": "Attach the issues linked to this task.",
+        "options": "/v1/p/acme/context/options",
+        "capture": "/v1/p/acme/context/capture"
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The agent composer is the same in the terminal client, so the entry is there too.
+
+## Guide
+
+[Add task context](/docs/build-plugins/node/add-task-context/) walks through it from start to finish.

@@ -1,3 +1,6 @@
 .astro/
 test-results/
 playwright-report/
+
+# The plugin reference, built from src/content/reference/ by scripts/reference.mjs.
+src/content/docs/docs/build-plugins/reference/

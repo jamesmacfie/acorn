@@ -8,6 +8,8 @@ import Cells, { type CellFrame } from './Cells.astro'
 interface Props {
   id: string
   both?: boolean
+  /** Replaces the specimen's own caption, for a page that shows a kit node standing for what the host draws. */
+  caption?: string
 }
 
 type Recorded = { meta: { title: string; caption: string; width: number } }
@@ -16,7 +18,7 @@ const trees = import.meta.glob<Recorded>('../generated/specimens/*.tree.json', {
 const pages = import.meta.glob<string>('../generated/specimens/*.html', { eager: true, query: '?raw', import: 'default' })
 const frames = import.meta.glob<CellFrame>('../generated/specimens/*.cells.json', { eager: true, import: 'default' })
 
-const { id, both = false } = Astro.props
+const { id, both = false, caption } = Astro.props
 const file = (extension: string) => `../generated/specimens/${id}${extension}`
 const tree = trees[file('.tree.json')]
 const html = pages[file('.html')]
@@ -60,7 +62,7 @@ const role = both ? 'group' : 'tabpanel'
       <span class="frame-size">{both && 'Terminal '}{cells.columns}×{cells.rows}</span>
     </div>
   </div>
-  <figcaption class="frame-caption">{meta.caption}</figcaption>
+  <figcaption class="frame-caption">{caption ?? meta.caption}</figcaption>
 </figure>
 
 <script>

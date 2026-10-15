@@ -14,6 +14,15 @@ const showDrafts = previewBuild || !process.argv.includes('build')
 const docsDir = new URL('./src/content/docs/', import.meta.url)
 const labDir = new URL('./src/lab/', import.meta.url)
 
+// The plugin reference is generated before Astro starts (scripts/reference.mjs), one page per manifest
+// contribution key, so the sidebar lists whatever pages it wrote.
+const contributionsDir = new URL('docs/build-plugins/reference/contributions/', docsDir)
+if (!existsSync(contributionsDir)) throw new Error('The plugin reference is not built. Run node scripts/reference.mjs.')
+const contributionPages = readdirSync(contributionsDir)
+  .filter((name) => name.endsWith('.mdx'))
+  .map((name) => `docs/build-plugins/reference/contributions/${name.replace(/\.mdx$/, '')}`)
+  .sort()
+
 // Starlight drops drafts from a production build and then fails on any sidebar slug it can't find, so
 // the sidebar leaves drafts out too.
 // shortcut: reads `draft: true` with a regex instead of parsing frontmatter, fine while stubs are
@@ -302,7 +311,7 @@ export default defineConfig({
           label: 'Reference',
           items: [
             'docs/build-plugins/reference/manifest-reference',
-            'docs/build-plugins/reference/contributions',
+            { label: 'Contributions', items: ['docs/build-plugins/reference/contributions', ...contributionPages] },
             'docs/build-plugins/reference/permissions',
             'docs/build-plugins/reference/the-node-context',
             'docs/build-plugins/reference/the-client-bridge',

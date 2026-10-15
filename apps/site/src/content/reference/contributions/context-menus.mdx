@@ -1,0 +1,93 @@
+---
+title: contextMenus
+description: "Rows on acorn's context menus."
+sources:
+  - docs/plugin-authoring/ui-contributions.md
+  - docs/plugins/menus-and-markers.md
+  - docs/tui/plugin-losses.md
+checked: '498833615'
+---
+
+A context menu row is an entry on one of acorn's menus: a task row, an item row, your own rail icon,
+an Editor file or tab, a transcript message or turn, or selected text. acorn draws the row after its own,
+and runs your action with the ID of what was right-clicked. `when` shows the row only on targets whose
+facts match.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "contextMenus": [
+      {
+        "id": "flag",
+        "location": "task.row",
+        "label": "Flag in Acme",
+        "action": {
+          "verb": "runNodeAction",
+          "path": "/v1/p/acme/flag"
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "contextMenus": [
+      {
+        "id": "lint",
+        "location": "file.row",
+        "label": "Lint with Acme",
+        "icon": "sparkles",
+        "order": 600,
+        "when": {
+          "extension": "md"
+        },
+        "action": {
+          "verb": "runNodeAction",
+          "path": "/v1/p/acme/lint"
+        }
+      },
+      {
+        "id": "quote",
+        "location": "content.selection",
+        "label": "Send to Acme",
+        "when": {
+          "contentKind": "markdown"
+        },
+        "action": {
+          "verb": "runNodeAction",
+          "path": "/v1/p/acme/quote"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+In the terminal client, a file's row opens from its **Actions** button or Shift+F10, and transcript
+menus work as on the desktop. Rail icon menus are desktop only, and a selection menu offers a message's
+whole text, because a terminal has no text selection.
+
+## Mistakes
+
+- `when` values are literals, not patterns, and `"true"` isn't `true`.
+- A fact the location doesn't have is refused, so a typo can't make a row that never shows.
+- A row is not a grant. It can't edit or send what was right-clicked.
+
+## Guide
+
+[Add rows to context menus](/docs/build-plugins/ui/add-rows-to-context-menus/) walks through it from start to finish.

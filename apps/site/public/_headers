@@ -9,3 +9,8 @@
 # Astro puts a content hash in every file name here, so a changed file gets a new URL.
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Editors fetch the published JSON Schemas from other origins, so they're open to any.
+/schemas/*
+  Content-Type: application/json
+  Access-Control-Allow-Origin: *

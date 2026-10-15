@@ -1,6 +1,111 @@
 # Phase 15: generate the plugin reference
 
-Date: October 15, 2026. Status: proposed. Needs phases 2 and 3. Phases 16 and 17 depend on it.
+Date: October 15, 2026. Status: done. Needs phases 2 and 3. Phases 16 and 17 depend on it.
+
+## Completion note
+
+October 16, 2026. The plugin reference is generated: the manifest reference, a contributions index and
+one page per contribution key (31), Permissions, the Node context, the client bridge, Trees and events,
+Extension points, Action verbs, Limits, and Compatibility and versions. Every property in the published
+manifest schema has a description. [Generated references](../../site/references.md#the-plugin-reference)
+is the reference for how the pages are built and checked.
+
+What landed:
+
+- **Descriptions in the contract.** Every field in `packages/protocol/src/plugin/` and the shared schemas
+  it pulls in (`chrome/commands.ts`, `data/dataSourceContributions.ts`, `runtime/schedules.ts`) has a
+  `.describe()`, which `z.toJSONSchema` writes into `packages/plugin-types/acorn-plugin.schema.json`. The
+  schema had no property descriptions, and now every property has one. `pluginSchema.test.ts` fails on a property with
+  none. The parse is unchanged: protocol's 314 tests and node-core's 504 plugin tests pass.
+- **One derivation.** `pluginManifestVocabulary()` and `manifestJsonSchema()` moved from node-core's
+  `pluginAuthoring.ts` to `packages/protocol/src/plugin/vocabulary.ts`. The `plugin_authoring` tool adds
+  the core facets and the bridge text on top. Its output, guide and vocabulary together, is byte for byte
+  the same as on the base commit.
+- **The generator.** `apps/site/scripts/reference.mjs` joins each written half in
+  `apps/site/src/content/reference/` with facts from `referenceFacts.mjs`, and writes the pages into a
+  Git-ignored folder of the docs collection. The site's `dev`, `build`, and `lint` run it first. The
+  sidebar's Contributions group lists the per-key pages it wrote.
+- **The checks.** `apps/site/scripts/referenceExamples.test.ts` parses all 97 manifest examples, one of them a mistake that must fail, with
+  node-core's `pluginManifestSchema`, cross-field rules included, and holds the coverage rules from
+  [sync](./sync.md#coverage-checks). Fixture cases prove each check fails on a planted gap.
+- **The schemas.** `apps/site/public/_headers` sends `/schemas/*` as `application/json` with
+  `Access-Control-Allow-Origin: *`, and `headers.test.mjs` checks it. Phase 14 already served both files at
+  their `$id`, and the production build's `dist/schemas/` holds them.
+- **The drift.** `packages/plugin-types/README.md` and `packages/plugin-sdk/README.md` no longer state a
+  major. The SDK README said `2`.
+
+The acceptance checks: a production build writes 157 pages and passes the site's tests, with 185 Playwright
+tests, and a preview build passes all 294. `astro check` finds no errors. Adding a field
+with a description to the slots descriptor made it appear on the slots page with no other change, and
+removing it took it away.
+
+### Decisions
+
+- **`.describe()`, not `.meta({ description })`.** They write the same `description`, and
+  `deviceConfigSchema` already uses `.describe()`.
+- **Action verbs are defined once.** Each verb is one object in `chromeDescriptors.ts`, shared by the three
+  verb sets, so its description is written once. The sets and their order are unchanged.
+- **The example check runs under Vitest.** The Node's parser uses TypeScript that Node's type stripping
+  refuses, such as parameter properties. The generator runs in plain Node, through
+  `apps/site/scripts/tsResolve.mjs`, a resolve hook that retries an extensionless relative import with
+  `.ts`. The site's `test` script runs the Vitest file, and so does `specimens`.
+- **Facts read from source text, with a check.** The frame scopes, the bridge budgets, the trust prompt's
+  groups and facet sentences, and two node-core size limits are owned where plain Node can't import them.
+  The generator reads them as text and fails when a read finds nothing.
+- **The facts are `ReferenceTable` rows**, as phase 6 asked, so each field has an anchor. `ReferenceTable`
+  gained an `href` per row and `[words](/path/)` links in a cell. `Specimen` gained a `caption` override.
+- **Written halves import nothing.** The generator imports `ApiMajor`, `Badge`, `ReferenceTable`,
+  `Snapshot`, and `Specimen` into every page, so moving a page can't break a path. `@API_MAJOR@` in a written
+  half becomes the major, so no example holds the number.
+- **A link to a draft keeps its words and loses the link.** Every contribution page names its guide, and
+  the guides are phase 16 and 17 drafts. The links appear when those pages publish, with no edit here.
+- **Two export ceilings rose by one.** `@acorn/protocol` to 88 for `plugin/vocabulary.ts`, and
+  `@acorn/node-core` to 67 for `server/plugins/manifest.ts` and `server/plugins/coreFacets.ts`, with the
+  reasons in `tools/arch/boundaries.test.ts`. `@acorn/node-core` is a site dev dependency for those two.
+- **Three exports.** `KIT_EVENTS` from `tree/nodes.ts`, and `NODE_EVENT_CHANNELS` from
+  `transport/nodeEvents.ts`, so the pages read them.
+
+### Deviations
+
+- **The trust prompt has five groups, not two.** Besides **Enforced** and **Declared** it has **Web pages**,
+  **Reads**, and **Provides**. The Permissions page shows each line kind's real group, read from
+  `trustModel.ts`.
+- **Specimens on three pages.** Frames shows a tree pane, sources the kit's rows, and slots the kit's
+  `Badge`, each captioned as the node the host draws. A context menu row has no specimen, because the
+  kit's `Menu` draws only open, which the generator can't show in jsdom. The trust prompt is shell chrome,
+  so Permissions shows the `permissions` snapshot, as phase 12 did.
+- **No code regions from example plugins.** No example plugin exists until phases 16 and 17, so every
+  example is a fenced block. `collectExamples` in the test is the place to add regions.
+- **The tree limits are on Limits**, with each one's own doc comment from `TREE_LIMITS`, read with the
+  TypeScript parser.
+- **What plugins can't do and Examples stay drafts.** They moved to the written folder unchanged, because
+  this phase's table doesn't list them.
+- **No scratch branch.** The acceptance check that adds a field ran in the working tree and was reverted,
+  because this run's notes forbid new branches.
+- **The `routes.path` rule.** An app route lives under `/p/:projectId/x/<id>/`, which no doc said. The
+  field's description says so now.
+- **The protocol package may not name the plugin route prefix**, even in prose, so its descriptions say
+  "your own routes".
+- **The `kind` on a command is required.** The `plugin_authoring` brief still says leaving it out means an
+  action, and `docs/plugin-authoring/the-manifest.md` still says the major is `3`. Both need their owners.
+- **105 of the Node context's 144 members have no doc comment** in `acorn-plugin-types`, so their rows show a
+  signature only. The declarations' owner should add them.
+
+### What later phases need to know
+
+- Phases 16 and 17: mark every manifest example in a guide as ` ```json manifest ` or
+  ` ```json manifest-invalid `. An unmarked JSON block with manifest keys fails the test. Write the
+  fragment without `id`, `name`, `version`, `baseline`, and `apiVersion`, and use `acme` as the plugin ID in
+  routes. Publishing a guide turns on the links to it from the contribution pages.
+- A new contribution key fails the build until it has a written half at
+  `apps/site/src/content/reference/contributions/<key-in-kebab-case>.mdx` with an example.
+- A new field needs a `.describe()`, then `UPDATE_PLUGIN_SCHEMA=1` on the plugin-types test.
+- Phase 19: the facts are `ReferenceTable` components, not Markdown tables, so `llms.txt` must render the
+  page, not read its source.
+- Phase 20: check the live `/schemas/` headers with `curl -I`, and that VS Code shows the descriptions on
+  hover in a scaffolded `acorn-plugin.json`. The scaffold points `$schema` at `acorn.sh`, so the hover needs
+  the deploy. The descriptions are in the committed schema now.
+- The architecture checks fail on this base as earlier phases recorded, with nothing from this change.
 
 ## Goal
 

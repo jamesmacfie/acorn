@@ -1,0 +1,140 @@
+---
+title: themes
+description: "Color themes for Settings > Appearance."
+sources:
+  - docs/ui-design/appearance.md
+  - docs/contribution-kinds.md
+checked: '498833615'
+---
+
+A theme is a set of colors for acorn's palette tokens. You write the values, acorn checks each one and
+generates the CSS, and the theme appears in **Settings > Appearance** beside the built-in ones, with your
+plugin's name. You write no CSS, and none of yours reaches the window.
+
+`tokens` must list every palette token, and no others. The fields table below names them all.
+
+## A minimal example
+
+```json manifest
+{
+  "contributions": {
+    "themes": [
+      {
+        "id": "ember",
+        "label": "Ember",
+        "dark": true,
+        "tokens": {
+          "--bg": "#1e1f29",
+          "--bg-subtle": "#252734",
+          "--bg-hover": "#2d3040",
+          "--bg-selected": "#363a4f",
+          "--border": "#3a3d4f",
+          "--border-strong": "#4b4f66",
+          "--text": "#e6e7ee",
+          "--text-muted": "#a9abbd",
+          "--text-faint": "#7d8096",
+          "--accent": "#f0883e",
+          "--focus": "#f0883e",
+          "--add-bg": "rgba(63, 185, 80, 0.15)",
+          "--add-marker": "#3fb950",
+          "--del-bg": "rgba(248, 81, 73, 0.15)",
+          "--del-marker": "#f85149",
+          "--add-word-bg": "rgba(63, 185, 80, 0.35)",
+          "--del-word-bg": "rgba(248, 81, 73, 0.35)",
+          "--hunk-bg": "#252734",
+          "--hunk-text": "#a9abbd",
+          "--warn": "#d29922",
+          "--badge-border": "#4b4f66",
+          "--shadow-popover": "rgba(0, 0, 0, 0.5)"
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "contributions": {
+    "themes": [
+      {
+        "id": "ember",
+        "label": "Ember",
+        "dark": true,
+        "tokens": {
+          "--bg": "#1e1f29",
+          "--bg-subtle": "#252734",
+          "--bg-hover": "#2d3040",
+          "--bg-selected": "#363a4f",
+          "--border": "#3a3d4f",
+          "--border-strong": "#4b4f66",
+          "--text": "#e6e7ee",
+          "--text-muted": "#a9abbd",
+          "--text-faint": "#7d8096",
+          "--accent": "#f0883e",
+          "--focus": "#f0883e",
+          "--add-bg": "rgba(63, 185, 80, 0.15)",
+          "--add-marker": "#3fb950",
+          "--del-bg": "rgba(248, 81, 73, 0.15)",
+          "--del-marker": "#f85149",
+          "--add-word-bg": "rgba(63, 185, 80, 0.35)",
+          "--del-word-bg": "rgba(248, 81, 73, 0.35)",
+          "--hunk-bg": "#252734",
+          "--hunk-text": "#a9abbd",
+          "--warn": "#d29922",
+          "--badge-border": "#4b4f66",
+          "--shadow-popover": "rgba(0, 0, 0, 0.5)"
+        }
+      },
+      {
+        "id": "ember-light",
+        "label": "Ember light",
+        "tokens": {
+          "--bg": "#fbf8f3",
+          "--bg-subtle": "#f3eee6",
+          "--bg-hover": "#ece5da",
+          "--bg-selected": "#e4dccf",
+          "--border": "#d8cfc1",
+          "--border-strong": "#c3b8a8",
+          "--text": "#2b2620",
+          "--text-muted": "#5f574d",
+          "--text-faint": "#7a7166",
+          "--accent": "#b4541a",
+          "--focus": "#b4541a",
+          "--add-bg": "rgba(63, 185, 80, 0.15)",
+          "--add-marker": "#3fb950",
+          "--del-bg": "rgba(248, 81, 73, 0.15)",
+          "--del-marker": "#f85149",
+          "--add-word-bg": "rgba(63, 185, 80, 0.35)",
+          "--del-word-bg": "rgba(248, 81, 73, 0.35)",
+          "--hunk-bg": "#f3eee6",
+          "--hunk-text": "#5f574d",
+          "--warn": "#8a5a00",
+          "--badge-border": "#c3b8a8",
+          "--shadow-popover": "rgba(0, 0, 0, 0.18)"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The terminal client uses the terminal's own palette, or a built-in theme's colors on a truecolor
+terminal. A plugin theme doesn't change it.
+
+## Mistakes
+
+- Don't set `--is-dark` or `--color-scheme`. They come from `dark`.
+- Named colors, `var()`, and nested color functions are refused. Write `#1e1e2e` or `oklch(0.7 0.15 250)`.
+
+## Guide
+
+[Add a theme or a style pack](/docs/build-plugins/ui/add-a-theme-or-a-style-pack/) walks through it from start to finish.

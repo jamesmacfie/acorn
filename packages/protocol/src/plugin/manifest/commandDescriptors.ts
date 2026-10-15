@@ -11,27 +11,55 @@ import { isNormalizedChord, isPluginShortcutChord } from '../../chrome/keybindin
 import { contextFreeAction, selectedRowAction } from './chromeDescriptors.ts'
 import { pluginRoute } from './manifestFields.ts'
 
-export const commandCategory = z.enum(['action', 'navigation', 'pane', 'task', 'terminal', 'workspace'])
+export const commandCategory = z
+  .enum(['action', 'navigation', 'pane', 'task', 'terminal', 'workspace'])
+  .describe('The palette group the command is listed under.')
 
 // What every kind of command declares. Ids are local: client-core's `pluginCommand` qualifies both this
 // one and `parentId` as `plugin.<pluginId>.<id>` and stamps the owner, so a manifest cannot name another
 // plugin's group as its parent or claim another plugin's id
 // (docs/command-palette-and-shortcuts.md).
 const commandCommon = {
-  id: z.string().min(1).max(64),
-  title: z.string().min(1).max(120),
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .describe(
+      "The command's ID, unique in this manifest. A keybinding names it, and the host makes it `plugin.<pluginId>.<id>`.",
+    ),
+  title: z.string().min(1).max(120).describe("The command's name in the palette."),
   category: commandCategory.default('action'),
-  palette: z.boolean().default(true),
+  palette: z
+    .boolean()
+    .default(true)
+    .describe('Whether the palette lists it. Set `false` for a command only a keybinding runs.'),
   /** Secondary text on the row. */
-  hint: z.string().min(1).max(160).optional(),
+  hint: z.string().min(1).max(160).optional().describe('Secondary text on the palette row.'),
   /** What the root search matches on besides the title, for a command whose name is not what anybody
    *  types. */
-  keywords: z.array(z.string().min(1).max(40)).max(16).optional(),
+  keywords: z
+    .array(z.string().min(1).max(40))
+    .max(16)
+    .optional()
+    .describe('Words the palette search matches besides the title.'),
   /** Sibling order, before relevance. */
-  order: z.number().int().min(0).max(100_000).optional(),
+  order: z
+    .number()
+    .int()
+    .min(0)
+    .max(100_000)
+    .optional()
+    .describe('Order among its siblings, before search relevance. Lower comes first.'),
   /** A `group` this same manifest declares. Checked across the whole array by the manifest refinement,
    *  because a parent is another entry in the list and no field can see its siblings. */
-  parentId: z.string().min(1).max(64).optional(),
+  parentId: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .describe(
+      "The ID of a `group` command in this manifest to list this one under. Another plugin's group is refused.",
+    ),
 }
 
 // Which identity the host derives and sends, and it is not the whole vocabulary: `fleet` is missing on
@@ -39,18 +67,25 @@ const commandCommon = {
 // rate limits and error noise on a declaration nobody reviewed per node, and the two scopes a loaded
 // plugin actually needs — the open task and the routed project — are here. Core commands may still be
 // fleet-scoped (`COMMAND_SCOPES`).
-const loadedCommandScope = z.enum(['none', 'task', 'project', 'workspace', 'node']).default('node')
+const loadedCommandScope = z
+  .enum(['none', 'task', 'project', 'workspace', 'node'])
+  .default('node')
+  .describe(
+    "Which identifier the host sends your route: `task`, `project`, and `workspace` send the open one's ID. A scope with nothing open offers no command.",
+  )
 
 export const actionCommandDescriptor = z.object({
   ...commandCommon,
-  kind: z.literal('action'),
-  action: contextFreeAction,
+  kind: z.literal('action').describe('A command that runs one action. Every command names its `kind`.'),
+  action: contextFreeAction.describe('What the command does.'),
 })
 
 /** A parent. No action of its own: what it holds is the commands naming it as their `parentId`. */
 export const groupCommandDescriptor = z.object({
   ...commandCommon,
-  kind: z.literal('group'),
+  kind: z
+    .literal('group')
+    .describe('A command that holds the commands naming it as their `parentId`. It does nothing itself.'),
 })
 
 /**
@@ -65,15 +100,29 @@ export const groupCommandDescriptor = z.object({
  */
 export const searchCommandDescriptor = z.object({
   ...commandCommon,
-  kind: z.literal('search'),
+  kind: z
+    .literal('search')
+    .describe('A live search: the palette sends what the person types to your route and lists the results.'),
   scope: loadedCommandScope,
   // GET → { items: CommandSearchItem[] }, confined to this plugin's namespace by the refinement.
-  route: pluginRoute,
-  placeholder: z.string().min(1).max(120).optional(),
-  minQueryLength: z.number().int().min(0).max(MAX_COMMAND_SEARCH_MIN_QUERY).optional(),
+  route: pluginRoute.describe('A GET route sent `q` that answers `{ items }`. Each item is display text only.'),
+  placeholder: z.string().min(1).max(120).optional().describe('Text in the empty search box.'),
+  minQueryLength: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_COMMAND_SEARCH_MIN_QUERY)
+    .optional()
+    .describe('How many characters the person types before the host asks your route.'),
   // Floored as well as capped: a declared 5 ms is a plugin spending a request on every keystroke.
-  debounceMs: z.number().int().min(MIN_COMMAND_SEARCH_DEBOUNCE_MS).max(MAX_COMMAND_SEARCH_DEBOUNCE_MS).optional(),
-  onSelect: selectedRowAction,
+  debounceMs: z
+    .number()
+    .int()
+    .min(MIN_COMMAND_SEARCH_DEBOUNCE_MS)
+    .max(MAX_COMMAND_SEARCH_DEBOUNCE_MS)
+    .optional()
+    .describe('How long the host waits after a keystroke before it asks your route.'),
+  onSelect: selectedRowAction.describe("What picking a result does. A result can't choose its own action."),
 })
 
 /**
@@ -84,12 +133,14 @@ export const searchCommandDescriptor = z.object({
  */
 export const inputCommandDescriptor = z.object({
   ...commandCommon,
-  kind: z.literal('input'),
+  kind: z.literal('input').describe('One line of text, sent to your route when the person presses Enter.'),
   scope: loadedCommandScope,
   // POST { input, taskId?, projectId?, workspaceId? } → { ok: true, item?, message? }
-  route: pluginRoute,
-  placeholder: z.string().min(1).max(120).optional(),
-  onSuccess: contextFreeAction,
+  route: pluginRoute.describe(
+    "A POST route sent `{ input }` that answers `{ ok: true }`. On an error the person's text stays where they typed it.",
+  ),
+  placeholder: z.string().min(1).max(120).optional().describe('Text in the empty input box.'),
+  onSuccess: contextFreeAction.describe('What runs after your route answers.'),
 })
 
 /**
@@ -106,15 +157,19 @@ export const inputCommandDescriptor = z.object({
  */
 export const settingCommandDescriptor = z.object({
   ...commandCommon,
-  kind: z.literal('setting'),
+  kind: z.literal('setting').describe('A choice from a fixed list, with its current value shown.'),
   scope: loadedCommandScope,
   // GET → { value }
-  readRoute: pluginRoute,
+  readRoute: pluginRoute.describe('A GET route that answers the current `{ value }`.'),
   // PUT { value, taskId?, projectId?, workspaceId? } → { value }
-  writeRoute: pluginRoute,
+  writeRoute: pluginRoute.describe('A PUT route sent the picked `{ value }` that answers `{ value }`.'),
   // Two is the fewest that is a choice; a list long enough to need scrolling is a settings page
   // (`MIN_COMMAND_SETTING_OPTIONS`, `MAX_COMMAND_SETTING_OPTIONS`).
-  options: z.array(commandSettingOptionSchema).min(MIN_COMMAND_SETTING_OPTIONS).max(MAX_COMMAND_SETTING_OPTIONS),
+  options: z
+    .array(commandSettingOptionSchema)
+    .min(MIN_COMMAND_SETTING_OPTIONS)
+    .max(MAX_COMMAND_SETTING_OPTIONS)
+    .describe("The choices. A value your routes answer that isn't one of these is refused, not shown."),
 })
 
 export const commandDescriptor = z.discriminatedUnion('kind', [
@@ -126,7 +181,7 @@ export const commandDescriptor = z.discriminatedUnion('kind', [
 ])
 
 export const keybindingDescriptor = z.object({
-  command: z.string().min(1).max(64),
+  command: z.string().min(1).max(64).describe('The ID of a command in this manifest.'),
   defaultChord: z
     .string()
     .min(1)
@@ -137,7 +192,17 @@ export const keybindingDescriptor = z.object({
       } else if (!isPluginShortcutChord(value)) {
         ctx.addIssue({ code: 'custom', message: 'plugin shortcuts require meta, ctrl, or alt' })
       }
-    }),
-  when: z.enum(['global', 'task', 'surface']),
-  surface: z.string().min(1).max(64).optional(),
+    })
+    .describe(
+      'The default chord, such as `meta+shift+k`, with modifiers in the order meta, ctrl, alt, shift. It needs meta, ctrl, or alt.',
+    ),
+  when: z
+    .enum(['global', 'task', 'surface'])
+    .describe('Where the chord works: anywhere, in a task, or in one of your panes.'),
+  surface: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .describe("With `when: 'surface'`, the ID of the pane the chord works in."),
 })

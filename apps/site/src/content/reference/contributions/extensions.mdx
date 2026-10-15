@@ -1,0 +1,99 @@
+---
+title: extensions
+description: "What you add to another plugin's extension point."
+sources:
+  - docs/plugin-authoring/extensions.md
+  - docs/plugins/cooperative-extension-points.md
+  - docs/tui/plugin-losses.md
+checked: '498833615'
+---
+
+An extension is your contribution to a point another plugin opened. Name the point as
+`<owner>:<point>` and exactly one way in: `items` for rows or marks from your route, `remote` for a tree
+from your bundle, `frame` for an `inline` rectangle, or `route` for a hook handler. acorn shows your
+plugin's name beside what you bring, so nothing passes as the owner's.
+
+[Extension points](/docs/build-plugins/reference/extension-points/) lists every point acorn's own plugins
+open, with an example for each.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "task-status",
+        "point": "core:task",
+        "label": "Acme status",
+        "items": "/v1/p/acme/marks/tasks"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "overlay",
+        "id": "inspector",
+        "label": "Inspector"
+      }
+    ],
+    "extensions": [
+      {
+        "id": "fence",
+        "point": "core:markdown-fence",
+        "label": "Acme diagrams",
+        "remote": "fence",
+        "matches": [
+          "acme"
+        ],
+        "overlay": "inspector"
+      },
+      {
+        "id": "push-check",
+        "point": "git:push-actions",
+        "label": "Acme checks",
+        "remote": "pushCheck",
+        "order": 100
+      },
+      {
+        "id": "secret-scan",
+        "point": "acme:before-move",
+        "label": "Scan before moving",
+        "route": "/v1/p/acme/hooks/before-move",
+        "mode": "veto",
+        "priority": 50
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+What each kind of contribution does in the terminal client is on
+[Extension points](/docs/build-plugins/reference/extension-points/), point by point.
+
+## Mistakes
+
+- If the owner isn't installed or is turned off, your contribution draws nothing and reports nothing.
+- `matches` is for `remote` and `frame` only. `mode` is for a `route` only, and a `route` needs one.
+- `overlay` must be one of your own overlays, and it needs `remote`.
+
+## Guide
+
+[Add to another plugin's view](/docs/build-plugins/ui/add-to-another-plugins-view/) walks through it from start to finish.
