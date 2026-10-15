@@ -1,0 +1,60 @@
+---
+// The plugins directory: a card per plugin acorn ships, each linking to its docs page. Draft sentences
+// from phase 13's page list.
+import Page from './_Page.astro'
+import { href, wireframe } from './_nav'
+
+// The installed packages acorn bundles; every other plugin is compiled in.
+const installed = new Set(['Agent cost', 'Database', 'HTTP', 'Linear', 'Model providers', 'Rollbar', 'Sentry telemetry'])
+
+const plugins = [
+  ['Agents', 'Claude Code and Codex sessions in a task, and Agent Center.', 'Desktop and terminal'],
+  ['Agent browser', 'A browser your agents drive for themselves.', 'No pane: agents use it'],
+  ['Agent cost', 'What each agent session cost, from each provider.', 'Desktop and terminal'],
+  ['Context', 'Choose, size, and send task context to a session.', 'Desktop and terminal'],
+  ['Database', 'Browse and edit PostgreSQL rows, run SQL, and generate it.', 'Desktop and terminal'],
+  ['Docker', "The task's containers: logs, stats, exec, and lifecycle.", 'Desktop and terminal'],
+  ['Editor', 'Open, edit, and search the files in a task.', 'Desktop; your own $EDITOR in the terminal'],
+  ['Git', 'Changes, commits, history, stashes, and conflicts.', 'Desktop and terminal'],
+  ['GitHub', 'Pull requests, review threads, checks, and merge.', 'Desktop and terminal'],
+  ['HTTP', 'Send HTTP requests with variables and auth helpers.', 'Desktop and terminal'],
+  ['Linear', 'Linear issues beside your task, and tasks from issues.', 'Desktop and terminal'],
+  ['Memory', 'What agents save for later sessions, and how you review it.', 'Desktop and terminal'],
+  ['Model providers', 'OpenAI and Anthropic keys for the features that generate text.', 'Desktop and terminal'],
+  ['Notes', 'Task, workspace, and global notes.', 'Desktop and terminal'],
+  ['Preview', "A hardened pane that shows your app's local web page.", 'Desktop only'],
+  ['Rollbar', 'Rollbar items beside your task, and tasks from items.', 'Desktop and terminal'],
+  ['Sentry telemetry', "Send acorn's own telemetry to your Sentry project.", 'Desktop and terminal'],
+  ['Terminal', 'Shells, run targets, and raw agent sessions in a drawer.', 'Desktop and terminal'],
+  ['Workflows', 'Graphs of agent, terminal, check, and gate steps, and their runs.', 'Desktop and terminal'],
+]
+---
+
+<Page title="Plugins">
+  <main class="wrap">
+    <section class="section" style="border-top: 0">
+      <h1>Plugins</h1>
+      <p>Most of acorn is plugins. These ship with it. Turn any of them off per Node in Settings.</p>
+      <div class="cols" style="--min: 280px">
+        {
+          plugins.map(([name, sentence, worksIn]) => (
+            <a class="card" href={href('built-in-plugins', name)}>
+              <div class="row">
+                <span class="box" style="inline-size: 48px; block-size: 48px; padding: 0">icon</span>
+                <h2>{name}</h2>
+              </div>
+              <p>{sentence}</p>
+              <p>Ships as: {installed.has(name) ? 'Installed package' : 'Built in'}</p>
+              <p>Works in: {worksIn}</p>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+    <section class="section">
+      <h2>Build your own</h2>
+      <p>A plugin you write uses the same seams these do, and draws in the desktop app and the terminal client.</p>
+      <a class="button" href={wireframe('tutorial')}>Build your first plugin</a>
+    </section>
+  </main>
+</Page>

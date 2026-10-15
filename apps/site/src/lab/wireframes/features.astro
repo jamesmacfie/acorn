@@ -1,0 +1,37 @@
+---
+// The features index: one card per feature page, in phase 1's ranking. Only the agents page has a
+// wireframe; it stands for the other nine.
+import Page from './_Page.astro'
+import { wireframe } from './_nav'
+
+const features = [
+  ['Tasks', 'tasks', 'Workspaces, projects, tasks, worktrees, and panes: the model everything hangs on.'],
+  ['Agents', 'agents', 'Claude Code and Codex sessions, approvals, delegation, custom agents, and memory.'],
+  ['Review', 'review', 'GitHub pull request review, and Git: changes, history, stashes, and conflicts.'],
+  ['Desktop and terminal', 'desktop-and-terminal', 'One workspace, two clients, and the same plugins in both.'],
+  ['Task tools', 'task-tools', 'The editor, database, HTTP, Docker, preview, Linear, and Rollbar panes.'],
+  ['Plugins', 'plugins', 'Why plugins work the way they do, and what one can add.'],
+  ['Nodes', 'nodes', 'Local and remote Nodes, pairing, the fleet, and the standalone Node.'],
+  ['Browser extension', 'browser', 'The Chrome and Firefox extension.'],
+  ['Automation', 'automation', 'Workflows, schedules, dashboards, and the command line.'],
+  ['Security', 'security', 'What acorn keeps from agents and plugins, and how.'],
+]
+---
+
+<Page title="Features">
+  <main class="wrap section" style="border-top: 0">
+    <h1>Features</h1>
+    <p>What acorn does, one part at a time. Each page shows the part and links to its docs.</p>
+    <div class="cols" style="--min: 300px">
+      {
+        features.map(([name, page, sentence]) => (
+          <a class="card" href={page === 'agents' ? wireframe('features-agents') : `/features/${page}/`}>
+            <div class="box" style="aspect-ratio: 16 / 9">Small picture: a specimen or snapshot of {name}</div>
+            <h2>{name}</h2>
+            <p>{sentence}</p>
+          </a>
+        ))
+      }
+    </div>
+  </main>
+</Page>

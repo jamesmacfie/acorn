@@ -1,0 +1,220 @@
+---
+// The landing page: phase 8's eleven sections in order. The headline and paragraph are final; every
+// other line is draft copy for phase 8 to rewrite.
+import Install from './_Install.astro'
+import Page from './_Page.astro'
+import { href, wireframe } from './_nav'
+
+const tour = [
+  'Tasks',
+  'Agents',
+  'Review',
+  'Desktop and terminal',
+  'Task tools',
+  'Plugins',
+  'Nodes',
+  'Browser, automation, and security',
+]
+// The manifest entry for a pane, as `npm create acorn-plugin` writes it.
+const paneEntry = `"frames": [{
+  "target": "pane",
+  "id": "hello",
+  "label": "Hello",
+  "layout": "single",
+  "regions": {
+    "body": { "kind": "remote", "entry": "pane" }
+  }
+}]`
+const guides = [
+  ['build-plugins/ui', 'Add a pane'],
+  ['build-plugins/ui', 'Add a source to the left rail'],
+  ['build-plugins/ui', 'Add commands and keybindings'],
+  ['build-plugins/node', 'Give agents tools'],
+  ['build-plugins/node', 'Add a harness'],
+  ['build-plugins/ui', 'Add a theme or a style pack'],
+]
+const faq = [
+  ['What does it cost?', 'Nothing. acorn is open source under the MIT license.'],
+  [
+    'Do I need an API key?',
+    "Not for agents. acorn runs Claude Code and Codex with their own logins, and a harness never spends a key acorn holds. API keys are optional, for features like SQL generation.",
+  ],
+  [
+    'Does my code leave my machine?',
+    'acorn sends nothing anywhere. Your agents talk to their own providers. Telemetry is off by default, and nothing leaves the machine unless you turn it on and add a destination.',
+  ],
+  [
+    'Which platforms?',
+    'The desktop app runs on macOS and Windows. The terminal client and the standalone Node run wherever Node.js runs, Linux included.',
+  ],
+  [
+    'How is it different from a terminal multiplexer or an IDE?',
+    'A task owns its branch, worktree, agents, terminals, and review, and archiving it cleans all of that up.',
+  ],
+  [
+    'Can a plugin break the app or read my keys?',
+    'Installed plugins run in a sandbox, draw only with acorn’s components, and get only the permissions their manifest declares and you accept on each device.',
+  ],
+  [
+    'Can I run it on another machine?',
+    'Yes. Pair a remote Node and use it from the desktop app, the terminal client, or the command line.',
+  ],
+]
+---
+
+<Page title="Landing">
+  <main>
+    <section class="wrap section" style="border-top: 0">
+      <p class="tag">1 · Hero</p>
+      <p class="tag">Eyebrow, draft: FOR DEVELOPERS WHO RUN CODING AGENTS</p>
+      <h1>A workspace for working with coding agents, one task at a time.</h1>
+      <p>
+        Open a task and acorn gives it a branch, a Git worktree, terminals, and agent sessions, with the diff and
+        the pull request in the panes beside them. Use it from the desktop app or from your terminal. It's the same
+        workspace either way.
+      </p>
+      <div class="row">
+        <a class="button primary" href={wireframe('download/no-release')}>Get acorn</a>
+        <a class="button" href={wireframe('docs-home')}>Read the docs</a>
+      </div>
+      <Install />
+      <p>Desktop app for macOS and Windows · terminal client · command line · browser extension</p>
+    </section>
+
+    <section class="wrap section">
+      <p class="tag">2 · The picture</p>
+      <figure class="stack">
+        <div class="row"><span class="button">Desktop</span><span class="button">Terminal</span></div>
+        <div class="box" style="aspect-ratio: 16 / 10">
+          Shell snapshot, full width: one task with an agent session, the Changes pane, and the terminal drawer.
+          Drawn from HTML text, not an image.
+        </div>
+        <figcaption>The same task in the desktop app and in the terminal client.</figcaption>
+      </figure>
+    </section>
+
+    <section class="wrap section">
+      <p class="tag">3 · How it works</p>
+      <div class="cols" style="--min: 280px">
+        <div class="stack">
+          <h2>1. Open a task</h2>
+          <p>A task is one piece of work on one project. It gets a branch, and a Git worktree the first time it needs files.</p>
+          <div class="box" style="block-size: 200px">Specimen: the new task form</div>
+        </div>
+        <div class="stack">
+          <h2>2. Run agents in it</h2>
+          <p>Start Claude Code or Codex sessions in the task. Answer their approvals, queue turns, and hand work to child sessions.</p>
+          <div class="box" style="block-size: 200px">Specimen: an agent turn waiting on an approval</div>
+        </div>
+        <div class="stack">
+          <h2>3. Review and ship</h2>
+          <p>Read the diff, open the pull request, and merge from the same window. Archive the task and acorn cleans up its worktree.</p>
+          <div class="box" style="block-size: 200px">Specimen: the pull request's checks and merge button</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <p class="tag">4 · The tour</p>
+      <h2>What's in a task</h2>
+      <div class="row">
+        {tour.map((name, index) => <span class:list={['button', { primary: index === 0 }]}>{name}</span>)}
+      </div>
+      <div class="cols" style="--min: 320px">
+        <div class="box" style="aspect-ratio: 16 / 10">Shell snapshot for the selected tab</div>
+        <div class="stack">
+          <p>
+            Workspaces group projects, and a project holds tasks. Each task keeps its own row of panes, its terminals,
+            and its agent sessions, so switching tasks puts you back where you left that work.
+          </p>
+          <a href={wireframe('features')}>More about tasks</a>
+          <p class="tag">Without script, every tab's panel shows, in this order.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <p class="tag">5 · Two clients, one workspace</p>
+      <h2>The desktop app and the terminal client draw the same panes</h2>
+      <p>Both clients draw the same components, so a plugin written once works in both.</p>
+      <div class="cols" style="--min: 320px">
+        <div class="box" style="block-size: 320px">Specimen, desktop view: a plugin pane</div>
+        <div class="box" style="block-size: 320px">Specimen, terminal view: the same pane, 80×24</div>
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <p class="tag">6 · Add what's missing</p>
+      <h2>Add a pane with a manifest entry</h2>
+      <div class="cols" style="--min: 320px">
+        <div class="code">
+          <div><span>acorn-plugin.json</span><span>Copy</span></div>
+          <pre set:text={paneEntry} />
+        </div>
+        <div class="box" style="min-block-size: 240px">Specimen: the pane that entry draws</div>
+      </div>
+      <ul class="cols" style="--min: 200px; padding: 0; list-style: none">
+        {
+          guides.map(([base, title]) => (
+            <li>
+              <a href={href(base, title)}>{title}</a>
+            </li>
+          ))
+        }
+      </ul>
+      <p>Or ask your agent to write it. acorn's agents read the plugin vocabulary from your Node.</p>
+    </section>
+
+    <section class="wrap section">
+      <p class="tag">7 · Your machine, your keys</p>
+      <h2>What agents and plugins can't reach</h2>
+      <div class="cols" style="--min: 240px">
+        <a class="card" href="/docs/security/the-trust-model/">Agents get a token scoped to their task. They never see your credentials.</a>
+        <a class="card" href="/docs/security/credentials-and-secrets/">Credentials are encrypted at rest and left out of backups.</a>
+        <a class="card" href="/docs/security/plugin-trust-and-permissions/">Installed plugins run sandboxed, with only the permissions you accept on each device.</a>
+        <a class="card" href="/docs/security/telemetry-and-privacy/">Telemetry is off by default.</a>
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <p class="tag">8 · Run it anywhere</p>
+      <div class="cols" style="--min: 320px">
+        <div class="stack">
+          <h2>Your Node, on this machine or another</h2>
+          <p>
+            The desktop app runs a Node on your machine. Pair others, including a standalone Node on a server, and use
+            them from the desktop app, the terminal client, or the command line.
+          </p>
+          <a href="/docs/nodes/">Read about Nodes</a>
+        </div>
+        <div class="box" style="block-size: 260px">Small shell snapshot: Fleet home with two Nodes</div>
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <p class="tag">9 · FAQ</p>
+      <h2>Questions</h2>
+      <div class="stack">
+        {
+          faq.map(([question, answer]) => (
+            <details>
+              <summary>{question}</summary>
+              <p>{answer}</p>
+            </details>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <p class="tag">10 · Install again</p>
+      <h2>Get acorn</h2>
+      <Install />
+      <div class="row">
+        <a class="button primary" href={wireframe('download/no-release')}>Get acorn</a>
+        <a class="button" href={wireframe('docs-home')}>Read the docs</a>
+      </div>
+    </section>
+    <p class="wrap tag">11 · Footer, below</p>
+  </main>
+</Page>

@@ -1,0 +1,71 @@
+---
+// The shell every wireframe shares: the header, the page, and the footer.
+import './wireframe.css'
+import { footerColumns, headerLinks } from './_nav'
+
+interface Props {
+  title: string
+  /** The header link for the section the page belongs to. */
+  current?: string
+  /** Starts the narrow-screen menu open. */
+  menuOpen?: boolean
+}
+
+const { title, current, menuOpen = false } = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · wireframe · acorn</title>
+    <link rel="icon" href="/favicon.png" type="image/png" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a href="/lab/wireframes/landing/">[mark] acorn</a>
+        <nav class="wide-only" aria-label="Main">
+          {headerLinks.map((link) => <a href={link.href} aria-current={link.id === current ? 'page' : undefined}>{link.label}</a>)}
+        </nav>
+        <span class="spacer"></span>
+        <a class="box search" href="/lab/wireframes/search/">Search ⌘K</a>
+        <span class="button wide-only">Appearance</span>
+        <span class="button wide-only">Star on GitHub · count from 100</span>
+        <details class="menu" open={menuOpen}>
+          <summary class="button">Menu</summary>
+          <div>
+            <nav aria-label="Main">
+              {headerLinks.map((link) => <a href={link.href} aria-current={link.id === current ? 'page' : undefined}>{link.label}</a>)}
+            </nav>
+            <span class="button">Appearance</span>
+            <span class="button">Star on GitHub · count from 100</span>
+          </div>
+        </details>
+      </div>
+    </header>
+    <slot />
+    <footer class="site-footer">
+      <div class="wrap stack">
+        <div class="cols" style="--min: 160px">
+          {
+            footerColumns.map((column) => (
+              <div class="stack">
+                <h2>{column.label}</h2>
+                <ul>
+                  {column.links.map(([label, href]) => (
+                    <li>
+                      <a href={href}>{label}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          }
+        </div>
+        <p>[mark] acorn · MIT license · Newest release: the version, from GitHub at build</p>
+      </div>
+    </footer>
+  </body>
+</html>

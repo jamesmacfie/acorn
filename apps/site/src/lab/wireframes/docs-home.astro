@@ -1,0 +1,55 @@
+---
+// The docs home, which is also "What is acorn": the one-line description, the two doors, and the
+// Start here path. Each door lists the pages most readers want first.
+import Docs from './_Docs.astro'
+import { href } from './_nav'
+
+const useAcorn = [
+  ['start', 'Quick start: first project, first task, first agent'],
+  ['agents', 'Agent sessions'],
+  ['using', 'Tasks and worktrees'],
+  ['built-in-plugins', 'Database'],
+  ['settings', 'General'],
+  ['security', 'The trust model'],
+]
+const buildPlugins = [
+  ['build-plugins/start', 'Build your first plugin'],
+  ['build-plugins/ui', 'Add a pane'],
+  ['build-plugins/node', 'Give agents tools'],
+  ['build-plugins/reference', 'Manifest reference'],
+  ['components', 'Button'],
+]
+const startHere = ['Install', 'Quick start: first project, first task, first agent', 'Concepts', 'Desktop and terminal']
+---
+
+<Docs title="What is acorn" section="docs" toc={['Use acorn', 'Build plugins', 'Start here']}>
+  <p>A workspace for working with coding agents, one task at a time.</p>
+  <p>
+    Open a task and acorn gives it a branch, a Git worktree, terminals, and agent sessions, with the diff and the
+    pull request in the panes beside them. Use it from the desktop app or from your terminal. It's the same
+    workspace either way.
+  </p>
+  <div class="cols breakout" style="--min: 280px">
+    <section class="card" id="use-acorn">
+      <h2>Use acorn</h2>
+      <p>Install it, run agents in your tasks, and find every setting and built-in plugin.</p>
+      <ul class="stack">
+        {useAcorn.map(([base, title]) => <li><a href={href(base, title)}>{title}</a></li>)}
+      </ul>
+    </section>
+    <section class="card" id="build-plugins">
+      <h2>Build plugins</h2>
+      <p>Add a pane, a command, a harness, or a tool for agents. Every guide draws on both clients.</p>
+      <ul class="stack">
+        {buildPlugins.map(([base, title]) => <li><a href={href(base, title)}>{title}</a></li>)}
+      </ul>
+    </section>
+  </div>
+  <p class="tag">Phase 19: one line with a prompt to paste into your agent, pointing it at /agent-guide.md</p>
+  <section class="stack" id="start-here">
+    <h2>Start here</h2>
+    <ol class="steps">
+      {startHere.map((title) => <li><a href={href('start', title)}>{title}</a></li>)}
+    </ol>
+  </section>
+</Docs>

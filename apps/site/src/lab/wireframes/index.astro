@@ -1,0 +1,41 @@
+---
+// Every wireframe, in phase 5's order.
+import './wireframe.css'
+import { wireframe } from './_nav'
+import { templates } from './_templates'
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wireframes · acorn</title>
+    <link rel="icon" href="/favicon.png" type="image/png" />
+  </head>
+  <body>
+    <main class="wrap section stack" style="border-top: 0">
+      <h1>Wireframes</h1>
+      <p>
+        Every page template as grey boxes with real words, for structure only. Open a page for the 1440-pixel layout, or
+        see <a href={wireframe('narrow')}>every template at 375 pixels</a>. Copy marked draft is for later phases to
+        rewrite.
+      </p>
+      <ol class="steps">
+        {
+          templates.map((template) => (
+            <li>
+              {template.name}:{' '}
+              {template.pages.map(([label, page], index) => (
+                <Fragment>
+                  {index > 0 && ' · '}
+                  <a href={wireframe(page)}>{label}</a>
+                </Fragment>
+              ))}
+            </li>
+          ))
+        }
+      </ol>
+    </main>
+  </body>
+</html>

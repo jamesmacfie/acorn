@@ -1,0 +1,54 @@
+---
+// A docs page: sidebar, content, and table of contents. The folds at the top of the content take the
+// sidebar and the table of contents when the page is too narrow for them (wireframe.css).
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
+import Page from './_Page.astro'
+import Sidebar from './_Sidebar.astro'
+import { buildSidebar, slug, useSidebar } from './_nav'
+
+interface Props {
+  title: string
+  /** The sidebar the page sits in: the docs for using acorn, or Build plugins. */
+  section: 'docs' | 'build'
+  /** The page's sidebar title, when it differs from its heading. */
+  current?: string
+  toc: string[]
+}
+
+const { title, section, current = title, toc } = Astro.props
+const groups = section === 'build' ? buildSidebar : useSidebar
+const sidebarLabel = section === 'build' ? 'Build plugins' : 'Docs'
+---
+
+<Page title={title} current={section}>
+  <div class="wrap docs">
+    <nav class="sidebar" aria-label={sidebarLabel}>
+      <p>{sidebarLabel}</p>
+      <Sidebar groups={groups} current={current} />
+    </nav>
+    <main class="docs-content">
+      <div class="fold">
+        <details class="fold-sidebar">
+          <summary>Menu: {sidebarLabel}</summary>
+          <Sidebar groups={groups} current={current} />
+        </details>
+        <details>
+          <summary>On this page</summary>
+          <ul>{toc.map((heading) => <li><a href={`#${slug(heading)}`}>{heading}</a></li>)}</ul>
+        </details>
+      </div>
+      {section === 'build' && <p class="tag">Build plugins · plugin API {PLUGIN_API_MAJOR}</p>}
+      <h1>{title}</h1>
+      <slot />
+      <div class="cols breakout" style="--min: 200px">
+        <a class="card" href="#">Previous: the page before, in sidebar order</a>
+        <a class="card" href="#" style="text-align: end">Next: the page after, in sidebar order</a>
+      </div>
+      <p>Edit this page on GitHub · Last updated: the date of the page's newest commit</p>
+    </main>
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <ul>{toc.map((heading) => <li><a href={`#${slug(heading)}`}>{heading}</a></li>)}</ul>
+    </nav>
+  </div>
+</Page>

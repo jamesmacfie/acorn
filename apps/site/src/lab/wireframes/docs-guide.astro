@@ -1,0 +1,76 @@
+---
+// A docs guide page in phase 16's shape: prose, a numbered procedure, code blocks labeled with their
+// file, a real specimen breaking out of the text column, a callout, and previous and next links.
+import Specimen from '../../components/Specimen.astro'
+import Docs from './_Docs.astro'
+import { wireframe } from './_nav'
+
+const manifest = `"contributions": {
+  "frames": [{
+    "target": "pane", "id": "issues", "label": "Issues",
+    "layout": "single",
+    "regions": { "body": { "kind": "remote", "entry": "pane" } }
+  }]
+}`
+const client = `const tree = el('ListDetail', { split: true }, [
+  el('ListColumn', { label: 'Issues' }, rows),
+  el('DetailColumn', {}, [el('Heading', {}, [text(selected.title)])]),
+])`
+---
+
+<Docs
+  title="Add a pane"
+  section="build"
+  toc={['Before you start', 'Add the manifest entry', 'Draw the tree', 'Mistakes', 'Limits', 'Reference']}
+>
+  <p>Add a pane to a task's row, drawn from your plugin's tree, in the desktop app and the terminal client.</p>
+  <div class="breakout">
+    <Specimen id="list-detail" />
+  </div>
+  <aside class="callout" id="before-you-start">
+    <b>Before you start</b>
+    <p>Build the plugin in <a href={wireframe('tutorial')}>Build your first plugin</a>. This guide adds to it.</p>
+  </aside>
+  <h2 id="add-the-manifest-entry">Add the manifest entry</h2>
+  <p>A pane is a frame with the pane target. The host draws the pane's box, and your tree fills its one region.</p>
+  <ol class="steps">
+    <li>
+      <p>Add a frame to the contributions in your manifest.</p>
+      <div class="code">
+        <div><span>acorn-plugin.json</span><span>Copy</span></div>
+        <pre set:text={manifest} />
+      </div>
+    </li>
+    <li>Reload the plugin. The pane shows in the task's pane switcher.</li>
+  </ol>
+  <h2 id="draw-the-tree">Draw the tree</h2>
+  <ol class="steps" start="3">
+    <li>
+      <p>Build the pane's tree in your client entry.</p>
+      <div class="code">
+        <div><span>client.js</span><span>Copy</span></div>
+        <pre set:text={client} />
+      </div>
+    </li>
+    <li>Open the pane, then open the same task in the terminal client. Both draw the list and the detail.</li>
+  </ol>
+  <h2 id="mistakes">Mistakes</h2>
+  <div class="cols breakout" style="--min: 280px">
+    <div class="code">
+      <div><span>Wrong: acorn-plugin.json</span></div>
+      <pre set:text={'"layout": "single", "regions": { "list": … }'} />
+    </div>
+    <div class="code">
+      <div><span>Right: acorn-plugin.json</span></div>
+      <pre set:text={'"layout": "single", "regions": { "body": … }'} />
+    </div>
+  </div>
+  <p>The single layout has one region, body. Draft: phase 16 takes each mistake from the Node's refusal messages.</p>
+  <h2 id="limits">Limits</h2>
+  <p>A draft list of the caps on panes per plugin, and what the terminal client draws one pane at a time.</p>
+  <h2 id="reference">Reference</h2>
+  <ul>
+    <li><a href="#">Contributions: frames</a></li>
+    <li><a href="#">Layouts</a></li>
+  </ul>
+</Docs>

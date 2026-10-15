@@ -30,13 +30,17 @@ function group({ label, items }) {
   return kept.length > 0 ? [{ label, items: kept }] : []
 }
 
-// Lab pages live outside src/pages so a production build never sees them.
+// Lab pages live outside src/pages so a production build never sees them. A file whose name starts
+// with `_` is a component, not a page, as in src/pages.
 const lab = {
   name: 'acorn-lab',
   hooks: {
     'astro:config:setup': ({ injectRoute }) => {
       if (!showDrafts) return
-      for (const file of readdirSync(labDir, { recursive: true }).filter((name) => name.endsWith('.astro'))) {
+      const pages = readdirSync(labDir, { recursive: true }).filter(
+        (name) => name.endsWith('.astro') && !/(^|\/)_/.test(name),
+      )
+      for (const file of pages) {
         const route = file.replace(/(^|\/)index\.astro$/, '').replace(/\.astro$/, '')
         injectRoute({ pattern: `/lab/${route}`, entrypoint: new URL(file, labDir) })
       }

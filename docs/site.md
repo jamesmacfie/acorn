@@ -154,4 +154,8 @@ and renders inside `apps/site/src/layouts/Marketing.astro`. The layout validates
 field fails the build.
 
 To add a lab page, create an Astro file under `apps/site/src/lab/`. The `lab` integration in
-`apps/site/astro.config.mjs` serves it under `/lab/` in development and preview builds only.
+`apps/site/astro.config.mjs` serves it under `/lab/` in development and preview builds only. A file
+whose name starts with `_` is a component the lab pages import, not a page, as in `src/pages/`.
+
+The page wireframes are in `apps/site/src/lab/wireframes/`, at `/lab/wireframes/`. `/lab/wireframes/narrow/`
+shows every template at 375 pixels wide, side by side.

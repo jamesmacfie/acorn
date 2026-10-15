@@ -1,0 +1,70 @@
+---
+// A generated reference page: a short written introduction, then a field table with a filter box and an
+// anchor on every row. Phase 15 generates the rows from packages/protocol/src/plugin/contract.ts; these
+// are a sample of the real top-level fields.
+import Docs from './_Docs.astro'
+
+const fields = [
+  ['$schema', 'string', 'No', 'The JSON Schema an editor checks this file against.'],
+  ['id', 'string', 'Yes', "The plugin's id, unique on the Node."],
+  ['name', 'string', 'Yes', 'The name people see. Up to 120 characters.'],
+  ['icon', 'brand mark', 'No', "The plugin's logo, which any contribution can name as its glyph."],
+  ['icons', 'record of brand marks', 'No', 'More logos, for a package that hosts several brands. Up to 16.'],
+  ['version', 'string', 'Yes', "The plugin's own version."],
+  ['baseline', '"acorn-1"', 'Yes', 'The acorn baseline the plugin was built for.'],
+  ['apiVersion', 'string', 'Yes', 'The plugin API majors it works with, such as "5" or "4 || 5".'],
+  ['clients', 'string[]', 'No', 'The apps it runs in. Leave it out to run in every app.'],
+  ['requires.plugins', 'array', 'No', 'Other plugins it needs, each with a range over their major.'],
+  ['emits', 'array', 'No', 'Events other plugins may subscribe to. Up to 32.'],
+  ['node', 'path', 'No', 'The Node half’s entry file.'],
+  ['client', 'path', 'No', 'The client half’s entry file.'],
+  ['migrations', 'path', 'No', 'The folder of storage migrations.'],
+  ['permissions.api', 'string[]', 'No', 'Core API scopes the plugin asks for.'],
+  ['permissions.events', 'string[]', 'No', 'Event channels it listens to.'],
+  ['permissions.node', 'object', 'No', 'Node access: core services, capabilities, secrets, exec, and network.'],
+  ['contributions', 'object', 'No', 'Everything the plugin adds. One page per key.'],
+]
+---
+
+<Docs title="Manifest reference" section="build" toc={['Fields']}>
+  <p>
+    Every field in acorn-plugin.json, generated from the manifest contract in the build this page describes. The
+    schema at /schemas/acorn-plugin.schema.json checks the same fields in your editor.
+  </p>
+  <h2 id="fields">Fields</h2>
+  <label class="row" hidden>Filter fields <input id="field-filter" type="search" class="box" style="place-items: start; padding: 4px 8px" /></label>
+  <p class="tag">About 2 KB of script. Without script, the box stays hidden and every row shows.</p>
+  <div class="breakout table-scroll">
+    <table>
+      <thead>
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>What it does</th></tr>
+      </thead>
+      <tbody>
+        {
+          fields.map(([field, type, required, text]) => (
+            <tr id={field}>
+              <td>
+                <a href={`#${field}`}>{field}</a>
+              </td>
+              <td>{type}</td>
+              <td>{required}</td>
+              <td>{text}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+</Docs>
+
+<script>
+  // Hides the rows whose text doesn't contain what the reader typed.
+  const filter = document.querySelector<HTMLInputElement>('#field-filter')!
+  filter.closest('label')!.hidden = false
+  filter.addEventListener('input', () => {
+    const query = filter.value.trim().toLowerCase()
+    for (const row of document.querySelectorAll<HTMLTableRowElement>('tbody tr')) {
+      row.hidden = !row.textContent!.toLowerCase().includes(query)
+    }
+  })
+</script>
