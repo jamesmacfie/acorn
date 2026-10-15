@@ -1,14 +1,73 @@
 ---
-import Marketing from '../../layouts/Marketing.astro'
+import Feature from '../../components/Feature.astro'
+import Snapshot from '../../components/Snapshot.astro'
+import Specimen from '../../components/Specimen.astro'
+import { FEATURES } from '../../features'
+import FeaturePage from '../../layouts/FeaturePage.astro'
 import type { PageMeta } from '../../meta'
 
 export const meta = {
-  description: 'One workspace, two clients, and the same plugins in both.',
-  sources: ['docs/tui.md', 'docs/ui-design/closed-kit.md'],
-  checked: '1e0ef8b80',
+  description: FEATURES['desktop-and-terminal'].sentence,
+  sources: [
+    'docs/tui.md',
+    'docs/tui/process.md',
+    'docs/tui/plugin-losses.md',
+    'docs/ui-design/shell-hierarchy.md',
+    'docs/ui-design/closed-kit.md',
+    'docs/panes/layout.md',
+    'docs/cli.md',
+    'docs/first-party-plugins/terminal.md',
+  ],
+  checked: '663359ff7',
 } satisfies PageMeta
 ---
 
-<Marketing title="Desktop and terminal" meta={meta}>
-  <p>One workspace, two clients, and the same plugins in both. Not written yet.</p>
-</Marketing>
+<FeaturePage feature="desktop-and-terminal" meta={meta} related={['plugins', 'nodes', 'automation']} docs={{ href: '/docs/start/desktop-and-terminal/', label: 'Read about the two clients' }}>
+  <Snapshot slot="picture" id="terminal-small" />
+
+  <Feature number={1} title="Two clients of one Node" href="/docs/start/desktop-and-terminal/" link="Desktop and terminal">
+    <p>
+      Run <code>acorn</code> with no arguments and the terminal client opens the workspace on this machine's Node. It
+      attaches to the Node that's running, or starts one, so the desktop app and the terminal client can be open on
+      the same tasks and agent sessions at once. The desktop app runs on macOS and Windows. The terminal client runs
+      wherever Node.js 22, 24, or 26 does, Linux included.
+    </p>
+    <Snapshot slot="picture" id="hero-terminal" />
+  </Feature>
+
+  <Feature number={2} title="The same panes, from the same code" href="/docs/components/one-kit-two-hosts/" link="One kit, two hosts">
+    <p>
+      A pane is a tree of acorn's own components, and each client draws that tree: the desktop in HTML, the terminal
+      in character cells. No plugin writes terminal UI or knows which client it's in. The command palette and the
+      keyboard commands are shared too.
+    </p>
+    <Specimen slot="picture" id="issues-pane" both />
+  </Feature>
+
+  <Feature number={3} title="What the terminal draws its own way" href="/docs/start/desktop-and-terminal/" link="Desktop and terminal">
+    <p>
+      The terminal shows one pane at a time, with a strip of pane labels above it, and three panels on the left: the
+      sources, what's under the chosen one, and the tasks. A graph that the desktop draws as cards and curves becomes
+      an indented list in the same order. A plugin that draws its own web page gets one line that points at the
+      desktop app. A plugin's <code>Cmd</code> shortcut is pressed with <code>Ctrl</code>.
+    </p>
+  </Feature>
+
+  <Feature number={4} title="The command line, for scripts" href="/docs/automation/the-command-line/" link="The command line">
+    <p>
+      With a subcommand, <code>acorn</code> is a command-line interface (CLI) to a Node: list and create tasks, start
+      and wait on agent sessions and workflow runs, and call a plugin's own commands. Every command prints a table,
+      JSON, or JSON Lines, and exits with a code that says what went wrong. The desktop app can install the command
+      for you, from <strong>Settings → Command line</strong>.
+    </p>
+  </Feature>
+
+  <Fragment slot="terminal">
+    <p>
+      Almost every pane crosses unchanged. The editor's pane can run your own <code>$EDITOR</code> in place of its
+      built-in editor. The Preview pane and the terminal drawer aren't there, though a terminal still draws
+      wherever a pane opens one. The Agent pane can't attach or save files, and its settings pages need the desktop
+      app. <a href="/docs/built-in-plugins/">Built-in plugins</a>
+    </p>
+  </Fragment>
+</FeaturePage>

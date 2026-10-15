@@ -1,14 +1,88 @@
 ---
-import Marketing from '../../layouts/Marketing.astro'
+import Feature from '../../components/Feature.astro'
+import Snapshot from '../../components/Snapshot.astro'
+import { FEATURES } from '../../features'
+import FeaturePage from '../../layouts/FeaturePage.astro'
 import type { PageMeta } from '../../meta'
 
 export const meta = {
-  description: 'What acorn keeps from agents and plugins, and how.',
-  sources: ['docs/security.md'],
-  checked: '1e0ef8b80',
+  description: FEATURES.security.sentence,
+  sources: [
+    'docs/security.md',
+    'docs/security/credentials.md',
+    'docs/security/process-and-paths.md',
+    'docs/security/instruction-review.md',
+    'docs/security/node-plugin-security.md',
+    'docs/security/plugin-bundles.md',
+    'docs/security/audit.md',
+    'docs/telemetry.md',
+    'docs/data-layer/backup-and-retention.md',
+    'docs/managed-agents/accounts.md',
+  ],
+  checked: '663359ff7',
 } satisfies PageMeta
 ---
 
-<Marketing title="Security" meta={meta}>
-  <p>What acorn keeps from agents and plugins, and how. Not written yet.</p>
-</Marketing>
+<FeaturePage feature="security" meta={meta} related={['agents', 'plugins', 'nodes']} docs={{ href: '/docs/security/the-trust-model/', label: 'Read the trust model' }}>
+  <Snapshot slot="picture" id="permissions" />
+
+  <Feature number={1} title="Agents get a token for their own task" href="/docs/security/the-trust-model/" link="The trust model">
+    <p>
+      An agent gets a token that reaches only its own task's routes on the Node and can't spend a credential acorn
+      holds. Every process acorn starts gets an environment built from an allowlist, never a copy of the Node's, so it
+      doesn't get acorn's encryption key or your GitHub token.
+    </p>
+  </Feature>
+
+  <Feature number={2} title="Files and instructions are checked" href="/docs/security/files-processes-and-project-configuration/" link="Files, processes, and project configuration">
+    <p>
+      acorn's own file reads and writes stay inside the data folder and the worktrees, and follow symlinks before
+      they decide, so a link a branch adds to <code>~/.ssh</code> is refused. Committed project configuration that
+      runs code needs your review before it runs, and again when it changes. Two settings, off by default, check{' '}
+      <code>CLAUDE.md</code>, <code>AGENTS.md</code>, and skills before each agent turn: one for hidden characters,
+      one for changes you haven't reviewed.
+    </p>
+  </Feature>
+
+  <Feature number={3} title="Plugins run sandboxed, with the grants you accept" href="/docs/security/plugin-trust-and-permissions/" link="Plugin trust and permissions">
+    <p>
+      An installed plugin's client code runs in a sandbox and draws only with acorn's components or inside its own
+      frame. Its Node half runs in a worker that gets only the network, file, environment, and process grants its
+      manifest lists. Each device hashes a plugin's code itself and asks you before it runs those exact bytes.
+    </p>
+  </Feature>
+
+  <Feature number={4} title="Where your credentials live" href="/docs/security/credentials-and-secrets/" link="Credentials and secrets">
+    <p>
+      The credentials you connect, such as GitHub's, are encrypted on the Node, write-only, and never sent back in an
+      answer, a log, or an event. A backup blanks them. Claude Code and Codex keep their logins in their own
+      folders, and acorn never handles those tokens.
+    </p>
+  </Feature>
+
+  <Feature number={5} title="An audit log, and telemetry off" href="/docs/security/the-audit-log/" link="The audit log">
+    <p>
+      <strong>Settings → Audit log</strong> lists 90 days of security decisions: pairings, devices revoked, secrets
+      changed, plugins installed or turned off, and backups. Telemetry is off by default, and nothing leaves the
+      machine unless you turn it on and add somewhere to send it.
+    </p>
+  </Feature>
+
+  <Feature number={6} title="What acorn doesn't protect against" href="/docs/security/what-acorn-doesnt-protect-against/" link="What acorn doesn't protect against">
+    <p>
+      An agent runs shell commands as you, so it can read what you can, including the rest of acorn's data folder.{' '}
+      <strong>Keep agents out of Acorn's data folder</strong> closes that for Claude Code sessions. It's off by
+      default, and Codex can't enforce it. acorn doesn't defend a Node against root or other users on its machine,
+      and doesn't sandbox the plugins built into the app.
+    </p>
+  </Feature>
+
+  <Fragment slot="terminal">
+    <p>
+      The terminal client runs the app and its connection to the Node in one process, so the line the desktop draws
+      between two processes is a line between modules there. It keeps the device token out of every module that
+      draws, and still runs each installed plugin in a worker of its own.{' '}
+      <a href="/docs/security/the-trust-model/">The trust model</a>
+    </p>
+  </Fragment>
+</FeaturePage>

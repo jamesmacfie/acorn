@@ -52,12 +52,12 @@ anything from another origin:
 | A docs page, and the 404 page | 100 KB in total |
 
 The Playwright tests in `apps/site/tests/` load every page the build wrote and fail on a console error. They run
-axe on the landing page, the docs home, and the 404 page, one page for each template, and check that
-drafts and `/lab/` appear only in a preview build. On a preview build, they also check that the specimen
-gallery draws the site's header, sidebar, and text exactly as `/docs/` does, and run axe on the frames
-around its specimens and around the shell snapshots, and check that every link on the landing page goes
-to a page the build wrote. That link check runs on a preview build only, because most of the docs pages
-the landing page links to are drafts. They use the Chrome installed on the machine, so install Chrome
+axe on the landing page, the docs home, and the 404 page, one page for each template, and on every
+feature page, and check that drafts and `/lab/` appear only in a preview build. On a preview build, they
+also check that the specimen gallery draws the site's header, sidebar, and text exactly as `/docs/` does,
+and run axe on the frames around its specimens and around the shell snapshots, and check that every
+link on the landing page and the feature pages goes to a page the build wrote. That link check runs on a
+preview build only, because most of the docs pages those pages link to are drafts. They use the Chrome installed on the machine, so install Chrome
 before you run them. `ACORN_SITE_PREVIEW` must match the build you're testing.
 
 The landing page also has a Lighthouse target, checked by hand. [The site's design](./site/design.md#lighthouse)

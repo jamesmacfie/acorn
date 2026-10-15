@@ -1,6 +1,71 @@
 # Phase 9: write the feature pages
 
-Date: October 15, 2026. Status: proposed. Needs phases 6 and 7. Can run beside phase 8.
+Date: October 15, 2026. Status: done. Needs phases 6 and 7. Can run beside phase 8.
+
+## Completion note
+
+October 16, 2026. The ten feature pages and the features index are written and built, in
+`apps/site/src/pages/features/`. Every page follows the template below, links every section to the
+docs page that owns it, and has an **In the terminal** section written from
+`docs/first-party-plugins/terminal.md`. Each page's `meta` lists the docs and source files it was
+written from, checked at `663359ff7`.
+
+What landed:
+
+- `apps/site/src/layouts/FeaturePage.astro`, the template. It draws the hero with the title and one
+  sentence, the picture, the page's own `Feature` sections, **In the terminal**, three related
+  features as cards, and **Get started**.
+- `apps/site/src/features.ts`, the ten pages in phase 1's order with each title and sentence. The
+  index, the related cards, and each page's meta description read it.
+- `Feature` takes no picture, and then keeps to the reading measure. `Hero` takes no actions. A
+  `ul.cards` reset moved from the landing page into `site.css`, because three pages use it.
+- The Playwright suite runs axe on every feature page, and the link check covers the feature pages as
+  well as the landing page. `docs/site.md` and `docs/site/design.md` say so.
+
+The acceptance checks: a preview build passes all 244 Playwright tests, and a production build writes
+17 pages and passes its 35. axe finds nothing serious or critical on any feature page. The budget
+check passes. The compressed HTML runs from 5.7 KB for the browser page to 23.5 KB for the index, which
+draws ten windows. No page scrolls sideways at 375 pixels. Each page passed the voice review's word
+list and a read-through.
+
+### Decisions
+
+- **The pictures are the committed snapshots and specimens. No new specimen was added.** A specimen of
+  the Docker, HTTP, or Linear pane would be a hand-written imitation of that pane, not the pane, and
+  could drift from it unseen. A section with no honest picture is text only, as the outline allows.
+- **The index cards draw the pictures inert, with their captions hidden.** The whole card is a link,
+  so a tab or a caption inside it would fight the link. The Tasks card shows the command palette over
+  a task, because the task rows specimen is wider than a card.
+- **Task tools has nine sections**, one per pane, because the outline asks for that, over the three
+  to six of the template.
+- **The primary action is Get acorn**, as on the landing page, behind the same `shortcut:` comment.
+- **Labels were checked in the code, not in a `dev:agent` session.** Every quoted label, such as
+  **Steer now**, **Save and stage**, and **Back up this node**, was found in the source, and the
+  pictures are the real app. Behavior was checked against the internal docs and, where a doc was thin,
+  the component that draws it.
+
+### Deviations
+
+- **The browser page's outline was wider than the code.** Only GitHub pull requests get a task chip
+  on the page. Linear issues and Rollbar items hand off from a card in the sidebar
+  (`docs/browser-extension/handoffs.md`), and the page says that.
+- **The landing page's tour says "Install the Linear and Rollbar plugins".** Both ship with acorn as
+  bundled packages (`docs/extensibility/runtime.md`), so the feature pages say "Connect Linear". The
+  landing page isn't this phase's, so it's unchanged. James should decide whether to reword it.
+
+### What later phases need to know
+
+- Phase 7, or a later recapture: these sections have no picture and would take one. The Editor, HTTP,
+  Docker, Notes, Context, Linear, and Rollbar panes; the Agent pane with a queued message and
+  **Steer**; the Memory page; the Changes tab and the conflict resolver on the desktop;
+  **Settings → Schedules**; and a Home dashboard.
+- Phase 10: change **Get acorn** to **Download** in `FeaturePage.astro` when the landing page changes.
+- Phases 11 to 18: the feature pages link to about 50 docs pages, all drafts on this commit. The link
+  test runs on preview builds only, behind the same `shortcut:` comment as the landing page's. Remove
+  the skip once they're published.
+- A new feature page needs an entry in `apps/site/src/features.ts`, or the index won't list it.
+- The architecture checks fail on this base as earlier phases recorded, with nothing from this change.
+- Nothing here needs a deploy, so nothing is left for phase 20.
 
 ## Goal
 

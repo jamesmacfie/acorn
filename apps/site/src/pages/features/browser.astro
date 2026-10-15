@@ -1,14 +1,83 @@
 ---
-import Marketing from '../../layouts/Marketing.astro'
+import Feature from '../../components/Feature.astro'
+import Snapshot from '../../components/Snapshot.astro'
+import { FEATURES } from '../../features'
+import FeaturePage from '../../layouts/FeaturePage.astro'
 import type { PageMeta } from '../../meta'
 
 export const meta = {
-  description: 'The Chrome and Firefox extension.',
-  sources: ['docs/browser-extension.md'],
-  checked: '1e0ef8b80',
+  description: FEATURES.browser.sentence,
+  sources: [
+    'docs/browser-extension.md',
+    'docs/browser-extension/conversations.md',
+    'docs/browser-extension/page-capture.md',
+    'docs/browser-extension/element-picker.md',
+    'docs/browser-extension/handoffs.md',
+    'docs/browser-extension/task-pages.md',
+    'docs/browser-extension/notifications.md',
+    'docs/cli/browser-host.md',
+  ],
+  checked: '663359ff7',
 } satisfies PageMeta
 ---
 
-<Marketing title="Browser extension" meta={meta}>
-  <p>The Chrome and Firefox extension. Not written yet.</p>
-</Marketing>
+<FeaturePage feature="browser" meta={meta} related={['agents', 'review', 'security']} docs={{ href: '/docs/browser-extension/set-up-the-extension/', label: 'Set up the extension' }}>
+  <Snapshot slot="picture" id="browser" />
+
+  <Feature number={1} title="Talk to the task's agent from the sidebar" href="/docs/browser-extension/talk-to-an-agent-from-the-browser/" link="Talk to an agent from the browser">
+    <p>
+      The sidebar's Home shows the page beside it and the task it belongs to. Open a conversation with that task's
+      agent, send it a message, and answer the questions and permission requests it's waiting on, without
+      switching windows.
+    </p>
+  </Feature>
+
+  <Feature number={2} title="Send the page, a selection, or a screenshot" href="/docs/browser-extension/send-pages-selections-and-screenshots/" link="Send pages, selections, and screenshots">
+    <p>
+      Three buttons in the message box's toolbar add the page's link, the text you selected, or a screenshot of the
+      tab. The extension reads only the tab beside the sidebar: no whole page, no form contents, and no other
+      tabs.
+    </p>
+  </Feature>
+
+  <Feature number={3} title="Ask about an element" href="/docs/browser-extension/ask-about-an-element/" link="Ask about an element">
+    <p>
+      On a page that belongs to a task, such as your app running locally, right-click and choose{' '}
+      <strong>Ask Acorn about this element</strong>. Point at the element, type your question in the box beside it,
+      and it goes to the task's agent.
+    </p>
+  </Feature>
+
+  <Feature number={4} title="Bring a pull request or an issue into a task" href="/docs/browser-extension/task-chips-and-handoffs/" link="Task chips and handoffs">
+    <p>
+      A GitHub pull request gets a task chip in its header. A Linear issue or a Rollbar item gets a card in the
+      sidebar. Either one opens the task that already holds the item, or creates one. The extension matches a page
+      to its task from the addresses the task already records, so it asks GitHub nothing to do it.
+    </p>
+  </Feature>
+
+  <Feature number={5} title="See what's waiting on you" href="/docs/browser-extension/waiting-requests-and-notifications/" link="Waiting requests and notifications">
+    <p>
+      The toolbar badge counts the requests agents are waiting on for the projects behind the tab you're on.{' '}
+      <strong>Waiting for you</strong> in the sidebar lists them, and you can turn on your system's notifications
+      for them too.
+    </p>
+  </Feature>
+
+  <Feature number={6} title="No token in the browser" href="/docs/browser-extension/set-up-the-extension/" link="Set up the extension">
+    <p>
+      The extension talks to a native bridge that comes with the <code>acorn</code> command, and the bridge pairs
+      with your Node and holds its token and certificate pins. The extension and the websites you visit never see
+      them. At install it can read your tabs' addresses and titles, not their content, and you allow access to each
+      site from the sidebar's settings.
+    </p>
+  </Feature>
+
+  <Fragment slot="terminal">
+    <p>
+      The extension doesn't need the desktop app open. Its bridge connects to your Node on its own, so it works
+      beside the terminal client, or with no client open at all. <code>acorn browser install</code> registers the
+      bridge for Chrome and Firefox, on macOS. <a href="/docs/browser-extension/set-up-the-extension/">Set up the extension</a>
+    </p>
+  </Fragment>
+</FeaturePage>

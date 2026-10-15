@@ -1,14 +1,77 @@
 ---
-import Marketing from '../../layouts/Marketing.astro'
+import Feature from '../../components/Feature.astro'
+import Snapshot from '../../components/Snapshot.astro'
+import { FEATURES } from '../../features'
+import FeaturePage from '../../layouts/FeaturePage.astro'
 import type { PageMeta } from '../../meta'
 
 export const meta = {
-  description: 'Local and remote Nodes, pairing, the fleet, and the standalone Node.',
-  sources: ['docs/architecture/fleet.md', 'docs/node-distribution.md', 'docs/authentication.md'],
-  checked: '1e0ef8b80',
+  description: FEATURES.nodes.sentence,
+  sources: [
+    'docs/architecture-overview.md',
+    'docs/architecture/fleet.md',
+    'docs/node-distribution.md',
+    'docs/cli.md',
+    'docs/tui/process.md',
+    'docs/frontend/rail-and-routing.md',
+    'docs/data-layer/backup-and-retention.md',
+    'packages/client-core/src/features/fleet/FleetHome.tsx',
+    'packages/client-core/src/features/settings/SecuritySettings.tsx',
+  ],
+  checked: '663359ff7',
 } satisfies PageMeta
 ---
 
-<Marketing title="Nodes" meta={meta}>
-  <p>Local and remote Nodes, pairing, the fleet, and the standalone Node. Not written yet.</p>
-</Marketing>
+<FeaturePage feature="nodes" meta={meta} related={['desktop-and-terminal', 'security', 'automation']} docs={{ href: '/docs/nodes/', label: 'Read about Nodes' }}>
+  <Snapshot slot="picture" id="fleet" />
+
+  <Feature number={1} title="The Node does the work" href="/docs/nodes/" link="Nodes">
+    <p>
+      A Node is the process that keeps your workspaces, tasks, and agent transcripts, and runs Git, terminals, and
+      agents in your worktrees. The clients draw what it holds. The desktop app starts a Node on your computer, so
+      on one machine there's nothing to set up.
+    </p>
+  </Feature>
+
+  <Feature number={2} title="Run a Node on a server" href="/docs/nodes/run-a-standalone-node/" link="Run a standalone Node">
+    <p>
+      The standalone Node is a tarball with the Node, the command line, and the terminal client under one{' '}
+      <code>acorn</code> launcher. It runs workspaces, tasks, Git, files, the database client, Docker, and HTTP,
+      and agents, terminals, and workflows where their tools are installed. What needs a desktop window, such as
+      native dialogs and the browser preview, isn't there.
+    </p>
+  </Feature>
+
+  <Feature number={3} title="Pair from any client" href="/docs/nodes/pair-a-device-or-a-remote-node/" link="Pair a device or a remote Node">
+    <p>
+      A new Node prints its address, its certificate's fingerprint as six words, and a pairing code. Check that the
+      words match the ones acorn shows, enter the code, and use that Node from the desktop app, the terminal client,
+      or the command line. Each client pins the Node's certificate.
+    </p>
+  </Feature>
+
+  <Feature number={4} title="Every Node at a glance" href="/docs/nodes/the-fleet-view/" link="The fleet view">
+    <p>
+      Once you've paired a second Node, Fleet home shows a card for each one: its address, its task count, and how
+      many things need you there. A task belongs to exactly one Node. When one Node doesn't answer, it gets a banner
+      and the others still show.
+    </p>
+  </Feature>
+
+  <Feature number={5} title="Back up a Node" href="/docs/nodes/back-up-and-restore/" link="Back up and restore">
+    <p>
+      <strong>Back up this node</strong>, under <strong>Settings → Security and backup</strong>, copies the Node's
+      databases into one archive: workspaces, tasks, agent transcripts, saved queries, and saved requests. It blanks
+      stored credentials and leaves out paired devices and worktrees, so a restored Node asks you to reconnect and
+      pair again.
+    </p>
+  </Feature>
+
+  <Fragment slot="terminal">
+    <p>
+      The terminal client attaches to the Node on its machine, or starts one, and <code>acorn --node</code> opens a
+      paired Node elsewhere. The command line takes the same <code>--node</code>, and never falls back to another
+      Node when the one you named doesn't answer. <a href="/docs/start/desktop-and-terminal/">Desktop and terminal</a>
+    </p>
+  </Fragment>
+</FeaturePage>

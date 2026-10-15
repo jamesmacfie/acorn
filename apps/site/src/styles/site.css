@@ -537,6 +537,10 @@ site-search button > kbd {
 .feature-text > * {
   margin: 0;
 }
+/* A grid inside a section's text takes the column's full width. */
+.feature-text > .cards {
+  justify-self: stretch;
+}
 .feature :is(h2, h3) {
   font-size: var(--site-fs-h2);
 }
@@ -550,6 +554,10 @@ site-search button > kbd {
   }
   .features > .feature:nth-child(even) .feature-picture {
     order: -1;
+  }
+  /* A section with no picture keeps to the reading measure. */
+  .features > .feature:not(:has(> .feature-picture)) {
+    grid-template-columns: minmax(0, var(--site-measure));
   }
 }
 
@@ -584,6 +592,13 @@ site-search button > kbd {
   display: grid;
   gap: var(--space-8);
   grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+}
+/* A list of cards drops the list's own marks and measure. */
+ul.cards {
+  max-inline-size: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .card {
   position: relative;

@@ -35,19 +35,24 @@ test('drafts and the lab build only for preview deploys', () => {
   for (const route of [...drafts, '/lab/']) expect(built.has(route), route).toBe(previewBuild)
 })
 
-// Every claim on the landing page links to the docs page that owns it, so a renamed page fails here.
+const featureRoutes = routes.filter((route) => route.startsWith('/features/'))
+
+// Every claim on the landing page and the feature pages links to the docs page that owns it, so a
+// renamed page fails here.
 // shortcut: preview builds only, because most of those docs pages are drafts until their phases publish
 // them; run it on both builds once they're published (docs/future/marketing/08-landing.md).
-test('every link on the landing page goes to a page the build wrote', async ({ page }) => {
-  test.skip(!previewBuild, 'The docs pages the landing page links to are drafts, which only a preview build has.')
-  await page.goto('/')
-  const hrefs = await page
-    .locator('main a[href^="/"]')
-    .evaluateAll((links) => links.map((link) => link.getAttribute('href')!))
-  const built = new Set(routes)
-  expect(hrefs.length).toBeGreaterThan(0)
-  for (const href of new Set(hrefs)) expect(built.has(href), href).toBe(true)
-})
+for (const route of ['/', ...featureRoutes]) {
+  test(`every link on ${route} goes to a page the build wrote`, async ({ page }) => {
+    test.skip(!previewBuild, 'The docs pages these pages link to are drafts, which only a preview build has.')
+    await page.goto(route)
+    const hrefs = await page
+      .locator('main a[href^="/"]')
+      .evaluateAll((links) => links.map((link) => link.getAttribute('href')!))
+    const built = new Set(routes)
+    expect(hrefs.length).toBeGreaterThan(0)
+    for (const href of new Set(hrefs)) expect(built.has(href), href).toBe(true)
+  })
+}
 
 test('an unknown address offers the docs home and the search box', async ({ page }) => {
   const response = await page.goto('/no-such-page/')
@@ -56,8 +61,9 @@ test('an unknown address offers the docs home and the search box', async ({ page
   await expect(page.getByRole('button', { name: 'Search' })).toBeVisible()
 })
 
-// One page of each template: a marketing page, a docs page, and Starlight's splash page.
-for (const route of ['/', '/docs/', '/no-such-page/']) {
+// One page of each template, a marketing page, a docs page, and Starlight's splash page, and every
+// feature page, because each draws its own pictures.
+for (const route of ['/', '/docs/', '/no-such-page/', ...featureRoutes]) {
   test(`${route} has no serious accessibility violations`, async ({ page }) => {
     await page.goto(route)
     const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()

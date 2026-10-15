@@ -1,0 +1,59 @@
+---
+// A feature page: the title and its one sentence, a picture, three to six sections in the default slot,
+// what the terminal client does differently, related features, and the way to start. Each section is a
+// `Feature` that links to the docs page that owns its detail.
+import Card from '../components/Card.astro'
+import Hero from '../components/Hero.astro'
+import { FEATURES, type FeatureId } from '../features'
+import type { PageMeta } from '../meta'
+import Marketing from './Marketing.astro'
+
+interface Props {
+  feature: FeatureId
+  meta: PageMeta
+  related: FeatureId[]
+  /** The docs page a reader starts from, offered beside Get acorn. */
+  docs: { href: string; label: string }
+}
+
+const { feature, meta, related, docs } = Astro.props
+const { title, sentence } = FEATURES[feature]
+---
+
+<Marketing title={title} meta={meta}>
+  <Hero slot="hero" eyebrow="Features" title={title}>
+    <p>{sentence}</p>
+    <slot name="picture" slot="picture" />
+  </Hero>
+
+  <div class="section features"><slot /></div>
+
+  <section class="section">
+    <h2>In the terminal</h2>
+    <slot name="terminal" />
+  </section>
+
+  <section class="section">
+    <h2>Related features</h2>
+    <ul class="cards">
+      {
+        related.map((id) => (
+          <li>
+            <Card title={FEATURES[id].title} href={`/features/${id}/`}>
+              <p>{FEATURES[id].sentence}</p>
+            </Card>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2>Get started</h2>
+    <div class="actions">
+      {/* shortcut: there's no release, so this is Get acorn, as on the landing page; make it Download once one exists. */}
+      <a class="button" data-variant="primary" href="/download/">Get acorn</a>
+      <a class="button" href={docs.href}>{docs.label}</a>
+    </div>
+  </section>
+</Marketing>
