@@ -80,6 +80,8 @@ export function createRoutes(ctx, store, changed) {
       }
       // Runs only when the person left the box ticked, after the teardown script, before the worktree goes.
       case 'POST /archive/apply': {
+        // The Node calls this as its own service. A credential bound to one task may not cancel another's deploys.
+        if (context.principal.scope === 'task') return new Response('forbidden', { status: 403 })
         if (typeof body.taskId !== 'string') return new Response('bad request', { status: 400 })
         store.setStatus(body.taskId, 'running', 'cancelled')
         changed(body.taskId)

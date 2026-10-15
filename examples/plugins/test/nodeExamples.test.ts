@@ -135,6 +135,7 @@ describe('acme-agent', () => {
     await node.call('/v1/p/acme-agent/tools/add-note', post({ arguments: { text: 'Cap retries at one hour' } }, agent))
     const summarize = () => node!.call('/v1/p/acme-agent/summary', post({ item: TASK }))
 
+    expect((await node.call('/v1/p/acme-agent/summary', post({ item: TASK }, agent))).status).toBe(403)
     const refused = await summarize()
     expect(refused.status).toBe(409)
     expect((await refused.json()).error.message).toContain('Pick a model for Acme agent kit')
@@ -317,6 +318,7 @@ describe('acme-data', () => {
       details: ['staging f00dfee'],
       action: { label: 'Mark them cancelled', checked: false },
     })
+    expect((await node.call('/v1/p/acme-data/archive/apply', post({ taskId: TASK }, agent))).status).toBe(403)
     expect(await json(node.call('/v1/p/acme-data/archive/apply', post({ taskId: TASK })))).toEqual({ ok: true })
     expect(await check()).toEqual({ concern: null })
   })
@@ -376,6 +378,10 @@ describe('acme-data', () => {
     expect(
       (await json(node.call('/v1/p/acme-data/cli/deploys', post({ nodeId: 'n1', taskId: TASK })))).deploys,
     ).toMatchObject([{ sha: 'abc1234' }])
+    // Only the run that synced something records, under the verb the manifest declares.
+    expect(
+      await node.ctx.db.select({ action: schema.audit.action, subject: schema.audit.subject }).from(schema.audit),
+    ).toEqual([{ action: 'acme-data:sync', subject: 'acme-cloud' }])
     // One span per run, from `ctx.telemetry.startSpan`, which a test reads without a sink of its own.
     expect(node.ctx.recorded.filter((record) => record.kind === 'span')).toMatchObject([
       { name: 'sync-deploys', status: 'ok' },

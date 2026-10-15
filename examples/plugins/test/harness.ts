@@ -67,6 +67,8 @@ export async function startNode(example: Example, options: { userId?: string } =
     ...(migrations ? { migrations: join(example.dir, migrations) } : {}),
     ...(options.userId ? { userId: options.userId } : {}),
   })
+  // The host replays the manifest's audit verbs before init (pluginHost/manifestCatalog.ts).
+  for (const action of example.manifest.contributions.auditActions ?? []) ctx.audit.declare(action)
   await plugin.init(ctx)
   await plugin.ready?.(ctx)
   const device = await makeTestRequestContext({ plugin: id, env: ctx.env })

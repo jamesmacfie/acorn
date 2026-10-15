@@ -69,6 +69,8 @@ export default {
         // #region generate
         // The task row's menu posts `{ item }`, the task's id.
         case 'POST /summary': {
+          // `item` names any task, so an agent's credential, bound to one task, may not call this.
+          if (context.principal.scope === 'task') return refuse(403, 'Summaries are run from the task menu.')
           const list = notesOf(body.item)
           if (!list.length) return refuse(400, 'This task has no Acme notes to summarize.')
           try {
