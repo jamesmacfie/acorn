@@ -22,6 +22,10 @@ create more subtasks while it runs. A failure leaves the parent active and names
 Subtasks already archived stay archived, and retry skips them. Selected plugin cleanups apply to the
 task whose concerns appeared in the dialog. Restore acts on one task at a time.
 
+A task with active subtasks also has **Archive children** in its rail menu. After one confirmation, it
+archives each direct subtask, with its nested subtasks, one at a time, and leaves the task itself
+active. That dialog asks plugins nothing, as with the subtasks of an archived parent.
+
 Without the terminal capability, the status-only archive also archives every descendant and runs
 each task's archiving hook. It retains their worktrees. Task-scoped callers cannot archive a tree
 containing tasks outside their scope.

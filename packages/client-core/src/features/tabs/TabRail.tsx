@@ -52,6 +52,7 @@ import { registerCommands } from '../../host/registries/commands/commands'
 import { keybindingRegistry, registerKeybindings, resolveKeybindings } from '../../host/registries/commands/keybindings'
 import { formatChord } from '../../kit/lib/rendering/formatChord'
 import { archiveOrDeleteTask, confirmTaskArchive } from '../tasks/confirmTaskArchive'
+import { confirmAction } from '../../host/registries/shell/willPhase'
 import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { completeTaskArchive, isArchiving, withArchiving } from '../tasks/archiveLifecycle'
@@ -346,6 +347,18 @@ export default function TabRail() {
           if (task) void openArchive(task)
         },
       },
+      {
+        id: 'task.archive-children',
+        location: 'task.row',
+        label: 'Archive children',
+        icon: 'archive',
+        order: 31,
+        tone: 'danger',
+        // Read from the task list rather than the target: whether a row has subtasks is not one of
+        // the facts a row target carries.
+        when: (target) => childrenOf(target.id).length > 0,
+        run: (target) => void openArchiveChildren(target.id, target.title),
+      },
     ])
     const numbered = Array.from({ length: 9 }, (_, index) => ({
       id: `task.activate.${index + 1}`,
@@ -432,6 +445,23 @@ export default function TabRail() {
     setMenuId(null)
     const decision = await confirmTaskArchive(w, query.data ?? [])
     if (decision.confirmed) await archive(w, decision.action, decision.checked)
+  }
+
+  const childrenOf = (id: string) => (query.data ?? []).filter((task) => task.parentId === id)
+
+  // One question for the lot, then each direct child goes through the same archive as its own row's
+  // Archive, taking its nested subtasks with it. One at a time, so the teardowns don't race each other.
+  async function openArchiveChildren(id: string, title: string) {
+    setMenuId(null)
+    const confirmed = await confirmAction({
+      title: 'Archive children',
+      actionLabel: 'Archive children',
+      goes: `acorn archives every subtask of "${title}", including nested subtasks, and deletes the worktrees acorn made for them.`,
+      stays: 'The task itself stays. You can restore subtasks from Archive.',
+      danger: true,
+    })
+    if (!confirmed) return
+    for (const child of childrenOf(id)) await archive(child, 'archive')
   }
 
   async function archive(w: Task, action: string, applyChecks: string[] = []) {
