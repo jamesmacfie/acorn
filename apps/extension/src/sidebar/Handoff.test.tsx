@@ -359,13 +359,25 @@ describe('a handoff in the sidebar', () => {
     expect(button(root, 'Copied')).toBeDefined()
   })
 
-  it('offers the handoff for the page beside it when no button could be drawn', async () => {
+  it('looks up the page beside it when no button could be drawn', async () => {
     const { root, state } = mount({ url: PAGE })
     await settle(30)
-    button(root, 'Look up in Acorn')!.click()
-    await settle(20)
     expect(state.requests.filter((request) => request.op === 'handoff.resolve')).toHaveLength(1)
     expect(root.textContent).toContain('acme/widget#42')
+  })
+
+  it('keeps a dismissed card closed on the same page', async () => {
+    const { fake, root, state } = mount({ url: PAGE })
+    await settle(30)
+    const card = () => root.querySelector('[aria-label="Handoff"]')
+    button(card()!, 'Dismiss')!.click()
+    await settle(20)
+    expect(card()).toBeNull()
+    expect(button(root, 'Look up in Acorn')).toBeDefined()
+    fake.navigate('https://tracker.example/items/43')
+    await settle(20)
+    expect(card()!.textContent).toContain('https://tracker.example/items/43')
+    expect(state.requests.filter((request) => request.op === 'handoff.resolve')).toHaveLength(2)
   })
 
   it("closes the card when the tab leaves the item, unless the person typed a workflow's input", async () => {
@@ -374,9 +386,10 @@ describe('a handoff in the sidebar', () => {
     await clickSiteButton(fake)
     const card = () => root.querySelector('[aria-label="Handoff"]')
     expect(card()).not.toBeNull()
+    // The item it left closes; Home looks up the one the tab moved to.
     fake.navigate('https://tracker.example/items/43')
     await settle(20)
-    expect(card()).toBeNull()
+    expect(card()!.textContent).toContain('https://tracker.example/items/43')
 
     await clickSiteButton(fake, 'workflow')
     await settle(20)
@@ -424,28 +437,51 @@ describe('a handoff in the sidebar', () => {
     expect(conversationTitle(root)).toBe('Chat s2')
   })
 
-  it('takes the offer back when the tab moves to a page it may not read', async () => {
+  it('leaves the conversation under Agents open when Home looks up a page', async () => {
+    const { fake, root, state } = mount({ url: PAGE })
+    state.pageTasks = [
+      {
+        id: 't-new',
+        title: 'Fix the flaky test',
+        branch: 'fix',
+        projectId: 'p1',
+        pages: [{ origin: 'https://tracker.example', pathPrefix: '/items/42', source: 'tracker' }],
+      },
+    ]
+    state.sessions['t-new'] = [session('s2', 't-new')]
+    await settle(30)
+    await openChat(root, 'Chat s2')
+    fake.navigate('https://tracker.example/items/43')
+    await settle(30)
+    expect(root.querySelector('[aria-label="Handoff"]')).not.toBeNull()
+    await tab(root, 'Agents')
+    expect(conversationTitle(root)).toBe('Chat s2')
+  })
+
+  it('closes the card when the tab moves to a page it may not read', async () => {
     const { fake, root } = mount({ url: PAGE })
     await settle(30)
-    expect(button(root, 'Look up in Acorn')).toBeDefined()
+    const card = () => root.querySelector('[aria-label="Handoff"]')
+    expect(card()).not.toBeNull()
     // Leaving the site a toolbar click granted: the browser reports the load, but no address.
     fake.navigate(undefined)
     await settle(20)
-    expect(button(root, 'Look up in Acorn')).toBeUndefined()
+    expect(card()).toBeNull()
   })
 
-  it('offers the handoff once a toolbar click lets it read the page', async () => {
-    const { fake, root } = mount({ url: PAGE })
-    await settle(30)
+  it('looks the page up once a toolbar click lets it read the page', async () => {
+    const { fake, root, state } = mount({ url: PAGE })
     fake.activeTab = { ...fake.activeTab, url: undefined }
     fake.activate()
-    await settle(20)
-    expect(button(root, 'Look up in Acorn')).toBeUndefined()
+    await settle(30)
+    const card = () => root.querySelector('[aria-label="Handoff"]')
+    expect(card()).toBeNull()
     // The click grants access to the tab without any tab event the sidebar hears.
     fake.activeTab = { ...fake.activeTab, url: PAGE }
     fake.clickAction()
     await settle(20)
-    expect(button(root, 'Look up in Acorn')).toBeDefined()
+    expect(card()).not.toBeNull()
+    expect(state.requests.filter((request) => request.op === 'handoff.resolve')).toHaveLength(1)
   })
 
   it('shows only the task list on a page it may not read', async () => {
@@ -470,6 +506,9 @@ describe('a handoff in the sidebar', () => {
     fake.activeTab = { ...fake.activeTab, url: PAGE }
     fake.activate()
     await back(root)
+    // Home looks the page up; dismissing that card leaves This page's offer.
+    button(root.querySelector('[aria-label="Handoff"]')!, 'Dismiss')!.click()
+    await settle(20)
     expect(button(root, 'Look up in Acorn')).toBeDefined()
     fake.activeTab = { ...fake.activeTab, url: undefined }
     await openSettings(root)

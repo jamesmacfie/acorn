@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createSignal, onMount } from 'solid-js'
+import { For, Match, Show, Switch, createEffect, createSignal, onMount } from 'solid-js'
 import type {
   BridgeAgentChoice,
   BridgeAgentSession,
@@ -69,6 +69,23 @@ export function ThisPage(props: {
 }) {
   const offers = () => pageHandoffs(props.handoffs, props.pageUrl)
   const host = () => (props.pageUrl && URL.canParse(props.pageUrl) ? new URL(props.pageUrl).host : '')
+
+  // Home looks up the item on the page beside it, once per page and Node, so a card the person
+  // dismissed stays closed. A page several handoffs match waits for the person to pick one.
+  let lookedUp = ''
+  createEffect(() => {
+    const key = `${props.nodeId} ${props.pageUrl}`
+    const only = offers().length === 1 ? offers()[0]! : null
+    if (!only || props.handoff || props.pageTasks.length || !props.online || key === lookedUp) return
+    lookedUp = key
+    props.startHandoff({
+      pluginId: only.pluginId,
+      handoffId: only.id,
+      label: only.label,
+      url: props.pageUrl!,
+      auto: true,
+    })
+  })
 
   return (
     <section aria-label="This page">
@@ -146,7 +163,7 @@ export function ThisPage(props: {
             )}
           </For>
         </Match>
-        {/* Looking the page up sends its address to the Node, so it waits for the person's click. */}
+        {/* A dismissed card, a page several handoffs match, or an offline Node leaves it to a click. */}
         <Match when={offers().length}>
           <div class="row">
             <span class="quiet grow">No task in Acorn for this yet.</span>

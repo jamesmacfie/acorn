@@ -3,12 +3,20 @@ import { matchHandoffPage } from '@acorn/protocol/plugin/handoffs.ts'
 
 // Browser handoffs inside the extension (docs/browser-extension/handoffs.md): which declared handoffs a
 // page matches, and which site access shows their buttons. The background and the sidebar both match
-// from the cached list, so a page address goes to the Node only when the person asks for a handoff.
+// from the cached list. A page address goes to the Node only for a page a handoff matches: when the
+// person clicks its chip, or when Home shows the page and looks its item up.
 
-// A handoff the person asked for on one page: a button click, or the sidebar's own offer. `start` is
-// what the chip's menu chose to do with the item: make a task, or start a workflow in one.
+// A handoff on one page: a chip click, or Home's own lookup, which sets `auto`. `start` is what the
+// chip's menu chose to do with the item: make a task, or start a workflow in one.
 export type HandoffStart = 'task' | 'workflow'
-export type PageHandoff = { pluginId: string; handoffId: string; label: string; url: string; start?: HandoffStart }
+export type PageHandoff = {
+  pluginId: string
+  handoffId: string
+  label: string
+  url: string
+  start?: HandoffStart
+  auto?: boolean
+}
 
 export const handoffKey = (handoff: Pick<BridgeHandoff, 'pluginId' | 'id'>): string =>
   `${handoff.pluginId}:${handoff.id}`

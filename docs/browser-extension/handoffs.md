@@ -79,9 +79,10 @@ gets the click at once, and one that opens later gets the latest of each kind as
 
 ## The handoff card
 
-The card shows in Home's [**This page**](./task-pages.md#this-page) section, in place of its state, and a handoff brings it
-forward from Settings or an open conversation. It resolves the page through `handoff.resolve` and
-shows what came back:
+The card shows in Home's [**This page**](./task-pages.md#this-page) section, in place of its state. Home
+opens it for a page a handoff matches and no task holds, and a chip's click brings it forward from
+Settings or an open conversation. It resolves the page through `handoff.resolve` and shows what came
+back:
 
 1. Several items, such as one per connection, mean a choice. Nothing picks the first.
 2. **Linked tasks** lists the active tasks that already hold the item. **Chat** opens that task's

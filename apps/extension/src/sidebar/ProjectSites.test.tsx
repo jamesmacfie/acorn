@@ -545,14 +545,13 @@ describe('This page', () => {
     expect(thisPage(root).querySelector('strong')!.textContent).toBe('Fix login')
   })
 
-  it('offers the handoff for an item no task holds, and looks it up only on a click', async () => {
+  it('looks up an item no task holds without a click', async () => {
     const { state, root } = mount({ url: 'https://github.com/acme/web/pull/8' })
     state.taskPages = [pullTask]
     state.handoffs = [pullHandoff]
     await settle(30)
-    expect(thisPage(root).textContent).toContain('No task in Acorn for this yet.')
-    expect(button(thisPage(root), 'Look up in Acorn')).toBeDefined()
-    expect(state.requests.some((request) => request.op === 'handoff.resolve')).toBe(false)
+    expect(thisPage(root).querySelector('[aria-label="Handoff"]')).not.toBeNull()
+    expect(state.requests.filter((request) => request.op === 'handoff.resolve')).toHaveLength(1)
   })
 
   it("shows a project site's project, its tasks, and New task", async () => {

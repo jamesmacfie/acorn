@@ -46,8 +46,8 @@ Runn does when a command changes its stack and while a stack is starting. It sen
 `{ type: 'taskPages', nodeId, tasks }`. The sidebar, the task chip, and the
 [toolbar badge](./notifications.md#which-page-a-request-belongs-to) all match the page against it
 in the browser (`pageTasks` in `src/taskPages.ts`), so no page address goes to the Node for it. A page
-address still reaches the Node only on a click that resolves it: a handoff's **Look up in Acorn** or
-the chip's **Start task**.
+address reaches the Node only when a handoff resolves it: Home looking up a page a handoff matches,
+**Look up in Acorn**, or the chip's **Start task**.
 
 ## This page
 
@@ -62,10 +62,12 @@ states:
    "Task: <title> · <project>", then the plugin's state line, such as **Runn stack running**, and
    its link reads **Logs in Acorn**: the task on the plugin's pane, `runn` for Runn. When the person
    hid the branch marker on that origin, the row offers **Show the branch marker on this site**.
-2. **An item no task holds.** The page matches a handoff and no task: **Look up in Acorn**, which
-   opens the handoff card. Looking a page up sends its address to the Node, so it waits for this
-   click. That is the same action for a site whose layout has no anchor, for a handoff that declares
-   no anchors, such as Linear's and Rollbar's, and for Firefox.
+2. **An item no task holds.** The page matches a handoff and no task: Home looks the item up and
+   opens the handoff card, once for each page and Node, while the Node is online. That's the same for
+   a site whose layout has no anchor, for a handoff that declares no anchors, such as Linear's and
+   Rollbar's, and for Firefox. Home leaves the lookup to **Look up in Acorn** after the person
+   dismisses the card, when several handoffs match the page, and while the Node is offline. The
+   lookup leaves a conversation open under **Agents** alone, which a chip's click doesn't.
 3. **A project site with no item.** The project its [site associations](./project-sites.md) suggest,
    that project's open tasks, and **New task in Acorn**, which opens the project in the desktop app.
 
@@ -163,7 +165,8 @@ selected is refused as `not_selected`.
 ## Why
 
 Matching in the browser keeps page addresses off the Node: the panel recognises a page only through
-lists the Node already sent, and a page address goes to the Node only when the person clicks. Task
+lists the Node already sent. A page address goes to the Node only for a page a handoff matches,
+which is a narrow pattern such as a pull request, and only to the person's own Node. Task
 addresses use the project sites' grammar, so a plugin's exact origin, such as a local app's, needed no
 grammar change. A plugin publishes only a loopback origin with no path, so it can't tie someone else's
 site, such as github.com, to one of its tasks.

@@ -528,11 +528,11 @@ export function Workspace(props: {
     ),
   )
 
-  // A handoff shows on Home, so it closes the conversation.
+  // A handoff shows on Home, so it closes the conversation. Home's own lookup leaves it under Agents.
   createEffect(
     on(
       () => props.handoff,
-      (handoff) => handoff && current().sessionId && back(),
+      (handoff) => handoff && !handoff.auto && current().sessionId && back(),
       { defer: true },
     ),
   )
