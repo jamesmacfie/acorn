@@ -73,7 +73,13 @@ still open as `background`, before the turn's end is recorded (`codexStart.ts`).
 its session's harness is alive. When the session stops, fails, is archived, or starts reconnecting,
 no exit can arrive. The runtime then records the card as `unknown`, which the card reads as **lost**.
 At startup the runtime does the same for every background command still marked running, because no
-harness survives a Node restart. Output recorded before then stays on the card. In a check on
+harness survives a Node restart. Output recorded before then stays on the card.
+
+That startup pass reads only events written since the previous start's pass began, less a
+ten-minute margin for a clock set back. The previous pass settled everything older, and the
+`agent_command_settle` table remembers when it began. Reading every event would block the Node for
+tens of seconds on a long-used database, because its SQLite calls are synchronous. The time is saved
+only after the pass finishes, so a start that dies partway rereads the same events next time. In a check on
 October 12, 2026, a Claude command that was running when the app restarted didn't survive the restart
 either.
 

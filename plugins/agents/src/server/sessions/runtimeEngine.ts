@@ -57,6 +57,7 @@ import type { AgentDriverSession } from '../drivers/types'
 import { eventSubagentId, isActiveSubagent, quietedSubagents, SUBAGENT_QUIET_MS } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import type { RepeatedToolCallWarnings } from './repeatedToolCalls'
+import type { CommandScope } from './commandLifecycle'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
 import type { InstructionAdmission } from './instructionAdmission'
@@ -1267,15 +1268,15 @@ export class ManagedAgentEngine {
         ['ready', 'stopped', 'failed', 'archived', 'reconnecting'].includes(event.state)) ||
       (event.type === 'subagent' && ['idle', 'completed', 'failed'].includes(event.subagent.status ?? ''))
     ) {
-      await this.settleCommands(sessionId)
+      await this.settleCommands({ sessionId })
     }
     return record
   }
 
   /** Append lifecycle endings past client cursors. Read projection also covers untouched history. */
-  async settleCommands(sessionId?: string): Promise<void> {
+  async settleCommands(scope: CommandScope): Promise<void> {
     const { commandStatus } = await import('./commandLifecycle')
-    for (const record of await this.store.unfinishedCommands(sessionId)) {
+    for (const record of await this.store.unfinishedCommands(scope)) {
       if (record.event.type !== 'tool') continue
       const session = await this.store.requireSession(record.sessionId)
       const turn = record.turnId ? await this.store.turn(record.turnId) : null

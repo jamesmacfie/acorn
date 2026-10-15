@@ -92,6 +92,13 @@
       "when": 1791859104195,
       "tag": "0016_agent_turn_steering",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1792046121858,
+      "tag": "0017_agent_command_settle",
+      "breakpoints": true
     }
   ]
 }

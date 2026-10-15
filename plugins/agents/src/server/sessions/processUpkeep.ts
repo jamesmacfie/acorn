@@ -230,7 +230,7 @@ export class ProcessUpkeep {
       return null
     if (session.subagents.some(isActiveSubagent)) return null
     // A background command dies with the harness that started it.
-    const commands = await this.deps.store.unfinishedCommands(sessionId)
+    const commands = await this.deps.store.unfinishedCommands({ sessionId })
     if (commands.some((record) => record.event.type === 'tool' && record.event.tool.background)) return null
     // The request rows are the authority here. `ready` is only what the last event projected.
     if ((await this.deps.store.pendingRequests(sessionId)).length) return null

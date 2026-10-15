@@ -148,6 +148,13 @@ export const agentSearchFormat = sqliteTable('agent_search_format', {
   version: integer('version').notNull(),
 })
 
+// One row: when the last start's command settle began. No harness outlives the Node, so every command
+// opened before then was settled by that pass, and the next start reads only newer events. No row makes
+// the next start read every event once.
+export const agentCommandSettle = sqliteTable('agent_command_settle', {
+  settledBefore: integer('settled_before').notNull(),
+})
+
 export const agentRequests = sqliteTable(
   'agent_requests',
   {
