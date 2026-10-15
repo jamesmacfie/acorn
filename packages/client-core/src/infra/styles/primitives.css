@@ -677,7 +677,17 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   font-size: var(--fs-sm);
   background: var(--bg-subtle);
   border-bottom: var(--chrome-divider);
+  position: relative;
 }
+/* Busy sits over the last control's end and takes no room, so it never moves the rows below. */
+.ui-filterbar > .ui-spinner {
+  position: absolute;
+  inset-inline-end: calc(var(--pane-pad) + var(--space-4));
+  top: 50%;
+  translate: 0 -50%;
+  pointer-events: none;
+}
+.ui-filterbar[data-busy] > .ui-input:last-of-type { padding-inline-end: calc(var(--space-4) * 2 + 1em); }
 /* In-content find keeps its match navigation and keyboard contract. */
 .ui-toolbar[data-size='sm']:has(> .ui-findbar-search) { padding-block: var(--space-3); }
 /* A bar that ends a region which fills its pane is that region's footer, so its rule goes on top, where
