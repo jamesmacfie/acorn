@@ -33,7 +33,7 @@ For later phases:
   is 1,817,458 bytes against a 1,797,500 byte ceiling in `apps/node/scripts/check-service-budget.mjs`.
   The checks above raised it locally and didn't commit that. Phase 2 needs the pack to pass.
 - Arch-test reds that predate this phase: the client console baseline lists
-  `apps/tui/src/node/pair.ts`, the policyGate doc citation, three docs over 200 lines, and a Firefox
+  the terminal client's pairing module, which no longer exists, the policyGate doc citation, three docs over 200 lines, and a Firefox
   manifest path. `pluginDisable.test.ts` fails on its route list.
 
 Date: October 14, 2026. Status: proposed.

@@ -1,6 +1,6 @@
 # Keep the Node, client, and plugin splits honest
 
-Date: October 14, 2026. Status: proposed. Implementation not started.
+Date: October 14, 2026. Status: phases 1 to 9 implemented October 15, 2026. Phase 10, the remote preview proxy, is proposed.
 
 This programme fixes the places where acorn's two founding splits have drifted. The first split is
 the Node and the client: the Node owns data and execution, and a client on another machine presents

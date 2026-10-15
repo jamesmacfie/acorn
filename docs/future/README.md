@@ -16,7 +16,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
 | [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
-| [split/](./split/README.md) | Ten phases that fix drift in the Node and client split and the core and plugin split, including forge-neutral repositories and change requests. | Proposed October 14, 2026. Implementation not started. |
+| [split/](./split/README.md) | Ten phases that fix drift in the Node and client split and the core and plugin split, including forge-neutral repositories and change requests. | Phases 1 to 9 implemented October 15, 2026. Phase 10, the remote preview proxy, is proposed. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
 
 ## The single files
