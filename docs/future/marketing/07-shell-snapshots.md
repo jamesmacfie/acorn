@@ -87,6 +87,8 @@ A snapshot that fails this test is never committed with an exception. Fix the fi
 
 ### 5. Optional: make the hero clickable
 
+Skipped. James decided on October 15, 2026 to keep one hero scene. Don't build this step.
+
 herdr's hero is "a real layout" you can click. acorn can do the same thing cheaply: capture two or three
 variants of the hero scene, one per task in the rail, and swap between them when the visitor clicks a
 task. That's a few lines of script and no live app. [Phase 8](./08-landing.md) decides whether it's worth

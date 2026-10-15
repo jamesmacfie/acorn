@@ -128,5 +128,6 @@ extension. Those are [phase 17](./17-plugin-guides-node-and-agents.md).
 - Every code block in these guides comes from an example file region or passes phase 15's manifest
   check.
 - Every guide shows its example's specimen on both hosts, or says why the terminal draws nothing.
-- Someone who hasn't written an acorn plugin completes the tutorial and then the left rail guide from
-  the site alone. Record what confused them and fix it.
+- Following only the published pages, an agent completes the tutorial and then the left rail guide in a
+  scratch folder outside the repository. Record each step the pages got wrong or left out, and fix it.
+  A person walking it with only the published packages is [phase 20](./20-launch.md)'s job.

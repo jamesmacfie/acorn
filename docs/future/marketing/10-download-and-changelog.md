@@ -38,7 +38,9 @@ is down or the build is offline, so refreshing it by hand from time to time is e
 automatically. A build never fails because GitHub is down.
 
 Add a scheduled workflow that rebuilds and deploys production once a day, and on every published
-release, so the star count and the download links stay current.
+release, so the star count and the download links stay current. Put it in `.github/workflows/site.yml`
+beside the existing deploy job. It can't run until the Cloudflare secrets exist, so writing it is the
+whole job here. Phase 20 confirms it runs.
 
 ### 2. Match assets to platforms
 
@@ -92,8 +94,9 @@ hand. It's about 20 lines and needs no dependency.
 ### 6. Draw the star button
 
 Add a `<GitHubStars />` component for the header and the footer. It links to the repository, says
-**Star on GitHub**, and shows the count formatted as `1.2k` above the threshold the owner sets in
-[decision 4](./README.md#what-the-owner-decides). It's a plain link with no script and no request from
+**Star on GitHub**, and shows the count formatted as `1.2k` only when the repository has 100 stars or
+more ([owner decision 4](./README.md#what-the-owner-decides)). Keep the 100 as a named constant in the
+component. It's a plain link with no script and no request from
 the visitor's browser.
 
 ## Out of scope
@@ -107,5 +110,6 @@ Signing, notarization, building release assets, and an update feed. Those belong
   release is swapped in.
 - `SITE_OFFLINE=1 pnpm --filter @acorn/site build` succeeds using the committed GitHub data.
 - The changelog page lists the seeded entries, and the RSS feed validates with the W3C feed validator.
-- The scheduled rebuild runs and deploys.
+- The scheduled rebuild is written in `site.yml`. Confirming it runs and deploys is left for phase 20.
+- `<GitHubStars />` hides the count at 99 stars and shows it at 100, with a test for each.
 - The download page passes the budget and axe.

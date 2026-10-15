@@ -10,7 +10,11 @@ number, or a link to the docs page that explains it.
 
 ## Starting point
 
-- Phase 1 chose the eyebrow, the headline, the paragraph under it, and the order of sections.
+- [Phase 1](./01-positioning.md#decisions) chose the headline, the paragraph under it, the feature
+  ranking, and the order of sections. The headline is "A workspace for working with coding agents,
+  one task at a time." This phase writes the eyebrow and records it in phase 1.
+- The license is MIT ([owner decision 1](./README.md#what-the-owner-decides)), and the repository has
+  no `LICENSE` file.
 - Phase 6 built the components. Phase 7 captured the snapshots.
 - [Voice](./voice.md) has the rules, the words to avoid, and the FAQ facts.
 - [Research](./research.md) has the patterns this page takes: herdr's hero and product picture, hunk's
@@ -19,16 +23,16 @@ number, or a link to the docs page that explains it.
 
 ## The page from top to bottom
 
-Phase 1 confirms or reorders this outline. Write each section's copy to [voice](./voice.md), with every
-claim linked to the docs page that owns it.
+Phase 1 kept this outline as written. Write each section's copy to [voice](./voice.md), with every claim
+linked to the docs page that owns it.
 
 1. **Hero.** The eyebrow, the headline, and the paragraph. A primary action: **Download** when a release
    exists, **Get acorn** pointing at `/download/` when it doesn't. A secondary action, **Read the docs**.
    One line under the actions names the clients: the desktop app for macOS and Windows, the terminal
    client, the command line, and the browser extension.
 2. **The picture.** The hero snapshot, full width, with **Desktop** and **Terminal** tabs. Caption: the
-   same task in both clients. If phase 7 captured variants, clicking a task in the rail swaps the
-   scene.
+   same task in both clients. There's one scene. James decided against the clickable hero from
+   [phase 7](./07-shell-snapshots.md#5-optional-make-the-hero-clickable).
 3. **How it works, in three steps.** Each step is a heading, two sentences, and a small specimen:
    - Open a task. It gets a branch, and a worktree the first time it needs files.
    - Run agents in it. Claude Code and Codex sessions with approvals, queued turns, and delegation.
@@ -49,14 +53,17 @@ claim linked to the docs page that owns it.
    others, including a standalone Node on a server, and use them from any client. A small snapshot of
    Fleet home.
 9. **FAQ.** The questions in [voice](./voice.md#the-faq), answered in two or three sentences each, in
-   `<details>` elements so they work with no script.
+   `<details>` elements so they work with no script. "What does it cost?" answers that acorn is free
+   and open source under the MIT license, and links to the `LICENSE` file on GitHub.
 10. **Install again.** The install block repeated, with **Read the docs** beside it.
 11. **Footer.**
 
 ## Build notes
 
-- The page ships the scripts for the tabs, the copy buttons, the appearance picker, and, if used, the
-  hero swap. Nothing else. With scripting off, every tab's panel shows in order and the copy buttons
+- Add a root `LICENSE` file with the standard MIT text, "Copyright (c) 2026 James Macfie". Add
+  `"license": "MIT"` to the root `package.json`. Do this before writing any copy that says "open
+  source".
+- The page ships the scripts for the tabs, the copy buttons, and the appearance picker. Nothing else. With scripting off, every tab's panel shows in order and the copy buttons
   hide.
 - Tabs follow the WAI-ARIA tabs pattern, with arrow keys moving between tabs.
 - The headline is real text, never an image. The snapshot is HTML, so its text is searchable and
@@ -70,11 +77,11 @@ Feature pages, the download page, and the docs. This page links to them.
 
 ## Acceptance
 
-- The five-second test from phase 1, repeated on the built page with five new people, gets the same or
-  better results than the mockup did.
+- The root `LICENSE` file exists, and every mention of the license on the page says MIT.
 - Every claim on the page links to a docs page, and every docs page it links to exists and isn't a
   draft.
-- Lighthouse reports performance of at least 98 on mobile and 100 for accessibility. Record the numbers
-  and the date in the site's internal page.
+- Lighthouse, run against the production build served locally with `astro preview`, reports
+  performance of at least 98 on mobile and 100 for accessibility. Record the numbers and the date in the
+  site's internal page.
 - The page passes the budget check with the snapshot included.
-- The voice review checklist passes, and James approves the copy.
+- The voice review checklist passes. James reviews the copy at the end of the run.

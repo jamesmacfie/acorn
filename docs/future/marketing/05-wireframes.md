@@ -4,9 +4,11 @@ Date: October 15, 2026. Status: proposed. Needs phases 1 and 2. Phase 6 depends 
 
 ## Goal
 
-Every page template exists as a grey-box layout with real words in it, reviewed and approved on the
-preview deploy before anyone picks a color or a typeface. Structure gets argued about here, where it's
-cheap, and not in phase 6, where it isn't.
+Every page template exists as a grey-box layout with real words in it, built before anyone picks a
+color or a typeface. Structure gets settled here, where it's cheap, and not in phase 6, where it isn't.
+
+The run doesn't stop for a review. See [how agents run these phases](./README.md#how-agents-run-these-phases).
+James reviews the wireframes on the local site at the end of the run.
 
 ## Starting point
 
@@ -20,7 +22,7 @@ cheap, and not in phase 6, where it isn't.
 ## Why wireframes live in the site
 
 Build the wireframes as Astro pages under `/lab/wireframes/`, not in a design tool. The final medium is
-HTML at real widths, the reviewer opens a link on the preview, and the wireframe's components become
+HTML at real widths, the reviewer opens a page on the local site, and the wireframe's components become
 the page's components in phase 6. A design tool would also add an account and a sync step for
 something the site can do directly.
 
@@ -52,9 +54,10 @@ Wireframe each at 1440 pixels wide and at 375 pixels wide:
 13. **Header, footer, and mobile navigation.**
 14. **404.**
 
-## Decisions to make in review
+## Decisions
 
-Each has a recommendation. Record the outcome and the reason in this file under "Decisions":
+James accepted these on October 15, 2026. Build to them. If building one shows it doesn't work, change
+it, and write the change and its reason here.
 
 - **Landing hero.** Headline and paragraph across the full width, install action under them, and the
   desktop and terminal picture full width below. The picture is the proof, so it gets the room.
@@ -67,10 +70,9 @@ Each has a recommendation. Record the outcome and the reason in this file under 
   the docs and has a different reader.
 - **Version label.** The plugin API major shows in the plugin docs header, read from source.
 
-## Review
+## Self-review
 
-Review every template with James on the preview deploy, on a laptop and a phone. For each template,
-check that:
+Check every template on the local site at 1440 and 375 pixels wide. For each template, check that:
 
 1. Someone new can say what the page is for from the top 600 pixels.
 2. From the docs home, a plugin author reaches "Add a pane" in two clicks, and a user reaches "Agent
@@ -83,6 +85,6 @@ Color, type, brand, motion, and final copy below the hero. Those are phases 6 an
 
 ## Acceptance
 
-- All 14 templates are on the preview at both widths.
-- James has approved each one, and the decisions are recorded in this file with reasons.
-- The two-click checks pass for the paths in the review list.
+- All 14 templates are under `/lab/wireframes/` on the local site at both widths.
+- Any change to the decisions above is recorded in this file with its reason.
+- The two-click checks pass for the paths in the self-review list.

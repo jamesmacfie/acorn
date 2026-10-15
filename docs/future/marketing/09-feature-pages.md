@@ -111,11 +111,11 @@ order.
 2. Write each page from its sources. Verify every UI claim in a `dev:agent` or `dev:tui:agent` session,
    because internal docs describe contracts, not what's on screen.
 3. Add specimens that don't exist to phase 3's gallery, and ask for any missing snapshot in phase 7.
-4. Run the voice review on each page and get James's approval.
+4. Run the voice review on each page. James reviews the pages at the end of the run.
 
 ## Acceptance
 
-- All ten pages and the index are written, out of draft, and approved.
+- All ten pages and the index are written, out of draft, and pass the voice review.
 - Every section links to a docs page.
 - Every page has an "In the terminal" section that matches `docs/first-party-plugins/terminal.md`.
 - Each page passes the budget check and axe.

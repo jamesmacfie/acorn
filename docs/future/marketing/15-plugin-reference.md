@@ -122,8 +122,9 @@ reference describes what a loaded plugin can use.
 - The coverage checks pass, and each fails on a planted gap.
 - Every manifest example on the site parses with the real contract.
 - The `plugin_authoring` tool's output is unchanged by step 2.
-- `curl -I https://<preview>/schemas/acorn-plugin.schema.json` shows the JSON content type and the open
-  CORS header.
+- `apps/site/public/_headers` gives `/schemas/*` the JSON content type and the open CORS header, and the
+  built `dist/schemas/` holds both files. Checking the live headers with `curl -I` needs a deploy, so
+  [phase 20](./20-launch.md) does it.
 
 ## Risks
 

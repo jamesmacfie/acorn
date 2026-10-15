@@ -53,7 +53,8 @@ reader nothing about the product.
 **Nothing its internal docs don't say.** A public page explains what an internal doc states. When they
 disagree, the internal doc wins and the public page is wrong ([sync](./sync.md)).
 
-**"Open source", until the repository has a license.** [Owner decision 1](./README.md#what-the-owner-decides).
+**"Open source", until the repository's `LICENSE` file is committed.** The license is MIT
+([owner decision 1](./README.md#what-the-owner-decides)), and [phase 8](./08-landing.md) adds the file.
 
 **Anything about unshipped work.** No roadmap, no "coming soon", no "not yet". Proposals live in
 `docs/future/`, and the site doesn't link there.

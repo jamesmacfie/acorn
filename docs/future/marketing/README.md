@@ -92,7 +92,7 @@ both hosts, instead of describing it. It also means the docs can afford a pictur
 | [2](./02-scaffold.md) | `apps/site` builds, deploys a preview per pull request, and holds every page in the site map as a stub. |
 | [3](./03-specimens.md) | One plugin tree drawn by both hosts, committed as HTML and as cells, with a sync test. |
 | [4](./04-sync-tooling.md) | Every written page names its sources, and a report lists pages whose sources changed. |
-| [5](./05-wireframes.md) | Grey-box layouts for every page template, reviewed on the preview deploy. |
+| [5](./05-wireframes.md) | Grey-box layouts for every page template, under `/lab/wireframes/`. |
 | [6](./06-visual-design.md) | The site's design system, built from the app's own tokens, fonts, and mark. |
 | [7](./07-shell-snapshots.md) | Whole-window desktop and terminal pictures from fixture data. |
 | [8](./08-landing.md) | The landing page, written and built. |
@@ -127,28 +127,44 @@ content. Phase 20 is last. Phase 21 can wait until after launch.
 
 ## What the owner decides
 
-These need James before the phase that depends on them. Each has a recommendation.
+James decided these on October 15, 2026.
 
-1. **The license.** The repository has no `LICENSE` file, and GitHub reports no license. The site can't
-   call acorn open source until it has one. `acorn-plugin-types` and `acorn-plugin-sdk` already say
-   MIT in their `package.json`. Recommendation: pick a license before phase 8, because the landing page
-   copy changes with the answer.
-2. **The domain.** Confirm who holds `acorn.sh` and that its DNS can move to Cloudflare. The published
-   schema URL depends on it.
-3. **How the name is written.** The internal docs write "acorn". The browser extension writes "Acorn".
-   Recommendation: a lowercase wordmark, and "Acorn" as a proper noun in sentences, which is what the
-   extension and most product sites do.
-4. **The star count.** The repository has six stars on October 15, 2026. A count that small reads as a
-   warning, not proof. Recommendation: draw the **Star on GitHub** button everywhere, and show the
-   number only above a threshold the owner sets.
-5. **Analytics.** Recommendation: none at launch, or Cloudflare Web Analytics, which sets no cookies and
-   needs no consent banner. Nothing that loads a third-party script.
-6. **The monospace font.** The app's mono stack starts with Berkeley Mono, which needs a web license to
-   serve. Recommendation: self-host JetBrains Mono, which is under the SIL Open Font License, and keep
-   the app's stack as the fallback.
-7. **What the download page offers first.** Signing and release delivery belong to
-   [the bundle plan](../bundle.md). Until a signed release exists, the download page offers building
-   from source and the standalone Node tarball, and says so plainly.
+1. **The license: MIT.** The repository has no `LICENSE` file yet, and `acorn-plugin-types` and
+   `acorn-plugin-sdk` already say MIT in their `package.json`. [Phase 8](./08-landing.md) adds the root
+   `LICENSE` file. Once it's committed, the site can call acorn open source, and the FAQ answers "What
+   does it cost?" with "Nothing. acorn is open source under the MIT license."
+2. **The domain: deferred to deploy.** Keep `acorn.sh` in every URL and in the schema path. Who holds
+   it and how its DNS moves to Cloudflare is settled in [phase 20](./20-launch.md).
+3. **How the name is written: `acorn`, lowercase, everywhere.** The wordmark, headings, and the start
+   of a sentence all write "acorn". This covers the site only. The browser extension's own UI keeps
+   what it has.
+4. **The star count: shown at 100 or more.** The **Star on GitHub** button shows everywhere. The
+   number next to it shows only when the repository has 100 stars or more.
+5. **Analytics: none at launch.** No script, no beacon, nothing to configure.
+6. **The monospace font: JetBrains Mono, self-hosted.** It's under the SIL Open Font License. Commit
+   the files to the site and keep the app's stack as the fallback. Berkeley Mono isn't served, because
+   it needs a paid web license.
+7. **What the download page offers first: build from source and the standalone Node tarball.**
+   Signing and release delivery belong to [the bundle plan](../bundle.md). Until a signed release
+   exists, the download page says so plainly.
+
+The headline, the feature ranking, and the landing outline are in
+[phase 1's decisions](./01-positioning.md#decisions).
+
+## How agents run these phases
+
+James decided on October 15, 2026 that an agent runs phases 3 to 19 in order without stopping for
+him. Where a phase asks for a decision or for James's approval:
+
+- Take the recommendation in the phase file, write it under a "Decisions" heading in that file with
+  a one-line reason, and carry on.
+- Where a phase asks for a review on the preview deploy, check the page on the local site instead:
+  `pnpm --filter @acorn/site dev`, or a preview build with `ACORN_SITE_PREVIEW=1` served by
+  `astro preview`. James reviews everything at the end of the run and asks for changes then.
+- Skip anything that needs a live deploy, Cloudflare, the domain, or GitHub repository settings, and
+  list it in the phase's completion note as left for phase 20.
+
+The run stops after phase 19. Phase 20 and phase 21 wait for James.
 
 ## What this programme leaves to others
 

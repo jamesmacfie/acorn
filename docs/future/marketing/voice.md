@@ -73,7 +73,7 @@ Use one term per concept, everywhere, the same one the app uses on screen.
 
 | Term | Use it for | Not |
 | --- | --- | --- |
-| acorn (wordmark), Acorn (in a sentence) | The product, pending [owner decision 3](./README.md#what-the-owner-decides). | ACORN, the acorn app |
+| acorn | The product. Lowercase everywhere, including the wordmark, headings, and the start of a sentence ([owner decision 3](./README.md#what-the-owner-decides)). | Acorn, ACORN, the acorn app |
 | Node | The process that holds your data and runs your agents. Capital N. | server, backend, daemon |
 | desktop app | The Tauri app on macOS and Windows. | GUI, the app, Electron |
 | terminal client | `acorn` with no arguments, drawn in a terminal. | TUI, CLI app |
@@ -90,14 +90,11 @@ Use one term per concept, everywhere, the same one the app uses on screen.
 
 ## The one-line description
 
-[Phase 1](./01-positioning.md) picks the final line. These are the candidates, each built on facts the
-docs already state:
+James chose this line on October 15, 2026, in [phase 1](./01-positioning.md#decisions):
 
-- "Give every task its own worktree, agents, and review."
-- "A workspace for working with coding agents, one task at a time."
-- "Run Claude Code and Codex inside your tasks, not beside them."
+> A workspace for working with coding agents, one task at a time.
 
-And the paragraph under it, which every candidate shares:
+And the paragraph under it:
 
 > Open a task and acorn gives it a branch, a Git worktree, terminals, and agent sessions, with the diff
 > and the pull request in the panes beside them. Use it from the desktop app or from your terminal.
@@ -122,7 +119,7 @@ The landing page ends with an FAQ, and the docs have the long version. Answer in
 sentences, from facts the internal docs state. These questions come up on every site in
 [research](./research.md):
 
-- **What does it cost?** Answer after the license decision.
+- **What does it cost?** Nothing. acorn is open source under the MIT license.
 - **Do I need an API key?** No, for agents. acorn runs Claude Code and Codex with their own logins,
   and a harness never spends a key acorn holds (`docs/security/credentials.md`). API keys are optional,
   for features like SQL generation.

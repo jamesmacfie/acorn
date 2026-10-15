@@ -72,7 +72,8 @@ Built-in plugins, which are [phase 13](./13-docs-built-in-plugins.md).
 ## Acceptance
 
 - Every page above is out of draft, with `sources` and a current `checked`.
-- Someone who hasn't used acorn completes the quick start from the docs alone, on the desktop and in the
-  terminal client, with no help. Record what confused them and fix it.
+- Following only the published pages, an agent completes the quick start in a fresh `dev:agent` session
+  and in a fresh `dev:tui:agent` session. Record each step the pages got wrong or left out, and fix it.
+  A person walking it on a machine that has never run acorn is [phase 20](./20-launch.md)'s job.
 - Every UI path named on these pages exists in the current build. Check them in a `dev:agent` session.
 - The docs home's **Use acorn** door links to every page here.

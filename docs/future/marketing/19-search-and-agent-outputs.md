@@ -52,8 +52,8 @@ ask.
 
 - Titles as `<Page> · acorn docs` for docs and `<Page> · acorn` for marketing pages.
 - `description` from frontmatter, canonical URLs, and `og:` and `twitter:` tags.
-- Structured data on `/` and `/download/`: `SoftwareApplication` with the operating systems, the
-  license once decided, and the download URL when a release exists.
+- Structured data on `/` and `/download/`: `SoftwareApplication` with the operating systems, the MIT
+  license, and the download URL when a release exists.
 - `robots.txt` allows everything on production. Previews already send `noindex` from phase 2.
 
 ### 5. Social cards
@@ -67,7 +67,8 @@ Record in the site's internal page when to redraw cards: after a headline or sec
 
 ## Out of scope
 
-Analytics beyond [owner decision 5](./README.md#what-the-owner-decides). Translated pages.
+Analytics: there are none at launch ([owner decision 5](./README.md#what-the-owner-decides)). Translated
+pages.
 
 ## Acceptance
 
@@ -76,4 +77,7 @@ Analytics beyond [owner decision 5](./README.md#what-the-owner-decides). Transla
 - Every docs page answers at its URL plus `.md` with clean Markdown.
 - `/llms-full.txt` contains every docs page out of draft.
 - Every page has a unique title and description. A test fails on a duplicate.
-- A link to any page pasted into a chat app shows its card.
+- Every page's `og:image` points at a file that exists in the build. Checking that a pasted link shows
+  its card in a chat app needs a live URL, so it's left for phase 20.
+
+This is the last phase the agent run covers. Phase 20 and phase 21 wait for James.

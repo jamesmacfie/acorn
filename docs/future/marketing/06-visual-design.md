@@ -6,7 +6,8 @@ Date: October 15, 2026. Status: proposed. Needs phase 5. Phases 8, 9, and 10 dep
 
 The site looks like acorn, because it's built from acorn's own design tokens, fonts, and mark. A visitor
 who opens the app after the site sees the same type, the same rules, and the same themes. The site's
-look is approved by James as a gallery of every component, in every theme.
+look is built as a gallery of every component, in every theme, which James reviews on the local site
+at the end of the run. See [how agents run these phases](./README.md#how-agents-run-these-phases).
 
 ## Starting point
 
@@ -29,7 +30,7 @@ look is approved by James as a gallery of every component, in every theme.
 
 ## Direction
 
-The recommendation, to confirm with James before building:
+James confirmed this direction on October 15, 2026. Build to it.
 
 **The only color on the page is the product.** The site's own chrome uses the theme's text, background,
 border, and accent tokens. In the default Light theme, that's black on white with grey rules. Color
@@ -40,8 +41,13 @@ like.
 **Terminal type for chrome, a reading face for long prose.** Headings, navigation, labels, buttons,
 code, and specimens use the mono stack, as the Terminal pack does. Docs body text uses the same mono at
 15 to 16 pixels, with a 70-character measure. Mono text at that size and measure reads fine, and it's
-what hunk and posting do. If review finds long pages tiring, switch docs body text to Inter, which is
-already in the repository, and keep everything else mono.
+what hunk and posting do. If James's end review finds long pages tiring, docs body text switches to
+Inter, which is already in the repository, and everything else stays mono.
+
+The mono face is JetBrains Mono, self-hosted ([owner decision 6](./README.md#what-the-owner-decides)).
+Commit its regular, bold, and italic WOFF2 files and its license to `apps/site/public/fonts/`, declare
+them with `@font-face` and `font-display: swap`, and put `"JetBrains Mono"` first in the site's
+`--font-mono`, ahead of the app's stack. Don't serve Berkeley Mono.
 
 **The appearance picker is acorn's.** The header has one **Appearance** control, the same shape as the
 app's: the 12 themes and the 4 style packs. Picking one restyles the site and every specimen at once,
@@ -49,8 +55,8 @@ because both read the same tokens. The default follows the operating system's li
 the way the app does. A visitor who picks Cozy gets Literata, and nobody else downloads it, because a
 browser fetches a font only when a rule uses it.
 
-**The ASCII acorn is the mark.** The wordmark is the drawing beside the name in the mono face, set as
-text, not an image. The favicon is the drawing reduced to the cap and the outline.
+**The ASCII acorn is the mark.** The wordmark is the drawing beside the name, `acorn` in lowercase, in
+the mono face, set as text, not an image. The favicon is the drawing reduced to the cap and the outline.
 
 **No motion for decoration.** No scroll animations, no parallax, and no fading sections. The only
 transitions are the ones the app's motion tokens already define for hover and press. Respect reduced
@@ -123,7 +129,7 @@ Landing copy and page content. The gallery uses real copy where it exists and pl
 
 ## Acceptance
 
-- `/lab/design/` shows every component above in all 12 themes and 4 packs, and James approves it.
+- `/lab/design/` shows every component above in all 12 themes and 4 packs.
 - Switching theme or pack restyles the whole site and every specimen with no reload, and a reload shows
   no flash of another theme.
 - The contrast test passes in every theme.
