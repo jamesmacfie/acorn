@@ -121,6 +121,10 @@ import Snapshot from '../components/Snapshot.astro'
 <Snapshot id="hero" />
 ```
 
+A page that shows one scene twice passes `instance` on the second copy, such as
+`<Snapshot id="fleet" instance="tour" />`. It renames the scene's ids in that copy, so each id stays
+unique on the page.
+
 A desktop or browser scene draws at its window's size and scales to the column. A terminal scene sizes
 its text to fit its columns. The snapshot is `inert`, so nothing in it can be focused or clicked.
 

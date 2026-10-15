@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "title": "Tasks",
+    "caption": "Three tasks on one project, each on its own branch.",
+    "terminal": {
+      "columns": 80,
+      "rows": 3
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "ListColumn",
+          "props": {
+            "label": "Tasks"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Row",
+              "props": {
+                "density": "compact",
+                "meta": "retry-failed-webhooks"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Retry failed webhooks"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Row",
+              "props": {
+                "density": "compact",
+                "meta": "add-eu-vat"
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "Add VAT to EU invoices"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Row",
+              "props": {
+                "density": "compact",
+                "meta": "speed-up-the-overdue-invoices-query"
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "#text",
+                  "props": {
+                    "value": "Speed up the overdue invoices query"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

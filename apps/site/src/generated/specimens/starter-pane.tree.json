@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "title": "Hello",
+    "caption": "The pane a new plugin starts with, from the entry beside it.",
+    "terminal": {
+      "columns": 60,
+      "rows": 7
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Card",
+          "props": {},
+          "children": [
+            {
+              "id": "n2",
+              "type": "Stack",
+              "props": {
+                "gap": "row"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Heading",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "Hello"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n5",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "Ask the Node for a greeting"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n7",
+                  "type": "Button",
+                  "props": {
+                    "variant": "solid",
+                    "label": "Say hello"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

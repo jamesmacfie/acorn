@@ -54,8 +54,24 @@ same reason.
 `site.css` puts JetBrains Mono first in `--font-mono`, ahead of the app's fallback stack. A browser
 fetches a face only when a rule uses it, so a visitor who never picks Cozy never downloads Literata.
 
-The JetBrains Mono files are the full fonts from the project's release, not a Latin subset, because
-the terminal view of a specimen draws box-drawing characters.
+The JetBrains Mono files are subsets, about 20 KB each against 90 KB for the release's files, because
+a phone on a slow connection waits for them before it draws the page's text. Each keeps Latin-1, the
+punctuation and symbols the site writes, arrows, the Mac key symbols, and the box-drawing, block, and
+shape ranges the terminal view of a specimen draws. They leave out the programming ligatures, which
+the app doesn't draw either. A character outside the subset falls back to the next face in
+`--font-mono`. `Marketing.astro` preloads the regular and bold faces, the two the first screen uses.
+
+To rebuild them, take the `.woff2` files from the JetBrains Mono 2.304 release and run this for each of
+`Regular`, `Bold`, and `Italic`:
+
+```sh
+uvx --from fonttools --with brotli pyftsubset JetBrainsMono-Regular.woff2 \
+  --unicodes="U+0020-007E,U+00A0-00FF,U+0131,U+0152-0153,U+02C6,U+02DA,U+02DC,U+2010-2027,U+2030-203A,U+2044,U+20AC,U+2122,U+2190-2199,U+21A9,U+21B5,U+21D0-21D3,U+21E7,U+2212,U+2303-2304,U+2318,U+2325,U+232B,U+238B,U+23CE,U+2500-25FF,U+2713,U+2715,U+2717,U+2726" \
+  --layout-features="ccmp,locl,mark,mkmk" --flavor=woff2 \
+  --output-file=apps/site/public/fonts/JetBrainsMono-Regular.woff2
+```
+
+Add a range when the site starts writing a character outside it.
 
 ## The mark
 
@@ -86,9 +102,9 @@ The components are in `apps/site/src/components/`. Each has a comment that says 
 | `SiteHeader`, `SiteFooter` | The header and the footer on every page. Below 50rem the header's links fold into a menu. |
 | `Hero` | Eyebrow, headline, paragraph, actions, and a picture. A marketing page puts it in the layout's `hero` slot. |
 | `InstallBlock` | A tab per install method, its commands after a prompt, and **Copy**. |
-| `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window. |
+| `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window. A specimen switches between its desktop and terminal views with tabs, or shows them side by side with `both`. |
 | `Snapshot`, `Cells` | A [shell snapshot](./snapshots.md) in its frame, and a terminal's cells, which specimens and snapshots share. |
-| `Feature`, `Tour`, `Card` | A numbered feature section, the landing page's tabbed tour, and a card. |
+| `Feature`, `Tour`, `Card` | A numbered feature section, the landing page's tabbed tour, and a card. `Feature` takes `level={3}` under a section's own heading. |
 | `Badge`, `Keys` | The kit's own `Badge` and `Kbd` markup, with the text kept in `--text`. |
 | `ReferenceTable`, `Checkpoint` | A table with a sticky header and an anchor per row, and a step's check. |
 | `SocialCard` | The 1200 by 630 picture a shared link shows. |
@@ -114,6 +130,27 @@ Previous and next stay inside the page's own sidebar.
 | `apps/site/scripts/siteCss.test.mjs` | A color written into the site's styles, as hex, a function, or a name, and text set in a token that fails contrast in some theme. The wireframes are left out. |
 | `apps/site/scripts/contrast.test.mjs` | A pair of tokens the site sets text or a meaningful rule in that falls under 4.5:1 for text, or 3:1 for a rule, in any of the 12 themes. Add a pair here when a style uses a new one. |
 | `apps/site/tests/site.spec.ts` | A theme pick that doesn't restyle the page, a saved theme missing from the first frame, and an axe finding on the design gallery. |
+
+## Lighthouse
+
+The landing page has to score at least 98 for performance on mobile and 100 for accessibility. Check it
+by hand against a production build served by `astro preview`, with Lighthouse's default mobile settings:
+
+```sh
+pnpm --filter @acorn/site build
+pnpm --filter @acorn/site exec astro preview --ignore-lock --host 127.0.0.1 --port 4339
+npx lighthouse http://127.0.0.1:4339/ --form-factor=mobile --only-categories=performance,accessibility
+```
+
+| Date | Page | Performance | Accessibility | First paint | Largest paint |
+| --- | --- | --- | --- | --- | --- |
+| October 16, 2026 | The landing page as phase 8 built it | 99 | 100 | 1.7 s | 1.8 s |
+
+Lighthouse 13.5 simulates a slow phone connection, and on it the fonts cost the most. With the full
+JetBrains Mono files the landing page scored 90, and a page with almost no content scored 95. The site
+serves subsets of the fonts, and marketing pages preload the regular and bold faces
+([fonts](#fonts)). `astro preview` serves gzip, so the landing page's HTML arrives as
+73 KB there, against 27 KB with Brotli.
 
 ## The design lab
 

@@ -10,14 +10,23 @@ import SnapshotFrame from './SnapshotFrame.astro'
 
 interface Props {
   id: SnapshotId
+  /** Set when the page shows this scene more than once, so each copy's ids stay unique on the page. */
+  instance?: string
 }
 
 const pages = import.meta.glob<string>('../generated/snapshots/*.html', { eager: true, query: '?raw', import: 'default' })
 const frames = import.meta.glob<CellFrame>('../generated/snapshots/*.cells.json', { eager: true, import: 'default' })
 
-const { id } = Astro.props
+const { id, instance } = Astro.props
 const scene = SNAPSHOTS[id]
-const html = pages[`../generated/snapshots/${id}.html`]
+const captured = pages[`../generated/snapshots/${id}.html`]
+// The capture prefixes every id with the scene (docs/site/snapshots.md), so a second copy renames
+// `<scene>-` in the attributes that hold or point at an id.
+const html = instance
+  ? captured?.replace(/(\s(?:id|for|aria-[a-z]+)=")([^"]*)"/g, (_, attribute: string, value: string) =>
+      `${attribute}${value.replace(new RegExp(`(^|\\s)${id}-`, 'g'), `$1${id}-${instance}-`)}"`,
+    )
+  : captured
 const cells = frames[`../generated/snapshots/${id}.cells.json`]
 if (scene.host === 'terminal' ? !cells : html === undefined) {
   throw new Error(`There's no shell snapshot "${id}". Run pnpm --filter @acorn/site snapshots ${id}.`)

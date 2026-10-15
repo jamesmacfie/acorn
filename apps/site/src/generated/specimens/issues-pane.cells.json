@@ -1,0 +1,6 @@
+{"columns":60,"rows":4,"lines":[
+[{"text":"Issue               Title               State               ","attrs":["bold"]}],
+[{"text":"FW-12               Webhooks give up    In progress"}],
+[{"text":"FW-14               VAT on EU invoices  In review"}],
+[{"text":"FW-15               Slow overdue query  Todo"}]
+]}

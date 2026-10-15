@@ -120,11 +120,13 @@ sentences, from facts the internal docs state. These questions come up on every 
 [research](./research.md):
 
 - **What does it cost?** Nothing. acorn is open source under the MIT license.
-- **Do I need an API key?** No, for agents. acorn runs Claude Code and Codex with their own logins,
-  and a harness never spends a key acorn holds (`docs/security/credentials.md`). API keys are optional,
-  for features like SQL generation.
-- **Does my code leave my machine?** acorn sends nothing anywhere. Your agents talk to their own
-  providers. Telemetry is off by default, and nothing leaves the machine unless you turn it on and add
+- **Do I need an API key?** No, for agents. acorn runs Claude Code and Codex with their own logins.
+  API keys are optional, for features like SQL generation. `docs/security/credentials.md` says a
+  harness *generate* never spends a key acorn holds; it says nothing that wide about agent sessions,
+  so don't claim it for them.
+- **Does my code leave my machine?** Your code stays on the machine that runs the Node. acorn talks
+  to the services you connect, such as GitHub, and your agents talk to their own providers. Don't
+  write "acorn sends nothing anywhere": it calls GitHub, Linear, and the rest once you connect them. Telemetry is off by default, and nothing leaves the machine unless you turn it on and add
   a destination (`docs/telemetry.md`).
 - **Which platforms?** The desktop app: macOS and Windows. The terminal client and the standalone Node:
   wherever Node.js runs, Linux included.

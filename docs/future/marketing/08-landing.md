@@ -1,6 +1,98 @@
 # Phase 8: build the landing page
 
-Date: October 15, 2026. Status: proposed. Needs phases 1, 6, and 7.
+Date: October 15, 2026. Status: done. Needs phases 1, 6, and 7.
+
+## Completion note
+
+October 16, 2026. The landing page at `/` is written and built, in the 11 sections below, in
+`apps/site/src/pages/index.astro`. The root `LICENSE` file holds the MIT text, "Copyright (c) 2026
+James Macfie", and the root `package.json` says `"license": "MIT"`. The page and the footer link to
+that file, and every mention of the license says MIT.
+
+What landed:
+
+- The page. Every claim was checked against the internal docs and the code, and links to the docs
+  page that owns it. Its `meta` lists the docs it was written from, checked at `b8c018a90`.
+- Five specimens in `apps/site/specimens/landing/`: `task-rows`, `agent-turn`, and `ship` for the three
+  steps, `issues-pane` for the two clients, and `starter-pane`, the pane `npm create acorn-plugin`
+  scaffolds, beside its manifest entry.
+- `Specimen` takes `both`, which shows the desktop and terminal views side by side. `Snapshot` takes
+  `instance`, which renames a scene's ids so a page can show it twice. `Feature` takes `level={3}`.
+- `apps/site/src/install.ts` holds the install commands, for the landing page now and the download
+  page in phase 10. The wireframe's `_landing.ts` reads them from there.
+- A Playwright test that every link on the landing page goes to a page the build wrote.
+- Subset JetBrains Mono files, about 20 KB each, and a preload of the regular and bold faces on
+  marketing pages. [The site's design](../../site/design.md#fonts) has the command that makes them.
+
+The acceptance checks: Lighthouse 13.5 against the production build in `astro preview` scores 99 for
+performance on mobile and 100 for accessibility, the same in three runs, recorded in
+[the site's design](../../site/design.md#lighthouse). axe finds nothing on the page, best-practice rules
+included. The budget check passes with the snapshots: the page weighs 59.4 KB compressed, with 4.7 KB
+of script. A preview build passes all 222 Playwright tests, and a production build still writes 17
+pages and passes its tests. One acceptance line doesn't hold yet, which the deviations explain: most
+docs pages the page links to are drafts.
+
+### Decisions
+
+- **The eyebrow is "Claude Code and Codex".** Four words, saying what acorn runs. It's recorded in
+  [phase 1](./01-positioning.md#the-headline).
+- **The primary action is Get acorn**, to `/download/`, because there's no release. A `shortcut:`
+  comment marks it for phase 10.
+- **The install block is in the hero too**, under the line that names the clients, so section 10
+  repeats it, as the outline says.
+- **The tour's scenes.** Tasks shows the command palette over a task, Agents the hero scene, Review the
+  pull request, Desktop and terminal the 80 by 24 terminal, Task tools the Database pane, Plugins a
+  plugin's permissions, Nodes Fleet home, and the last tab the browser extension. The page shows
+  `hero` and `fleet` twice, and the second copy of each takes an `instance`. Each tab links to its
+  feature page. The last tab links to the browser extension's page, because one tab gets one link.
+- **New specimens for the steps.** The seed specimens are named for kit components, such as "Alert
+  in each tone", which say nothing beside "Run agents in it". The new ones draw the fixture's tasks,
+  an agent's steps, and a reviewed pull request with **Squash and merge** and **Archive task**, labels
+  the app uses.
+
+### Deviations
+
+- **Links to draft docs pages.** "Every docs page it links to exists and isn't a draft" can't hold until
+  phases 11 to 18 publish those pages. The links point where the docs will be, and the link test runs
+  on preview builds only, behind a `shortcut:` comment. In a production build those links 404 until then.
+- **The fonts are subsets**, not the full files phase 6 chose. On Lighthouse's simulated phone
+  connection the two 90 KB faces held up the first paint. The landing page scored 90, and a page with
+  almost no content scored 95. Inlining the stylesheets helped less than the fonts did, so the build
+  doesn't inline them. The subsets keep the box-drawing, block, and shape ranges the terminal pictures
+  need, and drop the programming ligatures, which the app doesn't draw.
+- **The specimens avoid three kit bugs** that phase 3 recorded: the split handle's missing value
+  attributes, muted row meta on a selected row, and a `Timeline` that puts cards straight into an `ol`.
+  Lighthouse can't leave a specimen out the way the gallery tests do, so `issues-pane` is a table,
+  `agent-turn` is cards in a stack, and no row is selected.
+- **Two FAQ facts in [voice](./voice.md#the-faq) were wider than the code**, and both are corrected
+  there. "acorn sends nothing anywhere" isn't true once you connect GitHub. "A harness never spends a
+  key acorn holds" is documented for a harness generate, not for agent sessions. The security card
+  says acorn never puts your GitHub token or API keys in an agent's environment, rather than that
+  agents never see your credentials, because on a standalone Node agents run as the Node's user and
+  can read its key file (`docs/node-distribution.md`).
+- **The standalone Node's commands include `node scripts/prune-runtime.mjs`**, which the wireframe's
+  copy left out and `docs/node-distribution.md` lists.
+- **The manifest entry includes `glyph` and `order`**, as the scaffold writes it.
+
+### What later phases need to know
+
+- Phase 9: the tour links to `/features/tasks/`, `agents`, `review`, `desktop-and-terminal`,
+  `task-tools`, `plugins`, `nodes`, and `browser`.
+- Phase 10: make the hero's primary action **Download** once a release exists. The download page can
+  import `installMethods` from `apps/site/src/install.ts`. The landing page's standalone tab assumes the
+  reader has the tarball, so the download page has to say where it comes from.
+- Phases 11 to 18: the landing page links to these docs pages, all drafts on this commit: `using/tasks-and-worktrees`,
+  `using/archive-and-restore`, `agents/agent-sessions`, `agents/model-providers-and-generating-text`,
+  `start/install`, `start/concepts`, `start/desktop-and-terminal`, `automation/the-command-line`,
+  `browser-extension/set-up-the-extension`, `nodes`, `nodes/run-a-standalone-node`,
+  `nodes/pair-a-device-or-a-remote-node`, the four `security/` pages, six `build-plugins/` guides, and
+  `build-plugins/start/have-your-agent-build-it`. Once they're published, remove the skip from the link
+  test in `apps/site/tests/site.spec.ts`.
+- Phase 18: the three kit bugs above still fail axe.
+- A character the site writes outside the font subset falls back to the next mono face. Add its range
+  with the command in [the site's design](../../site/design.md#fonts).
+- The design lab's landing page at `/lab/design/landing/` keeps the wireframe's draft copy.
+- Nothing here needs a deploy, so nothing is left for phase 20.
 
 ## Goal
 

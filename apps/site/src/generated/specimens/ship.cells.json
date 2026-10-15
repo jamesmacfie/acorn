@@ -1,0 +1,5 @@
+{"columns":60,"rows":3,"lines":[
+[{"text":"[checks passed]","fg":"ok"},{"text":" "},{"text":"[approved]","fg":"accent"}],
+[{"text":"[Squash and merge]","fg":"accent"},{"text":" [Archive task]"}],
+[]
+]}

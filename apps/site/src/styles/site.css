@@ -537,7 +537,7 @@ site-search button > kbd {
 .feature-text > * {
   margin: 0;
 }
-.feature h2 {
+.feature :is(h2, h3) {
   font-size: var(--site-fs-h2);
 }
 @media (min-width: 64rem) {

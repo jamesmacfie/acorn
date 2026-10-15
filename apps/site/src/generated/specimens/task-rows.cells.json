@@ -1,0 +1,5 @@
+{"columns":80,"rows":3,"lines":[
+[{"text":" ","fg":"accent"},{"text":" Retry failed webhooks                                   retry-failed-webhooks"}],
+[{"text":" ","fg":"accent"},{"text":" Add VAT to EU invoices                                             add-eu-vat"}],
+[{"text":" ","fg":"accent"},{"text":" Speed up the overdue invoices query       speed-up-the-overdue-invoices-query"}]
+]}

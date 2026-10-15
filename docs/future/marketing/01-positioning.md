@@ -26,8 +26,9 @@ The paragraph under it is the one in [voice](./voice.md#the-one-line-description
 > and the pull request in the panes beside them. Use it from the desktop app or from your terminal.
 > It's the same workspace either way.
 
-The eyebrow isn't chosen. [Phase 8](./08-landing.md) writes it: uppercase mono, under five words, saying
-who acorn is for or what it runs, to [voice](./voice.md). Record the result here.
+[Phase 8](./08-landing.md) wrote the eyebrow on October 16, 2026: **Claude Code and Codex**. It's four
+words and says what acorn runs, the two harnesses it manages, so a reader who uses either one sees
+themselves in it before the headline.
 
 ### No five-second test
 

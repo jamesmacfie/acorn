@@ -6,15 +6,18 @@ interface Props {
   title: string
   href: string
   link: string
+  /** The heading's level: 3 when the features sit under a section's own heading. */
+  level?: 2 | 3
 }
 
-const { number, title, href, link } = Astro.props
+const { number, title, href, link, level = 2 } = Astro.props
+const Heading = `h${level}` as const
 ---
 
 <section class="feature">
   <div class="feature-text">
     <p class="eyebrow">{String(number).padStart(2, '0')}</p>
-    <h2>{title}</h2>
+    <Heading>{title}</Heading>
     <slot />
     <a href={href}>{link}</a>
   </div>
