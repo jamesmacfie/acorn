@@ -98,6 +98,11 @@ way to what the sidebar last showed in the page's task, or its newest conversati
 the person opens from another task's row stays, with the banner, until they ask for the page's task.
 The panel reopens the last conversation only when the page doesn't belong to another task.
 
+**Agents** in the bottom bar carries the same marker as the desktop's Agent button, for the page's
+task: a turning loader while an agent works, and the alert glyph instead when one waits on the person.
+It counts as the [task chip](./handoffs.md#task-chips) does. The sidebar reads the task's conversations
+again on each hint that touches them, even under an open conversation, so the marker stays current.
+
 ## Home's task list
 
 Below **This page**, Home lists the open tasks of one workspace, grouped by project in the

@@ -10,6 +10,7 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import { RailTab } from '@acorn/client-core/features/tabs/RailTab.tsx'
+import { agentRailMarkers, type AgentRailState } from '@acorn/plugin-agents/contract/runtimeState.ts'
 import type { BrowserApi } from '../browser'
 import { HIDDEN_MARKERS_KEY, type PageHandoff } from '../handoffs'
 import { CallFailure, type CallError, type HostState, type RequestTarget } from '../messages'
@@ -60,6 +61,8 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   // The selected Node's plugin panels, and the plugins with one for the sidebar's task.
   const [panels, setPanels] = createSignal<BridgePanel[]>([])
   const [panelsShown, setPanelsShown] = createSignal<string[]>([])
+  // The agents of the task Agents shows, for the marker on its tab, as the desktop marks its Agent button.
+  const [agentState, setAgentState] = createSignal<AgentRailState>({ working: 0, attention: 0 })
   const [handoff, setHandoff] = createSignal<PageHandoff | null>(null)
   // Counts toolbar clicks, after which the active page may be readable where it wasn't.
   const [pageChecks, setPageChecks] = createSignal(0)
@@ -357,6 +360,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                   hasWorkflows={setHasWorkflows}
                   panels={panels()}
                   panelsShown={setPanelsShown}
+                  agentState={setAgentState}
                   resumed={() => !picked && setView('agents')}
                   heading={setAgentsHeading}
                   pageUrl={pageUrl()}
@@ -412,6 +416,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
               glyph={tab.glyph}
               label={tab.label}
               active={view() === tab.id}
+              markers={tab.id === 'agents' ? agentRailMarkers(agentState()) : undefined}
               aria-current={view() === tab.id ? 'page' : undefined}
               onClick={() => {
                 picked = true

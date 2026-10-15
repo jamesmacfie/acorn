@@ -1,6 +1,8 @@
 // How a managed session's runtime state looks: the same shape and colour on the desktop and in the
 // browser extension.
 
+import type { RailMarker } from '@acorn/plugin-api/client'
+
 type Tone = 'ok' | 'muted' | 'accent' | 'warn' | 'danger'
 
 /** A managed session's runtime state, as shown in the pane header, task sidebar, Agent Center, the
@@ -40,3 +42,36 @@ const RUNTIME_ICON: Record<string, string> = {
 }
 
 export const runtimeIcon = (state: string): string => RUNTIME_ICON[state] ?? 'circle-dashed'
+
+export type AgentRailState = { working: number; attention: number }
+
+/** The marker for one task's agent state, or nothing to say, on the desktop's rails and the extension's
+ *  Agents tab. Each counts its own sessions. Attention wins outright rather than taking a second corner:
+ *  one row, one answer to "what is this task's agent doing", and "it needs you" is the answer that
+ *  matters. */
+export function agentRailMarkers({ working, attention }: AgentRailState): RailMarker[] {
+  if (attention)
+    return [
+      {
+        id: 'attention',
+        label: `${attention} agent${attention > 1 ? 's' : ''} need${attention > 1 ? '' : 's'} you`,
+        // The same shape the pane header, the task sidebar and Agent Center give these two states
+        // (`runtimeIcon`), so a reader learns one vocabulary.
+        icon: runtimeIcon('waiting'),
+        tone: 'warn',
+        placements: ['top-end'],
+      },
+    ]
+  if (working)
+    return [
+      {
+        id: 'working',
+        label: `${working} agent${working > 1 ? 's' : ''} working`,
+        icon: runtimeIcon('working'),
+        tone: 'accent',
+        busy: true,
+        placements: ['top-end'],
+      },
+    ]
+  return []
+}

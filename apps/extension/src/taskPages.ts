@@ -1,4 +1,9 @@
-import type { BridgePageTask, BridgeTaskPage } from '@acorn/protocol/extensionBridge.ts'
+import type {
+  BridgeAgentSession,
+  BridgePageTask,
+  BridgePendingRequest,
+  BridgeTaskPage,
+} from '@acorn/protocol/extensionBridge.ts'
 import { siteMatches } from '@acorn/protocol/siteAssociations.ts'
 
 // Which tasks a page belongs to (docs/browser-extension/task-pages.md). The background keeps the selected
@@ -29,3 +34,17 @@ export const pageTasks = (tasks: readonly BridgePageTask[], url: string | undefi
 // the branch marker shows.
 export const appTask = (tasks: readonly BridgePageTask[], url: string | undefined): PageTask | null =>
   pageTasks(tasks, url).find(({ page }) => page.status) ?? null
+
+// How many of a task's agents wait on the person, and how many of the rest are working. A conversation
+// waits while the Node holds a request from it. The task chip and the sidebar's Agents tab count alike.
+export function agentCounts(
+  taskId: string,
+  sessions: readonly BridgeAgentSession[] | undefined,
+  requests: readonly BridgePendingRequest[],
+): { waiting: number; working: number } {
+  const waiting = new Set(requests.filter((request) => request.taskId === taskId).map((request) => request.sessionId))
+  const working = (sessions ?? []).filter(
+    (session) => session.runtimeState === 'working' && !waiting.has(session.id),
+  ).length
+  return { waiting: waiting.size, working }
+}

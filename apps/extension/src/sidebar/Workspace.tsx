@@ -14,11 +14,12 @@ import type {
   BridgeWorkspace,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserPanelView } from '@acorn/protocol/plugin/handoffs.ts'
+import type { AgentRailState } from '@acorn/plugin-agents/contract/runtimeState.ts'
 import type { BrowserApi } from '../browser'
 import { pageHandoffs, type PageHandoff } from '../handoffs'
 import { CallFailure, type RequestTarget } from '../messages'
 import { loadSiteChoices, pageScope, saveSiteChoices, type SiteChoices } from '../pageScope'
-import type { PageTask } from '../taskPages'
+import { agentCounts, type PageTask } from '../taskPages'
 import type { BridgeClient } from './bridgeClient'
 import { CaptureFailure, withCapture, type PageCapture } from '../capture'
 import { Conversation } from './Conversation'
@@ -72,6 +73,8 @@ export function Workspace(props: {
   // The Node's plugin panels, and which plugins have one for the task Agents shows.
   panels: readonly BridgePanel[]
   panelsShown(pluginIds: string[]): void
+  // How many of the task's agents are working, and how many need the person, for the Agents tab.
+  agentState(state: AgentRailState): void
   // The remembered conversation came back as the panel opened.
   resumed(): void
   heading(heading: Heading | null): void
@@ -295,12 +298,9 @@ export function Workspace(props: {
     remember()
   }
 
-  // Home skips list hints while a conversation is open, so it reads the list again on the way back.
   const back = () => {
     setCurrent((destination) => ({ ...destination, sessionId: null }))
     remember()
-    const shown = agentsTask().taskId
-    if (shown) void loadSessions(shown)
   }
 
   // A task's newest conversation opens, or Agents with its new-chat picker when it has none.
@@ -396,6 +396,14 @@ export function Workspace(props: {
   )
   createEffect(() => props.panelsShown(Object.keys(panelViews()).filter((pluginId) => panelViews()[pluginId] !== null)))
   onCleanup(() => props.panelsShown([]))
+  createEffect(() => {
+    const taskId = agentsTask().taskId
+    const { waiting, working } = taskId
+      ? agentCounts(taskId, sessionLists()[taskId], props.requests)
+      : { waiting: 0, working: 0 }
+    props.agentState({ working, attention: waiting })
+  })
+  onCleanup(() => props.agentState({ working: 0, attention: 0 }))
   // An open panel reads again when the Node's tasks change, which includes a plugin reporting a change.
   createEffect(on(() => props.tasks, reloadOpenPanel, { defer: true }))
   const step = () => {
@@ -600,7 +608,8 @@ export function Workspace(props: {
   })
 
   // Another client started, renamed, or finished a conversation in this task, an agent moved one on,
-  // or the Node dropped frames: read the list again. An open conversation reads its own hints.
+  // or the Node dropped frames: read the list again, even under an open conversation, because the
+  // Agents tab's marker counts from it. An open conversation also reads its own hints.
   createEffect(
     on(
       () => props.hint,
@@ -610,7 +619,7 @@ export function Workspace(props: {
         const listed = (id: string) => sessionLists()[taskId]?.some((session) => session.id === id)
         if (!hint.missed && !hint.tasks.includes(taskId) && !hint.sessions.some(listed)) return
         void loadRuns(taskId)
-        if (!current().sessionId) void loadSessions(taskId)
+        void loadSessions(taskId)
       },
       { defer: true },
     ),

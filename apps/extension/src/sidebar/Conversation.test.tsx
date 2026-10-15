@@ -572,6 +572,35 @@ describe('home', () => {
     expect(subject.fake.storage.get('destination:n1')).toEqual({ projectId: 'p1', taskId: 't1', sessionId: null })
   })
 
+  it("marks the Agents tab with the task's working agents, or the ones waiting, under an open conversation too", async () => {
+    const subject = mount()
+    const marker = () =>
+      subject.root.querySelector('nav.rail button[aria-label="Agents"] .sr-only')?.textContent ?? null
+    subject.state.sessions[1]!.runtimeState = 'working'
+    await settle()
+    await rememberTask(subject.root, subject.fake.storage, 'p1', 't1')
+    expect(marker()).toBe('1 agent working')
+
+    await openChat(subject.root, 'Chat s1')
+    subject.state.sessions[1]!.runtimeState = 'ready'
+    subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s2'], tasks: [], missed: false })
+    await settle(20)
+    expect(marker()).toBeNull()
+
+    subject.state.agentRequests.push(permission())
+    subject.state.host!.send({
+      v: 1,
+      event: 'agent',
+      nodeId: 'n1',
+      sessions: ['s1'],
+      tasks: [],
+      missed: false,
+      requests: true,
+    })
+    await settle(20)
+    expect(marker()).toBe('1 agent needs you')
+  })
+
   it('groups the conversations into managed sessions, workflow runs, and inline chats', async () => {
     const subject = mount()
     subject.state.sessions.push(session('s3', { kind: 'workflow' }), session('s4', { inline: true }))

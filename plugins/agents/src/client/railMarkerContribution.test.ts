@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { agentRailMarkerContribution, agentRailMarkers } from './railMarkerContribution'
+import { agentRailMarkers } from '../contract/runtimeState.ts'
+import { agentRailMarkerContribution } from './railMarkerContribution'
 
 describe('agentRailMarkers', () => {
   it('says nothing about a task with no agents in it', () => {

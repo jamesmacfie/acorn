@@ -10,25 +10,21 @@ import type {
 import { itemTaskLink } from '../acornLinks'
 import type { AppMarker, ChipTask } from '../handoffs'
 import type { BackgroundMessage, BridgeCall } from '../messages'
-import type { PageTask } from '../taskPages'
+import { agentCounts, type PageTask } from '../taskPages'
 
 // What the chip on a page shows for its task: the name, a link to it, and how many agents wait on the
-// person or, when none does, how many are working. A conversation is waiting while the Node holds a
-// request from it, as the sidebar counts it.
+// person or, when none does, how many are working.
 export function chipTask(
   nodeId: string,
   { task, page }: PageTask,
   sessions: readonly BridgeAgentSession[] | undefined,
   requests: readonly BridgePendingRequest[],
 ): ChipTask {
-  const waiting = new Set(requests.filter((request) => request.taskId === task.id).map((request) => request.sessionId))
-  const working = (sessions ?? []).filter(
-    (session) => session.runtimeState === 'working' && !waiting.has(session.id),
-  ).length
+  const { waiting, working } = agentCounts(task.id, sessions, requests)
   return {
     title: task.title,
-    state: waiting.size
-      ? { label: `${waiting.size} waiting`, tone: 'warn' }
+    state: waiting
+      ? { label: `${waiting} waiting`, tone: 'warn' }
       : working
         ? { label: `${working} working`, tone: 'ok' }
         : null,
