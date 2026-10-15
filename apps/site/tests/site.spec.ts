@@ -41,7 +41,7 @@ const featureRoutes = routes.filter((route) => route.startsWith('/features/'))
 // renamed page fails here.
 // shortcut: preview builds only, because most of those docs pages are drafts until their phases publish
 // them; run it on both builds once they're published (docs/future/marketing/08-landing.md).
-for (const route of ['/', ...featureRoutes]) {
+for (const route of ['/', '/download/', ...featureRoutes]) {
   test(`every link on ${route} goes to a page the build wrote`, async ({ page }) => {
     test.skip(!previewBuild, 'The docs pages these pages link to are drafts, which only a preview build has.')
     await page.goto(route)
@@ -61,9 +61,78 @@ test('an unknown address offers the docs home and the search box', async ({ page
   await expect(page.getByRole('button', { name: 'Search' })).toBeVisible()
 })
 
+// The download page with the fixture releases in apps/site/src/lib/releaseFixtures.ts, because GitHub has none.
+test('with no release, the download page says so and puts Build from source first', async ({ page }) => {
+  test.skip(!previewBuild, 'The fixture releases are lab pages, which only a preview build has.')
+  await page.goto('/lab/download/none/')
+  await expect(page.locator('main > .callout').first()).toContainText('acorn has no signed release.')
+  await expect(page.locator('main h2').first()).toHaveText('Build from source')
+  await expect(page.locator('main a[href*="/releases/download/"]')).toHaveCount(0)
+})
+
+test('with a release for every platform, the download page links every file', async ({ page }) => {
+  test.skip(!previewBuild, 'The fixture releases are lab pages, which only a preview build has.')
+  await page.goto('/lab/download/every-platform/')
+  const files = {
+    'macOS, Apple silicon': 'acorn_1.0.0_aarch64.dmg',
+    'macOS, Intel': 'acorn_1.0.0_x64.dmg',
+    'Windows installer': 'acorn_1.0.0_x64-setup.exe',
+    'Standalone Node': 'acorn-node-1.0.0.tar.gz',
+    Checksums: 'SHA256SUMS',
+  }
+  for (const [name, file] of Object.entries(files)) {
+    await expect(page.getByRole('link', { name, exact: true })).toHaveAttribute('href', new RegExp(`/${file}$`))
+  }
+  await expect(page.getByText('acorn has no signed release.')).toHaveCount(0)
+  const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+  expect(violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([])
+})
+
+test("the download page puts the visitor's platform first", async ({ page }) => {
+  test.skip(!previewBuild, 'The fixture releases are lab pages, which only a preview build has.')
+  const headings = page.locator('main h2')
+  await page.goto('/lab/download/every-platform/')
+  const defaultOrder = await headings.allTextContents()
+  await page.addInitScript(() =>
+    Object.defineProperty(Navigator.prototype, 'userAgentData', { get: () => ({ platform: 'Linux' }) }),
+  )
+  await page.goto('/lab/download/every-platform/')
+  expect(await headings.allTextContents()).toEqual([
+    'Terminal client and command line',
+    'Standalone Node',
+    'Build from source',
+    'Desktop app',
+    'Browser extension',
+  ])
+  expect(defaultOrder).not.toEqual(await headings.allTextContents())
+})
+
+test('the changelog feed has an item for every entry on the page', async ({ page, request }) => {
+  const feed = await (await request.get('/changelog/rss.xml')).text()
+  await page.goto('/changelog/')
+  const anchors = await page.locator('article[id]').evaluateAll((entries) => entries.map((entry) => entry.id))
+  expect(anchors.length).toBeGreaterThan(0)
+  expect([...feed.matchAll(/<guid[^>]*>[^<]*#([^<]+)<\/guid>/g)].map((match) => match[1])).toEqual(anchors)
+})
+
+// The star count shows from 100 stars (docs/future/marketing/README.md, owner decision 4).
+test('the star button hides the count at 99 stars', async ({ page }) => {
+  test.skip(!previewBuild, 'The design gallery is a lab page, which only a preview build has.')
+  await page.goto('/lab/design/')
+  await expect(page.getByTestId('stars').getByRole('link').nth(0)).toHaveAccessibleName('Star on GitHub')
+})
+
+test('the star button shows the count from 100 stars', async ({ page }) => {
+  test.skip(!previewBuild, 'The design gallery is a lab page, which only a preview build has.')
+  await page.goto('/lab/design/')
+  const links = page.getByTestId('stars').getByRole('link')
+  await expect(links.nth(1)).toHaveAccessibleName('Star on GitHub 100 stars')
+  await expect(links.nth(2)).toHaveAccessibleName('Star on GitHub 1.2k stars')
+})
+
 // One page of each template, a marketing page, a docs page, and Starlight's splash page, and every
 // feature page, because each draws its own pictures.
-for (const route of ['/', '/docs/', '/no-such-page/', ...featureRoutes]) {
+for (const route of ['/', '/docs/', '/no-such-page/', '/download/', '/changelog/', ...featureRoutes]) {
   test(`${route} has no serious accessibility violations`, async ({ page }) => {
     await page.goto(route)
     const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()

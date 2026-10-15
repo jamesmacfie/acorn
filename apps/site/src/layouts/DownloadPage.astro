@@ -1,0 +1,216 @@
+---
+// The download page for a release, or for none. A section per way of getting acorn, each tagged with
+// the platforms it serves, so the script below can move the visitor's ahead of the rest. With no
+// release, Build from source comes first, because it's the one way that works.
+import BuildFromSource from '../components/BuildFromSource.astro'
+import InstallBlock from '../components/InstallBlock.astro'
+import { installMethods } from '../install'
+import type { Release } from '../lib/github'
+import { sortAssets } from '../lib/releaseAssets'
+import type { PageMeta } from '../meta'
+import { GITHUB } from '../nav'
+import Marketing from './Marketing.astro'
+
+interface Props {
+  meta: PageMeta
+  release: Release | null
+}
+
+const { meta, release } = Astro.props
+const downloads = sortAssets(release?.assets ?? [])
+const desktop = [
+  { asset: downloads.macosArm64, label: 'macOS, Apple silicon', platform: 'macos' },
+  { asset: downloads.macosX64, label: 'macOS, Intel', platform: 'macos' },
+  { asset: downloads.windows, label: 'Windows installer', platform: 'windows' },
+].filter((download) => download.asset)
+const NO_RELEASE = 'acorn has no signed release. Build from source, or watch the repository for the first release.'
+const releases = `${GITHUB}/releases`
+const released = release && new Date(release.publishedAt).toLocaleDateString('en-US', { dateStyle: 'long', timeZone: 'UTC' })
+---
+
+<Marketing title="Download acorn" meta={meta}>
+  {
+    release ? (
+      <p>
+        <a href={release.url}>acorn {release.tag}</a>, released on {released}. <a href="/changelog/">See what changed</a>.
+      </p>
+    ) : (
+      <p class="callout">
+        {NO_RELEASE} <a href={releases}>Releases on GitHub</a>
+      </p>
+    )
+  }
+
+  <div data-platform-order>
+    {!release && <BuildFromSource />}
+
+    <section class="section" data-platforms="macos windows">
+      <h2>Desktop app</h2>
+      <p>
+        For macOS 12 or later, and Windows on x64. acorn needs Git on your <code>PATH</code>. To run agents, install
+        Claude Code or Codex: acorn runs them with their own logins and downloads neither.
+      </p>
+      {
+        desktop.length > 0 ? (
+          <Fragment>
+            <ul class="actions" data-platform-order>
+              {desktop.map(({ asset, label, platform }) => (
+                <li data-platforms={platform}>
+                  <a class="button" data-variant="primary" href={asset!.url}>
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            {/* shortcut: the desktop build is signed ad hoc, so every release needs these steps; drop them once
+                the bundle plan's Developer ID signing ships (docs/shell/packaging.md, signing gates). */}
+            <p>
+              Apple hasn't notarized this build, because it's signed without an Apple Developer ID, so macOS won't open
+              it with a double-click. Drag acorn to Applications. On macOS 14 or earlier, Control-click it,
+              choose <b>Open</b>, then <b>Open</b> again. On macOS 15 or later, open it once, then click <b>Open Anyway</b> in
+              System Settings, under Privacy &amp; Security.
+            </p>
+            <p>
+              The Windows installer isn't signed either, so Windows may stop it. Click <b>More info</b>,
+              then <b>Run anyway</b>. It installs for your user only, and downloads Microsoft's WebView2 if it's missing.
+            </p>
+            <p>
+              On first run, acorn starts a Node on your machine and opens a short setup that adds your first project.
+            </p>
+          </Fragment>
+        ) : (
+          <p class="callout">
+            {release
+              ? `${release.tag} has no desktop app. Build it from source.`
+              : NO_RELEASE}
+          </p>
+        )
+      }
+    </section>
+
+    <section class="section" data-platforms="macos windows linux">
+      <h2>Terminal client and command line</h2>
+      <p>
+        <code>acorn</code> with no arguments opens the terminal client. With a command, such
+        as <code>acorn task list</code>, it works on a paired Node from your shell or a script.
+      </p>
+      {
+        downloads.windows || downloads.macosArm64 || downloads.macosX64 ? (
+          <p>
+            In the desktop app, <b>Settings → Command line</b> puts <code>acorn</code> on your <code>PATH</code>. That copy
+            runs commands only, not the terminal client.
+          </p>
+        ) : null
+      }
+      {
+        downloads.node ? (
+          <p>
+            The standalone Node below holds both. Once it's unpacked, run <code>node bin/acorn.mjs</code> in its folder.
+          </p>
+        ) : (
+          <Fragment>
+            <p class="callout">
+              {release
+                ? `${release.tag} has no standalone Node. Build the terminal client from source.`
+                : NO_RELEASE}
+            </p>
+            <p>In a checkout, build both and run them:</p>
+            <InstallBlock
+              id="terminal"
+              methods={[
+                {
+                  label: 'From a checkout',
+                  commands: [
+                    'pnpm --filter @acorn/cli build',
+                    'pnpm --filter @acorn/tui build',
+                    'node apps/cli/bin/acorn.mjs',
+                  ],
+                },
+              ]}
+            />
+          </Fragment>
+        )
+      }
+    </section>
+
+    <section class="section" data-platforms="macos windows linux">
+      <h2>Standalone Node</h2>
+      <p>
+        Run a Node on a server, or any machine without the desktop app, and pair the desktop app, the terminal client, or
+        the command line with it. It needs Node 22.23.2, 24.18.1, or 26.5.1 or later in its branch. On Linux, its one
+        native module compiles when you install, so the machine needs the usual build tools. To run agents there, install
+        Claude Code or Codex on that machine.
+      </p>
+      {
+        downloads.node ? (
+          <ul class="actions">
+            <li>
+              <a class="button" data-variant="primary" href={downloads.node.url}>
+                Standalone Node
+              </a>
+            </li>
+            {downloads.checksums && (
+              <li>
+                <a class="button" href={downloads.checksums.url}>
+                  Checksums
+                </a>
+              </li>
+            )}
+          </ul>
+        ) : (
+          <Fragment>
+            <p class="callout">
+              {release
+                ? `${release.tag} has no standalone Node. Build it from source.`
+                : NO_RELEASE}
+            </p>
+            <p>
+              In a checkout, <code>pnpm pack:node</code> builds
+              it as <code>apps/node/release/acorn-node-&lt;version&gt;.tar.gz</code>.
+            </p>
+          </Fragment>
+        )
+      }
+      <p>Unpack it, install its dependencies, and start it:</p>
+      <InstallBlock id="standalone" methods={[installMethods[1]]} />
+      <p>
+        It prints a pairing code and six words when it starts. Pair a client with the code, once you've checked that the
+        words match the ones the client shows. <a href="/docs/nodes/run-a-standalone-node/">Run a standalone Node</a>
+      </p>
+    </section>
+
+    <section class="section" data-platforms="macos">
+      <h2>Browser extension</h2>
+      <p>
+        For Chrome 116 or later and Firefox 128 or later, on macOS. It isn't in a browser store, so you build it from a
+        checkout and load it, then install its native bridge so it can reach your Node.
+      </p>
+      <InstallBlock
+        id="extension"
+        methods={[
+          {
+            label: 'From a checkout',
+            commands: [
+              'pnpm --filter @acorn/extension build',
+              'pnpm --filter @acorn/cli build',
+              'node apps/cli/bin/acorn.mjs browser install',
+            ],
+          },
+        ]}
+      />
+      <p>
+        In Chrome, open <code>chrome://extensions</code>, turn on <b>Developer mode</b>, click <b>Load unpacked</b>, and
+        choose <code>apps/extension/dist/chrome</code>. In Firefox, open <code>about:debugging#/runtime/this-firefox</code>,
+        click <b>Load Temporary Add-on</b>, and choose <code>apps/extension/dist/firefox/manifest.json</code>. Firefox
+        removes it when it quits, so load it again after each restart. Then open the panel and pair it with your Node.
+      </p>
+      <p><a href="/docs/browser-extension/set-up-the-extension/">Set up the extension</a></p>
+    </section>
+
+    {release && <BuildFromSource />}
+  </div>
+</Marketing>
+
+<script>
+  import '../scripts/platform'
+</script>

@@ -1,6 +1,102 @@
 # Phase 10: build the download page, the changelog, and the star count
 
-Date: October 15, 2026. Status: proposed. Needs phase 6.
+Date: October 15, 2026. Status: done. Needs phase 6.
+
+## Completion note
+
+October 16, 2026. `/download/` and `/changelog/` are written and built. The changelog has an RSS feed
+at `/changelog/rss.xml`. The header and the footer show **Star on GitHub**. A build reads the star count
+and the newest release from GitHub, and falls back to a committed copy.
+[Releases and the changelog](../../site/releases.md) is the reference.
+
+What landed:
+
+- `apps/site/src/lib/github.ts` asks GitHub for the repository and its releases, using
+  `GITHUB_TOKEN` when it's set. Every page shares one answer. When GitHub doesn't answer, or
+  `SITE_OFFLINE=1` is set, the build uses `apps/site/src/data/github.json` and prints a warning.
+  `pnpm --filter @acorn/site github:refresh` rewrites the copy. On October 16, 2026, it holds 6 stars
+  and no release.
+- `apps/site/src/lib/releaseAssets.ts` holds the file name patterns, and `releaseFixtures.ts` holds
+  three releases: none, macOS only, and every platform. `releaseAssets.test.ts` runs under `node --test`
+  in the site's `test` script.
+- The download page is a layout, `apps/site/src/layouts/DownloadPage.astro`, so `/lab/download/<fixture>/`
+  can draw it with each fixture release. `src/scripts/platform.ts` moves the visitor's platform first.
+- `apps/site/src/data/changelog.ts` holds three entries, checked by Zod when the site builds. The
+  changelog page and the feed endpoint both read it.
+- `GitHubStars.astro` shows its count from `SHOW_COUNT_FROM = 100`, formatted like `1.2k`. The design
+  gallery shows it at 99, 100, and 1,234 stars.
+- `site.yml` rebuilds and deploys production once a day and on each published release. It always
+  builds `main`, and it passes the workflow's token to the build.
+- `docs/site/releases.md` is new. `docs/site.md` and `docs/site/design.md` point to it and list the new
+  components.
+
+The acceptance checks: the release asset test passes for all three fixtures. On a preview build,
+Playwright checks the no-release fixture, the every-platform fixture, the Linux order, and the star
+count at 99 and 100. A preview build passes all 256 Playwright tests. A production build passes its
+38, with 24 skipped because they need lab pages. `SITE_OFFLINE=1` builds. The W3C feed validator
+calls the feed valid, with one warning that the self link doesn't match, which only happens because
+the feed was pasted in rather than fetched from `acorn.sh`. axe finds nothing serious on `/download/`,
+`/changelog/`, or the every-platform fixture. The budget check passes. The download page's HTML is
+4.1 KB compressed, with 2.4 KB of script, and the changelog's HTML is 3.9 KB. Neither page scrolls
+sideways at 375 pixels.
+
+### Decisions
+
+- **Newest first, one entry per day.** An entry's anchor is its date, so the schema refuses entries out
+  of order or on the same day. Phase 21 replaces the file, so a separate ID field isn't worth having.
+- **The seed entries are merged by day.** October 12 holds both plugin API removals. October 2 holds
+  the memory library, the import, and the move to Markdown files. Release notes give the `acorn-1`
+  baseline no date, so its entry uses September 24, 2026, the date of commit `b147a5d35`, which
+  established it.
+- **With no release, sections 2 and 3 also give the from-checkout steps** under the no-release line:
+  build the command line and the terminal client, and `pnpm pack:node`. Owner decision 7 offers
+  building from source and the tarball first, and phase 8 asked for the tarball's origin.
+- **The notarization steps show for every release**, behind a `shortcut:` comment. The API can't say
+  whether a build is notarized, and the desktop build is signed ad hoc.
+- **The steps for opening the app cover two macOS versions.** `docs/shell/packaging.md` says to use
+  Gatekeeper's right-click **Open**. macOS 15 removed that, so the page also gives **Open Anyway** in
+  System Settings. Whoever owns `packaging.md` should update that line.
+- **The newest release counts prereleases**, as this file asks: it's the newest one that isn't a draft.
+- **The star button reads Star on GitHub**, not phase 6's **Star**. Between 50rem and 72rem it shrinks
+  to its icon and the count, as phase 6's button did.
+- **The footer shows the newest release's tag**, or nothing when there's none. The source version is
+  gone, along with its `shortcut:` comment.
+- **The primary action on the landing page and the feature pages reads Download once a release
+  exists**, and **Get acorn** until then. Both `shortcut:` comments are gone.
+
+### Deviations
+
+- **The changelog's `sources` sit on the page's `meta`, not in the data file.** `stale.mjs` reads
+  docs pages, marketing pages, and snapshots, so a citation in the data file would never reach the
+  report. `/changelog/` cites `docs/release-notes.md`, which flags the same change.
+- **The star count tests are Playwright tests on the design gallery**, not unit tests. The count lives
+  in an Astro component, and the site has no runner for components outside a build.
+- **The tarball commands were wrong.** `scripts/pack-node.mjs` writes `acorn-node-<version>.tar.gz`, which
+  unpacks into `acorn-node/`. `apps/site/src/install.ts` and `docs/node-distribution.md` said
+  `acorn-node-*.tgz` and `cd acorn-node-*`. Both are fixed, so the landing page's standalone tab changed
+  too.
+- **The install block's commands are focusable**, so a keyboard can scroll a command wider than the
+  block. axe flagged it on the download page.
+- **The changelog isn't in the link check.** Its only internal link is the feed, which isn't a page,
+  and the feed test covers it.
+
+### What later phases need to know
+
+- Phase 20: confirm that the daily and release runs of `site.yml` build `main` and deploy. They need
+  the Cloudflare secrets, and nothing has run.
+- Phase 20: refresh `apps/site/src/data/github.json` before launch.
+- Phase 21: `apps/site/src/data/changelog.ts` is the file to replace. The page and the feed read only
+  `changelog`, `textToHtml`, and `escapeHtml` from it.
+- Phases 11 and 14: the download page links to `/docs/nodes/run-a-standalone-node/` and
+  `/docs/browser-extension/set-up-the-extension/`, both drafts on this commit. The link test covers
+  `/download/` on preview builds only.
+- When the bundle plan settles release file names, update the patterns in `releaseAssets.ts` and the
+  fixtures in `releaseFixtures.ts` together.
+- In `.astro` markup, a line break right before an inline tag such as `<code>` or `<b>` drops the space
+  before it. Break the line between two words instead.
+- The architecture checks fail on this base as earlier phases recorded, and the format check still fails
+  on `packages/protocol/src/plugin/handoffs.ts` and `apps/site/src/features.ts`. None of the failures
+  come from this change.
 
 ## Goal
 

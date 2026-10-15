@@ -31,13 +31,15 @@ and `apps/site/src/content.config.ts` publishes drafts with a banner in a previe
 
 Every build runs `starlight-links-validator`, so a broken link between pages fails the build.
 
+A build reads GitHub too, and the changelog reads a data file: see [releases](./site/releases.md).
+
 ## Check it
 
 | Command | What it checks |
 | --- | --- |
 | `pnpm --filter @acorn/site lint` | `astro check`: types in the `.astro` pages, the content config, and the tests. Then `tsc` on the specimens, which use Solid's JSX. Root `pnpm lint` runs it too. |
 | `pnpm --filter @acorn/site specimens` | Regenerates every [specimen](./site/specimens.md) on both hosts and fails when a committed file differs. |
-| `pnpm --filter @acorn/site test` | The script tests, the budget check, then the Playwright tests. Run a build first. |
+| `pnpm --filter @acorn/site test` | The script tests, the release asset tests in `src/lib/`, the budget check, then the Playwright tests. Run a build first. |
 | `pnpm --filter @acorn/site snapshots` | Recaptures the [shell snapshots](#shell-snapshots) from the running apps. It checks nothing, so nothing in CI runs it. |
 
 The budget check, `apps/site/scripts/budget.mjs`, reads `dist`. For each page it adds up the Brotli-compressed
@@ -53,10 +55,11 @@ anything from another origin:
 
 The Playwright tests in `apps/site/tests/` load every page the build wrote and fail on a console error. They run
 axe on the landing page, the docs home, and the 404 page, one page for each template, and on every
-feature page, and check that drafts and `/lab/` appear only in a preview build. On a preview build, they
+feature page, the download page, and the changelog, and check that drafts and `/lab/` appear only in a
+preview build. On a preview build, they
 also check that the specimen gallery draws the site's header, sidebar, and text exactly as `/docs/` does,
 and run axe on the frames around its specimens and around the shell snapshots, and check that every
-link on the landing page and the feature pages goes to a page the build wrote. That link check runs on a
+link on the landing page, the feature pages, and the download page goes to a page the build wrote. That link check runs on a
 preview build only, because most of the docs pages those pages link to are drafts. They use the Chrome installed on the machine, so install Chrome
 before you run them. `ACORN_SITE_PREVIEW` must match the build you're testing.
 
@@ -145,7 +148,7 @@ type-checks the site, then builds and tests the production build and the preview
 - On a pull request, it uploads the preview build as a Worker version with the alias `pr-<number>`,
   and writes the preview URL to the job summary. Preview responses carry `X-Robots-Tag: noindex`. A
   pull request from a fork gets no preview, because it gets no secrets.
-- On a push to `main`, it deploys the production build.
+- On a push to `main`, once a day, and on each published release, it deploys the production build.
 
 The workflow needs two repository secrets:
 

@@ -5,6 +5,7 @@
 import Card from '../components/Card.astro'
 import Hero from '../components/Hero.astro'
 import { FEATURES, type FeatureId } from '../features'
+import { readGithub } from '../lib/github'
 import type { PageMeta } from '../meta'
 import Marketing from './Marketing.astro'
 
@@ -12,12 +13,14 @@ interface Props {
   feature: FeatureId
   meta: PageMeta
   related: FeatureId[]
-  /** The docs page a reader starts from, offered beside Get acorn. */
+  /** The docs page a reader starts from, offered beside the download page. */
   docs: { href: string; label: string }
 }
 
 const { feature, meta, related, docs } = Astro.props
 const { title, sentence } = FEATURES[feature]
+// Until there's a release to download, the download page offers ways to build acorn.
+const getAcorn = (await readGithub()).release ? 'Download' : 'Get acorn'
 ---
 
 <Marketing title={title} meta={meta}>
@@ -51,8 +54,7 @@ const { title, sentence } = FEATURES[feature]
   <section class="section">
     <h2>Get started</h2>
     <div class="actions">
-      {/* shortcut: there's no release, so this is Get acorn, as on the landing page; make it Download once one exists. */}
-      <a class="button" data-variant="primary" href="/download/">Get acorn</a>
+      <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
       <a class="button" href={docs.href}>{docs.label}</a>
     </div>
   </section>

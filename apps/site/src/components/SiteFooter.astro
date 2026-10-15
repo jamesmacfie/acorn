@@ -1,10 +1,12 @@
 ---
-// The site footer: the sitemap in four columns, the license, and the version.
-// shortcut: the version is the one the source builds, from the desktop app's package.json, because
-// no release exists to read; read the newest GitHub release once acorn publishes one.
-import desktop from '../../../desktop/package.json'
+// The site footer: the sitemap in four columns, the license, the newest release once there is one, and
+// the star button.
+import { readGithub } from '../lib/github'
+import GitHubStars from './GitHubStars.astro'
 import Mark from './Mark.astro'
 import { footerColumns, GITHUB } from '../nav'
+
+const { release } = await readGithub()
 ---
 
 <div class="site-footer">
@@ -27,6 +29,7 @@ import { footerColumns, GITHUB } from '../nav'
   <div class="site-footer-line">
     <Mark />
     <a href={`${GITHUB}/blob/main/LICENSE`}>MIT license</a>
-    <a href="/changelog/">Version {desktop.version}</a>
+    {release && <a href="/changelog/">{release.tag}</a>}
+    <GitHubStars />
   </div>
 </div>

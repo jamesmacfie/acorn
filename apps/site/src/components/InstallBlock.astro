@@ -26,7 +26,8 @@ const panels = methods.map((method, index) => ({ ...method, panel: `${id}-${inde
   {
     panels.map((method) => (
       <div class="install-panel" id={method.panel} role="tabpanel" aria-label={method.label}>
-        <pre><code id={method.code}>{method.commands.map((command, line) => <Fragment>{line > 0 && '\n'}<span>{command}</span></Fragment>)}</code></pre>
+        {/* Focusable, so a keyboard can scroll a command wider than the block. */}
+        <pre tabindex="0"><code id={method.code}>{method.commands.map((command, line) => <Fragment>{line > 0 && '\n'}<span>{command}</span></Fragment>)}</code></pre>
         <button type="button" class="button" data-copy={method.code} aria-live="polite" hidden>
           Copy
         </button>

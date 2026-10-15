@@ -11,7 +11,8 @@
     "specimens": "vitest run && pnpm --filter @acorn/tui exec vitest run src/kit/specimens.test.tsx",
     "snapshots": "node scripts/capture-shell.mjs",
     "stale": "node scripts/stale.mjs",
-    "test": "node --test scripts/*.test.mjs && node scripts/budget.mjs && playwright test"
+    "test": "node --test scripts/*.test.mjs src/lib/*.test.ts && node scripts/budget.mjs && playwright test",
+    "github:refresh": "node scripts/githubRefresh.ts"
   },
   "dependencies": {
     "@acorn/client-core": "workspace:*",

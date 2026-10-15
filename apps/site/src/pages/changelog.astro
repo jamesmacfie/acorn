@@ -1,14 +1,56 @@
 ---
+// The changelog: every entry in src/data/changelog.ts on one page, newest first, each with an anchor.
+// An entry that changes the plugin API carries a callout for plugin authors.
+import Badge from '../components/Badge.astro'
+import { changelog, textToHtml } from '../data/changelog'
 import Marketing from '../layouts/Marketing.astro'
 import type { PageMeta } from '../meta'
 
 export const meta = {
   description: 'What changed in acorn, newest first.',
   sources: ['docs/release-notes.md'],
-  checked: '1e0ef8b80',
+  checked: 'fe19d3086',
 } satisfies PageMeta
+
+const KINDS = {
+  added: { label: 'Added', tone: 'ok' },
+  changed: { label: 'Changed', tone: 'accent' },
+  fixed: { label: 'Fixed', tone: 'neutral' },
+  removed: { label: 'Removed', tone: 'warn' },
+} as const
+
+const longDate = (date: string) =>
+  new Date(`${date}T00:00:00Z`).toLocaleDateString('en-US', { dateStyle: 'long', timeZone: 'UTC' })
 ---
 
 <Marketing title="Changelog" meta={meta}>
-  <p>What changed, newest first, with an RSS feed. Not written yet.</p>
+  <p>What changed in acorn, newest first. <a href="/changelog/rss.xml">Follow the RSS feed</a></p>
+  {
+    changelog.map((entry) => (
+      <article class="section" id={entry.date}>
+        <p class="eyebrow">
+          <a href={`#${entry.date}`}>
+            <time datetime={entry.date}>{longDate(entry.date)}</time>
+          </a>
+          {entry.version && ` · ${entry.version}`}
+        </p>
+        <h2>{entry.title}</h2>
+        <p set:html={textToHtml(entry.summary)} />
+        <ul class="changelog-changes">
+          {entry.changes.map((change) => (
+            <li>
+              <Badge tone={KINDS[change.kind].tone}>{KINDS[change.kind].label}</Badge>{' '}
+              <span set:html={textToHtml(change.text)} />
+            </li>
+          ))}
+        </ul>
+        {entry.plugins && (
+          <aside class="callout" aria-label="Plugin authors">
+            <p class="eyebrow">Plugin authors</p>
+            <p set:html={textToHtml(entry.plugins)} />
+          </aside>
+        )}
+      </article>
+    ))
+  }
 </Marketing>

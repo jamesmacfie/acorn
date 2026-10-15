@@ -4,8 +4,8 @@
 // Starlight's sidebar menu there instead, which carries the same links (Sidebar.astro), so it passes
 // `menu={false}`.
 import Search from '@astrojs/starlight/components/Search.astro'
-import { Icon } from '@astrojs/starlight/components'
 import Appearance from './Appearance.astro'
+import GitHubStars from './GitHubStars.astro'
 import Mark from './Mark.astro'
 import { GITHUB, headerLinks, sectionOf } from '../nav'
 
@@ -26,11 +26,7 @@ const links = headerLinks.map((link) => ({ ...link, current: link.id === current
   <Search />
   <div class="site-header-tools">
     <Appearance id="appearance-header" />
-    <a class="button" href={GITHUB}>
-      <Icon name="github" />
-      <span class="sr-only">Star acorn on GitHub</span>
-      <span aria-hidden="true">Star</span>
-    </a>
+    <GitHubStars />
   </div>
   {
     menu && (

@@ -11,6 +11,7 @@ import Specimen from '../components/Specimen.astro'
 import Tour from '../components/Tour.astro'
 import Marketing from '../layouts/Marketing.astro'
 import { installMethods } from '../install'
+import { readGithub } from '../lib/github'
 import type { PageMeta } from '../meta'
 import { GITHUB } from '../nav'
 import type { SnapshotId } from '../snapshots'
@@ -204,6 +205,9 @@ const faq = [
     link: 'Pair a device or a remote Node',
   },
 ]
+
+// Until there's a release to download, the download page offers ways to build acorn.
+const getAcorn = (await readGithub()).release ? 'Download' : 'Get acorn'
 ---
 
 <Marketing title="acorn" meta={meta}>
@@ -214,8 +218,7 @@ const faq = [
       way.
     </p>
     <Fragment slot="actions">
-      {/* shortcut: there's no release, so this is Get acorn; phase 10 reads releases, and this becomes Download once one exists. */}
-      <a class="button" data-variant="primary" href="/download/">Get acorn</a>
+      <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
       <a class="button" href="/docs/">Read the docs</a>
     </Fragment>
     <div slot="picture" class="hero-stack">
@@ -338,7 +341,7 @@ const faq = [
     <h2>Get acorn</h2>
     <InstallBlock id="footer-install" methods={installMethods} />
     <div class="actions">
-      <a class="button" data-variant="primary" href="/download/">Get acorn</a>
+      <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
       <a class="button" href="/docs/">Read the docs</a>
     </div>
   </section>

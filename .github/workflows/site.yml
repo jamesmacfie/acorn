@@ -2,7 +2,9 @@ name: Site
 
 # The public site in apps/site: its checks, a preview deploy for each pull request, and the production
 # deploy from main. It runs when the site changes or when something it reads from does, so a kit or
-# contract change outside the site still runs the site's checks (docs/site.md).
+# contract change outside the site still runs the site's checks (docs/site.md). It also rebuilds
+# production once a day and on every published release, because the build reads the star count and the
+# newest release from GitHub.
 on:
   pull_request:
     paths: &site-inputs
@@ -23,13 +25,18 @@ on:
   push:
     branches: [main]
     paths: *site-inputs
+  schedule:
+    - cron: '17 4 * * *'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: site-${{ github.event_name }}-${{ github.ref }}
+  # Every production deploy shares one group, whatever started it.
+  group: site-${{ github.event_name == 'pull_request' && github.ref || 'production' }}
   # A newer push to a pull request replaces its preview. Production deploys finish in order.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -47,6 +54,8 @@ jobs:
           persist-credentials: false
           # The staleness report reads `git log` back to each page's `checked` commit.
           fetch-depth: 0
+          # A release event checks out its tag, which can be behind main. Production always builds main.
+          ref: ${{ github.event_name == 'release' && github.event.repository.default_branch || '' }}
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
@@ -86,12 +95,17 @@ jobs:
       # Each build runs the link validator. `test` runs the budget check's own tests, the budget, and the
       # Playwright tests in the runner's installed Chrome. The production build must leave out every
       # draft and /lab/ page, and the preview build must keep them.
+      # A build reads the star count and the newest release from GitHub. The token lifts the anonymous
+      # rate limit.
       - name: Check the production build
         run: pnpm --filter @acorn/site build && pnpm --filter @acorn/site test
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Check the preview build
         run: pnpm --filter @acorn/site build && pnpm --filter @acorn/site test
         env:
           ACORN_SITE_PREVIEW: '1'
+          GITHUB_TOKEN: ${{ github.token }}
 
       # A fork's pull request gets no secrets, so it gets no preview.
       - name: Upload the preview
@@ -110,11 +124,14 @@ jobs:
           echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deploy production
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          github.event_name == 'schedule' || github.event_name == 'release'
         working-directory: apps/site
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           # The last build was the preview, so build production again before it ships.
           pnpm build

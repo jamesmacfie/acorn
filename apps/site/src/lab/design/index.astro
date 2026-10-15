@@ -5,6 +5,7 @@
 import Badge from '../../components/Badge.astro'
 import Card from '../../components/Card.astro'
 import Feature from '../../components/Feature.astro'
+import GitHubStars from '../../components/GitHubStars.astro'
 import Hero from '../../components/Hero.astro'
 import InstallBlock from '../../components/InstallBlock.astro'
 import Keys from '../../components/Keys.astro'
@@ -142,6 +143,15 @@ const tour = [
     <p>Host support: <Badge>Desktop</Badge> <Badge>Terminal</Badge> <Badge tone="warn">Reduced</Badge></p>
     <p>Permission kind: <Badge tone="ok">Enforced</Badge> <Badge>Declared</Badge></p>
     <p>Plugin shipping: <Badge tone="accent">Built in</Badge> <Badge>Installed package</Badge></p>
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">Star button</p>
+    <ul class="actions" data-testid="stars">
+      <li><GitHubStars stars={99} /></li>
+      <li><GitHubStars stars={100} /></li>
+      <li><GitHubStars stars={1234} /></li>
+    </ul>
   </section>
 
   <section class="section">

@@ -232,6 +232,11 @@
   flex-wrap: wrap;
   gap: var(--space-5);
 }
+ul.actions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 
 select {
   min-block-size: var(--control-h);
@@ -338,7 +343,7 @@ select {
   gap: var(--space-5);
 }
 @media (max-width: 71.99rem) {
-  /* Search and the star button shrink to their icons. */
+  /* Search shrinks to its icon, and the star button to its icon and count. */
   .site-header site-search button > span,
   .site-header-tools .button > span[aria-hidden] {
     display: none;
@@ -593,6 +598,23 @@ site-search button > kbd {
   gap: var(--space-8);
   grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
 }
+/* The changelog's changes: a badge that names the kind, then the change. */
+.changelog-changes {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.callout {
+  max-inline-size: var(--site-measure);
+}
+.callout > * {
+  margin: 0;
+}
+.callout > * + * {
+  margin-block-start: var(--space-4);
+}
 /* A list of cards drops the list's own marks and measure. */
 ul.cards {
   max-inline-size: none;
@@ -756,8 +778,10 @@ ul.cards {
 }
 
 /* Callouts: Starlight's asides in the shape of the kit's banner `Alert`. The tone is the border and the
-   icon, beside a title that names it, because tone colors fail contrast as text in some themes. */
-.starlight-aside {
+   icon, beside a title that names it, because tone colors fail contrast as text in some themes. A
+   marketing page's `.callout` takes the same shape. */
+.starlight-aside,
+.callout {
   padding: var(--space-6);
   color: var(--text);
   background: var(--bg-subtle);

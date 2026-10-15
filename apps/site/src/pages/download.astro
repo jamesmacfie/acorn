@@ -1,14 +1,23 @@
 ---
-import Marketing from '../layouts/Marketing.astro'
+import DownloadPage from '../layouts/DownloadPage.astro'
+import { readGithub } from '../lib/github'
 import type { PageMeta } from '../meta'
 
 export const meta = {
-  description: 'Every way to get acorn, read from GitHub releases at build time.',
-  sources: ['README.md', 'docs/node-distribution.md'],
-  checked: '1e0ef8b80',
+  description: 'Every way to get acorn: the desktop app, the terminal client, the standalone Node, the browser extension, and the source.',
+  sources: [
+    'README.md',
+    'docs/node-distribution.md',
+    'docs/cli.md',
+    'docs/browser-extension/setup.md',
+    'docs/shell/packaging.md',
+    'apps/desktop/src-tauri/tauri.conf.json',
+    'scripts/pack-node.mjs',
+  ],
+  checked: 'fe19d3086',
 } satisfies PageMeta
+
+const { release } = await readGithub()
 ---
 
-<Marketing title="Download" meta={meta}>
-  <p>Every way to get acorn, read from GitHub releases at build time. Not written yet.</p>
-</Marketing>
+<DownloadPage meta={meta} release={release} />
