@@ -63,6 +63,9 @@ export const githubPlugin = (): NodePlugin => {
         resolve: '/v1/p/github/browser/pull-request',
       },
     ],
+    // The task's pull request in the extension's sidebar (docs/plugin-authoring/browser-panel.md). `pane`
+    // is the PR pane's ID in the client half, which the host can't see from here.
+    browserPanel: { label: 'Pull request', glyph: 'git-pull-request', pane: 'pr', route: '/v1/p/github/browser-panel' },
     init: async (ctx) => {
       // Opens and migrates before init returns; every router below closes over this handle rather
       // than reading one off the request environment (docs/data-layer/plugin-databases.md § Plugin databases).
@@ -136,6 +139,13 @@ export const githubPlugin = (): NodePlugin => {
           })
         }),
         { prefix: '/browser' },
+      )
+
+      ctx.routes.register(
+        lazyRouter(async () =>
+          (await import('../server/browserPanel')).browserPanel(store, ctx.core, emit, () => ctx.events.status()),
+        ),
+        { prefix: '/browser-panel', note: "GET ?taskId= — the task's pull request in the extension's sidebar" },
       )
 
       for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status(), emit))

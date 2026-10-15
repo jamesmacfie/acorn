@@ -57,8 +57,9 @@ states:
 1. **A task owns it.** Each task the page belongs to, with its project and branch, **Open in Acorn**
    on the pane that shows the item, and **Chat**, which opens the task's newest conversation or the
    new-chat picker. **Agents** below lists that task's conversations, and opening one makes the task
-   current. The panel shows no item state, such as checks or review: the Node holds none for the
-   page without a provider call. On an app a plugin published, the row leads with the branch, then
+   current. The panel shows no item state for the page itself. For the task's pull request, the
+   GitHub plugin's **Pull request** nav item shows its state, checks, and reviews
+   ([plugin panels](./plugin-panels.md)). On an app a plugin published, the row leads with the branch, then
    "Task: <title> · <project>", then the plugin's state line, such as **Runn stack running**, and
    its link reads **Logs in Acorn**: the task on the plugin's pane, `runn` for Runn. When the person
    hid the branch marker on that origin, the row offers **Show the branch marker on this site**.

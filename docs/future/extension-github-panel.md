@@ -4,7 +4,8 @@ This page is a plan for a GitHub panel in the browser extension's sidebar. The p
 checks, and reviews of the task's pull request. Read it before you build the panel or let a built-in
 plugin declare one.
 
-Proposed October 16, 2026, against `afb826ee3`. Implementation not started. The
+Proposed October 16, 2026, against `afb826ee3`. Parts 1 and 2 implemented October 16, 2026. The
+check in a real browser against a dev Node is still open. The
 [Docker panel](./extension-docker-panel.md) depends on the first part of this plan.
 
 ## Why

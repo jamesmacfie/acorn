@@ -29,8 +29,8 @@ task-scoped panes.
 
 A built-in plugin declares the same descriptor as `NodePlugin.browserPanel`. A built-in whose route is
 outside its namespace fails the boot. Its Node half can't see its client panes, so nothing checks
-`pane` for it. Add a test that `pane` matches the ID your client registers. Docker's panel is the
-built-in example.
+`pane` for it. Add a test that `pane` matches the ID your client registers. Docker's and GitHub's
+panels are the built-in examples.
 
 ## The panel route
 
