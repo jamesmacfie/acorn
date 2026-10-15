@@ -1,0 +1,61 @@
+---
+// A terminal's cells, as a specimen or a terminal snapshot records them (docs/site/specimens.md). Each
+// run names the palette slot the terminal drew it in, and the theme's own tokens fill the slot, the
+// same eight the terminal takes from a theme (apps/tui/src/appearance.ts). The styles are global, so a
+// terminal inside a desktop snapshot, which the capture writes as a `.cells` block, takes them too.
+type Run = { text: string; fg?: string; bg?: string; attrs?: string[] }
+export type CellFrame = { columns: number; rows: number; lines: Run[][] }
+
+interface Props {
+  cells: CellFrame
+}
+
+const { cells } = Astro.props
+
+/** A run's palette slots and attributes, as classes the styles below color for the current theme. */
+const runClass = (run: Run) =>
+  [run.fg && `fg-${run.fg}`, run.bg && `bg-${run.bg}`, ...(run.attrs ?? [])].filter(Boolean).join(' ') || undefined
+---
+
+<pre class="cells" style={`--columns: ${cells.columns}`}>{
+  cells.lines.map((line, row) => (
+    <Fragment>
+      {row > 0 && '\n'}
+      {line.map((run) => <span class={runClass(run)}>{run.text}</span>)}
+    </Fragment>
+  ))
+}</pre>
+
+<style is:global>
+  .cells {
+    --cell-fg: var(--text);
+    --cell-bg: var(--bg);
+    inline-size: calc(var(--columns) * 1ch);
+    margin: 0;
+    padding: 0;
+    color: var(--cell-fg);
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-size: var(--term-fs);
+    line-height: var(--lh-tight);
+    white-space: pre;
+  }
+  .cells span {
+    color: var(--cell-fg);
+    background: var(--cell-bg);
+  }
+  .cells .fg-muted { --cell-fg: var(--text-muted); }
+  .cells .fg-accent { --cell-fg: var(--accent); }
+  .cells .fg-ok { --cell-fg: var(--state-ok); }
+  .cells .fg-warn { --cell-fg: var(--state-warn); }
+  .cells .fg-danger { --cell-fg: var(--state-bad); }
+  .cells .bg-hover { --cell-bg: var(--bg-hover); }
+  .cells .bg-selected { --cell-bg: var(--bg-selected); }
+  .cells .bold { font-weight: bold; }
+  .cells .dim { opacity: 0.6; }
+  .cells .underline { text-decoration: underline; }
+  .cells .inverse {
+    color: var(--cell-bg);
+    background: var(--cell-fg);
+  }
+</style>

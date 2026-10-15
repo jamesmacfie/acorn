@@ -1,8 +1,8 @@
 ---
 // A whole window, as a shell snapshot shows it: the specimen frame's chrome bar at window scale, the
-// window's title, and for the terminal client its size. The snapshot goes in the slot.
+// window's title, which host drew it, and for the terminal client its size. The snapshot goes in the slot.
 interface Props {
-  host: 'desktop' | 'terminal'
+  host: 'desktop' | 'browser' | 'terminal'
   title: string
   caption: string
   /** The terminal's size, such as `120×36`. */
@@ -15,7 +15,7 @@ const { host, title, caption, size } = Astro.props
 <figure class="snapshot frame not-content" data-host={host}>
   <div class="frame-bar">
     <span class="frame-title">{title}</span>
-    <span class="frame-size">{host === 'terminal' ? `Terminal ${size ?? ''}` : 'Desktop'}</span>
+    <span class="frame-size">{host === 'terminal' ? `Terminal ${size ?? ''}` : host === 'browser' ? 'Browser' : 'Desktop'}</span>
   </div>
   <div class="snapshot-body"><slot /></div>
   <figcaption class="frame-caption">{caption}</figcaption>

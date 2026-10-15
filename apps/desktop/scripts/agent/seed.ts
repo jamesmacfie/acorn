@@ -25,6 +25,7 @@ import {
   seedUnattendedPolicy,
 } from '@acorn/plugin-agents/testkit'
 import { seedReviewNotes } from '@acorn/plugin-git/testkit'
+import { seedSiteSnapshots } from './siteSnapshots'
 
 // Seeds an agent-automation data root before the window starts (docs/local-development/agent-drivers.md
 // § Drive the desktop). Without a fixture it adds one project. Fixtures put a generated Git
@@ -48,7 +49,7 @@ const profile = (args['--profile'] || 'small') as LargeSurfaceProfile
 const seed = Number(args['--seed'] || 1)
 if (!dataDir || !projectPath || !isAbsolute(dataDir) || !isAbsolute(projectPath)) {
   throw new Error(
-    'Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces|tui-navigation|delegation-checks|unattended-policy|streaming-replay --profile small|scale|canonical --seed N]',
+    'Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces|tui-navigation|delegation-checks|unattended-policy|streaming-replay|site-snapshots --profile small|scale|canonical --seed N]',
   )
 }
 if (
@@ -60,6 +61,7 @@ if (
     'unattended-policy',
     'command-restart',
     'streaming-replay',
+    'site-snapshots',
   ].includes(fixture)
 )
   throw new Error(`Unknown fixture: ${fixture}`)
@@ -120,59 +122,42 @@ try {
   if (fixture === 'streaming-replay') {
     mkdirSync(projectPath, { recursive: true })
     writeFileSync(join(projectPath, 'README.md'), '# Generated streaming replay project\n')
-  } else if (fixture) writeRepository(projectPath)
+  } else if (fixture && fixture !== 'site-snapshots') writeRepository(projectPath)
   const db = openDb(join(dataDir, 'core.sqlite'))
   try {
     const ownerId = activeIdentityStore(dataDir).get() ?? ''
     if (workspaces) writePreference(db, ownerId, WORKSPACES_PREF_KEY, workspaces)
     if (telemetry) writePreference(db, ownerId, TELEMETRY_PREF_KEY, telemetry === 'on' ? '1' : '0')
-    const result = await createProject(db, { path: projectPath }, ownerId)
-    if (!result.ok) throw new Error(result.reason)
-    if (!fixture) {
-      process.stdout.write(`${result.project.id}\n`)
+    if (fixture === 'site-snapshots') {
+      // The site's fixture brings its own projects (./siteSnapshots.ts).
+      const seeded = await seedSiteSnapshots(db, ownerId, dataDir, projectPath)
+      process.stdout.write(`${JSON.stringify({ fixture, ...seeded })}\n`)
     } else {
-      // A task with no branch runs in the project folder, which is what the new-task dialog's "use the
-      // project folder" makes (node-core routes/projects/tasks.ts § POST). Core's tables are seeded
-      // directly, as the testkit allows for fixtures.
-      const taskId = randomUUID()
-      const now = Date.now()
-      const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
-      await db.insert(schema.tasks).values({
-        id: taskId,
-        title:
-          fixture === 'command-restart'
-            ? 'Command restart verification'
-            : fixture === 'tui-navigation'
-              ? 'Review changed files'
-              : fixture === 'delegation-checks'
-                ? 'Delegation check report'
-                : fixture === 'streaming-replay'
-                  ? 'Streaming replay'
-                  : fixture === 'unattended-policy'
-                    ? 'Unattended request policy'
-                    : `Large surfaces (${profile})`,
-        icon: null,
-        origin: 'local',
-        projectId: result.project.id,
-        branch: null,
-        skipSetup: true,
-        pullNumber: null,
-        worktreePath: null,
-        status: 'active',
-        parentId: null,
-        sort: (value ?? -1) + 1,
-        createdAt: now,
-        updatedAt: now,
-        archivedAt: null,
-      })
-
-      let otherTaskId: string | undefined
-      let otherWorkspaceTaskId: string | undefined
-      if (fixture === 'tui-navigation') {
-        otherTaskId = randomUUID()
+      const result = await createProject(db, { path: projectPath }, ownerId)
+      if (!result.ok) throw new Error(result.reason)
+      if (!fixture) {
+        process.stdout.write(`${result.project.id}\n`)
+      } else {
+        // A task with no branch runs in the project folder, which is what the new-task dialog's "use the
+        // project folder" makes (node-core routes/projects/tasks.ts § POST). Core's tables are seeded
+        // directly, as the testkit allows for fixtures.
+        const taskId = randomUUID()
+        const now = Date.now()
+        const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
         await db.insert(schema.tasks).values({
-          id: otherTaskId,
-          title: 'Plan follow-up work',
+          id: taskId,
+          title:
+            fixture === 'command-restart'
+              ? 'Command restart verification'
+              : fixture === 'tui-navigation'
+                ? 'Review changed files'
+                : fixture === 'delegation-checks'
+                  ? 'Delegation check report'
+                  : fixture === 'streaming-replay'
+                    ? 'Streaming replay'
+                    : fixture === 'unattended-policy'
+                      ? 'Unattended request policy'
+                      : `Large surfaces (${profile})`,
           icon: null,
           origin: 'local',
           projectId: result.project.id,
@@ -182,118 +167,141 @@ try {
           worktreePath: null,
           status: 'active',
           parentId: null,
-          sort: (value ?? -1) + 2,
+          sort: (value ?? -1) + 1,
           createdAt: now,
           updatedAt: now,
           archivedAt: null,
         })
 
-        // This project belongs to a separate workspace. The folder stays beside the generated repo,
-        // inside the fixture directory, so a session never adds or changes a personal checkout.
-        let otherWorkspaceId: string | undefined
-        if (workspaces === 'on') {
-          otherWorkspaceId = randomUUID()
-          await db.insert(schema.workspaces).values({
-            id: otherWorkspaceId,
-            name: 'Side project',
-            isDefault: false,
-            sort: 1,
+        let otherTaskId: string | undefined
+        let otherWorkspaceTaskId: string | undefined
+        if (fixture === 'tui-navigation') {
+          otherTaskId = randomUUID()
+          await db.insert(schema.tasks).values({
+            id: otherTaskId,
+            title: 'Plan follow-up work',
+            icon: null,
+            origin: 'local',
+            projectId: result.project.id,
+            branch: null,
+            skipSetup: true,
+            pullNumber: null,
+            worktreePath: null,
+            status: 'active',
+            parentId: null,
+            sort: (value ?? -1) + 2,
             createdAt: now,
             updatedAt: now,
+            archivedAt: null,
+          })
+
+          // This project belongs to a separate workspace. The folder stays beside the generated repo,
+          // inside the fixture directory, so a session never adds or changes a personal checkout.
+          let otherWorkspaceId: string | undefined
+          if (workspaces === 'on') {
+            otherWorkspaceId = randomUUID()
+            await db.insert(schema.workspaces).values({
+              id: otherWorkspaceId,
+              name: 'Side project',
+              isDefault: false,
+              sort: 1,
+              createdAt: now,
+              updatedAt: now,
+            })
+          }
+          const otherPath = join(dirname(projectPath), 'side-project')
+          mkdirSync(otherPath, { recursive: true })
+          writeFileSync(join(otherPath, 'README.md'), '# Side project\n')
+          const otherProject = await createProject(
+            db,
+            { path: otherPath, ...(otherWorkspaceId ? { workspaceId: otherWorkspaceId } : {}) },
+            ownerId,
+          )
+          if (!otherProject.ok) throw new Error(otherProject.reason)
+          otherWorkspaceTaskId = randomUUID()
+          await db.insert(schema.tasks).values({
+            id: otherWorkspaceTaskId,
+            title: 'Check workspace switch',
+            icon: null,
+            origin: 'local',
+            projectId: otherProject.project.id,
+            branch: null,
+            skipSetup: true,
+            pullNumber: null,
+            worktreePath: null,
+            status: 'active',
+            parentId: null,
+            sort: (value ?? -1) + 3,
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: null,
           })
         }
-        const otherPath = join(dirname(projectPath), 'side-project')
-        mkdirSync(otherPath, { recursive: true })
-        writeFileSync(join(otherPath, 'README.md'), '# Side project\n')
-        const otherProject = await createProject(
-          db,
-          { path: otherPath, ...(otherWorkspaceId ? { workspaceId: otherWorkspaceId } : {}) },
-          ownerId,
-        )
-        if (!otherProject.ok) throw new Error(otherProject.reason)
-        otherWorkspaceTaskId = randomUUID()
-        await db.insert(schema.tasks).values({
-          id: otherWorkspaceTaskId,
-          title: 'Check workspace switch',
-          icon: null,
-          origin: 'local',
-          projectId: otherProject.project.id,
-          branch: null,
-          skipSetup: true,
-          pullNumber: null,
-          worktreePath: null,
-          status: 'active',
-          parentId: null,
-          sort: (value ?? -1) + 3,
-          createdAt: now,
-          updatedAt: now,
-          archivedAt: null,
-        })
-      }
 
-      let session: Awaited<ReturnType<typeof seedLargeSession>> | undefined
-      if (fixture !== 'streaming-replay') {
-        const notes = [...largeDiffFiles(profile, seed)].flatMap((file) => file.notes)
-        const git = makeTestNodeContext({ plugin: { name: 'git' }, dataDir })
-        try {
-          await seedReviewNotes(git.storage.open(), taskId, notes)
-        } finally {
-          git.cleanup()
-        }
-
-        const agents = makeTestNodeContext({ plugin: { name: 'agents' }, dataDir })
-        try {
-          if (fixture === 'command-restart') {
-            session = await seedCommandRestart(agents.storage.open(), agents.core, taskId)
-          } else if (fixture === 'unattended-policy') {
-            session = await seedUnattendedPolicy({
-              db: agents.storage.open(),
-              core: agents.core,
-              secrets: agents.env.SECRETS,
-              dataDir,
-              taskId,
-              taskRoot: projectPath,
-            })
-          } else if (fixture === 'delegation-checks') {
-            session = await seedDelegationCheckReport(agents.storage.open(), agents.core, taskId)
-          } else {
-            // A short second session for the session-revisit flow to step away to. Written first, so the
-            // long one changed last and still opens by default.
-            if (fixture === 'large-surfaces') {
-              await seedLargeSession(agents.storage.open(), agents.core, {
-                taskId,
-                profile: 'small',
-                seed,
-                title: 'Small session',
-              })
-            }
-            session = await seedLargeSession(agents.storage.open(), agents.core, { taskId, profile, seed })
+        let session: Awaited<ReturnType<typeof seedLargeSession>> | undefined
+        if (fixture !== 'streaming-replay') {
+          const notes = [...largeDiffFiles(profile, seed)].flatMap((file) => file.notes)
+          const git = makeTestNodeContext({ plugin: { name: 'git' }, dataDir })
+          try {
+            await seedReviewNotes(git.storage.open(), taskId, notes)
+          } finally {
+            git.cleanup()
           }
-        } finally {
-          agents.cleanup()
-        }
-      }
 
-      const summary = fixture === 'streaming-replay' ? null : largeDiffSummary(profile, seed)
-      process.stdout.write(
-        `${JSON.stringify({
-          fixture,
-          profile,
-          seed,
-          ...(telemetry ? { telemetry } : {}),
-          projectId: result.project.id,
-          taskId,
-          sessionId: session?.session.id,
-          ...(otherTaskId ? { otherTaskId, otherWorkspaceTaskId } : {}),
-          files: summary?.files ?? 0,
-          fixedRows: summary?.fixedRows ?? 0,
-          threads: summary?.threads ?? 0,
-          notes: summary?.notes ?? 0,
-          digest: summary?.digest ?? '',
-          turns: session?.turns ?? 0,
-          events: session?.events ?? 0,
-        })}\n`,
-      )
+          const agents = makeTestNodeContext({ plugin: { name: 'agents' }, dataDir })
+          try {
+            if (fixture === 'command-restart') {
+              session = await seedCommandRestart(agents.storage.open(), agents.core, taskId)
+            } else if (fixture === 'unattended-policy') {
+              session = await seedUnattendedPolicy({
+                db: agents.storage.open(),
+                core: agents.core,
+                secrets: agents.env.SECRETS,
+                dataDir,
+                taskId,
+                taskRoot: projectPath,
+              })
+            } else if (fixture === 'delegation-checks') {
+              session = await seedDelegationCheckReport(agents.storage.open(), agents.core, taskId)
+            } else {
+              // A short second session for the session-revisit flow to step away to. Written first, so the
+              // long one changed last and still opens by default.
+              if (fixture === 'large-surfaces') {
+                await seedLargeSession(agents.storage.open(), agents.core, {
+                  taskId,
+                  profile: 'small',
+                  seed,
+                  title: 'Small session',
+                })
+              }
+              session = await seedLargeSession(agents.storage.open(), agents.core, { taskId, profile, seed })
+            }
+          } finally {
+            agents.cleanup()
+          }
+        }
+
+        const summary = fixture === 'streaming-replay' ? null : largeDiffSummary(profile, seed)
+        process.stdout.write(
+          `${JSON.stringify({
+            fixture,
+            profile,
+            seed,
+            ...(telemetry ? { telemetry } : {}),
+            projectId: result.project.id,
+            taskId,
+            sessionId: session?.session.id,
+            ...(otherTaskId ? { otherTaskId, otherWorkspaceTaskId } : {}),
+            files: summary?.files ?? 0,
+            fixedRows: summary?.fixedRows ?? 0,
+            threads: summary?.threads ?? 0,
+            notes: summary?.notes ?? 0,
+            digest: summary?.digest ?? '',
+            turns: session?.turns ?? 0,
+            events: session?.events ?? 0,
+          })}\n`,
+        )
+      }
     }
   } finally {
     db.close()

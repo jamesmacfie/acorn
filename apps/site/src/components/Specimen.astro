@@ -2,18 +2,17 @@
 // One specimen, as the desktop and the terminal draw it (docs/site/specimens.md). Everything here is
 // committed generator output in src/generated/specimens/; nothing runs the specimen's code.
 import 'virtual:acorn-ui.css'
+import Cells, { type CellFrame } from './Cells.astro'
 
 interface Props {
   id: string
 }
 
 type Recorded = { meta: { title: string; caption: string; width: number } }
-type Run = { text: string; fg?: string; bg?: string; attrs?: string[] }
-type Cells = { columns: number; rows: number; lines: Run[][] }
 
 const trees = import.meta.glob<Recorded>('../generated/specimens/*.tree.json', { eager: true, import: 'default' })
 const pages = import.meta.glob<string>('../generated/specimens/*.html', { eager: true, query: '?raw', import: 'default' })
-const frames = import.meta.glob<Cells>('../generated/specimens/*.cells.json', { eager: true, import: 'default' })
+const frames = import.meta.glob<CellFrame>('../generated/specimens/*.cells.json', { eager: true, import: 'default' })
 
 const { id } = Astro.props
 const file = (extension: string) => `../generated/specimens/${id}${extension}`
@@ -24,10 +23,6 @@ if (!tree || html === undefined || !cells) {
   throw new Error(`There's no specimen "${id}". Add apps/site/specimens/<group>/${id}.tsx, then run UPDATE_SPECIMENS=1 pnpm --filter @acorn/site specimens.`)
 }
 const { meta } = tree
-
-/** A run's palette slots and attributes, as classes the styles below color for the current theme. */
-const runClass = (run: Run) =>
-  [run.fg && `fg-${run.fg}`, run.bg && `bg-${run.bg}`, ...(run.attrs ?? [])].filter(Boolean).join(' ') || undefined
 
 // shortcut: ids come from the specimen id, so one specimen shown twice on a page repeats them; count
 // per page if a page ever needs that.
@@ -47,14 +42,7 @@ const terminal = `specimen-${id}-terminal`
     <div class="acorn-ui" style={`max-inline-size: ${meta.width}px`} set:html={html} />
   </div>
   <div class="view" id={terminal} role="tabpanel" aria-label="Terminal">
-    <pre class="cells" style={`--columns: ${cells.columns}`}>{
-      cells.lines.map((line, row) => (
-        <Fragment>
-          {row > 0 && '\n'}
-          {line.map((run) => <span class={runClass(run)}>{run.text}</span>)}
-        </Fragment>
-      ))
-    }</pre>
+    <Cells cells={cells} />
     <span class="frame-size">{cells.columns}×{cells.rows}</span>
   </div>
   <figcaption class="frame-caption">{meta.caption}</figcaption>
@@ -73,39 +61,5 @@ const terminal = `specimen-${id}-terminal`
   .view .frame-size {
     position: absolute;
     inset: var(--space-2) var(--space-4) auto auto;
-  }
-
-  /* The terminal view. Each run names the palette slot the terminal drew it in, and the theme's own
-     tokens fill the slot, the same eight the terminal takes from a theme (apps/tui/src/appearance.ts). */
-  .cells {
-    --cell-fg: var(--text);
-    --cell-bg: var(--bg);
-    inline-size: calc(var(--columns) * 1ch);
-    margin: 0;
-    padding: 0;
-    color: var(--cell-fg);
-    background: var(--bg);
-    font-family: var(--font-mono);
-    font-size: var(--term-fs);
-    line-height: var(--lh-tight);
-    white-space: pre;
-  }
-  .cells span {
-    color: var(--cell-fg);
-    background: var(--cell-bg);
-  }
-  .fg-muted { --cell-fg: var(--text-muted); }
-  .fg-accent { --cell-fg: var(--accent); }
-  .fg-ok { --cell-fg: var(--state-ok); }
-  .fg-warn { --cell-fg: var(--state-warn); }
-  .fg-danger { --cell-fg: var(--state-bad); }
-  .bg-hover { --cell-bg: var(--bg-hover); }
-  .bg-selected { --cell-bg: var(--bg-selected); }
-  .bold { font-weight: bold; }
-  .dim { opacity: 0.6; }
-  .underline { text-decoration: underline; }
-  .cells .inverse {
-    color: var(--cell-bg);
-    background: var(--cell-fg);
   }
 </style>

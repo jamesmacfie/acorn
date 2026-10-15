@@ -38,6 +38,7 @@ Every build runs `starlight-links-validator`, so a broken link between pages fai
 | `pnpm --filter @acorn/site lint` | `astro check`: types in the `.astro` pages, the content config, and the tests. Then `tsc` on the specimens, which use Solid's JSX. Root `pnpm lint` runs it too. |
 | `pnpm --filter @acorn/site specimens` | Regenerates every [specimen](./site/specimens.md) on both hosts and fails when a committed file differs. |
 | `pnpm --filter @acorn/site test` | The script tests, the budget check, then the Playwright tests. Run a build first. |
+| `pnpm --filter @acorn/site snapshots` | Recaptures the [shell snapshots](#shell-snapshots) from the running apps. It checks nothing, so nothing in CI runs it. |
 
 The budget check, `apps/site/scripts/budget.mjs`, reads `dist`. For each page it adds up the Brotli-compressed
 size of the HTML and of every stylesheet and script the page loads, following static imports between
@@ -54,7 +55,7 @@ The Playwright tests in `apps/site/tests/` load every page the build wrote and f
 axe on the landing page, the docs home, and the 404 page, one page for each template, and check that
 drafts and `/lab/` appear only in a preview build. On a preview build, they also check that the specimen
 gallery draws the site's header, sidebar, and text exactly as `/docs/` does, and run axe on the frames
-around its specimens. They use the Chrome installed on the machine, so
+around its specimens and around the shell snapshots. They use the Chrome installed on the machine, so
 install Chrome before you run them. `ACORN_SITE_PREVIEW` must match the build you're testing.
 
 ## Specimens
@@ -62,6 +63,30 @@ install Chrome before you run them. `ACORN_SITE_PREVIEW` must match the build yo
 Pictures of plugin UI on the site are _specimens_: plugin tree code that both hosts draw, committed as
 HTML and as terminal cells, and checked against the kit on every change. [Specimens](./site/specimens.md)
 covers adding one, the generators, the specimen stylesheet, and what jsdom can't draw.
+
+## Shell snapshots
+
+Pictures of whole acorn windows are _shell snapshots_: HTML and terminal cells captured from the
+running desktop app, terminal client, and browser extension on an invented fixture. Recapture them
+after a change to the shell, to a pane a scene shows, or to the app's stylesheets. The staleness
+report below lists snapshots older than their sources.
+
+```sh
+pnpm --filter @acorn/site snapshots              # every scene
+pnpm --filter @acorn/site snapshots hero review  # the scenes you name
+```
+
+Recapturing every scene takes about a minute and a half once the desktop app, the Node, and the
+terminal client are built. A first run builds them, which takes a few minutes more. The capture needs
+a graphical session, Chrome, `openssl`, and PostgreSQL's `initdb`, `pg_ctl`, `createdb`, and `psql`
+on `PATH`. It writes `apps/site/src/generated/snapshots/`. Look at the result on `/lab/snapshots/` in
+`pnpm dev:site` before you commit it, in a light and a dark theme.
+
+`apps/site/scripts/snapshotPrivacy.test.mjs` fails when a committed snapshot holds a home folder path,
+an email address outside `example.com`, something shaped like a token, or a host outside
+`example.com`, `localhost`, `127.0.0.1`, `github.com`, and `acorn.sh`. Fix the fixture or the capture,
+never the test. [Shell snapshots](./site/snapshots.md) covers the fixture, the scenes, how the capture
+works, and adding a scene.
 
 ## Design
 

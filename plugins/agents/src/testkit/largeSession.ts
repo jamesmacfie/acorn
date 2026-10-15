@@ -1,17 +1,13 @@
 // A long managed-agent session for the large-surface fixture (docs/testing/desktop.md § The large-surface fixture).
 //
-// Generated from a seed and written through this plugin's own store, the way an imported transcript
-// is (`importTranscript`): a session row, then per turn an enqueue, a
-// dispatch, a start, its events, and `turn_completed`. So the session, turn, event and request rows
-// relate exactly as they do for a real run, and the client's `loadSnapshot` pages through it the same
-// way. The session ends `stopped` and every request is resolved, so a node booting over it has
-// nothing to recover.
+// Generated from a seed and written through `seedTranscript`, so the client's `loadSnapshot` pages
+// through it the way it pages through a real run. Every request is resolved, so a node booting over it
+// has nothing to recover.
 //
 // Test scaffolding: imported by tests and the agent-automation seeder only.
-import { randomUUID } from 'node:crypto'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
-import type { AgentNormalizedEvent, AgentProviderDescriptor, AgentSession } from '../contract/wire.ts'
-import { AgentStore } from '../server/sessions/store'
+import type { AgentNormalizedEvent, AgentSession } from '../contract/wire.ts'
+import { seedTranscript, type TranscriptTurn } from './transcript'
 
 export type LargeSessionProfile = 'small' | 'scale' | 'canonical'
 
@@ -22,8 +18,6 @@ const LARGE_SESSION_PROFILES: Record<LargeSessionProfile, { turns: number; event
   scale: { turns: 94 },
   canonical: { turns: Infinity, events: 7_000 },
 }
-
-export type LargeSessionTurn = { user: string; events: AgentNormalizedEvent[] }
 
 const CODE = [
   '```ts',
@@ -42,9 +36,9 @@ export const LARGE_SESSION_OLDEST_MARKER = 'Oldest turn in the fixture session'
  * Every turn of one profile, deterministic from the seed. Numbers come from the turn index and the
  * seed only, so two runs write the same ledger apart from the row ids the store assigns.
  */
-export function largeSessionTurns(profile: LargeSessionProfile, seed = 1): LargeSessionTurn[] {
+export function largeSessionTurns(profile: LargeSessionProfile, seed = 1): TranscriptTurn[] {
   const shape = LARGE_SESSION_PROFILES[profile]
-  const turns: LargeSessionTurn[] = []
+  const turns: TranscriptTurn[] = []
   let events = 0
   for (let index = 0; index < shape.turns && (shape.events === undefined || events < shape.events); index++) {
     const tag = `${seed}-${index}`
@@ -149,99 +143,54 @@ export function largeSessionTurns(profile: LargeSessionProfile, seed = 1): Large
   return turns
 }
 
-const PROVIDER: AgentProviderDescriptor = {
-  id: 'claude',
-  profileId: 'claude-code',
-  label: 'Claude Code',
-  driverKind: 'acp',
-  driverVersion: 'fixture',
-  installed: true,
-  authenticated: true,
-  statusAuthority: 'protocol',
-  capabilities: [],
-  configOptions: [],
-  commands: [],
-  skills: [],
-  diagnostics: [],
-}
-
-/**
- * Write one generated session for `taskId` into this plugin's database. Read-only history, like an
- * imported transcript, so nothing tries to resume it.
- */
+/** Write one generated session for `taskId`. Read-only history, like an imported transcript, so nothing
+ *  tries to resume it. */
 export async function seedLargeSession(
   db: PluginDatabase,
   core: CoreServices,
   input: { taskId: string; profile: LargeSessionProfile; seed?: number; title?: string },
 ): Promise<{ session: AgentSession; turns: number; events: number }> {
-  const store = new AgentStore(db, core)
-  const turns = largeSessionTurns(input.profile, input.seed)
-  const session = await store.createSession(
-    {
-      taskId: input.taskId,
-      providerId: PROVIDER.id,
-      profileId: PROVIDER.profileId,
-      kind: 'imported',
-      title: input.title ?? `Large-surface fixture (${input.profile})`,
-      config: {
-        imported: true,
-        resumeVerified: false,
-        fixture: 'large-surfaces',
-        // Exercise the terminal composer's compact row and permission omission in the PTY fixture.
-        configOptions: [
-          {
-            id: 'mode',
-            label: 'Mode',
-            category: 'mode',
-            currentValue: 'default',
-            values: [{ value: 'default', label: 'Default' }],
-          },
-          {
-            id: 'model',
-            label: 'Model',
-            category: 'model',
-            currentValue: 'fixture',
-            values: [{ value: 'fixture', label: 'Fixture model' }],
-          },
-          {
-            id: 'reasoning',
-            label: 'Effort',
-            category: 'reasoning',
-            currentValue: 'high',
-            values: [{ value: 'high', label: 'high' }],
-          },
-          {
-            id: 'permissions',
-            label: 'Permissions',
-            category: 'permission',
-            currentValue: 'workspace',
-            values: [{ value: 'workspace', label: 'workspace' }],
-          },
-        ],
-      },
+  return seedTranscript(db, core, {
+    taskId: input.taskId,
+    title: input.title ?? `Large-surface fixture (${input.profile})`,
+    kind: 'imported',
+    config: {
+      imported: true,
+      resumeVerified: false,
+      fixture: 'large-surfaces',
+      // Exercise the terminal composer's compact row and permission omission in the PTY fixture.
+      configOptions: [
+        {
+          id: 'mode',
+          label: 'Mode',
+          category: 'mode',
+          currentValue: 'default',
+          values: [{ value: 'default', label: 'Default' }],
+        },
+        {
+          id: 'model',
+          label: 'Model',
+          category: 'model',
+          currentValue: 'fixture',
+          values: [{ value: 'fixture', label: 'Fixture model' }],
+        },
+        {
+          id: 'reasoning',
+          label: 'Effort',
+          category: 'reasoning',
+          currentValue: 'high',
+          values: [{ value: 'high', label: 'high' }],
+        },
+        {
+          id: 'permissions',
+          label: 'Permissions',
+          category: 'permission',
+          currentValue: 'workspace',
+          values: [{ value: 'workspace', label: 'workspace' }],
+        },
+      ],
     },
-    PROVIDER,
-  )
-  await store.setController(session.id, 'external')
-  let events = 0
-  for (const generated of turns) {
-    const { turn } = await store.enqueueTurn(session.id, {
-      input: [{ type: 'text', text: generated.user }],
-      source: 'import',
-      effectivePolicy: { imported: true },
-      idempotencyKey: randomUUID(),
-    })
-    await store.dispatchTurn(turn.id)
-    await store.startTurn(turn.id)
-    for (const event of generated.events) {
-      await store.recordEvent(session.id, turn.id, event)
-      events++
-    }
-  }
-  await store.recordEvent(session.id, null, {
-    type: 'session_state',
-    state: 'stopped',
+    turns: largeSessionTurns(input.profile, input.seed),
     detail: 'Large-surface fixture.',
   })
-  return { session: await store.requireSession(session.id), turns: turns.length, events: events + 1 }
 }

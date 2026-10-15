@@ -77,12 +77,15 @@ test('specimens leave the site around them unchanged', async ({ page }) => {
 
 // The frame around each specimen, not the specimen: what's inside `.acorn-ui` is the app's own markup,
 // drawn exactly as the app draws it, so a finding there belongs to the kit.
-test('the specimen frames have no serious accessibility violations', async ({ page }) => {
-  test.skip(!previewBuild, 'The specimen gallery is a lab page, which only a preview build has.')
-  await page.goto('/lab/specimens/')
-  const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).exclude('.acorn-ui').analyze()
-  expect(violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([])
-})
+// Shell snapshots are the same: the window inside each frame is the app's.
+for (const route of ['/lab/specimens/', '/lab/snapshots/']) {
+  test(`the frames on ${route} have no serious accessibility violations`, async ({ page }) => {
+    test.skip(!previewBuild, 'The galleries are lab pages, which only a preview build has.')
+    await page.goto(route)
+    const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).exclude('.acorn-ui').analyze()
+    expect(violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([])
+  })
+}
 
 // The design gallery's own components, around the specimens. Inside a specimen is the kit's markup, as
 // above, but the site's own badges and keys also carry `.acorn-ui`, so only the specimens are left out.

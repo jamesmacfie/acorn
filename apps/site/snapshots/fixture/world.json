@@ -1,0 +1,104 @@
+{
+  "workspace": "Fernwood",
+  "projects": [
+    { "name": "billing-api", "folder": "billing-api", "remote": "https://github.com/fernwood/billing-api.git" },
+    { "name": "web-app", "folder": "web-app", "remote": "https://github.com/fernwood/web-app.git" }
+  ],
+  "author": { "name": "Ana Ruiz", "email": "ana@example.com" },
+  "tasks": [
+    {
+      "key": "webhooks",
+      "title": "Retry failed webhooks",
+      "project": "billing-api",
+      "notes": [
+        {
+          "title": "Plan",
+          "kind": "scratch",
+          "body": "- Retry 5xx and connection errors, never 4xx.\n- Five attempts, doubling from half a second.\n- Ask Sam whether the scheduler's timeout needs to grow."
+        }
+      ]
+    },
+    { "key": "vat", "title": "Add VAT to EU invoices", "project": "billing-api", "pullNumber": 128 },
+    { "key": "invoices-query", "title": "Speed up the overdue invoices query", "project": "billing-api", "sql": "overdue.sql" }
+  ],
+  "pull": {
+    "number": 128,
+    "branch": "add-eu-vat",
+    "title": "Add VAT to EU invoices",
+    "author": "sam-okafor",
+    "body": "<p>Invoices to EU customers now carry VAT at their country's standard rate. A business in another EU country is reverse charged, so its invoice carries none.</p><p>Adds Austria, Belgium, Spain, and Italy.</p>",
+    "reviews": [
+      { "author": "ana-ruiz", "state": "COMMENTED", "body": "<p>Looks right. One question on the reverse charge.</p>" }
+    ],
+    "threads": [
+      {
+        "path": "billing/invoices/vat.py",
+        "line": 19,
+        "comments": [
+          { "author": "ana-ruiz", "body": "<p>Should this check the customer's VAT number too? A business without one pays VAT like anyone else.</p>" },
+          { "author": "sam-okafor", "body": "<p>Good catch. The checkout already refuses a business without a valid number, so it can't reach here, but I'll add a test that says so.</p>" }
+        ]
+      }
+    ],
+    "checks": [
+      { "name": "test (3.12)", "status": "COMPLETED", "conclusion": "SUCCESS" },
+      { "name": "lint", "status": "COMPLETED", "conclusion": "SUCCESS" },
+      { "name": "preview deploy", "status": "IN_PROGRESS", "conclusion": null }
+    ]
+  },
+  "workflow": {
+    "baseline": "acorn-1",
+    "formatVersion": 1,
+    "name": "Ship to staging",
+    "steps": [
+      { "id": "tests", "name": "Run the tests", "after": [], "kind": "terminal:command", "with": { "command": "uv run pytest" } },
+      { "id": "types", "name": "Check types", "after": [], "kind": "terminal:command", "with": { "command": "uv run pyright" } },
+      { "id": "approve", "name": "Release to staging?", "after": ["tests", "types"], "kind": "gate-human" },
+      { "id": "deploy", "name": "Deploy", "after": ["approve"], "kind": "terminal:command", "with": { "command": "uv run fly deploy --app billing-staging" } }
+    ]
+  },
+  "workspaceNotes": [
+    {
+      "title": "Conventions",
+      "kind": "finding",
+      "body": "Money is `Decimal`, never `float`. Every webhook body is signed with `sign()`."
+    }
+  ],
+  "session": {
+    "task": "webhooks",
+    "title": "Retry failed webhooks",
+    "model": "Opus",
+    "turns": [
+      {
+        "user": "Webhook deliveries that get a 5xx are dropped. Retry server errors and connection failures with exponential backoff, up to five attempts. Don't retry a 4xx. Add tests.",
+        "events": [
+          { "type": "reasoning", "text": "The retry belongs in deliver(), so every caller gets it. A 4xx is the customer's endpoint refusing the event, so it stays final." },
+          { "type": "tool", "tool": { "id": "read-deliver", "title": "Read billing/webhooks/deliver.py", "kind": "read", "status": "completed", "output": "Read 10 lines." } },
+          { "type": "tool", "tool": { "id": "read-tests", "title": "Read tests/test_deliver.py", "kind": "read", "status": "completed", "output": "Read 13 lines." } },
+          { "type": "tool", "tool": { "id": "edit-backoff", "title": "Changed billing/webhooks/backoff.py", "kind": "edit", "status": "running", "paths": ["billing/webhooks/backoff.py"] } },
+          { "type": "file_change", "changeId": "edit-backoff", "path": "billing/webhooks/backoff.py" },
+          { "type": "tool", "tool": { "id": "edit-backoff", "title": "", "status": "completed" } },
+          { "type": "tool", "tool": { "id": "edit-deliver", "title": "Changed billing/webhooks/deliver.py", "kind": "edit", "status": "running", "paths": ["billing/webhooks/deliver.py"] } },
+          { "type": "file_change", "changeId": "edit-deliver", "path": "billing/webhooks/deliver.py" },
+          { "type": "tool", "tool": { "id": "edit-deliver", "title": "", "status": "completed" } },
+          { "type": "tool", "tool": { "id": "edit-tests", "title": "Changed tests/test_deliver.py", "kind": "edit", "status": "running", "paths": ["tests/test_deliver.py"] } },
+          { "type": "file_change", "changeId": "edit-tests", "path": "tests/test_deliver.py" },
+          { "type": "tool", "tool": { "id": "edit-tests", "title": "", "status": "completed" } },
+          { "type": "tool", "tool": { "id": "run-tests", "title": "uv run pytest tests/test_deliver.py", "kind": "execute", "status": "completed", "exitCode": 0, "output": "tests/test_deliver.py ....                                   [100%]\n\n4 passed in 0.21s" } },
+          { "type": "assistant_message", "messageId": "summary-1", "text": "Done. `deliver()` now retries a 5xx or a connection error up to five attempts, waiting 0.5, 1, 2, and 4 seconds between them. A 4xx returns straight away.\n\n- `backoff.py` is new and holds the delays.\n- `deliver()` takes a `sleep` argument, so the tests run without waiting.\n- Three new tests cover a retry that succeeds, giving up after five attempts, and a refusal.\n\nAll four tests pass." },
+          { "type": "usage", "usage": { "inputTokens": 18400, "outputTokens": 2100, "contextUsed": 31200, "contextSize": 200000 } },
+          { "type": "turn_completed", "stopReason": "end_turn" }
+        ]
+      },
+      {
+        "user": "Does anything else call deliver() with arguments that would break?",
+        "events": [
+          { "type": "tool", "tool": { "id": "search-callers", "title": "rg \"deliver\\(\" billing", "kind": "search", "status": "completed", "output": "billing/scheduler/outbox.py:41:    ok = deliver(client, endpoint.url, event)\nbilling/webhooks/deliver.py:9:def deliver(client, url, event, sleep=time.sleep):" } },
+          { "type": "assistant_message", "messageId": "summary-2", "text": "One caller, the outbox scheduler, and it passes three positional arguments. `sleep` is new and last, with a default, so nothing breaks.\n\nOne thing to check: the scheduler gives each delivery 10 seconds, and five attempts can now take 7.5 seconds plus the requests. That fits, with little to spare." },
+          { "type": "usage", "usage": { "inputTokens": 21900, "outputTokens": 640, "contextUsed": 33100, "contextSize": 200000 } },
+          { "type": "turn_completed", "stopReason": "end_turn" }
+        ]
+      }
+    ]
+  }
+}

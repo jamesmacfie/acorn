@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 
-const FIXTURES = new Set(['large-surfaces', 'tui-navigation'])
+const FIXTURES = new Set(['large-surfaces', 'tui-navigation', 'site-snapshots'])
 const PROFILES = new Set(['small', 'scale', 'canonical'])
 
 export function parseTuiAgentOptions(argv) {

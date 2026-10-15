@@ -13,3 +13,18 @@ it('renders the active alternate screen and preserves dimensions on resize', asy
     screen.dispose()
   }
 })
+
+it('reads the screen as runs of cells in palette slots', async () => {
+  const screen = createScreen(20, 2)
+  try {
+    await screen.write('\x1b[32mok\x1b[0m plain \x1b[1;91mbad\x1b[0m')
+    const { columns, rows, lines } = await screen.cells()
+    expect({ columns, rows }).toEqual({ columns: 20, rows: 2 })
+    expect(lines).toEqual([
+      [{ text: 'ok', fg: 'ok' }, { text: ' plain ' }, { text: 'bad', fg: 'danger', attrs: ['bold'] }],
+      [],
+    ])
+  } finally {
+    screen.dispose()
+  }
+})

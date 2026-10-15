@@ -1,6 +1,82 @@
 # Phase 7: capture whole windows from a real app
 
-Date: October 15, 2026. Status: proposed. Needs phase 3. Phases 8 and 9 depend on it.
+Date: October 15, 2026. Status: done. Needs phase 3. Phases 8 and 9 depend on it.
+
+## Completion note
+
+October 15, 2026. All ten scenes are captured from the running apps, committed in
+`apps/site/src/generated/snapshots/`, and shown at `/lab/snapshots/`, where they follow every theme
+and style pack. `pnpm --filter @acorn/site snapshots` recaptures all of them in about 85 seconds once
+the apps are built. [Shell snapshots](../../site/snapshots.md) is the reference, and
+[the public site](../../site.md#shell-snapshots) has the command.
+
+What landed:
+
+- The fixture, in `apps/site/snapshots/fixture/`: the Fernwood workspace, two projects as real Git
+  repositories, three tasks, notes, an agent session, a pull request branch, a SQL schema and query,
+  and a workflow. `--fixture site-snapshots` seeds it for both `pnpm dev:agent` and
+  `pnpm dev:tui:agent`, through `apps/desktop/scripts/agent/siteSnapshots.ts`. The agents testkit
+  gained `seedTranscript`, which `seedLargeSession` uses too.
+- `apps/site/scripts/capture-shell.mjs`, which runs the scenes, `shellPage.js`, which runs in each
+  window and copies it, and `fakeGithub.mjs`, which stands in for GitHub.
+- Three driver verbs: `run` for the desktop, `cells` for the terminal client, and `panel` for the
+  extension loop.
+- The site's `Snapshot` component, a `Cells` component that specimens share, scene titles in
+  `apps/site/src/snapshots.ts`, and the gallery page.
+- The specimen stylesheet reads every client-core stylesheet and the extension panel's, and keeps a
+  rule a snapshot uses. It grew from 6.3 KB to 13.3 KB compressed, on every page.
+- The privacy check, `apps/site/scripts/snapshotPrivacy.test.mjs`, which fails on a planted home path,
+  email, token, and host. Playwright runs axe on the gallery's frames.
+
+The acceptance checks pass. The privacy test passes on the committed snapshots. The budget check
+passes, and the gallery, with all ten snapshots, weighs 54.5 KB compressed against the 100 KB docs
+budget. The docs home weighs 35.6 KB. Each snapshot's compressed size is in the reference. A preview
+build passes all 221 Playwright tests.
+
+### Decisions and deviations
+
+- **The terminal scenes come from the real terminal client, not `capture.tsx`.** `capture.tsx` draws
+  against `apps/tui/src/fixture.ts`, a hand-written stand-in for the Node that can't hold agent
+  sessions, workflows, or a database without rewriting those routes. The capture runs the terminal
+  client on the seeded Node in `pnpm dev:tui:agent` and reads its screen with the new `cells` verb,
+  in phase 3's format. A selected row shows as inverse text, as it does in a terminal with no theme.
+- **One desktop session draws every desktop scene**, not a fresh session per scene. It's about ten
+  times faster. The scenes run in an order that keeps one from showing another's state, with `fleet`
+  last.
+- **The fixture's code is Python**, so no tool that checks the repository reads it as source.
+- **Nothing real reaches a picture.** Every process runs with the fixture's shell, stand-ins for the
+  agent command-line tools, no Docker socket, and UTC. The database scene gets a throwaway
+  PostgreSQL. The pull request scene gets a fake GitHub, reached through Node's own proxy support and
+  a certificate made for the run. The fleet and browser scenes use the terminal session's Node.
+- **The hidden window is told it's visible.** Animation frames run on a timer, the document reports
+  itself visible, and WebGL is refused so xterm draws text. Without these the diff, the terminal, and
+  the Database pane never draw.
+- **The copy drops what a picture can't use**: tooltips, which carried the machine's time zone, images
+  from other sites, and attribute values holding a commit or digest. Runtime CSS, such as
+  CodeMirror's, comes along without its fixed colors, so the SQL editor shows no syntax colors.
+- **The privacy check treats `127.0.0.1` as `localhost`**, because the fleet scene shows each Node's
+  endpoint.
+- **The browser scene's page is a labeled box.** The panel is the real side panel, opened beside the
+  pull request with the toolbar action, and its stylesheet applies only inside it.
+- **The site's color check reads `tan()` as a function**, not the color tan, so the snapshot's scaling
+  passes it.
+- **The workflow runs on the VAT task**, so the hero task keeps its layout.
+- Step 5 is skipped, as James decided.
+
+### What later phases need to know
+
+- Phase 8 and 9: draw a scene with `<Snapshot id="hero" />` from
+  `apps/site/src/components/Snapshot.astro`. The ids are in `apps/site/src/snapshots.ts`. The design
+  lab's snapshot frames still hold placeholders.
+- Restart `pnpm dev:site` after a recapture, because the stylesheet is built when it starts.
+- The capture needs a graphical session, Chrome, `openssl`, and PostgreSQL, so CI can't run it.
+- The desktop transcript's times are the capturing machine's local time. The renderer takes the
+  system's zone, and the capture can't change it.
+- `SNAPSHOT_SOURCES` in `apps/site/scripts/stale.mjs` is unchanged, so a change to a plugin's pane
+  doesn't list the scene that shows it.
+- The architecture checks fail on this base exactly as phase 2 recorded, and the format check still
+  fails on `packages/protocol/src/plugin/handoffs.ts`. None of the failures come from this change.
+- Nothing here needs a deploy, so nothing is left for phase 20.
 
 ## Goal
 

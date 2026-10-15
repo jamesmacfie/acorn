@@ -9,6 +9,7 @@
     "dev": "astro dev",
     "lint": "astro check && tsc -p specimens",
     "specimens": "vitest run && pnpm --filter @acorn/tui exec vitest run src/kit/specimens.test.tsx",
+    "snapshots": "node scripts/capture-shell.mjs",
     "stale": "node scripts/stale.mjs",
     "test": "node --test scripts/*.test.mjs && node scripts/budget.mjs && playwright test"
   },

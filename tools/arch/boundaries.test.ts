@@ -582,10 +582,10 @@ describe('architecture boundaries', () => {
     // ends up shipped. Any package's testkit/, not just node-core's.
     // One exception: the agent-automation seeder, which writes fixtures into a throwaway data root
     // before the window starts and is test scaffolding by purpose (docs/testing/desktop.md § The large-surface
-    // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling.
-    const offenders = EDGES.filter(
-      (e) => !isTestCode(e.fromFile) && rel(e.fromFile) !== 'apps/desktop/scripts/agent/seed.ts',
-    )
+    // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling. The site's fixture is
+    // one of its fixtures, in a module of its own.
+    const seeders = new Set(['apps/desktop/scripts/agent/seed.ts', 'apps/desktop/scripts/agent/siteSnapshots.ts'])
+    const offenders = EDGES.filter((e) => !isTestCode(e.fromFile) && !seeders.has(rel(e.fromFile)))
       .filter((e) => e.target.file?.includes('/src/testkit/') || e.target.file?.endsWith('/src/testkit.ts'))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     expect([...new Set(offenders)].sort()).toEqual([])

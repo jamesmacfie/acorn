@@ -87,6 +87,7 @@ The components are in `apps/site/src/components/`. Each has a comment that says 
 | `Hero` | Eyebrow, headline, paragraph, actions, and a picture. A marketing page puts it in the layout's `hero` slot. |
 | `InstallBlock` | A tab per install method, its commands after a prompt, and **Copy**. |
 | `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window. |
+| `Snapshot`, `Cells` | A [shell snapshot](./snapshots.md) in its frame, and a terminal's cells, which specimens and snapshots share. |
 | `Feature`, `Tour`, `Card` | A numbered feature section, the landing page's tabbed tour, and a card. |
 | `Badge`, `Keys` | The kit's own `Badge` and `Kbd` markup, with the text kept in `--text`. |
 | `ReferenceTable`, `Checkpoint` | A table with a sticky header and an anchor per row, and a step's check. |

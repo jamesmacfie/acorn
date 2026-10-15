@@ -4,8 +4,10 @@
 //
 //   apps/node/test/integration/harnessContribution.test.ts   agentDriverRegistry
 //   apps/desktop/scripts/agent/seed.ts                        seedLargeSession
+//   apps/desktop/scripts/agent/siteSnapshots.ts               seedTranscript
 export { agentDriverRegistry } from '../server/drivers/registry'
 export { seedLargeSession } from './largeSession'
+export { seedTranscript } from './transcript'
 export { seedDelegationCheckReport } from './delegationChecks'
 export { seedUnattendedPolicy } from './unattendedPolicy'
 export { seedCommandRestart } from './commandRestart'

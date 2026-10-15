@@ -42,7 +42,8 @@ function literalColors(file, css) {
   postcss.parse(css).walkDecls((decl) => {
     // Custom property names, strings, and URLs can hold color-like words that aren't colors.
     const value = decl.value.replace(/var\(--[\w-]+/g, '').replace(/(["']).*?\1|url\([^)]*\)/g, '')
-    const words = value.match(/(?<![\w-])[a-z]+(?![\w-])/gi) ?? []
+    // A word before a parenthesis is a function, such as `tan()`, not the color of the same name.
+    const words = value.match(/(?<![\w-])[a-z]+(?![\w(-])/gi) ?? []
     if (HEX.test(value) || COLOR_FUNCTION.test(value) || words.some(isNamedColor)) {
       found.push(`${file}: ${decl.prop}: ${decl.value}`)
     }

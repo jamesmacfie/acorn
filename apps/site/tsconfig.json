@@ -1,7 +1,7 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist", "specimens"],
+  "exclude": ["dist", "specimens", "snapshots"],
   "compilerOptions": {
     // The SDK's hand-written declarations, which its build copies to dist, so a check needs no build.
     "paths": {

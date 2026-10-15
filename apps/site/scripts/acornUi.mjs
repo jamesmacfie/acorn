@@ -1,29 +1,43 @@
-// The app's stylesheets, rewritten for the site (docs/site/specimens.md). A specimen's HTML is the
-// desktop's own markup, so it needs the desktop's own CSS, read from client-core at build time so a
-// stylesheet change reaches the site with no copy step.
+// The app's stylesheets, rewritten for the site (docs/site/specimens.md). A specimen's or a shell
+// snapshot's HTML is the desktop's own markup, so it needs the desktop's own CSS, read from client-core
+// at build time so a stylesheet change reaches the site with no copy step.
 //
 // The token blocks, `:root` rules that only declare custom properties, stay global: `data-theme` and
 // `data-style` on <html> drive the site and every specimen at once. Every other rule is rewritten to
-// apply only inside `.acorn-ui`, and a rule no committed specimen uses is dropped.
+// apply only inside `.acorn-ui`, and a rule that no committed specimen or snapshot uses is dropped.
 import { readFileSync, readdirSync } from 'node:fs'
+import { relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { JSDOM } from 'jsdom'
 import postcss from 'postcss'
 
-const STYLES = new URL('../../../packages/client-core/src/infra/styles/', import.meta.url)
-const SETTINGS = new URL('../../../packages/client-core/src/features/settings/', import.meta.url)
-const SPECIMENS = new URL('../src/generated/specimens/', import.meta.url)
+const CLIENT_CORE = new URL('../../../packages/client-core/src/', import.meta.url)
+const STYLES = new URL('infra/styles/', CLIENT_CORE)
+const SETTINGS = new URL('features/settings/', CLIENT_CORE)
+const SIDEBAR = new URL('../../extension/src/sidebar/sidebar.css', import.meta.url)
+const GENERATED = [
+  new URL('../src/generated/specimens/', import.meta.url),
+  new URL('../src/generated/snapshots/', import.meta.url),
+]
 
 // The site chooses its own fonts, so it leaves the app's font files out.
 const SKIPPED = new Set(['fonts.css'])
 
-/** The sheets the app's stylesheet manifest imports, in its order. The manifest's own rules hide
- *  every scrollbar on the page, so the site leaves those out too. */
+/** The sheets the app's stylesheet manifest imports, in its order, then every feature's own sheet,
+ *  which its components import, by path. The manifest's own rules hide every scrollbar on the page,
+ *  so the site leaves those out too. */
 function appSheets() {
   const manifest = readFileSync(new URL('styles.css', STYLES), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-  return [...manifest.matchAll(/@import\s+'\.\/([^']+)'/g)]
+  const imported = [...manifest.matchAll(/@import\s+'\.\/([^']+)'/g)]
     .map(([, name]) => name)
     .filter((name) => !SKIPPED.has(name))
-    .map((name) => readFileSync(new URL(name, STYLES), 'utf8'))
+    .map((name) => new URL(name, STYLES))
+  const root = fileURLToPath(CLIENT_CORE)
+  const features = readdirSync(root, { recursive: true })
+    .filter((path) => path.endsWith('.css') && !path.startsWith(relative(root, fileURLToPath(STYLES))))
+    .sort()
+    .map((path) => new URL(path, CLIENT_CORE))
+  return [...imported, ...features].map((url) => readFileSync(url, 'utf8'))
 }
 
 // Kit components the site draws with the kit's own markup, outside any specimen: badges and key caps.
@@ -43,13 +57,13 @@ const isTokenBlock = (rule) =>
 
 const inKeyframes = (rule) => rule.parent?.type === 'atrule' && /keyframes$/i.test(rule.parent.name)
 
-/** One selector, applying only inside `.acorn-ui`. A rule for the document's root element moves onto
- *  `.acorn-ui` itself, and a qualifier on the root stays there, so a style pack still keys off <html>. */
-export function scopeSelector(selector) {
+/** One selector, applying only inside `scope`. A rule for the document's root element moves onto the
+ *  scope itself, and a qualifier on the root stays there, so a style pack still keys off <html>. */
+export function scopeSelector(selector, scope = '.acorn-ui') {
   const root = selector.match(ROOT)
-  if (!root) return `.acorn-ui ${selector}`
+  if (!root) return `${scope} ${selector}`
   const qualifier = root[1] ? `:root${root[1]} ` : ''
-  return `${qualifier}.acorn-ui${selector.slice(root[0].length)}`
+  return `${qualifier}${scope}${selector.slice(root[0].length)}`
 }
 
 // What a static picture can't be in, so a rule for it is kept when the element it styles exists.
@@ -66,32 +80,39 @@ function matches(document, selector) {
   }
 }
 
-/** Every committed specimen's desktop HTML, in one document. */
-function specimenDocument() {
-  const html = readdirSync(SPECIMENS)
-    .filter((name) => name.endsWith('.html'))
-    .map((name) => readFileSync(new URL(name, SPECIMENS), 'utf8'))
-    .join('')
+/** Every committed specimen's and snapshot's desktop HTML, in one document. */
+function generatedDocument() {
+  const html = GENERATED.flatMap((dir) =>
+    readdirSync(dir)
+      .filter((name) => name.endsWith('.html'))
+      .map((name) => readFileSync(new URL(name, dir), 'utf8')),
+  ).join('')
   return new JSDOM(`<div class="acorn-ui">${html}</div>`).window.document
 }
 
-/** The specimen stylesheet: the app's sheets, scoped to `.acorn-ui` and pruned to what the specimens use. */
+/** The specimen stylesheet: the app's sheets, scoped to `.acorn-ui` and pruned to what the specimens and
+ *  snapshots use. */
 export function acornUiCss() {
-  const document = specimenDocument()
-  const sheet = postcss.parse(appSheets().join('\n'))
-  sheet.walkComments((comment) => comment.remove())
-  sheet.walkRules((rule) => {
-    if (inKeyframes(rule) || isTokenBlock(rule)) return
-    const used = rule.selectors
-      .map(scopeSelector)
-      .filter((selector) => SITE_KIT.test(selector) || matches(document, selector))
-    if (used.length > 0) rule.selectors = [...new Set(used)]
-    else rule.remove()
-  })
-  sheet.walkAtRules((atRule) => {
-    if (atRule.nodes?.length === 0) atRule.remove()
-  })
-  return sheet.toString()
+  const document = generatedDocument()
+  const scoped = (css, scope) => {
+    const sheet = postcss.parse(css)
+    sheet.walkComments((comment) => comment.remove())
+    sheet.walkRules((rule) => {
+      if (inKeyframes(rule) || isTokenBlock(rule)) return
+      const used = rule.selectors
+        .map((selector) => scopeSelector(selector, scope))
+        .filter((selector) => SITE_KIT.test(selector) || matches(document, selector))
+      if (used.length > 0) rule.selectors = [...new Set(used)]
+      else rule.remove()
+    })
+    sheet.walkAtRules((atRule) => {
+      if (atRule.nodes?.length === 0) atRule.remove()
+    })
+    return sheet.toString()
+  }
+  // The browser extension's panel has its own sheet, with class names the shell uses too, so it
+  // applies only inside a browser snapshot's panel.
+  return [scoped(appSheets().join('\n'), '.acorn-ui'), scoped(readFileSync(SIDEBAR, 'utf8'), '.acorn-ui .snapshot-sidebar')].join('\n')
 }
 
 // What the plugin serves, by id: the specimen stylesheet, and the theme and style pack ids for a picker.

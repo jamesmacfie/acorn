@@ -31,7 +31,7 @@ The launcher adds the current checkout as a local project. These flags change th
 | `--workspaces on\|off` | Sets the Node's workspace mode before seeding a project. |
 | `--reuse` | Reopens a stopped session's data. A stopped name isn't reused without it. |
 | `--vite` | Serves the live Vite renderer instead of the staged one, to check hot reload. |
-| `--fixture NAME` | Seeds a generated fixture. See [the large-surface flow](#large-surface-flow). |
+| `--fixture NAME` | Seeds a generated fixture. See [the large-surface flow](#large-surface-flow), and [shell snapshots](../site/snapshots.md#the-fixture) for `site-snapshots`. |
 
 Use `--fixture delegation-checks` to open a settled delegated report with one holding and one
 failing host check. It seeds an imported session in the isolated data root, so the report card can
@@ -60,9 +60,9 @@ pnpm dev:agent:ui -- --session my-change stop
 
 Take a `snapshot` before an element action and again after the UI changes. Its element references
 belong to that snapshot. Leave out `--session` when exactly one session is running. For a disposable
-check of the launcher and the first-run UI, run `pnpm dev:agent:smoke`.
-The `link` verb sends a URL to the renderer's normal link handler and waits for dispatch, without
-asking macOS to open a registered app.
+check of the launcher and the first-run UI, run `pnpm dev:agent:smoke`. `link` sends a URL to the
+renderer's link handler and waits for dispatch, without asking macOS to open a registered app.
+`run [FILE]` runs a script body in the window, from the file or stdin, and prints its result as JSON.
 
 `scroll` moves the largest scrolling region and reports where the reader is: the offset, and the turn
 at the top of the viewport where the content publishes one. With no delta it only reports. To check a
@@ -140,8 +140,8 @@ it refuses `--project` and `--onboarding`.
 The session manifest, Node data, TUI config, input trace, raw ANSI output, and flow reports live under
 `.acorn/agent-dev/tui/<session>/`. A stopped name needs `--reuse` to reopen. The driver listens on
 loopback only and keeps its control secret in the private session manifest. `stop` ends the PTY, and
-the launcher drains its child Node. A snapshot is the terminal's visible cells at that size, so take
-another after each step or resize.
+the launcher drains its child Node. A snapshot is the terminal's visible text at that size, so take
+another after each step or resize. `cells` prints it as [specimen cells](../site/specimens.md#how-it-works).
 
 To compare the two clients, start a desktop session with the same fixture, profile, and seed:
 

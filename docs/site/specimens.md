@@ -60,15 +60,17 @@ into attributes, because a mounted control holds them as properties.
 ## The specimen stylesheet
 
 `apps/site/scripts/acornUi.mjs` builds `virtual:acorn-ui.css` on every build and dev start, from the
-sheets `packages/client-core/src/infra/styles/styles.css` imports. It leaves out `fonts.css`, which the
+sheets `packages/client-core/src/infra/styles/styles.css` imports, then every other stylesheet in
+client-core, which features import beside their components. It leaves out `fonts.css`, which the
 site's own stylesheet imports, and the manifest's own rules that hide scrollbars. Every page loads it,
-because the token blocks in it are the site's tokens too ([design](../site.md#design)).
+because the token blocks in it are the site's tokens too ([design](../site.md#design)). The same sheet
+styles [shell snapshots](./snapshots.md#on-the-site).
 
 - Token blocks, which are `:root` rules that declare only custom properties, stay global. So
   `data-theme` and `data-style` on `<html>` drive every specimen.
 - Every other rule applies only inside `.acorn-ui`. A rule for `html` or `body` moves onto `.acorn-ui`.
   A style pack's `:root[data-style='…']` qualifier stays on the root.
-- A rule that matches nothing in the committed specimens' HTML is dropped. A rule for a state, such as
+- A rule that matches nothing in the committed specimens' and snapshots' HTML is dropped. A rule for a state, such as
   `:hover`, stays when the element it styles exists. The rules for `.ui-badge` and `.ui-kbd` always stay,
   because the site's `Badge` and `Keys` components draw the kit's markup outside any specimen.
 
