@@ -5,10 +5,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "astro build",
-    "dev": "astro dev",
+    "build": "pnpm --filter @acorn/cli build && astro build",
+    "dev": "pnpm --filter @acorn/cli build && astro dev",
     "lint": "astro check && tsc -p specimens",
-    "specimens": "vitest run && pnpm --filter @acorn/tui exec vitest run src/kit/specimens.test.tsx",
+    "specimens": "vitest run && pnpm --filter @acorn/tui exec vitest run src/kit/specimens.test.tsx && pnpm --filter @acorn/extension exec vitest run src/sidebar/pictures.test.tsx",
     "snapshots": "node scripts/capture-shell.mjs",
     "stale": "node scripts/stale.mjs",
     "test": "node --test scripts/*.test.mjs src/lib/*.test.ts && node scripts/budget.mjs && playwright test",

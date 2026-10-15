@@ -1,0 +1,68 @@
+---
+title: Workflows
+description: "What a workflow is, and the words around it: a run, a step, and a gate."
+sources:
+  - docs/workflows.md
+  - docs/workflows/execution.md
+  - docs/workflows/definitions.md
+  - docs/workflows/routes-and-ui.md
+  - plugins/workflows/src/shared/stepFields.ts
+checked: 07aa959a0
+---
+
+import Specimen from '../../../../components/Specimen.astro'
+
+A workflow is a set of steps that acorn runs on a task for you: ask an agent to do something, run a
+command, read some records, wait for your approval, and carry on. This page explains the parts. The
+pages after it cover writing one, the steps, and starting runs.
+
+## A workflow, a run, a step, and a gate
+
+- A **workflow** is the definition: its steps, the values it starts with, and its limits. It's a TOML
+  file in a repository, or one you made in the app.
+- A **run** is one go at a workflow, on one task. The Node runs it, so it keeps going when you close the
+  app. If the Node restarts, the run carries on, and a step that was part way through starts again.
+- A **step** is one thing a run does. Each step waits for the steps it names, and starts once they're
+  done, so two steps that wait on the same one run at the same time.
+- A **gate** is a step that waits: for you to approve, or for something outside acorn, such as CI
+  passing on the pull request.
+
+<Specimen id="workflow-run" />
+
+A step hands its result to the steps after it. An agent step can be asked for a result of a set shape,
+so the next step reads fields from it rather than prose. Only those results decide which way a run
+branches. Nothing reads meaning from an agent's transcript.
+
+## Where workflows come from
+
+The **Workflows** source in the left rail lists every workflow the workspace can run, from three places:
+
+| Where | What it is |
+| --- | --- |
+| `.acorn/workflows/*.toml` in a project's repository | Shared with everyone who works on it, and reviewed in pull requests. Wins over the other two when names clash. |
+| `~/.acorn/workflows/*.toml` on the Node's machine | Your own, for every project. |
+| Made in the app | Kept on the Node, in the workspace, and run once you publish it. |
+
+A workflow file from a repository can run commands on your machine, so acorn asks you to trust it
+before its first run and again when it changes, as it does for `.acorn/config.toml`.
+
+## What a run looks like
+
+A task that has run a workflow has a **Workflows** pane. It lists the task's runs, and shows the selected
+run's steps as a list or, with **Graph**, as a graph colored by status. Each step shows what it's doing
+while it runs and what it produced when it's done ([Workflows plugin](/docs/built-in-plugins/workflows/#the-run-pane)).
+
+A step that fails fails the run, with **Retry** on the step. A run that reaches a limit stops at
+that limit and says so.
+
+## In the terminal
+
+The terminal client draws the Workflows source, the editor, and the run pane, and the command line
+starts and watches runs ([Start and schedule runs](/docs/automation/start-and-schedule-runs/)).
+
+## Limits
+
+- A run keeps the definition it started with. Editing the workflow changes later runs.
+- Runs need the Terminal plugin on the Node, because it's what runs commands and run targets.
+- A Node runs at most four agent turns at a time, across every run.
+- A step whose plugin is off is shown as a problem. acorn doesn't run something else in its place.

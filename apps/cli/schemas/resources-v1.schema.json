@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://acorn.local/schemas/cli/resources-v1",
+  "$id": "https://acorn.sh/schemas/cli/resources-v1.schema.json",
   "oneOf": [
     { "$ref": "#/$defs/Node" },
     { "$ref": "#/$defs/Workspace" },

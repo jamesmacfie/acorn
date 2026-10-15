@@ -1,11 +1,144 @@
 ---
 title: Run a standalone Node
-description: Run a Node on its own, without the desktop app.
+description: Run acorn's Node without the desktop app, on a server or another machine, start and stop it from the command line or a service manager, and know which plugins it has.
 sources:
   - docs/node-distribution.md
   - docs/cli/local-service.md
-checked: 1e0ef8b80
-draft: true
+  - apps/node/src/entries/standalone.ts
+  - apps/node/src/composition/plugins.ts
+  - scripts/pack-node.mjs
+checked: 07aa959a0
 ---
 
-This page isn't written yet.
+A standalone Node is acorn's Node with no desktop app: on a server, a build machine, or Linux, where the
+desktop app doesn't run. You pair the desktop app, the terminal client, or the command line with it.
+This page covers installing it, the settings it reads, starting and stopping it, running it as a
+service, and what it can do.
+
+## Install it
+
+The machine needs Node.js 22.23.2 or later in branch 22, 24.18.1 or later in branch 24, or 26.5.1 or
+later in branch 26. On Linux it also needs the usual build tools, because `node-pty`, the one native
+module, compiles when you install.
+
+1. Build the archive in a checkout of acorn with `pnpm pack:node`. It writes
+   `apps/node/release/acorn-node-<version>.tar.gz`. Copy it to the machine.
+2. Unpack it and install what it needs:
+
+   ```sh
+   tar -xzf acorn-node-*.tar.gz
+   cd acorn-node
+   npm ci --omit=dev
+   npm rebuild
+   node scripts/prune-runtime.mjs
+   ```
+
+   `prune-runtime.mjs` removes installed files nothing loads. Run it again after every `npm ci`.
+
+3. Start it, with a folder of its own for its data:
+
+   ```sh
+   ACORN_DATA_DIR=/var/lib/acorn-node npm start
+   ```
+
+   It prints **acorn node ready**, with the address under **Connect to**, its **Identity** as six words,
+   and a **Pairing code**.
+
+The first time it starts in a terminal, it asks which address to answer on. Enter alone keeps it on
+this machine. [Pair a device or a remote
+Node](/docs/nodes/pair-a-device-or-a-remote-node/#let-other-machines-reach-the-node) explains the
+choice and how to pair.
+
+To run agents on it, install Claude Code or Codex on that machine, signed in with its own login, and
+on the `PATH` the Node starts with. acorn doesn't download either.
+
+## The settings it reads
+
+A standalone Node reads its settings from the environment. These are the ones you're likely to set:
+
+| Variable | What it does |
+| --- | --- |
+| `ACORN_DATA_DIR` | The folder the Node keeps everything in. Give each Node its own. |
+| `ACORN_ADVERTISE_HOST` | The addresses other machines reach it at, separated by commas. Without it, the Node answers only on this machine. |
+| `ACORN_PORT` | The port to listen on. Without it, the Node uses the port it had last time, if it's free. |
+| `SESSION_ENC_KEY` | The key it encrypts stored credentials with. Without it, the Node makes one and keeps it in its data folder. |
+
+[Environment variables](/docs/reference/environment-variables/#the-node) lists every one.
+
+The data folder should be readable only by the user the Node runs as. Only one Node can use a folder
+at a time. On Windows, file modes don't protect it, so restrict the folder's access in its properties.
+
+## Start and stop it from the command line
+
+The command line can run a Node for this machine in the background, from the archive's folder:
+
+```sh
+node bin/acorn.mjs node start --background
+node bin/acorn.mjs node status
+node bin/acorn.mjs node stop
+```
+
+- `node start --background` returns once the Node answers. Running it again returns the same Node.
+- `node status` says **running**, **starting**, **stopped**, or **running-unowned**, with the Node's ID,
+  address, process ID, and log file. **running-unowned** is a Node something else started, such as the
+  desktop app or a terminal.
+- `node stop` asks the Node to finish what it's doing, and waits up to 40 seconds. It won't stop a Node
+  it didn't start. `node stop --force` kills a Node it started that won't stop.
+
+These three always use this machine's data folder, and refuse `--node`. The command line keeps the
+Node's log in its config folder, under `services/`, and starts a new log file at 8 MB.
+
+A Node started this way prints no pairing banner. The command line and the terminal client on that
+machine already have its token. To pair a client on another machine, run the Node in a terminal or as a
+service instead, where it prints a pairing code.
+
+## Run it as a service
+
+To keep a Node running on a server, start it from a service manager. With no terminal, the Node
+asks no question, so set `ACORN_ADVERTISE_HOST` if other machines should reach it. A systemd unit looks
+like this:
+
+```ini
+[Unit]
+Description=acorn Node
+After=network-online.target
+
+[Service]
+User=acorn
+WorkingDirectory=/opt/acorn-node
+Environment=ACORN_DATA_DIR=/var/lib/acorn-node
+Environment=ACORN_ADVERTISE_HOST=build.local
+Environment=ACORN_PORT=4317
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning dist/standalone.js
+TimeoutStopSec=40
+
+[Install]
+WantedBy=multi-user.target
+```
+
+When the service stops, the Node gets SIGTERM and finishes within 30 seconds: it stops waiting on task
+scripts, closes its connections and databases, and releases its data folder. The pairing banner goes to
+the service's log. Once a device is paired, the banner shows the command that opens a new pairing code,
+`kill -USR1 <pid>`. Run it, and read the code from the log.
+
+## Which plugins it has
+
+A standalone Node has the plugins built into the Node: Agents, Agent browser, Docker, Editor, Git,
+GitHub, Memory, Notes, Preview, Terminal, and Workflows.
+
+The plugins the desktop app installs as packages, such as Database, HTTP, Linear, and Rollbar, aren't
+on a standalone Node. Install the ones you want from a paired desktop app, in **Settings** >
+**Plugins** > **Installed** > **Install…** ([Plugin trust and
+permissions](/docs/security/plugin-trust-and-permissions/#install-a-plugin-on-a-node)). Running from a
+checkout, `ACORN_BUNDLED_PLUGINS_DIR` points the Node at a folder of built packages, which it installs
+and keeps up to date the way the desktop app does.
+
+## Limits
+
+- What needs a window doesn't work: folder pickers, native dialogs, and the Preview pane, which acorn
+  refuses for a Node on another machine.
+- Add a project by typing its path on the Node's machine.
+- On Windows there's no `SIGUSR1`. Restart the Node for a new pairing code.
+- Agents on a standalone Node run as the Node's user, so they can read its keys, from its data folder or
+  its environment. The Node warns about this when it starts. The desktop app's Node keeps its keys
+  sealed instead ([Credentials and secrets](/docs/security/credentials-and-secrets/)).

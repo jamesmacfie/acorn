@@ -241,3 +241,20 @@ test('a saved theme and style pack apply before the first frame', async ({ page 
     style: 'modern',
   })
 })
+
+// The published JSON Schemas, each served where its `$id` says it is.
+const schemaFiles = [
+  ...readdirSync(new URL('../../../packages/plugin-types/', import.meta.url)).filter((name) =>
+    name.endsWith('.schema.json'),
+  ),
+  ...readdirSync(new URL('../../cli/schemas/', import.meta.url))
+    .filter((name) => name.endsWith('.schema.json'))
+    .map((name) => `cli/${name}`),
+]
+for (const file of schemaFiles) {
+  test(`/schemas/${file} is served at its $id`, async ({ request }) => {
+    const response = await request.get(`/schemas/${file}`)
+    expect(response.status()).toBe(200)
+    expect((await response.json()).$id).toBe(`https://acorn.sh/schemas/${file}`)
+  })
+}

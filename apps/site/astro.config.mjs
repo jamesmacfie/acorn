@@ -4,6 +4,8 @@ import starlight from '@astrojs/starlight'
 import { defineConfig } from 'astro/config'
 import starlightLinksValidator from 'starlight-links-validator'
 import { acornUi } from './scripts/acornUi.mjs'
+import { cliHelpModule } from './scripts/cliHelp.mjs'
+import { keybindingsModule } from './scripts/keybindings.mjs'
 
 // Drafts and /lab/ pages show in `astro dev` and on preview deploys, and never in production.
 const previewBuild = process.env.ACORN_SITE_PREVIEW === '1'
@@ -328,8 +330,10 @@ export default defineConfig({
       ].flatMap(group),
     }),
   ],
-  // The specimen stylesheet, `virtual:acorn-ui.css`, built from the app's own sheets.
-  vite: { plugins: [acornUi()] },
+  // The specimen stylesheet, `virtual:acorn-ui.css`, built from the app's own sheets, the command
+  // line's help, `virtual:acorn-cli-help`, read from the built binary, and the default shortcuts,
+  // `virtual:acorn-keybindings`, read from the code that registers them.
+  vite: { plugins: [acornUi(), cliHelpModule(), keybindingsModule()] },
   markdown: {
     // The docs are full of `--flags`, which smart typography turns into dashes.
     processor: unified({ smartypants: false }),

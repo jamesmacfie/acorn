@@ -25,7 +25,8 @@ so the words have something to hang on.
 
 A **Node** is the process that holds your data and does the work. It keeps your workspaces, projects,
 tasks, notes, and agent history, creates Git worktrees, and runs terminals, agents, and workflows. The
-desktop app starts one on your computer. You can also run a Node on another machine and pair with it.
+desktop app starts one on your computer. You can also run a Node on another machine and pair with it
+([Nodes](/docs/nodes/)).
 
 A **client** is what you look at: the desktop app, the terminal client, the command line, or the
 browser extension. A client owns how things look and what's selected. It doesn't own the data, so two
@@ -36,8 +37,9 @@ and you approve that pairing once. A token lets a device talk to a Node, and not
 [The trust model](/docs/security/the-trust-model/) says what a device, an agent, and a plugin can each
 reach.
 
-With more than one Node paired, the left rail adds **Fleet home**, a card for each Node with its task
-count, and lists such as agent sessions and the inbox gather every Node's rows. Each Node keeps its own data. Nodes don't share anything with each other.
+With more than one Node paired, the left rail adds **Fleet**, a card for each Node with its task
+count, and lists such as agent sessions and the inbox gather every Node's rows ([The fleet
+view](/docs/nodes/the-fleet-view/)). Each Node keeps its own data. Nodes don't share anything with each other.
 
 ## Workspace, project, and task
 
@@ -99,5 +101,5 @@ marked as stale, and a change you make goes to the Node or fails. It never prete
 
 - A task belongs to one project and one Node. It can't move to another Node.
 - Grouping projects into workspaces can't be undone.
-- Nodes don't share data. Fleet home shows several Nodes side by side, but each task, note, and agent
+- Nodes don't share data. **Fleet** shows several Nodes side by side, but each task, note, and agent
   session stays on the Node that made it.

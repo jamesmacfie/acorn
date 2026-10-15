@@ -18,6 +18,7 @@ const SIDEBAR = new URL('../../extension/src/sidebar/sidebar.css', import.meta.u
 const GENERATED = [
   new URL('../src/generated/specimens/', import.meta.url),
   new URL('../src/generated/snapshots/', import.meta.url),
+  new URL('../src/generated/sidebar/', import.meta.url),
 ]
 
 // The site chooses its own fonts, so it leaves the app's font files out.
@@ -111,7 +112,7 @@ export function acornUiCss() {
     return sheet.toString()
   }
   // The browser extension's panel has its own sheet, with class names the shell uses too, so it
-  // applies only inside a browser snapshot's panel.
+  // applies only inside a browser snapshot's panel and a sidebar picture.
   return [scoped(appSheets().join('\n'), '.acorn-ui'), scoped(readFileSync(SIDEBAR, 'utf8'), '.acorn-ui .snapshot-sidebar')].join('\n')
 }
 

@@ -1,0 +1,105 @@
+---
+title: Task chips and handoffs
+description: The chip acorn draws on sites such as GitHub, the handoff card that brings an item into a task, how the extension matches a page to its task, and Home's This page section.
+sources:
+  - docs/browser-extension/handoffs.md
+  - docs/browser-extension/task-pages.md
+  - apps/extension/src/content/siteButtons.ts
+  - apps/extension/src/sidebar/Handoff.tsx
+  - apps/extension/src/sidebar/Home.tsx
+  - apps/extension/src/taskPages.ts
+checked: 07aa959a0
+---
+
+import SidebarPicture from '../../../../components/SidebarPicture.astro'
+
+On a site a plugin knows, such as GitHub, the extension draws a small chip on the page. On a page that
+belongs to a task, the chip names the task. On an item no task holds yet, it offers to start one. This
+page covers the chip, the handoff card in the panel, and how a page is matched to its task.
+
+## Which sites get a chip
+
+A plugin on your Node says which pages it can bring into a task, and where on the page to put the chip.
+The desktop app's Node has GitHub, Linear, and Rollbar. A standalone Node has GitHub, and Linear and
+Rollbar once you install them.
+
+A page gets its chip once the extension can read it: allow its site under **Settings** >
+**Permissions** in the panel, or click the Acorn toolbar button on that tab. Without either, the panel
+still offers the same handoff in **This page**.
+
+## The task chip
+
+On a page that belongs to a task, the chip shows the task's name and its agents, such as **2 working**,
+or **1 waiting** when an agent waits on you. Click it to open the panel on that task. The arrow beside
+it opens a menu:
+
+- **Show in side panel** opens the panel on the task.
+- **Open in Acorn** opens the task in the desktop app, on the pane that shows the item.
+- **New chat about this page** opens the panel with the page's link waiting for the next conversation.
+- **Ask about an element** lets you point at part of the page and ask the task's agent
+  ([Ask about an element](/docs/browser-extension/ask-about-an-element/)).
+- **Copy Acorn link** copies a link to the task.
+
+The chip draws in its own sealed box, so the page can't restyle it or read it, and it follows the page's
+light or dark theme.
+
+## Bring an item into a task
+
+On a page no task holds, such as a pull request you haven't started on, the chip reads **Start task**.
+Its menu has **Create task** and **Start workflow…**, as the desktop app's row menu does. Either opens
+the panel on the handoff card.
+
+<SidebarPicture id="sidebar-handoff" />
+
+The card shows the item the page is, as the plugin reads it:
+
+1. If the page is more than one item, such as one per GitHub account, choose one.
+2. **Linked tasks** lists tasks that already hold it, with **Chat** and **Open in Acorn**.
+3. Otherwise, pick the project, and click **Create task**. acorn makes a task linked to the item, and the
+   item waits for the first conversation you open, as an **Item** in its draft.
+
+**Start workflow** makes the task and starts a workflow run on it
+([Workflows and plugin panels](/docs/browser-extension/workflows-and-plugin-panels/)). **Open in Acorn**
+opens the item in the desktop app instead.
+
+Pressing **Create task** again after a slow answer doesn't make a second task: acorn answers with the
+one it made. The card closes when you leave the item's page, unless you've started filling it in.
+
+## Match a page to its task
+
+The extension knows which task a page belongs to from what each task already records: a task made from
+a pull request knows that pull request's address, a task linked to a Linear issue or Rollbar error knows
+the item's, and a plugin can publish the address of a task's running app. The pull request's address
+covers its tabs, such as **Files changed**.
+
+The matching happens in the browser, against a list the Node sends of its tasks and their addresses.
+The page's address goes to the Node only when a handoff looks the item up.
+
+## This page
+
+Home's **This page** section says what acorn knows about the page beside the panel:
+
+<SidebarPicture id="sidebar-home" />
+
+- **A task holds it.** The task, with its project and branch, **Open in Acorn**, and **Chat**.
+- **An item no task holds.** The handoff card. After you dismiss it, **Look up in Acorn** brings it back.
+- **A project's site.** The project its sites suggest, with its open tasks and **New task in Acorn**
+  ([Project sites](/docs/browser-extension/project-sites/)).
+
+A page that's none of these has no **This page** section. **Current task**, the one you last used,
+stays pinned below when the page belongs to another.
+
+## The branch marker
+
+On a task's running app, such as a local development server a plugin started for the task, the
+extension draws a small marker in the page's bottom-right corner: the task's branch and the app's state,
+such as **running**. Its menu has **Show in side panel**, **Open in Acorn**, **Ask about an element**,
+**Copy Acorn link**, and **Hide on this site**. The site needs page access, as a chip does.
+
+## Limits
+
+- Firefox opens its panel only from the toolbar, so there a chip's click opens its menu, which says to
+  click Acorn in the toolbar.
+- **Open in Acorn** needs a desktop app that opens `acorn://` links, which only a release build does. An
+  extension from the development loop, `pnpm dev:extension`, offers **Copy Acorn link** instead.
+- The panel shows no item state, such as a pull request's checks. Open it in the desktop app for that.

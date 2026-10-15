@@ -31,7 +31,8 @@ with more than one Node, its header picks which one.
 
 ## Nodes
 
-The Nodes this device is paired with, each with its address and whether it's live.
+The Nodes this device is paired with, each with its address and whether it's live ([Pair a device or a
+remote Node](/docs/nodes/pair-a-device-or-a-remote-node/)).
 
 | Setting | What it changes | Stored on | Default |
 | --- | --- | --- | --- |

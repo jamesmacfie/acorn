@@ -1,0 +1,51 @@
+---
+// Every key a workflow file can hold, from the table the workflows plugin keeps beside its file loader
+// (plugins/workflows/src/contract/workflowFile.ts), which a test there holds to the format. One
+// reference table per table in the file, under its TOML header.
+import ReferenceTable from './ReferenceTable.astro'
+
+// `WorkflowFileTable` in that module. Read by path, as the plugin pages read manifests, because the site
+// doesn't depend on a plugin package.
+type Table = { path: string; title: string; alsoAt?: string[]; fields: { key: string; type: string; description: string }[] }
+
+const contract = import.meta.glob<Table[]>('../../../../plugins/workflows/src/contract/workflowFile.ts', {
+  eager: true,
+  import: 'WORKFLOW_FILE_TABLES',
+})
+const tables = Object.values(contract)[0]!
+
+// `steps[].agent` is written `[steps.agent]` in the file, and `inputs[]` is `[[inputs]]`.
+const header = (path: string) => {
+  const name = path.replace(/\[\]/g, '')
+  return path.endsWith('[]') ? `[[${name}]]` : `[${name}]`
+}
+const anchor = (path: string) => `workflow-${path.replace(/\[\]/g, '').replace(/\./g, '-') || 'top'}`
+---
+
+{
+  tables.map((table) => (
+    <>
+      <h3 id={anchor(table.path)}>
+        {table.title}
+        {table.path && (
+          <>
+            {' '}
+            <code>{header(table.path)}</code>
+          </>
+        )}
+      </h3>
+      {table.alsoAt && (
+        <p>
+          Also <code>{table.alsoAt.map(header).join(', ')}</code>.
+        </p>
+      )}
+      <ReferenceTable
+        head={['Key', 'Type', 'What it does']}
+        rows={table.fields.map((field) => ({
+          id: `${anchor(table.path)}-${field.key}`,
+          cells: [field.key, field.type, field.description],
+        }))}
+      />
+    </>
+  ))
+}

@@ -26,29 +26,61 @@ const forbiddenKeys = new Set([
 
 export const deviceConfigSchema = z
   .looseObject({
-    theme: z.string().min(1).max(128).optional(),
-    themeLight: z.string().min(1).max(128).optional(),
-    themeDark: z.string().min(1).max(128).optional(),
-    themeFollowSystem: z.boolean().optional(),
-    style: z.string().min(1).max(128).optional(),
-    keybindings: z.record(preferenceId, z.union([z.string().max(64), z.null()])).optional(),
+    theme: z
+      .string()
+      .min(1)
+      .max(128)
+      .optional()
+      .describe("The theme, by ID, when the theme doesn't follow the system."),
+    themeLight: z.string().min(1).max(128).optional().describe('The theme, by ID, while the system is in light mode.'),
+    themeDark: z.string().min(1).max(128).optional().describe('The theme, by ID, while the system is in dark mode.'),
+    themeFollowSystem: z
+      .boolean()
+      .optional()
+      .describe('Whether the theme follows the system, switching between `themeLight` and `themeDark`.'),
+    style: z.string().min(1).max(128).optional().describe('The style pack, by ID.'),
+    keybindings: z
+      .record(preferenceId, z.union([z.string().max(64), z.null()]))
+      .optional()
+      .describe('Shortcuts you changed: a command ID to its chord, such as `meta+shift+k`, or `null` to remove it.'),
     railOrder: z
       .strictObject({
-        pinned: z.array(preferenceId),
-        order: z.array(preferenceId),
-        sources: z.array(preferenceId).optional(),
+        pinned: z.array(preferenceId).describe('Task IDs pinned to the top of the left rail, in order.'),
+        order: z.array(preferenceId).describe('Task IDs in the order you dragged them. Other tasks follow.'),
+        sources: z.array(preferenceId).optional().describe('Source IDs, in the order you dragged them.'),
       })
-      .optional(),
-    leftCollapsed: z.boolean().optional(),
-    workspaceRail: z.boolean().optional(),
+      .optional()
+      .describe('The order of the left rail.'),
+    leftCollapsed: z.boolean().optional().describe('Whether the left rail is collapsed.'),
+    workspaceRail: z.boolean().optional().describe('Whether the workspace rail shows.'),
     // `<pluginId>:<sourceId>` → shown. Only explicit choices live here; an absent entry reads the
     // source's own default.
-    railVisibility: z.record(preferenceId, z.boolean()).optional(),
-    exclusiveSlots: z.partialRecord(z.enum(CORE_EXCLUSIVE_SLOTS), preferenceId).optional(),
+    railVisibility: z
+      .record(preferenceId, z.boolean())
+      .optional()
+      .describe(
+        "Whether each source shows in the left rail, keyed `<pluginId>:<sourceId>`. A missing entry uses the source's default.",
+      ),
+    exclusiveSlots: z
+      .partialRecord(z.enum(CORE_EXCLUSIVE_SLOTS), preferenceId)
+      .optional()
+      .describe(
+        "Which plugin draws each part of the window a plugin can replace, by plugin ID. `core` is acorn's own.",
+      ),
     plugins: z
-      .array(z.strictObject({ id: preferenceId, source: devicePluginSourceSchema }))
+      .array(
+        z.strictObject({
+          id: preferenceId.describe("The plugin's ID."),
+          source: devicePluginSourceSchema.describe(
+            'Where to install it from: `{ github, tag? }`, `{ npm, version? }`, `{ url }` on https, or `{ path }`.',
+          ),
+        }),
+      )
       .max(128)
-      .optional(),
+      .optional()
+      .describe(
+        'Plugins to offer for installing. Each shows in the Plugins palette, and nothing installs or is trusted until you say so.',
+      ),
   })
   .superRefine((value, ctx) => {
     for (const key of Object.keys(value)) {

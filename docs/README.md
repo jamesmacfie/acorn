@@ -143,6 +143,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [site/built-in-plugins.md](./site/built-in-plugins.md) | The public site's list of the plugins acorn ships, each plugin's facts box, and the test that keeps both whole. |
 | [site/design.md](./site/design.md) | How the public site looks: its stylesheet on acorn's tokens, fonts, mark, Appearance control, components, contrast check, and the landing page's Lighthouse scores. |
 | [site/specimens.md](./site/specimens.md) | Specimens on the public site: plugin tree code both hosts draw, the generators that commit and check it, and the scoped stylesheet. |
+| [site/references.md](./site/references.md) | The public site's generated reference pages: command-line help, keyboard shortcuts, configuration files, environment variables, and the published schemas, and the check behind each. |
 | [site/releases.md](./site/releases.md) | What the public site reads from GitHub at build time, the download page's release files, and the hand-written changelog and its feed. |
 | [site/snapshots.md](./site/snapshots.md) | Shell snapshots on the public site: the invented fixture, the scenes, how the capture drives the running apps, and adding a scene. |
 | [testing.md](./testing.md) | The way into the tests: the commands, focused runs, and the topic pages. |

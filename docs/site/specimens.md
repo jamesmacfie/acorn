@@ -47,8 +47,8 @@ pictures, looks at them, and commits them. The terminal generator also runs in t
 own test suite.
 
 The terminal generator lives in `apps/tui` because the cell renderer does, and it reads and writes the
-site's files by path. That's the one place an app touches another app's files. Apps still never import
-each other. Moving the cell renderer into a package would remove the exception, at far more cost.
+site's files by path. The sidebar generator below does the same from `apps/extension`. Those are the
+two places an app touches another app's files. Apps still never import each other.
 
 The output is the same on every machine. The generator renumbers node ids and element ids from the
 specimen id, pins the clock to January 15, 2026, and runs with the UTC time zone and the `en_US` locale.
@@ -56,6 +56,18 @@ The HTML keeps no scripts and no event handler attributes. An inline style keeps
 and the geometry a component computes for itself: `transform`, `width`, `height`, `min-width`, `top`,
 `left`, `position`, `grid-template-columns`, and `visibility`. Input values and checked boxes are copied
 into attributes, because a mounted control holds them as properties.
+
+## The browser extension's panel
+
+The extension's panel isn't a plugin tree, so its pictures are a third generator.
+`apps/extension/src/sidebar/pictures.test.tsx` mounts the real sidebar under jsdom against a scripted
+Node, the way the extension's own sidebar tests do, for each scene: pairing, Home, a conversation, and
+the handoff card. It writes the markup to `apps/site/src/generated/sidebar/<id>.html`, inside the
+`.snapshot-sidebar` wrapper the panel's own sheet is scoped to, and copies a text box's value into its
+markup. `pnpm --filter @acorn/site specimens` runs it last, with the same `UPDATE_SPECIMENS=1` switch,
+and the extension's test suite runs it too, so a sidebar change fails until someone regenerates the
+pictures. `SidebarPicture.astro` draws one at the panel's width, and holds each scene's title and
+caption. To add a scene, add a test that calls `picture()`, and an entry in that component.
 
 ## The specimen stylesheet
 
@@ -70,7 +82,8 @@ styles [shell snapshots](./snapshots.md#on-the-site).
   `data-theme` and `data-style` on `<html>` drive every specimen.
 - Every other rule applies only inside `.acorn-ui`. A rule for `html` or `body` moves onto `.acorn-ui`.
   A style pack's `:root[data-style='…']` qualifier stays on the root.
-- A rule that matches nothing in the committed specimens' and snapshots' HTML is dropped. A rule for a state, such as
+- A rule that matches nothing in the committed specimens', snapshots', and sidebar pictures' HTML is
+  dropped. A rule for a state, such as
   `:hover`, stays when the element it styles exists. The rules for `.ui-badge` and `.ui-kbd` always stay,
   because the site's `Badge` and `Keys` components draw the kit's markup outside any specimen.
 

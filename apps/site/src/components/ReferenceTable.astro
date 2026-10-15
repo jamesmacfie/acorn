@@ -4,11 +4,15 @@
 interface Props {
   /** The column headings. */
   head: string[]
-  /** One row per entry. `id` is its anchor, and its first cell is drawn as code. */
+  /** One row per entry. `id` is its anchor, and its first cell is drawn as code. The other cells are
+   *  text, where a span in backticks is drawn as code. */
   rows: { id: string; cells: string[] }[]
 }
 
 const { head, rows } = Astro.props
+
+const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const withCode = (text: string) => escape(text).replace(/`([^`]+)`/g, '<code>$1</code>')
 ---
 
 <div class="reference not-content">
@@ -26,7 +30,7 @@ const { head, rows } = Astro.props
               </a>
             </th>
             {row.cells.slice(1).map((cell) => (
-              <td>{cell}</td>
+              <td set:html={withCode(cell)} />
             ))}
           </tr>
         ))

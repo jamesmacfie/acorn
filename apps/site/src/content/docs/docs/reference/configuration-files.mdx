@@ -1,0 +1,103 @@
+---
+title: Configuration files
+description: "The files acorn reads its configuration from: a project's .acorn/config.toml, workflow files, and each device's acorn.json, with every field."
+sources:
+  - docs/workspaces-and-tasks/project-config.md
+  - docs/workflows/definitions.md
+  - docs/tui/process.md
+  - docs/shell/process.md
+  - packages/node-core/src/server/projects/runConfig.ts
+  - plugins/docker/src/server/dockerConfig.ts
+  - packages/plugin-types/acorn-device.schema.json
+  - packages/protocol/src/device/deviceConfig.ts
+  - packages/custody/src/config/deviceConfig.ts
+  - apps/desktop/src-tauri/src/lib.rs
+checked: 07aa959a0
+---
+
+import DeviceConfigReference from '../../../../components/DeviceConfigReference.astro'
+
+acorn reads three kinds of file you can write by hand: a project's `.acorn/config.toml`, workflow files,
+and each device's `acorn.json`. This page lists every field in each. The pages it links to explain when
+to use them.
+
+| File | Where | What it sets |
+| --- | --- | --- |
+| `.acorn/config.toml` | A repository's root, and `~/.acorn/config.toml` for every project on the Node's machine | Run targets, files to copy into worktrees, the Database pane's connection script, the preview, pane layouts, and Docker hints |
+| `.acorn/workflows/*.toml` | A repository's root, and `~/.acorn/workflows/` | One workflow per file |
+| `acorn.json` | Each device's own folder | Appearance, shortcuts, the left rail, and plugins to offer |
+
+The first two live on the Node, with the project. `acorn.json` lives on your device, beside the app or
+the terminal client.
+
+## The project config file
+
+A repository's `.acorn/config.toml` wins over your own `~/.acorn/config.toml`, which wins over the
+project's page in **Settings**. [Project configuration](/docs/using/project-configuration/) explains
+the layers, and why acorn asks you to trust a committed file before it runs anything from it.
+
+| Key | Type | What it does |
+| --- | --- | --- |
+| `copy` | array of strings | Files to copy into each new worktree, such as ones Git ignores. The whole list comes from one file. |
+| `[scripts.run.<id>]` | table | A run target, named `<id>`. A later file's target replaces one with the same name. |
+| `command` | string | Required, in a run target. The command that starts it. |
+| `url` | string | The address the target serves, such as `http://localhost:5173`. |
+| `url_command` | string | A command that prints the address. Use it or `url`, not both. |
+| `stop` | string | The command that stops the target. |
+| `restart` | string | The command that restarts it. Without one, acorn stops it and starts it again. |
+| `icon` | string | The target's icon. |
+| `default` | boolean | Makes this target's address the Preview pane's home page. Without one, the first target's is. |
+| `[database]` `url_script` | string | A script that prints the task's database connection URL, for the Database pane. |
+| `[preview]` `mode` | string | How the Preview pane finds its page: `"url"`, `"port"`, or `"script"`. |
+| `[preview]` `value` | string | The address, the port from 1 to 65535, or the script, to go with `mode`. |
+| `[layout.<id>]` `panes` | array of strings | Required, in a layout. The panes to open, left to right, split equally. Unknown names are dropped. |
+| `[layout.<id>]` `terminal` | string | A run target to start, with the terminal drawer open. |
+| `[layout.<id>]` `browser` | string | `"run:<id>"` points the Preview pane at that run target's address once it's up. |
+| `[docker]` `compose_project` | string | A Compose project whose containers the Docker pane suggests for each task. |
+| `[docker]` `match_labels` | array of strings | Container label keys whose value must equal the task's branch, for a container to be suggested. |
+| `[docker]` `match_name` | boolean | Whether a container whose name holds the task's branch is suggested. On by default. |
+
+The setup and teardown scripts aren't in this file, and a `[scripts]` `setup` or `archive` key is
+reported and ignored. [Task scripts](/docs/using/task-scripts/) says where they live. The `[docker]` hints
+only suggest containers, and run nothing, so they apply without trusting the file
+([Docker](/docs/built-in-plugins/docker/)). A line acorn
+can't read is reported, and the rest of the file still applies.
+
+## Workflow files
+
+Each `.toml` file in a repository's `.acorn/workflows/` folder is one workflow, named by its file name.
+acorn also reads `~/.acorn/workflows/` on the Node's machine, and a repository's file wins over one
+there with the same name. [Write a workflow](/docs/automation/write-a-workflow/#the-file-format) has
+every key, and a committed workflow file asks for your trust before it runs, the way
+`.acorn/config.toml` does.
+
+## The device config file
+
+`acorn.json` holds the settings that belong to one device rather than to a Node: the ones **Settings**
+marks **This device**. acorn reads it when it starts and watches it while it runs, so an edit applies
+at once. **Settings** > **Advanced** > **Device config file** shows where it is and opens it.
+
+| Client | Where |
+| --- | --- |
+| Desktop app on macOS | `~/Library/Application Support/com.acorn.desktop/acorn.json` |
+| Desktop app on Windows | `%APPDATA%\com.acorn.desktop\acorn.json` |
+| Terminal client | `acorn.json` in its config folder ([Environment variables](/docs/reference/environment-variables/#the-terminal-client-and-the-command-line)) |
+
+Changing a setting in the app writes the file, and keeps any key the app doesn't know. If the file
+doesn't parse, acorn says where the mistake is and keeps using the last settings that worked. Add
+`"$schema": "https://acorn.sh/schemas/acorn-device.schema.json"` for completion in your editor
+([JSON Schemas](/docs/reference/json-schemas/)).
+
+<DeviceConfigReference />
+
+The file can't hold credentials, tokens, scripts, or commands. acorn refuses a file with a key such as
+`commands`, `credentials`, or `tokens`, or any key starting `plugin:`, and keeps the last settings that
+worked.
+
+## Limits
+
+- `.acorn/config.toml` and workflow files are read on the Node's machine. A device can't add its own.
+- `acorn.json` sets this device only. Settings stored on the Node, such as a project's scripts, aren't
+  in it.
+- An entry under `plugins` in `acorn.json` offers that plugin for installing. It installs nothing and
+  trusts nothing until you approve it.

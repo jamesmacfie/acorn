@@ -1,0 +1,53 @@
+---
+// Every default shortcut, read from the code that registers it (scripts/keybindings.mjs): a table per
+// group for the desktop app, or for the terminal client's own keys with `terminal`.
+import shortcuts from 'virtual:acorn-keybindings'
+import Keys from './Keys.astro'
+
+interface Props {
+  terminal?: boolean
+}
+
+const rows = shortcuts.filter((row) => (Astro.props.terminal ? row.terminal : row.desktop))
+const FIRST = ['Global', 'Tasks', 'Panes']
+const groups = [...new Set(rows.map((row) => row.category))].sort(
+  (a, b) => (FIRST.indexOf(a) + 1 || 99) - (FIRST.indexOf(b) + 1 || 99) || a.localeCompare(b),
+)
+const slug = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+---
+
+{
+  groups.map((group) => (
+    <>
+      <h3 id={`keys-${Astro.props.terminal ? 'terminal-' : ''}${slug(group)}`}>{group}</h3>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Shortcut</th>
+            <th scope="col">What it does</th>
+            <th scope="col">Where</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows
+            .filter((row) => row.category === group)
+            .map((row) => (
+              <tr>
+                <td>
+                  <Keys chord={row.chord} />
+                  {row.to && (
+                    <>
+                      {' to '}
+                      <Keys chord={row.to} />
+                    </>
+                  )}
+                </td>
+                <td>{row.description}</td>
+                <td>{row.where}</td>
+              </tr>
+            ))}
+        </tbody>
+      </table>
+    </>
+  ))
+}

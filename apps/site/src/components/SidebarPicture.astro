@@ -1,0 +1,55 @@
+---
+// The browser extension's panel in one state, as its own jsdom tests mount it
+// (apps/extension/src/sidebar/pictures.test.tsx, docs/site/specimens.md). The markup is the panel's
+// own, styled by its sheet inside the specimen stylesheet, so it follows the visitor's theme. It's a
+// picture, so nothing in it can be focused or clicked.
+import 'virtual:acorn-ui.css'
+import SnapshotFrame from './SnapshotFrame.astro'
+
+const PICTURES = {
+  'sidebar-pairing': {
+    title: 'Pair this browser',
+    caption: 'Pairing, with the Node on this Mac found in its data folder.',
+  },
+  'sidebar-home': {
+    title: 'Home',
+    caption: "Home on a pull request's page: a request waiting for you, the page's task, and the workspace's tasks.",
+  },
+  'sidebar-conversation': {
+    title: 'A conversation',
+    caption: 'A conversation, with text selected on the page waiting in the draft.',
+  },
+  'sidebar-handoff': {
+    title: 'Home',
+    caption: 'The handoff card, for a pull request no task holds yet.',
+  },
+} as const
+
+interface Props {
+  id: keyof typeof PICTURES
+}
+
+const pages = import.meta.glob<string>('../generated/sidebar/*.html', { eager: true, query: '?raw', import: 'default' })
+const { id } = Astro.props
+const html = pages[`../generated/sidebar/${id}.html`]
+if (html === undefined) throw new Error(`There's no sidebar picture "${id}". Run UPDATE_SPECIMENS=1 pnpm --filter @acorn/site specimens.`)
+---
+
+<SnapshotFrame host="browser" title={PICTURES[id].title} caption={PICTURES[id].caption}>
+  <div class="panel acorn-ui" inert set:html={html} />
+</SnapshotFrame>
+
+<style>
+  /* The panel at the width a browser gives it, cut off where a short window would cut it. The class
+     pair outweighs the rule the specimen stylesheet moves from the app's body onto `.acorn-ui`. */
+  .panel.acorn-ui {
+    inline-size: min(100%, 360px);
+    max-block-size: 640px;
+    margin-inline: auto;
+    overflow: hidden;
+    border-inline: var(--surface-border);
+  }
+  .panel :global(.snapshot-sidebar) {
+    contain: layout;
+  }
+</style>

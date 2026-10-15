@@ -138,6 +138,11 @@ Some parts need the desktop app:
 
 Press Alt+E to grow the message box in terminals that can't tell Ctrl+Shift+Enter from Enter.
 
+Two more places reach a session: the browser panel, beside the page the work is about ([Talk to an
+agent from the browser](/docs/browser-extension/talk-to-an-agent-from-the-browser/)), and the command
+line's `acorn agent` commands, for scripts ([The command
+line](/docs/automation/the-command-line/#agents-and-workflows)).
+
 ## Limits
 
 - acorn has no control for importing a transcript from another tool. The Node accepts one through its

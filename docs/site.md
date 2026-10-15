@@ -68,9 +68,9 @@ has the command and the scores.
 
 ## Specimens
 
-Pictures of plugin UI on the site are _specimens_: plugin tree code that both hosts draw, committed as
-HTML and as terminal cells, and checked against the kit on every change. [Specimens](./site/specimens.md)
-covers adding one, the generators, the specimen stylesheet, and what jsdom can't draw.
+Pictures of plugin UI and of the browser extension's panel are _specimens_, committed and checked on
+every change ([specimens](./site/specimens.md)). Reference pages that list commands, shortcuts, files,
+and variables read them from the code at build ([generated references](./site/references.md)).
 
 ## Shell snapshots
 

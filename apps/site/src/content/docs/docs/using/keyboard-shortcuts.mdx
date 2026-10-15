@@ -9,6 +9,7 @@ sources:
   - apps/desktop/src/client/App.tsx
   - apps/desktop/src/client/TaskView.tsx
   - packages/client-core/src/host/palette/CommandPalette.tsx
+  - apps/site/scripts/keybindings.mjs
 checked: 90ded85ca
 ---
 
@@ -20,42 +21,19 @@ what the keyboard does right where you are.
 
 ## The defaults
 
-These are the desktop defaults on macOS. On Windows, read Ctrl for ⌘. **Settings** > **General** >
-**Keyboard shortcuts** lists every shortcut, including the ones plugins add, with what each is set to
-now.
+[Keyboard shortcuts reference](/docs/reference/keyboard-shortcuts-reference/) lists every shortcut acorn
+starts with, read from the code, with where each works. The ones you'll use most:
 
 | Shortcut | What it does |
 | --- | --- |
 | <Keys chord="meta+k" /> | Open the command palette |
 | <Keys chord="meta+/" /> | Show what the keyboard does here |
-| <Keys chord="meta+," /> | Open Settings |
-| <Keys chord="meta+l" /> | Switch project or workspace |
-| <Keys chord="meta+;" /> | Switch to the last project or workspace |
-| <Keys chord="meta+p" /> | Go to a file in this task |
 | <Keys chord="meta+shift+n" /> | New task |
 | <Keys chord="meta+1" /> to <Keys chord="meta+9" /> | Open the first nine tasks in the rail |
-| <Keys chord="meta+0" /> | Open GitHub |
 | <Keys chord="meta+shift+t" /> | Show or hide the terminal drawer |
-| <Keys chord="meta+shift+enter" /> | Maximize the focused pane, or bring the row back |
-| <Keys chord="meta+shift+f" /> | Find in files |
 
-Each pane has its own shortcut to show it:
-
-| Shortcut | Pane |
-| --- | --- |
-| <Keys chord="meta+shift+r" /> | Pull request |
-| <Keys chord="meta+shift+a" /> | Agent |
-| <Keys chord="meta+shift+g" /> | Git |
-| <Keys chord="meta+shift+d" /> | Notes |
-| <Keys chord="meta+shift+x" /> | Context |
-| <Keys chord="meta+shift+e" /> | Editor |
-| <Keys chord="meta+shift+b" /> | Preview |
-| <Keys chord="meta+shift+j" /> | Database |
-| <Keys chord="meta+shift+h" /> | API |
-
-Inside a pane, a few more apply. <Keys chord="meta+enter" /> commits in the Changes tab's message box
-and runs the query in the Database pane. In a pull request's list, `/` finds a file, `]` and `[` move
-between changed files, and `c` creates a pull request.
+On Windows, read Ctrl for ⌘. **Settings** > **General** > **Keyboard shortcuts** lists every shortcut,
+including the ones plugins add, with what each is set to now.
 
 ## Change a shortcut
 

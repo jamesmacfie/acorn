@@ -1,0 +1,164 @@
+---
+title: Write a workflow
+description: Make a workflow in the app's editor or as a TOML file in your repository, draft one with a model, and export it to a file. With every key a workflow file can hold.
+sources:
+  - docs/workflows/authoring.md
+  - docs/workflows/definitions.md
+  - docs/workflows/editor-details.md
+  - docs/workflows/file-drafts.md
+  - docs/workflows/ai-authoring.md
+  - plugins/workflows/src/contract/workflowFile.ts
+  - plugins/workflows/src/server/definitions/files.ts
+  - plugins/workflows/src/client/editor/WorkflowEditor.tsx
+checked: 07aa959a0
+---
+
+import WorkflowFileReference from '../../../../components/WorkflowFileReference.astro'
+
+A workflow lives in one of two places: a TOML file in a repository, or the Node, when you make it in the
+app. The editor opens both. This page covers the editor, drafting a workflow with a model, moving one
+from the app into a file, and every key a file can hold.
+
+## Choose where it lives
+
+| | A file in the repository | Made in the app |
+| --- | --- | --- |
+| Where | `.acorn/workflows/<name>.toml` in the project, or `~/.acorn/workflows/` for your own | On the Node, in a workspace, and optionally tied to one project |
+| Who sees it | Everyone with the repository | Anyone using that Node |
+| Reviewed | In a pull request, like any file | By you, when you publish |
+| Before it runs | acorn asks you to trust it, and again when it changes | You publish it |
+| Runs on a schedule | No | Yes |
+
+Start in the app to try something out, and export it to the repository when others should have it.
+
+## Make one in the editor
+
+1. Click **Workflows** in the left rail, then **New** above the list. **New workflow** in the command
+   palette does the same.
+
+   The editor opens on **Untitled workflow**, tied to the project the rail is showing.
+
+2. Fill in **Definition**: the name, **Approvals**, the riskiest tools agents may use, how many child
+   tasks and agents it may run at once, and its budget.
+3. Under **Inputs**, add the values a run starts with, such as an issue to fix.
+4. Click **Add step** and pick a kind. Kinds are grouped as **Ask AI**, **Records**, and **Flow**, then
+   one group for each plugin that adds steps. [Steps, gates, and budgets](/docs/automation/steps-gates-and-budgets/)
+   explains each one.
+5. Select a step to set it up. Its form says which earlier steps it waits for, and a prompt has a chip
+   for each input and each step certain to finish before it. Click a chip to put that value in the
+   prompt.
+6. Click **Publish…**, review what's published, and click **Publish**.
+
+   The badge beside the name changes from **Not published** to **Published**.
+
+The editor saves your draft as you go. Running and scheduling use the published version, so you can
+keep editing without changing what runs. The footer lists the first problem the workflow has, and
+clicking it selects the step.
+
+The editor has three views of the same workflow: the outline, **Graph**, and **Code**, which is the
+whole definition as JSON. **Undo** and **Redo** cover all three.
+
+A workflow an agent drafted with its workflow tools shows **Agent draft**, and runs only once you
+publish it.
+
+## Draft one with a model
+
+**AI authoring** in the editor's header opens a conversation about the workflow. It shows once you've
+connected a model, or have Claude Code or Codex installed ([Model providers and generating
+text](/docs/agents/model-providers-and-generating-text/)).
+
+1. Click **AI authoring** and describe what the workflow should do, or what to change.
+2. The model may ask you a question first. Then it proposes a change, shown as a list of what it adds,
+   removes, and edits.
+3. Apply it, or reject it. Applying is one step you can undo.
+
+The model sees the workflow, the step kinds, and the names of your data sources, but not their records,
+unless you turn on **Use preview records to help AI**, which sends up to three. It can't save, publish,
+run, or schedule anything. The conversation stays on this device, so closing the dialog and opening it
+again picks up where you were.
+
+## Edit a workflow file
+
+Pick a workflow file in the **Workflows** list and it opens in the same editor. acorn keeps your edits
+as a draft on the Node and doesn't touch the file until you publish:
+
+1. Click **Publish…**. acorn checks whether the file changed on disk since you opened it, and asks you
+   to choose where your edits and those changes disagree.
+2. Click **Write files**. acorn writes the file and leaves it uncommitted, for you to commit.
+
+A file acorn can't read stays as it is, and its row in the list says what's wrong. Fix it in a text
+editor.
+
+## Export a workflow to a file
+
+To move a workflow you made in the app into the repository, publish it, then choose **Export to
+repository…** from **More actions** in the editor's header. acorn shows the files it will write under `.acorn/workflows/` in
+the project, including any workflows and saved queries it uses. Click **Write files**. The workflow in
+the app stays as it was, and the new files are uncommitted.
+
+## The file format
+
+A workflow file is TOML. This one asks an agent to fix a bug, then runs the tests and waits for your
+approval at the same time:
+
+```toml
+baseline = "acorn-1"
+format_version = 1
+name = "Fix and review"
+
+[[inputs]]
+name = "issue"
+label = "Issue"
+description = "What's wrong, in a sentence or two."
+required = true
+schema_json = '{ "type": "string" }'
+
+[[steps]]
+id = "fix"
+name = "Fix the bug"
+prompt = "Fix this issue: ${inputs.issue}"
+goal = "The bug is fixed, the tests pass, and the fix is committed."
+
+[[steps]]
+id = "tests"
+name = "Run the tests"
+kind = "terminal:command"
+after = ["fix"]
+
+[steps.with]
+command = "pnpm test"
+
+[[steps]]
+id = "review"
+name = "Review the fix"
+kind = "gate-human"
+after = ["fix"]
+```
+
+The file's name, without `.toml`, is the workflow's ID. Each step's `id` stays the same when you rename
+the step, so what refers to it keeps working. A step with no `after` waits for the step above it, and
+`after = []` starts it straight away. `${inputs.<name>}` and `${steps.<id>.output}` put a value into a
+prompt, or into a string under `[steps.with]`.
+
+Typed values, such as a schema or a default that isn't text, are JSON in a string, in keys ending
+`_json`, because TOML can't hold every JSON value. The editor's **Code** view writes them for you.
+
+These are every key a file can hold. A plugin's step kind takes its own keys under `[steps.with]`,
+and the editor shows them as a form.
+
+<WorkflowFileReference />
+
+## In the terminal
+
+The terminal client draws the **Workflows** list in its Browse panel and the editor in the main panel.
+**Code** is a plain text box there.
+
+## Limits
+
+- A workflow file can't be scheduled. Make it in the app, or schedule a workflow made in the app that
+  runs it as a step.
+- acorn refuses a file without `baseline = "acorn-1"` and `format_version = 1`, and says which file.
+- The graph view's layout is kept on this device, not in the workflow, so a file's diff never shows
+  positions.
+- Exporting refuses a workflow that uses one of your own files in `~/.acorn/workflows`, or whose
+  destination files already exist.

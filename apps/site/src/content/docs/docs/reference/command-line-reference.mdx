@@ -1,0 +1,24 @@
+---
+title: Command line reference
+description: "Every `acorn` command and its options, as the command line's own help prints them."
+sources:
+  - docs/cli.md
+  - apps/cli/src/args.ts
+  - apps/cli/schemas/resources-v1.schema.json
+  - apps/site/scripts/cliHelp.mjs
+checked: 07aa959a0
+---
+
+import CliReference from '../../../../components/CliReference.astro'
+
+This page lists every `acorn` command with its options. Each block is the command's own `--help`
+output, read from the command line when this site was built, so it matches the release the site
+describes. [The command line](/docs/automation/the-command-line/) explains how to use it: choosing a
+Node, output formats, and exit codes.
+
+In the help text, `|` separates choices, `[…]` is optional, and words in capitals are values you supply.
+`-` in place of a file reads from standard input. `--help` needs no Node and no terminal, so
+`acorn <command> --help` always works. A plugin's own commands print their help with
+`acorn plugin <plugin> <command> --help`, from the Node that has the plugin.
+
+<CliReference />

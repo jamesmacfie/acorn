@@ -1,0 +1,6 @@
+{"columns":60,"rows":4,"lines":[
+[{"text":" ","fg":"accent"},{"text":"  Fix the bug                                  "},{"text":"Agent · Done","fg":"muted"}],
+[{"text":"  "},{"text":" ","fg":"accent"},{"text":"  Run the tests                         "},{"text":"Command · Running","fg":"muted"}],
+[{"text":"  "},{"text":" ","fg":"accent"},{"text":"  Review the fix              "},{"text":"Wait for a person · Waiting","fg":"muted"}],
+[]
+]}

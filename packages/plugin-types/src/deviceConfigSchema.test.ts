@@ -24,3 +24,13 @@ it('keeps the published device config schema generated from the parser', () => {
   expect(JSON.parse(generated).properties).toHaveProperty('plugins')
   expect(readFileSync(PATH, 'utf8')).toBe(generated)
 })
+
+// The site's Configuration files page draws each property's description, so none may be missing.
+it('describes every top-level property of the device config schema', () => {
+  const properties = JSON.parse(generate()).properties as Record<string, { description?: string }>
+  expect(
+    Object.entries(properties)
+      .filter(([, property]) => !property.description)
+      .map(([name]) => name),
+  ).toEqual([])
+})

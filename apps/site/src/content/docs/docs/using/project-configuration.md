@@ -50,7 +50,7 @@ equally. Unknown pane names are dropped. Apply a layout to a task from **Apply a
 command palette's **Run** group.
 
 The setup and teardown scripts aren't in this file. [Task scripts](/docs/using/task-scripts/) explains
-why.
+why. [Configuration files](/docs/reference/configuration-files/#the-project-config-file) lists every key.
 
 ## Where a value comes from
 

@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "title": "A device and two Nodes",
+    "caption": "Your device keeps how acorn looks and which Nodes it may reach. Each Node keeps its own data, and the two share nothing.",
+    "terminal": {
+      "columns": 60,
+      "rows": 4
+    },
+    "width": 680
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Graph",
+          "props": {
+            "id": "device-and-nodes",
+            "ariaLabel": "A device and two Nodes",
+            "nodes": [
+              {
+                "id": "device",
+                "label": "Your device",
+                "detail": "Appearance, shortcuts, paired Nodes"
+              },
+              {
+                "id": "local",
+                "label": "This computer",
+                "detail": "Its projects, worktrees, and agents",
+                "tone": "accent"
+              },
+              {
+                "id": "remote",
+                "label": "Build box",
+                "detail": "Its own projects, worktrees, and agents",
+                "tone": "accent"
+              }
+            ],
+            "edges": [
+              {
+                "from": "device",
+                "to": "local"
+              },
+              {
+                "from": "device",
+                "to": "remote"
+              }
+            ],
+            "positions": {
+              "device": {
+                "x": 210,
+                "y": 0
+              },
+              "local": {
+                "x": 105,
+                "y": 130
+              },
+              "remote": {
+                "x": 315,
+                "y": 130
+              }
+            }
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

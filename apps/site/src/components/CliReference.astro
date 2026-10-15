@@ -1,0 +1,22 @@
+---
+// The command line's help, as the built binary prints it (scripts/cliHelp.mjs): the overview, then the
+// usage lines for each command. Each command's help ends with the same options and exit codes as the
+// overview, so only the overview shows them.
+import { Code } from '@astrojs/starlight/components'
+import help from 'virtual:acorn-cli-help'
+
+const usage = (text: string) => text.split('\n\n')[0]!
+---
+
+<Code code={help.overview.trimEnd()} lang="text" title="acorn --help" />
+
+{
+  help.commands.map(({ command, text }) => (
+    <>
+      <h2 id={command}>
+        <code>acorn {command}</code>
+      </h2>
+      <Code code={usage(text)} lang="text" title={`acorn ${command} --help`} />
+    </>
+  ))
+}
