@@ -419,8 +419,9 @@ Each plugin landing page above has topic pages in a folder of the same name:
   addresses](./future/split/03-node-paths-and-addresses.md), [version skew](./future/split/04-version-skew.md),
   [repository identity](./future/split/05-repository-identity.md), [change
   requests](./future/split/06-change-requests.md), [a plugin API audit](./future/split/07-plugin-api-audit.md)
-  and [its table](./future/split/07-plugin-api-audit-table.md), [app plugin imports](./future/split/08-app-plugin-imports.md), and [remote
-  preview](./future/split/09-remote-preview.md).
+  and [its table](./future/split/07-plugin-api-audit-table.md), [app plugin imports](./future/split/08-app-plugin-imports.md), [remote
+  preview](./future/split/09-remote-preview.md), and [the remote preview
+  proxy](./future/split/10-remote-preview-proxy.md).
 
 ## Plugin rail and artwork proposal
 
