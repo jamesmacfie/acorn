@@ -47,7 +47,8 @@ body { padding-bottom: var(--pane-head-h); }
 .rail .tabrail-tab.active { border-top-color: var(--rail-accent, var(--accent)); }
 
 /* ── Header ─────────────────────────────────────────────────────────────────────────────────── */
-/* Pinned to the top edge so it stays in reach as the view scrolls, above the sticky composer. */
+/* Pinned to the top edge so it stays in reach as the view scrolls, above the sticky composer. The top
+ * rule separates it from the browser's own panel bar, which an extension can't colour. */
 .top {
   position: sticky;
   top: 0;
@@ -58,6 +59,7 @@ body { padding-bottom: var(--pane-head-h); }
   height: var(--pane-head-h);
   padding: 0 var(--space-6);
   background: var(--bg-subtle);
+  border-top: var(--chrome-divider);
   border-bottom: var(--chrome-divider);
 }
 /* A view's name in the desktop pane header's label style, with a list's count beside it. An open
