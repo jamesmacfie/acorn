@@ -1,0 +1,25 @@
+---
+import Marketing from '../../layouts/Marketing.astro'
+import type { PageMeta } from '../../meta'
+
+export const meta = {
+  description: 'Everything acorn does, one feature group at a time.',
+  sources: ['docs/features.md'],
+  checked: '1e0ef8b80',
+} satisfies PageMeta
+---
+
+<Marketing title="Features" meta={meta}>
+  <ul>
+    <li><a href="/features/tasks/">Tasks</a>: Workspaces, projects, tasks, worktrees, and panes: the model everything hangs on.</li>
+    <li><a href="/features/agents/">Agents</a>: Claude Code and Codex sessions, approvals, delegation, custom agents, and memory.</li>
+    <li><a href="/features/review/">Review</a>: GitHub pull request review, and Git: changes, history, stashes, and conflicts.</li>
+    <li><a href="/features/desktop-and-terminal/">Desktop and terminal</a>: One workspace, two clients, and the same plugins in both.</li>
+    <li><a href="/features/task-tools/">Task tools</a>: The editor, database, HTTP, Docker, preview, Linear, and Rollbar panes.</li>
+    <li><a href="/features/automation/">Automation</a>: Workflows, schedules, dashboards, and the command line.</li>
+    <li><a href="/features/browser/">Browser extension</a>: The Chrome and Firefox extension.</li>
+    <li><a href="/features/nodes/">Nodes</a>: Local and remote Nodes, pairing, the fleet, and the standalone Node.</li>
+    <li><a href="/features/plugins/">Plugins</a>: Why plugins work the way they do, and what one can add.</li>
+    <li><a href="/features/security/">Security</a>: What acorn keeps from agents and plugins, and how.</li>
+  </ul>
+</Marketing>

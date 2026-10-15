@@ -1,0 +1,40 @@
+---
+import { pageMeta, type PageMeta } from '../meta'
+
+interface Props {
+  title: string
+  meta: PageMeta
+}
+
+const { title, meta } = Astro.props
+// A marketing page with a missing or malformed field fails the build, as a docs page does.
+pageMeta.parse(meta)
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · acorn</title>
+    <meta name="description" content={meta.description} />
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+  </head>
+  <body>
+    <header>
+      <nav aria-label="Main">
+        <a href="/">acorn</a>
+        <a href="/features/">Features</a>
+        <a href="/docs/">Docs</a>
+        <a href="/plugins/">Plugins</a>
+        <a href="/download/">Download</a>
+        <a href="/changelog/">Changelog</a>
+      </nav>
+    </header>
+    <main>
+      <h1>{title}</h1>
+      <slot />
+    </main>
+  </body>
+</html>

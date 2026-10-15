@@ -1,0 +1,12 @@
+// The site deploys as a Cloudflare Worker with static assets and no script (docs/site.md).
+{
+  "name": "acorn-site",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    // Serve dist/404.html, with a 404 status, for any address the build didn't write.
+    "not_found_handling": "404-page"
+  },
+  // Each pull request uploads a version under a `pr-<number>` alias, served on workers.dev.
+  "preview_urls": true
+}

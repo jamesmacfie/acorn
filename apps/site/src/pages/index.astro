@@ -1,0 +1,15 @@
+---
+import Marketing from '../layouts/Marketing.astro'
+import type { PageMeta } from '../meta'
+
+export const meta = {
+  description: 'An agent workspace for developers who work with coding agents.',
+  sources: ['docs/features.md', 'README.md'],
+  checked: '1e0ef8b80',
+} satisfies PageMeta
+---
+
+<Marketing title="acorn" meta={meta}>
+  <p>What acorn is, a picture of it, and how to install it. Not written yet.</p>
+  <p><a href="/features/">Features</a> · <a href="/docs/">Docs</a> · <a href="/download/">Download</a></p>
+</Marketing>

@@ -1,0 +1,14 @@
+---
+import Marketing from '../layouts/Marketing.astro'
+import type { PageMeta } from '../meta'
+
+export const meta = {
+  description: 'The plugins acorn ships, each linked to its docs page.',
+  sources: ['docs/first-party-plugins.md'],
+  checked: '1e0ef8b80',
+} satisfies PageMeta
+---
+
+<Marketing title="Plugins" meta={meta}>
+  <p>The plugins acorn ships, each linked to its docs page. Not written yet.</p>
+</Marketing>

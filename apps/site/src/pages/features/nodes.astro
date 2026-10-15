@@ -1,0 +1,14 @@
+---
+import Marketing from '../../layouts/Marketing.astro'
+import type { PageMeta } from '../../meta'
+
+export const meta = {
+  description: 'Local and remote Nodes, pairing, the fleet, and the standalone Node.',
+  sources: ['docs/architecture/fleet.md', 'docs/node-distribution.md', 'docs/authentication.md'],
+  checked: '1e0ef8b80',
+} satisfies PageMeta
+---
+
+<Marketing title="Nodes" meta={meta}>
+  <p>Local and remote Nodes, pairing, the fleet, and the standalone Node. Not written yet.</p>
+</Marketing>

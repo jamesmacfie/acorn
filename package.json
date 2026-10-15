@@ -27,6 +27,7 @@
     "dev:no-watch": "pnpm --filter @acorn/desktop dev:no-watch",
     "dev:node": "pnpm --filter @acorn/node dev:node",
     "dev:plugin": "pnpm --filter @acorn/node dev:plugin",
+    "dev:site": "pnpm --filter @acorn/site dev",
     "dist": "pnpm --filter @acorn/desktop dist",
     "format": "oxfmt",
     "lint": "oxlint && oxfmt --check && knip --no-config-hints && turbo run lint --continue",

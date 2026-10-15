@@ -1,0 +1,14 @@
+---
+import Marketing from '../layouts/Marketing.astro'
+import type { PageMeta } from '../meta'
+
+export const meta = {
+  description: 'What changed in acorn, newest first.',
+  sources: ['docs/release-notes.md'],
+  checked: '1e0ef8b80',
+} satisfies PageMeta
+---
+
+<Marketing title="Changelog" meta={meta}>
+  <p>What changed, newest first, with an RSS feed. Not written yet.</p>
+</Marketing>

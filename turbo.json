@@ -54,6 +54,17 @@
     "lint": {
       "dependsOn": ["topo"]
     },
+    // ACORN_SITE_PREVIEW decides whether a site build keeps drafts and /lab/. Strict env mode would
+    // drop it, and the two builds must not share a cache entry. The tests read the built pages.
+    "@acorn/site#build": {
+      "dependsOn": ["^build", "topo"],
+      "outputs": ["dist/**"],
+      "env": ["ACORN_SITE_PREVIEW"]
+    },
+    "@acorn/site#test": {
+      "dependsOn": ["topo", "@acorn/site#build"],
+      "env": ["ACORN_SITE_PREVIEW"]
+    },
     // agent-cost consumes the published SDK declarations from dist, so a clean checkout must
     // build that workspace dependency before type-checking the plugin.
     "@acorn/plugin-agent-cost#lint": {

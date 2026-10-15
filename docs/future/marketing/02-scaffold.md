@@ -1,6 +1,83 @@
 # Phase 2: scaffold the site
 
-Date: October 15, 2026. Status: proposed. Every later phase depends on it.
+Date: October 15, 2026. Status: done. Every later phase depends on it.
+
+## Completion note
+
+October 15, 2026. `apps/site` (`@acorn/site`) builds with Astro 7.3 and Starlight 0.42. It holds every
+page in the site map as a stub: 167 docs pages and 15 marketing routes, plus a 404 page and `/lab/`.
+[The public site](../../site.md) is the reference for running, checking, and deploying it.
+
+What landed:
+
+- The docs collection schema in `apps/site/src/content.config.ts`. `description`, `sources`, and
+  `checked` are required, and `covers` is optional. A docs page without `sources` fails the build,
+  draft or not. Marketing pages export `meta`, typed `PageMeta`, and `Marketing.astro` validates it
+  with the same Zod schema in `apps/site/src/meta.ts`.
+- Every docs stub is a draft except the docs home, with `checked: 1e0ef8b80`. The sidebar in
+  `astro.config.mjs` lists every slug in site map order.
+- `ACORN_SITE_PREVIEW=1` makes a preview build. Drafts and `/lab/` build in `astro dev` and on
+  previews, never in production. A production build writes 17 pages, and a preview build writes 184.
+- `apps/site/scripts/budget.mjs`, with `node:test` tests that prove a 50 KB script and a script from
+  another origin both fail. Playwright tests load every built page, run axe on each template, and
+  check the draft and lab rule for whichever build they're given.
+- `.github/workflows/site.yml` checks both builds, uploads a preview per pull request, and deploys
+  production from `main`. `apps/site/wrangler.jsonc` and `apps/site/public/_headers` configure
+  Cloudflare. Nothing has been deployed.
+
+Secrets the deploy needs: `CLOUDFLARE_API_TOKEN`, with **Workers Scripts: Edit** on the account, and
+`CLOUDFLARE_ACCOUNT_ID`. The account's `workers.dev` subdomain must be on for preview URLs. Wrangler
+fails to upload a version to a Worker that doesn't exist, so the first production deploy from `main`
+has to land before any pull request gets a preview. Production goes to `workers.dev` until phase 20
+adds the `acorn.sh` route.
+
+Decisions and deviations:
+
+- The checks and deploys live in their own workflow, `site.yml`, not a `site` job in `ci.yml`. Only a
+  workflow can filter by path, and [sync](./sync.md#where-each-check-runs) wants the job to run only
+  for the paths it lists. `ci.yml`'s check job skips the site's tests so they don't run twice.
+- There's no separate `check` script. `lint` runs `astro check`, so root `pnpm lint` covers the site.
+- No `@astrojs/sitemap` dependency. Starlight adds that integration itself when `site` is set.
+- No `knip.jsonc` change. knip's Astro and Playwright plugins find the entry files. A probe export
+  in `apps/site/src/meta.ts` was reported, so the site is checked.
+- oxfmt doesn't read `.astro` files, and the repository's config formats TypeScript only. The site's
+  `.ts` files pass the format check, and nothing else changed.
+- `/docs/` is "What is acorn", and it's published, not a draft. The 404 page links to it, and the
+  link validator fails a production build that links to a page it didn't write.
+- Starlight fails a production build on a sidebar slug whose page is a draft. `astro.config.mjs`
+  leaves drafts out of the sidebar by reading `draft: true` from each file with a regex, and drops
+  groups left empty. A page that writes `draft` in another form would slip past it.
+- Lab pages live in `apps/site/src/lab/`, and a small integration injects them, because Astro has no
+  way to leave a `src/pages` file out of one kind of build.
+- Starlight draws code with Expressive Code, so the Shiki themes are set in `expressiveCode.themes`.
+- Wrangler runs through `pnpm dlx` at a pinned version, not as a dependency, so a normal install
+  doesn't download the Workers runtime. Previews use `wrangler versions upload --preview-alias pr-<n>`.
+- Playwright uses the installed Chrome, which GitHub's Ubuntu runners have, so nobody downloads a
+  browser. `astro preview` runs with `--ignore-lock`, because Astro 7 moves it to the background when
+  it detects a coding agent.
+- The Content Security Policy allows only the site's origin, but it needs `'unsafe-inline'` for
+  scripts and styles, because Starlight writes them inline. `astro preview` ignores `_headers`, so no
+  test exercises the policy.
+- Slugs follow the site map's title rule literally, so some are long, such as
+  `quick-start-first-project-first-task-first-agent`.
+- The per-component pages in phase 18 and the per-key contribution pages in phase 15 are generated, so
+  they have no stubs. Each of those sections has one stub page for now.
+- The favicon is a copy of the extension's 128-pixel icon.
+- Astro 7.3 needs zod 4.6 and Vite 8.3. The lockfile gains zod 4.6.7 beside the catalog's 4.4.3, and
+  the vitest suites that had resolved Vite 8.0.16 resolve 8.3.4. `@acorn/protocol`'s suite passes on
+  it. The catalog is unchanged.
+
+What later phases need to know:
+
+- To publish a docs page, delete its `draft: true` line.
+- Add CI checks to the `site` job in `site.yml`, and run them for both builds when output differs.
+- Phase 4 reads `sources` and `checked` from docs frontmatter and from each marketing page's `meta`
+  export.
+- The FAQ stub cites `docs/future/marketing/voice.md`, which goes when this folder is deleted.
+- `pnpm dev` starts the site's dev server along with the desktop app, the same way it starts the
+  extension and the terminal client.
+- Two architecture checks fail on the base commit before this change too: the console baseline and
+  library entrypoints in `boundaries.test.ts`. So do the doc length, doc path, and citation checks.
 
 ## Goal
 

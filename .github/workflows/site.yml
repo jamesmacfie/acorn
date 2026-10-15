@@ -1,0 +1,90 @@
+name: Site
+
+# The public site in apps/site: its checks, a preview deploy for each pull request, and the production
+# deploy from main. It runs when the site changes or when something it reads from does, so a kit or
+# contract change outside the site still runs the site's checks (docs/site.md).
+on:
+  pull_request:
+    paths: &site-inputs
+      - apps/site/**
+      - docs/**
+      - packages/protocol/**
+      - packages/client-core/src/kit/**
+      - packages/client-core/src/infra/styles/**
+      - packages/plugin-sdk/**
+      - packages/plugin-types/**
+      - apps/tui/src/kit/**
+      - examples/**
+      - pnpm-lock.yaml
+      - .github/workflows/site.yml
+  push:
+    branches: [main]
+    paths: *site-inputs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-${{ github.event_name }}-${{ github.ref }}
+  # A newer push to a pull request replaces its preview. Production deploys finish in order.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The Wrangler release the deploy steps run, kept out of the lockfile so a normal install doesn't
+  # download the Workers runtime.
+  WRANGLER: wrangler@4.149.0
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # `astro check`: types in the .astro pages, the content config, and the tests.
+      - run: pnpm --filter @acorn/site lint
+
+      # Each build runs the link validator. `test` runs the budget check's own tests, the budget, and the
+      # Playwright tests in the runner's installed Chrome. The production build must leave out every
+      # draft and /lab/ page, and the preview build must keep them.
+      - name: Check the production build
+        run: pnpm --filter @acorn/site build && pnpm --filter @acorn/site test
+      - name: Check the preview build
+        run: pnpm --filter @acorn/site build && pnpm --filter @acorn/site test
+        env:
+          ACORN_SITE_PREVIEW: '1'
+
+      # A fork's pull request gets no secrets, so it gets no preview.
+      - name: Upload the preview
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        working-directory: apps/site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.json
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Keep search engines off preview URLs.
+          printf '\n/*\n  X-Robots-Tag: noindex\n' >> dist/_headers
+          pnpm dlx "$WRANGLER" versions upload --preview-alias "pr-$PR_NUMBER"
+          url=$(jq -r 'select(.type == "version-upload") | .preview_alias_url // .preview_url' "$WRANGLER_OUTPUT_FILE_PATH")
+          echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy production
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: apps/site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # The last build was the preview, so build production again before it ships.
+          pnpm build
+          pnpm dlx "$WRANGLER" deploy

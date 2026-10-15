@@ -1,0 +1,10 @@
+---
+title: Add a settings page
+description: Give your plugin a page in Settings.
+sources:
+  - docs/plugin-authoring/settings-pages.md
+checked: 1e0ef8b80
+draft: true
+---
+
+This page isn't written yet.

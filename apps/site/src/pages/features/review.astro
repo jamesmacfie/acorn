@@ -1,0 +1,14 @@
+---
+import Marketing from '../../layouts/Marketing.astro'
+import type { PageMeta } from '../../meta'
+
+export const meta = {
+  description: 'GitHub pull request review, and Git: changes, history, stashes, and conflicts.',
+  sources: ['docs/github-integration.md', 'docs/git-client/history.md', 'docs/git-client/operations.md'],
+  checked: '1e0ef8b80',
+} satisfies PageMeta
+---
+
+<Marketing title="Review" meta={meta}>
+  <p>GitHub pull request review, and Git: changes, history, stashes, and conflicts. Not written yet.</p>
+</Marketing>

@@ -1,0 +1,14 @@
+---
+import Marketing from '../../layouts/Marketing.astro'
+import type { PageMeta } from '../../meta'
+
+export const meta = {
+  description: 'One workspace, two clients, and the same plugins in both.',
+  sources: ['docs/tui.md', 'docs/ui-design/closed-kit.md'],
+  checked: '1e0ef8b80',
+} satisfies PageMeta
+---
+
+<Marketing title="Desktop and terminal" meta={meta}>
+  <p>One workspace, two clients, and the same plugins in both. Not written yet.</p>
+</Marketing>

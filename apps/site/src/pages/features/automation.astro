@@ -1,0 +1,14 @@
+---
+import Marketing from '../../layouts/Marketing.astro'
+import type { PageMeta } from '../../meta'
+
+export const meta = {
+  description: 'Workflows, schedules, dashboards, and the command line.',
+  sources: ['docs/workflows.md', 'docs/schedules.md', 'docs/dashboards.md', 'docs/cli.md'],
+  checked: '1e0ef8b80',
+} satisfies PageMeta
+---
+
+<Marketing title="Automation" meta={meta}>
+  <p>Workflows, schedules, dashboards, and the command line. Not written yet.</p>
+</Marketing>
