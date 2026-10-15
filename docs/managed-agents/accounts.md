@@ -49,7 +49,9 @@ there too. Acorn gives each extra account its own folder and points the CLI at i
   the default file goes. When Claude saves a setting from inside an account session, the change can
   reach the shared file through the link.
 - **Other readers.** The terminal handoff passes the same variable. A delegated child on its parent's
-  harness inherits the parent's account.
+  harness inherits the parent's account, unless it's a custom agent that names its own.
+- **Custom agents.** A custom agent can name an account. Its sessions start there while the Node still
+  holds it, and on the default account otherwise ([custom agents](./custom-agents.md)).
 
 ## Add an account
 

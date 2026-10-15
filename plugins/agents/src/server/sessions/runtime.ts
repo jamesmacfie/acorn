@@ -304,16 +304,20 @@ export class ManagedAgentRuntime {
           created: false,
         }
     }
-    // The caller's choice, or the one a fork's config carries from its source, or else the harness's
-    // default account. The HTTP route drops a client's own `config.account`, so a request names an
-    // account only through `account`. A session resuming a provider reference stays on the login it
-    // came from, because the CLI finds the reference only in that folder.
+    // The caller's choice, or the one a fork's config carries from its source, or the custom agent's,
+    // or else the harness's default account. The HTTP route drops a client's own `config.account`, so a
+    // request names an account only through `account`. A session resuming a provider reference stays on
+    // the login it came from, because the CLI finds the reference only in that folder.
     const account =
       input.account ??
       sessionAccount(input.config) ??
       (input.resumeProviderSessionRef
         ? null
-        : await this.engine.readWhileRunning(() => this.engine.accounts.defaultAccount(input.providerId)))
+        : await this.engine.readWhileRunning(
+            async () =>
+              (await this.customAgentAccount(input.customAgentId)) ??
+              this.engine.accounts.defaultAccount(input.providerId),
+          ))
     const provider = await this.engine.readWhileRunning(() =>
       this.providers.usable((candidate) => candidate.id === input.providerId, account),
     )
@@ -415,6 +419,14 @@ export class ManagedAgentRuntime {
   async customAgents(): Promise<CustomAgent[]> {
     const userId = this.currentUserId()
     return userId ? readCustomAgents(this.core.prefs, userId) : customAgentRegistry.list()
+  }
+
+  /** The account a custom agent names, while this Node still holds it. One the person has since
+   *  removed gives null, so the start falls back to the harness's default account. */
+  async customAgentAccount(customAgentId: string | undefined): Promise<string | null> {
+    if (!customAgentId) return null
+    const agent = (await this.customAgents()).find((candidate) => candidate.id === customAgentId)
+    return agent?.account && (await this.engine.accounts.has(agent.providerId, agent.account)) ? agent.account : null
   }
 
   /**

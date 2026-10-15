@@ -97,6 +97,7 @@ describe('agent delegation service', () => {
       providers: { usable: async (pick: (provider: typeof PROVIDER) => boolean) => [PROVIDER, CLAUDE].find(pick) },
       spawnedAgentDefaults: async () => defaults,
       customAgents: async () => customAgents,
+      customAgentAccount: async () => null,
       acceptSession: vi.fn(async (input: Parameters<ManagedAgentRuntime['acceptSession']>[0]) =>
         sessions.createSession(input, input.providerId === 'claude' ? CLAUDE : PROVIDER),
       ),
