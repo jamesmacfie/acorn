@@ -425,6 +425,16 @@ Each plugin landing page above has topic pages in a folder of the same name:
   preview](./future/split/09-remote-preview.md), and [the remote preview
   proxy](./future/split/10-remote-preview-proxy.md).
 
+## GitLab and Bitbucket parity proposal
+
+- [Give GitLab and Bitbucket the same experience as GitHub](./future/github/README.md), with phases
+  for [agent context](./future/github/01-change-request-agent-context.md), [workflow
+  CI](./future/github/02-workflow-ci-by-provider.md), [GitHub assumptions outside the
+  plugin](./future/github/03-github-assumptions-outside-the-plugin.md), [shared review
+  views](./future/github/04-shared-change-request-ui.md), [a GitLab plugin](./future/github/05-gitlab-plugin.md),
+  [self-hosted hosts](./future/github/06-self-hosted-hosts.md), [fork
+  checkout](./future/github/07-fork-checkout.md), and [a Bitbucket plugin](./future/github/08-bitbucket-plugin.md).
+
 ## Plugin rail and artwork proposal
 
 - [Dynamic plugin rail presentation and artwork](./future/plugin-rail-artwork.md).
