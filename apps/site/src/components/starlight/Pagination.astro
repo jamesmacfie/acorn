@@ -1,0 +1,25 @@
+---
+// Previous and next, in sidebar order, kept inside the page's own sidebar: the last Docs page doesn't
+// lead into Build plugins.
+import { isBuildPath } from '../../nav'
+
+const { prev, next } = Astro.locals.starlightRoute.pagination
+const build = isBuildPath(Astro.url.pathname)
+const links = [
+  { rel: 'prev', label: 'Previous', link: prev },
+  { rel: 'next', label: 'Next', link: next },
+].filter(({ link }) => link && isBuildPath(link.href) === build)
+---
+
+{
+  links.length > 0 && (
+    <nav class="pagination print:hidden" aria-label="Previous and next pages">
+      {links.map(({ rel, label, link }) => (
+        <a class="card" href={link!.href} rel={rel}>
+          <span class="eyebrow">{label}</span>
+          <span>{link!.label}</span>
+        </a>
+      ))}
+    </nav>
+  )
+}

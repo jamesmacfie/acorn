@@ -83,3 +83,48 @@ test('the specimen frames have no serious accessibility violations', async ({ pa
   const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).exclude('.acorn-ui').analyze()
   expect(violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([])
 })
+
+// The design gallery's own components, around the specimens. Inside a specimen is the kit's markup, as
+// above, but the site's own badges and keys also carry `.acorn-ui`, so only the specimens are left out.
+for (const route of ['/lab/design/', '/lab/design/docs/', '/lab/design/landing/']) {
+  test(`${route} has no serious accessibility violations`, async ({ page }) => {
+    test.skip(!previewBuild, 'The design gallery is a lab page, which only a preview build has.')
+    await page.goto(route)
+    const { violations } = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .exclude('.specimen .acorn-ui')
+      .analyze()
+    expect(violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([])
+  })
+}
+
+for (const route of ['/', '/docs/']) {
+  test(`picking a theme and style pack on ${route} restyles the page without a reload`, async ({ page }) => {
+    await page.goto(route)
+    const background = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+    const before = await background()
+    await page.getByRole('button', { name: 'Appearance' }).click()
+    await page.getByRole('combobox', { name: 'Theme' }).selectOption('dracula')
+    await page.getByRole('combobox', { name: 'Style' }).selectOption('cozy')
+    expect(await background()).not.toBe(before)
+    await expect(page.locator('html')).toHaveAttribute('data-style', 'cozy')
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark')
+  })
+}
+
+// A saved choice is on <html> by the first frame, so a reload never draws another theme first.
+test('a saved theme and style pack apply before the first frame', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('acorn-theme', 'nord')
+    localStorage.setItem('acorn-style', 'modern')
+    requestAnimationFrame(() => {
+      const { theme, style } = document.documentElement.dataset
+      Object.assign(window, { firstFrame: { theme, style } })
+    })
+  })
+  await page.goto('/docs/')
+  expect(await page.evaluate(() => (window as unknown as { firstFrame: object }).firstFrame)).toEqual({
+    theme: 'nord',
+    style: 'modern',
+  })
+})

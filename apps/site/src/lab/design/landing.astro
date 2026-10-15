@@ -1,0 +1,176 @@
+---
+// The landing page wireframe, restyled with the site's components: its sections in their order, with
+// its draft copy and placeholders where pictures will go. It shows the design at the landing page's full
+// length, and its weight against the landing page's budget.
+import { Code } from '@astrojs/starlight/components'
+import Card from '../../components/Card.astro'
+import Feature from '../../components/Feature.astro'
+import Hero from '../../components/Hero.astro'
+import InstallBlock from '../../components/InstallBlock.astro'
+import SnapshotFrame from '../../components/SnapshotFrame.astro'
+import Specimen from '../../components/Specimen.astro'
+import Tour from '../../components/Tour.astro'
+import Marketing from '../../layouts/Marketing.astro'
+import type { PageMeta } from '../../meta'
+import { faq, guides, headline, installMethods, paneEntry, paragraph, tour } from '../wireframes/_landing'
+import Placeholder from './_Placeholder.astro'
+
+const meta: PageMeta = {
+  description: 'The landing page wireframe, restyled.',
+  sources: ['docs/future/marketing/05-wireframes.md', 'docs/future/marketing/06-visual-design.md'],
+  checked: '7cb189809',
+}
+
+const slug = (text: string) => text.toLowerCase().replace(/[^a-z]+/g, '-')
+const tourTabs = tour.map((label) => ({
+  id: slug(label),
+  label,
+  text: 'Placeholder copy for this feature group, one paragraph long, beside its shell snapshot.',
+  href: '/features/',
+  link: `More about ${label.toLowerCase()}`,
+}))
+const steps = [
+  ['Open a task', 'A task is one piece of work on one project. It gets a branch, and a Git worktree the first time it needs files.', 'tabs'],
+  ['Run agents in it', 'Start Claude Code or Codex sessions in the task. Answer their approvals, queue turns, and hand work to child sessions.', 'alert'],
+  ['Review and ship', 'Read the diff, open the pull request, and merge from the same window. Archive the task and acorn cleans up its worktree.', 'buttons'],
+]
+const security = [
+  ['/docs/security/the-trust-model/', 'Scoped tokens', 'Agents get a token scoped to their task. They never see your credentials.'],
+  ['/docs/security/credentials-and-secrets/', 'Encrypted credentials', 'Credentials are encrypted at rest and left out of backups.'],
+  ['/docs/security/plugin-trust-and-permissions/', 'Sandboxed plugins', 'Installed plugins run sandboxed, with only the permissions you accept on each device.'],
+  ['/docs/security/telemetry-and-privacy/', 'No telemetry by default', 'Telemetry is off by default.'],
+]
+---
+
+<Marketing title="Landing, restyled" meta={meta}>
+  <Hero slot="hero" eyebrow="For developers who run coding agents" title={headline}>
+    <p>{paragraph}</p>
+    <Fragment slot="actions">
+      <a class="button" data-variant="primary" href="/download/">Get acorn</a>
+      <a class="button" href="/docs/">Read the docs</a>
+    </Fragment>
+    <div slot="picture" class="hero-stack">
+      <InstallBlock id="hero-install" methods={installMethods} />
+      <p>Desktop app for macOS and Windows · terminal client · command line · browser extension</p>
+      <SnapshotFrame host="desktop" title="acorn · fix-login-redirect" caption="The same task in the desktop app and in the terminal client.">
+        <Placeholder label="Shell snapshot: one task with an agent session, the Changes pane, and the terminal drawer" />
+      </SnapshotFrame>
+    </div>
+  </Hero>
+
+  <section class="section">
+    <h2>How it works</h2>
+    <div class="features">
+      {
+        steps.map(([title, text, specimen], index) => (
+          <Feature number={index + 1} title={title} href="/docs/start/concepts/" link="Read the concepts">
+            <p>{text}</p>
+            <Specimen slot="picture" id={specimen} />
+          </Feature>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>What's in a task</h2>
+    <Tour tabs={tourTabs}>
+      {tourTabs.map((tab) => <Placeholder slot={tab.id} label={`Shell snapshot: ${tab.label}`} />)}
+    </Tour>
+  </section>
+
+  <section class="section">
+    <h2>The desktop app and the terminal client draw the same panes</h2>
+    <p>Both clients draw the same components, so a plugin written once works in both.</p>
+    <Specimen id="list-detail" />
+  </section>
+
+  <section class="section">
+    <h2>Add a pane with a manifest entry</h2>
+    <Code code={paneEntry} lang="json" title="acorn-plugin.json" />
+    <Specimen id="settings-section" />
+    <ul class="cards">
+      {
+        guides.map(([base, title]) => (
+          <li>
+            <Card title={title} href={`/docs/${base}/${slug(title)}/`}>
+              <p>Placeholder line for this guide.</p>
+            </Card>
+          </li>
+        ))
+      }
+    </ul>
+    <p>Or ask your agent to write it. acorn's agents read the plugin vocabulary from your Node.</p>
+  </section>
+
+  <section class="section">
+    <h2>What agents and plugins can't reach</h2>
+    <div class="cards">
+      {
+        security.map(([href, title, text]) => (
+          <Card title={title} href={href}>
+            <p>{text}</p>
+          </Card>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Your Node, on this machine or another</h2>
+    <p>
+      The desktop app runs a Node on your machine. Pair others, including a standalone Node on a server, and use them
+      from the desktop app, the terminal client, or the command line.
+    </p>
+    <a href="/docs/nodes/">Read about Nodes</a>
+    <SnapshotFrame host="terminal" title="acorn" size="120×36" caption="Fleet home with two Nodes.">
+      <Placeholder label="Small shell snapshot: Fleet home with two Nodes" />
+    </SnapshotFrame>
+  </section>
+
+  <section class="section">
+    <h2>Questions</h2>
+    <div class="faq">
+      {
+        faq.map(([question, answer]) => (
+          <details>
+            <summary>{question}</summary>
+            <p>{answer}</p>
+          </details>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Get acorn</h2>
+    <InstallBlock id="footer-install" methods={installMethods} />
+    <div class="actions">
+      <a class="button" data-variant="primary" href="/download/">Get acorn</a>
+      <a class="button" href="/docs/">Read the docs</a>
+    </div>
+  </section>
+</Marketing>
+
+<style>
+  .hero-stack {
+    display: grid;
+    gap: var(--space-8);
+  }
+  ul.cards {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .faq details {
+    padding-block: var(--space-6);
+    border-block-end: var(--divider);
+  }
+  .faq summary {
+    font-weight: var(--fw-semibold);
+    cursor: pointer;
+  }
+  .faq p {
+    margin-block-end: 0;
+  }
+</style>

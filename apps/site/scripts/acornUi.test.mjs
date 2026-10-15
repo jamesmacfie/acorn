@@ -34,8 +34,20 @@ test('every rule in the specimen stylesheet applies only inside .acorn-ui, apart
   assert.match(css, /prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-theme="light"\]\)/)
 })
 
-test('finds the 12 themes and 4 style packs', () => {
-  const { themes, styles } = appearances()
+test('keeps the kit rules the site draws outside specimens', () => {
+  const css = acornUiCss()
+  assert.match(css, /\.acorn-ui \.ui-kbd-key/)
+  assert.match(css, /\.acorn-ui \.ui-badge\[data-tone='warn'\]/)
+})
+
+test('finds the 12 themes and 4 style packs, with their labels, and which themes are dark', () => {
+  const { themes, styles, dark } = appearances()
   assert.equal(themes.length, 12)
-  assert.deepEqual(styles.toSorted(), ['cozy', 'cute', 'modern', 'terminal'])
+  assert.deepEqual(themes[0], { id: 'light', label: 'Light' })
+  assert.deepEqual(styles.map(({ id }) => id), ['terminal', 'modern', 'cozy', 'cute'])
+  assert.deepEqual(
+    themes.map(({ id }) => id).filter((id) => !dark.includes(id)),
+    ['light', 'solarized-light', 'catppuccin-latte'],
+  )
+  assert.equal(dark.length, 9)
 })

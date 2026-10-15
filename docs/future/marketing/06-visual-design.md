@@ -1,6 +1,97 @@
 # Phase 6: design the site from the app
 
-Date: October 15, 2026. Status: proposed. Needs phase 5. Phases 8, 9, and 10 depend on it.
+Date: October 15, 2026. Status: done. Needs phase 5. Phases 8, 9, and 10 depend on it.
+
+## Completion note
+
+October 15, 2026. The site is styled from acorn's tokens, fonts, and mark, on marketing pages and docs
+pages alike. The header's **Appearance** control offers the 12 themes and 4 style packs and restyles
+the site and every specimen with no reload. [The site's design](../../site/design.md) is the reference.
+James reviews it at `/lab/design/`, `/lab/design/docs/`, `/lab/design/landing/`, and
+`/lab/design/social-card/` in `pnpm dev:site`.
+
+What landed:
+
+- `apps/site/src/styles/site.css`, on the app's tokens, with `--site-*` tokens only for the hero
+  headline size, the prose measure, the page width, and section spacing. It maps Starlight's `--sl-*`
+  palette and type onto acorn's tokens, so Starlight's own parts follow the theme.
+- JetBrains Mono 2.304, regular, bold, and italic, with its OFL license, in `apps/site/public/fonts/`,
+  first in `--font-mono`. Inter, Literata, and Nunito come from the app's own `fonts.css`.
+- The wordmark, read from the app's `Acorn.tsx`, and `favicon.svg`, the drawing reduced to the cap and
+  the outline. The old PNG favicon is gone.
+- Components in `apps/site/src/components/`: header, footer, hero, install block, the specimen frame,
+  the snapshot frame, feature section, tabbed tour, card, badge, keys, reference table, checkpoint, and
+  social card. Tabs and copy buttons share two scripts.
+- Starlight's `Header`, `Sidebar`, `PageTitle`, `Footer`, `ThemeProvider`, and `ThemeSelect` replaced.
+- The no-flash script, `AppearanceScript.astro`, on every page.
+- `scripts/siteCss.test.mjs`, `scripts/contrast.test.mjs`, and Playwright tests for the theme switch,
+  the first frame after a reload, and axe on the three gallery pages.
+
+The acceptance checks pass. The contrast test passes in every theme. axe finds nothing serious on the
+gallery, outside the specimens' own markup. A preview build passes all 219 Playwright tests, and a
+production build writes 17 pages and passes its 24. The restyled landing wireframe weighs 33.9 KB in
+total with 4.7 KB of script, against 150 KB and 10 KB.
+
+### Decisions
+
+These follow the recommendations in this file, as [how agents run these phases](./README.md#how-agents-run-these-phases)
+says.
+
+- **Mono for long prose.** Docs body text is JetBrains Mono at `--fs-lg`, 15 pixels in Terminal, with
+  a 70-character measure. Switching it to Inter is a one-line change in `site.css` if James finds long
+  pages tiring.
+- **No text in a muted or tone color.** The contrast test found `--text-muted` at 2.93:1 in Solarized
+  Light, tone colors as low as 2.31:1 in Catppuccin Latte, and `--text` at 3.89:1 on `--bg-selected`
+  in Solarized Dark. So every piece of text is `--text`. Secondary text differs by size and case, a
+  callout's or a badge's tone is its border, and a current or hovered row gets an accent rule. A
+  primary button is `--bg` on `--text`, because text on the accent fails in Solarized Light. No theme
+  changed.
+- **Decorative rules aren't checked.** Grey rules that separate sections are decoration, which WCAG
+  1.4.11 leaves out, so `--border` isn't in the contrast test. The accent rules that mark state are.
+- **Two sidebars.** The Starlight config lists the Docs groups first and the Build plugins groups
+  after them, as top-level groups. `Sidebar.astro` shows a page its own half, split by URL, and
+  previous and next stay inside it.
+
+### Deviations
+
+- Search, the table of contents, and `MarkdownContent` aren't replaced. Their markup already does the
+  job, so `site.css` restyles them. The prose measure applies to the text column's children, and a
+  specimen, code block, or table takes the column's full width, with no override.
+- The header folds into its menu below 50rem, which is 800 pixels, not 768, so it folds at Starlight's
+  own breakpoint and a docs page never shows two menus. On a docs page the sidebar menu carries the
+  header's links and the Appearance control.
+- The table of contents leaves the page below Starlight's 72rem, 1152 pixels, not the wireframe's
+  1280, because Starlight's 52rem content column fits three columns there.
+- Callouts, badges, and keys take the kit's shape, but keep their text in `--text`, for the contrast
+  reason above. The kit itself still sets tone colors as text inside specimens.
+- Code block options moved to `apps/site/ec.config.mjs`, because Starlight's `<Code>` component can't
+  read a function from `astro.config.mjs`.
+- The specimen stylesheet now loads on every page, because its token blocks are the site's tokens. It
+  always keeps the kit's badge and key-cap rules, for the site's own components.
+- The footer shows the version the source builds, 1.0.0 from the desktop app's `package.json`,
+  because there's no release to read. A `shortcut:` comment in `SiteFooter.astro` marks it.
+- The landing wireframe's copy moved into `apps/site/src/lab/wireframes/_landing.ts`, so the wireframe
+  and its restyled version read the same words. The wireframes keep their grey-box look.
+
+### What later phases need to know
+
+- Phase 8: a page that fills the `hero` slot of `Marketing.astro` gets the `Hero` component's `h1`
+  instead of the layout's. `/lab/design/landing/` is the starting point. The eyebrow there is the
+  wireframe's draft.
+- Phase 10: replace the footer's source version with the newest release, and add the star count to
+  the header's star button at 100 stars or more.
+- Phase 15 and later: use `ReferenceTable` for reference rows that need anchors, and `Badge` for host
+  support, permission kind, and shipping.
+- Phase 19: screenshot `/lab/design/social-card/` at 1200 by 630. It shows one example card and takes
+  no parameters.
+- A new style that sets text or a rule in a token pair the contrast test doesn't list needs a row in
+  `PAIRS` in `scripts/contrast.test.mjs`.
+- Pagefind's index exists only in a build, so check search's look with a build and `astro preview`.
+  It was checked that way on `/docs/` in this phase, with one result to show.
+- The architecture checks still fail on this base exactly as phase 2 recorded. None of the failures
+  come from this change. `packages/protocol/src/plugin/handoffs.ts` also fails the format check on the
+  base.
+- Nothing here needs a deploy, so nothing is left for phase 20.
 
 ## Goal
 

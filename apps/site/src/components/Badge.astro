@@ -1,0 +1,12 @@
+---
+// A badge, drawn with the kit's own `Badge` markup so it takes the kit's shape in every style pack. The
+// site's stylesheet keeps its word in `--text`, because the kit's tone colors fail contrast as text in
+// some themes. The tone shows in the border.
+interface Props {
+  tone?: 'neutral' | 'accent' | 'ok' | 'warn' | 'danger'
+}
+
+const { tone = 'neutral' } = Astro.props
+---
+
+<span class="acorn-ui not-content"><span class="ui-badge" data-tone={tone} data-shape="tag" data-size="sm"><slot /></span></span>

@@ -63,6 +63,12 @@ Pictures of plugin UI on the site are _specimens_: plugin tree code that both ho
 HTML and as terminal cells, and checked against the kit on every change. [Specimens](./site/specimens.md)
 covers adding one, the generators, the specimen stylesheet, and what jsdom can't draw.
 
+## Design
+
+The site is styled from acorn's own design tokens, fonts, and mark, and offers the app's themes and
+style packs under **Appearance**. [The site's design](./site/design.md) covers the stylesheet, the
+components, Starlight's replaced parts, the contrast check, and the design gallery at `/lab/design/`.
+
 ## Keep pages in sync
 
 Every written page names the internal docs and source files it was written from in `sources`, and the

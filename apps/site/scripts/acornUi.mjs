@@ -10,6 +10,7 @@ import { JSDOM } from 'jsdom'
 import postcss from 'postcss'
 
 const STYLES = new URL('../../../packages/client-core/src/infra/styles/', import.meta.url)
+const SETTINGS = new URL('../../../packages/client-core/src/features/settings/', import.meta.url)
 const SPECIMENS = new URL('../src/generated/specimens/', import.meta.url)
 
 // The site chooses its own fonts, so it leaves the app's font files out.
@@ -24,6 +25,10 @@ function appSheets() {
     .filter((name) => !SKIPPED.has(name))
     .map((name) => readFileSync(new URL(name, STYLES), 'utf8'))
 }
+
+// Kit components the site draws with the kit's own markup, outside any specimen: badges and key caps.
+// Their rules stay whether or not a specimen uses them.
+const SITE_KIT = /\.ui-(?:badge|kbd)\b/
 
 // What may qualify the root element, such as `[data-style='cozy']` or `:not([data-theme="light"])`.
 const QUALIFIERS = String.raw`(?:\[[^\]]*\]|:not\([^)]*\))*`
@@ -77,7 +82,9 @@ export function acornUiCss() {
   sheet.walkComments((comment) => comment.remove())
   sheet.walkRules((rule) => {
     if (inKeyframes(rule) || isTokenBlock(rule)) return
-    const used = rule.selectors.map(scopeSelector).filter((selector) => matches(document, selector))
+    const used = rule.selectors
+      .map(scopeSelector)
+      .filter((selector) => SITE_KIT.test(selector) || matches(document, selector))
     if (used.length > 0) rule.selectors = [...new Set(used)]
     else rule.remove()
   })
@@ -102,17 +109,18 @@ export function acornUi() {
   }
 }
 
-/** The themes and style packs the token files define, by id. `light` and `terminal` are the plain
- *  `:root` defaults, with no block of their own. */
+/** The themes and style packs, in the app's order and with the app's labels, and the ids of the dark
+ *  themes: those whose token block sets `--is-dark: 1`. `light` and `terminal` are the plain `:root`
+ *  defaults, with no block of their own. */
 export function appearances() {
-  const themes = readFileSync(new URL('tokens-theme.css', STYLES), 'utf8')
+  const entries = (file) =>
+    [...readFileSync(new URL(file, SETTINGS), 'utf8').matchAll(/\{ id: '([^']+)', label: '([^']+)'/g)].map(
+      ([, id, label]) => ({ id, label }),
+    )
+  const blocks = readFileSync(new URL('tokens-theme.css', STYLES), 'utf8').matchAll(/:root\[data-theme="([^"]+)"\]\s*\{([^}]*)\}/g)
   return {
-    themes: ['light', ...[...themes.matchAll(/:root\[data-theme="([^"]+)"\]/g)].map(([, id]) => id)],
-    styles: [
-      'terminal',
-      ...readdirSync(STYLES)
-        .map((name) => name.match(/^style-(.+)\.css$/)?.[1])
-        .filter(Boolean),
-    ],
+    themes: entries('builtInThemes.ts'),
+    styles: entries('uiStyles.ts'),
+    dark: [...blocks].filter(([, , body]) => /--is-dark:\s*1\b/.test(body)).map(([, id]) => id),
   }
 }

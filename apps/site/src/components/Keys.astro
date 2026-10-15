@@ -1,0 +1,13 @@
+---
+// A shortcut, written as the app writes it and drawn with the kit's own `Kbd` markup: `meta+shift+g`
+// draws as three caps, ⇧ ⌘ G. A space separates the steps of a sequence.
+import { chordKeys, formatChord } from '@acorn/client-core/kit/lib/formatChord'
+
+interface Props {
+  chord: string
+}
+
+const steps = chordKeys(formatChord(Astro.props.chord))
+---
+
+<span class="acorn-ui not-content"><kbd class="ui-kbd" data-size="sm">{steps.map((step) => <span class="ui-kbd-step">{step.map((key) => <kbd class="ui-kbd-key">{key}</kbd>)}</span>)}</kbd></span>

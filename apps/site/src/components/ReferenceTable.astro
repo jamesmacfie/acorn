@@ -1,0 +1,36 @@
+---
+// A reference table, such as the manifest's fields: a header that stays in view while the reader
+// scrolls, and an anchor on every row so a link can land on one field.
+interface Props {
+  /** The column headings. */
+  head: string[]
+  /** One row per entry. `id` is its anchor, and its first cell is drawn as code. */
+  rows: { id: string; cells: string[] }[]
+}
+
+const { head, rows } = Astro.props
+---
+
+<div class="reference not-content">
+  <table>
+    <thead>
+      <tr>{head.map((heading) => <th scope="col">{heading}</th>)}</tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((row) => (
+          <tr id={row.id}>
+            <th scope="row">
+              <a href={`#${row.id}`}>
+                <code>{row.cells[0]}</code>
+              </a>
+            </th>
+            {row.cells.slice(1).map((cell) => (
+              <td>{cell}</td>
+            ))}
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>

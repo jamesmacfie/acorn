@@ -1,0 +1,119 @@
+---
+// The docs half of the design gallery: every component a docs page draws, inside Starlight's chrome as
+// the site replaces it, so the sidebar, the table of contents, and previous and next are on show too.
+import { Aside, Code, Steps } from '@astrojs/starlight/components'
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro'
+import Badge from '../../components/Badge.astro'
+import Card from '../../components/Card.astro'
+import Checkpoint from '../../components/Checkpoint.astro'
+import Keys from '../../components/Keys.astro'
+import ReferenceTable from '../../components/ReferenceTable.astro'
+import Specimen from '../../components/Specimen.astro'
+import { paneEntry } from '../wireframes/_landing'
+
+const sections = ['Code blocks', 'Callouts', 'Tables', 'Reference tables', 'Badges and keys', 'Steps', 'Specimens', 'Cards']
+const slug = (text: string) => text.toLowerCase().replace(/\s+/g, '-')
+
+const plugin = `import { definePlugin } from 'acorn-plugin-sdk'
+
+// Placeholder: a plugin that adds one pane.
+export default definePlugin({
+  activate(ctx) {
+    ctx.log.info('hello')
+  },
+})`
+
+const fields = [
+  { id: 'field-id', cells: ['id', 'string', 'The plugin’s id. Lowercase, with hyphens.'] },
+  { id: 'field-name', cells: ['name', 'string', 'What Settings → Plugins calls it.'] },
+  { id: 'field-version', cells: ['version', 'string', 'A semver version.'] },
+  { id: 'field-permissions', cells: ['permissions', 'object', 'What the plugin may reach. Placeholder text.'] },
+  { id: 'field-frames', cells: ['frames', 'array', 'The places the plugin draws. Placeholder text.'] },
+]
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Docs components',
+    description: "The docs page's components in every theme and style pack.",
+    sources: ['docs/future/marketing/06-visual-design.md'],
+    checked: '7cb189809',
+    prev: { link: '/lab/design/', label: 'Design gallery' },
+    next: { link: '/lab/design/landing/', label: 'Landing, restyled' },
+  }}
+  headings={sections.map((text) => ({ depth: 2, slug: slug(text), text }))}
+>
+  <p>
+    Every component a docs page draws, in the theme and style pack picked under <strong>Appearance</strong>. Prose
+    keeps a 70-character measure. A specimen, a code block, or a table takes the content column's full width.
+  </p>
+
+  <h2 id={slug('Code blocks')}>Code blocks</h2>
+  <p>Shiki's github-light and github-dark, the two themes the app loads, with the file's path above the code.</p>
+  <Code code={plugin} lang="ts" title="src/plugin.ts" />
+  <Code code={`"$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",\n${paneEntry}`} lang="json" title="acorn-plugin.json" />
+  <Code code="pnpm --filter @acorn/site dev" lang="sh" frame="terminal" title="Terminal" />
+  <p>Inline code reads <code>pnpm dev</code> in a sentence.</p>
+
+  <h2 id={slug('Callouts')}>Callouts</h2>
+  <Aside type="note">A note adds something the reader may want. Its tone is the kit's muted one.</Aside>
+  <Aside type="tip">A tip saves the reader a step. Its tone is the kit's ok one.</Aside>
+  <Aside type="caution" title="Plugins run on every device">
+    A caution says what can go wrong. Its tone is the kit's warn one, and a <a href="/docs/">link</a> keeps the text
+    color.
+  </Aside>
+  <Aside type="danger">A danger says what loses data or exposes a secret. Its tone is the kit's danger one.</Aside>
+
+  <h2 id={slug('Tables')}>Tables</h2>
+  <table>
+    <thead>
+      <tr><th>Command</th><th>What it does</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>pnpm dev</code></td><td>Starts the app for local development.</td></tr>
+      <tr><td><code>pnpm lint</code></td><td>Runs oxlint, the formatter check, the unused-export check, then tsc.</td></tr>
+      <tr><td><code>pnpm test</code></td><td>Runs every suite.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id={slug('Reference tables')}>Reference tables</h2>
+  <p>
+    The header stays in view while the table scrolls past, and every row has an anchor, such as{' '}
+    <a href="#field-permissions">permissions</a>. Placeholder rows.
+  </p>
+  <ReferenceTable head={['Field', 'Type', 'What it holds']} rows={fields} />
+
+  <h2 id={slug('Badges and keys')}>Badges and keys</h2>
+  <p>Host support: <Badge>Desktop</Badge> <Badge>Terminal</Badge> <Badge tone="warn">Reduced</Badge></p>
+  <p>Permission kind: <Badge tone="ok">Enforced</Badge> <Badge>Declared</Badge></p>
+  <p>Plugin shipping: <Badge tone="accent">Built in</Badge> <Badge>Installed package</Badge></p>
+  <p>Open the command palette with <Keys chord="meta+k" />, then press <Keys chord="enter" />.</p>
+
+  <h2 id={slug('Steps')}>Steps</h2>
+  <Steps>
+    <ol>
+      <li>
+        <p>Create the plugin.</p>
+        <Code code="npm create acorn-plugin@latest hello" lang="sh" />
+      </li>
+      <li>
+        <p>Install it into your Node from Settings → Plugins.</p>
+        <Checkpoint>A <strong>Hello</strong> pane shows in the task's pane switcher.</Checkpoint>
+      </li>
+      <li><p>Open the pane. Placeholder step.</p></li>
+    </ol>
+  </Steps>
+
+  <h2 id={slug('Specimens')}>Specimens</h2>
+  <Specimen id="settings-section" />
+
+  <h2 id={slug('Cards')}>Cards</h2>
+  <div class="cards not-content">
+    <Card title="Add a pane" href="/docs/build-plugins/ui/add-a-pane/">
+      <p>Draw your own pane in a task, on the desktop and in the terminal.</p>
+    </Card>
+    <Card title="Give agents tools" href="/docs/build-plugins/node/give-agents-tools/">
+      <p>Add tools an agent calls from inside its session.</p>
+    </Card>
+  </div>
+</StarlightPage>

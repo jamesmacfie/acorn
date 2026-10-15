@@ -1,0 +1,32 @@
+---
+// The site footer: the sitemap in four columns, the license, and the version.
+// shortcut: the version is the one the source builds, from the desktop app's package.json, because
+// no release exists to read; read the newest GitHub release once acorn publishes one.
+import desktop from '../../../desktop/package.json'
+import Mark from './Mark.astro'
+import { footerColumns, GITHUB } from '../nav'
+---
+
+<div class="site-footer">
+  <div class="site-footer-columns">
+    {
+      footerColumns.map((column) => (
+        <nav aria-label={column.label}>
+          <p class="eyebrow">{column.label}</p>
+          <ul>
+            {column.links.map(([label, href]) => (
+              <li>
+                <a href={href}>{label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ))
+    }
+  </div>
+  <div class="site-footer-line">
+    <Mark />
+    <a href={`${GITHUB}/blob/main/LICENSE`}>MIT license</a>
+    <a href="/changelog/">Version {desktop.version}</a>
+  </div>
+</div>

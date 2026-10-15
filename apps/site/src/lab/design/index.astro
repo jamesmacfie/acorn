@@ -1,0 +1,175 @@
+---
+// The design gallery: every component of the site's look, on a marketing page, in whichever theme and
+// style pack the header's Appearance control picks. The docs components are on /lab/design/docs/, inside
+// Starlight's own chrome.
+import Badge from '../../components/Badge.astro'
+import Card from '../../components/Card.astro'
+import Feature from '../../components/Feature.astro'
+import Hero from '../../components/Hero.astro'
+import InstallBlock from '../../components/InstallBlock.astro'
+import Keys from '../../components/Keys.astro'
+import SnapshotFrame from '../../components/SnapshotFrame.astro'
+import SocialCard from '../../components/SocialCard.astro'
+import Specimen from '../../components/Specimen.astro'
+import Tour from '../../components/Tour.astro'
+import Marketing from '../../layouts/Marketing.astro'
+import type { PageMeta } from '../../meta'
+import { headline, installMethods, paragraph } from '../wireframes/_landing'
+import Placeholder from './_Placeholder.astro'
+
+const meta: PageMeta = {
+  description: "The site's components in every theme and style pack.",
+  sources: ['docs/future/marketing/06-visual-design.md'],
+  checked: '7cb189809',
+}
+
+const tour = [
+  {
+    id: 'tasks',
+    label: 'Tasks',
+    text: 'Workspaces group projects, and a project holds tasks. Each task keeps its own panes, terminals, and agent sessions.',
+    href: '/features/tasks/',
+    link: 'More about tasks',
+  },
+  {
+    id: 'agents',
+    label: 'Agents',
+    text: 'Claude Code and Codex run inside the task, in its worktree, with their approvals beside the diff.',
+    href: '/features/agents/',
+    link: 'More about agents',
+  },
+  {
+    id: 'review',
+    label: 'Review',
+    text: 'The diff and the pull request sit in the panes beside the agent that wrote them.',
+    href: '/features/review/',
+    link: 'More about review',
+  },
+]
+---
+
+<Marketing title="Design" meta={meta}>
+  <Hero slot="hero" eyebrow="Design lab · placeholder eyebrow" title={headline}>
+    <p>{paragraph}</p>
+    <Fragment slot="actions">
+      <a class="button" data-variant="primary" href="/download/">Download acorn</a>
+      <a class="button" href="/docs/">Read the docs</a>
+    </Fragment>
+  </Hero>
+
+  <p>
+    Every component of the site's look, in the theme and style pack picked under <strong>Appearance</strong>. The
+    docs components are on <a href="/lab/design/docs/">the docs gallery</a>, the restyled landing wireframe is on{' '}
+    <a href="/lab/design/landing/">the landing page</a>, and the card a shared link shows is on{' '}
+    <a href="/lab/design/social-card/">the social card</a>. The header and footer are this page's own: narrow the
+    window below 800 pixels to fold the header into its menu.
+  </p>
+
+  <section class="section">
+    <p class="eyebrow">Install block</p>
+    <InstallBlock id="gallery-install" methods={installMethods} />
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">Specimen frame</p>
+    <Specimen id="list-detail" />
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">Snapshot frames</p>
+    <SnapshotFrame host="desktop" title="acorn · fix-login-redirect" caption="A task with an agent session, the Changes pane, and the terminal drawer.">
+      <Placeholder label="A desktop shell snapshot" />
+    </SnapshotFrame>
+    <SnapshotFrame host="terminal" title="acorn" size="120×36" caption="The same task in the terminal client.">
+      <Placeholder label="A terminal shell snapshot" />
+    </SnapshotFrame>
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">Feature sections</p>
+    <div class="features">
+      <Feature number={1} title="Each task gets its own worktree" href="/docs/using/tasks-and-worktrees/" link="Read about tasks">
+        <p>
+          A task is one piece of work on one project. It gets a branch, and a Git worktree the first time it needs
+          files, so two agents never edit the same checkout.
+        </p>
+        <Specimen slot="picture" id="tabs" />
+      </Feature>
+      <Feature number={2} title="Approve what the agent asks for" href="/docs/agents/permissions-and-approvals/" link="Read about approvals">
+        <p>Placeholder copy. On a wide screen, this section's picture sits on the other side.</p>
+        <Specimen slot="picture" id="buttons" />
+      </Feature>
+    </div>
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">Tabbed tour</p>
+    <h2>What's in a task</h2>
+    <Tour tabs={tour}>
+      <Placeholder slot="tasks" label="Shell snapshot: a task's panes" />
+      <Placeholder slot="agents" label="Shell snapshot: an agent session" />
+      <Placeholder slot="review" label="Shell snapshot: a pull request" />
+    </Tour>
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">Cards</p>
+    <div class="cards">
+      <Card title="Database" href="/docs/built-in-plugins/database/">
+        <p>Query Postgres, MySQL, and SQLite from a pane, and let agents run read-only queries.</p>
+        <Fragment slot="badges">
+          <Badge tone="accent">Built in</Badge>
+          <Badge>Desktop</Badge>
+          <Badge>Terminal</Badge>
+        </Fragment>
+      </Card>
+      <Card title="Preview" href="/docs/built-in-plugins/preview/">
+        <p>Open the task's dev server in a pane beside the code.</p>
+        <Fragment slot="badges">
+          <Badge tone="accent">Built in</Badge>
+          <Badge>Desktop</Badge>
+          <Badge tone="warn">Reduced</Badge>
+        </Fragment>
+      </Card>
+      <Card title="Agents" href="/features/agents/">
+        <p>Claude Code and Codex sessions, approvals, delegation, custom agents, and memory.</p>
+      </Card>
+    </div>
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">Badges</p>
+    <p>Host support: <Badge>Desktop</Badge> <Badge>Terminal</Badge> <Badge tone="warn">Reduced</Badge></p>
+    <p>Permission kind: <Badge tone="ok">Enforced</Badge> <Badge>Declared</Badge></p>
+    <p>Plugin shipping: <Badge tone="accent">Built in</Badge> <Badge>Installed package</Badge></p>
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">Keys</p>
+    <p>
+      Open the command palette with <Keys chord="meta+k" />, and a new task with <Keys chord="meta+shift+n" />. A
+      sequence: <Keys chord="ctrl+k escape" />.
+    </p>
+  </section>
+
+  <section class="section">
+    <p class="eyebrow">Social card, at half size</p>
+    <div class="social-preview">
+      <SocialCard section="Docs" title="What is acorn" description={paragraph} />
+    </div>
+  </section>
+</Marketing>
+
+<style>
+  /* The card is drawn at its real 1200 by 630 pixels and shrunk to half. A narrow screen shows its left. */
+  .social-preview {
+    inline-size: min(600px, 100%);
+    block-size: 315px;
+    overflow: hidden;
+    border: var(--surface-border);
+  }
+  .social-preview > :global(.social-card) {
+    transform: scale(0.5);
+    transform-origin: 0 0;
+  }
+</style>

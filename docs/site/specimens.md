@@ -60,18 +60,20 @@ into attributes, because a mounted control holds them as properties.
 ## The specimen stylesheet
 
 `apps/site/scripts/acornUi.mjs` builds `virtual:acorn-ui.css` on every build and dev start, from the
-sheets `packages/client-core/src/infra/styles/styles.css` imports. It leaves out `fonts.css`, and the
-manifest's own rules that hide scrollbars.
+sheets `packages/client-core/src/infra/styles/styles.css` imports. It leaves out `fonts.css`, which the
+site's own stylesheet imports, and the manifest's own rules that hide scrollbars. Every page loads it,
+because the token blocks in it are the site's tokens too ([design](../site.md#design)).
 
 - Token blocks, which are `:root` rules that declare only custom properties, stay global. So
   `data-theme` and `data-style` on `<html>` drive every specimen.
 - Every other rule applies only inside `.acorn-ui`. A rule for `html` or `body` moves onto `.acorn-ui`.
   A style pack's `:root[data-style='…']` qualifier stays on the root.
 - A rule that matches nothing in the committed specimens' HTML is dropped. A rule for a state, such as
-  `:hover`, stays when the element it styles exists.
+  `:hover`, stays when the element it styles exists. The rules for `.ui-badge` and `.ui-kbd` always stay,
+  because the site's `Badge` and `Keys` components draw the kit's markup outside any specimen.
 
 `apps/site/scripts/acornUi.test.mjs` fails if any rule applies outside `.acorn-ui`. With the ten seed specimens,
-the stylesheet is 35 KB, or 6.1 KB compressed with Brotli, against 128 KB for `primitives.css` alone.
+the stylesheet is 36 KB, or 6.3 KB compressed with Brotli, against 128 KB for `primitives.css` alone.
 The gallery page, with all ten specimens, weighs 29.9 KB compressed, inside the 100 KB docs budget.
 
 The terminal view colors each slot with the same theme token the terminal takes from a theme, so it

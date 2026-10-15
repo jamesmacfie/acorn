@@ -1,0 +1,18 @@
+---
+// The top of a marketing page: an eyebrow, the headline, a paragraph in the default slot, the actions,
+// and a picture under them at the page's full width.
+interface Props {
+  eyebrow: string
+  title: string
+}
+
+const { eyebrow, title } = Astro.props
+---
+
+<section class="hero">
+  <p class="eyebrow">{eyebrow}</p>
+  <h1>{title}</h1>
+  <div class="hero-text"><slot /></div>
+  <div class="actions"><slot name="actions" /></div>
+  {Astro.slots.has('picture') && <div class="hero-picture"><slot name="picture" /></div>}
+</section>

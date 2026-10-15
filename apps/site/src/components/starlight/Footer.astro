@@ -1,0 +1,17 @@
+---
+// The end of a docs page: the edit link and the date the page last changed, previous and next, and
+// the site footer.
+import EditLink from '@astrojs/starlight/components/EditLink.astro'
+import LastUpdated from '@astrojs/starlight/components/LastUpdated.astro'
+import SiteFooter from '../SiteFooter.astro'
+import Pagination from './Pagination.astro'
+---
+
+<footer class="docs-footer">
+  <div class="docs-footer-meta">
+    <EditLink />
+    <LastUpdated />
+  </div>
+  <Pagination />
+  <SiteFooter />
+</footer>

@@ -1,4 +1,9 @@
 ---
+import 'virtual:acorn-ui.css'
+import '../styles/site.css'
+import AppearanceScript from '../components/AppearanceScript.astro'
+import SiteFooter from '../components/SiteFooter.astro'
+import SiteHeader from '../components/SiteHeader.astro'
 import { pageMeta, type PageMeta } from '../meta'
 
 interface Props {
@@ -16,25 +21,19 @@ pageMeta.parse(meta)
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <AppearanceScript />
     <title>{title} · acorn</title>
     <meta name="description" content={meta.description} />
-    <link rel="icon" href="/favicon.png" type="image/png" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
   </head>
   <body>
-    <header>
-      <nav aria-label="Main">
-        <a href="/">acorn</a>
-        <a href="/features/">Features</a>
-        <a href="/docs/">Docs</a>
-        <a href="/plugins/">Plugins</a>
-        <a href="/download/">Download</a>
-        <a href="/changelog/">Changelog</a>
-      </nav>
-    </header>
-    <main>
-      <h1>{title}</h1>
+    <header class="site-bar"><SiteHeader /></header>
+    <main class="site-page">
+      {/* A page with a hero lets it carry the page's heading. */}
+      {Astro.slots.has('hero') ? <slot name="hero" /> : <h1>{title}</h1>}
       <slot />
     </main>
+    <footer class="site-foot"><SiteFooter /></footer>
   </body>
 </html>
