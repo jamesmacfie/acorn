@@ -35,6 +35,7 @@ const view = (source = 'web'): BrowserPanelView => ({
       links: [
         { label: 'App', url: 'https://app.example/' },
         { label: 'Database', url: 'postgres://localhost:5432/app' },
+        { label: 'Admin', url: 'https://admin.example/', ready: false },
       ],
     },
     {
@@ -43,6 +44,7 @@ const view = (source = 'web'): BrowserPanelView => ({
       rows: [
         { label: 'web', state: 'healthy', severity: 'info' },
         { label: 'worker', state: 'exited', severity: 'danger' },
+        { label: 'admin', state: 'starting', severity: 'pending' },
       ],
     },
     {
@@ -162,25 +164,27 @@ describe('plugin panels', () => {
     expect(shown.querySelector('pre')!.textContent).toBe('<b>Up</b> 3 minutes')
     expect(shown.querySelector('b')).toBeNull()
     const services = [...shown.querySelectorAll('[aria-label="Services"] .ui-row')].map((row) => row.textContent)
-    expect(services).toEqual(['webhealthy', 'workerexited'])
+    expect(services).toEqual(['webhealthy', 'workerexited', 'adminstarting'])
     expect(shown.querySelector('[aria-label="Services"] .dot[data-tone="bad"]')).not.toBeNull()
+    expect(shown.querySelector('[aria-label="Services"] .dot[data-tone="active"]')).not.toBeNull()
     expect(shown.querySelectorAll('pre')[1]!.textContent).toBe('web started\nweb ready')
     expect(shown.querySelector<HTMLAnchorElement>('a.button[href^="acorn:"]')!.getAttribute('href')).toBe(
       taskPaneLink('n1', 't1', 'runn'),
     )
   })
 
-  it('opens only a web address in a new tab, and copies any address', async () => {
+  it('opens only a web address that answers in a new tab, and copies any address', async () => {
     const writeText = vi.fn(async () => {})
     Object.assign(navigator, { clipboard: { writeText } })
     const { root } = mount()
     await settle(30)
     await openPanel(root)
-    const [app, database] = [...panel(root)!.querySelectorAll<HTMLElement>('[aria-label="Links"] .ui-row')]
+    const [app, database, admin] = [...panel(root)!.querySelectorAll<HTMLElement>('[aria-label="Links"] .ui-row')]
     const open = app!.querySelector<HTMLAnchorElement>('a')!
     expect(open.getAttribute('href')).toBe('https://app.example/')
     expect(open.getAttribute('target')).toBe('_blank')
     expect(database!.querySelector('a')).toBeNull()
+    expect(admin!.querySelector('a')).toBeNull()
     button(database!, 'Copy')!.click()
     await settle()
     expect(writeText).toHaveBeenCalledWith('postgres://localhost:5432/app')

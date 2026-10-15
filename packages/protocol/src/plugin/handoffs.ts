@@ -204,6 +204,9 @@ export const browserPanelSourceId = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}
 
 const panelText = z.string().min(1).max(40)
 
+// A panel adds `pending` for a state on its way to healthy, such as a service still starting.
+const panelSeverity = z.enum([...severity.options, 'pending'])
+
 // Strict throughout: a field or block kind this build doesn't know refuses the whole view, so a new
 // kind ships in Acorn before any plugin sends it.
 const panelBlock = z.discriminatedUnion('kind', [
@@ -211,19 +214,22 @@ const panelBlock = z.discriminatedUnion('kind', [
     kind: z.literal('status'),
     label: panelText,
     state: panelText,
-    severity,
+    severity: panelSeverity,
     detail: z.string().max(2_000).optional(),
   }),
   z.strictObject({
     kind: z.literal('links'),
     title: panelText,
     // Any scheme, such as a database address. The extension opens only http and https, and copies the rest.
-    links: z.array(z.strictObject({ label: panelText, url: z.string().min(1).max(2_048) })).max(16),
+    // `ready: false` is an address that isn't answering yet, which the extension shows but doesn't open.
+    links: z
+      .array(z.strictObject({ label: panelText, url: z.string().min(1).max(2_048), ready: z.boolean().optional() }))
+      .max(16),
   }),
   z.strictObject({
     kind: z.literal('rows'),
     title: panelText,
-    rows: z.array(z.strictObject({ label: z.string().min(1).max(80), state: panelText, severity })).max(64),
+    rows: z.array(z.strictObject({ label: z.string().min(1).max(80), state: panelText, severity: panelSeverity })).max(64),
   }),
   z.strictObject({
     kind: z.literal('logs'),

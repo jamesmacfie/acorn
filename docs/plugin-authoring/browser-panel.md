@@ -39,15 +39,17 @@ caller whose credential is bound to one task.
 | Block | Fields |
 | --- | --- |
 | `status` | `label`, `state`, `severity`, and an optional `detail`, shown as preformatted text |
-| `links` | `title`, and `links`, at most 16, each `{ label, url }` |
+| `links` | `title`, and `links`, at most 16, each `{ label, url }` with an optional `ready` |
 | `rows` | `title`, and `rows`, at most 64, each `{ label, state, severity }` |
 | `logs` | `title`, `sources`, at most 32, each `{ id, label }`, the `source` the lines came from or `null`, and `lines`, at most 200 |
 
 Labels, titles, and states are 1 to 40 characters, and a row label can be up to 80. `detail` is at
 most 2,000 characters, and a log line at most 1,000. A source ID matches
-`^[a-z0-9][a-z0-9._-]{0,63}$`. `severity` is `info`, `warn`, or `danger`, as [task addresses](./browser-handoffs.md#task-addresses) use it.
-A link of any scheme is allowed. The extension opens only `http` and `https` links in a new tab and
-offers every link to copy, so a database address is still useful.
+`^[a-z0-9][a-z0-9._-]{0,63}$`. `severity` is `info`, `warn`, or `danger`, as [task addresses](./browser-handoffs.md#task-addresses) use it,
+or `pending` for a state on its way to healthy, such as a service that is still starting.
+A link of any scheme is allowed. The extension opens only `http` and `https` links in a new tab, when
+the person clicks the address, and offers every link to copy, so a database address is still useful.
+Send `ready: false` for an address that isn't answering yet: the extension shows it but doesn't open it.
 
 Parse your answer with `browserPanelView` from `@acorn/protocol/plugin/handoffs.ts`, the schema the
 host applies. It is strict: an unknown field or block kind refuses the whole view, and so does an

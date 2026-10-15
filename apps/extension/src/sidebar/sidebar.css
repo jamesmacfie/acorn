@@ -344,3 +344,10 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .chip blockquote, .chip pre.context { margin: var(--space-2) 0 0; padding-left: var(--space-4); border-left: var(--bw-strong) solid var(--border); white-space: pre-wrap; font: inherit; max-height: 8.5em; overflow: auto; }
 /* A plugin panel's status detail and log lines, as the plugin wrote them. */
 .panel-block pre { margin: 0; font: var(--fs-sm) / var(--lh-tight) var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24em; overflow: auto; }
+/* Log lines sit on a tinted box so they read as output, not as the panel's own words. */
+.panel-block pre.logs { padding: var(--space-3) var(--space-4); background: var(--bg-subtle); border: var(--bw) solid var(--border); border-radius: var(--radius); }
+/* The section already pads the panel's edge, so the kit's own pad on group labels and rows would indent them past the status line. */
+.panel-block :is(.section-header, .ui-row) { padding-inline: 0; }
+/* An address that opens reads as plain text until it's hovered. */
+.panel-block a.address { text-decoration: none; }
+.panel-block a.address:hover { color: var(--text); text-decoration: underline; }

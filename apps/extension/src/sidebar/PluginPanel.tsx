@@ -1,15 +1,17 @@
 import { For, Match, Show, Switch, createSignal } from 'solid-js'
 import type { BridgePanel } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserPanelBlock, BrowserPanelView } from '@acorn/protocol/plugin/handoffs.ts'
+import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import { Row, SectionHeader } from '@acorn/client-core/kit/components/primitives.tsx'
 import { taskPaneLink } from '../acornLinks'
 import { OpenInAcorn } from './OpenInAcorn'
 import { State } from './state'
 
-const TONES = { info: 'ok', warn: 'warn', danger: 'bad' } as const
+const TONES = { info: 'ok', pending: 'active', warn: 'warn', danger: 'bad' } as const
 
-// Only a web address opens in a tab. Anything else, such as a database address, is copied.
-const opens = (url: string) => url.startsWith('https://') || url.startsWith('http://')
+// Only a web address that answers opens in a tab. Anything else, such as a database address, is copied.
+const opens = (link: { url: string; ready?: boolean }) =>
+  link.ready !== false && (link.url.startsWith('https://') || link.url.startsWith('http://'))
 
 // A plugin's read-only view of one task, drawn from the fixed blocks its route answered with, as text.
 // Changing anything happens in the plugin's pane in Acorn. `view` is undefined while the first read is
@@ -81,17 +83,14 @@ function Block(props: { block: BrowserPanelBlock; pickSource(source: string): vo
                   {(link) => (
                     <Row
                       density="compact"
-                      meta={<span class="quiet">{link.url}</span>}
-                      trailing={
-                        <>
-                          <Show when={opens(link.url)}>
-                            <a class="button quiet" href={link.url} target="_blank" rel="noreferrer">
-                              Open ↗
-                            </a>
-                          </Show>
-                          <Copy text={link.url} />
-                        </>
+                      meta={
+                        <Show when={opens(link)} fallback={<span class="quiet">{link.url}</span>}>
+                          <a class="quiet address" href={link.url} target="_blank" rel="noreferrer">
+                            {link.url}
+                          </a>
+                        </Show>
                       }
+                      trailing={<Copy text={link.url} />}
                     >
                       {link.label}
                     </Row>
@@ -145,7 +144,7 @@ function Block(props: { block: BrowserPanelBlock; pickSource(source: string): vo
                 {block().title}
               </SectionHeader>
               <Show when={block().lines.length} fallback={<p class="quiet">No log lines.</p>}>
-                <pre>{block().lines.join('\n')}</pre>
+                <pre class="logs">{block().lines.join('\n')}</pre>
               </Show>
             </>
           )}
@@ -163,8 +162,14 @@ function Copy(props: { text: string }) {
     setTimeout(() => setCopied(false), 1500)
   }
   return (
-    <button type="button" class="quiet" onClick={() => void copy().catch(() => {})}>
-      {copied() ? 'Copied' : 'Copy'}
+    <button
+      type="button"
+      class="icon"
+      aria-label={copied() ? 'Copied' : 'Copy'}
+      title={copied() ? 'Copied' : 'Copy'}
+      onClick={() => void copy().catch(() => {})}
+    >
+      <Icon name={copied() ? 'check' : 'copy'} />
     </button>
   )
 }
