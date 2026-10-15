@@ -46,6 +46,21 @@ export const SNAPSHOTS = {
     title: 'acorn · Add VAT to EU invoices',
     caption: 'A workflow run on its graph, waiting at a gate for a person.',
   },
+  notes: {
+    ...window,
+    title: 'acorn · Retry failed webhooks',
+    caption: "The Notes pane: the task's plan, beside the notes for the whole workspace.",
+  },
+  editor: {
+    ...window,
+    title: 'acorn · Retry failed webhooks',
+    caption: "The Editor pane: the task's files with their Git status, and a changed file open.",
+  },
+  context: {
+    ...window,
+    title: 'acorn · Retry failed webhooks',
+    caption: 'The Context pane: the sections an agent gets about its task, and their sizes.',
+  },
   fleet: {
     ...window,
     title: 'acorn · Fleet',

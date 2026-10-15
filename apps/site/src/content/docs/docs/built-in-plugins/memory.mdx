@@ -1,0 +1,78 @@
+---
+title: Memory
+description: The plugin that keeps what agents learn about a project, tells each new session about it, and gives you a page to review, edit, and undo it.
+sources:
+  - docs/notes-and-memory.md
+  - docs/notes-and-memory/memory-page.md
+  - docs/cli/plugin-commands.md
+  - plugins/memory/src/client/index.ts
+  - plugins/memory/src/node/index.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Memory plugin keeps the facts agents save for later sessions, such as a convention the code doesn't
+show, tells each new session what's there, and adds the Memory page where you read, change, undo, and
+import them.
+
+<PluginFacts id="memory">
+  <Fragment slot="adds">**Memory** in the left rail, the **Search memory** command, the memory indexes each new session starts with, a card in the transcript when an agent changes a memory, and tools agents use to read and save memories.</Fragment>
+  <Fragment slot="needs">Nothing.</Fragment>
+  <Fragment slot="reach">Its own Markdown files on the Node's machine, in `~/.acorn/memory`, or `memory/` in the Node's data folder when `ACORN_DATA_DIR` is set, and, when you import, Claude Code's memory folder and the project's `.acorn/memory` folder, read only.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+There's nothing to set up. Agents start saving memories in their first sessions.
+
+<Steps>
+
+1. Click **Memory** in the left rail.
+
+   <Checkpoint>The page lists this project's memories, newest first, or says there are none yet. With nothing selected, it shows **Recent changes**, **Project context**, and **Import memory**.</Checkpoint>
+
+</Steps>
+
+## Use it
+
+[Memory](/docs/using/memory/) covers it in full:
+
+- [What agents save](/docs/using/memory/#what-agents-save), and the checks a memory passes first.
+- [What a new session is told](/docs/using/memory/#what-a-new-session-is-told).
+- [The Memory page](/docs/using/memory/#the-memory-page): find, read, add, change, delete, and restore.
+- [Undo an agent's change](/docs/using/memory/#undo-an-agents-change) from its transcript card.
+- [Import Claude memory files](/docs/using/memory/#import-claude-memory-files).
+
+## From the command palette
+
+**Search memory** searches this project's memories, and opens the one you pick on the Memory page.
+
+## For agents
+
+Each new session starts with the memory contract and two indexes, your private memories and this
+project's, with each memory's name and description. Agents have five tools: `memory_list`,
+`memory_search`, and `memory_get` read, and `memory_write` and `memory_delete` change. The two that change
+are **Write tools**, on by default. Turn them off under **Settings** > **Agents** > **Tools and
+permissions** to keep agents from saving
+([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)).
+
+## Settings
+
+**Project context**, on the Memory page, sets how long the project's index may be, from 200 to 32,000
+characters. The plugin has no Settings page.
+
+## In the terminal
+
+The terminal client draws the same Memory page. To edit a memory's body, choose **Edit body in
+$EDITOR**.
+
+## Limits
+
+- The Memory page lists project memories only. Private memories reach every session, but you change
+  them through an agent or as files.
+- Each memory keeps 20 earlier versions, and the change log keeps the last 1,000 changes.
+- Memory has no command-line command.
+- The plugin can't be turned off, because every new session's start depends on it.

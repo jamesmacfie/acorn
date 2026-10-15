@@ -1,0 +1,77 @@
+---
+title: Agent cost
+description: A badge beside an agent session's title with what the session would cost at API prices, and where its prices come from.
+sources:
+  - plugins/agent-cost/README.md
+  - plugins/agent-cost/acorn-plugin.config.mjs
+  - docs/managed-agents/providers.md
+  - docs/tui/plugin-losses.md
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Agent cost plugin puts a badge beside an agent session's title, with what the session would cost at
+the provider's API prices. In Settings it's called **Agent session cost**.
+
+<PluginFacts id="agent-cost">
+  <Fragment slot="adds">A cost badge in the header of each managed agent session.</Fragment>
+  <Fragment slot="needs">Nothing. It reads prices from **Settings** > **Agents** > **Limits and cost**.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+There's nothing to set up.
+
+<Steps>
+
+1. Start a managed agent session in a task, and send it a message.
+
+   <Checkpoint>Once the first turn ends, a badge beside the session's title shows its cost, such as `$0.42`, or `≈$0.42` when it's an estimate.</Checkpoint>
+
+</Steps>
+
+## What the badge shows
+
+- When the harness reports the session's cost in US dollars, the badge shows that.
+- Otherwise the badge estimates it from the tokens each turn used and the model's price, and starts with
+  `≈`.
+- When the model has no known price, or the harness's token counts go backwards, it shows nothing.
+
+On Codex, the badge's tip adds how much of the input came from the prompt cache, and how many tokens were
+written to it.
+
+The estimate is what the same tokens would cost on the provider's API. It isn't your bill: a Claude or
+ChatGPT plan, credits, and negotiated prices all differ.
+[Usage and cost](/docs/agents/usage-and-cost/) covers plan usage beside it.
+
+## Change a price
+
+Open **Settings** > **Agents** > **Limits and cost**. It lists Claude and Codex models with their input,
+output, cache write, and cache read prices per million tokens. Change a price there, or add a model
+under **Other models**. Prices are kept on the Node.
+
+## What it can reach
+
+Nothing beyond what the Agent pane hands it: the session's provider, each turn's token counts, and the
+model's price. It has no code on the Node, no storage, and no network.
+
+## Settings
+
+The plugin has no Settings page of its own. Prices are on **Limits and cost**
+([Settings: Agents](/docs/settings/agents/)). To hide the badge, turn the plugin off under **Settings** >
+**Plugins** > **Installed** > **Agent session cost**.
+
+## In the terminal
+
+The terminal client draws the same badge in the session's header.
+
+## Limits
+
+- The estimate covers the session's own conversation, not its subagents, tool fees, or premiums for long
+  context, service tier, or region.
+- One price covers a whole turn, so switching models within a turn isn't priced separately.
+- A Codex fork starts with its source's token count, so adding a fork's cost to its source's counts the
+  source twice.

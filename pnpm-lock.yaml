@@ -446,6 +446,9 @@ importers:
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1
+      lucide-static:
+        specifier: ^1.27.0
+        version: 1.27.0
       postcss:
         specifier: ^8.5.29
         version: 8.5.29

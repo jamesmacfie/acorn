@@ -1,0 +1,140 @@
+---
+title: Terminal
+description: The terminal drawer, shells and agent CLIs in each task, run targets, how sessions survive quitting with tmux, and what a reattached terminal shows.
+sources:
+  - docs/terminal.md
+  - docs/terminal/sessions.md
+  - docs/terminal/client.md
+  - docs/terminal/run-targets.md
+  - docs/terminal/activity.md
+  - plugins/terminal/src/client/TerminalPanel.tsx
+  - plugins/terminal/src/client/TerminalSettings.tsx
+  - plugins/terminal/src/client/terminalPrefs.ts
+  - plugins/terminal/src/client/commands.ts
+  - plugins/terminal/src/server/workflowSteps.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+The Terminal plugin gives every task terminals: shells and agent command lines in a drawer under the
+task, running in the task's worktree on the Node, that keep running when you switch tasks.
+
+<Snapshot id="hero" />
+
+<PluginFacts id="terminal">
+  <Fragment slot="adds">The terminal drawer, the **Sessions** view in the terminal client, run targets and layouts, the **Run** commands, three workflow steps, **Settings** > **Features** > **Terminal**, and the task's setup and teardown scripts.</Fragment>
+  <Fragment slot="needs">Nothing. With tmux on the Node's machine, terminals outlive acorn quitting.</Fragment>
+  <Fragment slot="reach">Processes on the Node, in the task's worktree. It's the most trusted plugin acorn has, and it can't be turned off.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+There's nothing to set up.
+
+<Steps>
+
+1. Open a task, and press ⌘⇧T, or click **Terminal** in the pane switcher.
+
+2. The empty drawer says **No terminals**. Click **New terminal**.
+
+   <Checkpoint>A **Shell** tab opens, with a prompt in the task's worktree.</Checkpoint>
+
+</Steps>
+
+## Use the drawer
+
+The drawer sits under the task's panes, between the two rails. Each tab is one terminal. **+**, **New terminal**,
+starts a shell, or Claude Code, Codex, or Aider, in the task's worktree. **Hide terminals** closes the
+drawer. Drag the top edge to resize it, and close
+a tab with its **×**. **Stop** interrupts the tab's program.
+
+| Chord | What it does |
+| --- | --- |
+| ⌘⇧T | Opens or closes the drawer. |
+| ⌘⇧1 to ⌘⇧9 | Selects a tab. |
+| ⌘⇧[ and ⌘⇧] | Selects the previous or next tab. |
+
+Escape takes the keyboard out of a focused terminal.
+
+A tab keeps running when you switch tasks, and its output keeps arriving, so coming back shows it as it
+is, with no reload. Closing the drawer leaves its terminals running.
+
+## Run an agent's own command line
+
+Pick **Claude Code**, **Codex**, or **Aider** from **+** to run the CLI exactly as it is outside acorn.
+It still gets acorn's tools and, by default, the task's context.
+[Agents in the terminal drawer](/docs/agents/agents-in-the-terminal-drawer/) compares this with a managed
+session, and **Continue in terminal** moves a managed session here.
+
+## Run targets and layouts
+
+A run target is a named command for the project, such as a dev server, set in `.acorn/config.toml` or on
+the project's **Setup and scripts** tab. A layout opens a set of panes, starts a target, and points the
+Preview pane at it. From the palette's **Run** group:
+
+| Command | What it does |
+| --- | --- |
+| **Run a target** | Starts a target in a drawer tab, or stops it if it's running. |
+| **Apply a layout** | Opens the layout's panes and starts its target. |
+| **Focus a terminal** | Selects one of the task's running terminals. |
+| **Run setup script** | Runs the project's setup script in this task again. |
+
+A target from a committed `.acorn/config.toml` runs only after you trust that file
+([Project configuration](/docs/using/project-configuration/)).
+
+## Terminals that outlive acorn
+
+When tmux is installed on the Node's machine, each terminal runs in a tmux session. Quitting acorn, or
+restarting the Node, leaves it running, and the Node finds it again when it starts. Without tmux, a
+terminal ends with the Node, and **+** marks each choice **Closes when acorn quits**.
+
+When a terminal comes back on screen after a reconnect, the Node rebuilds its screen from the last
+256 KiB of output and sends that, then the live output. Older scrollback is gone, and a full-screen
+program redraws from its next output.
+
+## From the command palette
+
+**New Claude Code terminal** and **New Codex terminal** open a CLI in a new tab in one step. The **Run**
+commands above start targets and layouts.
+
+## For agents
+
+Agents can start and stop the project's run targets with the `run_` tools, which are **Execute tools**,
+off by default. To show an agent a terminal, open **Context** below its message box and choose
+**Terminal sessions**, then pick the session.
+
+## In workflows
+
+| Step | What it does |
+| --- | --- |
+| **Run a command** | Runs one shell command in the task's checkout and hands its exit code, output, and errors to the next step. It has a **Timeout**, **Allow failure**, and **Environment**. |
+| **Command exit code** | Runs a command as a check: exit 0 passes, 75 means not yet, and anything else fails. |
+| **Start a run target** | Starts one of the project's run targets, and can **Wait for a URL**. It hands on the session and the URL. |
+
+## Settings
+
+**Settings** > **Features** > **Terminal** is stored on this device
+([Settings: Features](/docs/settings/features/)):
+
+| Setting | What it changes | Default |
+| --- | --- | --- |
+| **When the terminal button is clicked, open** | What an empty drawer starts: nothing, a **Shell**, **Claude Code**, or **Codex**. | **Empty (pick a profile with +)** |
+| **Text size** | The terminal's font size. | 15px, or your style pack's size |
+
+## In the terminal
+
+The terminal client has no drawer. Its **Sessions** view lists the task's terminals and opens one full
+screen, in the task's worktree. Enter gives it the keyboard, and Escape gives it back. Closing the view
+leaves the terminal running. Any pane that holds a terminal, such as a container's shell, draws it in
+the terminal client too.
+
+## Limits
+
+- A reattached terminal keeps the last 256 KiB of output, about 1,000 lines of scrollback.
+- Without tmux, terminals end when the Node stops.
+- A newly installed agent CLI shows in **+** within five minutes, or after a reload.
+- Killing a terminal happens in the drawer. The palette can't do it.

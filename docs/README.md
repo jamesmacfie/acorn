@@ -140,6 +140,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [local-development/packaged-stacks.md](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
 | [local-development/formatting.md](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, the `git blame` ignore file, and carrying a branch across a formatting commit. |
 | [site.md](./site.md) | The public site in `apps/site`: running, building, checking, and deploying it, and adding a page. |
+| [site/built-in-plugins.md](./site/built-in-plugins.md) | The public site's list of the plugins acorn ships, each plugin's facts box, and the test that keeps both whole. |
 | [site/design.md](./site/design.md) | How the public site looks: its stylesheet on acorn's tokens, fonts, mark, Appearance control, components, contrast check, and the landing page's Lighthouse scores. |
 | [site/specimens.md](./site/specimens.md) | Specimens on the public site: plugin tree code both hosts draw, the generators that commit and check it, and the scoped stylesheet. |
 | [site/releases.md](./site/releases.md) | What the public site reads from GitHub at build time, the download page's release files, and the hand-written changelog and its feed. |

@@ -1,0 +1,133 @@
+---
+title: Docker
+description: See the Node's containers, images, volumes, and networks, the containers a task started, their logs, stats, and a shell, and what archiving does to them.
+sources:
+  - docs/docker.md
+  - plugins/docker/src/client/index.ts
+  - plugins/docker/src/client/ContainerDetail.tsx
+  - plugins/docker/src/client/DockerBrowse.tsx
+  - plugins/docker/src/client/DockerSettings.tsx
+  - plugins/docker/src/client/DockerProjectSettings.tsx
+  - plugins/docker/src/client/dockerPrefs.ts
+  - plugins/docker/src/client/commands.ts
+  - plugins/docker/src/client/agentContextContribution.ts
+  - plugins/docker/src/node/index.ts
+  - plugins/docker/src/server/archiveCheck.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Docker plugin shows the Docker engine on the Node's machine: every container, image, volume, and
+network in the left rail, and in each task, the containers that task started, with their logs, stats,
+and a shell.
+
+<PluginFacts id="docker">
+  <Fragment slot="adds">**Docker** in the left rail, the **Docker** pane on a task with containers, a badge in the task's footer, two palette commands, a check when you archive a task, **Settings** > **Features** > **Docker**, and a **Docker** tab on each project's settings.</Fragment>
+  <Fragment slot="needs">Docker on the Node's machine, with the `docker` command line.</Fragment>
+  <Fragment slot="reach">The Docker engine on the Node's machine, through the `docker` command line.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. Make sure Docker is running on the Node's machine.
+
+2. Click **Docker** in the left rail.
+
+   <Checkpoint>The list shows the engine's containers. **Settings** > **Features** > **Docker** says **Running**, with Docker's version.</Checkpoint>
+
+</Steps>
+
+## How a container belongs to a task
+
+A task's containers are the ones Docker Compose started in the task's worktree, or in a folder inside it.
+acorn reads Compose's own record of the folder each container was started from, and compares it with the
+task's worktree. A container started anywhere else isn't the task's.
+
+So to give a task its containers, run `docker compose up` in its worktree. The easiest way is a run
+target that runs it, which you start from the task
+([Project configuration](/docs/using/project-configuration/)). The task then shows a **Docker** pane, and its footer shows
+how many containers are running.
+
+The project's `.acorn/config.toml` can add hints under `[docker]`: a Compose project name, label keys,
+or matching the branch name in a container's name. A hint only suggests containers in the task's
+summary. It doesn't make them the task's, so they aren't listed in the pane or cleaned up with it.
+
+## Look at a container
+
+Pick a container, in the task's **Docker** pane or under **Containers** in the left rail. Its detail
+has four tabs:
+
+| Tab | What it shows |
+| --- | --- |
+| **Info** | The container's image, state, ports, mounts, networks, and environment. |
+| **Logs** | Its log, live. **Follow** keeps the newest line in view, and **Find in logs** searches it. |
+| **Stats** | CPU, memory, network and block I/O, and process count, live. |
+| **Terminal** | A shell inside the container, while it's running. |
+
+Beside the tabs: **Start** or **Stop**, **Restart**, **Open shell**, and **Remove container**. In the
+left rail, with no task, the shell button is **Copy shell command** instead.
+
+## Manage images, volumes, and networks
+
+The left rail's Docker list has **Containers**, grouped by Compose project, **Images**, **Volumes**,
+and **Networks**. Each can remove what you pick. **Remove unused** prunes images or networks no
+container uses, and removes unused volumes, which deletes their data. Removing or pruning asks you to
+press twice, unless you turn that off.
+
+## When you archive a task
+
+If the task has running containers, the archive dialog says how many, with **Also stop its containers**
+ticked. With it ticked, acorn stops the task's containers, and removes the ones Compose started. It
+removes no volumes or networks, and doesn't run `docker compose down` on the whole project, so a project
+shared with another task keeps its other containers.
+[Archive and restore](/docs/using/archive-and-restore/) covers the rest of archiving.
+
+## Run Compose from committed configuration
+
+A run target from a committed `.acorn/config.toml`, such as one that runs `docker compose up`, runs code
+from the repository, so it runs only after you trust that file
+([Project configuration](/docs/using/project-configuration/)). The `[docker]` hints run nothing, and need
+no trust.
+
+## From the command palette
+
+| Command | What it does |
+| --- | --- |
+| **Open Docker** | Opens Docker in the left rail. |
+| **Find a Docker resource** | Searches containers, images, volumes, and networks at once, and shows the one you pick in the left rail. |
+
+## For agents
+
+To tell an agent what's running, open **Context** below its message box and choose **Docker service
+state**. It sends the state and ports of the task's containers, without environment values or logs.
+
+## Settings
+
+**Settings** > **Features** > **Docker** is stored on this device
+([Settings: Features](/docs/settings/features/)):
+
+| Setting | What it changes | Default |
+| --- | --- | --- |
+| **Ask twice before destructive actions** | Whether remove, prune, and Compose down ask you to press twice. | On |
+| **Show stopped containers in the Docker list** | Whether stopped containers are listed. | On |
+
+The page also shows the **Docker engine**'s state. A project's **Docker** tab shows its `[docker]` hints
+and which file set each: **Compose project**, **Match labels**, and **Match container names**. Change
+them in the file.
+
+## In the terminal
+
+The terminal client draws the same list, pane, and detail. The **Terminal** tab is a real terminal in
+the container.
+
+## Limits
+
+- One Docker engine: the one on the Node's machine. Each Node shows its own.
+- A container started outside the task's worktree isn't the task's, even with a hint.
+- Logs keep about the last 512,000 characters on screen.
+- Docker controls the containers. Anyone who can run `docker` on that machine can change them.

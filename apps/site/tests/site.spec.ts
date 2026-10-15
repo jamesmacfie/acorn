@@ -54,6 +54,17 @@ for (const route of ['/', '/download/', ...featureRoutes]) {
   })
 }
 
+// Every plugin on /plugins/ links to its docs page, and those are all published, so this runs on both builds.
+test('every link on /plugins/ goes to a page the build wrote', async ({ page }) => {
+  await page.goto('/plugins/')
+  const hrefs = await page
+    .locator('main a[href^="/"]')
+    .evaluateAll((links) => links.map((link) => link.getAttribute('href')!))
+  const built = new Set(routes)
+  expect(hrefs.length).toBeGreaterThan(0)
+  for (const href of new Set(hrefs)) expect(built.has(href.replace(/#.*$/, '')), href).toBe(true)
+})
+
 test('an unknown address offers the docs home and the search box', async ({ page }) => {
   const response = await page.goto('/no-such-page/')
   expect(response?.status()).toBe(404)
@@ -131,8 +142,18 @@ test('the star button shows the count from 100 stars', async ({ page }) => {
 })
 
 // One page of each template, a marketing page, a docs page, and Starlight's splash page, and every
-// feature page, because each draws its own pictures.
-for (const route of ['/', '/docs/', '/no-such-page/', '/download/', '/changelog/', ...featureRoutes]) {
+// feature page, because each draws its own pictures. The plugins page and a plugin's page, for the
+// cards and the facts box.
+const axeRoutes = [
+  '/',
+  '/docs/',
+  '/no-such-page/',
+  '/download/',
+  '/changelog/',
+  '/plugins/',
+  '/docs/built-in-plugins/database/',
+]
+for (const route of [...axeRoutes, ...featureRoutes]) {
   test(`${route} has no serious accessibility violations`, async ({ page }) => {
     await page.goto(route)
     const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()

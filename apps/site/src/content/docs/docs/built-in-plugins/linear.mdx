@@ -1,0 +1,114 @@
+---
+title: Linear
+description: Connect Linear, list your issues in the rail, read and comment on them in a pane, and start a task from one.
+sources:
+  - docs/integrations/linear.md
+  - docs/integrations/settings.md
+  - docs/integrations/project-sources.md
+  - docs/agent-tools/tracker-tools.md
+  - docs/github-integration/tasks-and-references.md
+  - plugins/linear/acorn-plugin.config.mjs
+  - plugins/linear/src/server/provider.ts
+  - plugins/linear/src/tree/LinearIssueView.tsx
+  - packages/client-core/src/features/settings/connections/AddConnection.tsx
+  - packages/client-core/src/features/settings/ConnectionProjectMap.tsx
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Linear plugin brings your Linear issues into acorn: a list in the left rail, the issue itself in a
+pane with its comments, and a panel beside a pull request that mentions one.
+
+<PluginFacts id="linear">
+  <Fragment slot="adds">The **Linear issues** source in the left rail, the **Linear** pane on a task linked to an issue, a panel for an issue a pull request links to, a palette command, a section in the task's context, and tools agents use to read and comment on linked issues.</Fragment>
+  <Fragment slot="needs">A Linear personal API key, and at least one Linear project or team followed by a workspace or project.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. In Linear, open **Settings** > **Security & access** > **Personal API keys**, and create a key.
+
+2. In acorn, open **Settings** > **Services**, click **Add connection**, and choose **Linear**.
+
+3. Paste the key in **Personal API key**, and click **Connect**. acorn checks the key with Linear
+   before it saves it.
+
+4. On the connection's page, under **Where it shows up**, choose a Linear project or team, choose the
+   workspace or project that should follow it, and click **Follow**.
+
+   <Checkpoint>The left rail shows **Linear issues**, listing the open issues in what you followed.</Checkpoint>
+
+</Steps>
+
+You can connect more than one Linear workspace. Each is its own connection, with its own map. Following
+a team instead of a project lists every active issue in the team, which can be a long list.
+
+## Read an issue
+
+Click an issue in the rail to open it beside the list. It shows the issue's state, its description,
+comments with their replies, links, relations, and parent. The branch name Linear suggests for it has a
+copy button. **Copy link** copies the issue's address, and the refresh button reads it again from
+Linear.
+
+A `linear.app` issue link inside the issue opens in the same view, with **Back to** and the issue you
+came from. Images in an issue show as links.
+
+To comment, type in **Leave a comment…**, or click **Reply** on a comment. acorn posts it to Linear with
+your key.
+
+The rail's **Search** asks Linear, so it finds an issue past the first 250 the list holds. It searches
+active issues in what you follow, by title and key.
+
+## Start a task from an issue
+
+Right-click an issue in the rail, and choose **Create task…**. **New task** creates a task titled with the
+issue's key and title, on the branch Linear suggests. **Attach to task** links the issue to a task you have.
+[Tasks and worktrees](/docs/using/tasks-and-worktrees/#create-a-task-from-a-pull-request-or-an-issue)
+has the dialog.
+
+A task linked to an issue has a **Linear** pane, which lists its **Linked Linear issues**. Press ⌘⇧L to
+open it.
+
+## See an issue beside a pull request
+
+When a pull request's description links a Linear issue, click the link and the issue opens in a panel
+over the pull request, so you don't lose your place. A task made from a pull request is linked to the
+Linear issues its description names, when acorn can tell which Linear workspace they're in.
+
+## From the command palette
+
+**Find a Linear issue** searches the issues your current project follows, by title and key, and opens
+the one you pick beside the rail.
+
+## For agents
+
+An issue linked to the task is in the task's context, under **Issues**. Agents in that task can read a
+linked issue's description and comments, see its images, and post a comment, through acorn's issue
+tools ([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)). They can act
+only on issues linked to their task.
+
+## Settings
+
+The connection's page under **Settings** > **Services** holds its **Name**, **Replace key**, an
+**Enabled** switch, **Where it shows up**, and **Disconnect**
+([Settings: Connections](/docs/settings/connections/#services)). A project's **Connections** tab and a
+workspace's page show what they follow.
+
+## In the terminal
+
+The terminal client draws the same rail source, issue view, and pane. Connect Linear from the desktop
+app.
+
+## Limits
+
+- The rail lists active issues only, up to 250. Search reaches further, 50 results at a time for each
+  connection.
+- An issue isn't listed until a workspace or project follows its Linear project or team.
+- Images in an issue open as links, not inline.
+- A pull request's issue keys link to Linear only when exactly one of your Linear connections covers
+  its project.

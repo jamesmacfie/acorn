@@ -21,6 +21,7 @@
     "acorn-plugin-sdk": "workspace:*",
     "astro": "^7.3.0",
     "jsdom": "^30.0.1",
+    "lucide-static": "^1.27.0",
     "postcss": "^8.5.29",
     "solid-js": "catalog:",
     "starlight-links-validator": "^0.26.0"

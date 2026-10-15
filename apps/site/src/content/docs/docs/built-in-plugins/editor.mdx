@@ -1,0 +1,149 @@
+---
+title: Editor
+description: Open, edit, save, and search the files in a task's worktree, recover unsaved text, and see what other plugins mark on a line.
+sources:
+  - docs/editor.md
+  - docs/editor/editor-pane.md
+  - docs/editor/file-navigation.md
+  - docs/editor/editing-controls.md
+  - docs/editor/save-and-recovery.md
+  - docs/editor/find-in-files.md
+  - docs/editor/file-renderers.md
+  - docs/editor/line-markers.md
+  - docs/editor/line-annotations.md
+  - plugins/editor/src/client/index.ts
+  - plugins/editor/src/client/EditorPane.tsx
+  - plugins/editor/src/client/FileTree.tsx
+  - plugins/editor/src/client/EditorSettings.tsx
+  - plugins/editor/src/client/editorPrefs.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+The Editor plugin adds the Editor pane: the task's files in a tree, open files in tabs, a code editor that
+saves as you type, and search across the worktree.
+
+<Snapshot id="editor" />
+
+<PluginFacts id="editor">
+  <Fragment slot="adds">The **Editor** pane, **Go to file**, **Find in files…**, and other palette commands, and **Settings** > **Features** > **Editor**.</Fragment>
+  <Fragment slot="needs">Nothing. In the terminal client, an editor of your own in `$EDITOR`.</Fragment>
+  <Fragment slot="reach">The files in the task's worktree. Every read and write is held to the worktree, and a link that points outside it is refused.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+There's nothing to set up.
+
+<Steps>
+
+1. Open a task, and click **Editor** in the pane switcher, or press ⌘⇧E.
+
+2. Press ⌘P, type part of a file's name, and press Enter.
+
+   <Checkpoint>The file opens in a tab, and the strip under it shows its path, line and column, language, and **Saved**.</Checkpoint>
+
+</Steps>
+
+## Open files
+
+- **The tree.** Click a file to open it. A single click opens a preview tab, which the next file you
+  open replaces, until you edit it. The tree shows dotfiles and leaves out `.git` and `node_modules`.
+  Files Git ignores are muted. **Show ignored files** hides them, **Collapse all folders** and **Reveal
+  active file** move around, and **New file or folder** creates one.
+- **Go to file**, ⌘P. Matches across the whole path, so `client/App` finds `src/client/App.tsx`.
+  With nothing typed, it lists the files you opened recently. Add `:42`, or `:42:7`, to jump to a line and
+  column.
+- **Links.** A file reference elsewhere in acorn, such as one in an agent's message, opens here.
+
+The tree marks files with their Git status: `M` modified, `A` added, `?` untracked, `R` renamed, `!`
+conflicted, and `D` deleted. A folder counts its changed files. Right-click a file, or press F2, to
+rename it, or move it to the system Trash with **Move to trash…**.
+
+Pictures, such as PNG, JPEG, GIF, and WebP files, open as a preview. SVG opens as text.
+
+## Edit and save
+
+The editor saves as you type, after a short pause, and ⌘S saves at once. The strip under the file says
+**Saved**, **Unsaved**, **Saving…**, or **Save failed**.
+
+When the file changes on disk, such as when an agent edits it, acorn reloads it if you have no unsaved
+changes. If you do, it keeps your text and stops saving it automatically, and offers:
+
+- **Compare**, to see your text beside the file on disk.
+- **Reload from disk**, which discards your text after you confirm.
+- **Overwrite disk…**, which saves your text over the file on disk after you confirm.
+
+A file deleted on disk shows **Deleted on disk**, with **Recreate file…** and **Save as…**. If a save
+fails, **Retry save** tries again. Unsaved text you can't save yet is kept on this device, so closing
+the pane, or acorn, doesn't lose it.
+
+The strip's **Details** menu holds this file's word wrap and indentation. acorn reads a file's
+indentation when it opens it. **Add to your message to the agent** puts a reference to the file in the
+agent's message box.
+
+## Find in a file, and in files
+
+⌘F opens find and replace in the open file, with **Match case**, **Whole word**, **Regular expression**,
+**Select all matches**, and **Replace**. ⌘⇧F opens the pane's **Search** tab, beside **Files**, which searches the whole
+worktree with ripgrep. Right-click a folder and choose **Find in folder** to search inside it.
+
+## See what other plugins mark
+
+Other plugins draw on the editor:
+
+- **Line bars.** An accent bar beside a line means it's part of the task's pull request, and a second bar,
+  in the added-line color, means it differs from the last commit.
+- **Line blame.** After the end of the line your cursor is on, Git shows who last changed it.
+- **File views.** A plugin can show a file another way, such as a rendered table. **Preview** switches
+  between that view and the text.
+- **Hover and problems.** A plugin can answer hover for a language and report problems in a file.
+
+## From the command palette
+
+| Command | Chord | What it does |
+| --- | --- | --- |
+| **Go to file** | ⌘P | Finds a file in the worktree and opens it. |
+| **Find in files…** | ⌘⇧F | Opens the pane's **Search** tab. |
+| **Go to line** | | Moves to a line, and a column, in the open file. |
+| **Reopen closed file** | ⌘⇧T | Opens the last file you closed, up to 20 back. |
+| **Go back in editor**, **Go forward in editor** | ⌥←, ⌥→ | Moves through the files and places you jumped between. |
+| **Toggle word wrap** | ⌘⌥W | Wraps the open file, for this session. |
+
+The open file's editing commands are in the palette too, such as **Toggle comment**, **Duplicate line**,
+**Indent selection**, and **Outdent selection**.
+
+## Edit in your own editor
+
+Click **Edit in your terminal editor** beside the file's tabs to open it in `$EDITOR` instead, or `$VISUAL`, or
+`vi`, in the task's worktree. acorn reads the file again when your editor exits. A non-zero exit shows an
+error instead of claiming a save. The choice is saved on this device.
+
+## Settings
+
+**Settings** > **Features** > **Editor** is stored on this device
+([Settings: Features](/docs/settings/features/)):
+
+| Setting | What it changes | Default |
+| --- | --- | --- |
+| **Word wrap** | Wraps text in files you haven't set yourself. | Off |
+| **Indentation** | What a file with no indentation to detect uses. | Two spaces |
+| **Show line blame** | Shows who last changed the line your cursor is on. | On |
+
+## In the terminal
+
+The terminal client has no code editor of its own. It keeps the tree, tabs, **Go to file**, search, and
+Git status, and opens each file in `$EDITOR` in the pane. Pictures show their name instead. Line bars and
+line blame are desktop only.
+
+## Limits
+
+- A file over 256 Ki characters opens without syntax colors.
+- A search keeps the first 2,000 matches.
+- Files must be UTF-8 text. A file with invalid UTF-8 or a NUL byte doesn't open as text.
+- The editor has no permanent delete. Restore a trashed file from the Node's system Trash.
+- Rename needs a Node on macOS or Linux.

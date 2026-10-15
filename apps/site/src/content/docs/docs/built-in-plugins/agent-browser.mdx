@@ -1,0 +1,89 @@
+---
+title: Agent browser
+description: The browser agents drive on the Node to open, read, click through, and screenshot web pages, and what it can reach.
+sources:
+  - docs/agent-tools/browser-and-scripts.md
+  - docs/security/webviews.md
+  - plugins/browser/src/server/agentTools.ts
+  - plugins/browser/src/server/driver.ts
+  - plugins/browser/src/server/diagnostics.ts
+  - plugins/browser/src/server/captures.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Agent browser plugin gives agents a browser of their own, on the Node, to open a page, read it,
+click and type, take a screenshot, and read the console. It has no pane: you don't watch it or steer
+it. In Settings it's called **Browser**.
+
+<PluginFacts id="browser">
+  <Fragment slot="adds">Six agent tools: `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_fill`, `browser_screenshot`, and `browser_console`.</Fragment>
+  <Fragment slot="needs">Google Chrome or Chromium on the Node's machine, and the tools turned on, because they're off by default.</Fragment>
+  <Fragment slot="reach">The web, from the Node's machine, wherever an agent points it. Screenshots are stored on the Node.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. Install Google Chrome on the machine the Node runs on, if it isn't there.
+
+2. Open **Settings** > **Agents** > **Tools and permissions**. Turn on **Execute tools**, or only the six
+   `browser_` tools in the list below the tiers.
+
+3. In a task, ask an agent to open a page, such as "open https://example.com and tell me its heading".
+
+   <Checkpoint>The agent's transcript shows it calling `browser_navigate` and `browser_snapshot`, and it answers with the page's heading.</Checkpoint>
+
+</Steps>
+
+Turning on **Execute tools** also turns on the other execute tools, such as starting run targets and
+spawning agents. Turn on the six tools alone if that's all you want
+([Permissions and approvals](/docs/agents/permissions-and-approvals/#acorns-tool-tiers)).
+
+## What an agent can do with it
+
+| Tool | What it does |
+| --- | --- |
+| `browser_navigate` | Opens an address. |
+| `browser_snapshot` | Reads the page as a compact tree of its elements, each with a reference such as `e1`. |
+| `browser_click` | Clicks an element by its reference. |
+| `browser_fill` | Types into a field by its reference, replacing what's there. |
+| `browser_screenshot` | Screenshots the page. The image is stored on the Node, and the agent gets an address for it. |
+| `browser_console` | Reads the page's recent console output and errors. |
+
+The browser runs with no window. To show an agent your app, give it the same address your Preview pane
+shows: the agent's browser and your preview are separate, and the agent never drives your preview.
+
+## How tasks are kept apart
+
+- Each task gets its own browsing context, so cookies and logins one task sets up never reach another.
+- An agent clicks and types through the element it read, so a page can't swap in another element in
+  between.
+- The tools can't run JavaScript of the agent's own in the page.
+- Screenshots are kept per task, the newest 20. Only that task's agents and your devices can read them.
+
+## For agents
+
+The six tools are the whole plugin. They reach any agent on the Node, through the MCP server as well, so
+an agent on a remote Node with no screen still gets a browser
+([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)).
+
+## Settings
+
+The tools' switches are on **Settings** > **Agents** > **Tools and permissions**
+([Settings: Agents](/docs/settings/agents/)). The plugin has no page of its own.
+
+## In the terminal
+
+The tools run on the Node, so they work the same whichever client you use.
+
+## Limits
+
+- Without Chrome or Chromium on the Node's machine, the tools say they're unavailable.
+- The Node keeps up to eight tasks' browsers open, and closes the oldest to open another.
+- Console output keeps 200 entries, up to 8 KiB each and 256 KiB in all.
+- The browser can reach whatever the Node's machine can, including your local network.

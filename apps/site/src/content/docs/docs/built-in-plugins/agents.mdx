@@ -1,0 +1,95 @@
+---
+title: Agents
+description: The plugin that runs Claude Code and Codex as managed agent sessions in a task's Agent pane, with Agent Center to see them all.
+sources:
+  - docs/managed-agents.md
+  - docs/managed-agents/client-surfaces.md
+  - docs/first-party-plugins/terminal.md
+  - plugins/agents/src/client/index.ts
+  - plugins/agents/src/node/index.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+The Agents plugin runs Claude Code and Codex as managed agent sessions: each task's **Agent** pane, with
+its transcript, request cards, and message box, and Agent Center, which lists every session across your
+tasks. The [Agents](/docs/agents/agent-sessions/) section of these docs covers it in full. This page is
+the plugin's summary.
+
+<Snapshot id="hero" />
+
+<PluginFacts id="agents">
+  <Fragment slot="adds">The **Agent** pane, **Agents** in the left rail for Agent Center, the session palette commands, the Claude Code, Codex, and Aider harnesses, four pages under **Settings** > **Agents**, and plan usage in the Agent pane's header.</Fragment>
+  <Fragment slot="needs">Claude Code or Codex installed and signed in on the Node's machine. acorn uses each command line's own login.</Fragment>
+  <Fragment slot="reach">The harnesses it starts on the Node, in each task's worktree, and every session's transcript, kept on the Node. It can't be turned off, because acorn's sessions depend on it.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. Install Claude Code or Codex on the Node's machine, and sign in to it there.
+
+2. Open a task. The **Agent** pane opens with **Start a managed coding session**, and a card for each
+   harness. Click **Claude Code** or **Codex**.
+
+   <Checkpoint>A session opens with its message box. A harness acorn can't find says so on its card, such as "codex is not available on PATH."</Checkpoint>
+
+</Steps>
+
+## Use it
+
+The Agents section has a page for each part:
+
+| To | Read |
+| --- | --- |
+| Start a session, write turns, read the transcript, and archive or fork a session | [Agent sessions](/docs/agents/agent-sessions/) |
+| Choose a harness, its login, and what a new session starts with | [Harnesses and defaults](/docs/agents/harnesses-and-defaults/) |
+| Answer what an agent asks for, and set its permission mode | [Permissions and approvals](/docs/agents/permissions-and-approvals/) |
+| Save an agent with its own instructions and tool limit | [Custom agents](/docs/agents/custom-agents/) |
+| Have an agent start another | [Delegation and subagents](/docs/agents/delegation-and-subagents/) |
+| Send into a running turn, queue, and set goals | [Steering, queues, and follow-ups](/docs/agents/steering-queues-and-follow-ups/) |
+| Attach files and context | [Files, attachments, and context](/docs/agents/files-attachments-and-context/) |
+| Search transcripts | [Search agent history](/docs/agents/search-agent-history/) |
+| See plan usage and session cost | [Usage and cost](/docs/agents/usage-and-cost/) |
+| Run a CLI as it is instead | [Agents in the terminal drawer](/docs/agents/agents-in-the-terminal-drawer/) |
+| Give agents acorn's tools, and your own MCP servers | [Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/) |
+
+## Agent Center
+
+Click **Agents** in the left rail, or run **Open Agent Center**. It lists sessions across your tasks with
+their state, counts how many are working and how many need you, shows each harness's health, and
+searches every transcript. Its archived filter has **Restore** for a session you archived on its own.
+
+## From the command palette
+
+The plugin's commands include **Open Agent Center**, a new session, and starting Claude Code or Codex in
+the terminal drawer. [Agent sessions](/docs/agents/agent-sessions/) lists the session menu's commands.
+
+## For agents
+
+Every session gets acorn's tools through acorn's MCP server, scoped to its task, and the task's context
+with its first message. Other plugins add to what sessions see: custom agents, skills, tool hooks, and
+cards in the transcript.
+
+## Settings
+
+**Settings** > **Agents** has four pages from this plugin: **Harnesses and defaults**, **Custom agents**,
+**MCP**, and **Limits and cost** ([Settings: Agents](/docs/settings/agents/)).
+
+## In the terminal
+
+The terminal client draws the same Agent pane: the roster, the transcript, the message box, the queue,
+and request cards. It draws the plugin's Settings pages too. **Attach**, **Export**, and **Continue in terminal** need the
+desktop app.
+
+## Limits
+
+- Managed sessions run Claude Code and Codex, and harnesses other plugins add. Aider runs only in the
+  terminal drawer.
+- A session lives as long as its task. Archiving a task retires its sessions.
+- acorn doesn't move a session to another account when one runs out of plan usage.

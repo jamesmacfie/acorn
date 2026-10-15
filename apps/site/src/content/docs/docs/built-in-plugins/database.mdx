@@ -1,0 +1,189 @@
+---
+title: Database
+description: Browse, edit, and query a task's PostgreSQL database from a pane, save queries per project, and generate SQL from a description.
+sources:
+  - docs/database.md
+  - docs/database/pane.md
+  - docs/database/palette-and-workflows.md
+  - docs/cli/plugin-commands.md
+  - plugins/database/acorn-plugin.config.mjs
+  - plugins/database/src/tree/DatabasePanel.tsx
+  - plugins/database/src/tree/RowDetail.tsx
+  - plugins/database/src/tree/GenerateSqlModal.tsx
+  - plugins/database/src/tree/SaveQueryModal.tsx
+  - plugins/database/src/server/database.ts
+  - plugins/database/src/server/workflowSteps.ts
+  - packages/node-core/src/server/core/data.ts
+  - packages/client-core/src/features/settings/ProjectConfigTabs.tsx
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+The Database plugin adds a pane for the task's PostgreSQL database: its tables and rows, a SQL editor,
+queries you save for the project, and SQL written for you from a description.
+
+<Snapshot id="database" />
+
+<PluginFacts id="database">
+  <Fragment slot="adds">The **Database** pane, three palette commands, a source for the agent's **Context** picker, two workflow steps, and the `acorn plugin database query` command.</Fragment>
+  <Fragment slot="needs">A PostgreSQL connection URL, from the worktree's `.env`, the Node's environment, or a command you give it. To generate SQL: an API key or an agent command line, such as Claude Code.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+The pane shows only on a task that has somewhere to get a database URL from. acorn looks in three
+places, in this order, and uses the first that answers:
+
+1. The project's **Connection URL command**, which prints the URL.
+2. `DATABASE_URL` in the `.env` file at the root of the task's worktree.
+3. `DATABASE_URL` in the Node's own environment.
+
+<Steps>
+
+1. Give acorn the URL. If your project keeps `DATABASE_URL` in a `.env` file, there's nothing to do,
+   as long as the file is in the task's worktree. A `.env` file Git ignores isn't copied into a new
+   worktree unless your `.acorn/config.toml` lists it under `copy`
+   ([Tasks and worktrees](/docs/using/tasks-and-worktrees/#when-the-worktree-is-made-and-where)).
+   Otherwise, open **Settings**, choose the project, open its **Database** tab, and type a command that
+   prints the URL in **Connection URL command**, such as `./scripts/db-url.sh`. It runs in the task's
+   worktree, and acorn uses the last line it prints.
+
+2. Open a task in that project, and click **Database** in the pane switcher, or press ⌘⇧J. A task that
+   was already open shows the button within two minutes, or when you come back to the window.
+
+   <Checkpoint>The pane's bar shows your database's name in green, and **Tables** lists its tables with their count.</Checkpoint>
+
+</Steps>
+
+acorn reads the URL each time it connects and never stores it. The plugin itself never sees it:
+acorn opens the connection and hands the plugin the results. A command set in a committed
+`.acorn/config.toml` runs only after you trust that file
+([Project configuration](/docs/using/project-configuration/)).
+
+## Browse tables and rows
+
+Click a table in **Tables** to read its rows. The pane writes the matching `SELECT` into the editor, and
+the bar under the editor says how many rows it shows out of the table's total, such as **500 of 12,408
+rows**. **Filter tables…** narrows the list. A table outside the `public` schema shows with its schema
+name.
+
+A table opens on its first 500 rows, in primary key order. To read further, write a query with an
+`OFFSET` and run it.
+
+## Edit a row
+
+Click a row to open it as a form, one field per column, with each column's type and whether it's the
+primary key.
+
+- Change a value and click **Save**. Tick **Set to NULL** to clear a nullable column.
+- Click **Delete**, then **Delete row?** to confirm.
+- **Add row**, above the grid, opens an empty form. Columns you leave as **NULL** take their default.
+
+You can edit only rows you opened from **Tables**, and only in a table with a primary key, because acorn
+finds the row by its key. Rows from a query you ran are read-only in the form.
+
+## Run SQL
+
+Type SQL in the editor and click **Run**, or press ⌘Enter. The pane runs the whole editor, as it is, on
+the task's database, and shows the result with its command, row count, and time, such as **SELECT · 3
+rows · 4ms**. It runs what you type, writes included: it's your database.
+
+Table and column names complete as you type, after `FROM` and after a table's alias and a dot. Hover
+over a name to see its columns or type.
+
+The editor's text is kept for the task, and saved as you type, so a half-written query is still there
+when you come back. Clicking a table or loading a saved query replaces it. A query that fails because
+the network dropped isn't run again for you, because acorn can't tell whether it ran.
+
+If you change the schema outside the pane, click **Reconnect**, the arrow at the end of the bar, so
+completions and **Tables** see the change.
+
+## Save queries for the project
+
+Click **Save**, give the query a **Name**, and add **Notes** on what it answers. Saved queries belong
+to the project, so every task in it can use them. **Saved queries** lists them: pick one to load it
+into the editor, or remove it from the list. Loading a query doesn't run it.
+
+Load a saved query, change it, and click **Save** again to update it in place.
+
+## Generate SQL from a description
+
+**Generate** shows when acorn has something to generate with: a model provider key, or an agent command
+line such as Claude Code on the Node's machine
+([Model providers and generating text](/docs/agents/model-providers-and-generating-text/)).
+
+1. Click **Generate**.
+2. Describe what the query should return, in **What should the query return?**
+3. Optionally, add saved queries under **Example queries**, so the model sees how you write SQL.
+4. Pick the model, and click **Generate**.
+
+The SQL lands in the editor. It doesn't run until you run it. The model gets your schema, read from the
+live database by default, and your saved queries' notes when you pick them as examples. On the project's
+**Database** tab, **Schema source** can read the schema from a script or a file instead, and **Schema
+notes** tells the model what the schema can't, such as what each value of a status column means.
+
+## From the command palette
+
+The commands sit in a **Database** group.
+
+| Command | What it does |
+| --- | --- |
+| **Run query** | Runs the editor's SQL, as ⌘Enter does. |
+| **Find a saved query** | Searches this project's saved queries by name, notes, and SQL, and loads the one you pick. |
+| **Generate SQL** | Asks what the query should return, writes the SQL with your first model connection and its default model, and opens the pane on it. Use the pane's **Generate** to choose the model or add examples. |
+
+## For agents
+
+To hand an agent your saved queries, open **Context** below the agent's message box, choose **Saved
+database queries**, and pick the queries. The agent gets their SQL and notes with your next message.
+Connection details are never in it.
+[Files, attachments, and context](/docs/agents/files-attachments-and-context/) covers the picker.
+
+## In workflows
+
+Two steps, both read-only:
+
+| Step | What it does |
+| --- | --- |
+| **Run a query** | Runs a **Saved query** or inline **SQL** on the task's database and hands the rows to the next step. **Row cap** sets how many, up to 200. |
+| **Generate and run a query** | Writes SQL from **Ask for** with the model in **Generate with**, then runs it. Its output has the SQL and the rows. |
+
+A step refuses SQL that writes, and runs in a read-only transaction, so a function that writes fails
+too. A result bigger than 256 KB fails the step rather than being cut.
+[Workflows](/docs/built-in-plugins/workflows/) covers the pane they run in.
+
+## From the command line
+
+`acorn plugin database query` runs read-only SQL for a task and prints the rows, up to 200. Its input is
+a JSON file with the Node's ID, the task's ID, and the SQL:
+
+```sh
+acorn plugin database query --input-file query.json --output json
+```
+
+where `query.json` holds `{ "nodeId": "…", "taskId": "…", "sql": "select 42 as answer" }`.
+
+## Settings
+
+The Database plugin has no Settings page. Its settings are on each project's **Database** tab:
+**Connection URL command**, **Schema source**, and **Schema notes**
+([Settings: Workspaces and projects](/docs/settings/workspaces-and-projects/#database)).
+
+## In the terminal
+
+The terminal client draws the same pane. The editor is a text field above the tables and results. It
+saves as you type and on Ctrl+S, but it has no syntax colors and no completions.
+
+## Limits
+
+- PostgreSQL only.
+- A table opens on its first 500 rows. The pane has no paging control.
+- A query's rows can't be edited in the form, and nor can a table without a primary key.
+- The editor holds up to 2 MiB of text.
+- A schema change made elsewhere shows after **Reconnect**, not on its own.
+- Workflow steps and the command line only read, and return at most 200 rows.
+- Generation sends at most 80,000 characters of schema, plus 16,000 of notes and examples.

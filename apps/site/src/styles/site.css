@@ -824,6 +824,14 @@ ul.cards {
 .sl-markdown-content th {
   background: var(--bg-subtle);
 }
+/* A built-in plugin's facts box: the fact's name stays on one line beside its value. */
+.plugin-facts th {
+  white-space: nowrap;
+}
+.plugin-facts ul {
+  margin: 0;
+  padding-inline-start: 1.25em;
+}
 
 .reference {
   font-size: var(--fs);

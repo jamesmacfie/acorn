@@ -22,6 +22,9 @@ shell's sources change.
 | `database` | The Database pane with the schema, a query, and its result | Desktop |
 | `review` | A pull request with an inline review thread and its checks | Desktop |
 | `workflow` | A workflow run on its graph, waiting at a gate | Desktop |
+| `notes` | The webhooks task's Notes pane, with its plan open | Desktop |
+| `editor` | The webhooks task's Editor pane, with a changed file open | Desktop |
+| `context` | The webhooks task's Context pane | Desktop |
 | `fleet` | Fleet home with two Nodes | Desktop |
 | `browser` | The extension's panel beside the pull request's page | Chrome |
 | `terminal-small` | The task's Git pane, 80 by 24 | Terminal client |
@@ -143,6 +146,9 @@ Compressed sizes on October 15, 2026, with Brotli:
 | `review.html` | 6.5 KB |
 | `database.html` | 4.6 KB |
 | `workflow.html` | 4.2 KB |
+| `editor.html` | 6.3 KB, on October 16 |
+| `notes.html` | 3.5 KB, on October 16 |
+| `context.html` | 3.5 KB, on October 16 |
 | `fleet.html` | 2.8 KB |
 | `browser.html` | 0.9 KB |
 | `hero-terminal.cells.json` | 1.1 KB |

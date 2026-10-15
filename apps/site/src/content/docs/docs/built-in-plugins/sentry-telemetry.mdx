@@ -1,0 +1,91 @@
+---
+title: Sentry telemetry
+description: Send the Node's own errors, traces, logs, and metrics to your Sentry project, and choose what goes.
+sources:
+  - docs/integrations/sentry.md
+  - docs/telemetry/plugins-and-sinks.md
+  - plugins/sentry-telemetry/acorn-plugin.config.mjs
+  - plugins/sentry-telemetry/src/server/provider.ts
+  - plugins/sentry-telemetry/src/server/redact.ts
+  - plugins/sentry-telemetry/src/tree/settings.tsx
+  - plugins/sentry-telemetry/src/shared/settings.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Sentry telemetry plugin sends acorn's own telemetry, the errors, traces, logs, and metrics a Node
+collects about itself, to a Sentry project you choose. It's how you'd watch your own Nodes, and it sends
+nothing until you set it up. In Settings it's called **Sentry export**.
+
+<PluginFacts id="sentry-telemetry">
+  <Fragment slot="adds">**Sentry export** under **Settings** > **Connections** > **Services**, and its own page under **Settings** > **Machines**.</Fragment>
+  <Fragment slot="needs">A Sentry project's DSN, and telemetry turned on for the Node.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. Open **Settings** > **Machines** > **Telemetry**, and turn on **Collect timings, logs, and errors on
+   this node**.
+
+2. In Sentry, open **Settings** > **Projects**, choose your project, and copy the DSN from **Client
+   Keys**.
+
+3. In acorn, open **Settings** > **Services**, click **Add connection**, and choose **Sentry export**.
+   Paste the DSN in **DSN**. **Environment** is added to everything acorn sends, and is `production`
+   when you leave it blank. **Release** groups what you send by version, and is optional.
+
+4. Click **Connect**. acorn checks the DSN by sending Sentry an empty message, which costs no quota.
+
+   <Checkpoint>**Services** lists the connection as `Sentry · <host>/<project>`, and new errors from the Node show up as issues in your Sentry project.</Checkpoint>
+
+</Steps>
+
+A Node holds one Sentry export connection. To send somewhere else, replace the DSN, or change
+**Environment** for a staging project.
+
+## Choose what's sent
+
+**Settings** > **Machines** > **Sentry export** picks how many traces go, which of the five kinds of
+record to send, and whether errors carry stack traces and task IDs. Everything is on by default.
+[Telemetry and privacy](/docs/security/telemetry-and-privacy/#send-telemetry-to-sentry) has every
+setting with its default. Changes apply from the next send, which happens every few seconds.
+
+Each kind becomes the Sentry item you'd expect: an error becomes an issue, a trace a transaction, a log
+line a structured log, and a metric a trace metric. A scheduled job's run becomes a cron check-in.
+
+## What's sent, and what isn't
+
+A record holds a name, a time, and a few labels, such as which plugin caused it. It never holds prompts,
+agent output, file contents, diffs, terminal output, request bodies, or credentials, and full paths are
+shortened, with your home folder as `~`. acorn cleans records as it collects them, and this plugin
+cleans the names and labels again before they leave, in case a plugin put a path or a token in one.
+[Telemetry and privacy](/docs/security/telemetry-and-privacy/#what-never-leaves-the-machine) has the
+full list.
+
+The plugin reads every record from every part of acorn and every plugin. That's the whole feature, and
+it's why the plugin's permissions mark reading telemetry as broad.
+
+## Settings
+
+Its page is **Sentry export**, under **Settings** > **Machines**, stored on the Node
+([Settings: Machines](/docs/settings/machines/#sentry-export)). Its connection is under **Settings** >
+**Services**.
+
+## In the terminal
+
+The plugin sends from the Node, whichever client you use. Its settings page, and the connection, open
+only in the desktop app.
+
+## Limits
+
+- One Sentry project per Node.
+- Sentry-hosted projects only: the plugin can reach `sentry.io` and its ingest addresses, not a
+  self-hosted Sentry.
+- Disconnecting stops the export within five seconds.
+- An error sends at most 50 stack frames.
+- Pattern cleaning catches known credential shapes, not every possible secret.

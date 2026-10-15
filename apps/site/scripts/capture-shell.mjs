@@ -117,6 +117,52 @@ const DESKTOP = {
       await click('Graph')
     },
   ],
+  // The built-in plugin pages' panes, each on the webhooks task with nothing pinned beside it.
+  notes: [
+    async () => {
+      if (named('Close settings')) await click('Close settings')
+      await until(() => named('Retry failed webhooks'), 'the fixture tasks')
+    },
+    async ({ tasks }) => {
+      await open(`acorn://local/t/${tasks.webhooks}?pane=notes`)
+      if (named('Unpin Git')) await click('Unpin Git')
+      await click('Plan')
+      const body = () => [...document.querySelectorAll('textarea')].some((field) => field.value.includes('Retry 5xx'))
+      await until(body, 'the plan note')
+    },
+  ],
+  editor: [
+    async ({ tasks }) => {
+      await open(`acorn://local/t/${tasks.webhooks}?pane=editor`)
+      await until(() => document.querySelector('[role="treeitem"]'), 'the file tree')
+    },
+    async () => {
+      // A tree row is named by its path, then its Git status after a comma. A folder is open when a
+      // row inside it shows.
+      const paths = () =>
+        [...document.querySelectorAll('[role="treeitem"]')]
+          .filter(visible)
+          .map((item) => [item.getAttribute('aria-label')?.split(',')[0], item])
+      const row = (path) => paths().find(([name]) => name === path)?.[1]
+      for (const folder of ['billing', 'billing/webhooks']) {
+        const item = await until(() => row(folder), `the ${folder} folder`)
+        if (!paths().some(([name]) => name?.startsWith(`${folder}/`))) {
+          item.click()
+          await settle()
+        }
+      }
+      ;(await until(() => row('billing/webhooks/deliver.py'), 'the file')).click()
+    },
+    async () => {
+      await until(() => document.querySelector('.cm-content')?.textContent.includes('def '), 'the file text')
+    },
+  ],
+  context: [
+    async ({ tasks }) => {
+      await open(`acorn://local/t/${tasks.webhooks}?pane=context`)
+      await until(() => document.body.textContent.includes('What the agent gets'), 'the context preview')
+    },
+  ],
   // Last, because once a second Node is paired every window shows which Node it's on.
   fleet: [
     async ({ secondNode }) => {

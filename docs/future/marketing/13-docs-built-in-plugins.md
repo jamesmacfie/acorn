@@ -1,7 +1,88 @@
 # Phase 13: document every built-in plugin
 
-Date: October 15, 2026. Status: proposed. Needs phases 2 and 4. Follows the page rules in
+Date: October 15, 2026. Status: done. Needs phases 2 and 4. Follows the page rules in
 [phase 11](./11-docs-start-and-core.md#how-every-docs-page-is-written).
+
+## Completion note
+
+October 16, 2026. The Built-in plugins overview and 19 plugin pages are written, published, and marked
+checked, and `/plugins/` lists every plugin acorn ships. Both checks the phase asked for land with them.
+
+What landed:
+
+- The pages, in `apps/site/src/content/docs/docs/built-in-plugins/`, all `.mdx`, in the shape this
+  doc gives. The docs home's **Use acorn** card links to the overview.
+- `apps/site/src/data/plugins.ts`, one entry per plugin: name, sentence, Lucide icon, compiled or
+  package, whether it's required, which clients draw it, its docs page, and, for an installed package,
+  a reason for each permission. `/plugins/` and the overview both read it.
+- `PluginFacts.astro`, the facts box. **Ships as** and **Works in** come from the data module. For an
+  installed package, **Can reach** is generated from the manifest through `permissionKeys` in
+  `apps/site/src/lib/pluginPermissions.ts`, and the build fails on a grant with no reason.
+- `apps/site/scripts/pluginPages.test.mjs`. It reads the desktop, terminal client, and Node activation
+  lists and `BUNDLED_PLUGINS`, and fails on a shipped plugin with no entry or no docs page, an entry
+  nothing ships, a wrong compiled-or-package claim, a permission with no reason, and a reason for a
+  permission nobody asks for. Fixture cases prove each failure, and a planted gap against the real
+  rosters failed as expected.
+- `/plugins/`, a card per plugin with its icon, sentence, **Ships as**, and **Works in**, and a short
+  section on building your own. `lucide-static` is a site dependency for the icons, at the version
+  client-core already pins.
+- Three shell snapshot scenes, `notes`, `editor`, and `context`, captured on the fixture. Playwright
+  tests check every link on `/plugins/` on both builds and run axe on `/plugins/` and the Database page.
+- `docs/site/built-in-plugins.md` describes the data module and the test. `docs/site.md`,
+  `docs/plugins/adding-a-contribution.md`, `docs/site/snapshots.md`, and `docs/README.md` point at it.
+
+The acceptance checks: a production build and a preview build both pass the site's tests, 31 script
+tests with 112 and 259 Playwright tests, and the link validator finds every internal link and anchor
+valid. `astro check` finds no errors. In a `dev:agent` session, the setup steps for Database (with a
+throwaway PostgreSQL behind **Connection URL command**), HTTP, Editor, and Terminal were walked, and
+**Settings** > **Plugins** > **Installed** was read for the plugin names and the **Enabled** switch.
+
+### Decisions
+
+- **Permission keys follow the manifest's own fields**, such as `node.net:api.linear.app`, and the
+  page shows them as code beside the reason. Showing the trust prompt's own sentences would mean
+  importing client-core's `permissions.ts`, which isn't a package export and doesn't load in plain Node,
+  where the test runs.
+- **Onboarding has an entry and no page.** Its docs link is Install's first-run section, so it's on
+  `/plugins/` and the overview and the test still covers it.
+- **Pictures where the fixture can draw one.** Database, Git, GitHub, Agents, Terminal, and Workflows
+  reuse existing scenes, and Notes, Editor, and Context get new ones. Linear, Rollbar, and Docker need a
+  service the fixture fakes nothing for, Preview is a native webview the capture draws as a box, and
+  Agent browser, Agent cost, Memory, Model providers, and Sentry telemetry have no pane worth a window.
+  Those pages have no picture.
+- **The Workflows page links no Automation page**, and `/plugins/`' build-your-own section links
+  `/features/plugins/`, because those docs are still drafts and a production build fails on a link to
+  a draft.
+
+### Deviations
+
+- **Context and Onboarding aren't on Settings > Plugins > Installed**, because they have no Node half,
+  so neither can be turned off. `docs/plugins/activation.md` says every plugin but the four required
+  ones can be. The overview and the Context page say what the app does.
+- **The Database pane has no paging.** `docs/database/pane.md` lists paged rows, and the route takes an
+  offset, but the pane always asks for the first 500 rows of a table. The page says so.
+- **A loaded pane's availability isn't read again in a hidden window.** The `dev:agent` window counts
+  as hidden, so the Database pane appeared only after faking visibility, as `shellPage.js` does. A
+  visible window reads it every two minutes and on focus, and the page says the button can take that
+  long to appear.
+- **Rollbar only reads, and Linear writes only comments.** The permission reasons say so, rather than
+  "reads and updates".
+
+These need fixing in the internal docs by their owners.
+
+### What later phases need to know
+
+- Phase 14: link the Workflows plugin page to the Automation pages once they publish, and the Docker
+  and Terminal pages' run target mentions to the command line and configuration reference.
+- Phase 15: point `/plugins/`' **Build your own** link at How plugins work once it publishes. Its
+  Permissions reference can link each built-in page's facts box as a worked example.
+- A new built-in plugin, or a new permission on an installed package, needs its entry and reason in
+  `apps/site/src/data/plugins.ts`, or the site's tests fail.
+- Linear, Rollbar, GitHub, and Sentry setup steps follow the code and the connection forms. Nobody
+  walked them against a real account. Phase 20's review should.
+- The architecture checks fail on this base as earlier phases recorded, with nothing from this change.
+  `docs/site.md` sits at the 200-line limit.
+- Nothing here needs a deploy, so nothing is left for phase 20.
 
 ## Goal
 

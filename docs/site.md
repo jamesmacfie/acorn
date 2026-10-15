@@ -190,7 +190,7 @@ Every docs page takes these frontmatter fields, on top of Starlight's own:
 To add a marketing page, create an Astro file under `apps/site/src/pages/`. It exports a `meta` object
 with the same `description`, `sources`, and `checked`, typed as `PageMeta` from `apps/site/src/meta.ts`,
 and renders inside `apps/site/src/layouts/Marketing.astro`. The layout validates `meta`, so a page with a missing
-field fails the build.
+field fails the build. A plugin acorn ships also needs [an entry and a docs page](./site/built-in-plugins.md).
 
 To add a lab page, create an Astro file under `apps/site/src/lab/`. The `lab` integration in
 `apps/site/astro.config.mjs` serves it under `/lab/` in development and preview builds only. A file

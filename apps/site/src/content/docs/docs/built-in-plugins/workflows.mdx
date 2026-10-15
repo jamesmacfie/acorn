@@ -1,0 +1,117 @@
+---
+title: Workflows
+description: The Workflows source and editor, the run pane on a task, and what each step shows while it runs and when it's done.
+sources:
+  - docs/workflows.md
+  - docs/workflows/routes-and-ui.md
+  - docs/workflows/authoring.md
+  - docs/workflows/starting-runs.md
+  - docs/workflows/step-kinds.md
+  - plugins/workflows/src/client/index.ts
+  - plugins/workflows/src/client/runs/paneContribution.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+The Workflows plugin runs workflows: a graph of steps, such as an agent turn, a command, a database
+query, and a gate that waits for you, on a task. It adds the Workflows source and editor, and a
+**Workflows** pane on each task that has run one.
+
+<Snapshot id="workflow" />
+
+<PluginFacts id="workflows">
+  <Fragment slot="adds">**Workflows** in the left rail with its editor, the **Workflows** pane on a task with a run, **Start workflow…** on Linear, Rollbar, and GitHub rows and on Git commits, palette commands, **Settings** > **Automation** > **Workflows**, and tools agents use to find and start workflows.</Fragment>
+  <Fragment slot="needs">Nothing to start. A workflow's own steps may need other plugins, such as Agents or Database.</Fragment>
+  <Fragment slot="reach">What each step's plugin does on the Node, for the task the run belongs to. A workflow file from a repository runs only after you trust it.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+There's nothing to set up.
+
+<Steps>
+
+1. Click **Workflows** in the left rail.
+
+   <Checkpoint>The list shows every workflow the workspace can run, with its recent runs below. Each row says how many steps it has, its project, and where it came from.</Checkpoint>
+
+2. Click **New workflow** to start one in the editor.
+
+</Steps>
+
+## The Workflows source
+
+The list reads workflows from three places: files committed in the project's `.acorn/workflows/`
+folder, files in your own `~/.acorn/workflows`, and workflows you made in the app. A file with an
+error is a row of its own, so it doesn't go missing quietly.
+
+Pick a workflow to open it in the editor: an outline of its definition, its inputs, and its steps, where
+**Add step** groups the step kinds as **Ask AI**, **Records**, and **Flow**, then one group per plugin.
+
+## Start a run
+
+- **Run…** in the editor, or the start dialog, which asks for the workflow's inputs.
+- **Start workflow…** in the menu on a Linear issue, a Rollbar error, or a GitHub pull request. It fills
+  the inputs it can from the item, makes a task or attaches to one, and starts the run. Its button reads
+  **Create & run** or **Attach & run**.
+- A Git commit's menu, which starts the run on a new task branched from that commit.
+- On a schedule, or when another plugin's trigger fires.
+
+A run opens in its task's **Workflows** pane.
+
+## The run pane
+
+A task that has run a workflow has a **Workflows** pane. It lists the task's runs, newest first, then the
+selected run's steps, and one step's detail beside them. **List** and **Graph**, in the header, switch
+between the step list and the same graph the editor draws, colored by status.
+
+| Step | While it runs | When it's done | Controls |
+| --- | --- | --- | --- |
+| An agent | The conversation, with its queue and message box | The same conversation, and the step's result | **Show in Agent pane**, **Stop step** |
+| A command | The output as it streams | The exit code, how long it took, and the output | **Stop step** |
+| A run target | **Starting…** | The URL | **Open terminal** |
+| A database query | **Reading…** | The rows, and the SQL behind them | |
+| An HTTP request | **Sending…** | The status, the headers, and the body | |
+| A gate for you | **Waiting for you**, with a form if it asks for one | Approved, or what it reached | **Approve**, **Reject** |
+
+A failed step shows its error with **Retry**, and an agent step also has **Edit prompt and retry**.
+**Reject** fails the run, so it asks first. The footer shows the run's status, cost, and tokens, with
+**Cancel run** while it's live.
+
+An agent step's conversation is the Agent pane's own, so you can read it and reply without leaving the
+run.
+
+## From the command palette
+
+| Command | What it does |
+| --- | --- |
+| **Run a workflow** | Picks a workflow and starts it on the current task. |
+| **Find a run** | Searches this task's runs, and opens the one you pick. |
+| **New workflow** | Creates a workflow and opens the editor. |
+
+## For agents
+
+Agents can find workflows, save drafts, and start a workflow you've approved for agents, with acorn's
+workflow tools ([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)).
+
+## Settings
+
+**Settings** > **Automation** > **Workflows** lists the workflows a task's checkout would load, and any
+problems with them ([Settings: Automation](/docs/settings/automation/#workflows)). Schedules for
+workflows are on **Settings** > **Automation** > **Schedules**.
+
+## In the terminal
+
+The terminal client draws the same source, editor, and run pane. **Start workflow…** on a row's menu is
+desktop only.
+
+## Limits
+
+- A workflow file from a repository runs only after you trust it, and asks again when it changes.
+- A run keeps the definition it started with. Editing the workflow changes later runs, not this one.
+- A step whose plugin is off shows as a problem rather than running something else.
+- Triggers are checked every five minutes, so a trigger can start a run up to five minutes late.
