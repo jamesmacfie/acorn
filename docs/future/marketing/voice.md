@@ -87,6 +87,7 @@ Use one term per concept, everywhere, the same one the app uses on screen.
 | built-in plugin | Any plugin acorn ships. User docs don't care about tiers. | first-party, core plugin |
 | compiled plugin, loaded plugin | Plugin docs only, defined once on "How plugins work". | tier 1, sandboxed plugin |
 | kit, component | The shared set of UI components plugins draw with. | widget library, design system |
+| (none) | "Specimen" and "snapshot" are the site's build terms, for code, file names, and these plans. On a page, say what the picture shows: "the Changes pane on the desktop and in the terminal". | specimen, snapshot, rendering |
 
 ## The one-line description
 
