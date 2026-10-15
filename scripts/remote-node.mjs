@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Start a Node in a Linux container and pair a `pnpm dev:agent` window to it, so a "remote Node" check
-// runs against a different filesystem and network from the client's (docs/local-development.md
-// § Test against a remote Node).
+// runs against a different filesystem and network from the client's
+// (docs/local-development/remote-node.md).
 
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
