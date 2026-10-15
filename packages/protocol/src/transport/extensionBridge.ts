@@ -18,7 +18,8 @@ import type { NodeProbeResult, NodeRecord, NodeStatus } from './broker.ts'
 
 // The browser extension's native messaging contract: the identities a host registration allows, the
 // frame limits, and the typed operations. The browser extension and the CLI's native host are both
-// apps and may not import each other, so the contract lives here. docs/browser-extension.md owns it.
+// apps and may not import each other, so the contract lives here. docs/browser-extension/native-messaging.md
+// owns it.
 // Named for the extension: `browser` is a plugin's ID, and protocol modules named for a plugin are a
 // closed list in tools/arch/boundaries.test.ts.
 

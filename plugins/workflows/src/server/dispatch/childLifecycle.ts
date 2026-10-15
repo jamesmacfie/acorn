@@ -5,7 +5,7 @@ import { eq, inArray } from 'drizzle-orm'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
-import type { WorkflowChildRunSummary } from '../../shared/api'
+import type { WorkflowChildRunSummary } from '../../contract/wire.ts'
 import type { AgentExecuteGoalSummary } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import type {
   ResolvedWorkflowGraph,

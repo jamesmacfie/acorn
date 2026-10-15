@@ -13,6 +13,12 @@ const ref = (id: string, path: string | null = null, github: ProjectRef['github'
   name: id,
   path,
   workspaceId: 'default',
+  repository: github && {
+    provider: 'github',
+    host: 'github.com',
+    path: `${github.owner}/${github.name}`,
+    externalId: github.repoId === null ? null : String(github.repoId),
+  },
   github,
 })
 

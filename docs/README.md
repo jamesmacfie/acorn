@@ -29,7 +29,8 @@ the whole plugin system in one page.
 | [architecture/control-plane.md](./architecture/control-plane.md) | The three parties, and what a control plane may hold. |
 | [conventions.md](./conventions.md) | The naming rules: files, folders, exports, state, contributions, packages. |
 | [api-reference.md](./api-reference.md) | The map of the `/v1` API and which page owns each route, header, and frame. |
-| [api-reference/transport.md](./api-reference/transport.md) | Namespaces, the broker deadline, pairing, protocol versioning, request processing, idempotency, and the error envelope. |
+| [api-reference/transport.md](./api-reference/transport.md) | Namespaces, the broker deadline, pairing, request processing, idempotency, and the error envelope. |
+| [api-reference/versioning.md](./api-reference/versioning.md) | The protocol major, the tolerant handshake, mixed builds and their 90-day window, and how a route is removed. |
 | [api-reference/core-routes.md](./api-reference/core-routes.md) | Every `/v1/core` route with its gate. |
 | [api-reference/plugin-routes.md](./api-reference/plugin-routes.md) | Each first-party plugin's route families, and the GitHub and Changes diff contracts. |
 | [api-reference/editor.md](./api-reference/editor.md) | Editor file reads, guarded writes, task-addressed file actions, and mixed-version behavior. |
@@ -134,6 +135,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | --- | --- |
 | [local-development.md](./local-development.md) | Getting the app running, the dev loops, the environment, and the database commands. |
 | [local-development/agent-drivers.md](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client, native control, and the large-surface flow. |
+| [local-development/remote-node.md](./local-development/remote-node.md) | Starting a Node in a Linux container and pairing a desktop window to it, for remote Node checks. |
 | [local-development/streaming-replay.md](./local-development/streaming-replay.md) | Generated ACP replies, per-process desktop sampling, and alternating renderer comparisons. |
 | [local-development/extension-dev-loop.md](./local-development/extension-dev-loop.md) | `pnpm dev:extension`: an isolated browser with the extension loaded and reloading, its native host and Node, and the sidebar driver. |
 | [local-development/profiling.md](./local-development/profiling.md) | Timing a cold start and a task switch. |
@@ -191,6 +193,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [cli/local-service.md](./cli/local-service.md) | The CLI-owned background Node: start, status, and stop. |
 | [cli/browser-host.md](./cli/browser-host.md) | `acorn browser install`, `status`, and `uninstall`: registering the extension's native host. |
 | [browser-extension.md](./browser-extension.md) | The Chrome and Firefox extension, its native bridge, the native messaging contract, pairing, and sidebar states. |
+| [browser-extension/native-messaging.md](./browser-extension/native-messaging.md) | The frames, operations, and events between the extension's background and its native host, and the frame limits the host enforces. |
 | [browser-extension/setup.md](./browser-extension/setup.md) | Installing the extension's development builds and native bridge on macOS, pairing, repair and removal, and every sidebar state with its next step. |
 | [browser-extension/conversations.md](./browser-extension/conversations.md) | The extension's agent operations, change hints, conversation window, send retries, and browser storage. |
 | [browser-extension/page-capture.md](./browser-extension/page-capture.md) | The extension's link, selection, and screenshot captures, page access, sending them, and the attachment operations. |
@@ -368,7 +371,7 @@ Each plugin landing page above has topic pages in a folder of the same name:
   plugin](./plugins/client-half.md), [Collaboration rules](./plugins/collaboration.md), [Commands and
   keybindings](./plugins/commands.md), [Cooperative extension
   points](./plugins/cooperative-extension-points.md), [Data ownership](./plugins/data-ownership.md),
-  [Descriptors](./plugins/descriptors.md), [Detail regions](./plugins/detail-regions.md), [The dev loop](./plugins/dev-loop.md),
+  [Code hosts](./plugins/code-hosts.md), [Descriptors](./plugins/descriptors.md), [Detail regions](./plugins/detail-regions.md), [The dev loop](./plugins/dev-loop.md),
   [Distribution](./plugins/distribution.md), [Document surfaces and
   webviews](./plugins/document-surfaces.md), [Events](./plugins/events.md), [Forward
   compatibility](./plugins/forward-compatibility.md), [Frames](./plugins/frames.md), [Keeping a
@@ -417,9 +420,10 @@ Each plugin landing page above has topic pages in a folder of the same name:
   rig](./future/split/02-remote-test-rig.md), [Node paths and
   addresses](./future/split/03-node-paths-and-addresses.md), [version skew](./future/split/04-version-skew.md),
   [repository identity](./future/split/05-repository-identity.md), [change
-  requests](./future/split/06-change-requests.md), [a plugin API audit](./future/split/07-plugin-api-audit.md),
-  [app plugin imports](./future/split/08-app-plugin-imports.md), and [remote
-  preview](./future/split/09-remote-preview.md).
+  requests](./future/split/06-change-requests.md), [a plugin API audit](./future/split/07-plugin-api-audit.md)
+  and [its table](./future/split/07-plugin-api-audit-table.md), [app plugin imports](./future/split/08-app-plugin-imports.md), [remote
+  preview](./future/split/09-remote-preview.md), and [the remote preview
+  proxy](./future/split/10-remote-preview-proxy.md).
 
 ## Plugin rail and artwork proposal
 

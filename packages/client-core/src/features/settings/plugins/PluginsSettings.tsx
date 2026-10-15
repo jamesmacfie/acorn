@@ -371,12 +371,7 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
         </Show>
       }
     >
-      <InstallPlugin
-        nodeLabel={nodeLabel()}
-        nodeIsLocal={node()?.local === true}
-        install={install}
-        onClose={() => setOpen(undefined)}
-      />
+      <InstallPlugin nodeLabel={nodeLabel()} nodeId={nodeId()} install={install} onClose={() => setOpen(undefined)} />
     </Show>
   )
 }

@@ -80,17 +80,18 @@ export function githubAgentTools(
           )
         }
 
-        const relation = await core.tasks.attachPull(ctx.taskId, {
-          repoOwner: owner,
-          repoName: repo,
-          pullNumber: created.number,
+        const relation = await core.tasks.attachChangeRequest(ctx.taskId, {
+          provider: 'github',
+          path: `${owner}/${repo}`,
+          number: created.number,
+          sourceBranch: task.branch,
           sessionId: ctx.sessionId,
         })
         onAttached()
         return {
           number: created.number,
           relationship: relation.role,
-          pull: { owner: relation.repoOwner, repo: relation.repoName, number: String(relation.pullNumber) },
+          pull: { owner, repo, number: String(relation.number) },
         }
       },
     },

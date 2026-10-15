@@ -1,8 +1,8 @@
 // GitHub PR list filter state, kept per workspace (docs/workspaces-and-tasks.md). The open/closed tab
-// and the free-text query are remembered per workspace id and persisted to the `pr_filters` pref, so
+// and the free-text query are remembered per workspace id and persisted under `github:pr-filters`, so
 // returning to a workspace restores its last filter. Signals-only.
 import { createSignal } from 'solid-js'
-import { onScopeEvicted, parseJson, PersistedSliceKeys, type PersistedStateSlice } from '@acorn/plugin-api/client'
+import { onScopeEvicted, parseJson, type PersistedStateSlice } from '@acorn/plugin-api/client'
 
 export type PrFilter = { tab: 'open' | 'closed'; filter: string }
 const defaultFilter = (): PrFilter => ({ tab: 'open', filter: '' })
@@ -57,7 +57,7 @@ const parsePrFilter = (raw: unknown): PrFilter => {
 
 export const prFiltersSlice: PersistedStateSlice<PrFilter> = {
   id: 'github.pr-filters',
-  key: PersistedSliceKeys.prFilters,
+  key: 'github:pr-filters',
   scope: 'workspace',
   restore: 'view',
   version: 1,

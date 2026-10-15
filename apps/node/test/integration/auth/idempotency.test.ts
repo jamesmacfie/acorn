@@ -200,7 +200,6 @@ describe('Idempotency-Key on /v1', () => {
     const assembledEnv = {
       DB: harness.db,
       NODE_ID: 'node-1',
-      APP_VERSION: 'test',
       DEVICES: devices,
       PAIRING_CODES: pairingCodes(),
       IDEMPOTENCY: store,

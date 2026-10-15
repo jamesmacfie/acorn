@@ -9,8 +9,7 @@ The plugin is `plugins/editor`.
 Editor file access uses core's task-root guard for reads and writes. Writes refuse dangling links
 before opening the file, so a missing target outside the worktree can't be created through a link
 inside it. New files under real directories in the root, and safe internal aliases, still work. For
-the path replacement limit, see
-[security controls](../security/process-and-paths.md).
+the path replacement limit, see [security controls](../security/process-and-paths.md).
 
 ### One round trip to text
 
@@ -144,10 +143,9 @@ confirmed trash retires affected tabs and local recovery. Rename uses a Node bui
 calls the host's atomic exclusive rename primitive on macOS or Linux. An ordinary Node host does not
 compile code when a person renames a file. The action is disabled when this Node build has no helper
 for its platform or architecture and fails closed when the volume lacks the primitive. Quick-open
-reads a fresh file list each time; the Node
-invalidates Git status
-and broadcasts worktree changes to task aliases. Restore trashed entries from the owning Node's
-system Trash. The editor has no permanent-delete action or in-app trash browser.
+reads a fresh file list each time; the Node invalidates Git status and broadcasts worktree changes
+to task aliases. Restore trashed entries from the owning Node's system Trash. The editor has no
+permanent-delete action or in-app trash browser.
 
 Rename also rewrites closed-tab, navigation, and device recent paths under the captured Node and
 task. Trash prunes those references. These records contain paths and positions, never document text.
@@ -156,19 +154,19 @@ task. Trash prunes those references. These records contain paths and positions, 
 
 Window focus, worktree invalidation, reconnect, and **Reload status** revalidate the active text
 file. Bursts share one active-file refresh at a time. Inactive cached files become stale and
-revalidate before the pane shows them. An unchanged
-read leaves the buffer, undo history, selection, and save timer alone. Changed disk text replaces a
-clean buffer and clamps its cursor and scroll. A dirty draft stays visible and pauses automatic saves
-when the disk revision diverges. A failed read retains the useful text. A missing file shows
-**Deleted on disk**; connection failures show a separate read error.
+revalidate before the pane shows them. An unchanged read leaves the buffer, undo history, selection,
+and save timer alone. Changed disk text replaces a clean buffer and clamps its cursor and scroll. A
+dirty draft stays visible and pauses automatic saves when the disk revision diverges. A failed read
+retains the useful text. A missing file shows **Deleted on disk**; connection failures show a
+separate read error.
 
 **Compare** renders the disk snapshot against the live draft through the shared read-only diff rows.
 **Reload from disk** confirms before discarding a dirty draft. **Overwrite disk…** confirms the
 named file and snapshot revision captured when its confirmation appears, so a tab switch or newer
 disk version makes that decision fail. Reload confirmation follows the same rule; when disk already
-contains the draft text it preserves the editor's selection and undo history. **Recreate file…** uses an
-absence precondition. **Save as…** writes a separate path under the task root. **Retry save** handles
-ordinary write failures. None of these actions stages a file.
+contains the draft text it preserves the editor's selection and undo history. **Recreate file…**
+uses an absence precondition. **Save as…** writes a separate path under the task root. **Retry
+save** handles ordinary write failures. None of these actions stages a file.
 
 ## File status and editing controls
 

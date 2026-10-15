@@ -20,6 +20,8 @@ import { copyWorktreeFiles, ensureWorktree } from './worktrees'
 // parallel run.
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
 
+const pullSeven = { number: 7, ref: 'pull/7/head', name: 'pull request #7' }
+
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'pipe' }).toString()
 
 // A checkout with a stale `origin/main`, written directly as a remote-tracking ref with no network,
@@ -59,10 +61,12 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
     git(src, 'add', '.')
     git(src, 'commit', '-q', '-m', 'three')
     checkoutHeadSha = git(src, 'rev-parse', 'HEAD').trim()
-    // A local 'origin' serving refs/pull/7/head at commit one, so the PR path runs without a network.
+    // A local 'origin' serving refs/pull/7/head and the branch feat/source at commit one, so both
+    // change request paths run without a network.
     const origin = join(template, 'origin')
     execFileSync('git', ['clone', '-q', '--bare', src, origin])
     git(origin, 'update-ref', 'refs/pull/7/head', originMainSha)
+    git(origin, 'update-ref', 'refs/heads/feat/source', originMainSha)
     git(src, 'remote', 'add', 'origin', origin)
   })
 
@@ -91,16 +95,41 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
   // FETCH_HEAD is a file in the repo's common dir that every concurrent fetch rewrites, so a PR branch
   // created from it could be born at another PR's head: right name, clean status, no diff, another
   // task's tree. Asserting the private per-PR ref keeps it out.
-  it('creates a PR branch from a private per-PR ref, not FETCH_HEAD', async () => {
+  it('creates a change request branch from a private per-request ref, not FETCH_HEAD', async () => {
     // A decoy FETCH_HEAD: whatever it says must not reach the new branch.
     writeFileSync(join(checkout, '.git', 'FETCH_HEAD'), `${localMainSha}\t\t'refs/pull/999/head' of nowhere\n`)
 
-    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/pr-7', 7)
+    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/pr-7', pullSeven)
     expect(res.ok).toBe(true)
     if (!res.ok) return
     expect(git(res.path, 'rev-parse', 'HEAD').trim()).toBe(originMainSha)
     expect(git(res.path, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('feat/pr-7')
-    expect(git(checkout, 'rev-parse', 'refs/acorn/pull/7').trim()).toBe(originMainSha)
+    expect(git(checkout, 'rev-parse', 'refs/acorn/change-request/7').trim()).toBe(originMainSha)
+  })
+
+  // A code host with no ref for its change requests: core fetches the source branch by name.
+  it('fetches the source branch when the change request has no ref', async () => {
+    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/source', {
+      number: 3,
+      ref: 'feat/source',
+      name: 'pull request #3',
+    })
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(git(res.path, 'rev-parse', 'HEAD').trim()).toBe(originMainSha)
+    expect(git(res.path, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('feat/source')
+  })
+
+  it('names the change request when its ref cannot be fetched', async () => {
+    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/mr-12', {
+      number: 12,
+      ref: 'merge-requests/12/head',
+      name: 'merge request !12',
+    })
+    expect(res).toEqual({
+      ok: false,
+      reason: expect.stringContaining('Could not fetch merge request !12 from merge-requests/12/head.'),
+    })
   })
 
   it('reuses an existing branch untouched', async () => {
@@ -110,11 +139,11 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
     if (res.ok) expect(git(res.path, 'rev-parse', 'HEAD').trim()).toBe(originMainSha)
   })
 
-  it.each([null, 7])('identifies a branch occupied by another worktree (pull %s)', async (pullNumber) => {
+  it.each([null, pullSeven])('identifies a branch occupied by another worktree (%o)', async (changeRequest) => {
     const occupied = join(dir, 'outside worktrees\noccupied')
     git(checkout, 'worktree', 'add', '-b', 'feat/occupied', occupied)
     writeFileSync(join(occupied, 'a.txt'), 'uncommitted work')
-    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/occupied', pullNumber)
+    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/occupied', changeRequest)
     expect(res).toEqual({
       ok: false,
       reason: expect.stringContaining(`Branch 'feat/occupied' is already checked out at '${realpathSync(occupied)}'.`),

@@ -22,6 +22,7 @@ export async function deleteProject(db: AppDatabase, id: string, ownerId = ''): 
   const removedProviders = db.transaction((tx) => {
     if (taskIds.length) {
       tx.delete(schema.taskPulls).where(inArray(schema.taskPulls.taskId, taskIds)).run()
+      tx.delete(schema.taskChangeRequests).where(inArray(schema.taskChangeRequests.taskId, taskIds)).run()
       tx.delete(schema.taskScriptAttempts).where(inArray(schema.taskScriptAttempts.taskId, taskIds)).run()
       tx.delete(schema.taskLinks).where(inArray(schema.taskLinks.taskId, taskIds)).run()
       tx.delete(schema.tasks).where(inArray(schema.tasks.id, taskIds)).run()

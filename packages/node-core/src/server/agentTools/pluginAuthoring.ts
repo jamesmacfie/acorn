@@ -43,7 +43,7 @@ type JsonSchema = {
   enum?: string[]
   const?: string
   maxItems?: number
-  type?: string
+  type?: string | string[]
 }
 
 let cached: JsonSchema | null = null
@@ -140,7 +140,7 @@ export type PluginAuthoringVocabulary = {
     contributionCaps: Record<string, number>
     // Contributions that are one route on the plugin's node half rather than a list.
     contributionRoutes: string[]
-    // Contributions that are one object rather than a list, such as `browserPanel`.
+    // Contributions that are one object rather than a list, such as `browserPanel` and `codeHost`.
     contributionObjects: string[]
     frameTargets: string[]
     slots: string[]

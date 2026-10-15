@@ -1,5 +1,41 @@
 # Phase 1: ship the loaded plugins with the standalone Node
 
+## Completion note
+
+Landed October 14, 2026.
+
+What changed:
+
+- `scripts/bundled-plugins.mjs` holds the roster and `buildBundledPlugins(output)`. The desktop's
+  `build-bundled-plugins.mjs` calls it with `dist/bundled-plugins`, and `scripts/pack-node.mjs` calls
+  it with the tarball's `plugins` folder. A plugin that fails to build stops either build with its
+  id and the command that rebuilds it alone.
+- `apps/node/src/entries/standalone.ts` uses `../plugins` beside its own file when that folder
+  exists. `ACORN_BUNDLED_PLUGINS_DIR` still wins. A checkout has no such folder, so `pnpm dev:node`
+  and a built `apps/node/dist` reconcile nothing, as before.
+- The **Plugins** section of `docs/node-distribution.md` describes one behavior. The roster pointers
+  in `docs/plugins/` and the cloud image phase moved with it.
+
+Decisions:
+
+- The entry finds the tarball by checking for the folder, with no marker file or extra variable.
+  The entry is its own chunk in the Node build, so `import.meta.url` is `dist/standalone.js`.
+- The roster stays unexported. Both callers only need the build function.
+
+Checked by hand: a fresh `pnpm pack:node` tarball, unpacked, installed, and started on an empty data
+root, reconciled all seven, and `GET /v1/core/plugins` listed seven active installed rows. After
+uninstalling Linear and restarting, the boot log reported it as not restored and the roster showed
+six. A fake roster entry made the build stop with the new message.
+
+For later phases:
+
+- `pnpm pack:node` fails on this branch's base before any of this runs. The service's static graph
+  is 1,817,458 bytes against a 1,797,500 byte ceiling in `apps/node/scripts/check-service-budget.mjs`.
+  The checks above raised it locally and didn't commit that. Phase 2 needs the pack to pass.
+- Arch-test reds that predate this phase: the client console baseline lists
+  the terminal client's pairing module, which no longer exists, the policyGate doc citation, three docs over 200 lines, and a Firefox
+  manifest path. `pluginDisable.test.ts` fails on its route list.
+
 Date: October 14, 2026. Status: proposed.
 
 ## Goal

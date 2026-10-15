@@ -3,8 +3,8 @@ import { BUILTIN_STEP_KINDS } from '../steps/builtins'
 import { validateWorkflow, type WorkflowValidationCatalog } from './definition'
 import type { PolicyDescription, WorkflowDef, WorkflowStepDef } from '../../shared/workflowContracts'
 
-// The rules for a polling `gate-policy` and `ci-loop`'s wait (docs/workflows/execution.md § Polling
-// gates). The runner's own behavior is in ../workflowGate.test.ts.
+// The rules for a polling `gate-policy` and `ci-loop`'s wait (docs/workflows/polling-gates.md). The
+// runner's own behavior is in ../workflowGate.test.ts.
 
 const POLICIES: Record<string, PolicyDescription> = {
   'test:ci': { label: 'CI', description: 'CI.', icon: 'x', fields: [] },

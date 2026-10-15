@@ -3,6 +3,7 @@ import '../../helpers/registerProviders'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import {
+  ACORN_BUILD,
   NODE_PROTOCOL_VERSION,
   type DevicesResponse,
   type NodeInfo,
@@ -35,7 +36,6 @@ beforeEach(() => {
   env = {
     DB: harness.db,
     NODE_ID,
-    APP_VERSION: '9.9.9-test',
     NODE_FINGERPRINT: FINGERPRINT,
     DEVICES: deviceService(harness.db),
     PAIRING_CODES: pairingCodes(),
@@ -100,17 +100,18 @@ describe('GET /v1/node', () => {
     })
   })
 
-  it('adds the node identity once authenticated, and nothing else', async () => {
+  it('adds the node identity and build once authenticated, and nothing else', async () => {
     const { deviceToken } = await pairDevice()
     const info = (await (await send('/v1/node', { token: deviceToken })).json()) as NodeInfo
     // `toEqual`, not `toMatchObject`, and that is the assertion: this response must stay readable by
-    // every client forever (docs/api-reference/transport.md § Versioning), so the bar for a field on it is a
+    // every client forever (docs/api-reference/versioning.md § Versioning), so the bar for a field on it is a
     // consumer.
     expect(info).toEqual({
       baseline: ACORN_BASELINE,
       protocolVersion: NODE_PROTOCOL_VERSION,
       fingerprint: FINGERPRINT,
       nodeId: NODE_ID,
+      buildVersion: ACORN_BUILD,
       eventTransport: { viewers: 1 },
     })
   })

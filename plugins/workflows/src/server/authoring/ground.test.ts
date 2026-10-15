@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import type { StepKindDescription, WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
 import { BUILTIN_EXAMPLES } from './generate'
@@ -11,6 +10,9 @@ import {
   stripJsonFences,
   type GroundedWorkflow,
 } from './ground'
+
+// What the agents plugin publishes as its default profile, which these tests stand in for.
+const DEFAULT_PROFILE_ID = 'claude-code'
 
 // Driven from a fixture catalog: the module is pure, so none of this needs a runner, a provider or a
 // database.

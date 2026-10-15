@@ -2,6 +2,7 @@ import { renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
+import { buildVersion } from '../../scripts/buildVersion.mts'
 
 const repoRoot = resolve(import.meta.dirname, '../..')
 // Filled by the acorn:renderer-graph plugin below, one list of source modules per emitted chunk.
@@ -53,7 +54,7 @@ export default defineConfig({
   // Which host the kit draws to (client-core kit/tokens/support.ts). Stated rather than left to the
   // default, so the two host packages read the same way and a bundle that lands on the wrong one is a
   // grep away.
-  define: { __ACORN_HOST__: '"dom"' },
+  define: { __ACORN_HOST__: '"dom"', __ACORN_BUILD__: JSON.stringify(buildVersion()) },
   // Why format and entryFileNames matter for the highlighter worker's Content-Security-Policy:
   // docs/shell/origins.md § The syntax-highlighter worker's separate policy. The `worker-` prefix is what
   // the CSP's filename match keys on.

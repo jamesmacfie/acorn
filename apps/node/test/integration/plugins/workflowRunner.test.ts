@@ -68,6 +68,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
         : null
       return note ? `# Context\n\n## Notes\n${note.body}` : ''
     },
+    defaultProfileId: () => 'claude-code',
     notify: vi.fn(),
   })
 

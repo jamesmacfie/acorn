@@ -106,7 +106,6 @@ describe('a loaded plugin that contributes a node provider', () => {
       DB: core.db,
       DATA_DIR: dataRoot,
       NODE_ID: 'node-1',
-      APP_VERSION: 'test',
       NODE_FINGERPRINT: 'ff'.repeat(32),
       ...testSecretEnv(ENC_KEY),
       INTERNAL_TOKEN: INTERNAL,

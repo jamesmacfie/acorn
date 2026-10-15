@@ -216,8 +216,6 @@ describe('the GitHub source promotion for an Acorn link', () => {
       expect(pull).toMatchObject({ title: 'Fix deploy', headRef: 'feature/deploy' })
       const seed = await githubPullPromotion.prepare(pull!, {
         projectId: 'project-1',
-        owner: 'acme',
-        repo: 'widget',
         branch: '',
       })
       expect(seed).toMatchObject({

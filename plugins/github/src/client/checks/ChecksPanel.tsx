@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { jobLogOptions, runJobsOptions } from '../queries'
-import { checkStatusTone, checkStatusWord, FAILED_STATUSES } from '@acorn/plugin-api/client'
+import { checkStatusTone, checkStatusWord, FAILED_STATUSES } from './checkStatus'
 import { Button, EmptyState, Fold, Log, Modal, Stack, StatusDot } from '@acorn/plugin-api/ui'
 import { splitJobLog } from './splitJobLog'
 

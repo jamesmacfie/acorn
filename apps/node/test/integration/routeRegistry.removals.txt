@@ -1,0 +1,6 @@
+# Routes removed while NODE_PROTOCOL_VERSION stayed the same (docs/api-reference/versioning.md §
+# Removing a route). A route can go once the 90-day window in Mixed builds has passed since the first
+# client build that no longer calls it. One line per route: the route, the date it was removed, then
+# that client build's date and commit, as Settings → Nodes shows it. For example:
+#
+# GET /v1/p/example/widgets 2027-01-13 2026-10-15 cde782f12e98

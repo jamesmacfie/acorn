@@ -5,6 +5,7 @@ import {
   createProjectRef,
   getProject,
   projectByGithub,
+  projectByRepository,
   toProjectRef,
   updateProjectRef,
   type ProjectCreateRefInput,
@@ -26,6 +27,9 @@ export type ProjectService = {
   // Oldest project wins, matching projectByGithub. Callers that need every clone
   // use project checkouts and their own project-level IDs rather than guessing from the pair.
   byGithub(owner: string, name: string): Promise<ProjectRef | null>
+  // The project whose remote is `path` on a host `provider` claims. Oldest wins, the same rule as
+  // byGithub, so two clones of one repository resolve the same way through either.
+  byRepository(provider: string, path: string): Promise<ProjectRef | null>
   checkouts(): Promise<{ id: string; path: string }[]>
   // Every project of one workspace, in the rail's order. Unlike `checkouts()` this keeps a project
   // with no folder on disk, because a caller deciding what a workspace contains has to be able to
@@ -41,7 +45,9 @@ export type ProjectService = {
     providerIds?: readonly string[],
   ): Promise<Array<{ connectionId: string; externalId: string; projectId: string }>>
   create(input: ProjectCreateRefInput): Promise<ProjectRef>
-  update(id: string, patch: ProjectUpdateRefInput): Promise<ProjectRef | null>
+  // A loaded plugin's calls pass its id as `holder` (server/plugins/permissions.ts), so it can't set an
+  // external id on a repository another code host holds.
+  update(id: string, patch: ProjectUpdateRefInput, holder?: string): Promise<ProjectRef | null>
   // Without site associations: they only steer the browser extension's suggestions, so they stay out of
   // the plugin contract.
   config(id: string): Promise<PluginProjectConfigResponse | null>
@@ -66,6 +72,10 @@ export function createProjectService(db: AppDatabase, activeIdentity: ActiveIden
     },
     byGithub: async (owner, name) => {
       const row = await projectByGithub(db, owner, name)
+      return row ? toProjectRef(row) : null
+    },
+    byRepository: async (provider, path) => {
+      const row = await projectByRepository(db, provider, path)
       return row ? toProjectRef(row) : null
     },
     byWorkspace: async (workspaceId) =>
@@ -103,7 +113,7 @@ export function createProjectService(db: AppDatabase, activeIdentity: ActiveIden
         .orderBy(asc(schema.workspaceExternalProjects.integrationId), asc(schema.workspaceExternalProjects.externalId))
     },
     create: (input) => createProjectRef(db, input, activeIdentity.get() ?? ''),
-    update: (id, patch) => updateProjectRef(db, id, patch),
+    update: (id, patch, holder) => updateProjectRef(db, id, patch, holder),
     config: async (id) => {
       const response = await getProjectConfig(db, id)
       if (!response) return null

@@ -373,7 +373,7 @@ export const hostPlatform = (): string | undefined => acornGlobal()?.platform
 // covers it.
 //
 // `nodeFetch` alone discriminates "there is a broker". The rest degrade individually rather than
-// nulling the whole group, the same tolerance docs/api-reference/transport.md § Versioning describes.
+// nulling the whole group, the same tolerance docs/api-reference/versioning.md § Versioning describes.
 export const nodeTransport = (): NodeTransport | null => {
   const acorn = acornGlobal()
   if (!acorn?.nodeFetch) return null

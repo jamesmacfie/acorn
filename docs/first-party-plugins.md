@@ -90,6 +90,40 @@ they are, and neither does a component slot outside the task footer. Keybindings
 used to be gaps and aren't: loaded plugins declare `commands` and `keybindings`, and an
 `agentContexts` descriptor names two routes the host fetches.
 
+## What the apps import from plugins
+
+An app may import any plugin's `node/index.ts` and `client/index.ts`, because composition roots exist
+to register plugins. An import from a plugin's `contract/` folder is different: it means an app depends
+on that one plugin. Each one is listed here and in `tools/arch/boundaries.test.ts`, which fails on an
+import missing from its list and on a listed import that's gone. Add the reason in both places.
+
+- **CLI and agents.** The built-in `agent` commands and `projection.ts` read the session, turn, event,
+  and provider shapes from `wire.ts`. [Agents and workflows](./cli/agents-and-workflows.md#why-these-commands-are-built-in)
+  says why those commands aren't a `cliCommands` contribution. The browser extension's native bridge
+  (`browser/agents.ts` and `browser/bridge.ts`) relays managed sessions, and also reads `appApproval`,
+  `lifecycle`, `sessionModel`, and `newSessionChoices`. `browser/workflows.ts` reads a run's agent
+  sessions from `wire.ts`.
+- **CLI and workflows.** The built-in `workflow` commands read the run, step, and definition shapes from
+  `wire.ts`. The native bridge (`browser/bridge.ts` and `browser/workflows.ts`) relays the same shapes.
+- **Desktop and terminal.** `TaskView.tsx` opens a terminal profile through `sessionsClient`, the create
+  and list half of terminal's client, so the shell can't write to, attach to, or kill a session.
+- **Extension and agents.** The sidebar draws a session's state with `runtimeState`, marks the Agents
+  tab with it, and registers the harness marks from `providerMarks`.
+- **Extension and workflows.** The sidebar prefills a workflow's inputs from the page's item with
+  `itemInputs`, and draws runs and steps with `statusDisplay`.
+- **Node and four plugins.** `composition.ts` runs agents', terminal's, and workflows' startup
+  reconcile through their `runtime` and `runner` capabilities, and reads GitHub's `mirror` for the
+  storage footprint log.
+- **Terminal client and terminal.** `Sessions.tsx` and `sessionPty.ts` draw the terminal drawer
+  themselves, so they read `hostClient`, `wire`, and `toolbarActions`. The drawer stays in the shells
+  for reason B above. Its open, maximized, and focus state is client-core's (`setTerminalOpen`,
+  `isTerminalMax`, `consumeTerminalFocusIntent`), because both shells and terminal's own panel read it.
+  That state moves to terminal if the drawer ever does.
+- **Terminal client and agents.** `Sessions.tsx` hands a terminal session back to managed mode through
+  `handoffClient`.
+- **Terminal client and workflows.** `Shell.tsx` hosts the launch-from-commit dialog Git opens, through
+  `gitLaunch`.
+
 ## Rules of thumb
 
 **When a new plugin should be first-party:** it owns transport, renders inside another surface's

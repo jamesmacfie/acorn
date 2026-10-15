@@ -158,11 +158,11 @@ export type { TaskCreatedHook, TaskSessionsBridge } from '@acorn/node-core/serve
 export { RUN_TARGETS } from '@acorn/node-core/server/routes'
 
 // ── Agents: profiles, headless runs, MCP registration ─────────────────────────────────────────
-export { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/node-core/server/agentProfiles/index.ts'
-// Three stdout readings, because the CLIs frame their answers differently and a profile picks the one
-// that matches its own. See streamJson.ts for what codex emits instead of a `result` event, and for why
-// `textAdapter` reads a plain-text one-shot.
-export { codexJsonAdapter, lineDelimitedJsonAdapter, textAdapter } from '@acorn/node-core/server/agentProfiles'
+export { agentProfileRegistry } from '@acorn/node-core/server/agentProfiles/index.ts'
+// Two stdout readings, because the CLIs frame their answers differently and a profile picks the one
+// that matches its own. See streamJson.ts for why `textAdapter` reads a plain-text one-shot. A CLI with
+// its own stream shape brings its own adapter, as the agents plugin's codex profile does.
+export { lineDelimitedJsonAdapter, textAdapter } from '@acorn/node-core/server/agentProfiles'
 // The extra environment an agent CLI needs on top of `brokerEnv`'s base allowlist. In core because
 // core spawns a CLI itself for a one-shot generate, and here because the drivers that spawn the
 // interactive ones live in a plugin.
@@ -204,7 +204,6 @@ export type { PluginContextSection } from '@acorn/node-core/server/agentTools'
 export type { InternalEnvFactory } from '@acorn/node-core/server/auth'
 
 // ── Blobs and the sync engine ─────────────────────────────────────────────────────────────────
-export { diffDocumentBlobKey, fileBodyBlobKey, patchBlobKey } from '@acorn/node-core/server/blobs.ts'
 
 export { serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 export type { Cached, RefreshResult, RouteFailure, RouteResult } from '@acorn/node-core/server/sync/engine.ts'

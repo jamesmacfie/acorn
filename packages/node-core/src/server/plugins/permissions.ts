@@ -6,6 +6,7 @@ import type { PrefService } from '../core/prefs'
 import type { ProjectService } from '../core/projectRefs'
 import { dataSourceFor } from '../core/data'
 import type { CapabilityId, CapabilityRegistry } from '../pluginHost/capabilities'
+import { codeHostFor } from '../pluginHost/codeHosts'
 import type { NodePermissions } from './manifest'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/state.ts'
 import { BIND_CAPABILITY_CALLER } from '@acorn/protocol/plugin/ids.ts'
@@ -16,7 +17,7 @@ export { NODE_CORE_FACETS } from './coreFacets'
 // What `projects:read` grants (docs/security/plugin-node-realm.md § Rung 1: permission-shaped context, on why `checkouts()` needs its own
 // disclosure line in the trust prompt). `byWorkspace` is the scope-validation half used by a loaded
 // owner of workspace-scoped records; it returns the same bounded ProjectRef projection as `byId`.
-const PROJECT_READS = ['byId', 'byGithub', 'byWorkspace', 'checkouts', 'externalProjects'] as const
+const PROJECT_READS = ['byId', 'byGithub', 'byRepository', 'byWorkspace', 'checkouts', 'externalProjects'] as const
 // Behind its own token because config() and setup() return the shell commands acorn executes. The
 // trust assertion sits on the same surface: code with no reason to read project config has no reason
 // to assert its trust.
@@ -57,6 +58,24 @@ const projectsFor = (
     ? {
         externalProjects: (workspaceId: string) =>
           projects.externalProjects(workspaceId, providers.idsForOwner(pluginId)),
+      }
+    : {}),
+  // A repository's external id is its provider's, so a loaded plugin sets one only on a host it holds.
+  // The host checked here is the caller's own input, which is the host the write uses.
+  ...(keys.includes('create')
+    ? {
+        create: async (input: Parameters<ProjectService['create']>[0]) => {
+          const host = (input.repository?.host ?? (input.github ? 'github.com' : '')).trim().toLowerCase()
+          if ((input.repository?.externalId ?? input.github?.repoId) != null && codeHostFor(host) !== pluginId)
+            throw new Error(`Only the code host that holds ${host || 'this repository'} can set its external id.`)
+          return projects.create(input)
+        },
+      }
+    : {}),
+  ...(keys.includes('update')
+    ? {
+        // Core checks the holder against the repository it writes, not one read here beforehand.
+        update: (id: string, patch: Parameters<ProjectService['update']>[1]) => projects.update(id, patch, pluginId),
       }
     : {}),
 })

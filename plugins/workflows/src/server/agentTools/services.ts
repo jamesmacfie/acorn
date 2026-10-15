@@ -2,7 +2,7 @@
 // boot path: the tool names and schemas register at init, and this module loads with the first call.
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { AgentRequestsCapability, AgentTurnsCapability } from '@acorn/plugin-agents/contract/lifecycle.ts'
-import type { WorkflowChildRunSummary } from '../../shared/api'
+import type { WorkflowChildRunSummary } from '../../contract/wire.ts'
 import type { WorkflowDraftWriter } from '../definitions/activation'
 import type { CallerLookup } from './caller'
 import { catalogPage, getDefinition, listDefinitions, validateCandidate, type WorkflowToolDeps } from './discovery'

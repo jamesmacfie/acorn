@@ -20,6 +20,7 @@ import {
 import DockerExecTerminal from './DockerExecTerminal'
 import ContainerInfo from './ContainerInfo'
 import { STATS_BESIDE_POINT } from './extensionPoints'
+import { portAddress, remoteNode } from './nodeAddress'
 import {
   Alert,
   Button,
@@ -207,10 +208,10 @@ function ContainerDetailView(props: ContainerDetailProps) {
   }
 
   function copyPort(p: DockerPort) {
-    if (!p.hostPort) return
-    const url = `http://localhost:${p.hostPort}`
-    void navigator.clipboard.writeText(url)
-    toast(`Copied ${url}`)
+    const address = portAddress(p, owner.nodeId)
+    if (!address) return
+    void navigator.clipboard.writeText(address.url)
+    toast(address.caveat ? `Copied ${address.url}. ${address.caveat}` : `Copied ${address.url}`)
   }
 
   // Exec into the container. With a task in scope, open it as a session in the task's terminal
@@ -221,7 +222,8 @@ function ContainerDetailView(props: ContainerDetailProps) {
     if (!view.current()) return
     if (!view.taskId) {
       void navigator.clipboard.writeText(execCommand(name))
-      toast('Copied the shell command')
+      const node = remoteNode(owner.nodeId)
+      toast(node ? `Copied the shell command. Run it on ${node.label}.` : 'Copied the shell command')
       return
     }
     setError('')
@@ -322,6 +324,7 @@ function ContainerDetailView(props: ContainerDetailProps) {
             >
               <ContainerInfo
                 detail={d()}
+                nodeId={owner.nodeId}
                 showEnv={showEnv()}
                 onToggleEnv={() => {
                   setShowEnv(!showEnv())

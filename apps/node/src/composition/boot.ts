@@ -154,7 +154,7 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
     reconcileBundledPackages({ dataDir, bundledRoot: options.bundledPluginsDir, development: options.development })
     mark('bundled-packages')
     const capabilities = new CapabilityRegistry()
-    const runtime = makeRuntime(root, options.appVersion, capabilities, options.serviceInstanceId, options.keys)
+    const runtime = makeRuntime(root, capabilities, options.serviceInstanceId, options.keys)
     const db = runtime.DB
     drain.sqlite = async () => db.close()
     // Audit retention and the idempotency sweep run as node-owned schedules, not boot-time calls

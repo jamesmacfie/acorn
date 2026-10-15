@@ -17,7 +17,7 @@ import {
   writeJson,
   wsOnNotice,
   wsOnWorkflowStepEvent,
-  type WorkflowNotice,
+  type NoticeFrame,
 } from '@acorn/plugin-api/client'
 import { wsAttach, wsRememberSize, wsWrite } from './wsChannel'
 
@@ -36,7 +36,7 @@ export type TerminalApi = {
   attach(id: string, on: (m: ServerMsg) => void, size?: { cols: number; rows: number }): () => void
   // Workflow commands use workflowClient's HTTP routes; notices and live step events use WebSocket.
   workflow: {
-    onNotice(cb: (n: WorkflowNotice) => void): () => void
+    onNotice(cb: (n: NoticeFrame) => void): () => void
     onStepEvent(cb: (event: { runId: string; stepId: string; event: unknown }) => void): () => void
   }
 }

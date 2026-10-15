@@ -31,6 +31,12 @@ is a run of `Meter`s, and Terminal is a `Rectangle kind="pty"` wrapping the exec
 is the kit's admission that a PTY owns its own pixels: the node owns the box and the way in and out of
 it with the keyboard, and xterm owns everything inside.
 
+A published port on Info copies its address. Docker publishes on the Node's machine, so for a remote
+Node the address takes its host from the Node's endpoint (`plugins/docker/src/client/nodeAddress.ts`).
+A port bound to that machine's loopback, such as `127.0.0.1:3000`, copies a `localhost` address with a
+note that it opens only on the Node or through an SSH tunnel. Without a task in scope, **Copy shell
+command** copies a `docker exec` line, and for a remote Node the notice names the Node to run it on.
+
 Another plugin can send someone to one container. Its surface declares a `destinations` entry with
 `targetKind: "docker-container"` and calls `bridge.ui.openDestination` with the container's short id.
 The task pane opens on that container (`plugins/docker/src/client/index.ts`). The id selects a chip;

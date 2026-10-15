@@ -7,13 +7,9 @@ import { join } from 'node:path'
 import { vi } from 'vitest'
 import { makeTestNodeContext, schema as coreSchema } from '@acorn/plugin-api/testkit'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import {
-  agentProfileRegistry,
-  DEFAULT_PROFILE_ID,
-  type AgentToolContribution,
-  type ToolContext,
-} from '@acorn/plugin-api/node'
+import { agentProfileRegistry, type AgentToolContribution, type ToolContext } from '@acorn/plugin-api/node'
 import { AGENTS_TOOL_CALLER, type AgentSettledTurn } from '@acorn/plugin-agents/contract/toolCaller.ts'
+import { AGENTS_DEFAULT_PROFILE } from '@acorn/plugin-agents/contract/defaultProfile.ts'
 import {
   AGENTS_REQUESTS,
   AGENTS_TURNS,
@@ -29,6 +25,9 @@ import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { workflowsPlugin } from '../../../../node/index'
 import { WORKFLOW_INVOCATION_ROUTE } from '../../../routes/invocationBridge'
 import type { WorkflowDef } from '../../../../shared/workflowContracts'
+
+// What the agents plugin publishes as its default profile, which these tests stand in for.
+const DEFAULT_PROFILE_ID = 'claude-code'
 
 if (!agentProfileRegistry.get(DEFAULT_PROFILE_ID)) {
   agentProfileRegistry.register({
@@ -144,6 +143,7 @@ export async function bootWorkflowTools(existingRoot?: string) {
   })
   const execute = vi.fn(async (_request: AgentSessionExecuteRequest) => finishedStep())
   ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, execute)
+  ctx.capabilities.provide(AGENTS_DEFAULT_PROFILE, { id: DEFAULT_PROFILE_ID })
   // Agent steps write a handoff note when they finish. Nothing here reads it back.
   ctx.capabilities.provide(NOTES_STORE, { append: async () => undefined, setIncluded: async () => undefined } as never)
 

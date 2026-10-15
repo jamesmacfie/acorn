@@ -32,7 +32,7 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     expect(v.manifest.required.length).toBeGreaterThan(3)
     expect(Object.keys(v.manifest.contributionCaps).length).toBeGreaterThan(8)
     expect(v.manifest.contributionRoutes).toEqual(['taskAddresses'])
-    expect(v.manifest.contributionObjects).toEqual(['browserPanel'])
+    expect(v.manifest.contributionObjects).toEqual(['browserPanel', 'codeHost'])
     expect(v.actions.railOnSelect.length).toBeGreaterThan(4)
     expect(v.actions.commandsAndBadges.length).toBeGreaterThan(3)
     expect(v.manifest.frameTargets).toContain('pane')

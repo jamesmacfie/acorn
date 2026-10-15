@@ -5,7 +5,6 @@ client: AttentionItem
 client: AttentionSourceContribution
 client: BindingCandidate
 client: BindingOrigin
-client: CHECK_TONE
 client: COMMAND_CLOSED
 client: CheckedDiagnostic
 client: ClientPlugin
@@ -17,7 +16,6 @@ client: ContentLinkContribution
 client: ContentSelectionTarget
 client: ContributedCommand
 client: DocumentServiceRoute
-client: FAILED_STATUSES
 client: FileMenuTarget
 client: InAppTarget
 client: InputCommand
@@ -26,6 +24,7 @@ client: ItemRowTarget
 client: LANGUAGE_REQUEST_TOO_LARGE
 client: LatestSignal
 client: ModelPick
+client: NoticeFrame
 client: PaneContribution
 client: PaneIntent
 client: PaneLayoutContribution
@@ -40,6 +39,7 @@ client: RailMarker
 client: RailMarkerContribution
 client: RailMarkerDot
 client: RefPanelProps
+client: ReferenceTargetContribution
 client: SearchCommand
 client: SessionSummary
 client: SettingSave
@@ -50,7 +50,6 @@ client: TaskLayout
 client: TaskSlotContribution
 client: UiSlotContribution
 client: WORKSPACES_PREF_KEY
-client: WorkflowNotice
 client: WorkspacesMode
 client: activateTaskSignals
 client: activeNodeId
@@ -63,10 +62,6 @@ client: bytesOf
 client: cachedTaskScripts
 client: canAddProjectFromFolder
 client: canPickFolder
-client: checkStatusTone
-client: checkStatusWord
-client: checksState
-client: checksSummary
 client: clearLocal
 client: clientCapability
 client: clientCapabilityId
@@ -147,7 +142,7 @@ client: patchProject
 client: pathForTask
 client: persistDraft
 client: pickFiles
-client: pickFolder
+client: pickNodeFolder
 client: pluginLabel
 client: positionAt
 client: postJson
@@ -191,7 +186,6 @@ client: sendForm
 client: sendReferenceToAgent
 client: sendToSession
 client: setActiveNode
-client: setManagedAgentReferenceHandler
 client: setSelectedSource
 client: setTerminalOpen
 client: slotFills
@@ -244,7 +238,6 @@ node: CompiledPluginBroadcast
 node: CoreProcService
 node: CoreServices
 node: DATA_LIMITS
-node: DEFAULT_PROFILE_ID
 node: DataColumn
 node: DataTable
 node: DeliverableSkill
@@ -325,7 +318,6 @@ node: buildHeadlessArgv
 node: buildSessionEnv
 node: childEnv
 node: chunkRowsByColumnBudget
-node: codexJsonAdapter
 node: configureAcornMcp
 node: confineExistingFile
 node: connectProvider
@@ -338,12 +330,10 @@ node: defaultBudgets
 node: deliverableSkills
 node: describeError
 node: describeSecretRefusal
-node: diffDocumentBlobKey
 node: encodeCached
 node: encodeFileGuardPolicy
 node: envFlags
 node: externalIdsFor
-node: fileBodyBlobKey
 node: formatOmitted
 node: getProfile
 node: git
@@ -366,7 +356,6 @@ node: ownerId
 node: parseCached
 node: parseJson
 node: pastedContent
-node: patchBlobKey
 node: portableCarrier
 node: principalMayActOnTask
 node: providerCredential
@@ -466,7 +455,6 @@ testkit: makeTestPluginDb
 testkit: makeTestRequestContext
 testkit: memoryIdentityStore
 testkit: onServerError
-testkit: patchBlobKey
 testkit: readPackageSkill
 testkit: registerSkill
 testkit: rendererBaseCheckout
@@ -656,7 +644,6 @@ ui/tree: Toolbar
 ui/tree: ToolbarSpacer
 ui/tree: TreeRow
 ui/tree: UserAvatar
-ui/tree: createArmedConfirm
 ui/tree: createComponent
 ui/tree: createElement
 ui/tree: createTextNode

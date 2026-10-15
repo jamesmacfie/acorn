@@ -9,7 +9,6 @@ import {
   workspacesOptions,
 } from '../../infra/queries'
 import { createWorkspace, patchProject } from './workspaceMutations'
-import { pickFolder } from '../../infra/platform'
 import { projectSettingsTarget, workspaceSettingsTarget } from '../../host/registries/shell/settings'
 import { Alert, Button, Input } from '../../kit/components/primitives'
 import AddProjectControls from './AddProjectControls'
@@ -84,12 +83,6 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
     }
   }
 
-  async function mapFolder(id: string) {
-    const path = await pickFolder()
-    if (!path) return
-    await guard(() => patchProject(id, { path }), "Couldn't link the folder.")
-  }
-
   async function addWorkspace(event: Event) {
     event.preventDefault()
     const name = newWorkspace()?.trim()
@@ -159,7 +152,7 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
               allowMove={mode() === 'on'}
               openProject={(id) => props.navigate(projectSettingsTarget(id))}
               openWorkspace={(id) => props.navigate(workspaceSettingsTarget(id))}
-              mapFolder={(id) => void mapFolder(id)}
+              mapFolder={(id, path) => guard(() => patchProject(id, { path }), "Couldn't link the folder.")}
               refresh={refresh}
             />
           </Show>

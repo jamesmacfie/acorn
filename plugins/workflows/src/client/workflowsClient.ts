@@ -13,15 +13,16 @@ import {
 } from '@acorn/plugin-api/client'
 import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
-import type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../contract/wire.ts'
-import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type {
-  WorkflowGenerateRequest,
-  WorkflowGenerateResult,
+  WorkflowDefRow,
+  WorkflowDefSummary,
   WorkflowRunProjection,
+  WorkflowRunRow,
   WorkflowStepProjection,
-  WorkflowTaskGroup,
-} from '../shared/api'
+  WorkflowStepRow,
+} from '../contract/wire.ts'
+import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
+import type { WorkflowGenerateRequest, WorkflowGenerateResult, WorkflowTaskGroup } from '../shared/api'
 import type { WorkflowCatalog } from '../shared/workflowContracts'
 import type { WorkflowRecordAttempt, WorkflowRecordFilter, WorkflowRecordPage } from '../shared/workflowProcessing'
 import type {

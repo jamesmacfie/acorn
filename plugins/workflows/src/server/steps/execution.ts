@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
-import { DEFAULT_PROFILE_ID, type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
+import type { HeadlessResult, PluginDatabase } from '@acorn/plugin-api/node'
 import {
   MAX_AGENT_GOAL_CHARS,
   type AgentExecuteGoalSummary,
@@ -50,7 +50,10 @@ const minDefined = (...values: Array<number | undefined>): number | undefined =>
 
 type ExecutionServices = {
   db: PluginDatabase
-  deps: Pick<RunnerDeps, 'hooks' | 'createChildTask' | 'emitStepEvent' | 'writeHandoff' | 'notify' | 'runStep'>
+  deps: Pick<
+    RunnerDeps,
+    'hooks' | 'createChildTask' | 'emitStepEvent' | 'writeHandoff' | 'notify' | 'runStep' | 'defaultProfileId'
+  >
   treeSafety: WorkflowTreeSafety
   state: WorkflowRunState
   kind(kind: string): StepKindContribution | undefined
@@ -446,6 +449,9 @@ export class WorkflowStepExecution {
     opts: StepRunRequest,
     ctx: StepHandlerContext,
   ): Promise<HeadlessResult> {
+    // A dispatched child row can carry its parent's profile. Use the frozen definition.
+    const profileId = def.profileId ?? this.services.deps.defaultProfileId?.()
+    if (!profileId) throw new Error('This step names no agent profile, and no plugin supplies a default.')
     // Record the session when the first event names it so the Agent pane can link a running step.
     let noted = ctx.step.agentSessionId ?? ''
     const dispatch =
@@ -493,8 +499,7 @@ export class WorkflowStepExecution {
             ...opts,
             admitAutomatic,
             ...(opts.goal !== undefined ? { onGoal: (summary) => void writeGoal(summary) } : {}),
-            // A dispatched child row can carry its parent's profile. Use the frozen definition.
-            profileId: def.profileId ?? DEFAULT_PROFILE_ID,
+            profileId,
             workflowRunId: ctx.run.id,
             workflowStepId: ctx.step.id,
             posture: workflowPosture(ctx.run.posture),

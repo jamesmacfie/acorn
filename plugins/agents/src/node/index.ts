@@ -31,6 +31,7 @@ import type { SessionMessages } from '../server/sessions/sessionMessages'
 import { AGENTS_TURN_FOLLOW_UP } from '../contract/turnFollowUp.ts'
 import type { TurnFollowUps } from '../server/sessions/turnFollowUps'
 import { AGENTS_RUNTIME } from '../contract/runtime'
+import { AGENTS_DEFAULT_PROFILE } from '../contract/defaultProfile'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
 import {
   AGENTS_ACTIVITY,
@@ -395,6 +396,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
 
       managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime, delegation))
       lifecycleCapabilities = [
+        ctx.capabilities.provide(AGENTS_DEFAULT_PROFILE, { id: claudeCodeProfile.id }),
         ctx.capabilities.provide(AGENTS_TURNS, {
           list: (filter) => runtime!.store.lifecycleTurns(filter),
         }),

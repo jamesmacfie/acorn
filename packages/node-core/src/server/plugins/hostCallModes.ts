@@ -69,6 +69,9 @@ const modes = {
       idsForWorkspace: 'async',
       inProject: 'async',
       links: 'async',
+      changeRequests: 'async',
+      attachChangeRequest: 'async',
+      adoptChangeRequests: 'async',
       pulls: 'async',
       attachPull: 'async',
       adoptPullNumbers: 'async',
@@ -91,6 +94,7 @@ const modes = {
     projects: {
       byId: 'async',
       byGithub: 'async',
+      byRepository: 'async',
       checkouts: 'async',
       byWorkspace: 'async',
       externalProjects: 'async',

@@ -34,7 +34,7 @@ const args = {
   userLogin: 'james',
   task: { id: 't1' } as never,
   repo: 'acme/api',
-  github: { owner: 'acme', name: 'api' },
+  repository: { provider: 'github', host: 'github.com', path: 'acme/api', externalId: null },
 }
 
 describe('the context-section registry', () => {
@@ -110,7 +110,7 @@ describe('the context-section registry', () => {
     )
     await getContextSections()[0].assemble({ ...args, db: { marker: 'core-handle' } as never })
     expect(seen).not.toHaveProperty('db')
-    expect(seen).toMatchObject({ userLogin: 'james', repo: 'acme/api', github: { owner: 'acme', name: 'api' } })
+    expect(seen).toMatchObject({ userLogin: 'james', repo: 'acme/api', repository: { path: 'acme/api' } })
   })
 
   it('resolves include=* and the defaults against what is actually registered', () => {

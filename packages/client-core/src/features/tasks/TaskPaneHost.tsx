@@ -62,12 +62,15 @@ export default function TaskPaneHost(props: {
       const pane = paneContribution(id)
       return pane && paneAvailable(pane, props.task) ? [pane] : []
     })
-  // A layout can name only panes this task cannot show: DEFAULT_PANE is the PR pane, and a task on a
-  // project with no GitHub remote has no PR. Then the task draws the first pane it does offer, and
-  // `layout()` is the layout as drawn, so the switcher marks that pane and add, close, and pin act on
-  // it. The repair is written only when the person acts (`dispatch`), never from render, because a
+  // A layout can be empty, or name only panes this task cannot show, such as a plugin's pane after the
+  // plugin stopped. Then the task draws its change request's pane, or else the first pane it does offer,
+  // and `layout()` is the layout as drawn, so the switcher marks that pane and add, close, and pin act
+  // on it. The repair is written only when the person acts (`dispatch`), never from render, because a
   // render can run before the saved layouts have loaded and would overwrite them.
-  const fallbackPane = () => (chosenPanes().length ? undefined : switcherPanes()[0])
+  const fallbackPane = () =>
+    chosenPanes().length
+      ? undefined
+      : (switcherPanes().find((pane) => pane.id === props.task.changeRequest?.pane) ?? switcherPanes()[0])
   const layout = (): TaskLayout => {
     const fallback = fallbackPane()
     return fallback ? { ...stored(), panes: [fallback.id] } : stored()
@@ -307,7 +310,7 @@ export default function TaskPaneHost(props: {
                   ref={(element) => slotRefs.set(pane.id, element)}
                   use:paneFocus={{ taskId: props.task.id, paneId: pane.id }}
                   class="task-slot"
-                  classList={{ 'task-slot-pr': pane.id === 'pr', 'task-slot-pinned': isPinned(pane.id) }}
+                  classList={{ 'task-slot-pinned': isPinned(pane.id) }}
                   style={{ 'flex-grow': weightFor(pane.id), 'min-width': `${minWidthFor(pane)}px` }}
                   tabindex="0"
                   data-pane-id={pane.id}

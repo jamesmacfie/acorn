@@ -109,10 +109,6 @@ export {
   use,
 } from '@acorn/client-core/host/frames/remoteSolid.ts'
 export type { KitNodeProps } from '@acorn/client-core/host/frames/remoteSolid.ts'
-// The two-press delete, as a helper rather than a node. Here rather than on ./ui because that barrel is
-// components compiled for a document, and a tree bundle must not pull one in: its own build compiles
-// JSX into acorn's nodes, so a shell component reaching it would come out the far side as a tree.
-export { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm'
 // The one way the app writes a shortcut, for a tree's `tipKey`. A pure function, like the two below.
 export { formatChord } from '@acorn/client-core/kit/lib/formatChord'
 export { modelProviderFailure } from '@acorn/client-core/kit/lib/modelProviderFailure'

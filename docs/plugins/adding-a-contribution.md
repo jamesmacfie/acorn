@@ -40,7 +40,7 @@ settings page, touches that plugin's `src/` and the golden lists. A new compiled
 - `apps/node/package.json` and `apps/desktop/package.json`, each with
   `"@acorn/plugin-<id>": "workspace:*"` for the half it composes.
 
-A loaded plugin needs one entry in `BUNDLED_PLUGINS` in `apps/desktop/scripts/build-bundled-plugins.mjs`
+A loaded plugin needs one entry in `BUNDLED_PLUGINS` in `scripts/bundled-plugins.mjs`
 and its own `acorn-plugin.config.mjs`. It touches no composition list and no golden list, because the
 manifest is the record. Some loaded packages have an `apps/node` dependency entry only because that
 app's tests import them.
@@ -58,8 +58,10 @@ UPDATE_PLUGIN_GOLDENS=1 pnpm --filter @acorn/desktop --filter @acorn/node test
   every rail source with its order (`parity.test.ts`).
 - `apps/desktop/test/client/clientPluginDisable.snapshot.json`: every client registry entry and which
   optional plugin owns it (`clientPluginDisable.test.ts`).
-- `apps/node/test/integration/routeRegistry.snapshot.json`: every `/v1/p/<plugin>/` route the compiled
-  plugins mount (`routeRegistry.test.ts`).
+- `apps/node/test/integration/routeRegistry.snapshot.json`: every `/v1` route the Node mounts, core
+  and compiled plugins alike (`routeRegistry.test.ts`). Regenerating it never drops a route on its
+  own. A removal also needs a line in the removal file beside it, as
+  [Removing a route](../api-reference/versioning.md#removing-a-route) describes.
 - `apps/node/test/integration/pluginSystem/pluginDisable.snapshot.json`: the full Node boot's routes,
   tools, context sections, providers, and databases, and which optional plugin owns each
   (`pluginDisable.test.ts`).

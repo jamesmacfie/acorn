@@ -11,8 +11,10 @@ import {
   createProject,
   detectProject,
   getProject,
+  githubFacet,
   listProjects,
   patchProject,
+  projectRepository,
   type ProjectRow,
 } from '../../projects/projects'
 import { getProjectConfigWithRepo, setProjectConfig, setProjectRunTargets } from '../../projects/projectConfig'
@@ -60,22 +62,23 @@ const configBody = z.object({
 })
 const runTargetsBody = z.object({ runTargets: z.string() })
 
-const toWireProject = (row: ProjectRow): Project => ({
-  id: row.id,
-  name: row.name,
-  path: row.path,
-  workspaceId: row.workspaceId,
-  sort: row.sort,
-  hidden: row.hidden,
-  color: row.color,
-  vcs: (row.vcs as 'git' | null) ?? null,
-  defaultBranch: row.defaultBranch,
-  remoteUrl: row.remoteUrl,
-  github:
-    row.githubOwner && row.githubName
-      ? { owner: row.githubOwner, name: row.githubName, repoId: row.githubRepoId }
-      : null,
-})
+const toWireProject = (row: ProjectRow): Project => {
+  const repository = projectRepository(row)
+  return {
+    id: row.id,
+    name: row.name,
+    path: row.path,
+    workspaceId: row.workspaceId,
+    sort: row.sort,
+    hidden: row.hidden,
+    color: row.color,
+    vcs: (row.vcs as 'git' | null) ?? null,
+    defaultBranch: row.defaultBranch,
+    remoteUrl: row.remoteUrl,
+    repository,
+    github: githubFacet(repository),
+  }
+}
 
 // MCP config inspector (docs/mcp.md § Configuration): read only the known candidate files and mask
 // secrets here, so raw values never cross to the renderer. Read-only, since acorn never launches these

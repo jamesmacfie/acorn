@@ -23,6 +23,7 @@
       "git",
       "git",
       "git",
+      "git",
       "git/tasks",
       "git/tasks",
       "github",
@@ -107,6 +108,7 @@
     "capabilities": [
       "agents.activity.v1",
       "agents.customAgentRegistry",
+      "agents.defaultProfile",
       "agents.draftAttachments",
       "agents.harnessRegistry",
       "agents.instructionReviewRoute",
@@ -238,6 +240,7 @@
     },
     "git": {
       "routes": [
+        "git",
         "git",
         "git",
         "git",

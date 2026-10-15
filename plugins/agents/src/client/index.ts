@@ -21,7 +21,7 @@ import { activateManagedAgentNotifications, managedAgentStore } from './sessions
 import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
-import { activateManagedAgentReferences } from './referenceContribution'
+import { managedReferenceTarget } from './referenceContribution'
 import { agentCenterSourceContribution } from './sourceContribution'
 import { agentsCommands } from './commands'
 import { agentCommandsSlotContribution } from './AgentCommands'
@@ -60,6 +60,7 @@ export const agentsClientPlugin: ClientPlugin = {
     for (const mark of PROVIDER_MARKS) ctx.brandMarks.register(mark)
     ctx.panes.register(agentPaneContribution)
     ctx.agentContexts.register(sessionContextContribution)
+    ctx.referenceTargets.register(managedReferenceTarget)
     // Anyone with a session id, or with the id of a workflow step that started one, can draw its
     // conversation. The run pane uses it to hold the transcript, the queue and the composer for the
     // node it has selected, so a step reads the same way in either place.
@@ -396,7 +397,6 @@ export const agentsClientPlugin: ClientPlugin = {
       installManagedHandoff(async (sessionId) => {
         managedAgentStore.upsertSession(await managedAgentApi.resumeManaged(sessionId))
       }),
-      activateManagedAgentReferences(),
       activateManagedAgentNotifications(),
       activateManagedAgentNoticeTargets(),
       activateManagedAgentPaneIntents(),

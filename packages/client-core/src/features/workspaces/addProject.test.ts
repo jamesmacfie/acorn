@@ -6,7 +6,7 @@ import { setActiveNode } from '../../infra/node/activeNode'
 import { refreshFleet, _resetFleet } from '../../infra/node/fleet'
 import { projectsKey, workspacesKey } from '../../infra/queries'
 import { activeToasts, dismissToast } from '../notifications/toast'
-import { addProjectFromFolder, canAddProjectFromFolder } from './addProject'
+import { addProjectFromFolder, canAddProjectFromFolder, pickNodeFolder } from './addProject'
 
 const local: NodeRecord = { nodeId: 'local', label: 'Local', endpoint: 'https://127.0.0.1:9443', local: true }
 const remote: NodeRecord = { ...local, nodeId: 'remote', label: 'Remote', local: false }
@@ -77,6 +77,15 @@ describe('adding a project from a folder', () => {
     setActiveNode(local.nodeId)
     delete window.acorn!.folderPath
     expect(canAddProjectFromFolder()).toBe(false)
+  })
+
+  it('opens the picker only for a local Node, whichever Node is active', async () => {
+    setActiveNode(remote.nodeId)
+    await expect(pickNodeFolder(local.nodeId)).resolves.toBe('/src/repo')
+    setActiveNode(local.nodeId)
+    await expect(pickNodeFolder(remote.nodeId)).resolves.toBeNull()
+    await expect(pickNodeFolder(null)).resolves.toBeNull()
+    expect(pick).toHaveBeenCalledOnce()
   })
 
   it('adds to the selected workspace on the local Node and refreshes membership', async () => {

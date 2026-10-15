@@ -33,12 +33,7 @@ import { toast } from '../../features/notifications/toast'
 type StatusCb = (pluginId?: string) => void
 // The bell-row frame, one shape shared with the node that sends it (@acorn/protocol/notices.ts)
 // rather than a hand-written twin here that drifts when a field is added.
-//
-// The name stays `WorkflowNotice` because it is published through the plugin-api facade, where
-// removing a name costs a major bump. Nothing about the payload is specific to workflows: `kind` is a
-// contributed id.
-export type WorkflowNotice = NoticeFrame
-type NoticeCb = (n: WorkflowNotice) => void
+type NoticeCb = (n: NoticeFrame) => void
 type StepEventCb = (event: { runId: string; stepId: string; event: unknown }) => void
 type StepChangedCb = (event: { runId: string; stepId: string; status: string }) => void
 

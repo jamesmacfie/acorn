@@ -13,7 +13,8 @@ import {
   type Review,
   type Thread,
 } from '../../../shared/api'
-import { chunkRowsByColumnBudget, createLogger, patchBlobKey, type PluginDatabase } from '@acorn/plugin-api/node'
+import { chunkRowsByColumnBudget, createLogger, type PluginDatabase } from '@acorn/plugin-api/node'
+import { patchBlobKey } from '../../blobKeys'
 import { filesResource, prResource } from '../../resourceKeys'
 import { mapLimited } from '../../mapLimited'
 import type { FilesFetch, PullComposite } from './prFetch'

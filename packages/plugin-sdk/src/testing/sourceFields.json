@@ -401,6 +401,12 @@
             "null"
           ]
         },
+        "remoteRepository": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "githubRepository": {
           "type": [
             "string",
@@ -445,6 +451,7 @@
         "projectId",
         "name",
         "upstream",
+        "remoteRepository",
         "githubRepository",
         "aheadUpstream",
         "behindUpstream",
@@ -467,6 +474,11 @@
       {
         "pointer": "/upstream",
         "label": "Upstream",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/remoteRepository",
+        "label": "Remote repository",
         "origin": "declared"
       },
       {
@@ -1133,6 +1145,12 @@
             "null"
           ]
         },
+        "remoteRepository": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "githubRepository": {
           "type": [
             "string",
@@ -1183,6 +1201,7 @@
         "projectId",
         "name",
         "upstream",
+        "remoteRepository",
         "githubRepository",
         "aheadUpstream",
         "behindUpstream",
@@ -1207,6 +1226,11 @@
       {
         "pointer": "/upstream",
         "label": "Upstream",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/remoteRepository",
+        "label": "Remote repository",
         "origin": "declared"
       },
       {

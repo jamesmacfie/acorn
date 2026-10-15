@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema, type AppDatabase } from '../db'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { createTaskService } from './tasks'
+import { declareCodeHost } from '../pluginHost/codeHosts'
 import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 
 const { broadcasts } = vi.hoisted(() => ({ broadcasts: [] as Record<string, unknown>[] }))
@@ -420,6 +421,15 @@ describe('archivedBefore', () => {
   })
 })
 
+// A project row on github.com, as the repository facet migration and every facet write leave one.
+const github = (owner: string, name: string) => ({
+  githubOwner: owner,
+  githubName: name,
+  repoProvider: 'github',
+  repoHost: 'github.com',
+  repoPath: `${owner}/${name}`.toLowerCase(),
+})
+
 describe('adoptPullNumbers project matching', () => {
   let t: TestDb
 
@@ -430,9 +440,9 @@ describe('adoptPullNumbers project matching', () => {
 
   afterEach(() => t.cleanup())
 
-  it.each([{ pullNumber: 99 }, { branch: 'different' }, { status: 'archived' as const }])(
-    'preserves a task changed between adoption lookup and write: %j',
-    async (patch) => {
+  it.each(['primary', 'branch', 'archived'] as const)(
+    'leaves a task that already fails adoption: %s',
+    async (state) => {
       await t.db
         .insert(schema.workspaces)
         .values({ id: 'workspace', name: 'Workspace', isDefault: true, sort: 0, createdAt: 1, updatedAt: 1 })
@@ -442,8 +452,7 @@ describe('adoptPullNumbers project matching', () => {
         workspaceId: 'workspace',
         sort: 0,
         hidden: false,
-        githubOwner: 'acme',
-        githubName: 'widget',
+        ...github('acme', 'widget'),
         createdAt: 1,
         updatedAt: 1,
       })
@@ -452,20 +461,18 @@ describe('adoptPullNumbers project matching', () => {
         title: 'Task',
         origin: 'local',
         projectId: 'project',
-        branch: 'feature',
-        status: 'active',
+        branch: state === 'branch' ? 'different' : 'feature',
+        status: state === 'archived' ? 'archived' : 'active',
         sort: 0,
         createdAt: 1,
         updatedAt: 1,
       })
-      const batch = t.db.batch.bind(t.db)
-      vi.spyOn(t.db, 'batch').mockImplementationOnce(async (statements) => {
-        await t.db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, 'task'))
-        return batch(statements)
-      })
-      expect(await createTaskService(t.db).adoptPullNumbers('acme', 'widget', new Map([['feature', 42]]))).toBe(0)
-      const [task] = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task'))
-      expect(task).toMatchObject({ ...patch, pullNumber: 'pullNumber' in patch ? patch.pullNumber : null })
+      const tasks = createTaskService(t.db)
+      if (state === 'primary') {
+        await tasks.attachPull('task', { repoOwner: 'acme', repoName: 'widget', pullNumber: 99, sessionId: 's' })
+      }
+      expect(await tasks.adoptPullNumbers('acme', 'widget', new Map([['feature', 42]]))).toBe(0)
+      expect((await tasks.load('task'))?.pullNumber).toBe(state === 'primary' ? 99 : null)
     },
   )
 
@@ -485,8 +492,7 @@ describe('adoptPullNumbers project matching', () => {
         vcs: 'git',
         defaultBranch: 'main',
         remoteUrl: 'https://github.com/acme/widget.git',
-        githubOwner: 'acme',
-        githubName: 'widget',
+        ...github('acme', 'widget'),
         githubRepoId: 1,
         createdAt: now,
         updatedAt: now,
@@ -501,8 +507,7 @@ describe('adoptPullNumbers project matching', () => {
         vcs: 'git',
         defaultBranch: 'main',
         remoteUrl: 'https://github.com/acme/widget.git',
-        githubOwner: 'Acme',
-        githubName: 'Widget',
+        ...github('Acme', 'Widget'),
         githubRepoId: 1,
         createdAt: now + 1,
         updatedAt: now + 1,
@@ -571,8 +576,7 @@ describe('task pull attachments', () => {
       vcs: 'git',
       defaultBranch: 'main',
       remoteUrl: null,
-      githubOwner: 'Acme',
-      githubName: 'Widget',
+      ...github('Acme', 'Widget'),
       githubRepoId: 1,
       createdAt: now,
       updatedAt: now,
@@ -641,6 +645,89 @@ describe('task pull attachments', () => {
     expect(broadcasts.filter((frame) => frame.channel === 'tasks:changed')).toEqual([
       { channel: 'tasks:changed', taskId: 'task-pulls' },
     ])
+  })
+})
+
+// The generic methods on a host GitHub doesn't claim. The provider is whoever declares the host.
+describe('change requests on another code host', () => {
+  let t: TestDb
+  let undeclare: () => void
+
+  beforeEach(async () => {
+    t = makeTestDb()
+    broadcasts.length = 0
+    undeclare = declareCodeHost('gitlab-test', { label: 'GitLab test', hosts: ['gitlab.test'] }, false)
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'w', name: 'W', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.projects).values({
+      id: 'p',
+      name: 'api',
+      workspaceId: 'w',
+      sort: 0,
+      hidden: false,
+      repoProvider: 'gitlab-test',
+      repoHost: 'gitlab.test',
+      repoPath: 'group/sub/api',
+      createdAt: now,
+      updatedAt: now,
+    })
+    await t.db.insert(schema.tasks).values(
+      ['one', 'two'].map((id, sort) => ({
+        id,
+        title: id,
+        origin: 'local',
+        projectId: 'p',
+        branch: `feat/${id}`,
+        status: 'active',
+        sort,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    )
+  })
+
+  afterEach(() => {
+    undeclare()
+    t.cleanup()
+  })
+
+  it('attaches and adopts by provider and path, with no GitHub field', async () => {
+    const tasks = createTaskService(t.db)
+    const attached = await tasks.attachChangeRequest('one', {
+      provider: 'gitlab-test',
+      path: 'Group/Sub/API',
+      number: 12,
+      sourceBranch: 'feat/one',
+      sessionId: 'session',
+    })
+    expect(attached).toEqual({
+      taskId: 'one',
+      provider: 'gitlab-test',
+      host: 'gitlab.test',
+      path: 'group/sub/api',
+      number: 12,
+      role: 'primary',
+      provenance: 'agent',
+      sourceBranch: 'feat/one',
+      sessionId: 'session',
+    })
+    expect(await tasks.adoptChangeRequests('gitlab-test', 'group/sub/api', new Map([['feat/two', 13]]))).toBe(1)
+    expect(await tasks.changeRequests('two')).toEqual([
+      expect.objectContaining({ number: 13, role: 'primary', provenance: 'adopted', sourceBranch: 'feat/two' }),
+    ])
+    expect((await tasks.load('one'))?.pullNumber).toBeNull()
+    expect(await tasks.pulls('one')).toEqual([])
+  })
+
+  it('refuses another provider or an unsafe source branch', async () => {
+    const tasks = createTaskService(t.db)
+    const input = { path: 'group/sub/api', number: 12, sessionId: 'session' }
+    await expect(tasks.attachChangeRequest('one', { ...input, provider: 'github' })).rejects.toThrow(/does not match/)
+    await expect(
+      tasks.attachChangeRequest('one', { ...input, provider: 'gitlab-test', sourceBranch: '--upload-pack=x' }),
+    ).rejects.toThrow(/not a valid source branch/)
+    expect(await tasks.changeRequests('one')).toEqual([])
   })
 })
 

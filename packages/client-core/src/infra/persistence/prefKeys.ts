@@ -27,7 +27,6 @@ export const PrefKeys = {
   taskLayouts: 'task_layouts',
   notices: 'notices',
   editorOpenFiles: 'editor_open_files',
-  prFilters: 'pr_filters',
   keybindings: 'keybindings',
   diffView: 'diff_view',
   gitGraphVisible: 'git_graph_visible',
@@ -84,7 +83,6 @@ export const PrefKeys = {
   // workspace ids, and both clients paired with the node should return you to the same place.
   workspaceViewsScoped: 'core:workspace-views',
   editorOpenFilesScoped: 'editor:open-files',
-  prFiltersScoped: 'github:pr-filters',
   contextSelectionScoped: 'context:section-selection',
   // Which nodes' disk-encryption warnings this device has been shown (docs/security/audit.md § Filesystem
   // and backup). A JSON array of nodeIds in one key, because a key per node would need a scoped slice
@@ -132,7 +130,6 @@ export const PrefKeys = {
 export const PersistedSliceKeys = {
   taskLayouts: PrefKeys.taskLayoutsScoped,
   editorOpenFiles: PrefKeys.editorOpenFilesScoped,
-  prFilters: PrefKeys.prFiltersScoped,
   contextSelection: PrefKeys.contextSelectionScoped,
   workspaceViews: PrefKeys.workspaceViewsScoped,
 } as const

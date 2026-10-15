@@ -43,8 +43,9 @@ write path.
 
 The task-scoped `github_pull_create` agent tool shares the same create service as the interactive
 route. It infers the head from the task branch, uses the requested base, and atomically attaches the
-created PR through `CoreServices.tasks.attachPull`: the first attachment claims
-`tasks.pull_number`, while later attachments become durable related rows with the managed session id.
+created PR through `CoreServices.tasks.attachChangeRequest`: the first attachment becomes the task's
+primary change request, while later attachments become durable related rows with the managed session
+id.
 After a managed agent turn completes, the GitHub plugin checks the task branch for an open PR using
 the Node owner's GitHub connection. A single result whose head and base repositories match the task
 project is adopted into active tasks on that branch that have no primary PR. The task-change event

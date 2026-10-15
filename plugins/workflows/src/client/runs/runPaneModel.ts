@@ -17,7 +17,7 @@ import {
 } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { WorkflowRunRow } from '../../contract/wire.ts'
-import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
+import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../contract/wire.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { WorkflowCatalog, WorkflowDef, WorkflowGateForm } from '../../shared/workflowContracts'
 import { isWorkflowStepEvent } from '../../shared/stepEvents'

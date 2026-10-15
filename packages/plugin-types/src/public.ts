@@ -86,12 +86,15 @@ export type {
   ChildTaskSeed,
   AttachTaskPullInput,
   TaskPullRelation,
+  AttachChangeRequestInput,
+  TaskChangeRequest,
   RunTarget,
   LayoutRecipe,
   TaskRunConfig,
   CoreTaskService,
 } from './contracts/coreTasks.js'
 export type {
+  ProjectRepository,
   ProjectRef,
   ProjectCreateRefInput,
   ProjectUpdateRefInput,

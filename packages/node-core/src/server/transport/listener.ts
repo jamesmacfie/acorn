@@ -245,13 +245,9 @@ export async function drainWithDeadline(
 //
 // It takes an already-opened DataRoot rather than a path because the root carries the nodeId and the
 // exclusive lock. The lock's lifetime is the process's, so acquiring it belongs to whoever owns teardown
-// (the composition root), not to a bindings factory that has no stop() to hook. `appVersion` comes from
-// the composition root, which reads it from the packaged app and passes it in ServiceStartConfig. The
-// plain-Node entry has no packaged version, and saying so is more useful than parsing a package.json
-// that will not exist beside the bundled artifact.
+// (the composition root), not to a bindings factory that has no stop() to hook.
 export function makeRuntime(
   root: DataRoot,
-  appVersion = '0.0.0-dev',
   capabilities = new CapabilityRegistry(),
   serviceInstanceId?: string,
   keys?: NodeKeys,
@@ -261,7 +257,6 @@ export function makeRuntime(
     dbPath: resolveDatabasePath(root.dir),
     blobsDir: resolve(root.dir, 'blobs'),
     nodeId: root.nodeId,
-    appVersion,
     serviceInstanceId,
     capabilities,
   })

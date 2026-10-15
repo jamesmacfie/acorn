@@ -5,19 +5,16 @@
 //
 // "An agent is working here" is not in this list. That belongs to the agents plugin, which knows about
 // both managed sessions and terminal harnesses, and it publishes it through the same marker registry.
-// Uncommitted changes are not here either: the git plugin publishes its added/removed dot.
+// Uncommitted changes are not here either: the git plugin publishes its added/removed dot. Nor are CI
+// checks, which the code host's plugin publishes for its change requests.
 //
 // Priorities here sit above the range contributed markers are clamped to
 // (RAIL_MARKER_PLUGIN_MAX_PRIORITY), so a plugin marker can never push a core lifecycle state out of
 // its corner. The numbers are policy, not data: depend on the relative order, not the literals.
 import type { TaskStatus } from '@acorn/protocol/task.ts'
-import { CHECK_TONE } from '../../kit/lib/rendering/displayMeta'
 import type { RailMarker } from '../tabs/railMarkers'
 
-type RailChecks = 'success' | 'failure' | 'pending' | 'mixed'
-
 export type RailStatusInputs = {
-  checks: RailChecks | null // null when the task has no PR / no checks
   unread: boolean // an unread notice for this task, from any source
   status: TaskStatus | undefined // live worktree status (missing)
   archiving: boolean // guarded teardown in flight for this task
@@ -25,21 +22,7 @@ export type RailStatusInputs = {
   pinned: boolean // held at the top of the rail
 }
 
-const CHECKS_LABEL: Record<RailChecks, string> = {
-  success: 'CI checks passing',
-  failure: 'CI checks failing',
-  pending: 'CI checks running',
-  mixed: 'CI checks: some failed, some still running',
-}
-
-export function railStatusMarkers({
-  checks,
-  unread,
-  status,
-  archiving,
-  settingUp,
-  pinned,
-}: RailStatusInputs): RailMarker[] {
+export function railStatusMarkers({ unread, status, archiving, settingUp, pinned }: RailStatusInputs): RailMarker[] {
   const markers: RailMarker[] = []
   // Teardown owns the slot under the task's glyph on its own. Anything it outranks stays in the
   // tooltip rather than vanishing.
@@ -92,14 +75,6 @@ export function railStatusMarkers({
       tone: 'warn',
       placements: ['top-start', 'bottom-start'],
       priority: 240,
-    })
-  if (checks)
-    markers.push({
-      id: 'checks',
-      label: CHECKS_LABEL[checks],
-      dotTone: CHECK_TONE[checks],
-      placements: ['top-end', 'bottom-end'],
-      priority: 200,
     })
   return markers
 }

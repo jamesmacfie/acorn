@@ -31,8 +31,9 @@ export type LayoutAction =
   | { type: 'equalize' }
   | { type: 'replace'; layout: TaskLayout }
 
-const DEFAULT_PANE: PaneId = 'pr'
-export const defaultLayout = (pane: PaneId = DEFAULT_PANE): TaskLayout => ({ panes: [pane] })
+// With no pane, a task draws the first pane it offers (TaskPaneHost). A task backed by a change request
+// passes its code host's pane.
+export const defaultLayout = (pane?: PaneId): TaskLayout => ({ panes: pane ? [pane] : [] })
 
 // Persistence validation intentionally answers "is this a pane-shaped id?", not "is it registered
 // in this build?". Render hosts perform the registry lookup and leave unknown ids inert.
@@ -57,8 +58,7 @@ export function applyLayoutAction(layout: TaskLayout, action: LayoutAction): Tas
       const pinned = layout.pinned ?? []
       // Pinned-browser-tab convention: the first close gesture only removes the guard.
       if (pinned.includes(action.pane)) return { ...layout, pinned: pinned.filter((id) => id !== action.pane) }
-      const panes = layout.panes.filter((id) => id !== action.pane)
-      return { ...layout, panes: panes.length ? panes : [DEFAULT_PANE] }
+      return { ...layout, panes: layout.panes.filter((id) => id !== action.pane) }
     }
     case 'pin': {
       if (!layout.panes.includes(action.pane)) return layout

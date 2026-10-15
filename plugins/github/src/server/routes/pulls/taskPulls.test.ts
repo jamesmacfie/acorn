@@ -13,7 +13,7 @@ describe('task pull relations', () => {
   it('does not expose another task to a task-confined principal', async () => {
     const tasks = {
       load: vi.fn(),
-      pulls: vi.fn(),
+      changeRequests: vi.fn(),
     } as unknown as CoreServices['tasks']
 
     const response = await request(
@@ -24,21 +24,32 @@ describe('task pull relations', () => {
 
     expect(response.status).toBe(404)
     expect(tasks.load).not.toHaveBeenCalled()
-    expect(tasks.pulls).not.toHaveBeenCalled()
+    expect(tasks.changeRequests).not.toHaveBeenCalled()
   })
 
   it('returns durable relations for the principal own task', async () => {
     const tasks = {
       load: vi.fn().mockResolvedValue({ id: 'task-a' }),
-      pulls: vi.fn().mockResolvedValue([
+      changeRequests: vi.fn().mockResolvedValue([
         {
-          repoOwner: 'acme',
-          repoName: 'widget',
-          pullNumber: 42,
+          taskId: 'task-a',
+          provider: 'github',
+          host: 'github.com',
+          path: 'acme/widget',
+          number: 42,
           role: 'related',
           provenance: 'agent',
           sessionId: 'session-1',
-          requestId: null,
+        },
+        // Linked on the task rather than by an agent, so not a durable agent relation.
+        {
+          taskId: 'task-a',
+          provider: 'github',
+          host: 'github.com',
+          path: 'acme/widget',
+          number: 41,
+          role: 'primary',
+          provenance: 'task',
         },
       ]),
     } as unknown as CoreServices['tasks']

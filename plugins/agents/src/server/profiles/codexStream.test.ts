@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseCodexStreamJson } from './streamJson'
+import { parseCodexStreamJson } from './codexStream'
 
 describe('Codex stream JSON', () => {
   it('takes the last agent message and maps identity and usage', () => {

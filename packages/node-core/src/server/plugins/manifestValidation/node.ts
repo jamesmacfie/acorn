@@ -70,6 +70,17 @@ export function validateNodeDeclarations(refs: ManifestReferences): void {
         message: `CLI command requires declared core capability '${entry.capability}'`,
       })
   })
+  // A code host's data sources get the paths of the projects on its hosts, so the person consents to
+  // that the same way they consent to any project read.
+  const readsProjects = ['projects:read', 'projects:write', 'projects:config'].some((grant) =>
+    manifest.permissions.node.core.includes(grant),
+  )
+  if (manifest.contributions.codeHost !== undefined && !readsProjects)
+    ctx.addIssue({
+      code: 'custom',
+      path: ['contributions', 'codeHost'],
+      message: 'a code host reads the projects on its hosts; declare `projects:read` in permissions.node.core',
+    })
   if (!manifest.node) {
     for (const kind of ['dataSources', 'dataSourceDiscoveries'] as const) {
       manifest.contributions[kind]?.forEach((_entry, i) =>
@@ -112,6 +123,13 @@ export function validateNodeDeclarations(refs: ManifestReferences): void {
         code: 'custom',
         path: ['contributions', 'browserPanel'],
         message: 'a browser panel comes from a node route; declare `node` in the manifest',
+      })
+    // Only a running node half registers its declarations, so a code host without one would claim nothing.
+    if (manifest.contributions.codeHost !== undefined)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'codeHost'],
+        message: 'a code host is claimed while the node half runs; declare `node` in the manifest',
       })
   }
 }

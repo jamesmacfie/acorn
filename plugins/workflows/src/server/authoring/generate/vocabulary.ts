@@ -1,4 +1,3 @@
-import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import type { WorkflowCatalog } from '../../../shared/workflowContracts'
 import { GENERATE_MAX_PROFILES, GENERATE_MAX_VOCABULARY_CHARS } from './limits'
 
@@ -36,7 +35,7 @@ const vocabularyAt = (catalog: WorkflowCatalog, compact: boolean): string => {
   // ones a definition might actually have to name.
   const ranked = [...profiles].sort(
     (a, b) =>
-      Number(b.id === DEFAULT_PROFILE_ID) - Number(a.id === DEFAULT_PROFILE_ID) ||
+      Number(b.id === catalog.defaultProfileId) - Number(a.id === catalog.defaultProfileId) ||
       Number(b.structured) - Number(a.structured) ||
       a.id.localeCompare(b.id),
   )
@@ -48,7 +47,7 @@ const vocabularyAt = (catalog: WorkflowCatalog, compact: boolean): string => {
     lines.push(
       ...shown.map((profile) => {
         const notes = [
-          ...(profile.id === DEFAULT_PROFILE_ID ? ['The default'] : []),
+          ...(profile.id === catalog.defaultProfileId ? ['The default'] : []),
           ...(profile.structured ? ['Has a structured mode'] : []),
         ]
         return `- \`${profile.id}\`, ${profile.label}.${notes.map((note) => ` ${note}.`).join('')}`
@@ -60,7 +59,7 @@ const vocabularyAt = (catalog: WorkflowCatalog, compact: boolean): string => {
   // `decide` is the one kind that needs a profile with a one-shot structured mode, and whether it
   // needs to say so depends on the node it runs on.
   const structured = ranked.filter((profile) => profile.structured)
-  const defaultStructured = structured.some((profile) => profile.id === DEFAULT_PROFILE_ID)
+  const defaultStructured = structured.some((profile) => profile.id === catalog.defaultProfileId)
   lines.push('')
   if (!structured.length) {
     lines.push('No profile here has a structured mode, and a `decide` step needs one, so do not write a')

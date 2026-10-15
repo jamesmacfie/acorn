@@ -45,6 +45,9 @@ describe('pull discovery after managed agent turns', () => {
       hidden: false,
       githubOwner: 'acme',
       githubName: 'widget',
+      repoProvider: 'github',
+      repoHost: 'github.com',
+      repoPath: 'acme/widget',
       createdAt: 1,
       updatedAt: 1,
     })
@@ -128,7 +131,7 @@ describe('pull discovery after managed agent turns', () => {
     ['closed', [{ ...pull(), state: 'closed' }]],
   ])('leaves the task unlinked for %s results', async (_label, pulls) => {
     vi.mocked(gh).mockResolvedValue(Response.json(pulls))
-    const adopt = vi.spyOn(ctx.core.tasks, 'adoptPullNumbers')
+    const adopt = vi.spyOn(ctx.core.tasks, 'adoptChangeRequests')
     listener(completed)
     await vi.waitFor(() => expect(ctx.providers.withConnection).toHaveResolvedTimes(1))
     expect(adopt).not.toHaveBeenCalled()

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
+import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import {
   makeTestCoreServices,
   makeTestDb,
@@ -16,6 +16,9 @@ import { resolveWorkflowGraph } from '../definitions/resolution'
 import { WorkflowDispatcher } from './dispatcher'
 import { WorkflowRunner, type RunnerDeps } from '../runs/runner'
 import { inlinePrompt } from '../runs/deps'
+
+// What the agents plugin publishes as its default profile, which these tests stand in for.
+const DEFAULT_PROFILE_ID = 'claude-code'
 
 const scope = { workspaceId: 'workspace', projectId: 'project', repoDir: null, userDir: null }
 const result = (structuredOutput: unknown = null) => ({
@@ -139,6 +142,7 @@ describe('nested workflow execution', () => {
       runStep,
       writeHandoff: async () => {},
       assembleContext: async () => '',
+      defaultProfileId: () => DEFAULT_PROFILE_ID,
       notify: vi.fn(),
       dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
       dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),

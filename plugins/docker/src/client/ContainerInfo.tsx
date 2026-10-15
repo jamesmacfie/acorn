@@ -13,9 +13,18 @@ import {
   Text,
 } from '@acorn/plugin-api/ui'
 import type { DockerContainerDetail, DockerPort } from '../shared/model'
+import { portAddress } from './nodeAddress'
+
+function portTitle(port: DockerPort, nodeId: string | null): string {
+  const address = portAddress(port, nodeId)
+  if (!address) return 'Not published'
+  return address.caveat ? `Copy ${address.url}. ${address.caveat}` : `Copy ${address.url}`
+}
 
 export default function ContainerInfo(props: {
   detail: DockerContainerDetail
+  /** The Node whose Docker runs this container, which the port addresses point at. */
+  nodeId: string | null
   showEnv: boolean
   onToggleEnv(): void
   onCopyPort(port: DockerPort): void
@@ -60,7 +69,7 @@ export default function ContainerInfo(props: {
               <For each={d().ports}>
                 {(port) => (
                   <Chip
-                    title={port.hostPort ? `Copy http://localhost:${port.hostPort}` : 'Not published'}
+                    title={portTitle(port, props.nodeId)}
                     {...(port.hostPort ? { onPress: () => props.onCopyPort(port) } : {})}
                   >
                     {port.hostPort ? `${port.hostPort} → ` : ''}

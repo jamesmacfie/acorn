@@ -103,6 +103,10 @@ to depend on something that was never meant to be public. A plugin declares only
 `linear` and `rollbar` also declare `./server/index.ts`, because a `vi.mock` has to name the module
 the code under test imports. The test holds that list at two.
 
+An app's production import from a plugin's `contract/` folder is a dependency on that one plugin, so
+each is listed with its reason on [first-party plugins](../first-party-plugins.md#what-the-apps-import-from-plugins),
+and the boundary test fails on one that isn't.
+
 No production file imports any package's `testkit/`. That's how a temporary-directory SQLite factory
 would end up shipped.
 
@@ -136,6 +140,10 @@ folder is named `main`, `service`, or `wiring`. Every workspace package carries 
 - **The client stays portable.** Only `packages/client-core/src/infra/platform/` reads `window.acorn`.
   It's a global, so this is a source scan. Tests are exempt, because stubbing `globalThis.window` is how
   the platform code gets tested.
+- **A path for a Node comes from `pickNodeFolder`.** The native picker returns a path on the client's
+  disk, which means nothing to a remote Node. `pickNodeFolder` returns null unless the Node is local,
+  so only it and the **This device** target of the plugin installer call `pickFolder`. Tests are
+  exempt.
 - **Core seams can't be reached around.** The raw identity store is confined to `packages/node-core`
   and the two composition roots that build it. The plugin trust and bundle stores are confined to
   `@acorn/custody`, because trust binds to a hash the host computed and the renderer must stay inert.

@@ -9,7 +9,7 @@ A PR can promote to a task. The task stores the core project ID and pull number;
 facet supplies provider owner/name metadata. Subsequent task context and changes use the owning Node.
 The PR pane keeps that scalar PR as its primary and adds read-only tabs to the strip from three
 sources: durable
-`task_pulls` relations, the connected base/head graph of the mirrored open-PR list, and PR links in
+agent-attached change requests, the connected base/head graph of the mirrored open-PR list, and PR links in
 the primary description, comments, reviews, and threads. A pull body is GitHub's rendered HTML, and
 only the `/pull/` form of a link is taken, so a `Fixes #42` that GitHub wrote as an issue link stays
 out of the strip. Stack and mention evidence is derived on read, so retargeting a stack or editing

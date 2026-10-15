@@ -114,7 +114,8 @@ export async function ensureWorktree(
   owner: string,
   repo: string,
   branch: string,
-  pullNumber: number | null,
+  // The task's primary change request: what to fetch from origin, and how a person names it.
+  changeRequest: { number: number; ref: string; name: string } | null,
 ): Promise<EnsureWorktreeResult> {
   if (!isValidBranch(branch)) return { ok: false, reason: 'Invalid branch name.' }
   const path = join(worktreesRoot, worktreeBranchDirName(owner, repo, branch))
@@ -132,26 +133,29 @@ export async function ensureWorktree(
   const { prepareWorktreePhase } = await import('./preparationTelemetry')
   mkdirSync(worktreesRoot, { recursive: true })
 
-  if (pullNumber != null) {
-    // PR workspace. Fetch the head with the checkout's git credentials, then check it out on the
-    // PR's branch, where `branch` equals pr.headRef, so the worktree tracks a real branch and not a
-    // detached commit. `--` ends option parsing before positionals.
+  if (changeRequest) {
+    // Change request workspace. Fetch its head with the checkout's git credentials, then check it out
+    // on its source branch, where `branch` equals that branch, so the worktree tracks a real branch and
+    // not a detached commit. `--` ends option parsing before positionals.
     //
-    // Fetch into a private per-PR ref, never FETCH_HEAD. FETCH_HEAD lives in the repo's common dir,
-    // shared by the checkout and every worktree, so any other fetch in this repo between the two
-    // commands below can rewrite it first, and a branch would be born at another PR's head: right name,
-    // clean status, no diff, wrong tree. The ref is kept afterwards, since it costs 41 bytes and
+    // Fetch into a private per-request ref, never FETCH_HEAD. FETCH_HEAD lives in the repo's common
+    // dir, shared by the checkout and every worktree, so any other fetch in this repo between the two
+    // commands below can rewrite it first, and a branch would be born at another request's head: right
+    // name, clean status, no diff, wrong tree. The ref is kept afterwards, since it costs 41 bytes and
     // records what the branch came from.
-    const head = `refs/acorn/pull/${pullNumber}`
+    const head = `refs/acorn/change-request/${changeRequest.number}`
     try {
       await prepareWorktreePhase('git.fetch', () =>
-        gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+pull/${pullNumber}/head:${head}`], {
+        gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+${changeRequest.ref}:${head}`], {
           cwd: checkout,
           timeoutMs: 60_000,
         }),
       )
     } catch (error) {
-      return { ok: false, reason: gitFailure(`Could not fetch pull/${pullNumber}/head.`, error) }
+      return {
+        ok: false,
+        reason: gitFailure(`Could not fetch ${changeRequest.name} from ${changeRequest.ref}.`, error),
+      }
     }
     const exists = await branchExists(checkout, branch)
     const args = exists ? ['worktree', 'add', '--', path, branch] : ['worktree', 'add', '-b', branch, '--', path, head]

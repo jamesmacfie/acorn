@@ -7,8 +7,8 @@ workflows plugin, which has [its own page](./workflow-routes.md). It's part of t
 A plugin's routes mount under its registry namespace. A router that names its own top-level segment
 repeats it, so a literal path can carry the plugin name twice, as in `/v1/p/memory/memory`. The route
 builders in `@acorn/protocol/api.ts` and each plugin's `shared/api.ts` are authoritative.
-`apps/node/test/integration/routeRegistry.snapshot.json` lists every compiled plugin route. Loaded
-plugin routes reach the server through the fetch dispatcher and aren't in it.
+`apps/node/test/integration/routeRegistry.snapshot.json` lists every core and compiled plugin route.
+Loaded plugin routes reach the server through the fetch dispatcher and aren't in it.
 
 The task-scope gate covers `/v1/p/<plugin>/tasks/:id` and everything under it. A route addressed by
 another id, such as a session or a run, checks scope in its own handler

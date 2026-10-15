@@ -9,10 +9,7 @@
 // or red: a stale read starts the Node's refresh, which then announces `pr-synced`.
 import { createSignal } from 'solid-js'
 import {
-  CHECK_TONE,
   activeTaskId,
-  checksState,
-  checksSummary,
   clientEvents,
   onPluginFrame,
   onScopeEvicted,
@@ -21,6 +18,7 @@ import {
   type RailMarker,
   type RailMarkerContribution,
 } from '@acorn/plugin-api/client'
+import { CHECK_TONE, checksState, checksSummary } from '../checks/checkStatus'
 import { pullRoute, type PullDetail } from '../../shared/api'
 import { formatPullRef, pullRefMatchesTask } from '../../shared/pullRef'
 import { reviewDecision } from './model'

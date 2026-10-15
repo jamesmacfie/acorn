@@ -6,12 +6,12 @@ import type { DataSourceDescription, DataSourceRequest } from '@acorn/protocol/d
 import type { Env } from '../bindings'
 import { gitText } from '../core/git'
 import { getDb, schema } from '../db'
-import { parseGithubRemote } from '../projects/projects'
+import { githubFacet, parseGitRemote } from '../projects/projects'
 import { worktreeCounts } from './localGitRead'
 import { createDataSelectionPager, selectDataRecords } from './selection'
 
 const branchDescription: DataSourceDescription = {
-  revision: '2',
+  revision: '3',
   schema: {
     type: 'object',
     additionalProperties: false,
@@ -19,6 +19,7 @@ const branchDescription: DataSourceDescription = {
       projectId: { type: 'string' },
       name: { type: 'string' },
       upstream: { type: ['string', 'null'] },
+      remoteRepository: { type: ['string', 'null'] },
       githubRepository: { type: ['string', 'null'] },
       aheadUpstream: { type: ['number', 'null'] },
       behindUpstream: { type: ['number', 'null'] },
@@ -31,6 +32,7 @@ const branchDescription: DataSourceDescription = {
       'projectId',
       'name',
       'upstream',
+      'remoteRepository',
       'githubRepository',
       'aheadUpstream',
       'behindUpstream',
@@ -43,6 +45,9 @@ const branchDescription: DataSourceDescription = {
   fields: [
     { pointer: '/name', label: 'Branch', origin: 'declared', display: { kind: 'text', role: 'title' } },
     { pointer: '/upstream', label: 'Upstream', origin: 'declared' },
+    // `host/path`, such as `gitlab.com/group/repo`. `githubRepository` is the same remote as GitHub's
+    // `owner/name`, kept until the next plugin API major.
+    { pointer: '/remoteRepository', label: 'Remote repository', origin: 'declared' },
     { pointer: '/githubRepository', label: 'GitHub remote repository', origin: 'declared' },
     ...(['aheadUpstream', 'behindUpstream', 'aheadDefault', 'behindDefault'] as const).map((key) => ({
       pointer: `/${key}`,
@@ -253,10 +258,9 @@ async function projectOptions(request: Extract<DataSourceRequest, { operation: '
   }
 }
 
-async function remoteGithubRepository(path: string, remote: string): Promise<string | null> {
+async function remoteRepository(path: string, remote: string): Promise<{ host: string; path: string } | null> {
   try {
-    const repository = parseGithubRemote(await gitText(['remote', 'get-url', remote], { cwd: path, timeoutMs: 5_000 }))
-    return repository ? `${repository.owner}/${repository.name}`.toLowerCase() : null
+    return parseGitRemote(await gitText(['remote', 'get-url', remote], { cwd: path, timeoutMs: 5_000 }))
   } catch {
     return null
   }
@@ -281,7 +285,7 @@ export async function localBranches(request: DataSourceRequest, env: Env) {
     const rows = refs.split('\n').filter(Boolean)
     const remotes = [...new Set(rows.map((row) => row.split('\0')[2] || 'origin'))]
     const repositories = new Map(
-      await Promise.all(remotes.map(async (remote) => [remote, await remoteGithubRepository(path, remote)] as const)),
+      await Promise.all(remotes.map(async (remote) => [remote, await remoteRepository(path, remote)] as const)),
     )
     const records = []
     for (let index = 0; index < rows.length; index += 4) {
@@ -289,6 +293,8 @@ export async function localBranches(request: DataSourceRequest, env: Env) {
         ...(await Promise.all(
           rows.slice(index, index + 4).map(async (row) => {
             const [name = '', upstream = '', upstreamRemote = '', stamp = ''] = row.split('\0')
+            const repository = repositories.get(upstreamRemote || 'origin') ?? null
+            const github = githubFacet(repository)
             const branch = `refs/heads/${name}`
             const [againstUpstream, againstDefault] = await Promise.all([
               divergence(path, branch, upstream || null),
@@ -300,7 +306,8 @@ export async function localBranches(request: DataSourceRequest, env: Env) {
                 projectId: project.id,
                 name,
                 upstream: upstream || null,
-                githubRepository: repositories.get(upstreamRemote || 'origin') ?? null,
+                remoteRepository: repository && `${repository.host}/${repository.path}`,
+                githubRepository: github && `${github.owner}/${github.name}`,
                 aheadUpstream: againstUpstream?.ahead ?? null,
                 behindUpstream: againstUpstream?.behind ?? null,
                 aheadDefault: againstDefault?.ahead ?? null,

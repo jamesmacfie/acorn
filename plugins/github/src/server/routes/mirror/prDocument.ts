@@ -13,7 +13,7 @@ import {
   type DiffSegmentRequest,
   type FileDocument,
 } from '@acorn/diff-document/document'
-import { diffDocumentBlobKey, patchBlobKey } from '@acorn/plugin-api/node'
+import { diffDocumentBlobKey, patchBlobKey } from '../../blobKeys'
 import type { PullFile } from '../../../shared/api'
 import { mapLimited } from '../../mapLimited'
 import type { PatchBlobStore } from './prMirror'

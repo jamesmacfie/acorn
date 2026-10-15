@@ -49,7 +49,6 @@ export function PromoteToTaskModal(props: {
   const params = useParams()
   const projects = createQuery(() => projectsOptions(true))
   const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
-  const github = () => project()?.github
   const [projectConfig] = createResource(
     () => (project()?.vcs === 'git' ? project()?.id : undefined),
     (projectId) => taskBridge().project.get(projectId),
@@ -98,8 +97,7 @@ export function PromoteToTaskModal(props: {
     void Promise.resolve(
       promotion().prepare(props.item, {
         projectId,
-        owner: github()?.owner ?? '',
-        repo: github()?.name ?? '',
+        repository: project()?.repository,
         branch: '',
         existingBranches: props.existingBranches,
       }),
@@ -140,8 +138,7 @@ export function PromoteToTaskModal(props: {
     try {
       const context = {
         projectId,
-        owner: github()?.owner ?? '',
-        repo: github()?.name ?? '',
+        repository: project()?.repository,
         branch: isGitProject ? b : undefined,
         existingBranches: props.existingBranches,
       }

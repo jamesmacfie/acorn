@@ -5,6 +5,7 @@ import type { Env } from '../bindings'
 import { getDb, schema } from '../db'
 import type { DataSourceInvocation } from '../dataSources/authority'
 import { invokeDataSource } from '../dataSources/runtime'
+import { projectRepository } from '../projects/projects'
 
 const hasContext = (binding: DataBinding, name: 'viewer' | 'workspaceLinks'): boolean =>
   binding.address.from === 'context' && binding.address.name === name
@@ -58,19 +59,19 @@ export async function sourceBindingContext(
         ),
       )
     const links = rows.map((row) => row.externalId)
-    if (content.query.source.pluginId === 'github') {
-      const projects = await db
-        .select({ owner: schema.projects.githubOwner, name: schema.projects.githubName })
-        .from(schema.projects)
-        .where(
-          and(
-            eq(schema.projects.workspaceId, scope.workspaceId),
-            scope.projectId ? eq(schema.projects.id, scope.projectId) : undefined,
-          ),
-        )
-      links.push(
-        ...projects.flatMap((project) => (project.owner && project.name ? [`${project.owner}/${project.name}`] : [])),
+    // A code host's source also links the repositories of the projects in scope, by path.
+    const projects = await db
+      .select()
+      .from(schema.projects)
+      .where(
+        and(
+          eq(schema.projects.workspaceId, scope.workspaceId),
+          scope.projectId ? eq(schema.projects.id, scope.projectId) : undefined,
+        ),
       )
+    for (const project of projects) {
+      const repository = projectRepository(project)
+      if (repository?.provider === content.query.source.pluginId) links.push(repository.path)
     }
     context.workspaceLinks = [...new Set(links)].sort()
   }

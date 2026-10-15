@@ -229,7 +229,9 @@ const panelBlock = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('rows'),
     title: panelText,
-    rows: z.array(z.strictObject({ label: z.string().min(1).max(80), state: panelText, severity: panelSeverity })).max(64),
+    rows: z
+      .array(z.strictObject({ label: z.string().min(1).max(80), state: panelText, severity: panelSeverity }))
+      .max(64),
   }),
   z.strictObject({
     kind: z.literal('logs'),

@@ -83,6 +83,45 @@ const customAgentDescriptor = z.object({
   maxToolRisk: z.enum(['read', 'write', 'execute']).optional(),
 })
 
+// The Git hosts whose repositories this plugin names, such as `gitlab.com` (docs/plugins/code-hosts.md).
+// The provider is the plugin's own id, so two providers can't collide. Hosts are bare lowercase names,
+// with no scheme or port, because core compares them with the host it parses from a remote.
+export const codeHostDescriptor = z.object({
+  label: z.string().min(1).max(64),
+  hosts: z
+    .array(
+      z
+        .string()
+        .max(253)
+        .regex(
+          /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/,
+          'a host is a bare lowercase name',
+        ),
+    )
+    .min(1)
+    .max(16),
+  // How core treats this host's change requests, its pull or merge requests. Every field is optional.
+  changeRequest: z
+    .object({
+      // The ref core fetches from origin to check one out, such as `merge-requests/{number}/head`.
+      // Without one, core fetches the source branch by name. It's a Git argument, so no leading dash,
+      // no `:` that would end the refspec, and no `..`.
+      ref: z
+        .string()
+        .max(200)
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*\{number\}[A-Za-z0-9._/-]*$/, 'a ref is a path holding {number} once')
+        .refine((ref) => !ref.includes('..'), 'a ref has no ..')
+        .optional(),
+      // What a person calls one, such as `merge request`, and the mark before its number in a title.
+      label: z.string().min(1).max(64).optional(),
+      prefix: z.string().min(1).max(4).optional(),
+      // The client pane that shows one. A task whose primary change request is on this host opens on it.
+      pane: z.string().min(1).max(64).optional(),
+    })
+    .optional(),
+})
+export type CodeHostDescriptor = z.infer<typeof codeHostDescriptor>
+
 // `api` and `events` are enforced by client-core's frame broker. `contributions` stays loose: a manifest
 // written for a newer acorn should contribute less on an older one rather than fail to parse.
 //
@@ -138,6 +177,8 @@ const contributionsShape = z.looseObject({
   // A read-only sidebar panel in the browser extension, served as a view by a GET route on this
   // plugin's node half (./handoffs.ts `browserPanelView`). One per plugin.
   browserPanel: browserPanelDescriptor.optional(),
+  // Compiled plugins declare the same thing on `NodePlugin.codeHost`.
+  codeHost: codeHostDescriptor.optional(),
 })
 
 // Every contribution kind a manifest may declare, as a runtime list.
@@ -483,4 +524,5 @@ export type PluginContributions = {
   browserHandoffs?: Omit<import('./handoffs.ts').BrowserHandoff, 'pluginId'>[]
   taskAddresses?: string
   browserPanel?: import('./handoffs.ts').BrowserPanelDescriptor
+  codeHost?: CodeHostDescriptor
 } & Record<string, unknown>

@@ -16,7 +16,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
 | [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Twenty-one phases for the public website at `acorn.sh`: positioning, wireframes and design, real UI drawn by both hosts, the landing and feature pages, download and changelog, the user docs, the generated plugin reference, plugin guides with tested examples, and the component docs. | Proposed October 15, 2026. Implementation not started. |
-| [split/](./split/README.md) | Nine phases that fix drift in the Node and client split and the core and plugin split, including forge-neutral repositories and change requests. | Proposed October 14, 2026. Implementation not started. |
+| [split/](./split/README.md) | Ten phases that fix drift in the Node and client split and the core and plugin split, including forge-neutral repositories and change requests. | Phases 1 to 9 implemented October 15, 2026. Phase 10, the remote preview proxy, is proposed. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
 
 ## The single files
@@ -68,7 +68,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 ## Retired folders
 
 `cleanup/` shipped all seventeen proposals and was deleted on October 12, 2026. The reference
-pages each proposal touched own the result: [mixed builds](../api-reference/transport.md#mixed-builds) for the
+pages each proposal touched own the result: [mixed builds](../api-reference/versioning.md#mixed-builds) for the
 version policy, [formatting](../local-development/formatting.md) for the formatter, and
 [conventions](../conventions.md) for the comment and staleness rules. Each proposal's completion
 note remains in Git history.

@@ -167,3 +167,30 @@ describe('project ordering in the shared settings table', () => {
     expect(openProject).not.toHaveBeenCalled()
   })
 })
+
+describe('a path-less project row', () => {
+  it('asks for a typed path where this client has no picker for the Node', async () => {
+    const mapFolder = vi.fn(async () => true)
+    dispose = render(
+      () => (
+        <ProjectTable
+          groups={[{ id: 'work', label: 'Work', projects: [{ ...project('a'), path: null }] }]}
+          workspaces={[]}
+          groupHeads={false}
+          taskCount={() => 0}
+          openProject={() => {}}
+          mapFolder={mapFolder}
+          refresh={async () => {}}
+        />
+      ),
+      host,
+    )
+    expect(host.querySelector('form')).toBeNull()
+    ;[...host.querySelectorAll('button')].find((button) => button.textContent === 'Add folder')!.click()
+    const input = host.querySelector<HTMLInputElement>('form input')!
+    input.value = ' /srv/projects/sample '
+    input.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    expect(mapFolder).toHaveBeenCalledWith('a', '/srv/projects/sample')
+  })
+})

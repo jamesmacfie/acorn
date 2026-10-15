@@ -3,6 +3,16 @@
 This page covers the CLI's managed agent and workflow commands, and the merged run list. It's part of
 the [command-line client](../cli.md).
 
+## Why these commands are built in
+
+A loaded plugin adds a command through [`cliCommands`](../plugin-authoring/cli-commands.md), which
+takes one bounded JSON object in and returns one out. `agent events --follow` reads an event stream, and both
+`wait` commands poll until a run or a session changes. That contribution can't do either, so `agent`
+and `workflow` live in the CLI and call `/v1/p/agents` and `/v1/p/workflows` directly. They read each
+plugin's route shapes from its `contract/wire.ts`, so renaming a field breaks the CLI's type check.
+Add a follow or wait form to `cliCommands` when a third plugin needs one, and move these commands onto
+it then.
+
 ## Agents
 
 `agent providers` reports the agents plugin's provider and profile roster, installation, sign-in, and

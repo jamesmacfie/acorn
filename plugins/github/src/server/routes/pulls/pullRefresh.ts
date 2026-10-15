@@ -126,7 +126,7 @@ export async function refreshOpenPulls(
     ...deletePullMirrorStatements(db, removedPulls),
   ])
   // After the mirror commits, never inside it: two SQLite files cannot share a transaction.
-  await core.tasks.adoptPullNumbers(owner, repo, branchToPull)
+  await core.tasks.adoptChangeRequests('github', `${owner}/${repo}`, branchToPull)
   emit('pulls-changed', { repoOwner: owner, repoName: repo })
   return { ok: true }
 }

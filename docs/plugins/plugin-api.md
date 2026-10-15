@@ -69,6 +69,12 @@ the export can leave.
 addition or removal, run `UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test`. The facade carries
 no API major, so a compiled-only export can leave without changing the manifest contract.
 
+A facade name is a seam core offers plugins in general, or a registry with one contributor so far.
+Code that only one plugin uses and core doesn't belongs in that plugin, or in its `contract/` folder
+when another package needs it. `tools/arch/facadeConsumers.test.ts` fails on a name that nothing
+outside the facade imports, tests included. Closed-kit nodes are exempt, because the support matrix
+holds that list. Run `node tools/arch/facadeConsumers.ts` to see who imports each name.
+
 ## One vocabulary across the registries
 
 One shape means one verb, on both contexts:

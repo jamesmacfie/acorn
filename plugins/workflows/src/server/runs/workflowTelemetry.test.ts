@@ -2,13 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import {
   agentProfileRegistry,
-  DEFAULT_PROFILE_ID,
   type ExtensionPointId,
   type PluginTelemetry,
   type TelemetryRecord,
 } from '@acorn/plugin-api/node'
 import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runner'
 import type { WorkflowDef } from '../../shared/workflowContracts'
+
+// What the agents plugin publishes as its default profile, which these tests stand in for.
+const DEFAULT_PROFILE_ID = 'claude-code'
 
 // A run and its steps as spans, raised by this plugin through `ctx.telemetry` and owned by it
 // (docs/workflows/child-runs.md § What a run reports). Core adds nothing workflow-shaped: a compiled plugin
@@ -35,6 +37,7 @@ const baseDeps = (telemetry: PluginTelemetry, over: Partial<RunnerDeps> = {}): R
   runStep: async () => ok,
   writeHandoff: async () => {},
   assembleContext: async () => '',
+  defaultProfileId: () => DEFAULT_PROFILE_ID,
   notify: () => {},
   telemetry,
   ...over,
