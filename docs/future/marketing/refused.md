@@ -1,68 +1,76 @@
-# What is refused, on the record
+# What the site won't build or say
 
-Part of [docs/future/marketing/](./README.md). The refusals this folder already states inline,
-collected so a later session argues with the reasoning instead of with silence. Nothing here is new;
-each entry names where it is argued in full. First collected 2026-08-30.
+Date: October 15, 2026. Part of [the website programme](./README.md).
 
-The site's refusals come in two shapes: things the site will not build, and things the site will not
-say. The second shape matters more, because the internal docs are unusually honest and a public page
-is where that gets laundered away by accident.
+This page collects the site's refusals, so a later session argues with the reason instead of with
+silence. Some carry over from the August 2026 notes, and some are from this plan. Each says what would
+change the answer.
 
-## Nothing server-side until a registry exists
+## Things the site won't build
 
-Static output, static hosting. A Workers app only pays off once a live registry endpoint exists, and
-[the ecosystem blockers](../ecosystem/blockers.md) put that behind containment and signing. Next.js
-buys pages acorn does not have — pricing, dashboards, i18n — so it buys nothing here
-([README.md](./README.md) § The decisions).
+**No server.** The output is static files. There are no accounts, no forms, and nothing to store. A
+server becomes worth having when there's a live plugin registry, and
+[the ecosystem plan](../ecosystem/blockers.md) puts that behind signing and package verification.
 
-## No live registry endpoint; `/plugins` is a static list
+**No plugin registry or browse-and-install list.** `/plugins` lists the plugins acorn ships. A list of
+third-party plugins would imply a review acorn doesn't do. If discovery ever exists, it's unreviewed and
+says so, the way herdr's does.
 
-Same reason, one page down. It becomes dynamic when the ecosystem work says so and not before
-([README.md](./README.md) § Deliberately not doing now).
+**No screenshots of the UI where a specimen or snapshot can do the job.** A PNG goes stale silently. The
+exceptions are things the kit can't draw: the macOS install dialog, a browser's extension permission
+prompt, and the social card images.
 
-## No docs versioning snapshots yet
+**No video on the landing page.** A video costs megabytes and goes stale with every UI change. A shell
+snapshot is text and CSS, and a maintainer recaptures it in minutes.
 
-Plan the seam — `versions/<v>/` directories plus a `manifest.json`, non-canonical paths excluded from
-the sitemap and llms.txt — and build none of it until `PLUGIN_API_MAJOR` first moves. There is exactly
-one version today ([README.md](./README.md) § Deliberately not doing now).
+**No docs versioning.** There's one version of acorn. Plan the seam the way herdr does, with a
+`versions/<v>/` folder of frozen pages and a manifest, and build none of it until `PLUGIN_API_MAJOR`
+moves after launch and a plugin author needs the old pages.
 
-## No i18n
+**No translations.** Starlight supports them, and acorn has no second-language audience.
 
-Starlight supports it; acorn has no second-language audience
-([README.md](./README.md) § Deliberately not doing now).
+**No blog at launch.** An empty blog reads as an abandoned one. The changelog carries release news. Add
+a blog when there's a first post worth writing.
 
-## No separate repository for the site
+**No comparison pages.** A page that names another product has to stay accurate about that product,
+and nobody here maintains that. The FAQ answers "how is this different from X" in prose, without
+naming a competitor's features.
 
-The point of `apps/site/` is that the manifest reference is generated from
-`packages/protocol/src/plugin/contract.ts` in the same build, with a CI check that regenerated output
-matches committed output. A separate repo turns that into a publish-and-consume pipeline for no
-benefit ([README.md](./README.md) § The decisions).
+**No email capture.** It needs a server or a third party, and there's nothing to send.
 
-## The site distinguishes enforced resources from declared intent
+**No third-party scripts.** No embedded videos, chat widgets, font services, or tag managers. The site
+loads from one origin.
 
-The node half's host, filesystem, environment, process, and network grants are enforced by its
-permission-scoped worker and RPC context. Scheduled/check intent remains declared because acorn
-cannot verify plugin-authored behavior. The site must preserve that split
-([README.md](./README.md) § Honesty constraints the public docs inherit).
+**No separate repository.** The site reads the plugin contract, the kit, and the stylesheets from
+source. A separate repository turns each into a publish step.
 
-## The site never implies signing, review, or a deprecation program
+**No Starlight default look.** Starlight's header, sidebar, search box, and footer are replaced by
+acorn's own components in phase 6. A docs site that looks like every other Starlight site tells the
+reader nothing about the product.
 
-There is none of the three. If discovery ever exists it is explicitly unreviewed, and trust is
-enforced on the user's own devices. The compatibility promise is exactly the `PLUGIN_API_MAJOR`
-promise and nothing more, and the compatibility page says so
-([README.md](./README.md) § Honesty constraints the public docs inherit).
+## Things the site won't say
 
-## A public page never says something its owning internal doc does not
+**Nothing its internal docs don't say.** A public page explains what an internal doc states. When they
+disagree, the internal doc wins and the public page is wrong ([sync](./sync.md)).
 
-Public pages are splits and distillations of internal docs, per the mapping in
-[site-map.md](./site-map.md). Internal docs stay the source of truth
-([README.md](./README.md) § Honesty constraints the public docs inherit).
+**"Open source", until the repository has a license.** [Owner decision 1](./README.md#what-the-owner-decides).
 
-## Three things stay internal
+**Anything about unshipped work.** No roadmap, no "coming soon", no "not yet". Proposals live in
+`docs/future/`, and the site doesn't link there.
 
-`docs/plugins.md` as a whole, because it is the internal reference manual and design record and the
-public tree takes only the authoring-facing subset. `docs/first-party-plugins.md` and
-`docs/future/`, because tier audits, migration records, and design notes are the argument and the
-public pages state only the conclusions. And anything unshipped: the public docs describe what loads
-today, and roadmap talk stays in the blog if it happens at all ([site-map.md](./site-map.md) § What
-is deliberately not public).
+**That plugins are reviewed, signed, or vetted.** There's no signing, no registry, no review, and no
+deprecation program. Trust is decided on the person's own devices, and the site says exactly that.
+
+**That a plugin's declared intent is enforced.** The Node half runs in a permission-scoped worker, and
+the network, environment, file, and process grants in `permissions.node` are enforced. A plugin's
+scheduled and task-check behavior is declared, because acorn can't verify what plugin code intends.
+The permissions page keeps that split ([plugin node realm](../../security/plugin-node-realm.md)).
+
+**A compatibility promise wider than the real one.** A plugin that loads under a plugin API major keeps
+loading under it. The site doesn't promise that the major won't move, that an old major keeps working,
+or any deprecation window.
+
+**Claims it can't back with a number or a mechanism.** [Voice](./voice.md#rules) has the list.
+
+**Internals a person doesn't need.** The broker, custody, migrations, the service protocol, package
+boundaries, and tier audits stay in the internal docs.
