@@ -223,7 +223,7 @@ export async function initPlugins(
       declareBrowserHandoffs(
         plugin.name,
         binding ? (binding.browserHandoffs ?? []) : (plugin.browserHandoffs ?? []),
-        binding,
+        binding ?? { browserPanel: plugin.browserPanel },
       ),
     )
     onUndo(declareCodeHost(plugin.name, binding ? binding.codeHost : plugin.codeHost, !binding))

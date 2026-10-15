@@ -12,7 +12,7 @@ import type {
   DockerScope,
   DockerVolume,
 } from '../shared/model'
-import { docker, DockerCliError, dockerEnv } from './cli'
+import { docker, DockerCliError, dockerEnv, dockerOutput } from './cli'
 import {
   eventScope,
   parseImagesOutput,
@@ -31,7 +31,11 @@ const MAX_STREAM_CHILDREN = 32 // Bound concurrent stream readers to protect the
 type VersionJson = { Client?: { Context?: string }; Server?: { Version?: string } }
 
 class DockerService {
-  constructor(private readonly broadcast: (frame: WsServerFrame) => void) {}
+  constructor(
+    private readonly broadcast: (frame: WsServerFrame) => void,
+    // Tells the browser extension to read an open Docker panel again (docs/docker.md § Browser panel).
+    private readonly status: () => void,
+  ) {}
   private infoCache: { at: number; value: DockerInfo } | null = null
   private pendingInfo: Promise<DockerInfo> | null = null
   private lists = new Map<DockerScope, { at: number; data: unknown }>()
@@ -177,8 +181,24 @@ class DockerService {
       this.broadcastTimer = null
       const scopes = [...this.dirtyScopes]
       this.dirtyScopes.clear()
-      if (!this.disposed && scopes.length) this.broadcast({ channel: 'docker:changed', scopes })
+      if (this.disposed || !scopes.length) return
+      this.broadcast({ channel: 'docker:changed', scopes })
+      if (scopes.includes('containers')) this.status()
     }, BROADCAST_DEBOUNCE_MS)
+  }
+
+  // A container's last `lines` lines, read once for the browser panel. Not the log stream, which keeps
+  // a child running for its viewers. stdout and stderr come back apart, so both are read with their
+  // timestamps, merged in time order, and the timestamps dropped.
+  async logTail(ref: string, lines: number): Promise<string[]> {
+    const { stdout, stderr } = await dockerOutput(['logs', '--tail', String(lines), '--timestamps', ref], {
+      timeout: 10_000,
+    })
+    return [...stdout.split('\n'), ...stderr.split('\n')]
+      .filter(Boolean)
+      .sort()
+      .slice(-lines)
+      .map((line) => line.replace(/^\S+ /, '').replace(/\r$/, ''))
   }
 
   // ── Log/stats stream children ───────────────────────────────────────────────────────────────
@@ -278,8 +298,11 @@ class DockerService {
 
 let service: DockerService | null = null
 
-export function getDockerService(broadcast: (frame: WsServerFrame) => void = () => {}): DockerService {
-  if (!service) service = new DockerService(broadcast)
+export function getDockerService(
+  broadcast: (frame: WsServerFrame) => void = () => {},
+  status: () => void = () => {},
+): DockerService {
+  if (!service) service = new DockerService(broadcast, status)
   return service
 }
 

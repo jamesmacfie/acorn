@@ -51,15 +51,21 @@ const DAEMON_DOWN_RE = /cannot connect to the docker daemon|docker daemon is not
 
 type ExecErr = { code?: number | string; killed?: boolean; stdout?: string; stderr?: string; message?: string }
 
+type DockerOpts = { timeout?: number; maxBuffer?: number }
+
 // Run `docker <args>` and return stdout. Failures become DockerCliError so callers branch on kind.
-export async function docker(args: string[], opts: { timeout?: number; maxBuffer?: number } = {}): Promise<string> {
+export async function docker(args: string[], opts: DockerOpts = {}): Promise<string> {
+  return (await dockerOutput(args, opts)).stdout
+}
+
+// The same, with stderr too, for `docker logs`, which replays a container's stderr there.
+export async function dockerOutput(args: string[], opts: DockerOpts = {}): Promise<{ stdout: string; stderr: string }> {
   try {
-    const { stdout } = await exec('docker', args, {
+    return await exec('docker', args, {
       timeout: opts.timeout ?? 20_000,
       maxBuffer: opts.maxBuffer ?? 16 * 1024 * 1024,
       env: dockerEnv(),
     })
-    return stdout
   } catch (err) {
     const e = err as ExecErr
     if (e.code === 'ENOENT') throw new DockerCliError('not_installed', 'docker CLI not found on PATH')

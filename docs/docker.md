@@ -12,6 +12,26 @@ and doesn't store the inventory as application data. The plugin is in `plugins/d
 - Logs, stats, inspect, and exec.
 - Start/stop/restart/pause/unpause/remove, Compose lifecycle, and prune.
 - Task badges, summaries, and archive-time teardown prompts.
+- A read-only panel in the browser extension's sidebar. See [Browser panel](#browser-panel).
+
+## Browser panel
+
+The plugin declares a [browser panel](./plugin-authoring/browser-panel.md) as `NodePlugin.browserPanel`.
+`GET /v1/p/docker/browser-panel?taskId=<id>[&source=<id>]` is device-only, because container logs can
+hold credentials. It lists the task's containers the way the task pane's own read does, from
+[matching](#matching) on the working directory only, and answers 404 when there are none. If the daemon
+can't be reached, it answers that error instead of a view.
+
+The view has a status block with each failing or starting container named, a row per container, a
+`http://localhost:<port>` link per published TCP port, and the last 200 log lines of one container.
+The log source ID is the lowercased container name, so a recreated Compose container keeps the
+sidebar's choice. Without a choice, the panel shows the first failing container, then the first
+running one. Health comes from the status text, such as "Up 3 hours (unhealthy)", because the events
+watcher drops health events. The code is `plugins/docker/src/server/browserPanel.ts`.
+
+When a container event passes the watcher's debounce, the plugin calls `ctx.events.status()`, so an
+open panel reads again. New log lines don't trigger a read. The port links assume the browser runs on
+the Node's own computer.
 
 ## Client
 

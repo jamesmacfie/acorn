@@ -22,6 +22,8 @@ them with the blocks the extension already has. The extension needs no changes.
 
 ## Part 1: let a built-in plugin declare a panel
 
+Implemented October 16, 2026, with the [Docker panel](./extension-docker-panel.md).
+
 Only a loaded plugin can declare a panel today. A built-in plugin can declare browser handoffs through
 `NodePlugin.browserHandoffs`, but not a panel. GitHub and Docker are both built in, so open the panel
 the same way handoffs were opened. Whichever panel ships first does this part.

@@ -25,7 +25,7 @@ import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { NodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'
 import type { CodeHostDescriptor, PluginEmit } from '@acorn/protocol/plugin/contract.ts'
-import type { BrowserHandoffDescriptor } from '@acorn/protocol/plugin/handoffs.ts'
+import type { BrowserHandoffDescriptor, BrowserPanelDescriptor } from '@acorn/protocol/plugin/handoffs.ts'
 import type { HookMode, HookPayload, HookPayloadShape, HookVerdict } from '@acorn/protocol/extensionPoints.ts'
 import type { PluginTelemetry } from '../telemetry/collector'
 import type { Logger } from '../telemetry/logger'
@@ -545,6 +545,10 @@ export type NodePlugin = {
   // browser extension draws on a website, each resolved by a route this plugin serves. A loaded plugin
   // declares them in its manifest and this field is ignored for it.
   browserHandoffs?: readonly BrowserHandoffDescriptor[]
+  // The compiled tier's sidebar panel (docs/plugin-authoring/browser-panel.md): a read-only view the
+  // browser extension draws for a task, served by a route this plugin owns. A loaded plugin declares it
+  // in its manifest and this field is ignored for it.
+  browserPanel?: BrowserPanelDescriptor
   // The compiled tier's code host (docs/plugins/code-hosts.md): the Git hosts whose repositories this
   // plugin names. A loaded plugin declares it in its manifest and this field is ignored for it.
   codeHost?: CodeHostDescriptor

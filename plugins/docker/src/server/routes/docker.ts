@@ -11,6 +11,7 @@ import {
   setRouteTestCapability,
   viaBridge,
 } from '@acorn/plugin-api/node'
+import type { BrowserPanelView } from '@acorn/protocol/plugin/handoffs.ts'
 import type {
   DockerComposeAction,
   DockerContainerAction,
@@ -43,6 +44,8 @@ export type DockerBridge = {
   taskSummary(): Promise<DockerTaskSummary[]>
   taskContainers(taskId: string): Promise<DockerContainerSummary[]>
   taskTeardown(taskId: string): Promise<{ ok: true }>
+  /** The extension's sidebar view of a task's containers (../browserPanel.ts); 404 with none. */
+  browserPanel(taskId: string, source: string | null): Promise<BrowserPanelView>
   /** A project's `[docker]` keys, read from its checkout and the home config (../dockerConfig.ts). */
   projectMatcher(projectId: string): Promise<DockerProjectMatcher>
 }
@@ -95,6 +98,9 @@ export const docker = new Hono<AppEnv>()
   .use('/compose/*', requireDevice)
   .use('/task-summary', requireDevice)
   .use('/projects/*', requireDevice)
+  // Device-only although task-addressed: container logs can hold credentials, and the extension's
+  // native host, its only caller, holds a device credential.
+  .use('/browser-panel', requireDevice)
   .get('/info', (c) => viaBridge(c, DOCKER, (b) => b.info()))
   .get('/containers', (c) => viaBridge(c, DOCKER, (b) => b.containers()))
   .get('/containers/:ref/inspect', (c) => {
@@ -148,4 +154,9 @@ export const docker = new Hono<AppEnv>()
   // Read only. The keys are in a committed file, and a write there would change the repo-config trust
   // snapshot, so every task would ask to trust the repo again for an edit to three matcher keys.
   .get('/projects/:id/matcher', (c) => viaBridge(c, DOCKER, (b) => b.projectMatcher(c.req.param('id'))))
+  .get('/browser-panel', (c) => {
+    const taskId = c.req.query('taskId')
+    if (!taskId) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, DOCKER, (b) => b.browserPanel(taskId, c.req.query('source') ?? null))
+  })
   .get('/tasks/:id/containers', (c) => viaBridge(c, DOCKER, (b) => b.taskContainers(c.req.param('id'))))

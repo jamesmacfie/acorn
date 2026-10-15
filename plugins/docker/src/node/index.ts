@@ -10,8 +10,10 @@ export const dockerPlugin = (): NodePlugin => {
   return {
     name: 'docker',
     label: 'Docker',
+    // The extension's sidebar panel (../server/browserPanel.ts). `pane` is client/paneContribution.ts's ID.
+    browserPanel: { label: 'Docker', glyph: 'container', pane: 'docker', route: '/v1/p/docker/browser-panel' },
     init: (ctx) => {
-      const bridge = dockerBridge(ctx.core, ctx.events.send)
+      const bridge = dockerBridge(ctx.core, ctx.events.send, ctx.events.status)
       capability = ctx.capabilities.provide(DOCKER, bridge)
       // Archiving a task leaves its containers running unless somebody stops them, so docker says so
       // and offers to. Registered through ctx, like every other contribution here, so the host owns the

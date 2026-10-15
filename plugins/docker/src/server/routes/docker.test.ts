@@ -73,6 +73,7 @@ const fake = (over: Partial<DockerBridge> = {}): DockerBridge => ({
   taskSummary: async () => [{ taskId: 't1', running: 2, total: 3, projects: ['runn_x'] }],
   taskContainers: async () => [summary],
   taskTeardown: async () => ({ ok: true }),
+  browserPanel: async () => ({ blocks: [] }),
   projectMatcher: async () => ({
     repo: {},
     home: {},
@@ -155,6 +156,17 @@ describe('docker routes', () => {
     expect(await (await app.fetch(req('/api/docker/tasks/t1/containers'), {} as Env)).json()).toEqual([summary])
   })
 
+  it('forwards the browser panel task and source, and 400s without a task', async () => {
+    let got: unknown = null
+    setDockerBridge(fake({ browserPanel: async (taskId, source) => ((got = { taskId, source }), { blocks: [] }) }))
+    const app = authed()
+    await app.fetch(req('/api/docker/browser-panel?taskId=t1&source=web-1'), {} as Env)
+    expect(got).toEqual({ taskId: 't1', source: 'web-1' })
+    await app.fetch(req('/api/docker/browser-panel?taskId=t1'), {} as Env)
+    expect(got).toEqual({ taskId: 't1', source: null })
+    expect((await app.fetch(req('/api/docker/browser-panel'), {} as Env)).status).toBe(400)
+  })
+
   it('passes BridgeError statuses through', async () => {
     setDockerBridge(
       fake({
@@ -189,6 +201,7 @@ describe('the docker daemon surface is device-only', () => {
     expect(daemonRoutes.length).toBeGreaterThanOrEqual(12)
     expect(daemonRoutes.map((r) => r.path)).toContain('/containers/:ref/inspect')
     expect(daemonRoutes.map((r) => r.path)).toContain('/task-summary')
+    expect(daemonRoutes.map((r) => r.path)).toContain('/browser-panel')
   })
 
   // The 403 test below passes on the pinned Hono even without a bare gate, because its trailing `/*`
@@ -217,7 +230,7 @@ describe('the docker daemon surface is device-only', () => {
     for (const { method, path } of daemonRoutes) {
       // A concrete ref, and a body that would validate, so a 400 cannot be mistaken for the gate. The
       // gate runs before body parsing: it must not have to read the request to refuse it.
-      const url = `/api/docker${path.replace(':ref', 'web-1')}`
+      const url = `/api/docker${path.replace(':ref', 'web-1')}?taskId=t1`
       const body = method === 'POST' ? { action: 'stop', kind: 'images', force: true, project: 'runn_x' } : undefined
       expect((await app.fetch(req(url, method, body), {} as Env)).status, `${method} ${path}`).toBe(403)
     }
@@ -234,7 +247,7 @@ describe('the docker daemon surface is device-only', () => {
     setDockerBridge(fake())
     const app = authed()
     for (const { method, path } of daemonRoutes) {
-      const url = `/api/docker${path.replace(':ref', 'web-1')}`
+      const url = `/api/docker${path.replace(':ref', 'web-1')}?taskId=t1`
       const body = method === 'POST' ? { action: 'stop', kind: 'images', force: true, project: 'runn_x' } : undefined
       expect((await app.fetch(req(url, method, body), {} as Env)).status, `${method} ${path}`).toBe(200)
     }

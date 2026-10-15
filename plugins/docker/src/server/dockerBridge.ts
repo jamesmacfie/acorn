@@ -42,8 +42,12 @@ const isActive = (c: DockerContainerSummary): boolean =>
 // core services rather than a db handle (docs/data-layer/plugin-databases.md § Plugin databases).
 export type DockerCoreServices = Pick<CoreServices, 'tasks' | 'projects'>
 
-export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsServerFrame) => void): DockerBridge {
-  const service = getDockerService(broadcast)
+export function dockerBridge(
+  core: DockerCoreServices,
+  broadcast?: (frame: WsServerFrame) => void,
+  status?: () => void,
+): DockerBridge {
+  const service = getDockerService(broadcast, status)
 
   async function linkedContainers(taskId: string): Promise<DockerContainerSummary[]> {
     const task = await core.tasks.load(taskId)
@@ -141,6 +145,20 @@ export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsSer
         return out
       }),
     taskContainers: (taskId) => run(() => linkedContainers(taskId)),
+    // Only working_dir matches count, as for every task-addressed read. No containers is no panel, the
+    // same rule that shows the desktop's Docker pane. A failed log read shows as the only line. Loaded on
+    // first use, because a boot doesn't need it.
+    browserPanel: (taskId, source) =>
+      run(async () => {
+        const { dockerBrowserPanel, logContainer, PANEL_LOG_LINES } = await import('./browserPanel')
+        const containers = withStale(await linkedContainers(taskId))
+        const container = logContainer(containers, source)
+        if (!container) throw new BridgeError(404, 'docker_no_containers')
+        const lines = await service
+          .logTail(container.id, PANEL_LOG_LINES)
+          .catch((err: unknown) => [err instanceof Error ? err.message : String(err)])
+        return dockerBrowserPanel(containers, { container, lines })
+      }),
     taskTeardown: (taskId) =>
       run(async () => {
         const task = await core.tasks.load(taskId)

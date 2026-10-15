@@ -1,11 +1,12 @@
 // The browser handoffs, task address routes, and sidebar panels each running plugin declares, for the
 // extension's discovery route (docs/plugin-authoring/browser-handoffs.md). Filled by the host from a
 // loaded manifest's `contributions.browserHandoffs`, `taskAddresses`, and `browserPanel`, or a built-in's
-// `NodePlugin.browserHandoffs`, and emptied with the plugin's other registrations. A package waiting
+// `NodePlugin.browserHandoffs` and `browserPanel`, and emptied with the plugin's other registrations. A package waiting
 // for review or a restart has no binding yet, so its declarations aren't here until it runs.
 import { z } from 'zod'
 import {
   browserHandoffDescriptor,
+  browserPanelDescriptor,
   type BrowserHandoff,
   type BrowserHandoffDescriptor,
   type BrowserPanel,
@@ -20,39 +21,56 @@ type Declaration = {
 }
 const declared = new Map<string, Declaration>()
 
+const isOwnRoute = (pluginId: string, route: string): boolean => {
+  const url = new URL(route, 'https://acorn.invalid')
+  return (
+    route.startsWith('/') && url.origin === 'https://acorn.invalid' && url.pathname.startsWith(`/v1/p/${pluginId}/`)
+  )
+}
+
 // Both tiers pass this, so a compiled declaration meets the rules a manifest does: the descriptor
 // schema, a resolve route inside the plugin's own namespace, and IDs unique within the plugin. A loaded
 // manifest was already held to them when it parsed; a built-in that breaks them fails the boot.
 function validated(pluginId: string, descriptors: readonly BrowserHandoffDescriptor[]): BrowserHandoff[] {
   const parsed = z.array(browserHandoffDescriptor).max(4).parse(descriptors)
-  const ownRoute = `/v1/p/${pluginId}/`
   const ids = new Set<string>()
   for (const handoff of parsed) {
-    const url = new URL(handoff.resolve, 'https://acorn.invalid')
-    if (
-      !handoff.resolve.startsWith('/') ||
-      url.origin !== 'https://acorn.invalid' ||
-      !url.pathname.startsWith(ownRoute)
-    )
-      throw new Error(`browser handoff '${handoff.id}' resolves through '${handoff.resolve}', outside ${ownRoute}`)
+    if (!isOwnRoute(pluginId, handoff.resolve))
+      throw new Error(
+        `browser handoff '${handoff.id}' resolves through '${handoff.resolve}', outside /v1/p/${pluginId}/`,
+      )
     if (ids.has(handoff.id)) throw new Error(`duplicate browser handoff id '${handoff.id}'`)
     ids.add(handoff.id)
   }
   return parsed.map((handoff) => ({ ...handoff, pluginId }))
 }
 
+// The same rules for a panel: the descriptor schema and a route inside the plugin's own namespace.
+// Unlike a manifest's, a built-in's `pane` can't be checked here, because the Node half can't see its
+// client panes; each plugin that declares a panel tests that instead.
+function validatedPanel(
+  pluginId: string,
+  panel: BrowserPanelDescriptor | undefined,
+): BrowserPanelDescriptor | undefined {
+  if (panel === undefined) return undefined
+  const parsed = browserPanelDescriptor.parse(panel)
+  if (!isOwnRoute(pluginId, parsed.route))
+    throw new Error(`browser panel route '${parsed.route}' is outside /v1/p/${pluginId}/`)
+  return parsed
+}
+
 /** Record what `pluginId` declares. Returns the undo for the plugin's registration list. Only a loaded
- *  manifest declares `taskAddresses` and `browserPanel`, and its parse already confined their routes to
- *  the plugin. */
+ *  manifest declares `taskAddresses`, and its parse already confined the route to the plugin. A panel
+ *  comes from a loaded manifest or a built-in's `NodePlugin.browserPanel`. */
 export function declareBrowserHandoffs(
   pluginId: string,
   descriptors: readonly BrowserHandoffDescriptor[],
-  loaded: { taskAddresses?: string; browserPanel?: BrowserPanelDescriptor } = {},
+  routes: { taskAddresses?: string; browserPanel?: BrowserPanelDescriptor } = {},
 ): () => void {
   const declaration = {
     handoffs: validated(pluginId, descriptors),
-    taskAddresses: loaded.taskAddresses,
-    panel: loaded.browserPanel,
+    taskAddresses: routes.taskAddresses,
+    panel: validatedPanel(pluginId, routes.browserPanel),
   }
   declared.set(pluginId, declaration)
   return () => {

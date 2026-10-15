@@ -23,9 +23,14 @@ Declare it in the manifest. The manifest also needs a `node` entry:
 | `pane` | A task-scoped pane in the same manifest, which **Open in Acorn** opens on the task. Without one, the task opens on whichever pane it showed last. |
 | `route` | A `GET` route inside your own `/v1/p/<pluginId>/` namespace. |
 
-Only a loaded plugin declares a panel, and each plugin declares at most one. The manifest is refused
-when the route is outside your namespace, when there is no `node` entry, or when `pane` names
-anything other than one of your task-scoped panes.
+Each plugin declares at most one panel. The manifest is refused when the route is outside your
+namespace, when there is no `node` entry, or when `pane` names anything other than one of your
+task-scoped panes.
+
+A built-in plugin declares the same descriptor as `NodePlugin.browserPanel`. A built-in whose route is
+outside its namespace fails the boot. Its Node half can't see its client panes, so nothing checks
+`pane` for it. Add a test that `pane` matches the ID your client registers. Docker's panel is the
+built-in example.
 
 ## The panel route
 

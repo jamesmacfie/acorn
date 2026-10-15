@@ -3,7 +3,9 @@
 This page is a plan for a Docker panel in the browser extension's sidebar. The panel shows the task's
 containers, their published ports, and recent logs. Read it before you build the panel.
 
-Proposed October 16, 2026, against `afb826ee3`. Implementation not started.
+Proposed October 16, 2026, against `afb826ee3`. Implemented October 16, 2026, with part 1 of the pull
+request panel plan. The check in a real browser against a Compose project is still open. The
+reference is [Browser panel](../docker.md#browser-panel).
 
 ## Why
 
