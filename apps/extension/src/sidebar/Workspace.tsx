@@ -463,10 +463,7 @@ export function Workspace(props: {
             />
             {/* The task the person last used stays pinned when the page is not its own. */}
             <Show when={!pageTask() || (current().taskId && current().taskId !== pageTask()!.task.id)}>
-              <CurrentTask
-                task={task()}
-                projectName={current().projectId ? projectName(current().projectId!) : null}
-              />
+              <CurrentTask task={task()} projectName={current().projectId ? projectName(current().projectId!) : null} />
             </Show>
           </Show>
         </div>

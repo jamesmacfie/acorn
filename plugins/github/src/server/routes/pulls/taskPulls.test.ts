@@ -42,7 +42,15 @@ describe('task pull relations', () => {
           sessionId: 'session-1',
         },
         // Linked on the task rather than by an agent, so not a durable agent relation.
-        { taskId: 'task-a', provider: 'github', host: 'github.com', path: 'acme/widget', number: 41, role: 'primary', provenance: 'task' },
+        {
+          taskId: 'task-a',
+          provider: 'github',
+          host: 'github.com',
+          path: 'acme/widget',
+          number: 41,
+          role: 'primary',
+          provenance: 'task',
+        },
       ]),
     } as unknown as CoreServices['tasks']
 
