@@ -1,6 +1,60 @@
 # Phase 4: make drift visible
 
-Date: October 15, 2026. Status: proposed. Needs phase 2. Do it before the docs phases start.
+Date: October 15, 2026. Status: done. Needs phase 2. Do it before the docs phases start.
+
+## Completion note
+
+October 15, 2026. `pnpm --filter @acorn/site stale` lists every page whose sources changed since its
+`checked` commit, `--touching <paths…>` lists the pages that cite given files, and `--mark <page>`
+clears a page. [Keep pages in sync](../../site.md#keep-pages-in-sync) is the reference.
+
+What landed:
+
+- `apps/site/scripts/stale.mjs`. It reads docs frontmatter, each marketing page's `meta` export, and
+  shell snapshots, then runs one `git log` per page. A full report over 183 pages takes about 6 seconds.
+  `--json` works with both reports, and both exit 0.
+- `apps/site/scripts/stale.test.mjs`, run by `node --test` in the site's `test` script. It fails when a
+  page cites a path that doesn't exist, cites nothing, or has a `checked` commit that isn't in the
+  history of `HEAD`. It also covers both header formats, the snapshot commit format, and folder matching
+  in `--touching`.
+- The `site` job in `site.yml` checks out full history and writes both reports to the job summary. The
+  step runs before the other checks and can't fail the job.
+- A "When the public site cites your doc" section in `docs/writing-docs.md`, a line in `AGENTS.md`
+  pointing to it, and a "Keep pages in sync" section in `docs/site.md`.
+
+Decisions:
+
+- The script reads `sources` and `checked` with a few regular expressions, not a YAML parser. The site
+  doesn't depend on one, and both header shapes are simple. The test fails on a page that yields no
+  sources, so a parsing miss can't hide a page.
+- `--touching` matches a changed file against a source that names it, or a folder that holds it.
+- `--mark` takes a page's file or its URL, and writes `git rev-parse --short HEAD`.
+- The test checks that `checked` is an ancestor of `HEAD`, not just a commit that exists. `main` takes
+  branches as merge commits, so a hash marked on a branch stays in its history. A squash or rebase
+  merge would orphan it, and the test would catch that.
+- CI calls `node apps/site/scripts/stale.mjs` directly, so pnpm's banner stays out of the summary. On a
+  pull request, `--touching` gets `git diff --name-only <base>...HEAD`.
+- Snapshots: phase 7 hasn't run, so this phase sets their format. A `.html` snapshot names its commit near
+  the top as `<!-- commit 3f9a2c1, captured 2026-10-20 -->`. A `.cells.json` snapshot has a top-level
+  `"commit"` field. Their sources are in `SNAPSHOT_SOURCES` in `stale.mjs`: the desktop shell's chrome,
+  layouts, and stylesheets for HTML, and the terminal client's chrome and paint folders for cells.
+  `--mark` refuses a snapshot, because recapturing it clears it.
+
+The acceptance checks pass locally. `--touching docs/database.md` lists the Database plugin page and
+`/features/task-tools/`. `--mark` clears a listed page, and a planted missing source or unknown commit
+fails the test. The job summary on a real pull request is unchecked, which is left for phase 20.
+
+What later phases need to know:
+
+- The report lists two pages on this commit: `/404/` cites `docs/site.md`, which phases 2 to 4 edited,
+  and `/docs/help/faq/` cites `voice.md`, which phase 1 edited. Both stay listed. Whoever writes those
+  pages clears them with `--mark`.
+- When you write a page, narrow its `sources` to the docs that own its claims, then run `--mark` on it.
+- Phase 7 must write the snapshot commit in the format above, or the test fails on the snapshot.
+- Phase 20 can use `pnpm --filter @acorn/site stale` as the release check. An empty report prints
+  "No page's sources changed since it was checked."
+- The architecture doc checks still fail on this base exactly as phase 2 recorded. None of the failures
+  come from this change.
 
 ## Goal
 

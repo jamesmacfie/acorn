@@ -45,12 +45,35 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
+          # The staleness report reads `git log` back to each page's `checked` commit.
+          fetch-depth: 0
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # Lists the pages whose sources changed since someone last checked them and, on a pull request,
+      # the pages that cite a file it changes. Both go to the job summary for review and never fail the
+      # job.
+      - name: Report pages to review
+        continue-on-error: true
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          {
+            echo '### Pages whose sources changed since they were checked'
+            echo '```'
+            node apps/site/scripts/stale.mjs
+            echo '```'
+            if [ -n "$BASE" ]; then
+              echo '### Pages that cite a file this pull request changes'
+              echo '```'
+              node apps/site/scripts/stale.mjs --touching $(git diff --name-only "$BASE"...HEAD)
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # `astro check` for the .astro pages, the content config, and the tests, then the specimens with
       # Solid's JSX.

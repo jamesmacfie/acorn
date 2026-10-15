@@ -143,6 +143,25 @@ message lists each page over 200 lines.
 Vitest hides `console.info` from passing tests when it detects an agent, so the citation counts don't
 print. To see them, run `env -u CLAUDECODE -u AI_AGENT npx vitest run docCitations` in `tools/arch`.
 
+## When the public site cites your doc
+
+Pages on the public site name the internal docs and source files they were written from. When you
+change one of those files, the page might teach something that's no longer true. Before you open a pull
+request, list the pages your change affects:
+
+```sh
+pnpm --filter @acorn/site stale --touching $(git diff --name-only main...)
+```
+
+For each page it lists, do one of these:
+
+- Update the page in the same pull request, then run `pnpm --filter @acorn/site stale --mark <page>`
+  to record that it matches.
+- Say in the pull request description why the page doesn't need a change.
+
+The site job in CI prints the same list in its summary, and doesn't fail on it. For more information,
+see [Keep pages in sync](./site.md#keep-pages-in-sync).
+
 ## Why
 
 Source comments cite the docs about 3,000 times. Before the citation check existed, a renamed page or

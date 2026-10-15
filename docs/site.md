@@ -63,6 +63,36 @@ Pictures of plugin UI on the site are _specimens_: plugin tree code that both ho
 HTML and as terminal cells, and checked against the kit on every change. [Specimens](./site/specimens.md)
 covers adding one, the generators, the specimen stylesheet, and what jsdom can't draw.
 
+## Keep pages in sync
+
+Every written page names the internal docs and source files it was written from in `sources`, and the
+commit at which someone last confirmed it matched them in `checked`. `apps/site/scripts/stale.mjs`
+reads both, from docs frontmatter and from each marketing page's `meta` export:
+
+| Command | What it prints |
+| --- | --- |
+| `pnpm --filter @acorn/site stale` | Each page with commits to its sources since `checked`, newest first. |
+| `pnpm --filter @acorn/site stale --touching <paths…>` | Each page that cites one of the given repository paths, or a folder that holds one. |
+| `pnpm --filter @acorn/site stale --mark <page>` | Nothing to review. It sets the page's `checked` to the current commit. Name the page by its file or its URL. |
+
+Add `--json` to either report for the same data as JSON. Both reports exit 0 whatever they find.
+
+To clear a page, read the commits the report lists. Update the page if the behavior it describes
+changed, commit, then run `--mark` on it and commit that. `--mark` is the only supported way to change
+`checked`, so nobody types a hash by hand.
+
+`apps/site/scripts/stale.test.mjs` fails when a page cites a path that doesn't exist, or when `checked` isn't a
+commit in the history of `HEAD`. It runs with the other script tests in `pnpm --filter @acorn/site test`.
+
+Shell snapshots in `apps/site/src/generated/snapshots/` count as pages. A snapshot names the commit it
+was captured at near the top of the file: `<!-- commit 3f9a2c1, captured 2026-10-20 -->` in a `.html`
+snapshot, and a top-level `"commit": "3f9a2c1"` in a `.cells.json` snapshot. Its sources are the
+shell's folders and stylesheets, listed in `SNAPSHOT_SOURCES` in `stale.mjs`. Recapture a snapshot to
+clear it. `--mark` doesn't take one.
+
+In CI, the `site` job checks out the full history and writes both reports to the job summary. On a
+pull request, `--touching` gets every file the pull request changes. Neither report fails the job.
+
 ## Formatting
 
 oxfmt doesn't read `.astro` or Markdown files, and the repository's oxfmt config formats only
