@@ -245,6 +245,7 @@ export function markPluginNodeStale(nodeId: string): void {
 
 /** Remove a node immediately so an in-flight read cannot keep its authority alive. */
 export function forgetPluginNode(nodeId: string): void {
+  cancelRosterRetry(nodeId)
   const byNode = new Map(distribution().byNode)
   if (!byNode.delete(nodeId)) return
   const current = distribution()
@@ -262,6 +263,34 @@ export function forgetPluginNode(nodeId: string): void {
 
 async function rosterFor(nodeId: string): Promise<readonly NodePluginRow[]> {
   return (await readJson<NodePluginState>(corePluginsRoute, { nodeId })).plugins
+}
+
+// A failed read on a node that is still connected gets no other trigger: `watchPluginChanges` reads
+// again only when a node's connection changes, and a node that is busy rather than gone keeps its
+// socket. Without an answer, every pane gated on one of its plugins stays hidden, so the read retries
+// itself, waiting longer each time, until it succeeds, the node goes offline, or the node is forgotten.
+const ROSTER_RETRY_MS = [2_000, 5_000, 15_000, 30_000] as const
+const rosterRetries = new Map<string, { timer: ReturnType<typeof setTimeout>; attempt: number }>()
+
+function retryRosterRead(nodeId: string): void {
+  const previous = rosterRetries.get(nodeId)
+  if (previous) clearTimeout(previous.timer)
+  const attempt = previous ? previous.attempt + 1 : 0
+  const timer = setTimeout(
+    () => {
+      syncPluginDistribution({ nodeIds: [nodeId] }).catch(() => {
+        /* logged by the queue */
+      })
+    },
+    ROSTER_RETRY_MS[Math.min(attempt, ROSTER_RETRY_MS.length - 1)],
+  )
+  rosterRetries.set(nodeId, { timer, attempt })
+}
+
+function cancelRosterRetry(nodeId: string): void {
+  const pending = rosterRetries.get(nodeId)
+  if (pending) clearTimeout(pending.timer)
+  rosterRetries.delete(nodeId)
 }
 
 // Node reads and bundle caching are independent requests, so a pass runs a few at once. A slow remote
@@ -309,6 +338,8 @@ function enqueuePass(options: DistributionSyncOptions): Promise<void> {
     for (const nodeId of paired) {
       if (options.trustOnly || options.deviceOnly) continue
       if (nodeState(nodeId) === 'offline') {
+        // Coming back online triggers its own read.
+        cancelRosterRetry(nodeId)
         const old = byNode.get(nodeId)
         if (old) byNode.set(nodeId, { ...old, reachable: false, stale: true })
         continue
@@ -323,10 +354,12 @@ function enqueuePass(options: DistributionSyncOptions): Promise<void> {
             log.warn(`${row.name} on ${nodeId} has no provable running identity; loaded UI is withheld`)
           }
         byNode.set(nodeId, { nodeId, rows, reachable: true, stale: false, observedAt: Date.now() })
+        cancelRosterRetry(nodeId)
       } catch (error) {
-        log.warn(`could not read the plugin roster on ${nodeId}`, error)
+        log.warn(`could not read the plugin roster on ${nodeId}; trying again shortly`, error)
         const old = byNode.get(nodeId)
         if (old) byNode.set(nodeId, { ...old, stale: true })
+        retryRosterRead(nodeId)
       }
     })
     // Cache active and installed offers; caching an update never selects it. A bundle for another app
@@ -484,6 +517,7 @@ export function _seedPendingTrust(requests: readonly PluginTrustRequest[]): void
 }
 
 export function _resetPluginDistribution(): void {
+  for (const nodeId of [...rosterRetries.keys()]) cancelRosterRetry(nodeId)
   setDevicePluginIds([])
   initialized = false
   dismissed.clear()

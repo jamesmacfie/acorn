@@ -115,6 +115,43 @@ describe('plugin distribution reconciliation', () => {
     expect(selected('a')).toBe('one')
   })
 
+  it('reads a connected node again after its first read fails, until one answers', async () => {
+    vi.useFakeTimers()
+    try {
+      let failures = 2
+      readRoster = async (nodeId) => {
+        if (failures-- > 0) throw new Error('The node did not answer within 30000ms')
+        return rosters.get(nodeId) ?? []
+      }
+      await syncPluginDistribution({ nodeIds: ['a'] })
+      expect(distribution().byNode.has('a')).toBe(false)
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(reads).toEqual(['a', 'a'])
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(reads).toEqual(['a', 'a', 'a'])
+      expect(distribution().byNode.get('a')).toMatchObject({ reachable: true, stale: false })
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(reads).toHaveLength(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops retrying a node once it is forgotten', async () => {
+    vi.useFakeTimers()
+    try {
+      readRoster = async () => {
+        throw new Error('The node did not answer within 30000ms')
+      }
+      await syncPluginDistribution({ nodeIds: ['b'] })
+      forgetPluginNode('b')
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(reads).toEqual(['b'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('discards a response from a node unpaired during its read', async () => {
     await syncPluginDistribution()
     let release: ((rows: NodePluginRow[]) => void) | undefined

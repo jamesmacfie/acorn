@@ -106,6 +106,11 @@ costs one broker timeout of 30 seconds rather than one per Node ahead of it. Com
 order, and a Node unpaired during its read is dropped at commit
 (`packages/client-core/src/host/plugins/distribution.ts`).
 
+A failed roster read on a Node that's still connected retries itself after 2, 5, 15, and then every
+30 seconds, until one answers, the Node goes offline, or it's unpaired. Nothing else would read
+again, because reads follow connection changes and a busy Node keeps its socket. Until a read lands,
+every pane that needs one of that Node's plugins stays hidden.
+
 `applyNodePlugins` waits for registration and applies the Node's disabled list when it arrives.
 Concurrent calls for one Node share a request, answers for a Node no longer selected are dropped, and
 a failed read can be retried. The host skips a pass whose plugins and disabled set match the last, so
