@@ -436,6 +436,27 @@ describe('conversation', () => {
     expect(transcript(subject.root)).toEqual(['YouFor s1 only'])
   })
 
+  it('sends with Command-Enter and toggles the box size with Command-Shift-Enter', async () => {
+    const subject = mount()
+    await openSession(subject)
+    const box = subject.root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!
+    const press = (init: KeyboardEventInit) =>
+      box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init }))
+    expect(box.rows).toBe(3)
+    press({ metaKey: true, shiftKey: true })
+    expect(box.rows).toBe(18)
+    button(subject.root, 'Collapse the message box')!.click()
+    expect(box.rows).toBe(3)
+    type(subject.root, 'Ship it')
+    press({})
+    await settle()
+    expect(subject.state.turns.size).toBe(0)
+    press({ metaKey: true })
+    await settle()
+    expect(subject.state.turns.size).toBe(1)
+    expect(draft(subject.root)).toBe('')
+  })
+
   it('reads again when the Node comes back, and holds sends while it is away', async () => {
     const subject = mount()
     await openSession(subject)

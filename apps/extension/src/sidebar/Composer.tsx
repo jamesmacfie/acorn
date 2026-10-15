@@ -1,5 +1,7 @@
 import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
 import { TURN_TEXT_MAX_CHARS } from '@acorn/protocol/extensionBridge.ts'
+import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { formatChord } from '@acorn/client-core/kit/lib/formatChord'
 import type { BrowserApi } from '../browser'
 import { CallFailure, isUncertain } from '../messages'
 import type { BridgeClient } from './bridgeClient'
@@ -42,6 +44,15 @@ export function Composer(props: {
   const [loaded, setLoaded] = createSignal(false)
   const [sending, setSending] = createSignal(false)
   const [note, setNote] = createSignal<string | null>(null)
+  // The desktop composer's size toggle, with its chords. The panel runs no keymap, so the field reads
+  // its own keys: Command or Control with Enter sends, and with Shift as well toggles the size.
+  const [expanded, setExpanded] = createSignal(false)
+  const chords = (event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => {
+    if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey) || event.isComposing) return
+    event.preventDefault()
+    if (event.shiftKey) setExpanded((open) => !open)
+    else event.currentTarget.form?.requestSubmit()
+  }
   let mounted = true
   let typed = false
   // A capture stored from elsewhere, such as the page's right-click menu, joins the visible draft, so
@@ -228,14 +239,27 @@ export function Composer(props: {
           </For>
         </ul>
       </Show>
-      <textarea
-        name="message"
-        rows={3}
-        maxLength={TURN_TEXT_MAX_CHARS}
-        placeholder="Message the agent"
-        value={text()}
-        onInput={(event) => edit(event.currentTarget.value)}
-      />
+      <div class="field">
+        <textarea
+          name="message"
+          rows={expanded() ? 18 : 3}
+          maxLength={TURN_TEXT_MAX_CHARS}
+          placeholder="Message the agent"
+          value={text()}
+          onInput={(event) => edit(event.currentTarget.value)}
+          onKeyDown={chords}
+        />
+        <button
+          type="button"
+          class="icon"
+          aria-label={expanded() ? 'Collapse the message box' : 'Expand the message box'}
+          aria-pressed={expanded()}
+          title={`${expanded() ? 'Collapse' : 'Expand'} ${formatChord('meta+shift+enter')}`}
+          onClick={() => setExpanded((open) => !open)}
+        >
+          <Icon name={expanded() ? 'minimize-2' : 'maximize-2'} />
+        </button>
+      </div>
       <div class="row toolbar">
         <span class="grow" />
         <button type="submit" disabled={sending() || (!text().trim() && !captures().length) || props.blocked !== null}>

@@ -47,7 +47,11 @@ body { padding-bottom: var(--pane-head-h); }
 .rail .tabrail-tab.active { border-top-color: var(--rail-accent, var(--accent)); }
 
 /* ── Header ─────────────────────────────────────────────────────────────────────────────────── */
+/* Pinned to the top edge so it stays in reach as the view scrolls, above the sticky composer. */
 .top {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
   display: flex;
   align-items: center;
   gap: var(--gap-inline);
@@ -313,6 +317,17 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .attachments img { display: block; max-width: 100%; max-height: 160px; object-fit: contain; border: var(--divider); border-radius: var(--radius-control); }
 .composer { position: sticky; bottom: var(--pane-head-h); background: var(--bg); border-top: var(--chrome-divider); }
 .toolbar { flex-wrap: nowrap; }
+/* The size toggle sits in the field's top corner, as on the desktop, with the text kept clear of it. */
+.composer .field { position: relative; }
+.composer .field textarea { display: block; width: 100%; padding-right: calc(var(--control-h-sm) + var(--space-4)); }
+.composer .field > button.icon {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: var(--control-h-sm);
+  min-height: var(--control-h-sm);
+  color: var(--text-muted);
+}
 
 /* Each capture is a chip; opening it shows what goes to the agent. */
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
