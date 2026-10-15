@@ -1,0 +1,21 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-switcher",
+  "name": "Acme switcher",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "coreSlot",
+        "id": "acme-switcher",
+        "label": "Pane list with labels",
+        "coreSlot": "pane.switcher",
+        "layout": "single",
+        "regions": { "body": { "kind": "remote", "entry": "switcher" } }
+      }
+    ]
+  }
+}

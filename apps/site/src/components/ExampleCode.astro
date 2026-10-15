@@ -1,0 +1,26 @@
+---
+// Code from an example plugin in examples/plugins/, which the examples test installs and runs, so the
+// code on a guide is the code that's tested (docs/site/plugin-guides.md). `file` is the path under
+// examples/plugins/, and it titles the block. `region` shows one `// #region`. `pick` shows the
+// manifest's parts a step adds, by dotted path. A file, region, or path that isn't there fails the build.
+import { Code } from '@astrojs/starlight/components'
+import { language, pick as pickManifest, region as regionOf } from '../lib/exampleCode.ts'
+
+interface Props {
+  file: string
+  region?: string
+  pick?: string[]
+}
+
+const files = import.meta.glob<string>(
+  ['../../../../examples/plugins/*/**/*.{js,json,ts,tsx}', '!**/node_modules/**', '!../../../../examples/plugins/test/**'],
+  { eager: true, query: '?raw', import: 'default' },
+)
+
+const { file, region, pick } = Astro.props
+const source = files[`../../../../examples/plugins/${file}`]
+if (source === undefined) throw new Error(`There's no example file examples/plugins/${file}`)
+const code = pick ? pickManifest(source, pick) : regionOf(source, region)
+---
+
+<Code code={code} lang={language(file)} title={file} />

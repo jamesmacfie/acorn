@@ -1,0 +1,97 @@
+---
+title: Mark tasks, sources, and panes
+description: Put a status mark on a task in the tab rail, a source's icon, or a pane's button, from one batched route.
+sources:
+  - docs/plugins/rows-and-annotations.md
+  - docs/plugins/menus-and-markers.md
+  - docs/tui/plugin-losses.md
+  - examples/plugins/acme-tracker/acorn-plugin.json
+  - examples/plugins/acme-tracker/server/routes.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll put status marks on three of acorn's controls: a task in the tab rail, a source's icon on the
+left rail, and a pane's button in the pane switcher. A mark is a severity, a line of text, and an
+optional icon. acorn decides where and how it draws.
+
+## The result
+
+There's no picture of the example's marks, because acorn draws them on its own rail controls: a small
+icon or dot in a corner of the button, and each mark's text in the button's tooltip. On the left rail,
+the Acme tracker example's source reads **2 open issues** in its legend.
+
+## Before you start
+
+You need a plugin with a Node half ([Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/)).
+Marks need no client bundle. The code is from
+[`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker).
+
+## Steps
+
+<Steps>
+
+1. **Declare an extension for each point.** Three points belong to acorn:
+
+   | Point | Marks | Key | Who consents |
+   | --- | --- | --- | --- |
+   | `core:task` | A task in the tab rail | `{ task }` | Nobody needs to |
+   | `core:source` | A source's icon | `{ sourceId, projectId }` | The source sets `statusAnnotations: true` |
+   | `core:pane` | A pane's button | `{ paneId, taskId }` | The pane sets `statusAnnotations: true` |
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.extensions']} />
+
+   The example consents on its own source and pane, so it can mark them. Any plugin's source or pane
+   that sets `statusAnnotations` can be marked by any plugin.
+
+2. **Answer the batch.** acorn posts every key on screen to your route in one request:
+   `{ keys: [...] }`. Answer marks for the keys you know, and leave the rest out.
+
+   <ExampleCode file="acme-tracker/server/routes.js" region="marks" />
+
+   A mark is `{ key, severity, text, icon? }`. `severity` is `info`, `warn`, or `danger`, and acorn
+   picks the color from it. `text` is up to 200 characters.
+
+3. **Check it.** Save. Use **Link an Acme issue** on a task's menu: the task gains a mark, and the
+   **Tracker** button in that task's pane switcher does too. The **Acme issues** icon on the left rail
+   carries its count in its tooltip.
+
+</Steps>
+
+## Mistakes
+
+`statusAnnotations` is consent from the thing being marked, so the Node accepts it on a source or a
+task pane, and refuses it anywhere else, such as a settings page:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [{ "target": "settings", "id": "settings", "label": "Acme", "statusAnnotations": true,
+      "layout": "single", "regions": { "body": { "kind": "remote", "entry": "settings" } } }]
+  }
+}
+```
+
+- A mark has no color, no position, and no click action. Put the action in a menu row or a command.
+- Answering a key acorn didn't ask about does nothing. Marks are read back only for the keys sent.
+
+## In the terminal
+
+The terminal client draws task marks as dots and a legend, and a source's or pane's marks as a dot or
+`+N` with a count.
+
+## Limits
+
+- `core:task` keeps at most 256 marks from one contributor per request.
+- A task row has four corners. Every mark still appears in its tooltip legend and its accessible
+  description, in order.
+- acorn asks once per contributor for each set of visible keys, not on a timer per row. Call
+  `ctx.events.status()` when your answer changes.
+
+## Reference
+
+- [extensions](/docs/build-plugins/reference/contributions/extensions/)
+- [Extension points](/docs/build-plugins/reference/extension-points/) has each `core:` point's key.

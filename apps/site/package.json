@@ -8,7 +8,7 @@
     "build": "pnpm --filter @acorn/cli build && node scripts/reference.mjs && astro build",
     "dev": "pnpm --filter @acorn/cli build && node scripts/reference.mjs && astro dev",
     "lint": "node scripts/reference.mjs && astro check && tsc -p specimens",
-    "specimens": "vitest run && pnpm --filter @acorn/tui exec vitest run src/kit/specimens.test.tsx && pnpm --filter @acorn/extension exec vitest run src/sidebar/pictures.test.tsx",
+    "specimens": "pnpm --filter @acorn/plugin-examples exec vitest run test/pictures.test.ts && vitest run && pnpm --filter @acorn/tui exec vitest run src/kit/specimens.test.tsx && pnpm --filter @acorn/extension exec vitest run src/sidebar/pictures.test.tsx",
     "snapshots": "node scripts/capture-shell.mjs",
     "reference": "node scripts/reference.mjs",
     "stale": "node scripts/stale.mjs",
@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-examples": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@astrojs/check": "^0.9.10",
     "@axe-core/playwright": "^4.13.0",

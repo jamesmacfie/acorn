@@ -1,0 +1,66 @@
+---
+title: Choose how your plugin draws
+description: Descriptors for facts, trees for UI, and frames for pixels, and how to tell which one a surface needs.
+sources:
+  - docs/plugins/ui-tiers.md
+  - docs/plugins/descriptors.md
+  - docs/plugins/frames.md
+  - docs/plugin-authoring/the-client-half.md
+checked: dfb0bd69b
+---
+
+import Specimen from '../../../../../components/Specimen.astro'
+
+A plugin draws in one of three ways. Ask which of them a surface is, in this order, and take the first
+that fits: a fact, UI, or pixels. This page is for anyone about to add something a person sees.
+
+## Descriptors, for facts
+
+A badge in the top bar, a row in a menu, an entry in the palette, a mark on a task: each is a fact. You
+declare it in the manifest, a route on your Node half answers its data, and acorn draws it with its
+own components. None of your code runs on the device, so a plugin that only declares descriptors needs
+no client bundle and gets no trust prompt for one. A descriptor stays live when nothing of yours is
+mounted.
+
+<Specimen id="badges-and-chips" caption="The kit's badges. A top bar badge is a descriptor: a route answers its text and tone, and acorn draws one of these." />
+
+## Trees, for UI
+
+A pane, a reference panel, a settings page, a card in another plugin's view: each is UI, and each is a
+tree. Your `client.js` runs in a Web Worker with no DOM and no network, and describes the UI as a tree
+of acorn's components by name. The host draws them, so your UI gets acorn's keyboard handling, focus,
+screen reader labels, and the reader's theme and style pack. The same tree draws in the desktop app and
+in the terminal client.
+
+<Specimen id="hello-pane" />
+
+A tree isn't a fixed schema. Your code runs, branches, and loops, and sends the host changes to named
+components. What it can't do is name a CSS class, a color, or a pixel.
+
+## Frames, for pixels
+
+A canvas, a chart library, an image editor: each needs pixels acorn can't draw, so it's a frame, a
+sandboxed iframe whose contents are yours. It has no network, talks to acorn through one message port,
+and draws only in the desktop app. In the terminal client it's one muted line that names your plugin.
+[Draw your own pixels in a frame](/docs/build-plugins/ui/draw-your-own-pixels-in-a-frame/) builds one.
+
+A frame has no picture here, because the site can't run your pixels.
+
+## Choose
+
+| You want | Use | Guide |
+| --- | --- | --- |
+| A count in the top bar or task footer | A descriptor, `slots` | [Put a badge in the top bar or task footer](/docs/build-plugins/ui/put-a-badge-in-the-top-bar-or-task-footer/) |
+| A row in a menu | A descriptor, `contextMenus` | [Add rows to context menus](/docs/build-plugins/ui/add-rows-to-context-menus/) |
+| A palette entry | A descriptor, `commands` | [Add commands and keybindings](/docs/build-plugins/ui/add-commands-and-keybindings/) |
+| A mark on a task, source, or pane | A descriptor, `extensions` on a `core:` point | [Mark tasks, sources, and panes](/docs/build-plugins/ui/mark-tasks-sources-and-panes/) |
+| A pane | A tree, `frames` | [Add a pane](/docs/build-plugins/ui/add-a-pane/) |
+| A list on the left rail | A tree or a descriptor, `sources` | [Add a source to the left rail](/docs/build-plugins/ui/add-a-source-to-the-left-rail/) |
+| A settings page | A tree, `frames` | [Add a settings page](/docs/build-plugins/ui/add-a-settings-page/) |
+| A chart or a canvas | A frame | [Draw your own pixels in a frame](/docs/build-plugins/ui/draw-your-own-pixels-in-a-frame/) |
+
+## Limits
+
+- A small surface never takes a frame. A badge, a menu row, or a mark is always a descriptor.
+- A tree is for things that number in the dozens, such as a card or a section. A mark on each of
+  thousands of lines is an annotation the host draws in batches.

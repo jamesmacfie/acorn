@@ -115,6 +115,15 @@
       "dependsOn": ["topo"],
       "inputs": ["$TURBO_DEFAULT$", "../../apps/node/test/__fixtures__/**"]
     },
+    // The guides' pictures are compared against the site's list and the committed trees, outside the package.
+    "@acorn/plugin-examples#test": {
+      "dependsOn": ["topo"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "../../apps/site/specimens/examples.json",
+        "../../apps/site/src/generated/specimens/*.tree.json"
+      ]
+    },
     "create-acorn-plugin#test": {
       "dependsOn": ["topo"],
       "inputs": ["$TURBO_DEFAULT$", "../plugin-types/acorn-plugin.schema.json"]

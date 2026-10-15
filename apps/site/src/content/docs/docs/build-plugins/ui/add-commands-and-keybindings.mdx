@@ -1,0 +1,133 @@
+---
+title: Add commands and keybindings
+description: Add your plugin's commands to the palette, all five kinds of them, and give them keyboard shortcuts.
+sources:
+  - docs/plugins/commands.md
+  - docs/command-palette-and-shortcuts/shortcuts.md
+  - docs/plugins/descriptors.md
+  - examples/plugins/acme-tracker/acorn-plugin.json
+  - examples/plugins/acme-tracker/server/routes.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Keys from '../../../../../components/Keys.astro'
+import Snapshot from '../../../../../components/Snapshot.astro'
+
+You'll add commands to the command palette, and a keyboard shortcut for one of them. Commands are
+descriptors: you declare them, your routes answer their data, and acorn draws them.
+
+## The result
+
+The palette is acorn's own, and your commands sit in it beside acorn's. In the Acme tracker example,
+typing `acme` lists **Acme tracker › Open the Acme tracker**, **Find an Acme issue**, **New Acme
+issue**, and **Sort Acme issues by**.
+
+<Snapshot id="palette" />
+
+## Before you start
+
+Finish [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/). A `search`,
+`input`, or `setting` command needs a Node half, because its routes are there. The code is from
+[`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker).
+
+## Steps
+
+<Steps>
+
+1. **Declare the commands.** Every command has a `kind`, one of five:
+
+   | Kind | What it does |
+   | --- | --- |
+   | `action` | Runs one action verb, such as `openPane`. |
+   | `group` | Holds other commands, which name it as `parentId`. Picking it opens the group. |
+   | `search` | Searches your `route` as the person types, and runs `onSelect` on the row they pick. |
+   | `input` | Asks for a line of text, posts it to your `route`, and runs `onSuccess`. |
+   | `setting` | Offers 2 to 32 fixed choices, read from `readRoute` and written to `writeRoute`. |
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.commands']} />
+
+   `scope` says what the command is about, and the palette offers it only where that exists: `task` in
+   a task, `project` with a project open, `none` everywhere. The default is `node`.
+
+2. **Answer the routes.** A search route gets `q` and answers rows. An input route gets
+   `{ input, taskId? }` and answers `{ ok: true, message? }`, and the palette shows the message. A
+   setting's routes both answer `{ value }`.
+
+   <ExampleCode file="acme-tracker/server/routes.js" region="commands" />
+
+   A route's answer never chooses what happens next. The verb that runs is the one in the manifest.
+
+3. **Add a shortcut.** A `keybindings` entry binds one of this manifest's commands to a chord. Write
+   the chord with `meta`, `ctrl`, or `alt`, modifiers in that order, then `shift`. `when` is `global`,
+   `task`, or `surface`, which also needs the pane's ID.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.keybindings']} />
+
+4. **Check it.** Save. Press <Keys chord="meta+k" /> and type `acme`. Pick **New Acme issue** in a
+   task, type a title, and press Enter: the palette says **Created ACME-** and the issue's number.
+   Press <Keys chord="meta+alt+i" /> in a task to open the pane. **Settings** > **Keyboard shortcuts**
+   lists the binding with your plugin's name.
+
+</Steps>
+
+## Why a binding that already works wins
+
+A plugin's chord never takes one that already works. If acorn or a plugin installed earlier holds the
+chord, yours is left unbound, and **Settings** > **Keyboard shortcuts** says so. The person can bind it
+there, even over one of acorn's own. So choose a chord nobody uses, and expect some people to change it.
+
+## Mistakes
+
+Every command names its `kind`:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "contributions": {
+    "commands": [{ "id": "open", "title": "Open Acme", "action": { "verb": "openUrl", "url": "https://acme.example" } }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "contributions": {
+    "commands": [{ "id": "open", "kind": "action", "title": "Open Acme",
+      "action": { "verb": "openUrl", "url": "https://acme.example" } }]
+  }
+}
+```
+
+A chord needs a modifier other than Shift:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "contributions": {
+    "commands": [{ "id": "open", "kind": "action", "title": "Open Acme",
+      "action": { "verb": "openUrl", "url": "https://acme.example" } }],
+    "keybindings": [{ "command": "open", "defaultChord": "shift+a", "when": "global" }]
+  }
+}
+```
+
+- A setting's value that isn't one of `options` is refused on the way in and on the way out.
+- `parentId` must be a `group` in the same manifest. Another plugin's group is refused.
+
+## In the terminal
+
+The terminal client's palette, <kbd>Ctrl</kbd>+<kbd>K</kbd>, is the same palette with the same commands.
+There, `meta` in a chord is <kbd>Ctrl</kbd>, because the terminal emulator keeps the Command key, so
+`meta+alt+i` is <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>I</kbd>.
+
+## Limits
+
+- A search shows at most 50 rows.
+- One binding per command. A loaded plugin can't bind a chord that works while the person is typing.
+- `meta+k`, `meta+,`, `meta+1` to `meta+9`, and Escape are never a plugin's.
+
+## Reference
+
+- [commands](/docs/build-plugins/reference/contributions/commands/)
+- [keybindings](/docs/build-plugins/reference/contributions/keybindings/)
+- [Action verbs](/docs/build-plugins/reference/action-verbs/)

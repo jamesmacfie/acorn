@@ -1,0 +1,56 @@
+{
+  "id": "acme-review",
+  "name": "Acme review",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "node": "./node.js",
+  "client": "./dist/client.js",
+  "requires": { "plugins": [{ "id": "agents" }] },
+  "permissions": {
+    "api": [],
+    "events": ["plugin:acme-review:changed"],
+    "node": { "core": [], "capabilities": ["agents.transcriptMedia"], "secrets": false, "exec": false, "net": [] }
+  },
+  "contributions": {
+    "frames": [{
+      "target": "pane", "id": "review", "label": "Review", "glyph": "list-checks",
+      "layout": "single", "regions": { "body": { "kind": "remote", "entry": "pane" } }
+    }],
+    "commands": [{
+      "id": "open", "kind": "action", "title": "Open Review", "category": "pane",
+      "action": { "verb": "openPane", "pane": "review" }
+    }],
+    "contextMenus": [{
+      "id": "add", "location": "file.row", "label": "Add to review", "when": { "directory": false },
+      "action": { "verb": "runNodeAction", "path": "/v1/p/acme-review/add" }
+    }],
+    "agentTools": [{
+      "id": "files", "description": "List the files under review in this task.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "risk": "read", "handler": "/v1/p/acme-review/tools/files"
+    }],
+    "documentServices": [{
+      "id": "todos", "label": "Review TODOs", "languageId": "markdown",
+      "hover": { "route": "/v1/p/acme-review/hover" },
+      "diagnostics": { "route": "/v1/p/acme-review/diagnostics" }
+    }],
+    "extensions": [
+      { "id": "marks", "point": "editor:file", "label": "Review", "items": "/v1/p/acme-review/marks" },
+      { "id": "tool-card", "point": "agents:tool-card", "label": "Review files", "remote": "toolCard",
+        "matches": ["acme-review_files"] },
+      { "id": "interrupt", "point": "terminal:toolbar-actions", "label": "Interrupt", "remote": "interrupt" },
+      { "id": "csv-artifact", "point": "agents:artifact", "label": "CSV table", "remote": "csvMedia",
+        "matches": ["text/csv"] },
+      { "id": "csv-attachment", "point": "agents:transcript-attachment", "label": "CSV table", "remote": "csvMedia",
+        "matches": ["text/csv"] },
+      { "id": "csv-file", "point": "editor:document", "label": "CSV table", "remote": "csvFile",
+        "matches": ["*.csv"] },
+      { "id": "docs", "point": "core:link-preview", "label": "Acme docs", "remote": "docsPreview",
+        "matches": ["https://docs.example.com/*"] },
+      { "id": "checklist", "point": "core:markdown-fence", "label": "Review checklist", "remote": "checklist",
+        "matches": ["review"] },
+      { "id": "issue", "point": "linear:issue-summary", "label": "Review status", "remote": "issueReview" }
+    ]
+  }
+}

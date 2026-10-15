@@ -1,0 +1,239 @@
+{
+  "meta": {
+    "title": "rates.csv in Editor",
+    "caption": "acme-review's viewer for .csv files. Editor keeps the Source toggle and the tab.",
+    "terminal": {
+      "columns": 50,
+      "rows": 5
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Table",
+          "props": {
+            "size": "sm"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "TableRow",
+              "props": {
+                "head": true
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "region"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n5",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "rate"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n7",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n8",
+                      "type": "#text",
+                      "props": {
+                        "value": "since"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n9",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n10",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n11",
+                      "type": "#text",
+                      "props": {
+                        "value": "eu"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n12",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n13",
+                      "type": "#text",
+                      "props": {
+                        "value": "20%"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n14",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n15",
+                      "type": "#text",
+                      "props": {
+                        "value": "2024-01"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n16",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n17",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n18",
+                      "type": "#text",
+                      "props": {
+                        "value": "uk"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n19",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n20",
+                      "type": "#text",
+                      "props": {
+                        "value": "20%"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n21",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n22",
+                      "type": "#text",
+                      "props": {
+                        "value": "2021-01"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n23",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n24",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n25",
+                      "type": "#text",
+                      "props": {
+                        "value": "no"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n26",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n27",
+                      "type": "#text",
+                      "props": {
+                        "value": "25%"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n28",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n29",
+                      "type": "#text",
+                      "props": {
+                        "value": "2023-07"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

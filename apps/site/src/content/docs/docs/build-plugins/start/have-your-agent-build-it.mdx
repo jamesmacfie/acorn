@@ -1,0 +1,57 @@
+---
+title: Have your agent build it
+description: Ask an agent in an acorn task to write a plugin, approve it once, and let it iterate in development mode.
+sources:
+  - docs/plugins/agent-install.md
+  - docs/agent-tools/plugin-tools.md
+  - docs/plugin-authoring/installing-a-hand-written-package.md
+  - packages/client-core/src/features/settings/plugins/PluginsSettings.tsx
+checked: dfb0bd69b
+---
+
+An agent in an acorn task can write a plugin for you. acorn teaches it the plugin contract of the Node
+it's running on, and you decide whether the result is installed. This page is for anyone who'd rather
+describe a plugin than write one.
+
+## Start the agent
+
+1. Open a task and start a Claude Code or Codex session in it
+   ([Agent sessions](/docs/agents/agent-sessions/)).
+2. Open **Settings** > **Plugins** > **Installed**, and under **Create a plugin**, click **Ask an agent**
+   beside **Ask an agent to write one**. acorn drafts a prompt into the session's message box. It
+   doesn't send it.
+3. Finish the draft's last line, **What it should do:**, with what you want, such as "a pane that lists
+   this task's TODO comments". Then send it.
+
+The draft tells the agent three things, and you can write them yourself in any session instead:
+
+1. **Call `plugin_authoring` first.** It's an agent tool that answers with the authoring contract and
+   this Node's own manifest vocabulary: every contribution, field, limit, action verb, and extension
+   point, read from the Node's own schemas. An answer from the agent's memory is out of date by
+   design ([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)).
+2. **Write the package in a folder.** The same files [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/)
+   starts from.
+3. **Ask with `plugin_request`, using `dev: true`.** The agent can't install anything itself.
+
+## Approve it
+
+`plugin_request` installs nothing. It puts a question in your notification bell, with the source, the
+agent's one line of reasoning, and whether it asked for development mode. Approving takes two
+screens: the ask, before anything is fetched, and a review of what the package declares, before any of
+its code starts. Then the device's own trust prompt asks about the client bundle, as for any plugin.
+
+Approving a request with `dev: true` turns on development mode for the plugin on this device. From
+then on, the agent edits the folder, the Node reloads the plugin a moment after each save, and this
+device runs each new version without asking. The loop is edit and reload, not edit, prompt, and
+restart.
+
+## End it
+
+When the plugin does what you want, open its page in **Settings** > **Plugins** > **Installed**, and on
+the **Permissions** tab, turn **Development mode** off. The next version asks again, like any plugin.
+
+## Limits
+
+- An agent's request expires after an hour, or when the Node restarts.
+- Twenty requests can be waiting at once. Asking the same thing twice is one request.
+- Development mode is for a folder install with a Node half. A downloaded plugin always asks.

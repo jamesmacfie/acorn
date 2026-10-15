@@ -1,0 +1,123 @@
+{
+  "meta": {
+    "title": "Tracker: the header region",
+    "caption": "The pane's header region: one tree.",
+    "terminal": {
+      "columns": 60,
+      "rows": 2
+    },
+    "width": 520
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Inline",
+          "props": {
+            "gap": "inline"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Text",
+              "props": {
+                "emphasis": "strong"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Loading…"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Button",
+              "props": {
+                "size": "sm",
+                "onPress": {
+                  "$handler": 1
+                }
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "Refresh"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "op": "remove",
+        "id": "n1"
+      },
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n6",
+          "type": "Inline",
+          "props": {
+            "gap": "inline"
+          },
+          "children": [
+            {
+              "id": "n7",
+              "type": "Text",
+              "props": {
+                "emphasis": "strong"
+              },
+              "children": [
+                {
+                  "id": "n8",
+                  "type": "#text",
+                  "props": {
+                    "value": "2 open issues"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n9",
+              "type": "Button",
+              "props": {
+                "size": "sm",
+                "onPress": {
+                  "$handler": 2
+                }
+              },
+              "children": [
+                {
+                  "id": "n10",
+                  "type": "#text",
+                  "props": {
+                    "value": "Refresh"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

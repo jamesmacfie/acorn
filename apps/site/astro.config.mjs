@@ -279,6 +279,7 @@ export default defineConfig({
             'docs/build-plugins/ui/add-a-theme-or-a-style-pack',
             'docs/build-plugins/ui/add-icons-and-brand-marks',
             'docs/build-plugins/ui/notify-the-person',
+            'docs/build-plugins/ui/use-the-sdk-and-jsx',
           ],
         },
         {

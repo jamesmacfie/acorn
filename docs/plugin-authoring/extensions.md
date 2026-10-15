@@ -63,8 +63,8 @@ and a source or task pane with `statusAnnotations: true` lets others mark its ic
 ([source and pane annotations](../plugins/rows-and-annotations.md#source-and-pane-annotations)).
 
 Call the `plugin_authoring` agent tool for the current location list and every point you can fill,
-with its props or key. [An extension example](./extension-example.md) fills nine places,
-seven of them points.
+with its props or key. [An extension example](./extension-example.md) fills eleven places,
+nine of them points.
 
 ## Add task annotations
 

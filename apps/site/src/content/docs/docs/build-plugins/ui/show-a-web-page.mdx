@@ -1,0 +1,78 @@
+---
+title: Show a web page
+description: Show a website in a pane of its own, limited to the hosts you list.
+sources:
+  - docs/plugins/document-surfaces.md
+  - docs/shell/webviews.md
+  - docs/security/webviews.md
+  - examples/plugins/acme-frame/acorn-plugin.json
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll show a website in a pane: a webview acorn draws, kept to the hosts you list.
+
+## The result
+
+The Acme frame example's **Acme docs** pane shows `https://docs.acme.example/`. There's no picture: it's
+a live website.
+
+## Before you start
+
+Finish [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/). A webview needs a
+client bundle. The code is from
+[`examples/plugins/acme-frame`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-frame).
+
+## Steps
+
+<Steps>
+
+1. **Declare the webview.** `url` is where it starts, and `hosts` lists every host it may show. A
+   redirect to anything else is blocked.
+
+   <ExampleCode file="acme-frame/acorn-plugin.json" pick={['contributions.frames#acme-frame-docs']} />
+
+   For a start address that depends on the task, use `urlSource` instead of `url`: a route of yours
+   that answers `{ url }`.
+
+2. **Open it.** Give it a command that runs `openPane`.
+
+   <ExampleCode file="acme-frame/acorn-plugin.json" pick={['contributions.commands#docs']} />
+
+3. **Check it.** Save, and run **Open the Acme docs** from the palette. The person approves the hosts
+   in the plugin's trust prompt, listed apart from what the rest of the plugin may do, because a page
+   reaches the live internet.
+
+</Steps>
+
+## Mistakes
+
+A webview needs `hosts`:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [{ "target": "webview", "id": "docs", "label": "Docs", "url": "https://docs.acme.example/" }]
+  }
+}
+```
+
+- HTTPS is required, except for `localhost`, `127.0.0.1`, and `::1`.
+- Your code can't read the page or type into it. A frame of yours can only navigate it, go back and
+  forward, and reload.
+
+## In the terminal
+
+The terminal client can't draw a web page, so the pane isn't offered there.
+
+## Limits
+
+- The page runs in its own temporary storage, with no access to acorn and no developer tools.
+- It's a page, not your UI. For your own UI, use a tree, or a frame for your own pixels.
+
+## Reference
+
+[frames](/docs/build-plugins/reference/contributions/frames/) has `url`, `urlSource`, and `hosts`.

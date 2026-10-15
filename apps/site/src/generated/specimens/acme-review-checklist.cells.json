@@ -1,0 +1,5 @@
+{"columns":50,"rows":3,"lines":[
+[{"text":"Review checklist","attrs":["bold"]}],
+[{"text":"billing/webhooks/deliver.py"}],
+[{"text":"billing/invoices/vat.py"}]
+]}

@@ -3,17 +3,21 @@ import { basename, join } from 'node:path'
 import { createComponent, type JSX } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
-import type { TreeMutation, TreeNode } from '@acorn/protocol/tree/messages.ts'
+import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
+import { renumber } from '@acorn/plugin-examples/renumber.ts'
 import { createRemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'
 import { TreeHost } from '@acorn/client-core/host/tree/TreeHost.tsx'
 import { solidTree } from 'acorn-plugin-sdk/remote'
 import type { SpecimenMeta } from '../specimens/specimen'
+import examplePictures from '../specimens/examples.json'
 
 // The specimen generator's first two steps (docs/site/specimens.md): run each specimen's tree in this
 // process and record the batches it sends, then draw those batches with the desktop's TreeHost under
 // jsdom. Each step writes a committed file and fails when the committed file differs.
 // `UPDATE_SPECIMENS=1` rewrites them. The terminal step is apps/tui/src/kit/specimens.test.tsx, which
-// reads the `.tree.json` files this one writes.
+// reads the `.tree.json` files this one writes. An example plugin's picture, listed in
+// apps/site/specimens/examples.json, is recorded by examples/plugins/test/pictures.test.ts instead,
+// and this draws its HTML from the committed tree.
 
 const OUT = join(import.meta.dirname, '../src/generated/specimens')
 const update = process.env.UPDATE_SPECIMENS === '1'
@@ -56,21 +60,6 @@ async function record(component: SpecimenModule['default']): Promise<TreeMutatio
   await new Promise((done) => setTimeout(done, 0))
   root.dispose()
   return renumber(batches)
-}
-
-/** Node ids come from one counter per process, so they depend on which specimens ran first. Number
- *  them again in the order they appear. */
-function renumber(batches: TreeMutation[][]): TreeMutation[][] {
-  const ids = new Map<string, string>()
-  const id = (old: string) => ids.get(old) ?? (ids.set(old, `n${ids.size + 1}`), ids.get(old)!)
-  const node = (tree: TreeNode): TreeNode => ({ ...tree, id: id(tree.id), children: tree.children.map(node) })
-  return batches.map((ops) =>
-    ops.map((op) => {
-      if (op.op === 'insert') return { ...op, parent: op.parent && id(op.parent), node: node(op.node) }
-      if (op.op === 'move') return { ...op, id: id(op.id), parent: op.parent && id(op.parent) }
-      return { ...op, id: id(op.id) }
-    }),
-  )
 }
 
 /** Delivers the batches to the desktop's TreeHost, through the transport a worker would use, and
@@ -184,7 +173,7 @@ function sanitize(specimen: string, html: string): string {
 
 it('finds the specimens', () => {
   expect(specimens.length).toBeGreaterThan(0)
-  const ids = specimens.map((specimen) => specimen.id)
+  const ids = [...specimens.map((specimen) => specimen.id), ...examplePictures.map((picture) => picture.id)]
   expect(new Set(ids).size, 'Two specimens share an id. Ids are file names, and must be unique across groups.').toBe(
     ids.length,
   )
@@ -197,8 +186,14 @@ it.each(specimens)('$id draws the committed tree and HTML', async ({ id, module 
   check(`${id}.html`, `${sanitize(id, await drawDesktop(batches))}\n`)
 })
 
+it.each(examplePictures)('$id draws the committed HTML of its example tree', async ({ id }) => {
+  const { batches } = JSON.parse(readFileSync(join(OUT, `${id}.tree.json`), 'utf8')) as { batches: TreeMutation[][] }
+  check(`${id}.html`, `${sanitize(id, await drawDesktop(batches))}\n`)
+})
+
 it('commits no output for a specimen that no longer exists', () => {
-  const expected = new Set(specimens.flatMap(({ id }) => [`${id}.tree.json`, `${id}.html`, `${id}.cells.json`]))
+  const ids = [...specimens.map(({ id }) => id), ...examplePictures.map(({ id }) => id)]
+  const expected = new Set(ids.flatMap((id) => [`${id}.tree.json`, `${id}.html`, `${id}.cells.json`]))
   const stale = readdirSync(OUT).filter((name) => !expected.has(name))
   if (update) for (const name of stale) rmSync(join(OUT, name))
   else expect(stale).toEqual([])

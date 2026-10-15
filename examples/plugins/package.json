@@ -1,0 +1,29 @@
+{
+  "name": "@acorn/plugin-examples",
+  "version": "1.0.0",
+  "description": "The example plugins the public site's guides show, and the harness that installs and runs each one.",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./harness.ts": "./test/harness.ts",
+    "./packed.ts": "./test/packed.ts",
+    "./renumber.ts": "./test/renumber.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-api": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "@types/node": "^26.0.0",
+    "acorn-plugin-sdk": "workspace:*",
+    "acorn-plugin-types": "workspace:*",
+    "solid-js": "catalog:",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.11"
+  }
+}

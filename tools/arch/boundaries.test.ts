@@ -27,7 +27,7 @@ const EXTS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.css']
 type Pkg = { name: string; dir: string; src: string; kind: 'app' | 'plugin' | 'lib' }
 
 // Derived from the filesystem, never hardcoded: a new package is covered the day it is added.
-const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
+const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools', 'examples']
   .flatMap((base) => {
     const dir = join(ROOT, base)
     if (!existsSync(dir)) return []

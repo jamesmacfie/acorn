@@ -1,0 +1,7 @@
+{"columns":60,"rows":5,"lines":[
+[{"text":"[In review]","fg":"warn"}],
+[{"text":"VAT missing on EU invoices","attrs":["bold"]}],
+[{"text":"Invoices to EU customers show no VAT line when the customer"}],
+[{"text":"has no tax ID."}],
+[]
+]}

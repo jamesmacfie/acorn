@@ -1,0 +1,113 @@
+{
+  "meta": {
+    "title": "The board's card",
+    "caption": "acme-board's own tree. Its point's regions draw above and below it.",
+    "terminal": {
+      "columns": 50,
+      "rows": 2
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Heading",
+              "props": {
+                "level": 2
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Loading…"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Badge",
+              "props": {},
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": ""
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "op": "remove",
+        "id": "n1"
+      },
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n6",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n7",
+              "type": "Heading",
+              "props": {
+                "level": 2
+              },
+              "children": [
+                {
+                  "id": "n8",
+                  "type": "#text",
+                  "props": {
+                    "value": "Retry webhooks with backoff"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n9",
+              "type": "Badge",
+              "props": {},
+              "children": [
+                {
+                  "id": "n10",
+                  "type": "#text",
+                  "props": {
+                    "value": "Doing"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

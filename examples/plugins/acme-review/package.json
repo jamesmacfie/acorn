@@ -1,0 +1,17 @@
+{
+  "name": "acme-review",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "vite build", "check": "tsc --noEmit" },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "acorn-plugin-sdk": "file:../acorn-packs/acorn-plugin-sdk-1.1.0.tgz",
+    "acorn-plugin-types": "file:../acorn-packs/acorn-plugin-types-1.0.0.tgz",
+    "solid-js": "^1.9.13",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12"
+  },
+  "overrides": { "acorn-plugin-types": "$acorn-plugin-types" }
+}

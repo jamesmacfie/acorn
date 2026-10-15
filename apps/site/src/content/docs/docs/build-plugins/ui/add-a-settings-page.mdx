@@ -1,0 +1,114 @@
+---
+title: Add a settings page
+description: Add your plugin's page to Settings, place it in a group, make its sections searchable, and get the plugin strip with Show in left rail.
+sources:
+  - docs/plugin-authoring/settings-pages.md
+  - docs/plugins/activation.md
+  - docs/frontend/settings-pages.md
+  - examples/plugins/acme-tracker/acorn-plugin.json
+  - examples/plugins/acme-tracker/client.js
+  - examples/plugins/acme-tracker/server/routes.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll add a page to **Settings** for your plugin, in the group it belongs to, with sections the
+settings search can find.
+
+## The result
+
+The Acme tracker example's page, under **Connections**. acorn draws the strip above it: the plugin's
+name and where it came from, **Manage plugin**, **Show in left rail**, and **Enabled**. The tree draws
+the rest.
+
+<Specimen id="acme-tracker-settings" />
+
+## Before you start
+
+Finish [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/). The code is from
+[`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker).
+
+## Steps
+
+<Steps>
+
+1. **Declare the page.** Add a `frames` entry with `target: "settings"` and a tree in its `body`.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.frames#settings']} />
+
+   - `category` is the group in Settings' sidebar: `general`, `agents`, `connections`, `features`,
+     `automation`, or `machines`. Without one, the page goes under **Features**.
+   - `keywords`, up to 16, are words someone might search for that aren't in the label.
+   - `sections`, up to 16, are one per `SettingsSection` your tree draws, in order. Each becomes a
+     search result, **Acme tracker › Display**, that scrolls to that section.
+   - `railSourceVisibility` lists your own sources. acorn puts **Show in left rail** for each in the
+     strip, and keeps the choice itself.
+
+2. **Draw the page.** Use `SettingsSection` for each section, with the same `id` as in `sections`, and
+   `SettingRow` for each setting: a label, an optional one-line description, and the control.
+
+   <ExampleCode file="acme-tracker/client.js" region="settings" />
+
+3. **Store the value on your Node half.** The page reads and writes your own route. The example's
+   palette command for the same setting uses the same route, so both stay in step.
+
+   <ExampleCode file="acme-tracker/server/routes.js" region="commands" />
+
+4. **Check it.** Save, open **Settings**, and find **Acme tracker** under **Connections**. Search
+   Settings for `sort`: **Acme tracker › Display** is a result. Turn **Show in left rail** off and the
+   source's icon leaves the rail.
+
+</Steps>
+
+## Mistakes
+
+- Don't draw your own enable switch or status line. The strip has them.
+- A `sections` id that doesn't match a `SettingsSection` in your tree makes a search result that
+  scrolls nowhere.
+- A `railSourceVisibility` entry that isn't one of your own sources gets no switch. The roster says
+  why, and the page stays.
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      { "target": "settings", "id": "settings", "label": "Acme", "category": "connections" }
+    ]
+  }
+}
+```
+
+A settings page needs a `layout` and regions, like a pane:
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      { "target": "settings", "id": "settings", "label": "Acme", "category": "connections",
+        "layout": "single", "regions": { "body": { "kind": "remote", "entry": "settings" } } }
+    ]
+  }
+}
+```
+
+## In the terminal
+
+The terminal client draws the same page in its Settings route, from the same tree. The strip's
+**Show in left rail** is the desktop's.
+
+## Limits
+
+- `settingsScope` says what a change affects: `node`, the default, `device`, `workspace`, or `project`.
+  A `workspace` or `project` page is a tab on every workspace's or project's settings page instead.
+- The page always reads the Node in view, and its header names that Node as text.
+- Search finds sections, not each row.
+
+## Reference
+
+[frames](/docs/build-plugins/reference/contributions/frames/) has `category`, `settingsScope`,
+`keywords`, `sections`, and `railSourceVisibility`.

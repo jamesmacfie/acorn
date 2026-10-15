@@ -66,6 +66,8 @@
     // A tool reads the default export.
     "**/*.config.{ts,mjs}": ["exports"],
     "plugins/{drizzle,vitest}.shared.ts": ["exports"],
+    // An example plugin's Node half. The host imports its default export, and nothing in the repository does.
+    "examples/plugins/**/{node.js,node/index.js}": ["exports"],
     "apps/node/test/__fixtures__/**": ["exports"],
     // A type-level test declares its assertions as types nothing imports.
     "**/*.test-d.ts": ["exports", "types"],

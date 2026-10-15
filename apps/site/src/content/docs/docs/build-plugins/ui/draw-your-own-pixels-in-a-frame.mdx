@@ -1,0 +1,91 @@
+---
+title: Draw your own pixels in a frame
+description: Draw a pane with your own DOM and canvas in a sandboxed frame, talk to acorn through the bridge, and claim keys.
+sources:
+  - docs/plugins/frames.md
+  - docs/plugin-authoring/the-bridge.md
+  - docs/plugin-authoring/the-client-half.md
+  - docs/plugins/commands.md
+  - examples/plugins/acme-frame/acorn-plugin.json
+  - examples/plugins/acme-frame/client.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll draw a pane whose pixels are yours: a sandboxed frame with your own DOM, here a canvas chart.
+Use a frame only for what acorn's components can't draw. Anything else is a tree.
+
+## The result
+
+The Acme frame example's **Deploy chart** pane draws a line chart on a canvas, in the theme's accent
+color. There's no picture here: the site draws trees, and a frame is your own code running. In the
+terminal client, the pane is one muted line that names the plugin and points at the desktop app.
+
+## Before you start
+
+Scaffold with `npm create acorn-plugin acme-frame -- --rectangle`, which writes a frame instead of a
+tree, and install it as in [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/).
+The code is from [`examples/plugins/acme-frame`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-frame).
+
+## Steps
+
+<Steps>
+
+1. **Declare a frame region.** A region set to `"frame"` is your own page.
+
+   <ExampleCode file="acme-frame/acorn-plugin.json" pick={['client', 'contributions.frames#acme-frame']} />
+
+2. **Do the handshake.** acorn posts `{ acornBridge: 1 }` with a port. Take the port, wait for
+   `ready`, and answer. If nothing comes back within 10 seconds, acorn replaces the frame with a
+   placeholder that says it failed to start.
+
+   <ExampleCode file="acme-frame/client.js" region="handshake" />
+
+3. **Draw.** Read your data through the bridge from your own routes, and draw it however you like.
+   The theme arrives as custom properties in an `appearance` message, which the scaffold applies to the
+   document, so `--accent` is the theme's accent.
+
+   <ExampleCode file="acme-frame/client.js" region="draw" />
+
+4. **Claim keys.** A chord in `claimsKeys` reaches your frame instead of acorn's shortcuts. Every other
+   chord goes to acorn, even while your frame has focus.
+
+   <ExampleCode file="acme-frame/client.js" region="keys" />
+
+5. **Check it.** Save, and run **Open the deploy chart** from the palette. Press
+   <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> with the chart focused, and it reads the route again.
+
+</Steps>
+
+## What the sandbox allows
+
+The frame runs at its own origin, `app-plugin://<hash>`, with no network: `fetch`, WebSockets, and the
+like all fail. It can load only `client.js` and acorn's `/ui.css`, so inline anything else. `alert` and
+`confirm` are suppressed, and the clipboard and links go through the bridge: `ui.copy`, and `ui.openUrl`
+for `https` addresses, only while the frame has focus.
+
+The bridge closes and shows a placeholder after 100 requests in flight, or 1,000 messages in 10
+seconds.
+
+## Mistakes
+
+- Sending nothing back on `ready`. Any message counts, and `{ kind: 'connected' }` is the usual one.
+- Hard-coding colors. Read the theme's custom properties, or the frame looks wrong in every other theme.
+- Claiming `meta+k`, `meta+,`, `meta+1` to `meta+9`, or Escape. They're never a plugin's.
+
+## In the terminal
+
+A frame draws as one muted line naming your plugin. Put anything the terminal needs in a tree.
+
+## Limits
+
+- A frame is for a pane, a panel, a settings page, an overlay, or another plugin's `rectangle` point.
+  Small surfaces such as badges never take one.
+- One client bundle per plugin: a frame and your trees share `client.js`.
+
+## Reference
+
+- [The client bridge](/docs/build-plugins/reference/the-client-bridge/)
+- [frames](/docs/build-plugins/reference/contributions/frames/)

@@ -1,0 +1,203 @@
+{
+  "meta": {
+    "title": "Acme tracker settings",
+    "caption": "The settings page's tree. The host draws the plugin strip above it.",
+    "terminal": {
+      "columns": 70,
+      "rows": 10
+    },
+    "width": 560
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "section"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "SettingsSection",
+              "props": {
+                "id": "account",
+                "label": "Account",
+                "description": "The Acme workspace this plugin reads."
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "SettingRow",
+                  "props": {
+                    "label": "Workspace"
+                  },
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "Text",
+                      "props": {},
+                      "children": [
+                        {
+                          "id": "n5",
+                          "type": "#text",
+                          "props": {
+                            "value": "acme-demo"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "SettingsSection",
+              "props": {
+                "id": "display",
+                "label": "Display"
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "SettingRow",
+                  "props": {
+                    "label": "Sort issues by",
+                    "description": "The palette command changes the same setting."
+                  },
+                  "children": [
+                    {
+                      "id": "n8",
+                      "type": "Select",
+                      "props": {
+                        "label": "Sort issues by",
+                        "value": "state",
+                        "options": [
+                          {
+                            "value": "state",
+                            "label": "State"
+                          },
+                          {
+                            "value": "key",
+                            "label": "Key"
+                          }
+                        ],
+                        "onChange": {
+                          "$handler": 1
+                        }
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "op": "remove",
+        "id": "n1"
+      },
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n9",
+          "type": "Stack",
+          "props": {
+            "gap": "section"
+          },
+          "children": [
+            {
+              "id": "n10",
+              "type": "SettingsSection",
+              "props": {
+                "id": "account",
+                "label": "Account",
+                "description": "The Acme workspace this plugin reads."
+              },
+              "children": [
+                {
+                  "id": "n11",
+                  "type": "SettingRow",
+                  "props": {
+                    "label": "Workspace"
+                  },
+                  "children": [
+                    {
+                      "id": "n12",
+                      "type": "Text",
+                      "props": {},
+                      "children": [
+                        {
+                          "id": "n13",
+                          "type": "#text",
+                          "props": {
+                            "value": "acme-demo"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n14",
+              "type": "SettingsSection",
+              "props": {
+                "id": "display",
+                "label": "Display"
+              },
+              "children": [
+                {
+                  "id": "n15",
+                  "type": "SettingRow",
+                  "props": {
+                    "label": "Sort issues by",
+                    "description": "The palette command changes the same setting."
+                  },
+                  "children": [
+                    {
+                      "id": "n16",
+                      "type": "Select",
+                      "props": {
+                        "label": "Sort issues by",
+                        "value": "state",
+                        "options": [
+                          {
+                            "value": "state",
+                            "label": "State"
+                          },
+                          {
+                            "value": "key",
+                            "label": "Key"
+                          }
+                        ],
+                        "onChange": {
+                          "$handler": 2
+                        }
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

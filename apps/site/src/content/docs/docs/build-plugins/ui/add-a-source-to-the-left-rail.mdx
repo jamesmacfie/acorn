@@ -1,0 +1,155 @@
+---
+title: Add a source to the left rail
+description: Put an icon on acorn's left rail that opens a list and a detail, from your trees or from a route.
+sources:
+  - docs/plugins/descriptors.md
+  - docs/frontend/rail-and-routing.md
+  - docs/plugin-authoring/settings-pages.md
+  - docs/plugins/rows-and-annotations.md
+  - docs/tui/sources-and-settings.md
+  - examples/plugins/acme-tracker/acorn-plugin.json
+  - examples/plugins/acme-tracker/client.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll add a source to the left rail: an icon that opens a list beside a detail, like the rail's own
+Docker, Git, and Workflows sources.
+
+## The result
+
+The Acme tracker example's **Acme issues** source. The list is one tree and the detail beside it is
+another, from the same bundle.
+
+<Specimen id="acme-tracker-list" />
+
+<Specimen id="acme-tracker-detail" />
+
+## Before you start
+
+Finish [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/), and turn on
+development mode so a save reloads the plugin. The code is from
+[`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker),
+whose `client.js` is the scaffold's plumbing with a table of entries, one per tree.
+
+## Steps
+
+<Steps>
+
+1. **Declare the source.** Add a `sources` entry. `order` is required and places the icon on the
+   rail, lower first. `glyph` is a [Lucide](https://lucide.dev/icons/) name. `tree` names the two
+   entries your bundle draws the list and the detail with.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.sources']} />
+
+   `showInRailByDefault` says whether the icon is on the rail before the person chooses. Leave it out,
+   or set `true`, to show it. `statusAnnotations: true` lets plugins mark the icon, which step 5 uses.
+
+2. **Draw the list.** The host mounts the list with `collapsed` in its props: `true` while the person
+   has the column at icon width. Then each `Row` draws as its `collapsedIcon`, named by `label` in a
+   tooltip. A row with a `collapsedIcon` always draws as the icon, so send it only while collapsed.
+
+   <ExampleCode file="acme-tracker/client.js" region="source-list" />
+
+   <Specimen id="acme-tracker-list-collapsed" />
+
+3. **Draw the detail.** The list and the detail run in the same worker, so the selection is a
+   variable both read. Pressing a row sets it and draws both again.
+
+   <ExampleCode file="acme-tracker/client.js" region="source-detail" />
+
+4. **Check it.** Save, and click the new icon on the left rail. Click a row: the detail follows. Drag
+   the column narrow until it collapses to icons. In the terminal client, the source is in the
+   **Menu** panel, its list in **Browse**, and the detail in the main area.
+
+5. **Mark the icon.** With `statusAnnotations: true`, any plugin, yours included, can put a status mark
+   on the source's icon through the `core:source` point. The example marks its own source with the
+   count of open issues ([Mark tasks, sources, and panes](/docs/build-plugins/ui/mark-tasks-sources-and-panes/)).
+
+6. **Offer the rail switch on your settings page.** Name the source in your settings page's
+   `railSourceVisibility`, and acorn draws **Show in left rail** in the strip above the page. Turned
+   off, the icon goes, and the palette still offers **Open Acme issues**, marked **hidden from the
+   left rail** ([Add a settings page](/docs/build-plugins/ui/add-a-settings-page/)).
+
+</Steps>
+
+## A source drawn from a route
+
+A plugin with a Node half can give `items` instead of `tree`: a route that answers the rows, which
+acorn draws itself, with its own search box. Picking a row runs `onSelect`, any action verb, such as
+opening a pane or navigating to a project pane:
+
+```json manifest title="acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "sources": [
+      {
+        "id": "issues",
+        "label": "Acme issues",
+        "glyph": "list-todo",
+        "order": 400,
+        "items": "/v1/p/acme/issues",
+        "search": "/v1/p/acme/issues/search",
+        "onSelect": { "verb": "openUrl", "url": "https://acme.example/issues" },
+        "emptyState": { "message": "Nothing is assigned to you." }
+      }
+    ]
+  }
+}
+```
+
+The route answers `{ items: [{ id, title, subtitle?, fields?, icon?, severity?, badge?, short? }] }`.
+`short` is what the row shows at icon width, a few characters such as an issue key. The
+[acme-board](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-points/acme-board)
+example draws its source this way.
+
+## Mistakes
+
+A tree source owns its selection and its empty state, so it takes no `onSelect` or `emptyState`:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "client": "./client.js",
+  "contributions": {
+    "sources": [
+      { "id": "issues", "label": "Issues", "order": 400, "tree": { "list": "list", "detail": "detail" },
+        "onSelect": { "verb": "openPane", "pane": "acme" } }
+    ]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "client": "./client.js",
+  "contributions": {
+    "sources": [
+      { "id": "issues", "label": "Issues", "order": 400, "tree": { "list": "list", "detail": "detail" } }
+    ]
+  }
+}
+```
+
+- Give `items` or `tree`, never both. `search` needs `items`.
+- Sending `collapsedIcon` on every row draws a full-width list as a column of icons.
+- `emptyState` shows when `items` answers no rows, not when the route fails.
+
+## In the terminal
+
+The source is in the **Menu** panel. Its list draws in **Browse**, where <kbd>/</kbd> filters it, and
+its detail in the main area. The rail icon, its marks, and **Show in left rail** are the desktop's.
+
+## Limits
+
+- One source is one icon. The rail places it by `order`, never by when the plugin loaded.
+- `projectScoped: true` makes an `items` source follow the open project. The route gets `?project=`.
+- A row's menu on an `items` source takes other plugins' rows through `item.row`
+  ([Add rows to context menus](/docs/build-plugins/ui/add-rows-to-context-menus/)).
+
+## Reference
+
+[sources](/docs/build-plugins/reference/contributions/sources/) has every field.

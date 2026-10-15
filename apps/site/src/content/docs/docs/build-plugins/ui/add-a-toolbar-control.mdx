@@ -1,0 +1,84 @@
+---
+title: Add a toolbar control
+description: Put a control beside the terminal's or Preview's own, and ask the owner to interrupt a session or reload a page.
+sources:
+  - docs/plugins/toolbar-actions.md
+  - docs/plugins/remote-points.md
+  - examples/plugins/acme-review/acorn-plugin.json
+  - examples/plugins/acme-review/src/client.tsx
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll put a control of your own in the terminal's toolbar or Preview's, beside the owner's controls,
+and have it ask the owner to act.
+
+## The result
+
+The Acme review example's **Interrupt** button, which sits after the terminal's **Stop**:
+
+<Specimen id="acme-review-interrupt" />
+
+## Before you start
+
+Read [Add to another plugin's view](/docs/build-plugins/ui/add-to-another-plugins-view/). The code is
+from [`examples/plugins/acme-review`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-review).
+
+## Steps
+
+<Steps>
+
+1. **Pick the point.** Both stack up to four contributors, after the owner's own controls:
+
+   | Point | Props | Action |
+   | --- | --- | --- |
+   | `terminal:toolbar-actions` | `{ taskId, projectId?, session?: { id, title, running } }` | `interrupt`, with `{ expectedSessionId }` |
+   | `preview:toolbar-actions` | `{ taskId, projectId?, url?, loading, canGoBack, canGoForward }` | `reload`, with `{ expectedUrl }` |
+
+2. **Declare the extension.**
+
+   <ExampleCode file="acme-review/acorn-plugin.json" pick={['contributions.extensions#interrupt']} />
+
+3. **Draw the control and ask.** `host.invoke` asks the owner to run its action. It answers
+   `{ ok: true }` or `{ ok: false, reason }`, and a refusal is an answer, so draw it.
+
+   <ExampleCode file="acme-review/src/client.tsx" region="interrupt" />
+
+4. **Check it.** Save. Open a task's terminal drawer with a running session: **Interrupt** is after
+   **Stop**. Press it, and the session gets the same Ctrl+C **Stop** sends.
+
+</Steps>
+
+## Why the owner may refuse
+
+- `needs_person`: the call didn't follow a person's press or key in your tree in the last second. A
+  timer, a props update, or focus alone doesn't count.
+- `changed`: the session or page isn't the one you named, or the task or Node changed since your tree
+  mounted.
+- `unsupported`: Preview has no live page to reload.
+
+## Mistakes
+
+- Offering a reload before `url` arrives. It's absent until a page loads.
+- Calling `invoke` from a timer. Every call without a person's press is refused.
+- Asking for anything but the declared action: it's refused with `unknown_action` before the owner hears
+  of it.
+
+## In the terminal
+
+`terminal:toolbar-actions` draws on a line under the terminal client's sessions view, and the person
+check counts a key or click inside your control. The terminal client has no Preview, so
+`preview:toolbar-actions` never draws there.
+
+## Limits
+
+- Your control gets no page contents, no terminal output, no input to the terminal, and no history.
+- A fifth contributor draws as a count, "1 more from other plugins".
+- A task switch mounts a fresh tree. A call from the old one is refused.
+
+## Reference
+
+[Extension points](/docs/build-plugins/reference/extension-points/) has both points.

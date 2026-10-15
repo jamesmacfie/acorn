@@ -232,6 +232,7 @@ Guides for what a plugin draws, in [phase 16](./16-plugin-guides-ui.md):
 | Add a theme or a style pack | `docs/plugin-authoring/ui-contributions.md`, `docs/ui-design/appearance.md` |
 | Add icons and brand marks | `docs/ui-design/icons.md` |
 | Notify the person | `docs/plugin-map.md`, `docs/notifications/rows-and-targets.md` |
+| Use the SDK and JSX | `docs/plugin-authoring/the-bridge.md`, `docs/plugin-authoring/extension-example.md` |
 
 Guides for the Node half, agents, data, and the browser, in [phase 17](./17-plugin-guides-node-and-agents.md):
 

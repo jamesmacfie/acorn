@@ -1,0 +1,135 @@
+---
+title: Add a pane
+description: Add a pane of your own to a task, laid out in one of acorn's eight layouts and filled with trees.
+sources:
+  - docs/panes/contributions.md
+  - docs/panes/layout.md
+  - docs/plugin-authoring/the-client-half.md
+  - docs/plugins/remote-trees.md
+  - examples/plugins/acme-tracker/acorn-plugin.json
+  - examples/plugins/acme-tracker/client.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll add a pane to a task: a rectangle in the task's row of panes, laid out by acorn and filled with
+trees your plugin draws.
+
+## The result
+
+The Acme tracker example's **Tracker** pane has two regions, a header and a body. Each is a tree from
+the same client bundle.
+
+<Specimen id="acme-tracker-pane-header" />
+
+<Specimen id="acme-tracker-pane" />
+
+## Before you start
+
+You need a plugin that installs and draws, which [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/)
+gets you. Its client is the one-file `client.js` that `npm create acorn-plugin` writes. The code below
+is from [`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker),
+which uses the same plumbing with one change: a table of entries, so one bundle draws several trees.
+
+## Steps
+
+<Steps>
+
+1. **Declare the pane.** Add a `frames` entry with `target: "pane"`. `id` is permanent, because people's
+   saved layouts store it. `label` and `glyph` name the pane's button in the pane switcher, and `order`
+   places it there.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['client', 'contributions.frames#acme-tracker']} />
+
+2. **Pick a layout.** `layout` is one of eight names, and each has its own regions. You fill the
+   regions, and acorn decides how they sit at every width and in the terminal:
+
+   | Layout | Regions |
+   | --- | --- |
+   | `single` | `body` |
+   | `list-detail` | `list` and `detail`, with optional `list-header` and `list-footer` |
+   | `header-body-footer` | `header`, `body`, and `footer`, all optional |
+   | `tabs` | `panel:<tab id>`, one per tab |
+   | `document-over-frame`, `frame-beside-document` | `document` and `frame` |
+   | `stack-split` | `top` and `bottom` |
+   | `wizard` | `step` |
+
+3. **Fill each region.** A region is a tree, `{ "kind": "remote", "entry": "<name>" }`, where the name
+   is an entry your bundle offers. It can also be `"frame"`, for a rectangle whose pixels are yours
+   ([Draw your own pixels in a frame](/docs/build-plugins/ui/draw-your-own-pixels-in-a-frame/)), or a
+   document acorn's editor draws.
+
+4. **Draw the trees.** Each entry returns a tree of acorn's own components. The host mounts each region
+   with `{ taskId, projectId }` as its props, and its bridge reaches your own routes.
+
+   <ExampleCode file="acme-tracker/client.js" region="pane" />
+
+5. **Reload and open it.** Save. With development mode on, acorn reloads the plugin
+   ([Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/)).
+   Then open a task and click the pane's button in the pane switcher on the right edge of the window,
+   or run the command that opens it.
+
+   The pane appears in the task's row. Open the same task in the terminal client: the pane is in its
+   pane list, drawn in cells.
+
+</Steps>
+
+To open the pane from the palette, add a command whose action is `openPane`
+([Add commands and keybindings](/docs/build-plugins/ui/add-commands-and-keybindings/)).
+
+## Mistakes
+
+A layout's required regions have to be there. `list-detail` needs both halves:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      { "target": "pane", "id": "acme", "label": "Acme", "layout": "list-detail",
+        "regions": { "list": { "kind": "remote", "entry": "list" } } }
+    ]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      { "target": "pane", "id": "acme", "label": "Acme", "layout": "list-detail",
+        "regions": {
+          "list": { "kind": "remote", "entry": "list" },
+          "detail": { "kind": "remote", "entry": "detail" }
+        } }
+    ]
+  }
+}
+```
+
+A region a layout doesn't have is refused too, such as `body` in `list-detail`. And an entry the
+manifest names has to be one your bundle offers in `tree:ready`, or the region draws a placeholder that
+says the tree failed.
+
+## In the terminal
+
+The terminal client shows one pane at a time and draws each region in cells, from the same trees. A
+`frame` region draws as one muted line that names your plugin and points at the desktop app.
+
+## Limits
+
+- A pane is task-scoped unless you set `scope: "project"`. A project pane draws beside a rail source's
+  list, and needs a `routes` entry and a source whose `onSelect` navigates to it.
+- `availability` names a route that answers which tasks the pane appears on. Without it, the pane is
+  offered on every task.
+- A tree can't measure itself or draw outside its region.
+
+## Reference
+
+- [frames](/docs/build-plugins/reference/contributions/frames/) has every field of a pane.
+- [Trees and events](/docs/build-plugins/reference/trees-and-events/) has the components a tree can
+  name and the events it can handle.

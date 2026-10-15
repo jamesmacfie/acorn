@@ -1,0 +1,309 @@
+{
+  "meta": {
+    "title": "Tracker: the body region",
+    "caption": "The pane's body region: another tree from the same bundle.",
+    "terminal": {
+      "columns": 80,
+      "rows": 5
+    },
+    "width": 560
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Table",
+          "props": {},
+          "children": [
+            {
+              "id": "n2",
+              "type": "TableRow",
+              "props": {
+                "head": true
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "Issue"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n5",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "Title"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n7",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n8",
+                      "type": "#text",
+                      "props": {
+                        "value": "State"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "op": "remove",
+        "id": "n1"
+      },
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n9",
+          "type": "Table",
+          "props": {},
+          "children": [
+            {
+              "id": "n10",
+              "type": "TableRow",
+              "props": {
+                "head": true
+              },
+              "children": [
+                {
+                  "id": "n11",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n12",
+                      "type": "#text",
+                      "props": {
+                        "value": "Issue"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n13",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n14",
+                      "type": "#text",
+                      "props": {
+                        "value": "Title"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n15",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n16",
+                      "type": "#text",
+                      "props": {
+                        "value": "State"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n17",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n18",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n19",
+                      "type": "#text",
+                      "props": {
+                        "value": "ACME-12"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n20",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n21",
+                      "type": "#text",
+                      "props": {
+                        "value": "Webhooks give up after one retry"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n22",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n23",
+                      "type": "#text",
+                      "props": {
+                        "value": "In progress"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n24",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n25",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n26",
+                      "type": "#text",
+                      "props": {
+                        "value": "ACME-14"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n27",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n28",
+                      "type": "#text",
+                      "props": {
+                        "value": "VAT missing on EU invoices"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n29",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n30",
+                      "type": "#text",
+                      "props": {
+                        "value": "In review"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n31",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n32",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n33",
+                      "type": "#text",
+                      "props": {
+                        "value": "ACME-15"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n34",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n35",
+                      "type": "#text",
+                      "props": {
+                        "value": "Overdue invoice query is slow"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n36",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n37",
+                      "type": "#text",
+                      "props": {
+                        "value": "Todo"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

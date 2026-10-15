@@ -1,0 +1,112 @@
+---
+title: Add rows to context menus
+description: Add rows to the menus on tasks, rail icons, Editor's files and tabs, agent messages, and selected text.
+sources:
+  - docs/plugins/menus-and-markers.md
+  - docs/plugin-authoring/ui-contributions.md
+  - examples/plugins/acme-tracker/acorn-plugin.json
+  - examples/plugins/acme-tracker/server/routes.js
+  - examples/plugins/acme-review/acorn-plugin.json
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll add rows to acorn's right-click menus. A row is a descriptor: acorn draws it in its own menu,
+after its own rows, and runs the action you declared on whatever was right-clicked.
+
+## The result
+
+There's no picture: the menu is acorn's, and it draws only while open. Your row appears in it with its
+label and icon, after acorn's rows.
+
+## Before you start
+
+Finish [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/). A row that runs
+`runNodeAction` needs a Node half. The code is from
+[`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker).
+
+## Steps
+
+<Steps>
+
+1. **Pick a location.** `location` says which menu the row joins:
+
+   | Location | The menu on | Facts `when` can match |
+   | --- | --- | --- |
+   | `task.row` | A task in the tab rail | `origin`, `projectId`, `pinned` |
+   | `item.row` | A row in a source's list, such as a Linear issue | `providerId`, `projectId` |
+   | `rail.source`, `rail.pane` | One of your own rail icons, named by `surface` | `projectId`, and `shown` and `pinned` for a pane |
+   | `file.row`, `document.tab` | A file or folder in Editor's tree, or an open file's tab | `projectId`, `extension`, `directory`, `readOnly` |
+   | `agent.message`, `agent.turn` | A message in an agent transcript, or a finished turn | `projectId`, `role`, `status` |
+   | `content.selection` | Text the person selected | `contentKind`, `languageId`, `readOnly` |
+
+2. **Declare the rows.** `when` is a map of literal facts, and the row shows only where every one
+   matches: `{ "role": "assistant" }` means an assistant's message.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.contextMenus']} />
+
+   The Acme review example adds a row to Editor's files, on files only:
+
+   <ExampleCode file="acme-review/acorn-plugin.json" pick={['contributions.contextMenus']} />
+
+3. **Answer the action.** `runNodeAction` posts to your route what was right-clicked, never what your
+   descriptor chose. A task row sends `{ item }`, the task's ID. A rail icon sends
+   `{ rail: { location, sourceId, projectId } }`. A message sends `{ message: { taskId, sessionId,
+   role, status, text, revision, … } }`, with the text the card shows. A file sends
+   `{ resource: { kind: "file", taskId, projectId, path, directory, readOnly } }`: the path, never the
+   bytes.
+
+   <ExampleCode file="acme-tracker/server/routes.js" region="menus" />
+
+4. **Check it.** Save. Right-click a task in the tab rail: **Link an Acme issue** is after acorn's own
+   rows. Right-click an assistant's message in an agent session for **File as an Acme issue**.
+
+</Steps>
+
+## Mistakes
+
+`when` values are literals of the fact's own type. A string `"true"` isn't the Boolean `true`, and
+naming a fact the location doesn't have is refused, so a typo can't make a row that never shows:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "contextMenus": [{ "id": "flag", "location": "task.row", "label": "Flag", "when": { "status": "done" },
+      "action": { "verb": "runNodeAction", "path": "/v1/p/acme/flag" } }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "contextMenus": [{ "id": "flag", "location": "task.row", "label": "Flag", "when": { "pinned": true },
+      "action": { "verb": "runNodeAction", "path": "/v1/p/acme/flag" } }]
+  }
+}
+```
+
+- A rail location needs `surface`, the ID of one of your own sources or panes. The other locations
+  take none.
+- A row is not a grant. It can't edit the file, send the message, or replace the selection.
+
+## In the terminal
+
+A file's row opens from Editor's **Actions** button or <kbd>Shift</kbd>+<kbd>F10</kbd>, and transcript
+menus work as on the desktop. Rail icon menus are desktop only. A selection menu offers a message's
+whole text, because a terminal has no text selection, so put an action that must work everywhere in a
+command too.
+
+## Limits
+
+- 32 rows per manifest.
+- A row can't be red. Only acorn marks an action as destroying something.
+- Selected text over 64 KiB offers no rows, and the menu says why.
+
+## Reference
+
+[contextMenus](/docs/build-plugins/reference/contributions/context-menus/) has every field.

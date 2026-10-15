@@ -1,0 +1,125 @@
+{
+  "meta": {
+    "title": "Acme issues: the detail",
+    "caption": "The detail tree beside the list, drawing the selected issue.",
+    "terminal": {
+      "columns": 60,
+      "rows": 6
+    },
+    "width": 520
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "EmptyState",
+          "props": {
+            "title": "Pick an issue"
+          },
+          "children": []
+        }
+      }
+    ],
+    [
+      {
+        "op": "remove",
+        "id": "n1"
+      },
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n2",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n3",
+              "type": "Heading",
+              "props": {
+                "level": 2
+              },
+              "children": [
+                {
+                  "id": "n4",
+                  "type": "#text",
+                  "props": {
+                    "value": "Webhooks give up after one retry"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n5",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n6",
+                  "type": "Badge",
+                  "props": {
+                    "tone": "accent"
+                  },
+                  "children": [
+                    {
+                      "id": "n7",
+                      "type": "#text",
+                      "props": {
+                        "value": "In progress"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n8",
+                  "type": "Text",
+                  "props": {
+                    "emphasis": "muted"
+                  },
+                  "children": [
+                    {
+                      "id": "n9",
+                      "type": "#text",
+                      "props": {
+                        "value": "ACME-12"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n10",
+              "type": "Text",
+              "props": {
+                "wrap": true
+              },
+              "children": [
+                {
+                  "id": "n11",
+                  "type": "#text",
+                  "props": {
+                    "value": "A failed delivery is retried once, then dropped. Retry with backoff for an hour."
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

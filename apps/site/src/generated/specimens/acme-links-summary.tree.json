@@ -1,0 +1,99 @@
+{
+  "meta": {
+    "title": "The card summary point",
+    "caption": "acme-links's tree, drawn by the host in the region acme-board mounted above its card.",
+    "terminal": {
+      "columns": 50,
+      "rows": 1
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Inline",
+          "props": {
+            "gap": "inline"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Icon",
+              "props": {
+                "name": "rocket"
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "Text",
+              "props": {
+                "emphasis": "muted"
+              },
+              "children": [
+                {
+                  "id": "n4",
+                  "type": "#text",
+                  "props": {
+                    "value": "Checking deploys…"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "op": "remove",
+        "id": "n1"
+      },
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n5",
+          "type": "Inline",
+          "props": {
+            "gap": "inline"
+          },
+          "children": [
+            {
+              "id": "n6",
+              "type": "Icon",
+              "props": {
+                "name": "rocket"
+              },
+              "children": []
+            },
+            {
+              "id": "n7",
+              "type": "Text",
+              "props": {
+                "emphasis": "muted"
+              },
+              "children": [
+                {
+                  "id": "n8",
+                  "type": "#text",
+                  "props": {
+                    "value": "Deployed to staging"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

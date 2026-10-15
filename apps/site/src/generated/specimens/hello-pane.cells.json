@@ -1,0 +1,10 @@
+{"columns":60,"rows":8,"lines":[
+[],
+[{"text":"┌──────────────────────────────────────────────────────────┐"}],
+[{"text":"│ "},{"text":"Hello pane","attrs":["bold"]},{"text":"                                               │"}],
+[{"text":"│ "},{"text":"A tree of acorn components, drawn by the host.","fg":"muted"},{"text":"           │"}],
+[{"text":"│ Ask the Node for a greeting                              │"}],
+[{"text":"│ [Say hello] [Which branch?]                              │"}],
+[{"text":"└──────────────────────────────────────────────────────────┘"}],
+[]
+]}

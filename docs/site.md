@@ -71,6 +71,7 @@ has the command and the scores.
 Pictures of plugin UI and of the browser extension's panel are _specimens_, committed and checked on
 every change ([specimens](./site/specimens.md)). Reference pages that list commands, shortcuts, files,
 variables, and the plugin API read them from the code at build ([generated references](./site/references.md)).
+The plugin guides show code and pictures from tested example plugins ([plugin guides](./site/plugin-guides.md)).
 
 ## Shell snapshots
 

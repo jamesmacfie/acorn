@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "title": "A control in the terminal's toolbar",
+    "caption": "acme-review's Interrupt button, drawn beside the terminal's own Stop.",
+    "terminal": {
+      "columns": 30,
+      "rows": 1
+    },
+    "width": 240
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Inline",
+          "props": {},
+          "children": [
+            {
+              "id": "n2",
+              "type": "Button",
+              "props": {
+                "size": "sm",
+                "disabled": false,
+                "onPress": {
+                  "$handler": 1
+                }
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Interrupt"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

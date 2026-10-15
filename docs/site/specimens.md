@@ -31,7 +31,9 @@ Hover and focus styles still work, because they're CSS.
 
 ## How it works
 
-`pnpm --filter @acorn/site specimens` runs two generators, in this order:
+An example plugin's tree is recorded by the examples package first, and then drawn like any other
+specimen ([pictures on a guide](./plugin-guides.md#pictures-on-a-guide)). For the specimens in
+`apps/site/specimens/`, `pnpm --filter @acorn/site specimens` runs two generators, in this order:
 
 1. `apps/site/scripts/specimens.test.ts` runs each specimen in-process with `solidTree` and a recording
    remote root, and writes the batches to `apps/site/src/generated/specimens/<id>.tree.json`. Those are

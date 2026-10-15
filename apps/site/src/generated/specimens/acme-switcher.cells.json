@@ -1,0 +1,8 @@
+{"columns":40,"rows":6,"lines":[
+[{"text":" ","fg":"accent","bg":"hover"},{"text":" ","bg":"hover"},{"text":"Agent","bg":"hover","attrs":["inverse"]},{"text":"                              ⌘1","bg":"hover"}],
+[{"text":" ","fg":"accent","bg":"hover"},{"text":" ","bg":"hover"},{"text":"Changes","bg":"hover","attrs":["inverse"]},{"text":"                            ⌘2","bg":"hover"}],
+[{"text":" ","fg":"accent"},{"text":" Editor                             ⌘3"}],
+[{"text":" ","fg":"accent"},{"text":" Tracker "},{"text":"●","fg":"accent"}],
+[{"text":"[Equal widths]"}],
+[]
+]}

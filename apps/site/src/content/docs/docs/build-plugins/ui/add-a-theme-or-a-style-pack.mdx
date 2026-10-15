@@ -1,0 +1,95 @@
+---
+title: Add a theme or a style pack
+description: Add a color theme and a style pack to acorn's Appearance settings, as data in your manifest.
+sources:
+  - docs/plugin-authoring/ui-contributions.md
+  - docs/ui-design/appearance.md
+  - packages/protocol/src/appearance/themeTokens.ts
+  - packages/protocol/src/appearance/styleValues.ts
+  - examples/plugins/acme-theme/acorn-plugin.json
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll add a color theme and a style pack to **Settings** > **Appearance**. Both are data in your
+manifest: no code, no route, and no client bundle.
+
+## The result
+
+The Acme theme example adds **Acme dusk**, a dark theme, and **Acme roomy**, a style pack with taller rows
+and rounder cards. There's no picture of them here, because a theme recolors the whole window: pick
+them in [Appearance](/docs/using/appearance-themes-and-styles/) once the plugin is installed.
+
+## Before you start
+
+You need a manifest and nothing else. The code is from
+[`examples/plugins/acme-theme`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-theme),
+which has no Node half and no client.
+
+## Steps
+
+<Steps>
+
+1. **Declare the theme.** A theme sets all 22 palette colors, no more and no fewer. `dark` says whether
+   it's dark, and acorn derives everything else, such as `--danger` and the surface shades, from the
+   palette.
+
+   <ExampleCode file="acme-theme/acorn-plugin.json" pick={['contributions.themes']} />
+
+   A value is a hex color, such as `#1c1a24`, or a color function with plain arguments, such as
+   `rgba(74, 222, 128, 0.14)` or `oklch(0.7 0.15 250)`.
+
+2. **Declare the style pack.** A pack sets shape, not color: row height, corner radius, elevation,
+   fonts, and the like. It's partial, and any token it leaves out keeps the default.
+
+   <ExampleCode file="acme-theme/acorn-plugin.json" pick={['contributions.styles']} />
+
+   A pack may point a role at another token of the same kind, such as
+   `--radius-surface: var(--radius-lg)`.
+
+3. **Check it.** Install the plugin, and open **Settings** > **Appearance**. **Acme dusk** is with the
+   built-in themes and **Acme roomy** with the style packs, each with your plugin's name.
+
+</Steps>
+
+## Why both are data
+
+acorn writes the CSS for your theme and pack itself, from your values, so no CSS of yours reaches the
+window. A theme can only set color and can't break a layout. A pack can only set the tokens acorn lists,
+from each one's allowed values, so it can't hide a control or paint over a prompt.
+
+## Mistakes
+
+A theme names every palette color, and only those. A derived color, such as `--danger`, is refused:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "contributions": {
+    "themes": [{ "id": "red", "label": "Red", "tokens": { "--danger": "#ff0000" } }]
+  }
+}
+```
+
+- Don't set `--is-dark` or `--color-scheme`. acorn writes them from `dark`.
+- Named colors such as `red`, `var()`, and nested functions are refused in a theme.
+- One value acorn can't use refuses the whole style pack.
+
+## In the terminal
+
+The terminal client uses the terminal's own palette, or a built-in theme's colors on a truecolor
+terminal. A plugin theme doesn't change it, and nor does a style pack, because a terminal draws no
+shapes.
+
+## Limits
+
+- Up to eight style packs per plugin.
+- The person's choice is saved by ID, `plugin:acme-theme:dusk`. While your plugin is off or missing,
+  acorn shows a built-in theme, and goes back to yours when it returns.
+- A style pack can't change icons.
+
+## Reference
+
+- [themes](/docs/build-plugins/reference/contributions/themes/) lists the 22 palette colors.
+- [styles](/docs/build-plugins/reference/contributions/styles/) lists the tokens a pack can set.

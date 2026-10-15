@@ -1,0 +1,89 @@
+{
+  "meta": {
+    "title": "Review",
+    "caption": "acme-review's pane, written in JSX with the SDK and built into one file.",
+    "terminal": {
+      "columns": 50,
+      "rows": 3
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "section"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Text",
+              "props": {
+                "emphasis": "strong"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Files under review"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Text",
+              "props": {
+                "emphasis": "muted"
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "Use Add to review on a file."
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "op": "remove",
+        "id": "n4"
+      },
+      {
+        "op": "insert",
+        "parent": "n1",
+        "index": 1,
+        "node": {
+          "id": "n6",
+          "type": "Text",
+          "props": {},
+          "children": [
+            {
+              "id": "n7",
+              "type": "#text",
+              "props": {
+                "value": "billing/webhooks/deliver.py"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

@@ -1,0 +1,122 @@
+---
+title: Open your view to other plugins
+description: Declare an extension point on your own pane, choose its kind, and let other plugins fill it, with the acme-board and acme-links pair.
+sources:
+  - docs/plugins/cooperative-extension-points.md
+  - docs/plugins/remote-points.md
+  - docs/plugins/detail-regions.md
+  - docs/plugins/rows-and-annotations.md
+  - examples/plugins/acme-points/acme-board/acorn-plugin.json
+  - examples/plugins/acme-points/acme-links/acorn-plugin.json
+  - examples/plugins/acme-points/acme-links/client.js
+  - examples/plugins/acme-points/acme-links/node.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll open your own view to other plugins: declare a place in your pane, an extension point, that
+another plugin can fill. This page uses a pair of examples: `acme-board` opens two points, and
+`acme-links` fills them.
+
+## The result
+
+`acme-board`'s card view, and `acme-links`'s deploy status, which acorn draws in the region
+`acme-board` mounted above the card:
+
+<Specimen id="acme-links-summary" />
+
+<Specimen id="acme-board-card" />
+
+## Before you start
+
+You need a pane ([Add a pane](/docs/build-plugins/ui/add-a-pane/)). The code is from
+[`examples/plugins/acme-points`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-points).
+`acme-board`'s card view is a project pane, opened from its own rail source.
+
+## Steps
+
+<Steps>
+
+1. **Declare the points.** An `extensionPoints` entry names the point, its kind, and where it sits.
+   `acme-board` opens two:
+
+   - `card-links`, kind `rows`, in `pane.footer` under its `board` pane. Contributors answer rows, and
+     acorn draws them as a list.
+   - `card-summary`, kind `remote`, in `stack` mode for up to two contributors, mounted in the header
+     of `board`. Contributors draw trees, and acorn draws them above the card.
+
+   <ExampleCode file="acme-points/acme-board/acorn-plugin.json" pick={['contributions.extensionPoints']} />
+
+2. **Fill them from the other plugin.** A contributor names the point as `<owner>:<point>`.
+
+   <ExampleCode file="acme-points/acme-links/acorn-plugin.json" pick={['contributions.extensions']} />
+
+3. **Answer the rows.** A `rows` contributor's route answers display strings. `onSelect` is declared
+   once, in the manifest, and gets the picked row's ID.
+
+   <ExampleCode file="acme-points/acme-links/node.js" region="rows" />
+
+4. **Draw the tree.** A tree in a mounted region gets `{ surface, item, projectId }`, where `item` is
+   what the owner's view shows. Nothing else of the owner's crosses.
+
+   <ExampleCode file="acme-points/acme-links/client.js" region="summary" />
+
+5. **Check it.** Install both plugins. Open **Board** on the left rail and pick a card: the deploy
+   status sits above it and the pull requests below it. **Settings** > **Advanced** > **Extension
+   points** lists both points with `acme-links` as their contributor.
+
+</Steps>
+
+## Choose the kind
+
+| Kind | For | Contributors send |
+| --- | --- | --- |
+| `rows` | Related items under your pane | A route of rows |
+| `annotation` | Marks on items you draw, keyed by fields you declare in `key` | A route that answers a batch of keys |
+| `remote` | A section of someone else's UI in yours | A tree |
+| `rectangle` | Someone else's pixels beside yours, in `pane.inline-below` or `pane.inline-beside` | An `inline` frame |
+| `hook` | A say in something you're about to do, declared with a `payload` | A route that observes or vetoes |
+
+A `remote` point's `mode` is `stack`, where up to `max` contributors draw in order, or `replace`,
+where one contributor matched by key draws in place of your default.
+
+## Mistakes
+
+`location` and `surface` are for `rows` and `rectangle` points. A `remote` point is placed with
+`mounts`:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [{ "target": "pane", "id": "board", "label": "Board", "layout": "single",
+      "regions": { "body": { "kind": "remote", "entry": "board" } } }],
+    "extensionPoints": [{ "id": "summary", "label": "Summary", "kind": "remote", "location": "pane.footer",
+      "surface": "board" }]
+  }
+}
+```
+
+- A contributor names your point by its ID, so renaming the point breaks theirs.
+- A rows route gets no item. The rows are about the pane, not what it shows.
+
+## In the terminal
+
+The terminal client draws rows as a list at the end of the pane, a `remote` region in cells around your
+view, capped at 30% of the pane, and a `rectangle` as one muted line.
+
+## Limits
+
+- `mounts` works on project panes and reference panels. A task pane's selection lives inside its tree,
+  where acorn can't see it.
+- A loaded owner can't pass actions to a mounted region's trees. A point's `actions` reach a tree only
+  where a plugin compiled into acorn draws the point.
+- A point can be mounted in up to eight places.
+
+## Reference
+
+- [extensionPoints](/docs/build-plugins/reference/contributions/extension-points/)
+- [Extension points](/docs/build-plugins/reference/extension-points/) lists acorn's own.

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-links",
+  "name": "Acme links",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "node": "./node.js",
+  "client": "./client.js",
+  "permissions": {
+    "api": [],
+    "events": [],
+    "node": { "core": [], "capabilities": [], "secrets": false, "exec": false, "net": [] }
+  },
+  "contributions": {
+    "extensions": [
+      {
+        "id": "links",
+        "point": "acme-board:card-links",
+        "label": "Pull requests",
+        "items": "/v1/p/acme-links/links",
+        "onSelect": { "verb": "runNodeAction", "path": "/v1/p/acme-links/open" }
+      },
+      {
+        "id": "summary",
+        "point": "acme-board:card-summary",
+        "label": "Deploy status",
+        "remote": "summary"
+      }
+    ]
+  }
+}

@@ -1,7 +1,131 @@
 # Phase 16: write the plugin tutorial and the UI guides
 
-Date: October 15, 2026. Status: proposed. Needs phase 15. Follows the page rules in
+Date: October 15, 2026. Status: done. Needs phase 15. Follows the page rules in
 [phase 11](./11-docs-start-and-core.md#how-every-docs-page-is-written).
+
+## Completion note
+
+October 16, 2026. The tutorial, "Have your agent build it", "Choose how your plugin draws", the 20 UI
+guides, and a new "Use the SDK and JSX" guide are written and published. Every guide's code comes from
+a tested example plugin in `examples/plugins/`, and every picture is that example's own tree.
+[Plugin guides and their examples](../../site/plugin-guides.md) is the reference for the examples, the
+harness, and how a guide shows code and pictures.
+
+What landed:
+
+- **`@acorn/plugin-examples`**, a private workspace package at `examples/plugins/`, with seven
+  examples: `hello-pane`, `acme-tracker`, `acme-review`, `acme-points` (`acme-board` and `acme-links`),
+  `acme-frame`, `acme-theme`, and `acme-switcher`. All but `acme-review` are hand-written in the
+  scaffold's no-build form. `pnpm-workspace.yaml` lists `examples/*`.
+- **The harness**, `examples/plugins/test/harness.ts`: the Node's manifest parser, the testkit's real
+  Node context with the manifest's own permissions, and the bridge handshake the host performs, with
+  every message parsed by the protocol's `sandboxMessage`. `test/packed.ts` holds the packed-SDK
+  helpers that used to live in the scaffold's test, which now imports them.
+- **The test**, `examples/plugins/test/examples.test.ts`: every manifest parses, every route string
+  it names is served, every tree entry it names mounts and draws, and each guide's promises hold.
+  `acme-review` is built outside the repository from the packed SDK and types, as the old extension
+  example test did from the doc's fenced blocks.
+- **The pictures.** `apps/site/specimens/examples.json` lists 17. `test/pictures.test.ts` records each
+  example tree against its Node half into `apps/site/src/generated/specimens/`, and the site and
+  terminal generators draw them like any specimen. `pnpm --filter @acorn/site specimens` runs it first.
+- **Code on a page.** `ExampleCode.astro` shows a `// #region` of an example file, or the parts of a
+  manifest picked by dotted path, titled with the file's path. `src/lib/exampleCode.ts` does the
+  cutting, with node tests.
+- **The extension example** moved into `examples/plugins/acme-review/`, and its three internal pages
+  link to the files. It gained a `core:markdown-fence` viewer and an `agents:transcript-attachment`
+  viewer, so it fills eleven places, nine of them points.
+
+The acceptance checks: the examples test passes, 39 cases with the pictures, and the scaffold's 24.
+Every JSON block on the guides passes phase 15's manifest check, which caught one wrong "Wrong" example.
+A production build writes 181 pages and passes the site's tests with 209 Playwright tests, and a preview
+build passes all 295. `astro check` finds no errors. The architecture suite fails the same eight checks
+it fails on the base commit, with nothing from this change.
+
+### What the walk found
+
+An agent walked the tutorial and the left rail guide in a `dev:agent` session, with the plugins in a
+scratch folder outside the repository, then the reference panel, settings page, commands, notice,
+attention, board pair, and switcher steps. Fixed on the way:
+
+- **The scaffold's README said installing needs a restart.** Installing starts the plugin at once. The
+  README now gives the real path, typing the folder into **Package** or **Choose…**, then **Accept
+  plugin** once Settings closes, and how to reload.
+- **There's no reload button.** Turning **Enabled** off and on re-reads the folder, and a changed bundle
+  asks again with **Accept update**. The tutorial says so, and teaches development mode after it.
+- **A bare text node beside a heading overprints the heading in the terminal.** The scaffold's greeting
+  is wrapped in `Text` now.
+- **A prop that's `undefined` makes the host refuse the whole batch.** The replacement switcher drew
+  nothing in the real app, because a pane with no shortcut sent `meta: undefined`. JSON hid it in the
+  pictures. `el()` drops undefined props, in the scaffold too, and the harness parses every batch.
+- **A `Row` with `collapsedIcon` always draws collapsed.** The tracker list sent it at full width and
+  drew a column of icons. It sends it only while `collapsed`, and the test checks.
+- **A `rows` point in `pane.footer` draws only under a task pane.** The manifest accepts one on a
+  project pane, and nothing draws. `acme-board` puts its rows under a task pane.
+
+Not walked: the terminal client step. Its agent launcher runs its own Node, and the auto-mode classifier
+refused reading that Node's credential to install the plugin there. The terminal pictures prove the
+trees draw in cells, and the step is written from the terminal docs. Right-click menus and the
+toolbar control weren't pressed, because the driver can't open a context menu or a running terminal
+session. Their routes are tested.
+
+### Decisions
+
+- **A workspace package, not a folder of fixtures.** Both the scaffold's test and the examples test
+  import the harness by package name, so `tools/arch/boundaries.test.ts` scans `examples/` as a library
+  folder. The harness sits in `test/`, because it imports the testkit.
+- **The examples package records the pictures, and the site lists them.** Starting a Node half needs
+  the testkit, which the site doesn't load. The examples test writes the trees into the site's folder
+  by path, as the terminal generator writes cells, and the site keeps the titles and captions.
+  `renumber` moved into the examples package, and the site's generator imports it.
+- **A manifest is cut by path, not by region.** JSON has no comments. `pick` keeps one array entry with
+  `#id`.
+- **The tracker's rail source draws from trees**, so its list and detail have pictures. The guide shows
+  the `items` form too, and `acme-board` uses it.
+- **Descriptors get the kit node the host draws**, captioned so, as phase 15 did: the badge guide shows
+  the kit's badges, and the commands guide the palette snapshot. Menus, marks, notices, a frame, a
+  webview, and a theme have no picture, and each guide says why.
+- **The plumbing is copied into each hand-written `client.js`.** A client is one file with no imports,
+  so the copy is the cost of the no-build form. `drawAll` lives only in the tracker, which uses it.
+- **Development mode comes after two hand reloads in the tutorial,** following the phase's order, so a
+  reader sees what it saves them.
+
+### Deviations
+
+- **"Use the SDK and JSX" is a new page**, at the end of **Draw in acorn**, and in the site map.
+- **The tutorial has ten steps.** Accepting the plugin is its own step, between installing and opening.
+- **No `content.selection` row in `acme-tracker`.** The menus guide shows the locations in a table and
+  the example's three rows, plus `acme-review`'s `file.row`.
+- **"How plugins work" stays a draft.** No phase owns it. Phases 13 and 14 asked to point links at it.
+- **The scaffold's test lost a check.** It held `packages/plugin-types/README.md`'s example to the host
+  major, and phase 15 removed the major from that README. It now checks that the README names none.
+
+### Problems for their owners
+
+- **Trust prompt copy.** An extension on `core:task`, `core:source`, or `core:pane` reads "Add its own
+  rows to core's "Acme issues" list", using the extension's label as the owner's list name, three times.
+  `acme-links` reads "Add its own rows to acme-board's "Pull requests" list", where "Pull requests" is
+  its own label and the point is "Linked items".
+- **The plugin page's Enabled row** says "Takes effect when the node next starts" for a loaded plugin,
+  which takes effect at once.
+- **The terminal draws a `Badge` inside a `TableCell` as `[object Object]`.** The tracker uses text in
+  the cell.
+- **A `pane.footer` point on a project pane** parses and never draws. Either the manifest should refuse
+  it, or `register.ts` should draw it.
+- **The Node service and the terminal client are over their size ceilings on the base commit**,
+  1,855,253 bytes against 1,820,500, and 741,202 against 720,000. `dev:agent` and `dev:tui:agent` fail
+  until someone trims them. `--prepared` and `--no-build` get around it.
+
+### What later phases need to know
+
+- Phase 17: add examples under `examples/plugins/`. The examples test picks up any folder with a
+  manifest, one level of nesting allowed. Add props to `PROPS`, cases for each guide's promises, and
+  pictures to `apps/site/specimens/examples.json`. Follow the guide shape in the reference.
+- A hand-written tree must not send a prop that's `undefined`. Use the plumbing's `el()`.
+- The guides link to `https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/…`, which resolve
+  once this merges.
+- Phase 20: `npm create acorn-plugin` and the two SDK packages aren't on npm, and the tutorial's first
+  step needs the first. A person walking the tutorial with published packages is still yours, and so
+  is the terminal step.
 
 ## Goal
 

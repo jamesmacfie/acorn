@@ -1,0 +1,160 @@
+---
+title: Build your first plugin
+description: Scaffold a plugin, install it from its folder, open its pane, change it, and give it a route of its own.
+sources:
+  - docs/plugin-authoring/start-from-the-scaffold.md
+  - docs/plugin-authoring/complete-example.md
+  - docs/plugin-authoring/installing-a-hand-written-package.md
+  - docs/plugins/dev-loop.md
+  - docs/tui/plugins.md
+  - packages/create-acorn-plugin/index.mjs
+  - packages/client-core/src/features/settings/plugins/InstallPlugin.tsx
+  - packages/client-core/src/host/trust/PluginTrustDialog.tsx
+  - examples/plugins/hello-pane/client.js
+  - examples/plugins/hello-pane/server/routes.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../../components/Checkpoint.astro'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Keys from '../../../../../components/Keys.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+This tutorial builds a plugin called `hello-pane` from nothing: a pane in every task, drawn with
+acorn's own components, that asks its own code on the Node for an answer. It takes about fifteen
+minutes. You need acorn [installed](/docs/start/install/) and running on this computer, with a project
+added, and Node.js 22.18 or later for `npm`.
+
+When you finish, the pane looks like this, in the desktop app and in the terminal client:
+
+<Specimen id="hello-pane" both />
+
+<Steps>
+
+1. **Scaffold the plugin.** In a folder outside your projects, run:
+
+   ```sh
+   npm create acorn-plugin hello-pane
+   ```
+
+   <Checkpoint>
+     A `hello-pane` folder holds `acorn-plugin.json`, `node/index.js`, `server/routes.js`, `client.js`,
+     and `README.md`.
+   </Checkpoint>
+
+2. **Read the three files that run.** There's no build step: these files are what acorn runs.
+
+   - `acorn-plugin.json` is the manifest. It names the plugin, the permissions it asks for, and what it
+     adds to acorn: here, a pane and a command that opens it. acorn reads it before running anything.
+   - `node/index.js` and `server/routes.js` are the Node half. They run inside the Node, which holds
+     your data, and answer requests at `/v1/p/hello-pane/`. The starter route, `/greeting`, says
+     hello from the task it's asked about.
+   - `client.js` is the client half. It runs in a sandbox with no DOM and no network, and describes the
+     pane as a tree of acorn's own components. Its first half is plumbing that talks to acorn. The pane
+     itself is near the end, in `mount`.
+
+   [Choose how your plugin draws](/docs/build-plugins/start/choose-how-your-plugin-draws/) says why
+   the pane is a tree rather than your own HTML.
+
+3. **Install it from its folder.** In acorn, open **Settings** > **Plugins** > **Installed** and click
+   **Install…**. Set **Source** to **Local folder**, click **Choose…** and pick the `hello-pane` folder,
+   or type the folder's absolute path into **Package**. Then click **Install**.
+
+   <Checkpoint>
+     **Hello pane** appears in the list, reading **Waiting for approval on this device**.
+   </Checkpoint>
+
+4. **Accept the plugin.** Close Settings. acorn asks before it runs any of a plugin's code on this
+   device: **hello-pane wants to run in acorn**, with what the plugin may do listed under **Enforced**.
+   For this plugin, that's **Read task details**. Click **Accept plugin**.
+   [Plugin trust and permissions](/docs/security/plugin-trust-and-permissions/) explains the prompt.
+
+5. **Open the pane.** Open a task, or create one. Press <Keys chord="meta+k" />, type `hello`, and pick
+   **Open Hello pane**. Then click **Say hello**.
+
+   <Checkpoint>
+     The pane opens in the task's row, with a **Hello pane** button in the pane switcher on the right
+     edge of the window. After **Say hello**, the line under the heading reads **Hello from** and your
+     task's title.
+   </Checkpoint>
+
+6. **Change the tree.** In `client.js`, find the `Heading` in `mount` and add a line of text under it:
+
+   ```js
+   el('Heading', {}, [text('Hello pane')]),
+   el('Text', { emphasis: 'muted' }, [text('A tree of acorn components, drawn by the host.')]),
+   ```
+
+   Each `el` call names one of acorn's components, its props, and its children.
+   [Trees and events](/docs/build-plugins/reference/trees-and-events/) lists them all.
+
+   Then reload the plugin: in **Settings** > **Plugins** > **Installed**, click **Manage** beside
+   **Hello pane**, turn **Enabled** off, then on again. Close Settings. The bundle changed, so acorn
+   asks again: **hello-pane was updated**. Click **Accept update**.
+
+   <Checkpoint>The pane shows your new line under the heading.</Checkpoint>
+
+7. **Add a route and call it.** Give the Node half a second route, which says which branch the task
+   works on. In `server/routes.js`, replace the check at the top of `handle` so it lets any `GET` through,
+   and answer `/branch` before the greeting:
+
+   <ExampleCode file="hello-pane/server/routes.js" />
+
+   In `client.js`, replace the tree in `mount` with one that has a button for each route:
+
+   <ExampleCode file="hello-pane/client.js" region="tree" />
+
+   The bridge sends `bridge.get` to your own routes and nowhere else. Reload as in step 6, and accept
+   the update.
+
+   <Checkpoint>
+     **Which branch?** answers **This task works on** and the task's branch, or **This task runs in the
+     project folder** for a task without a worktree.
+   </Checkpoint>
+
+8. **Open the same task in the terminal client.** In a terminal, run `acorn`. The first time, it pairs
+   with the desktop app's Node ([Desktop and terminal](/docs/start/desktop-and-terminal/#start-the-terminal-client-against-a-running-node)).
+   The terminal client is a device of its own, so it asks to accept the plugin too. Open the task,
+   then switch to **Hello pane** in the strip of pane labels.
+
+   <Checkpoint>
+     The same pane, drawn in cells from the same `client.js`: the heading, your line, the answer, and
+     the two buttons.
+   </Checkpoint>
+
+9. **Turn on development mode.** Steps 6 and 7 reloaded and accepted by hand. While you work on a
+   plugin, let acorn do it: on the plugin's page, open the **Permissions** tab, and under
+   **Development mode** click **Turn on**.
+
+   <Checkpoint>
+     **Development mode** reads **In development**. Change the heading's text in `client.js` and save:
+     the pane shows the change a moment later, with no prompt.
+   </Checkpoint>
+
+   Development mode reloads the plugin when its files change, keeps its logs in a **Logs** tab, and runs
+   each new version on this computer without asking. It's offered only for a plugin installed from a
+   folder. Turn it off when you finish.
+
+10. **Go further.** [Choose how your plugin draws](/docs/build-plugins/start/choose-how-your-plugin-draws/)
+    covers the three ways to draw. The guides under **Draw in acorn** each add one thing, starting
+    with [Add a pane](/docs/build-plugins/ui/add-a-pane/) and
+    [Add a source to the left rail](/docs/build-plugins/ui/add-a-source-to-the-left-rail/). Every one
+    is backed by an example plugin in
+    [`examples/plugins`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins).
+
+</Steps>
+
+## In the terminal
+
+The terminal client draws the pane from the same tree, one pane at a time. It can't install a plugin
+from a folder: install from the desktop app, and the terminal client offers the plugin once it's
+accepted there. In the terminal client, <Keys chord="meta+k" /> is <kbd>Ctrl</kbd>+<kbd>K</kbd>.
+
+## Limits
+
+- The Node runs plugins you install only on a patched Node.js release. On an older one, the plugin's
+  row says it failed and names both versions.
+- A folder install is linked, not copied, and acorn can't pin its bytes. Keep the folder where it is.
+- `client.js` is one file with no imports. To use packages or JSX, bundle it first
+  ([Use the SDK and JSX](/docs/build-plugins/ui/use-the-sdk-and-jsx/)).

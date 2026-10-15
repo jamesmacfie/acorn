@@ -1,0 +1,96 @@
+---
+title: Put a badge in the top bar or task footer
+description: Show a short count or status in acorn's top bar or a task's footer, answered by a route and kept fresh.
+sources:
+  - docs/contribution-kinds.md
+  - docs/plugins/more-descriptors.md
+  - docs/plugins/ui-tiers.md
+  - docs/plugins/freshness.md
+  - examples/plugins/acme-tracker/acorn-plugin.json
+  - examples/plugins/acme-tracker/server/routes.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll put a badge in the top bar, beside the notification bell, or in an open task's footer: a few
+words, such as a count, that your Node half answers and acorn draws.
+
+## The result
+
+The Acme tracker example's top bar badge reads **2 open**. acorn draws it with the kit's `Badge` in the
+tone your route names:
+
+<Specimen id="badges-and-chips" caption="The kit's badges in each tone. A slot badge is one of these, drawn by acorn from your route's answer." />
+
+## Before you start
+
+You need a plugin with a Node half ([Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/)).
+A badge needs no client bundle. The code is from
+[`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker).
+
+## Steps
+
+<Steps>
+
+1. **Declare the badges.** `slot` is `topbar` or `footer`. `data` is the route that answers the
+   badge. `onClick` is optional, from the narrow set of action verbs. `refresh` is how often, in
+   seconds, acorn reads the route when nothing tells it to.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.slots']} />
+
+2. **Answer the badge.** The route answers `{ text, tone?, tooltip? }`, where `tone` is `neutral`,
+   `accent`, or `warn`. Answer `null` to hide the badge.
+
+   <ExampleCode file="acme-tracker/server/routes.js" region="badges" />
+
+3. **Keep it fresh.** When your data changes, call `ctx.events.status()`. acorn reads all of your
+   plugin's badges, rows, and marks again on every connected client, and nobody else's. The example
+   calls it after creating an issue:
+
+   <ExampleCode file="acme-tracker/server/routes.js" region="status" />
+
+4. **Check it.** Save. The top bar shows **2 open**. Create an issue with **New Acme issue** in the
+   palette, and the badge reads **3 open** without waiting for `refresh`. Click it to open the pane.
+
+</Steps>
+
+## Mistakes
+
+A badge route belongs to your own plugin. A route in another plugin's namespace is refused:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "contributions": { "slots": [{ "id": "queue", "slot": "topbar", "data": "/v1/p/other/queue" }] }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "contributions": { "slots": [{ "id": "queue", "slot": "topbar", "data": "/v1/p/acme/queue" }] }
+}
+```
+
+- Answer `null` to hide the badge, not an empty `text`.
+- Don't poll with a short `refresh`. One interval serves every plugin's badges, so call
+  `ctx.events.status()` when the number changes instead.
+- `slot` is `topbar` or `footer`. No other place in the window takes a badge.
+
+## In the terminal
+
+The terminal client doesn't draw slots: it has no top bar or task footer of this kind. Put anything
+the terminal needs in a pane or a command too.
+
+## Limits
+
+- The route gets no task, so a footer badge says the same thing in every task.
+- `refresh` is at least 30 seconds and at most a day.
+- The text is a few words. A badge isn't a place for a sentence.
+
+## Reference
+
+[slots](/docs/build-plugins/reference/contributions/slots/) has every field.

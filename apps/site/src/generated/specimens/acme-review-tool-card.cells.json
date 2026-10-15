@@ -1,0 +1,5 @@
+{"columns":60,"rows":3,"lines":[
+[{"text":"acme-review_files","attrs":["bold"]}],
+[{"text":"billing/webhooks/deliver.py"}],
+[{"text":"billing/invoices/vat.py"}]
+]}
