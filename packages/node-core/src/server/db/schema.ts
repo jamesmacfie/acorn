@@ -55,6 +55,10 @@ export const integrations = sqliteTable('integrations', {
   // owner renaming a connection would rename a project in the mapping picker.
   name: text('name'),
   encryptedCredentials: text('encrypted_credentials').notNull(),
+  // A provider whose access token expires keeps its refresh token here, sealed like the credential,
+  // and the access token's expiry in epoch ms. Both null for a credential that never expires.
+  encryptedRefreshToken: text('encrypted_refresh_token'),
+  credentialExpiresAt: integer('credential_expires_at'),
   authKind: text('auth_kind').notNull().default('api-key'),
   account: text('account'), // JSON ProviderAccountRef; core renders but never interprets provider ids
   scopes: text('scopes').notNull().default('[]'), // JSON string[] resolved during validation

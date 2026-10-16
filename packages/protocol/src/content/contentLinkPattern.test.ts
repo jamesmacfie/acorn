@@ -40,4 +40,25 @@ describe('content-link patterns', () => {
     expect(() => compileContentLinkPattern('https://tracker.*.example/issues/{key}')).toThrow('host')
     expect(() => compileContentLinkPattern('https://tracker.example/issues/*')).toThrow('literal')
   })
+
+  it('takes one or more whole segments in a {capture+} before a literal', () => {
+    const pattern = compileContentLinkPattern('https://gitlab.com/{path+}/-/merge_requests/{number}')
+    expect(pattern.captures).toEqual(['path', 'number'])
+    expect(pattern.match('https://gitlab.com/group/sub/api/-/merge_requests/12')).toEqual({
+      path: 'group/sub/api',
+      number: '12',
+    })
+    expect(pattern.match('https://gitlab.com/api/-/merge_requests/12')).toEqual({ path: 'api', number: '12' })
+    expect(pattern.match('https://gitlab.com/-/merge_requests/12')).toBeNull()
+    expect(pattern.match('https://gitlab.com/group/api/merge_requests/12')).toBeNull()
+    expect(pattern.match('https://gitlab.com/group%2Fsub/api/-/merge_requests/12')).toBeNull()
+    expect(pattern.match('https://gitlab.com/group/api/-/merge_requests/12/diffs')).toBeNull()
+  })
+
+  it('allows one {capture+}, only right before a literal', () => {
+    expect(() => compileContentLinkPattern('https://gitlab.com/{path+}')).toThrow('before a literal')
+    expect(() => compileContentLinkPattern('https://gitlab.com/{path+}/{number}')).toThrow('before a literal')
+    expect(() => compileContentLinkPattern('https://gitlab.com/{a+}/-/{b+}/x')).toThrow('one {capture+}')
+    expect(() => compileContentLinkPattern('https://gitlab.com/{bad name+}/-')).toThrow('invalid name')
+  })
 })

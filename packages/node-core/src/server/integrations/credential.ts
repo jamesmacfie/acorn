@@ -3,15 +3,31 @@ import type { Context } from 'hono'
 import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { canUseProviderCredential, ownerId } from '../middleware/requireUser'
+import { freshConnection } from './connections'
 
-export async function providerCredential(c: Context<AppEnv>, providerId: string): Promise<string> {
+async function readCredential(c: Context<AppEnv>, providerId: string, force: boolean): Promise<string> {
   if (!canUseProviderCredential(c)) return ''
-  const [row] = await getDb(c.env)
-    .select({ encryptedCredentials: schema.integrations.encryptedCredentials })
+  const db = getDb(c.env)
+  const [row] = await db
+    .select()
     .from(schema.integrations)
     .where(and(eq(schema.integrations.userId, ownerId(c)), eq(schema.integrations.provider, providerId)))
   if (!row) return ''
+  const fresh = await freshConnection(db, row, c.env.SECRETS, { force })
+  if (!fresh) return ''
   // useOptional: "unreadable credential" falls through to '' as well, which keeps the three outcomes
   // converged. The read goes through CoreServices.secrets, so no plugin ever holds SESSION_ENC_KEY.
-  return (await c.env.SECRETS.useOptional(row.encryptedCredentials, `${providerId}: api call`, (value) => value)) ?? ''
+  return (
+    (await c.env.SECRETS.useOptional(fresh.encryptedCredentials, `${providerId}: api call`, (value) => value)) ?? ''
+  )
 }
+
+/** The owner's credential for a provider, renewed first when it is about to expire. '' when there is
+ *  none to use. */
+export const providerCredential = (c: Context<AppEnv>, providerId: string): Promise<string> =>
+  readCredential(c, providerId, false)
+
+/** A renewed credential, for a caller whose provider just refused the stored one with a `401`. '' when
+ *  the provider can't renew it, or refused the renewal and the connection now needs sign-in. */
+export const refreshProviderCredential = (c: Context<AppEnv>, providerId: string): Promise<string> =>
+  readCredential(c, providerId, true)

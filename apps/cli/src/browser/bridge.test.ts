@@ -1295,6 +1295,37 @@ describe('browser bridge handoffs', () => {
     expect(result.items[0].linkedTasks).toEqual([{ id: 't4', title: 'Has the link', projectId: 'p7' }])
   })
 
+  it("names a task that holds the item's change request by number, in a project tied to the item", async () => {
+    const { call, node } = await selected()
+    node.state.resolution = {
+      items: [item({ projects: ['p1'], seed: { origin: 'tracker-mr', changeRequest: { number: 7 } } })],
+    }
+    node.state.tasks.push(
+      {
+        id: 't5',
+        title: 'On the merge request',
+        projectId: 'p1',
+        branch: null,
+        status: 'active',
+        pullNumber: null,
+        changeRequest: { provider: 'tracker', number: 7 },
+        links: [],
+      },
+      {
+        id: 't6',
+        title: 'Another repository',
+        projectId: 'p9',
+        branch: null,
+        status: 'active',
+        pullNumber: null,
+        changeRequest: { provider: 'tracker', number: 7 },
+        links: [],
+      },
+    )
+    const result = await call({ op: 'handoff.resolve', nodeId: 'node-a', ...target })
+    expect(result.items[0].linkedTasks).toEqual([{ id: 't5', title: 'On the merge request', projectId: 'p1' }])
+  })
+
   it('refuses a page the handoff does not match, a handoff the Node dropped, and an unreadable answer', async () => {
     const { call, node } = await selected()
     await expect(

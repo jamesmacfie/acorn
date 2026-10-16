@@ -32,8 +32,9 @@ the cascade first. **Replace key** is a form with **Save** and **Cancel**.
 
 **Add connection** opens a gallery from the public descriptors: one card per `connectable` provider,
 saying what it asks for, or "Sign in with a code" for a device flow. A provider at `maxConnections`
-shows as connected, and its card opens the connection. **Add a key** on AI models shows only model
-providers. A card opens its form or device code on the same page. The fields, the write, and the
+shows as connected, and its card opens the connection. A device-flow provider that also declares
+fields, such as GitLab's personal access token, shows them below the code as **Or use a token**.
+**Add a key** on AI models shows only model providers. A card opens its form or device code on the same page. The fields, the write, and the
 device-flow pacing are in `packages/client-core/src/features/integrations/credentialForm.ts` and
 `deviceFlow.ts`, which onboarding shares.
 

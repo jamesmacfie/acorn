@@ -31,7 +31,7 @@ route. This is one array element:
 | --- | --- |
 | `id` | Lowercase letters, digits, and hyphens, at most 64 characters, unique among this plugin's contributions. |
 | `label` | 1 to 40 characters. The chip shows the task's name or **Start task**, and keeps the label in its accessible name. The extension uses it as text, never as markup. |
-| `match` | 1 to 8 page addresses in the [content-link grammar](../plugins/descriptors.md#content-links): `https://` only, a literal host or one `*.` level, and literal or `{capture}` path segments. The page must have exactly as many segments as the pattern, and one trailing slash is allowed. Declare one pattern per arity. |
+| `match` | 1 to 8 page addresses in the [content-link grammar](../plugins/descriptors.md#content-links): `https://` only, a literal host or one `*.` level, and literal, `{capture}`, or one `{capture+}` path segments. A `{capture+}` takes one or more segments and comes right before a literal, as in `https://gitlab.com/{path+}/-/merge_requests/{number}`. Otherwise the page must have exactly as many segments as the pattern, and one trailing slash is allowed. Declare one pattern per arity. |
 | `anchors` | Up to 4 CSS selectors, each at most 200 characters. The chip goes at the end of the first element that matches and is drawn. A selector can't contain `{`, `}`, `;`, `<`, or a control character. Leave it empty to offer the handoff in the sidebar only. |
 | `resolve` | A route inside this plugin's own `/v1/p/<pluginId>/` namespace. |
 

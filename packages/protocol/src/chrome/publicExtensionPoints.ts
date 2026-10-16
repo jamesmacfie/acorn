@@ -173,6 +173,8 @@ export const PUBLIC_EXTENSION_POINTS: readonly PublicExtensionPoint[] = [
   },
   { id: 'github:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
   { id: 'github:summary-badges', kind: 'remote', mode: 'stack', max: 4, props: '{ owner, repo, number }' },
+  { id: 'gitlab:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
+  { id: 'gitlab:summary-badges', kind: 'remote', mode: 'stack', max: 4, props: '{ owner, repo, number }' },
   {
     id: 'preview:toolbar-actions',
     kind: 'remote',

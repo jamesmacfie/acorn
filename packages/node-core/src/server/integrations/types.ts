@@ -27,8 +27,13 @@ export type ProviderRequestBudgets = Pick<
   'maxConcurrentRequests' | 'maxConcurrentRequestsPerConnection'
 >
 
+/** An access token that expires, with the token that renews it. `expiresAt` is epoch ms. */
+type RefreshedCredential = { secret: string; refreshToken: string; expiresAt: number }
+
 type NormalizedConnection = {
   secret: string
+  /** Set by a provider whose access token expires. */
+  refresh?: Omit<RefreshedCredential, 'secret'>
   label: string
   account: ProviderAccountRef | null
   scopes: string[]
@@ -49,6 +54,13 @@ export type TypedConnectionContract<TValidated> = {
   validate(credentials: ProviderCredentials): Promise<TValidated>
   normalize(credentials: ProviderCredentials, validated: TValidated): NormalizedConnection
   test(secret: string, config: unknown): Promise<ConnectionHealth>
+  /**
+   * Trade a refresh token for a fresh access token. The host calls it before the stored token expires
+   * and when a provider call is refused with it. Throw `ProviderOperationError('provider_needs_auth')`
+   * when the provider refuses the refresh token, which marks the connection as needing sign-in. Any
+   * other failure fails the one request and keeps the connection.
+   */
+  refresh?(refreshToken: string): Promise<RefreshedCredential>
 }
 
 export type ConnectionContract = TypedConnectionContract<unknown>

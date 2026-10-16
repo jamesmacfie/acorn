@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { eq } from 'drizzle-orm'
 import { schema } from '../db'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { connectionProviderRegistry } from './connectionProviders/registry'
@@ -6,6 +7,7 @@ import {
   connectProvider,
   disconnectConnection,
   externalRefForConnection,
+  freshConnection,
   renameConnection,
   rotateConnection,
   setConnectionDisabled,
@@ -275,5 +277,119 @@ describe('connection-only provider lifecycle', () => {
     expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(1)
     expect(attempts.filter((attempt) => attempt.status === 'rejected')).toHaveLength(1)
     expect(await testDb.db.select().from(schema.integrations)).toHaveLength(1)
+  })
+})
+
+describe('a provider whose access token expires', () => {
+  const REFRESHING_ID = 'refreshing-test'
+  const refreshed: string[] = []
+  let refusing = false
+  const refreshingProvider = publicConnectionProvider({
+    id: REFRESHING_ID,
+    label: 'Refreshing',
+    glyph: 'R',
+    kind: 'generic',
+    connection: {
+      authKind: 'oauth',
+      fields: [],
+      connectable: true,
+      disconnectable: true,
+      async validate(credentials) {
+        return credentials
+      },
+      normalize(credentials) {
+        return {
+          secret: credentials.accessToken!,
+          refresh: { refreshToken: credentials.refreshToken!, expiresAt: Number(credentials.expiresAt) },
+          label: 'Refreshing',
+          account: null,
+          scopes: [],
+          config: {},
+          capabilities: {},
+        }
+      },
+      async test() {
+        return { ok: true }
+      },
+      async refresh(refreshToken) {
+        refreshed.push(refreshToken)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        if (refusing) throw new ProviderOperationError('provider_needs_auth', 401)
+        return {
+          secret: `access-${refreshed.length}`,
+          refreshToken: `refresh-${refreshed.length}`,
+          expiresAt: Date.now() + 7_200_000,
+        }
+      },
+    },
+    capabilities: {},
+    budgets: { maxConcurrentRequests: 2, maxConcurrentRequestsPerConnection: 1 },
+  })
+  let testDb: TestDb
+
+  beforeAll(() => {
+    if (!connectionProviderRegistry.get(REFRESHING_ID)) connectionProviderRegistry.register(refreshingProvider)
+  })
+  beforeEach(() => {
+    testDb = makeTestDb()
+    broadcasts.length = 0
+    refreshed.length = 0
+    refusing = false
+  })
+  afterEach(() => testDb.cleanup())
+
+  const connect = (expiresAt: number) =>
+    connectProvider(
+      testDb.db,
+      'alice',
+      {
+        providerId: REFRESHING_ID,
+        credentials: { accessToken: 'access-0', refreshToken: 'refresh-0', expiresAt: String(expiresAt) },
+      },
+      SECRETS,
+    )
+  const stored = (id: string) =>
+    testDb.db.select().from(schema.integrations).where(eq(schema.integrations.id, id)).get()!
+  const secretOf = (row: { encryptedCredentials: string }) => SECRETS.use(row.encryptedCredentials, 'test', (v) => v)
+
+  it('stores the refresh token sealed, and leaves a token far from expiry alone', async () => {
+    const connected = await connect(Date.now() + 7_200_000)
+    const row = stored(connected.id)
+    expect(row.encryptedRefreshToken).not.toContain('refresh-0')
+    expect(await SECRETS.use(row.encryptedRefreshToken!, 'test', (v) => v)).toBe('refresh-0')
+    expect(await freshConnection(testDb.db, row, SECRETS)).toBe(row)
+    expect(refreshed).toEqual([])
+  })
+
+  it('renews a token near expiry once, however many callers ask, and writes both tokens back', async () => {
+    const connected = await connect(Date.now() + 60_000)
+    const row = stored(connected.id)
+    const [first, second] = await Promise.all([
+      freshConnection(testDb.db, row, SECRETS),
+      freshConnection(testDb.db, row, SECRETS),
+    ])
+    expect(refreshed).toEqual(['refresh-0'])
+    expect(await secretOf(first!)).toBe('access-1')
+    expect(second).toBe(first)
+    const after = stored(connected.id)
+    expect(await secretOf(after)).toBe('access-1')
+    expect(await SECRETS.use(after.encryptedRefreshToken!, 'test', (v) => v)).toBe('refresh-1')
+    expect(after.credentialExpiresAt).toBeGreaterThan(Date.now() + 3_600_000)
+  })
+
+  it('renews on demand, which is how a caller answers a 401', async () => {
+    const connected = await connect(Date.now() + 7_200_000)
+    const fresh = await freshConnection(testDb.db, stored(connected.id), SECRETS, { force: true })
+    expect(await secretOf(fresh!)).toBe('access-1')
+  })
+
+  it('marks the connection as needing sign-in when the refresh is refused, and stops refreshing', async () => {
+    refusing = true
+    const connected = await connect(Date.now() - 1)
+    expect(await freshConnection(testDb.db, stored(connected.id), SECRETS)).toBeNull()
+    expect(stored(connected.id)).toMatchObject({ status: 'needs-auth', lastError: 'provider_needs_auth' })
+    expect(broadcasts.at(-1)).toMatchObject({ status: 'needs-auth' })
+    await freshConnection(testDb.db, stored(connected.id), SECRETS, { force: true })
+    expect(refreshed).toHaveLength(1)
   })
 })

@@ -14,11 +14,10 @@ import {
   type Thread,
 } from '../../../shared/api'
 import { chunkRowsByColumnBudget, createLogger, type PluginDatabase } from '@acorn/plugin-api/node'
-import { patchBlobKey } from '../../blobKeys'
 import { filesResource, prResource } from '../../resourceKeys'
 import { mapLimited } from '../../mapLimited'
 import type { FilesFetch, PullComposite } from './prFetch'
-import { writePatchDocument } from './prDocument'
+import { patchBlobKey, writePatchDocument, type PatchBlobStore } from '@acorn/diff-document/store'
 import {
   checks as checksTable,
   comments as commentsTable,
@@ -321,14 +320,6 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
 }
 
 // ─── Files (REST /files → SQLite rows + BLOBS patch bodies) ──────────────────
-
-// Stated structurally rather than as `Pick<Env['BLOBS'], …>`: naming core's runtime bindings would put
-// `SECRETS`, `ACTIVE_IDENTITY` and `INTERNAL_TOKEN` on the plugin contract to reach one blob cache, and
-// a plugin should read what it needs off `ctx` or off the two methods it actually calls.
-export type PatchBlobStore = {
-  get(key: string): Promise<string | null>
-  put(key: string, value: string): Promise<void>
-}
 
 // Patch bodies are written a few at a time; a 2,200-file pull is 2,200 files on disk.
 const BLOB_WRITE_CONCURRENCY = 8

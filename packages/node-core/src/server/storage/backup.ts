@@ -33,7 +33,7 @@ export type BackupResult = {
 }
 
 const EXCLUDED = [
-  'credentials (integrations.encrypted_credentials)',
+  'credentials (integrations.encrypted_credentials and integrations.encrypted_refresh_token)',
   'device tokens (the devices table)',
   'the TLS private key',
   'the session encryption key and the internal token signing key (node-keys.sealed, or session.key and internal-token)',
@@ -60,7 +60,7 @@ function scrubCore(copy: string): void {
   const handle = openSqlite(copy)
   try {
     // Blanked rather than deleted (docs/data-layer/backup-and-retention.md § Backup and import).
-    handle.exec("UPDATE integrations SET encrypted_credentials = ''")
+    handle.exec("UPDATE integrations SET encrypted_credentials = '', encrypted_refresh_token = NULL")
     // Deleted outright, not blanked (docs/data-layer/backup-and-retention.md § Backup and import).
     handle.exec('DELETE FROM devices')
     // 24 hours of replay records for requests that can never be replayed against a new node.

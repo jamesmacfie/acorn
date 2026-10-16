@@ -795,7 +795,8 @@ describe('architecture boundaries', () => {
       '@acorn/node-core': 67,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.
-      '@acorn/diff-document': 2,
+      // The document model, and the store a code host's Node half keeps documents in.
+      '@acorn/diff-document': 3,
     }
     const problems: string[] = []
     for (const [name, limit] of Object.entries(limits)) {

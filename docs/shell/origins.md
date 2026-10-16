@@ -57,8 +57,9 @@ it, including preview and plugin pages. A Rust test fails if `windows` reappears
 `frame-src` names only `app-plugin:`. The response carries `frame-ancestors 'none'`, so a plugin iframe,
 which runs with `allow-scripts allow-same-origin`, can never load an `app://acorn` document and become
 same-origin with its parent. `style-src 'unsafe-inline'` is required because Shiki emits
-`style="color:#…"` attributes. Remote images are limited to GitHub avatar hosts for pull request
-authorship (`kit/components/content/UserAvatar.tsx`). Development widens the policy in one branch, for
+`style="color:#…"` attributes. Remote images are limited to the code hosts' avatar hosts for change
+request authorship (`kit/components/content/UserAvatar.tsx`): GitHub's, and `gitlab.com` with
+`secure.gravatar.com` for GitLab, which serves its uploaded avatars itself and falls back to Gravatar. Development widens the policy in one branch, for
 Vite's HMR socket and inline preamble, and a Rust test asserts the packaged policy has neither.
 
 ### The syntax-highlighter worker's separate policy

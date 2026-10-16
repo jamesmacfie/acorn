@@ -1,12 +1,12 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import { patchBlobKey } from '../../blobKeys'
+import { patchBlobKey, type PatchBlobStore } from '@acorn/diff-document/store'
 import { filesResource, prResource } from '../../resourceKeys'
 import { prFiles, reviewThreads, syncState } from '../../../node/schema'
 import { refreshPullDetail, refreshPullFiles } from '../pulls/pullRefresh'
 import { fakeGithub, makeFakePull } from './fakeGithub.helper'
-import { filesCompleteness, mirrorFiles, patchDigest, readComposite, readFiles, type PatchBlobStore } from './prMirror'
+import { filesCompleteness, mirrorFiles, patchDigest, readComposite, readFiles } from './prMirror'
 import { completePullTopology as COMPLETE } from '../../../shared/api'
 
 // The mirror's swap, against the real migrated github.sqlite: a refresh either swaps in a

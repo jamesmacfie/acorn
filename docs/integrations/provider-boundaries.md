@@ -15,6 +15,26 @@ own fetch, runs inside the `secrets.use` callback, not after it returns the plai
 echoes its credential in an error body has it scrubbed there, before the failure is logged or sent
 (`packages/node-core/src/server/core/secrets.ts`).
 
+## Tokens that expire
+
+A connection whose access token expires, such as GitLab's device sign-in, sets `refresh` on what its
+`normalize` returns: the refresh token and the access token's expiry. Core seals the refresh token
+beside the credential, in `integrations.encrypted_refresh_token`, with the expiry in
+`credential_expires_at`. The provider's connection contract adds a `refresh(refreshToken)` step that
+answers new tokens.
+
+`freshConnection` in `packages/node-core/src/server/integrations/connections.ts` renews the token
+when it is within five minutes of expiry, before `providerCredential`, `withConnections`, and
+`withConnection` hand it out. A route whose provider refused the token with a `401` asks for a renewal
+with `refreshProviderCredential`, and retries once. Both tokens are written back sealed, and one
+renewal runs at a time per connection, because a provider that rotates refresh tokens refuses the
+second of two renewals that spend the same one.
+
+A renewal the provider refuses, with `provider_needs_auth`, marks the connection `needs-auth`, and
+nothing renews it again until the person signs in. Any other failure fails only the one request and
+keeps the connection. A backup blanks the refresh token with the credential. [MCP
+sign-in](../future/mcp-sign-in.md) follows the same rules for its tokens.
+
 ## Errors
 
 A provider failure that isn't a deliberate `ProviderOperationError` is flattened to

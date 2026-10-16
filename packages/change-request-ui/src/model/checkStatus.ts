@@ -1,5 +1,3 @@
-import type { RailMarkerDot } from '@acorn/plugin-api/client'
-
 // Statuses that count as a failed check, which a host may offer to re-run.
 export const FAILED_STATUSES = new Set(['failure', 'error', 'startup_failure', 'cancelled', 'timed_out'])
 const IN_PROGRESS_STATUSES = new Set(['pending', 'in_progress', 'queued', 'requested', 'waiting', 'expected'])
@@ -20,7 +18,9 @@ export function checksState(checks: readonly { status: string | null }[]): 'succ
   return 'success'
 }
 
-export const CHECK_TONE: Record<ReturnType<typeof checksState>, RailMarkerDot> = {
+// The rail's dot tones (`RailMarkerDot` in the client facade), spelled here so a Node program can read
+// this module without the client's DOM types.
+export const CHECK_TONE: Record<ReturnType<typeof checksState>, 'ok' | 'bad' | 'warn' | 'mixed'> = {
   success: 'ok',
   failure: 'bad',
   pending: 'warn',

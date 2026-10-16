@@ -36,6 +36,7 @@ or writing a [task script](/docs/using/task-scripts/).
 | `ACORN_DEVICE_TOKEN` | A device token a launcher already holds. A standalone Node started in a terminal prints it back in its first line while it's still valid, instead of making a new one. |
 | `SESSION_ENC_KEY` | The 64-character hexadecimal key the Node encrypts stored credentials with. Without it, a standalone Node makes one and keeps it in `session.key` in its data folder. |
 | `GITHUB_CLIENT_ID` | The GitHub OAuth app the Node signs in with, in place of acorn's own. |
+| `GITLAB_CLIENT_ID` | The gitlab.com OAuth application the Node signs in with a code through. Without it, GitLab connects with a personal access token only. |
 
 ## The terminal client and the command line
 

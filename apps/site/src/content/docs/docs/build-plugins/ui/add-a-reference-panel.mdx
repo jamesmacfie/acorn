@@ -8,7 +8,7 @@ sources:
   - docs/panes.md
   - examples/plugins/acme-tracker/acorn-plugin.json
   - examples/plugins/acme-tracker/client.js
-checked: dfb0bd69b
+checked: 8fdb4823d
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -78,7 +78,8 @@ A content link has to land somewhere: a pane of yours, or your panel. One with n
 }
 ```
 
-- The pattern is `https` only, with a literal host, one capture per path segment, and no query.
+- The pattern is `https` only, with a literal host, one capture per path segment, and no query. One
+  `{capture+}` right before a literal segment takes one or more segments.
 - A panel's props name the item `item`. Its owner can't pass anything else.
 
 ## In the terminal

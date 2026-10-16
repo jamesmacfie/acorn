@@ -241,6 +241,7 @@ export default defineConfig({
             'docs/built-in-plugins/editor',
             'docs/built-in-plugins/git',
             'docs/built-in-plugins/github',
+            'docs/built-in-plugins/gitlab',
             'docs/built-in-plugins/http',
             'docs/built-in-plugins/linear',
             'docs/built-in-plugins/memory',

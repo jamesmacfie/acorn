@@ -11,7 +11,7 @@ import { SecretUnavailableError, type SecretService } from '../core/secrets'
 import { connectionProviderRegistry } from './connectionProviders/registry'
 import { integrationProviderRegistry } from './registry'
 import { providerRequestScheduler } from './budgetRuntime'
-import { ProviderOperationError } from './types'
+import { isProviderOperationError, ProviderOperationError, type ConnectionContract } from './types'
 import { resolvedConnectionCapabilities } from './connectionCapabilities'
 
 export { connectionHasCapability } from './connectionCapabilities'
@@ -101,6 +101,8 @@ export async function connectProvider(
         // Nobody has named this yet, so every surface falls back to the provider's own label.
         name: null,
         encryptedCredentials: await secrets.seal(normalized.secret),
+        encryptedRefreshToken: normalized.refresh ? await secrets.seal(normalized.refresh.refreshToken) : null,
+        credentialExpiresAt: normalized.refresh?.expiresAt ?? null,
         authKind: provider.connection.authKind,
         account: normalized.account ? JSON.stringify(normalized.account) : null,
         scopes: JSON.stringify(normalized.scopes),
@@ -134,10 +136,14 @@ export async function rotateConnection(
   )
   const normalized = provider.connection.normalize(request.credentials, validated)
   const now = Date.now()
+  const encryptedRefreshToken = normalized.refresh ? await secrets.seal(normalized.refresh.refreshToken) : null
+  const credentialExpiresAt = normalized.refresh?.expiresAt ?? null
   await db
     .update(schema.integrations)
     .set({
       encryptedCredentials: await secrets.seal(normalized.secret),
+      encryptedRefreshToken,
+      credentialExpiresAt,
       authKind: provider.connection.authKind,
       account: normalized.account ? JSON.stringify(normalized.account) : null,
       scopes: JSON.stringify(normalized.scopes),
@@ -153,6 +159,8 @@ export async function rotateConnection(
   return connectionSummary({
     ...row,
     encryptedCredentials: '',
+    encryptedRefreshToken: null,
+    credentialExpiresAt,
     authKind: provider.connection.authKind,
     account: normalized.account ? JSON.stringify(normalized.account) : null,
     scopes: JSON.stringify(normalized.scopes),
@@ -282,8 +290,10 @@ export async function forEachConnection<T>(
   connectionProviderRegistry.require(providerId)
   const rows = await listProviderConnections(db, userId, providerId)
   const out: T[] = []
-  for (const row of rows) {
-    if (row.status === 'disabled' || row.status === 'needs-auth') continue
+  for (const listed of rows) {
+    if (listed.status === 'disabled' || listed.status === 'needs-auth') continue
+    const row = await freshConnection(db, listed, secrets)
+    if (!row) continue
     let value: T | undefined
     try {
       // The visitor, which is what actually calls the provider, runs inside the scope.
@@ -354,3 +364,74 @@ export function externalRefForConnection(
 
 // --- Request-context seams, for provider plugins ---
 //
+
+// A refresh this early leaves room for a request that starts just before expiry to finish.
+const REFRESH_BEFORE_EXPIRY_MS = 5 * 60_000
+
+// One refresh at a time per connection. A provider that rotates refresh tokens refuses the second of
+// two refreshes that spend the same token, and that refusal would sign the person out.
+const refreshing = new Map<string, Promise<StoredConnection | null>>()
+
+/**
+ * The connection with an access token that is still good. A provider with a `refresh` step renews the
+ * token when it is within five minutes of expiry, or whenever `force` is set, which is how a caller
+ * answers a `401`. Both tokens are written back sealed. A refused refresh marks the connection as
+ * needing sign-in and answers null. Any other failure keeps the connection as it was, so the request
+ * goes ahead with the stored token.
+ */
+export async function freshConnection(
+  db: AppDatabase,
+  row: StoredConnection,
+  secrets: SecretService,
+  options: { force?: boolean } = {},
+): Promise<StoredConnection | null> {
+  const refresh = connectionProviderRegistry.get(row.provider)?.connection.refresh
+  // A connection whose refresh was refused waits for the person to sign in again.
+  if (!refresh || !row.encryptedRefreshToken || row.status === 'needs-auth') return row
+  const due = row.credentialExpiresAt != null && row.credentialExpiresAt - Date.now() < REFRESH_BEFORE_EXPIRY_MS
+  if (!options.force && !due) return row
+  const held = refreshing.get(row.id)
+  if (held) return held
+  const work = refreshConnection(db, row, secrets, refresh).finally(() => refreshing.delete(row.id))
+  refreshing.set(row.id, work)
+  return work
+}
+
+async function refreshConnection(
+  db: AppDatabase,
+  row: StoredConnection,
+  secrets: SecretService,
+  refresh: NonNullable<ConnectionContract['refresh']>,
+): Promise<StoredConnection | null> {
+  // A refresh that lost a race to another process still reads the winner's tokens.
+  const current = (await getConnection(db, row.userId, row.id)) ?? row
+  if (current.encryptedRefreshToken !== row.encryptedRefreshToken) return current
+  try {
+    const next = await secrets.use(current.encryptedRefreshToken!, `${row.provider}: refresh connection`, (token) =>
+      refresh(token),
+    )
+    const now = Date.now()
+    const update = {
+      encryptedCredentials: await secrets.seal(next.secret),
+      encryptedRefreshToken: await secrets.seal(next.refreshToken),
+      credentialExpiresAt: next.expiresAt,
+      status: 'connected',
+      lastError: null,
+      updatedAt: now,
+    }
+    await db.update(schema.integrations).set(update).where(eq(schema.integrations.id, row.id))
+    return { ...current, ...update }
+  } catch (error) {
+    const refused =
+      error instanceof SecretUnavailableError ||
+      (isProviderOperationError(error) && error.code === 'provider_needs_auth')
+    if (!refused) return current
+    const now = Date.now()
+    await db
+      .update(schema.integrations)
+      .set({ status: 'needs-auth', lastError: 'provider_needs_auth', updatedAt: now })
+      .where(eq(schema.integrations.id, row.id))
+    broadcastConnectionChanged({ integrationId: row.id, providerId: row.provider, status: 'needs-auth' })
+    return null
+  }
+}

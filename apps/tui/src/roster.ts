@@ -3,6 +3,7 @@ import { contextClientPlugin } from '@acorn/plugin-context/client/index.ts'
 import { dockerClientPlugin } from '@acorn/plugin-docker/client/index.ts'
 import { editorClientPlugin } from '@acorn/plugin-editor/client/index.ts'
 import { githubClientPlugin } from '@acorn/plugin-github/client/index.ts'
+import { gitlabClientPlugin } from '@acorn/plugin-gitlab/client/index.ts'
 import { gitClientPlugin } from '@acorn/plugin-git/client/index.ts'
 import { memoryClientPlugin } from '@acorn/plugin-memory/client/index.ts'
 import { notesClientPlugin } from '@acorn/plugin-notes/client/index.ts'
@@ -13,14 +14,14 @@ import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
-// because that is where a pane comes from on the desktop too. It is the same twelve the desktop
+// because that is where a pane comes from on the desktop too. It is the same thirteen the desktop
 // registers (docs/tui/plugin-losses.md § What a plugin loses here). A loaded plugin is not on this
 // list: it arrives from a node as a bundle, and the client runtime's `watchPluginChanges` finds it
 // once a node is reachable.
 //
 // ## Why this is its own module, imported after the first frame
 //
-// These imports pull in every pane, source and query module in twelve plugins. `main.tsx` awaits
+// These imports pull in every pane, source and query module in thirteen plugins. `main.tsx` awaits
 // `App` before it creates a renderer, so holding them in `App.tsx` would evaluate all of that before
 // a cell is drawn. ../scripts/check-startup-graph.mjs fails the build if the roster reaches the
 // startup graph.
@@ -37,6 +38,7 @@ export function installRoster(): void {
     dockerClientPlugin,
     editorClientPlugin,
     githubClientPlugin,
+    gitlabClientPlugin,
     gitClientPlugin,
     memoryClientPlugin,
     notesClientPlugin,

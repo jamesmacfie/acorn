@@ -227,7 +227,7 @@ export { encodeCached, isRecord, parseCached, parseJson } from '@acorn/node-core
 export { connectionHasCapability } from '@acorn/node-core/server/integrations'
 export { connectProvider } from '@acorn/node-core/server/integrations'
 export type { StoredConnection } from '@acorn/node-core/server/integrations'
-export { providerCredential } from '@acorn/node-core/server/integrations'
+export { providerCredential, refreshProviderCredential } from '@acorn/node-core/server/integrations'
 export { providerError } from '@acorn/node-core/server/integrations'
 export { providerRequestScheduler } from '@acorn/node-core/server/integrations'
 export {

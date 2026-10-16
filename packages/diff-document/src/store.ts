@@ -1,26 +1,21 @@
-import {
-  DIFF_DOCUMENT_VERSION,
-  documentCache,
-  documentTopology,
-  fileDocument,
-  searchDocument,
-  type DiffDocumentFile,
-  type DiffDocumentTopology,
-  type DiffSearchPage,
-  type DiffSearchRequest,
-  type DiffSegmentDescriptor,
-  type DiffSegmentPayload,
-  type DiffSegmentRequest,
-  type FileDocument,
-} from '@acorn/diff-document/document'
-import { diffDocumentBlobKey, patchBlobKey } from '../../blobKeys'
-import type { PullFile } from '../../../shared/api'
-import { mapLimited } from '../../mapLimited'
-import type { PatchBlobStore } from './prMirror'
+import { documentCache } from './cache.ts'
+import { DIFF_DOCUMENT_VERSION } from './model.ts'
+import type {
+  DiffDocumentFile,
+  DiffDocumentTopology,
+  DiffSearchPage,
+  DiffSearchRequest,
+  DiffSegmentDescriptor,
+  DiffSegmentPayload,
+  DiffSegmentRequest,
+} from './model.ts'
+import { searchDocument } from './search.ts'
+import { documentTopology, fileDocument, type FileDocument } from './segment.ts'
 
-// GitHub's diffs as documents (docs/github-integration/mirror.md § Diff documents). Everything here is
-// keyed by the patch's own digest, the same `sha256:<hex>` its body is stored under, so it serves a pull
-// request and a compare preview alike and can never hand one revision's rows to another.
+// A code host's diffs as documents, over a blob store the caller passes in
+// (docs/github-integration/mirror.md § Diff documents). Everything here is keyed by the patch's own
+// digest, the same `sha256:<hex>` its body is stored under, so it serves a pull request and a compare
+// preview alike and can never hand one revision's rows to another.
 //
 // A patch is cut into segments once, when it is mirrored, and its segment descriptors are stored
 // beside it as a small blob. A topology read then reads those and parses nothing. The segments'
@@ -33,6 +28,29 @@ const parsed = documentCache(64 * 1024 * 1024)
 
 /** Topology reads fan out over every file, a few at a time. */
 const READ_CONCURRENCY = 16
+
+/** The blob cache a Node half holds. The host's `BLOBS` binding is one. */
+export type PatchBlobStore = {
+  get(key: string): Promise<string | null>
+  put(key: string, value: string): Promise<void>
+}
+
+// The cache's keys (docs/caching.md § Immutable blob cache):
+//   patch:<digest>  - a file's unified-diff patch body, keyed by a digest of the patch text itself
+//                     (`sha256:<hex>`). Not the head blob sha: one new file has a different patch
+//                     against a different base.
+//   diffdoc:v<version>:<digest>
+//                   - the segment descriptors a patch cuts into, for one diff-document version
+//                     (written beside the patch, so a topology read parses nothing)
+export const patchBlobKey = (digest: string) => `patch:${digest}`
+const diffDocumentBlobKey = (version: number, digest: string) => `diffdoc:v${version}:${digest}`
+
+/** One changed file as a mirror stores it: its patch's digest when the host sent a patch. */
+export type StoredPatchFile = Pick<DiffDocumentFile, 'path' | 'status' | 'additions' | 'deletions' | 'sha'> & {
+  viewed?: boolean
+  patchState: 'available' | 'unavailable'
+  patchKey: string | null
+}
 
 /** Cut a patch and store its descriptors beside its body. Called where the body is written. A patch
  *  already cut is skipped: its key is its digest, and a refresh every 45 seconds would otherwise cut
@@ -80,9 +98,9 @@ export type TopologyResult = { ok: true; document: DiffDocumentTopology } | { ok
 
 /** The document over files already in provider order. A missing patch body is an integrity failure,
  *  the same one `readFiles` reports, and the caller repairs it with a refresh. */
-export async function topologyOf(blobs: PatchBlobStore, files: readonly PullFile[]): Promise<TopologyResult> {
+export async function topologyOf(blobs: PatchBlobStore, files: readonly StoredPatchFile[]): Promise<TopologyResult> {
   let missing = 0
-  const out = await mapLimited([...files], READ_CONCURRENCY, async (file): Promise<DiffDocumentFile> => {
+  const read = async (file: StoredPatchFile): Promise<DiffDocumentFile> => {
     const available = file.patchState === 'available' && file.patchKey != null
     const segments = available ? await descriptorsFor(blobs, file.patchKey!, file.path) : []
     if (available && !segments) missing++
@@ -92,11 +110,14 @@ export async function topologyOf(blobs: PatchBlobStore, files: readonly PullFile
       additions: file.additions,
       deletions: file.deletions,
       sha: file.sha,
-      viewed: file.viewed,
+      viewed: file.viewed ?? false,
       patchKey: available && segments ? file.patchKey : null,
       segments: segments ?? [],
     }
-  })
+  }
+  const out: DiffDocumentFile[] = []
+  for (let start = 0; start < files.length; start += READ_CONCURRENCY)
+    out.push(...(await Promise.all(files.slice(start, start + READ_CONCURRENCY).map(read))))
   return missing ? { ok: false, missing } : { ok: true, document: documentTopology(out) }
 }
 

@@ -19,7 +19,9 @@ keys, and maps its own records onto the neutral types. The one exception is Line
 **Linked issues** section, which goes through the host's ref resolution
 (`refResolutionsOptions` in `@acorn/plugin-api/client`), as GitHub's pane did.
 
-The GitHub plugin draws from it, and its mapper is `plugins/github/src/client/changeRequest.ts`.
+The GitHub and GitLab plugins draw from it. GitHub's mapper is
+`plugins/github/src/client/changeRequest.ts`. GitLab's routes answer the neutral model directly, from
+`plugins/gitlab/src/server/mirror/detail.ts`.
 
 ## The neutral model
 
@@ -31,13 +33,12 @@ line.
 
 A field one host lacks is optional, and the view hides what's absent:
 
-- `autoMergeEnabled` and `mergeBlocked` drive GitHub's auto-merge controls.
+- `autoMergeEnabled` and `mergeBlocked` drive GitHub's auto-merge controls. GitLab sends neither.
 - `conflicting` says the source branch conflicts. A host that can list the files passes `conflicts`.
-- A review's `changes-requested` verdict comes from GitHub only. Another host's approvals are
-  `approved`.
+- A review's `changes-requested` verdict comes from GitHub only. GitLab approvals are `approved`.
 - A check's `status` is one word from the table in `packages/change-request-ui/src/model/checkStatus.ts`,
-  compared without case. GitHub's words are the table, and another host maps its statuses onto them.
-- A check's `runId` opens its log and re-runs it. GitHub's is a workflow run.
+  compared without case. GitHub's words are the table, and GitLab maps its job statuses onto them.
+- A check's `runId` opens its log and re-runs it. GitHub's is a workflow run, and GitLab's is a job.
 - A thread's `outdated` must be `false`, with a side and a line, before the diff places it.
 
 ## Build a model
@@ -46,8 +47,8 @@ A field one host lacks is optional, and the view hides what's absent:
 a reactive root it owns, one per change request, as `prModel` in
 `plugins/github/src/client/pullDetail/prModel.ts` does. The input names:
 
-- The scope: the repository's namespace as `owner`, its name as `repo`, the number, and the task
-  when there is one.
+- The scope: the repository's namespace as `owner` (a GitHub owner or a GitLab group path), its
+  name as `repo`, the number, and the task when there is one.
 - The host: its plugin id, label, noun (`pull request`), number prefix (`#`), avatar function, and a
   function that turns a failed write into a sentence. A failure with code `reauth` offers to reconnect.
 - Accessors for the detail, the changed files, the people who can be mentioned, and the repository's
@@ -74,7 +75,8 @@ host owns the reads, the search past the loaded pages, each row's checks, and th
 ## Extension points
 
 Each code host opens its own `diff-line` and `summary-badges` points, so GitHub's are
-`github:diff-line` and `github:summary-badges`. Register both with `changeRequestPoints(noun)`. `DIFF_LINE_KEY` is the
+`github:diff-line` and `github:summary-badges` and GitLab's are `gitlab:diff-line` and
+`gitlab:summary-badges`. Register both with `changeRequestPoints(noun)`. `DIFF_LINE_KEY` is the
 `diff-line` key, `file`, `line`, and `side`. A `summary-badges` contributor gets
 `{ owner, repo, number }`, where `owner` is the repository's namespace. A contributor that wants every
 host files the same code against each host's point
@@ -90,6 +92,6 @@ host files the same code against each host's point
 
 ## Why
 
-A shared shape guessed from GitHub alone tilts toward GitHub, so each view moved here when a second
-code host needed it, and the model keeps only what both hosts send. When a view needs something one host
+A shared shape guessed from GitHub alone tilts toward GitHub, so the views moved here as the GitLab
+plugin needed them, and the model keeps only what both hosts send. When a view needs something one host
 does differently, the host passes a slot or a verb rather than the view branching on the host.

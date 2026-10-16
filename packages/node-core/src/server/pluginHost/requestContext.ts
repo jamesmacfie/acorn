@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Env } from '../bindings'
 import { getDb } from '../db'
-import { forEachConnection, getConnection, listProviderConnections } from '../integrations/connections'
+import { forEachConnection, freshConnection, getConnection, listProviderConnections } from '../integrations/connections'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { createExternalItemStore } from '../integrations/itemStore'
@@ -91,9 +91,10 @@ export function buildPluginRequestContext(
       assertOwnedCredential(pluginId, providerId)
       assertConnectionScope(providerId)
       if (connectionScope) {
-        const connection = await getConnection(getDb(env), principal.userId, connectionScope.connectionId!)
-        if (!connection || connection.provider !== providerId || ['disabled', 'needs-auth'].includes(connection.status))
-          return []
+        const listed = await getConnection(getDb(env), principal.userId, connectionScope.connectionId!)
+        if (!listed || listed.provider !== providerId || ['disabled', 'needs-auth'].includes(listed.status)) return []
+        const connection = await freshConnection(getDb(env), listed, env.SECRETS)
+        if (!connection) return []
         const value = await env.SECRETS.use(
           connection.encryptedCredentials,
           `${providerId}: source connection`,

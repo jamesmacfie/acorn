@@ -1,5 +1,83 @@
 # Phase 5: build a GitLab plugin for gitlab.com
 
+## Completion note
+
+October 17, 2026. Done, verified against a fake GitLab API only.
+
+What landed:
+
+- Refreshable connections. A connection's `normalize` may return `refresh`, core seals the refresh
+  token in `integrations.encrypted_refresh_token` with the expiry in `credential_expires_at` (migration
+  `0011`), and the connection contract gains `refresh(refreshToken)`. `freshConnection` in
+  `packages/node-core/src/server/integrations/connections.ts` renews within five minutes of expiry for
+  `providerCredential`, `withConnections`, and `withConnection`, and `refreshProviderCredential`, on
+  the facade, renews on demand after a `401`. A backup blanks the refresh token. [Tokens that
+  expire](../../integrations/provider-boundaries.md#tokens-that-expire) documents it.
+- `{name+}` captures in `compileContentLinkPattern`, once per pattern and only right before a literal.
+- `plugins/gitlab/`, a compiled plugin registered on the Node, the desktop, and the terminal client:
+  the code host, the device flow and a personal access token, the mirror, the four change request
+  routes, `gitlab:ci-settled` and `gitlab:review-received`, the three events, the data sources
+  `merge-requests`, `pipeline-jobs` with **Retry job**, and `local-branches`, the browser handoff, the
+  editor line markers, and the client: rail source, browse list and detail, `mr` pane, rail marker,
+  reference panel, content links, importer, and push action. [GitLab
+  integration](../../gitlab-integration.md) documents it.
+- The browser handoff seed takes `changeRequest: { number }`, and the browser bridge finds a task that
+  holds an item's change request by number, as it did a pull number.
+- Settings shows a device-flow provider's fields, when it declares any, as **Or use a token**.
+- The desktop's image policy allows `gitlab.com` and `secure.gravatar.com` for GitLab avatars
+  (docs/shell/origins.md).
+- Shared with GitHub rather than copied: GitHub's blob-backed diff document store moved to
+  `@acorn/diff-document/store`, and its line-marker comparison to `changeRequestLineMarkers` in
+  `plugins/editor/src/contract/lineMarkers.ts`.
+
+Decisions and deviations:
+
+- `GITLAB_CLIENT_ID` has no default. Acorn's gitlab.com OAuth application still needs registering,
+  with the device authorization grant on and the `api` scope. Without the variable, the provider
+  offers the token form alone.
+- A route renews on a `401` through `gitlabSession` and retries once. A background read, such as a
+  policy poll, gets the five-minute renewal only, and a `401` there fails that poll as `reauth`. One
+  renewal runs at a time per connection, in process. A refused renewal marks the connection
+  `needs-auth`, and nothing renews it again until the person signs in, the rule MCP sign-in also takes.
+- GitLab's routes answer the shared model directly, so the client maps nothing. Detail and files are
+  two resources: detail is one GraphQL request, files are REST with their patches in the blob cache.
+  A background reader refreshes the detail alone, because it has no blob cache to write to.
+- A GitLab task links its merge request's page under the GitLab connection, so the extension finds
+  the task from the merge request's address with no change to `taskPages`.
+- GitLab approvals have no time, so the mirror takes it from the approval's system note.
+- Job statuses map onto the check vocabulary: `failed` is `failure`, `running` is `in_progress`,
+  `manual` is `skipped`, and a failed job allowed to fail is `neutral`.
+- The editor's line marker kinds are `pull-request` and `uncommitted`, so GitLab marks a merge
+  request's changed lines as GitHub does, not its discussion lines.
+- **Open merge request** opens gitlab.com's own form for the branch. No create form was extracted.
+- The `mr` pane's chord is ⌘⇧M, because every pane chord must be unique and ⌘⇧R is GitHub's.
+- The closed tab reads one page of 50 closed and 50 merged merge requests live. The list's search
+  narrows the loaded rows and doesn't ask GitLab. Tab and filter aren't persisted.
+- Left out, for a later change if someone asks: a strip of related merge requests, Linear task links
+  from a merge request's description, viewed-file marks, an extension sidebar panel, and API telemetry
+  spans.
+- The Node half loads everything past its declarations on first use, to keep the service's static
+  graph small. It adds 13,109 B (1,896,362 B against 1,883,253 B at the phase 4 commit). The base was
+  already 50,453 B over the 1,832,800 B ceiling in `apps/node/scripts/check-service-budget.mjs`, so
+  the ceiling isn't raised here.
+- 200 open merge requests read in two GraphQL requests against the fake (`projectRoutes.test.ts`). A
+  real project's timing is unmeasured.
+- `packages/plugin-api/src/surface.snapshot.txt` gained `refreshProviderCredential` and phase 3's
+  missing `mirrorFootprintCapability`. The `apps/node` and desktop goldens gained only GitLab's lines.
+
+For later phases:
+
+- Phase 6: gitlab.com is fixed in `GITLAB_ORIGIN` and `GITLAB_HOST` in
+  `plugins/gitlab/src/server/config.ts`, the handoff patterns in `plugins/gitlab/src/node/index.ts`, the
+  content link patterns in `plugins/gitlab/src/shared/mergeRequestRef.ts`, and the image policy.
+  `maxConnections` is 1.
+- Phase 7: GitLab checks a fork's merge request out from `merge-requests/{number}/head` already.
+- A real-account check needs a gitlab.com login and the registered OAuth application.
+- Already red at the base and untouched: the `pluginDisable` and `routeRegistry` goldens in
+  `apps/node` (the browser-panel and agents MCP routes), knip's `proposalChanges`, three `docPaths`
+  entries for `dist` files, the Node service budget, and three site unit tests (`ACORN_BUILD`,
+  `meta+shift+j`, and the bundled `database` plugin).
+
 Date: October 16, 2026. Status: proposed. Depends on phases [1](./01-change-request-agent-context.md),
 [2](./02-workflow-ci-by-provider.md), and [3](./03-github-assumptions-outside-the-plugin.md). Runs
 alongside [phase 4](./04-shared-change-request-ui.md).

@@ -7,7 +7,7 @@ sources:
   - packages/protocol/src/plugin/handoffs.ts
   - examples/plugins/acme-browser/acorn-plugin.json
   - examples/plugins/acme-browser/node.js
-checked: f7af12472
+checked: 8fdb4823d
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -46,7 +46,9 @@ Node to see it.
    <ExampleCode file="acme-browser/acorn-plugin.json" pick={['contributions.browserHandoffs']} />
 
    - `match` lists the pages, `https://` only. A `{capture}` stands for one path segment, and a page
-     must have as many segments as the pattern.
+     must have as many segments as the pattern. One `{capture+}` right before a literal segment takes
+     one or more, for a path that nests to any depth, such as
+     `https://gitlab.com/{path+}/-/merge_requests/{number}`.
    - `anchors` are CSS selectors. The chip goes at the end of the first one that matches and is drawn.
      Leave the list empty to offer the handoff in the panel only.
    - `label` is the chip's accessible name, drawn as text.
@@ -84,7 +86,7 @@ project, and answers an existing linked task instead of making a second.
   anchor means no chip, and the panel still offers the handoff.
 - A seed link with no `ref.url`. The task can be found by resolving, but no page shows its chip.
 
-One pattern covers one number of path segments:
+One pattern covers one number of path segments, unless a `{capture+}` takes the rest:
 
 ```json manifest-invalid title="Wrong: acorn-plugin.json"
 {

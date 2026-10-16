@@ -35,6 +35,14 @@
       "github/data/pulls",
       "github/repos",
       "github/tasks",
+      "gitlab/auth",
+      "gitlab/browser",
+      "gitlab/change-requests",
+      "gitlab/data/branches",
+      "gitlab/data/jobs",
+      "gitlab/data/merge-requests",
+      "gitlab/import",
+      "gitlab/projects",
       "memory",
       "notes",
       "preview",
@@ -96,10 +104,12 @@
       "plugin-authoring"
     ],
     "connectionProviders": [
-      "github"
+      "github",
+      "gitlab"
     ],
     "integrationProviders": [
-      "github"
+      "github",
+      "gitlab"
     ],
     "providerRoutes": [],
     "modelProviders": [],
@@ -135,6 +145,7 @@
       "git.staticDependencyPolicy",
       "github.mirror",
       "github.mirrorFootprint",
+      "gitlab.mirrorFootprint",
       "memory.knowledgeRoute",
       "memory.library",
       "notes.seedTask",
@@ -162,6 +173,7 @@
       "browser.sqlite",
       "git.sqlite",
       "github.sqlite",
+      "gitlab.sqlite",
       "terminal.sqlite",
       "workflows.sqlite"
     ]
@@ -232,6 +244,30 @@
       ],
       "databases": [
         "github.sqlite"
+      ]
+    },
+    "gitlab": {
+      "routes": [
+        "gitlab/auth",
+        "gitlab/browser",
+        "gitlab/change-requests",
+        "gitlab/data/branches",
+        "gitlab/data/jobs",
+        "gitlab/data/merge-requests",
+        "gitlab/import",
+        "gitlab/projects"
+      ],
+      "connectionProviders": [
+        "gitlab"
+      ],
+      "integrationProviders": [
+        "gitlab"
+      ],
+      "capabilities": [
+        "gitlab.mirrorFootprint"
+      ],
+      "databases": [
+        "gitlab.sqlite"
       ]
     },
     "git": {

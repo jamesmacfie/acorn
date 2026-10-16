@@ -13,7 +13,7 @@ import {
 } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../../syncPolicy'
 import { readFiles } from '../mirror/prMirror'
-import { topologyOf } from '../mirror/prDocument'
+import { topologyOf } from '@acorn/diff-document/store'
 import { refreshPullFiles } from './pullRefresh'
 import { resolveRepoForUser } from '../mirror/repoMirror'
 import { githubToken } from '../../githubToken'

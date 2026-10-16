@@ -6,6 +6,7 @@
       "docker",
       "editor",
       "pr",
+      "mr",
       "git",
       "notes",
       "preview",
@@ -29,6 +30,7 @@
       "editor.navigation.go-to-line",
       "editor.search.open",
       "source.github.open",
+      "source.gitlab.open",
       "changes.open",
       "memory.search",
       "notes.find",
@@ -47,6 +49,7 @@
       "agents",
       "docker",
       "github",
+      "gitlab",
       "git",
       "memory",
       "workflows"
@@ -89,6 +92,8 @@
       "editor:line",
       "github:diff-line",
       "github:summary-badges",
+      "gitlab:diff-line",
+      "gitlab:summary-badges",
       "git:diff-line",
       "git:push-actions",
       "preview:toolbar-actions",
@@ -100,6 +105,7 @@
       "agents.security",
       "agents.loop-coverage",
       "github.push-actions",
+      "gitlab.push-actions",
       "changes.tool-card",
       "changes.diff-fence",
       "line-blame",
@@ -107,7 +113,8 @@
       "workflows.tool-card"
     ],
     "refPanels": [
-      "github-pull"
+      "github-pull",
+      "gitlab-merge-request"
     ],
     "agentContexts": [
       "agents.sessions",
@@ -124,6 +131,7 @@
       "agents",
       "docker",
       "pr-status",
+      "mr-status",
       "changes",
       "workflows.task-groups"
     ],
@@ -148,16 +156,19 @@
       "agents.session",
       "github.pull-request",
       "github.repository",
+      "gitlab.merge-request",
       "workflows.run"
     ],
     "brandMarks": [
       "github",
       "agents/claude",
       "agents/codex",
-      "docker"
+      "docker",
+      "gitlab"
     ],
     "projectImporters": [
-      "github"
+      "github",
+      "gitlab"
     ]
   },
   "owned": {
@@ -275,6 +286,39 @@
       ],
       "projectImporters": [
         "github"
+      ]
+    },
+    "gitlab": {
+      "panes": [
+        "mr"
+      ],
+      "commands": [
+        "source.gitlab.open"
+      ],
+      "sources": [
+        "gitlab"
+      ],
+      "extensionPoints": [
+        "gitlab:diff-line",
+        "gitlab:summary-badges"
+      ],
+      "extensions": [
+        "gitlab.push-actions"
+      ],
+      "refPanels": [
+        "gitlab-merge-request"
+      ],
+      "railMarkers": [
+        "mr-status"
+      ],
+      "contentLinks": [
+        "gitlab.merge-request"
+      ],
+      "brandMarks": [
+        "gitlab"
+      ],
+      "projectImporters": [
+        "gitlab"
       ]
     },
     "git": {

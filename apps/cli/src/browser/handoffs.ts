@@ -28,27 +28,33 @@ export const ownsRoute = (pluginId: string, route: string): boolean => {
   }
 }
 
-// Active tasks that already hold this item. A connection-stamped link names the item anywhere. A pull
-// number names it only inside a project the provider tied the item to, because `#12` means another pull
-// request in any other repository.
+// The change request an item names, by number: `changeRequest`, or a pull request's `pullNumber`.
+const changeRequestNumber = (item: BrowserHandoffItem): number | undefined =>
+  item.seed.changeRequest?.number ?? item.seed.pullNumber
+
+// Active tasks that already hold this item. A connection-stamped link names the item anywhere. A change
+// request number names it only inside a project the provider tied the item to, because `#12` means
+// another pull request in any other repository.
 export function linkedTasks(item: BrowserHandoffItem, tasks: readonly Task[]): Task[] {
   const links = item.seed.links ?? []
-  const pullNumber = item.seed.pullNumber
+  const number = changeRequestNumber(item)
   return tasks.filter(
     (task) =>
       task.status === 'active' &&
       (task.links.some((link) =>
         links.some((wanted) => wanted.connectionId === link.connectionId && wanted.identifier === link.identifier),
       ) ||
-        (pullNumber !== undefined && task.pullNumber === pullNumber && item.projects.includes(task.projectId))),
+        (number !== undefined &&
+          (task.changeRequest?.number ?? task.pullNumber) === number &&
+          item.projects.includes(task.projectId))),
   )
 }
 
 // The projects a linked task may be created in: the ones the provider tied the item to, then any whose
-// site associations cover the page. A pull number names a pull request only in its own repository, so
+// site associations cover the page. A change request number names one only in its own repository, so
 // an item carrying one stays with the provider's projects.
 export const creatableProjects = (item: BrowserHandoffItem, siteProjects: readonly string[]): string[] =>
-  item.seed.pullNumber === undefined ? [...new Set([...item.projects, ...siteProjects])] : item.projects
+  changeRequestNumber(item) === undefined ? [...new Set([...item.projects, ...siteProjects])] : item.projects
 
 export function bridgeHandoffItem(
   item: BrowserHandoffItem,

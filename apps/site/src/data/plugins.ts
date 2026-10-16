@@ -119,6 +119,15 @@ export const PLUGINS = {
     worksIn: both,
     docs: '/docs/built-in-plugins/github/',
   },
+  gitlab: {
+    name: 'GitLab',
+    sentence:
+      'Review gitlab.com merge requests with their discussions and pipelines, merge them, and start a task from one.',
+    icon: 'git-pull-request',
+    ships: 'compiled',
+    worksIn: both,
+    docs: '/docs/built-in-plugins/gitlab/',
+  },
   http: {
     name: 'HTTP',
     sentence: 'Send HTTP requests from a pane, and keep them with the project.',

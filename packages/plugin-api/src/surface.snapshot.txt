@@ -353,6 +353,7 @@ node: lazyRouter
 node: lineDelimitedJsonAdapter
 node: listProfiles
 node: mayActOnTask
+node: mirrorFootprintCapability
 node: ownerId
 node: parseCached
 node: parseJson
@@ -367,6 +368,7 @@ node: publicProvider
 node: readConfigFileSync
 node: recordSkillDelivery
 node: redactSecretText
+node: refreshProviderCredential
 node: registerAcornMcp
 node: registerAcornMcpBeforeSpawn
 node: registerDeletedTaskPurge

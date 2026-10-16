@@ -1,0 +1,40 @@
+{
+  "name": "@acorn/plugin-gitlab",
+  "version": "1.0.0",
+  "description": "GitLab as a mirrored source for gitlab.com: merge requests, approvals, discussions, and pipeline jobs.",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./node/index.ts": "./src/node/index.ts",
+    "./client/index.ts": "./src/client/index.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/change-request-ui": "workspace:*",
+    "@acorn/diff-document": "workspace:*",
+    "@acorn/plugin-agents": "workspace:*",
+    "@acorn/plugin-api": "workspace:*",
+    "@acorn/plugin-editor": "workspace:*",
+    "@acorn/plugin-workflows": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "@solidjs/router": "^0.16.1",
+    "@tanstack/solid-query": "^5.101.0",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "solid-js": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
+    "@types/node": "^26.0.0",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.11"
+  }
+}

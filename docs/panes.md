@@ -12,6 +12,7 @@ These panes ship with acorn:
 | ID | Order | What it shows |
 | --- | ---: | --- |
 | `pr` | 10 | The linked GitHub pull request |
+| `mr` | 10 | The linked GitLab merge request |
 | `agents` | 15 | The managed Agent pane |
 | `git` | 20 | Tabs for the worktree diff with staging, commit, and remote actions; history; stashes; and worktrees |
 | `workflows` | 25 | Workflow runs on this task, their nodes, and the selected node's work, which for an agent node is its whole conversation |
@@ -40,8 +41,8 @@ On desktop, right-click the Preview rail button and select **Copy URL** to copy 
 preview start URL. This works while the pane is closed. The action reports a failure if the URL is
 unavailable or the clipboard write fails.
 
-The Pull request, Linear, and Rollbar rail buttons offer the same **Copy URL** item. It copies the
-pull request's GitHub address, or the address of each Linear issue or Rollbar error the task links, one
+The Pull request, Merge request, Linear, and Rollbar rail buttons offer the same **Copy URL** item. It
+copies the pull request's GitHub address or the merge request's GitLab address, or the address of each Linear issue or Rollbar error the task links, one
 per line. A pane offers it by setting `url(task)` on its contribution, and the item is hidden when that
 returns nothing. A linked-items pane gets `url` from the host, which reads the task's own links.
 

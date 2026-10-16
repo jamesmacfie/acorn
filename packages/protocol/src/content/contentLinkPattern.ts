@@ -9,7 +9,8 @@ export type CompiledContentLinkPattern = {
   match(href: string): ContentLinkCaptures | null
 }
 
-type Segment = { literal: string } | { capture: string }
+// `rest` is a `{name+}` capture: one or more whole segments, joined with `/`.
+type Segment = { literal: string } | { capture: string; rest?: true }
 const CAPTURE = /^[A-Za-z][A-Za-z0-9_]{0,31}$/
 
 const decoded = (value: string, label: string): string => {
@@ -22,6 +23,11 @@ const decoded = (value: string, label: string): string => {
 
 // Compile a non-regex URL grammar. Matching is linear over host/path segments, so no manifest string
 // can introduce catastrophic backtracking into synchronous content rendering.
+//
+// A path segment is a literal, a `{capture}` of one segment, or a `{capture+}` of one or more. A
+// `{capture+}` appears once and only right before a literal, such as GitLab's
+// `https://gitlab.com/{path+}/-/merge_requests/{number}`. Every other segment has a fixed width, so
+// the address's segment count alone says how many segments the `+` capture takes.
 export function compileContentLinkPattern(pattern: string): CompiledContentLinkPattern {
   if (!pattern.length || pattern.length > CONTENT_LINK_PATTERN_MAX_LENGTH) {
     throw new Error(`content-link pattern must be 1-${CONTENT_LINK_PATTERN_MAX_LENGTH} characters`)
@@ -49,7 +55,19 @@ export function compileContentLinkPattern(pattern: string): CompiledContentLinkP
   if (rawSegments.some((segment) => !segment))
     throw new Error('content-link pattern path cannot contain empty segments')
   const captures: string[] = []
-  const segments: Segment[] = rawSegments.map((segment) => {
+  const segments: Segment[] = rawSegments.map((segment, index) => {
+    const rest = /^\{([^{}+]+)\+\}$/.exec(segment)?.[1]
+    if (rest !== undefined) {
+      if (!CAPTURE.test(rest)) throw new Error(`content-link capture '${rest}' has an invalid name`)
+      if (captures.includes(rest)) throw new Error(`content-link capture '${rest}' is duplicated`)
+      if (rawSegments.some((other, at) => at !== index && /^\{[^{}]+\+\}$/.test(other)))
+        throw new Error('content-link pattern may contain one {capture+}')
+      const next = rawSegments[index + 1]
+      if (next === undefined || /[{}]/.test(next))
+        throw new Error(`content-link capture '${rest}+' must come right before a literal segment`)
+      captures.push(rest)
+      return { capture: rest, rest: true }
+    }
     const capture = /^\{([^{}]+)\}$/.exec(segment)?.[1]
     if (capture !== undefined) {
       if (!CAPTURE.test(capture)) throw new Error(`content-link capture '${capture}' has an invalid name`)
@@ -66,6 +84,7 @@ export function compileContentLinkPattern(pattern: string): CompiledContentLinkP
     return { literal }
   })
 
+  const spread = segments.some((segment) => 'rest' in segment && segment.rest)
   return {
     captures,
     match(href) {
@@ -81,23 +100,31 @@ export function compileContentLinkPattern(pattern: string): CompiledContentLinkP
       // One trailing slash names the same item: some providers spell their canonical address with one.
       const path = url.pathname.length > 1 && url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname
       const candidate = path === '/' ? [] : path.slice(1).split('/')
-      if (candidate.length !== segments.length || candidate.some((segment) => !segment)) return null
+      // The `+` capture takes whatever the fixed-width segments leave, which must be at least one.
+      const width = candidate.length - segments.length + 1
+      if ((spread ? width < 1 : width !== 1) || candidate.some((segment) => !segment)) return null
       const result: Record<string, string> = {}
-      for (let index = 0; index < segments.length; index++) {
-        const segment = segments[index]
-        let value: string
-        try {
-          value = decoded(candidate[index]!, 'content link')
-        } catch {
-          return null
+      let at = 0
+      for (const segment of segments) {
+        const taken = 'rest' in segment && segment.rest ? width : 1
+        const values: string[] = []
+        for (const raw of candidate.slice(at, at + taken)) {
+          let value: string
+          try {
+            value = decoded(raw, 'content link')
+          } catch {
+            return null
+          }
+          // `%2F` is still a slash semantically. Reject it after decoding so a capture cannot smuggle
+          // extra path segments past the grammar.
+          if (value.includes('/')) return null
+          values.push(value)
         }
-        // `%2F` is still a slash semantically. Reject it after decoding so a capture cannot smuggle
-        // multiple path segments through the single-segment grammar.
-        if (value.includes('/')) return null
+        at += taken
         if ('literal' in segment) {
-          if (value !== segment.literal) return null
+          if (values[0] !== segment.literal) return null
         } else {
-          result[segment.capture] = value
+          result[segment.capture] = values.join('/')
         }
       }
       return result

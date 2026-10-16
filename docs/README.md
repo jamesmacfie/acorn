@@ -98,6 +98,7 @@ the whole plugin system in one page.
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
+| [gitlab-integration.md](./gitlab-integration.md) | gitlab.com merge requests, approvals, pipelines, the mirror, and the importer. |
 | [git-client/worktrees.md](./git-client/worktrees.md) | Git worktree inventory, task ownership, and guarded cleanup in both clients. |
 | [git-client/history.md](./git-client/history.md) | Pinned history pages, read-only revision diffs, limits, and routes in both clients. |
 | [git-client/stashes.md](./git-client/stashes.md) | Stash browsing and guarded task checkout writes in both clients. |

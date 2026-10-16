@@ -1,0 +1,85 @@
+---
+title: GitLab
+description: Connect gitlab.com, import projects, review merge requests with their discussions and pipelines, merge one, and start a task from one.
+sources:
+  - docs/gitlab-integration.md
+  - docs/plugins/change-request-ui.md
+  - plugins/gitlab/src/client/index.ts
+  - plugins/gitlab/src/node/index.ts
+  - plugins/gitlab/src/server/provider.ts
+  - packages/change-request-ui/src/views/Overview.tsx
+checked: 8fdb4823d
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The GitLab plugin connects your gitlab.com account and brings your projects' merge requests into acorn:
+the list, each merge request's diff, discussions, and pipeline, and the controls to review and merge one.
+It draws them with the same views as the GitHub plugin.
+
+<PluginFacts id="gitlab">
+  <Fragment slot="adds">**GitLab** in the left rail, the **Merge request** pane on a task with a merge request, a panel for a merge request a link points to, **Import from GitLab** on **Settings** > **Overview**, and the merge request behind acorn's pull request tools for agents.</Fragment>
+  <Fragment slot="needs">A gitlab.com account, connected with a sign-in code or a personal access token with the `api` scope.</Fragment>
+  <Fragment slot="reach">GitLab's API, with your connection's token, and the projects on the Node. The token is stored encrypted on the Node, and agents never see it.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. Open **Settings** > **Services**, click **Add connection**, and choose **GitLab**.
+
+2. Click **Connect GitLab** and enter the code on gitlab.com's page, or paste a personal access token
+   with the `api` scope under **Or use a token**. Sign-in with a code needs the Node to have an OAuth
+   application, in `GITLAB_CLIENT_ID`. Without one, the token form is the way in.
+
+3. Add a project, if it isn't one already. In **Settings** > **Overview**, click **Import from GitLab**,
+   and choose **Clone** or **Link folder** for a project. A project in a nested group is listed by its
+   full path.
+
+4. Click **GitLab** in the left rail.
+
+   <Checkpoint>The list shows the project's open merge requests.</Checkpoint>
+
+</Steps>
+
+A sign-in with a code lasts two hours at a time. acorn renews it on its own, and asks you to sign in
+again only when gitlab.com refuses the renewal.
+
+## Review a merge request
+
+A merge request opens on its overview, with its changed files and its conversation below, the same way
+a GitHub pull request does. The overview shows its state, author, branches, approvals, and pipeline,
+then the description, labels, and reviewers. The conversation holds comments, approvals, commits, and
+the discussions on the diff. Comment on a line of the diff to start a discussion there, and reply or
+resolve one in place. **Approve** approves it.
+
+Open a pipeline job from the overview to read its log, split into the log's own sections. **Re-run**
+retries a failed job.
+
+The merge box offers **Merge**, with **Merge** or **Squash and merge** beside it, or **Ready for
+review** on a draft, and **Close**. A merge request with conflicts says **This branch has conflicts**.
+
+## Start a task from a merge request
+
+Right-click a merge request in the list and choose **Create task**. The task checks out the merge
+request, a fork's included, and opens on the **Merge request** pane, ⌘⇧M. The browser extension offers
+**Open in Acorn** on a merge request's page on gitlab.com.
+
+**Open merge request** under a task's **Changes** tab opens gitlab.com's own form for the task's branch.
+An agent opens one with `pr_create`.
+
+## For agents
+
+acorn's pull request tools, `pr_current`, `pr_checks`, `pr_review_comments`, and `pr_create`, read and
+open the task's merge request on a GitLab task. A workflow step that waits for CI waits for the merge
+request's pipeline.
+
+## Limits
+
+- gitlab.com only, and one GitLab account per Node.
+- No merge trains or merging on its own when the pipeline passes.
+- GitLab has no "changes requested" review, so a merge request is approved or not.
+- **Search** narrows the loaded list. It doesn't ask GitLab.

@@ -68,6 +68,8 @@ To customize local desktop development, create `<checkout>/apps/desktop/.env`:
 ```dotenv
 # Optional: use your own GitHub app instead of acorn's default.
 # GITHUB_CLIENT_ID=your-app-client-id
+# Optional: a gitlab.com OAuth application, for GitLab's sign-in with a code.
+# GITLAB_CLIENT_ID=your-application-id
 SESSION_ENC_KEY=<64 hexadecimal characters>
 ```
 

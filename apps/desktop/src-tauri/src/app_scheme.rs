@@ -87,9 +87,10 @@ pub fn renderer_csp(helper_port: u16, dev_server: Option<&str>) -> String {
         &script,
         "style-src 'self' 'unsafe-inline'",
         "font-src 'self'",
-        // GitHub avatars are the only automatic HTTPS images in renderer-owned content. A Node
-        // cannot turn a URL in a description or metadata row into a request from this device.
-        "img-src 'self' data: blob: https://github.com https://avatars.githubusercontent.com",
+        // Code host avatars, GitHub's and GitLab's, are the only automatic HTTPS images in
+        // renderer-owned content. A Node cannot turn a URL in a description or metadata row into a
+        // request from this device to any other host.
+        "img-src 'self' data: blob: https://github.com https://avatars.githubusercontent.com https://gitlab.com https://secure.gravatar.com",
         &connect,
         // Monaco's highlighter worker is the only worker this origin may start. Loaded plugin tree
         // workers start in a host-owned document at app-plugin://<hash>, never in this origin.
@@ -291,7 +292,7 @@ mod tests {
         assert!(!csp.contains("unsafe-inline'; style"), "inline script must not be allowed in a packaged build: {csp}");
         assert!(csp.contains("frame-src app-plugin:"), "{csp}");
         assert!(csp.contains("frame-ancestors 'none'"), "{csp}");
-        assert!(csp.contains("img-src 'self' data: blob: https://github.com https://avatars.githubusercontent.com"), "{csp}");
+        assert!(csp.contains("img-src 'self' data: blob: https://github.com https://avatars.githubusercontent.com https://gitlab.com https://secure.gravatar.com"), "{csp}");
         assert!(csp.contains("object-src 'none'"), "{csp}");
         // No wildcard port ever reaches the directive.
         assert!(!csp.contains("127.0.0.1:*"), "{csp}");

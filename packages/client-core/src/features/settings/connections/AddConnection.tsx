@@ -26,8 +26,8 @@ import { galleryCards, providerAsks, type GalleryCard } from './connections'
 //
 // The steps are what the descriptor asks for. Typed fields are a form with Connect and Cancel, and
 // anything typed counts as unsaved. A device-flow provider shows the code to enter at the provider, and
-// a code that is still waiting counts as unsaved too, because leaving stops the polling that would
-// finish it. The fields, the write and the pacing live in the integrations feature, because first-run
+// its fields, when it declares any, as a second way in below it. A code that is still waiting counts
+// as unsaved too, because leaving stops the polling that would finish it. The fields, the write and the pacing live in the integrations feature, because first-run
 // onboarding connects a provider the same way.
 
 export type AddConnectionProps = {
@@ -147,86 +147,108 @@ export function AddConnection(props: AddConnectionProps) {
         }
       >
         {(provider) => (
-          <SettingsSection
-            id="steps"
-            label={provider().connection.kind === 'device-flow' ? 'Sign in' : 'Credentials'}
-            description={
-              provider().connection.kind === 'device-flow'
-                ? `${provider().label} opens a page in your browser where you enter a code.`
-                : `acorn checks with ${provider().label} before it saves anything.`
-            }
-          >
-            <Show
-              when={provider().connection.kind === 'device-flow'}
-              fallback={
-                <>
-                  <CredentialFields form={form}>
-                    <Show when={form.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+          <>
+            <SettingsSection
+              id="steps"
+              label={provider().connection.kind === 'device-flow' ? 'Sign in' : 'Credentials'}
+              description={
+                provider().connection.kind === 'device-flow'
+                  ? `${provider().label} opens a page in your browser where you enter a code.`
+                  : `acorn checks with ${provider().label} before it saves anything.`
+              }
+            >
+              <Show
+                when={provider().connection.kind === 'device-flow'}
+                fallback={
+                  <>
+                    <CredentialFields form={form}>
+                      <Show when={form.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+                      <Inline gap="row">
+                        <Button
+                          variant="solid"
+                          tone="accent"
+                          busy={form.busy()}
+                          disabled={!form.complete()}
+                          onPress={() => void form.submit()}
+                        >
+                          Connect
+                        </Button>
+                        <Button variant="ghost" onPress={backToGallery} disabled={form.busy()}>
+                          Cancel
+                        </Button>
+                      </Inline>
+                    </CredentialFields>
+                  </>
+                }
+              >
+                <Show
+                  when={deviceFlow.device()}
+                  fallback={
                     <Inline gap="row">
                       <Button
                         variant="solid"
                         tone="accent"
-                        busy={form.busy()}
-                        disabled={!form.complete()}
-                        onPress={() => void form.submit()}
+                        onPress={() => void deviceFlow.start()}
+                        disabled={deviceFlow.busy()}
                       >
-                        Connect
+                        {deviceFlow.busy() ? 'Starting…' : `Connect ${provider().label}`}
                       </Button>
-                      <Button variant="ghost" onPress={backToGallery} disabled={form.busy()}>
+                      <Button variant="ghost" onPress={backToGallery}>
                         Cancel
                       </Button>
                     </Inline>
-                  </CredentialFields>
-                </>
-              }
-            >
-              <Show
-                when={deviceFlow.device()}
-                fallback={
+                  }
+                >
+                  {(started) => (
+                    <div class="integration-device">
+                      <Text emphasis="muted" wrap>
+                        Enter this code on the {provider().label} page. Keep this page open until it finishes.
+                      </Text>
+                      <div class="integration-device-code copyable">
+                        <code>{started().userCode}</code>
+                        <CopyButton text={() => started().userCode} title="Copy the code" />
+                      </div>
+                      {/* A real link, not a fetch: the shell opens it in the owner's browser. Safe under the
+                        CSP because it is a navigation, not a frame or a connect-src. */}
+                      <Show
+                        when={safeVerificationUrl(started().verificationUri)}
+                        fallback={
+                          <Alert>
+                            {provider().label} sent a sign-in address acorn won't open. Cancel and try again.
+                          </Alert>
+                        }
+                      >
+                        {(url) => <Button href={url().href}>Open {url().host}</Button>}
+                      </Show>
+                      <Text emphasis="muted">Waiting for approval…</Text>
+                      <Button variant="ghost" onPress={deviceFlow.cancel}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </Show>
+              </Show>
+              <Show when={deviceFlow.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+            </SettingsSection>
+            {/* A device-flow provider that also declares fields takes a typed credential as its second way
+              in, such as GitLab's personal access token. */}
+            <Show when={provider().connection.kind === 'device-flow' && provider().connection.fields.length}>
+              <SettingsSection
+                id="token"
+                label="Or use a token"
+                description={`acorn checks with ${provider().label} before it saves anything.`}
+              >
+                <CredentialFields form={form}>
+                  <Show when={form.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
                   <Inline gap="row">
-                    <Button
-                      variant="solid"
-                      tone="accent"
-                      onPress={() => void deviceFlow.start()}
-                      disabled={deviceFlow.busy()}
-                    >
-                      {deviceFlow.busy() ? 'Starting…' : `Connect ${provider().label}`}
-                    </Button>
-                    <Button variant="ghost" onPress={backToGallery}>
-                      Cancel
+                    <Button busy={form.busy()} disabled={!form.complete()} onPress={() => void form.submit()}>
+                      Connect with token
                     </Button>
                   </Inline>
-                }
-              >
-                {(started) => (
-                  <div class="integration-device">
-                    <Text emphasis="muted" wrap>
-                      Enter this code on the {provider().label} page. Keep this page open until it finishes.
-                    </Text>
-                    <div class="integration-device-code copyable">
-                      <code>{started().userCode}</code>
-                      <CopyButton text={() => started().userCode} title="Copy the code" />
-                    </div>
-                    {/* A real link, not a fetch: the shell opens it in the owner's browser. Safe under the
-                        CSP because it is a navigation, not a frame or a connect-src. */}
-                    <Show
-                      when={safeVerificationUrl(started().verificationUri)}
-                      fallback={
-                        <Alert>{provider().label} sent a sign-in address acorn won't open. Cancel and try again.</Alert>
-                      }
-                    >
-                      {(url) => <Button href={url().href}>Open {url().host}</Button>}
-                    </Show>
-                    <Text emphasis="muted">Waiting for approval…</Text>
-                    <Button variant="ghost" onPress={deviceFlow.cancel}>
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-              </Show>
+                </CredentialFields>
+              </SettingsSection>
             </Show>
-            <Show when={deviceFlow.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-          </SettingsSection>
+          </>
         )}
       </Show>
     </>

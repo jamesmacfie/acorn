@@ -1,5 +1,6 @@
 {
   "panes": [
+    "10 mr meta+shift+m",
     "10 pr meta+shift+r",
     "15 agents meta+shift+a",
     "20 git meta+shift+g",
@@ -14,6 +15,7 @@
     "0 home",
     "1 fleet",
     "10 github",
+    "11 gitlab",
     "40 docker",
     "45 git",
     "50 workflows",

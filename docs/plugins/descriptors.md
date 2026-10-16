@@ -110,7 +110,12 @@ segment to one of three destinations:
 - The plugin's own reference panel, shown over whatever the reader was looking at.
 - The plugin's own route, for a compiled recognizer that declares a `path` resolver.
 
-A link must have a pane or a panel, or the manifest is rejected. The grammar is exact-arity, with no
+A link must have a pane or a panel, or the manifest is rejected. A path segment is a literal, a
+`{capture}` of one segment, or a `{capture+}` of one or more, which joins them with `/`. A pattern may
+hold one `{capture+}`, and only right before a literal segment, so
+`https://gitlab.com/{path+}/-/merge_requests/{number}` takes `group/sub/api` at any group depth and
+matching stays linear (`compileContentLinkPattern` in
+`packages/protocol/src/content/contentLinkPattern.ts`). Otherwise the grammar is exact-arity, with no
 trailing wildcard, so a URL shape with an optional last segment needs one entry per arity. One
 trailing slash on the address is ignored, because some providers spell their canonical addresses with
 one. [Browser handoffs](../plugin-authoring/browser-handoffs.md) use the same grammar for the pages

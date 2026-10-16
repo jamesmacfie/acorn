@@ -97,6 +97,9 @@ const handoffTaskSeed = z.strictObject({
   title: z.string().min(1).max(300).optional(),
   branch: z.string().min(1).max(250).optional(),
   pullNumber: z.int().positive().optional(),
+  // A change request on the project's repository, which becomes the task's primary one. `pullNumber`
+  // is the same thing under its GitHub name.
+  changeRequest: z.strictObject({ number: z.int().positive() }).optional(),
   // Connection-stamped links, as the task route takes them. Core stamps the provider from the
   // connection and refuses one the caller doesn't own.
   links: z
