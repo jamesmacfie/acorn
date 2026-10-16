@@ -107,9 +107,9 @@ export function providerMetaLine(provider: AgentProviderUsage, now = Date.now())
  *  (docs/managed-agents/accounts.md). */
 export type UsageGroup = { provider: string; label: string; readings: AgentProviderUsage[] }
 
-/** The tab a reading sits under. The CLI's own login has no account name. */
-export const usageTabId = (reading: AgentProviderUsage): string => reading.accountName ?? 'default'
-export const usageTabLabel = (reading: AgentProviderUsage): string =>
+/** Which account a reading is for, within its harness. The CLI's own login has no account name. */
+export const usageAccountKey = (reading: AgentProviderUsage): string => reading.accountName ?? 'default'
+export const usageAccountLabel = (reading: AgentProviderUsage): string =>
   reading.accountLabel ?? reading.accountName ?? 'Usual sign-in'
 
 // Account labels carry a suffix, while the group names only the harness. The Node omits the usual
@@ -202,31 +202,67 @@ export function providerUsageRows(provider: AgentProviderUsage, now = Date.now()
       }
     }
   }
+  return rows
+}
+
+// Today's figures for one account. The panel folds them under the account's quotas, behind
+// `dailySummary`, because they run to nine rows and pushed the next harness out of the popover.
+export function dailyUsageRows(provider: AgentProviderUsage): UsageDetailRow[] {
   const daily = provider.daily?.today
-  if (daily) {
-    rows.push({
+  if (!daily) return []
+  const rows: UsageDetailRow[] = [
+    {
       label: 'Estimated today',
       value: daily.estimatedCostUsd == null ? 'No price for this model' : formatEstimateUsd(daily.estimatedCostUsd),
-    })
-    if (daily.unpricedModels.length > 0) {
-      rows.push({ label: 'Unpriced models', value: daily.unpricedModels.join(', ') })
-    }
-    rows.push({ label: 'Tokens today', value: formatTokens(daily.totalNonCacheTokens) })
+    },
+  ]
+  if (daily.unpricedModels.length > 0) {
+    rows.push({ label: 'Unpriced models', value: daily.unpricedModels.join(', ') })
+  }
+  rows.push({ label: 'Tokens today', value: formatTokens(daily.totalNonCacheTokens) })
+  rows.push({
+    label: 'Input / output',
+    value: `${formatTokens(daily.inputTokens)} / ${formatTokens(daily.outputTokens)}`,
+  })
+  if (daily.cacheWriteTokens || daily.cacheReadTokens) {
     rows.push({
-      label: 'Input / output',
-      value: `${formatTokens(daily.inputTokens)} / ${formatTokens(daily.outputTokens)}`,
+      label: 'Cache write / read',
+      value: `${formatTokens(daily.cacheWriteTokens)} / ${formatTokens(daily.cacheReadTokens)}`,
     })
-    if (daily.cacheWriteTokens || daily.cacheReadTokens) {
-      rows.push({
-        label: 'Cache write / read',
-        value: `${formatTokens(daily.cacheWriteTokens)} / ${formatTokens(daily.cacheReadTokens)}`,
-      })
-    }
-    rows.push({ label: 'Working time', value: formatDuration(daily.workingSeconds) })
-    rows.push({ label: 'Sessions', value: String(daily.sessionCount) })
-    if (daily.estimatedCacheSavingsUsd != null && daily.estimatedCacheSavingsUsd > 0) {
-      rows.push({ label: 'Saved by caching (estimate)', value: formatEstimateUsd(daily.estimatedCacheSavingsUsd) })
-    }
+  }
+  rows.push({ label: 'Working time', value: formatDuration(daily.workingSeconds) })
+  rows.push({ label: 'Sessions', value: String(daily.sessionCount) })
+  if (daily.estimatedCacheSavingsUsd != null && daily.estimatedCacheSavingsUsd > 0) {
+    rows.push({ label: 'Saved by caching (estimate)', value: formatEstimateUsd(daily.estimatedCacheSavingsUsd) })
   }
   return rows
+}
+
+/** The daily fold's closed label, such as "Today ≈$178 · 1.8M tokens · 9 sessions". Null when there is
+ *  nothing for today, so the panel draws no fold. */
+export function dailySummary(provider: AgentProviderUsage): string | null {
+  const daily = provider.daily?.today
+  if (!daily) return null
+  return `Today ${[
+    daily.estimatedCostUsd == null ? null : formatEstimateUsd(daily.estimatedCostUsd),
+    `${formatTokens(daily.totalNonCacheTokens)} tokens`,
+    `${daily.sessionCount} ${daily.sessionCount === 1 ? 'session' : 'sessions'}`,
+  ]
+    .filter(Boolean)
+    .join(' · ')}`
+}
+
+/** A small bar on a closed account row: a short name, how much is left, and its health. */
+export type CompactQuota = { label: string; value: string; fill: number; health: AgentUsageHealth }
+
+// The two windows that decide which account to start work on: the session and the week. A harness that
+// reports neither, such as a contributed one, gets its first two, whatever they are.
+export function compactQuotas(provider: AgentProviderUsage): CompactQuota[] {
+  const known = ['session', 'weekly'].flatMap((id) => provider.quotas.find((quota) => quota.id === id) ?? [])
+  return (known.length ? known : provider.quotas.slice(0, 2)).map((quota) => ({
+    label: quota.id === 'session' ? '5h' : quota.id === 'weekly' ? 'week' : quota.label,
+    value: formatPercent(quota.percentRemaining),
+    fill: clampRemaining(quota.percentRemaining) / 100,
+    health: quota.health,
+  }))
 }

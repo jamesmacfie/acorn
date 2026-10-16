@@ -53,7 +53,11 @@ window length, so a quota carries `windowSeconds`. A collector that can't say le
 bar draws without the mark. A contributed harness has no way to declare a window. A reset further out
 than the whole window also drops the mark, because then the window isn't the one acorn assumed.
 
-`AgentUsageSection.tsx` draws the list. A provider's usage is account-level, so the Node collects it
+Under each account's quotas, the day's estimated cost, tokens, working time, and session count sit
+in a fold labeled with a one-line summary, such as "Today ≈$178 · 1.8M tokens · 9 sessions". The fold
+remembers whether you left it open, with one setting for every account.
+
+`AgentUsageSection.tsx` draws the panel. A provider's usage is account-level, so the Node collects it
 once for every client.
 
 ## Pricing
