@@ -37,10 +37,10 @@ vi.mock('./usageStore', () => ({
 
 const { default: AgentUsageSection } = await import('./AgentUsageSection')
 const disposers: Array<() => void> = []
-const mount = () => {
+const mount = (defaultAccounts?: Record<string, string>) => {
   const host = document.createElement('div')
   document.body.append(host)
-  disposers.push(render(() => <AgentUsageSection showHeader={false} />, host))
+  disposers.push(render(() => <AgentUsageSection showHeader={false} defaultAccounts={defaultAccounts} />, host))
   return host
 }
 afterEach(() => {
@@ -63,21 +63,48 @@ describe('AgentUsageSection', () => {
     expect(refreshProvider.mock.calls).toEqual([['claude'], ['codex']])
   })
 
-  it("tabs a harness's accounts and shows the chosen one's reading", async () => {
-    const reading = (email: string, accountName?: string): AgentProviderUsage => ({
+  describe('a harness with two accounts', () => {
+    const quota = (id: string, label: string, percentRemaining: number) => ({
+      id,
+      label,
+      percentRemaining,
+      resetsAt: null,
+      resetText: null,
+      windowSeconds: null,
+      health: 'healthy' as const,
+    })
+    const reading = (email: string, session: number, accountName?: string): AgentProviderUsage => ({
       ...provider('claude', accountName ? `Claude Code · ${accountName}` : 'Claude Code'),
       account: { email, organization: null },
+      quotas: [quota('session', 'Session', session), quota('weekly', 'Weekly', 70)],
       ...(accountName ? { accountName } : {}),
     })
-    snapshot = { providers: [reading('me@home.test'), reading('me@work.test', 'work')], refreshedAt: 1 }
-    const host = mount()
+    const rows = (host: HTMLElement) => [...host.querySelectorAll<HTMLDetailsElement>('details')]
 
-    const tabs = [...host.querySelectorAll<HTMLElement>('[role="tab"]')]
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Usual sign-in', 'work'])
-    expect(host.textContent).toContain('me@home.test')
-    tabs[1]!.click()
-    await Promise.resolve()
-    expect(host.textContent).toContain('me@work.test')
-    expect(host.textContent).not.toContain('me@home.test')
+    it('opens the default account and shows the other closed, with its bars', async () => {
+      snapshot = { providers: [reading('me@home.test', 81), reading('me@work.test', 23, 'work')], refreshedAt: 1 }
+      const host = mount()
+
+      const [home, work] = rows(host)
+      expect(home!.open).toBe(true)
+      expect(work!.open).toBe(false)
+      expect(home!.textContent).toContain('me@home.test')
+      // Bodies build on first open, so the closed row has its summary and nothing else.
+      expect(host.textContent).not.toContain('me@work.test')
+      expect(work!.querySelector('summary')!.textContent).toBe('work5h23%week70%')
+
+      work!.querySelector('summary')!.click()
+      // The browser fires `toggle` a task after the click, not straight away.
+      await new Promise((resolve) => setTimeout(resolve))
+      expect(work!.open).toBe(true)
+      expect(host.textContent).toContain('me@work.test')
+    })
+
+    it('opens the account the selected session is on', () => {
+      snapshot = { providers: [reading('me@home.test', 81), reading('me@work.test', 23, 'work')], refreshedAt: 1 }
+      const [home, work] = rows(mount({ claude: 'work' }))
+      expect(home!.open).toBe(false)
+      expect(work!.open).toBe(true)
+    })
   })
 })

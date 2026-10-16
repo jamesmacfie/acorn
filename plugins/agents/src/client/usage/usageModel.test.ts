@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { AgentProviderUsage, AgentUsageQuota, AgentUsageSnapshot } from '../../shared/usage'
 import { usageHealth } from '../../shared/usage'
 import {
+  compactQuotas,
+  dailySummary,
+  dailyUsageRows,
   formatEstimateUsd,
   formatReset,
   formatTokens,
@@ -11,7 +14,7 @@ import {
   quotaPace,
   usageGroups,
   usageSummaryEntries,
-  usageTabLabel,
+  usageAccountLabel,
 } from './usageModel'
 
 const provider = (id: 'claude' | 'codex', percent: number): AgentProviderUsage => ({
@@ -170,9 +173,8 @@ describe('agent usage detail formatting', () => {
         },
       },
     }
-    expect(providerUsageRows(claude).map((row) => row.label)).toEqual([
-      'Session',
-      'Extra usage',
+    expect(providerUsageRows(claude).map((row) => row.label)).toEqual(['Session', 'Extra usage'])
+    expect(dailyUsageRows(claude).map((row) => row.label)).toEqual([
       'Estimated today',
       'Tokens today',
       'Input / output',
@@ -181,7 +183,13 @@ describe('agent usage detail formatting', () => {
       'Sessions',
       'Saved by caching (estimate)',
     ])
-    expect(providerUsageRows(claude).find((row) => row.label === 'Estimated today')?.value).toBe('<$1')
+    expect(dailyUsageRows(claude).find((row) => row.label === 'Estimated today')?.value).toBe('<$1')
+    expect(dailySummary(claude)).toBe('Today <$1 · 1,540 tokens · 2 sessions')
+  })
+
+  it('has no daily summary or rows without figures for today', () => {
+    expect(dailySummary(provider('claude', 82))).toBeNull()
+    expect(dailyUsageRows(provider('claude', 82))).toEqual([])
   })
 
   it('writes an estimate in whole dollars with a separator', () => {
@@ -210,6 +218,45 @@ describe('agent usage detail formatting', () => {
     }
     expect(providerMetaLine(claude, 1_000)).toBe('Claude Max · james@runn.io · James · updated just now')
     expect(providerMetaLine(claude, 1_000)).not.toContain('Claude Code')
+  })
+
+  describe('the small bars on a closed account row', () => {
+    const quota = (id: string, label: string, percentRemaining: number): AgentUsageQuota => ({
+      id,
+      label,
+      percentRemaining,
+      resetsAt: null,
+      resetText: null,
+      windowSeconds: null,
+      health: usageHealth(percentRemaining),
+    })
+    const bars = (quotas: AgentUsageQuota[]) =>
+      compactQuotas({ ...provider('claude', 50), quotas }).map((bar) => `${bar.label} ${bar.value}`)
+
+    it('reads the session and the week, in that order, whatever else the harness reports', () => {
+      const claude = [quota('weekly', 'Weekly', 64), quota('session', 'Session', 12), quota('opus', 'Opus weekly', 90)]
+      expect(bars(claude)).toEqual(['5h 12%', 'week 64%'])
+      expect(compactQuotas({ ...provider('claude', 50), quotas: claude })[0]).toEqual({
+        label: '5h',
+        value: '12%',
+        fill: 0.12,
+        health: 'critical',
+      })
+    })
+
+    it('reads only the week on a plan with no session limit', () => {
+      expect(bars([quota('weekly', 'Weekly', 75)])).toEqual(['week 75%'])
+    })
+
+    it("falls back to a contributed harness's first two windows under their own names", () => {
+      expect(
+        bars([quota('daily', 'Daily', 40), quota('monthly', 'Monthly', 90), quota('yearly', 'Yearly', 99)]),
+      ).toEqual(['Daily 40%', 'Monthly 90%'])
+    })
+
+    it('draws none for a reading with no quotas', () => {
+      expect(bars([])).toEqual([])
+    })
   })
 
   describe('the pace mark under a quota bar', () => {
@@ -274,7 +321,7 @@ describe('agent usage detail formatting', () => {
         },
       },
     }
-    expect(providerUsageRows(claude)).toEqual(
+    expect(dailyUsageRows(claude)).toEqual(
       expect.arrayContaining([
         { label: 'Estimated today', value: 'No price for this model' },
         { label: 'Unpriced models', value: 'claude-new-model' },
@@ -289,13 +336,13 @@ describe('usage groups', () => {
     const work = { ...provider('claude', 30), label: 'Claude Code · work', accountName: 'work' }
     const groups = usageGroups({ providers: [personal, work], refreshedAt: 1 })
     expect(groups[0]?.label).toBe('Claude Code')
-    expect(groups[0]?.readings.map(usageTabLabel)).toEqual(['personal', 'work'])
+    expect(groups[0]?.readings.map(usageAccountLabel)).toEqual(['personal', 'work'])
   })
 
   it("puts a harness's accounts under its own name, default first, in the node's order", () => {
     const work = { ...provider('claude', 30), label: 'Claude Code · work', accountName: 'work' }
     const groups = usageGroups({ providers: [provider('claude', 80), work, provider('codex', 50)], refreshedAt: 1 })
-    expect(groups.map((group) => [group.label, group.readings.map(usageTabLabel)])).toEqual([
+    expect(groups.map((group) => [group.label, group.readings.map(usageAccountLabel)])).toEqual([
       ['Claude Code', ['Usual sign-in', 'work']],
       ['Codex', ['Usual sign-in']],
     ])

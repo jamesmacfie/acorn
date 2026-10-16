@@ -39,7 +39,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [plugin-rail-artwork.md](./plugin-rail-artwork.md) | Dynamic artwork and tooltips on plugin rail buttons, plus a shared artwork component for compiled UI and remote trees. | Proposed October 13, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
-| [usage-ui.md](./usage-ui.md) | Replace the account tabs in the plan usage popover with one row per account, showing each account's session and week bars, and fold the daily figures into one summary line. | Proposed October 16, 2026. Implementation not started. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan
@@ -54,6 +53,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 
 | Removed plan | Owner or remaining handoff |
 | --- | --- |
+| `usage-ui.md`, removed October 16, 2026 | [Harness accounts § Plan usage](../managed-agents/accounts.md#plan-usage) and [providers § Plan usage](../managed-agents/providers.md#plan-usage). Open acceptance: a real-window check with two signed-in Claude Code accounts. The small bars on account rows follow the account name, because a fold's `meta` slot sits right after its label, so they line up across rows only when the names are the same length. |
 | `element-picker/`, removed October 14, 2026 | [Ask Acorn about an element](../browser-extension/element-picker.md), which lists what wasn't checked in a browser. |
 | `ui-performance/`, phases 01 to 05 removed October 13, 2026, and the rest October 14, 2026 | [Streaming replay](../local-development/streaming-replay.md), [Markdown renders block by block](../ui-design/kit-internals.md#markdown-renders-block-by-block), [idle stop](../managed-agents/operations.md#idle-stop), and [diagnosis](../telemetry/diagnosis.md). Open acceptance: the [checks still to run](../testing/ui-performance-open-checks-2026-10-14.md). |
 | `steering.md`, removed October 13, 2026 | [Steer a running turn](../managed-agents/steering.md). Open acceptance: a real-window Node kill between the harness taking a steer and the Node recording it. |
