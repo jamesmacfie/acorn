@@ -42,7 +42,7 @@ import { locationTask, type Navigation } from './location'
 import { NeedsYou } from './NeedsYou'
 import { PluginPanel } from './PluginPanel'
 import type { Heading } from './TopBar'
-import { Workflows, runsLive } from './Workflows'
+import { Runs, runsLive } from './Runs'
 
 // The tab glyph of a plugin panel that names none.
 const PANEL_GLYPH = 'puzzle'
@@ -108,8 +108,9 @@ export function Workspace(props: {
   // Whether the Node runs the workflows plugin, which a failed runs read says it doesn't. Unknown until
   // the first read answers.
   const [runsAvailable, setRunsAvailable] = createSignal<boolean | null>(null)
-  // The run Runs shows in a task, and the step whose conversation is open. Each names its task.
-  const [selectedRun, setSelectedRun] = createSignal<{ taskId: string; runId: string } | null>(null)
+  // Which runs the person opened or closed on Runs, by run ID, for every task. Not stored. The step
+  // whose conversation is open names its task.
+  const [runFolds, setRunFolds] = createSignal<Record<string, boolean>>({})
   const [openStep, setOpenStep] = createSignal<{
     taskId: string
     run: BridgeWorkflowRun
@@ -268,10 +269,20 @@ export function Workspace(props: {
     nav.openTask(forTask, 'agents')
   }
 
-  // Start run made the item's task and started a run in it, which Runs shows expanded.
+  // A run just started opens on Runs, alone, and the task's runs are read again to show it.
+  const openStartedRun = (forTask: string, runId: string) => {
+    setRunFolds((folds) => ({
+      ...folds,
+      ...Object.fromEntries((runLists()[forTask] ?? []).map((run) => [run.id, false])),
+      [runId]: true,
+    }))
+    void loadRuns(forTask)
+  }
+
+  // Start run made the item's task and started a run in it.
   const startedHandoffWorkflow = (_projectId: string, forTask: string, runId: string) => {
     props.dismissHandoff()
-    setSelectedRun({ taskId: forTask, runId })
+    openStartedRun(forTask, runId)
     nav.openTask(forTask, 'runs')
   }
 
@@ -714,13 +725,16 @@ export function Workspace(props: {
           <Match when={tab() === 'runs' && taskId()} keyed>
             {(id) => (
               <div class="view" aria-label="Runs">
-                <Workflows
+                <Runs
                   client={props.client}
                   nodeId={nodeId}
                   taskId={id}
+                  online={props.online}
+                  project={task() ? { id: task()!.projectId, name: projectName(task()!.projectId) } : null}
                   runs={runLists()[id] ?? null}
-                  selected={selectedRun()?.taskId === id ? selectedRun()!.runId : null}
-                  select={(runId) => setSelectedRun({ taskId: id, runId })}
+                  folds={runFolds()}
+                  fold={(runId, open) => setRunFolds((folds) => ({ ...folds, [runId]: open }))}
+                  started={(runId) => openStartedRun(id, runId)}
                   refreshRuns={() => void loadRuns(id)}
                   open={(run, opened) => {
                     setOpenStep({ taskId: id, run, step: opened })

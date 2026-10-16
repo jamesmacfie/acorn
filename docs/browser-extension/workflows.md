@@ -1,17 +1,24 @@
 # Workflows in the browser extension
 
 This page covers workflows in the [browser extension](../browser-extension.md): starting one from a
-[handoff](./handoffs.md), the **Workflows** tab that lists a task's runs and their steps, and the
-operations behind them. The code is in `apps/extension/src/sidebar/Handoff.tsx`,
-`apps/extension/src/sidebar/Workflows.tsx`, `apps/extension/src/sidebar/Workspace.tsx`, and
-`apps/cli/src/browser/workflows.ts`. The sidebar draws statuses, icons, and durations from
+[handoff](./handoffs.md) or from a task's **Runs** tab, the tab's runs and their steps, and the
+operations behind them. The code is in `apps/extension/src/sidebar/Runs.tsx`,
+`apps/extension/src/sidebar/WorkflowForm.tsx`, `apps/extension/src/sidebar/Handoff.tsx`,
+`apps/extension/src/sidebar/Workspace.tsx`, and `apps/cli/src/browser/workflows.ts`. The sidebar draws statuses, icons, and durations from
 `plugins/workflows/src/contract/statusDisplay.ts`, the module the desktop's run pane uses.
 
 ## Starting a workflow
 
-The handoff card's **Run workflow** picker lists the project's workflows, and the task chip's
-**Start workflow…** opens the [handoff card](./handoffs.md#the-handoff-card) on the first of them.
-A chosen workflow shows its inputs, filled from the item, with **Start run** and **Cancel**.
+A workflow starts in two places, and both draw the same picker and form from `WorkflowForm.tsx`:
+
+- The handoff card's **Run workflow** picker lists the project's workflows, and the task chip's
+  **Start workflow…** opens the [handoff card](./handoffs.md#the-handoff-card) on the first of them.
+  A chosen workflow shows its inputs, filled from the item, with **Start run** and **Cancel**.
+- A task's **Runs** tab has **Run workflow** in its header, with the task's project's workflows. See
+  [starting a run in a task](#starting-a-run-in-a-task).
+
+The picker groups the workflows under the project's name. Workflow definitions have no description,
+so each row is a name.
 
 The list is what a task in that project can run, by the desktop's rule for its own **Start
 workflow…** box. The host reads the workflows plugin's merged list for the project's workspace and
@@ -29,27 +36,48 @@ schema.
 
 **Start run** creates the item's linked task with `handoff.create`, then starts the run with
 `workflow.start`. Both writes keep their keys, so pressing it again after one went unconfirmed makes
-no second task or run. A workflow from the repository's own config that Acorn doesn't trust yet is
+no second task or run. A start that the Node confirmed lets its key go, so the same workflow can run
+again on purpose. A workflow from the repository's own config that Acorn doesn't trust yet is
 refused, with a message to start it once in the desktop app, where the trust prompt is. Once the run
-starts, the card closes, and the panel opens the new task on its **Runs** tab, with the run chosen.
+starts, the card closes, and the panel opens the new task on its **Runs** tab, with the run open.
 
 ## The Runs tab
 
 A task shows **Runs** in its tab strip while the Node runs the workflows plugin, so a task with no run
-yet still has one. A turning loader marks the tab while a run runs. The tab lists:
+yet still has one. A turning loader marks the tab while a run runs.
 
-1. **Runs**, newest first, each with its status icon, its name, and when it started. A click chooses
-   the run, and the newest is chosen until the person picks one.
-2. **Steps** of the chosen run, each with its status icon, its name, and how long it took.
+The tab is the kit's `Section`, headed **Runs** with the count and **Run workflow** at its right. Each
+run is a kit `Row` with its status icon, turning while it runs, its name, when it started, and a
+chevron. A click opens or closes it. The newest run starts open and the others closed, and more than
+one can be open. Which runs the person opened or closed lasts while the panel is open, and isn't
+stored.
 
-A step that ran an agent opens that conversation. The top bar names the step, with the run above it,
-and **Back** returns to **Runs**. A step with no conversation, such as a gate or one not started,
-can't be opened.
+An open run's steps follow it, each a kit `Row` with `nested`, which insets it behind a line down its
+left. A step shows its status icon, a dashed circle for one not started, its name, and how long it
+took. A step that ran an agent has a chevron and opens that conversation. The top bar names the step,
+with the run above it, and **Back** returns to **Runs**. A step with no conversation, such as a gate or
+one not started, has a dimmer name and does nothing.
 
-While the chosen run is running, waiting on a person, or cancelling, the sidebar reads the runs and
-its steps again every 3 seconds. A change hint for the task, or a reconnect, reads the runs again.
-A Node without the workflows plugin answers the runs read with a failure, and no task shows the tab.
-A task open on **Runs** then gives way to **Agents**.
+A run's steps are read with `workflow.steps` when it opens and when its status changes. While an open
+run is running, waiting on a person, or cancelling, the sidebar reads the runs, and the steps of each
+open live run, every 3 seconds. A change hint for the task, or a reconnect, reads the runs again. A
+Node without the workflows plugin answers the runs read with a failure, and no task shows the tab. A
+task open on **Runs** then gives way to **Agents**.
+
+A task with no run shows an empty state: a faint workflow icon, "No runs in this task", and **Run
+workflow**.
+
+### Starting a run in a task
+
+**Run workflow** opens the kit's `Picker` on the workflows of the task's project, read with
+`workflows.list` when the tab opens.
+
+- A workflow whose every input has a default starts at once, with `workflow.start` and the task's ID.
+- Any other shows the form under the header: the **Workflow** picker, a field per input with its
+  default, **Start run**, and **Cancel**. No item fills the inputs here.
+
+The new run shows at the top, open, and the others close. Each start uses a new key, kept while the
+start is unconfirmed, so pressing it again after a lost reply starts no second run.
 
 ## Native operations
 

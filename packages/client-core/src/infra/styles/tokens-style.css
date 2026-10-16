@@ -22,7 +22,8 @@
      the raw scale rung, so a pack that changes control rounding now moves them too. */
   --radius: var(--radius-control);
 
-  --bw-0: 0;  --bw: 1px;  --bw-strong: 2px;  --bw-marker: 3px;
+  /* `0px`, not `0`: a pack points `--marker-w` here, and calc() can't add a unitless 0 to a length. */
+  --bw-0: 0px;  --bw: 1px;  --bw-strong: 2px;  --bw-marker: 3px;
 
   --divider-w: var(--bw);          /* list-row separators, a pack may zero these */
   --chrome-divider-w: var(--bw);   /* … without losing topbar / section-header structure */

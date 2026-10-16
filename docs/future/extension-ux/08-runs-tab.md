@@ -1,7 +1,59 @@
 # Phase 8: a task's Runs tab
 
-Date: October 16, 2026. Status: proposed. Depends on [phase 1](./01-navigation.md). Reuses the
-workflow form from [phase 5](./05-this-page.md).
+Date: October 16, 2026. Status: done on October 17, 2026. Depends on [phase 1](./01-navigation.md).
+Reuses the workflow form from [phase 5](./05-this-page.md).
+
+## Completion note
+
+Landed on October 17, 2026. The Runs tab lives in `apps/extension/src/sidebar/Runs.tsx`, which
+replaces `Workflows.tsx`. It's the kit's `Section`, headed **Runs** with the count and **Run
+workflow**. Each run is a kit `Row` that opens and closes, with its steps under it as rows with
+`nested`. A step with a conversation opens it with `from: 'runs'`. A task with no run shows the kit's
+`EmptyState`. **Run workflow** starts a run at once, or shows the workflow form under the header.
+[Workflows](../../browser-extension/workflows.md), [handoffs](../../browser-extension/handoffs.md),
+[first-party plugins](../../first-party-plugins.md), and the site's page on workflows and plugin
+panels are updated.
+
+Decisions and deviations:
+
+- The workflow picker, the form, and the keyed start moved out of `Handoff.tsx` into
+  `WorkflowForm.tsx`, as `WorkflowPicker`, `WorkflowForm`, and `workflowStarter`. The handoff card
+  and the Runs tab both use them.
+- `workflowStarter` keeps a start's key until the Node confirms it, then lets it go. The handoff
+  card's old code kept the key after a confirmed start too. That made no difference on the card,
+  which closes, but on Runs it would have turned a second **Triage** into a replay of the first.
+- A workflow starts at once when every input has a default, so an optional input with no default
+  still shows the form. The form's inputs start from their defaults.
+- Which runs are open is a signal in `Workspace.tsx`, `runFolds`, keyed by run ID, beside the Agents
+  tab's fold state. A run with no entry is open when it's the newest. It isn't stored. It replaces
+  `selectedRun`. A run started from Runs or from the handoff card opens alone through
+  `openStartedRun`.
+- A step list is its own component, mounted while its run is open. It reads `workflow.steps` when the
+  run opens and when the run's status changes. One clock in `Runs` ticks every 3 seconds while an
+  open run is live. Each tick reads the runs, and each open live run reads its steps.
+- The step's thread line is the kit `Row`'s `nested` rule, a straight line down the left. The
+  prototype's tick into each step is left out. A step with no conversation shows its name in the
+  kit's muted `Text` and has no role, so it can't be pressed.
+- The kit's `Row` gained `expanded`, which sets `aria-expanded`, so a run row says whether it's open.
+- The workflow form sits in a kit `Card` under the header. In the empty state, picking a workflow
+  that needs inputs swaps the empty state for the header and the form. **Cancel** brings it back.
+- Kit fix: the Modern and Cute packs set `--marker-w` to `--bw-0`, which was a unitless `0`. CSS
+  rejects `calc(0 + 16px)`, so in those packs every nested `Row`'s inset fell to nothing and the steps
+  sat left of their run, on the desktop too. `--bw-0` is `0px` now.
+- Workflow definitions have no description, so the picker's rows show names only, as on the handoff
+  card.
+
+Sidebar-only, so a plugin can't reach it: `Runs`, `RunItem`, `RunSteps`, `WorkflowPicker`, and
+`WorkflowForm` live in the extension, and so do the `.run-form` rules in `sidebar.css`. The desktop
+draws a run as a graph in the workflows plugin's `RunPane`, not as steps under a run row, so there was
+no desktop list to share. The rows, section, empty state, card, picker, and fields are all kit parts.
+
+For later phases:
+
+- Phase 9: `Row`'s `nested` and `expanded` work in the sidebar with no extra CSS.
+- Tests: `apps/extension/src/test/sidebarUi.ts` has `runRows` and `stepRows`. `Runs.test.tsx` has its
+  own fake Node, with `state.runs`, `state.steps` per run, and `state.lostStarts` for a start the Node
+  leaves unconfirmed.
 
 ## Goal
 
@@ -20,8 +72,8 @@ workflow starts only from an issue page.
 
 ## Starting point
 
-- `apps/extension/src/sidebar/Workflows.tsx` lists a task's runs, newest first, then the chosen run's
-  steps in a second list below. A running run is read again every 3 seconds.
+- `Workflows.tsx` in `apps/extension/src/sidebar/` listed a task's runs, newest first, then the
+  chosen run's steps in a second list below. A running run is read again every 3 seconds.
 - Statuses, icons, and durations come from `plugins/workflows/src/contract/statusDisplay.ts`, the
   module the desktop's run pane uses.
 - `workflows.list` and `workflow.start` already exist. `workflow.start` takes a `taskId`.

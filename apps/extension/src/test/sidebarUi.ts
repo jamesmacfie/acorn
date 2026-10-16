@@ -110,6 +110,16 @@ export async function openChat(root: ParentNode, title: string) {
   )
 }
 
+// The open task's Runs tab: each run's row, and the step rows of its open runs, or of one run by name.
+export const runRows = (root: ParentNode) => [
+  ...root.querySelectorAll<HTMLElement>('ul[aria-label="Runs"] > li > .ui-row'),
+]
+export const stepRows = (root: ParentNode, run?: string) => [
+  ...root.querySelectorAll<HTMLElement>(
+    run ? `ul[aria-label="Steps of ${run}"] .ui-row` : 'ul[aria-label^="Steps of"] .ui-row',
+  ),
+]
+
 // Home on a page that matches nothing: the task list without This page.
 export const idle = (root: ParentNode) =>
   root.querySelector('[aria-label="Home"] [aria-label="Tasks"]') !== null &&

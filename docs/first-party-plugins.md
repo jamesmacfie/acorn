@@ -110,8 +110,9 @@ import missing from its list and on a listed import that's gone. Add the reason 
 - **Extension and agents.** The sidebar draws a session's state with `runtimeState`, marks the Agents
   tab, each task row, and a conversation's state line with it, and registers the harness marks from
   `providerMarks`.
-- **Extension and workflows.** The sidebar prefills a workflow's inputs from the page's item with
-  `itemInputs`, and draws runs and steps with `statusDisplay`.
+- **Extension and workflows.** The sidebar prefills a workflow's inputs from the page's item, and
+  parses and checks the inputs of a start in a task, with `itemInputs`. It draws runs and steps with
+  `statusDisplay`.
 - **Node and four plugins.** `composition.ts` runs agents', terminal's, and workflows' startup
   reconcile through their `runtime` and `runner` capabilities, and reads GitHub's `mirror` for the
   storage footprint log.

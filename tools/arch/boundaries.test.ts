@@ -358,7 +358,11 @@ describe('architecture boundaries', () => {
         "prefills a workflow's inputs from the page's item",
       ],
       [
-        'apps/extension/src/sidebar/Workflows.tsx -> plugins/workflows/src/contract/statusDisplay.ts',
+        'apps/extension/src/sidebar/Runs.tsx -> plugins/workflows/src/contract/itemInputs.ts',
+        "parses and checks a workflow's inputs before a start in a task",
+      ],
+      [
+        'apps/extension/src/sidebar/Runs.tsx -> plugins/workflows/src/contract/statusDisplay.ts',
         'run and step glyphs, tones, and elapsed times',
       ],
       // The Node composition root runs startup work through these capabilities.

@@ -95,7 +95,7 @@ resolves the page through `handoff.resolve` and draws the item in the kit's `Car
 
 A chosen workflow adds a **Workflow** picker, a field per input with a red asterisk when required
 and its description as the placeholder, filled from the item, then **Start run** and **Cancel**.
-**Start run** creates the task, starts the run, and opens **Runs** with the run chosen
+**Start run** creates the task, starts the run, and opens **Runs** with the run open
 ([workflows](./workflows.md#starting-a-workflow)). **Cancel** removes the part and what was typed.
 
 The card has no **Dismiss**. It closes when the tab leaves the item, and Home looks the item up again

@@ -19,7 +19,9 @@ import {
   openSettings,
   openTask,
   pickFrom,
+  runRows,
   shownTask,
+  stepRows,
   tab,
   taskTabs,
 } from '../test/sidebarUi'
@@ -400,10 +402,9 @@ describe('a handoff in the sidebar', () => {
     expect(shownTask(root)).toBe('Fix the flaky test')
     expect(taskTabs(root)).toEqual(['Agents', 'Runs'])
     expect(openTab(root)).toBe('Runs')
-    // The kit's own header and rows, as the desktop draws them.
-    expect(root.querySelector('.section-header')!.textContent).toBe('Runs1')
-    expect(root.querySelector('[aria-label="Runs"] .ui-row[data-selected]')!.textContent).toContain('PR review')
-    const steps = () => [...root.querySelectorAll<HTMLElement>('[aria-label="Steps"] .ui-row')]
+    // The started run is open, with its steps under it.
+    expect(runRows(root).map((row) => row.getAttribute('aria-expanded'))).toEqual(['true'])
+    const steps = () => stepRows(root, 'PR review')
     expect(steps().map((row) => row.textContent)).toEqual(['Explain the PR1m28s', 'Final analysis'])
     // A step that hasn't run has no conversation to open.
     expect(steps().map((row) => row.getAttribute('role'))).toEqual(['button', null])
@@ -414,7 +415,7 @@ describe('a handoff in the sidebar', () => {
     // Back from a step's conversation opens Runs.
     await back(root)
     expect(openTab(root)).toBe('Runs')
-    expect(root.querySelector('[aria-label="Steps"]')).not.toBeNull()
+    expect(steps()).toHaveLength(2)
   })
 
   it('starts the task and its workflow again with the same keys after the Node left the run unconfirmed', async () => {
@@ -729,7 +730,7 @@ describe('moving between task pages', () => {
     const { fake, root } = twoTasks()
     await switchTo(fake, PAGE)
     await tab(root, 'Runs')
-    ;[...root.querySelectorAll<HTMLElement>('[aria-label="Steps"] .ui-row')][0]!.click()
+    stepRows(root)[0]!.click()
     await settle(30)
     expect(conversationTitle(root)).toBe('Explain the PR')
     await back(root)

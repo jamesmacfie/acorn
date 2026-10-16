@@ -256,11 +256,12 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .sites { display: grid; gap: var(--gap-row); }
 
 /* ── This page ──────────────────────────────────────────────────────────────────────────────── */
-/* A field's caption beside its picker, small and muted, as one column of labels. */
-.this-page .ui-field[data-layout='row'] > .ui-field-label { flex: none; width: 74px; }
-.this-page .ui-field-label { font-size: var(--fs-xs); color: var(--text-muted); }
+/* A field's caption beside its picker, small and muted, as one column of labels. Runs' workflow form
+   shares them. */
+:is(.this-page, .run-form) .ui-field[data-layout='row'] > .ui-field-label { flex: none; width: 74px; }
+:is(.this-page, .run-form) .ui-field-label { font-size: var(--fs-xs); color: var(--text-muted); }
 /* The issue card: the item's logo, key, and title, then its project and what to do with it. */
-.handoff .ui-card { display: grid; gap: var(--space-5); }
+:is(.handoff, .run-form) .ui-card { display: grid; gap: var(--space-5); }
 .item-head { display: flex; align-items: flex-start; gap: var(--space-4); }
 .item-head > .ui-icon { flex: none; margin-top: var(--space-1); }
 .item-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
@@ -273,6 +274,10 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .pending-item { display: grid; justify-items: start; gap: var(--space-2); }
 .ui-empty .pending-item { justify-items: center; }
 .agents > .pending { padding: var(--space-4) var(--pane-pad) 0; }
+
+/* ── Runs ───────────────────────────────────────────────────────────────────────────────────── */
+/* Run workflow's form, under the Runs header, laid out as This page's card. */
+.run-form { padding: 0 var(--pane-pad) var(--space-4); }
 
 /* ── Needs you ──────────────────────────────────────────────────────────────────────────────── */
 /* The top bar's amber button, with the count of requests waiting. */

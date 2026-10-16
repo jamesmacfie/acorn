@@ -3,7 +3,7 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { BridgeHandoffItem, BridgeWorkflow } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
-import { Button, Card, Field, Textarea } from '@acorn/client-core/kit/components/primitives.tsx'
+import { Button, Card, Field } from '@acorn/client-core/kit/components/primitives.tsx'
 import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
 import {
   collectItemWorkflowInputs,
@@ -19,6 +19,7 @@ import { PageTaskRow } from './TaskRow'
 import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { errorGuidance } from './guidance'
+import { WorkflowForm, WorkflowPicker, inputText, workflowStarter } from './WorkflowForm'
 
 // What the item's context becomes in a draft: the plugin's proposal, or the item's title and address
 // when it proposed none.
@@ -84,9 +85,9 @@ export function Handoff(props: {
   // The chip's menu asked for a workflow, so the first one is chosen once the list arrives.
   let wantsWorkflow = props.handoff.start === 'workflow'
   // A create keeps its key, so a retry, after an unconfirmed create or a failed start, can't make a
-  // second task. A start keeps its own for the same task, workflow, and values.
+  // second task. The starter keeps its own for the same task, workflow, and values.
   let lastCreate: { key: string; identifier: string; connectionId: string; projectId: string } | null = null
-  let lastStart: { key: string; taskId: string; workflowId: string; inputs: string } | null = null
+  const startRun = workflowStarter(props.client, props.nodeId, setProblem)
 
   const target = () => ({
     pluginId: props.handoff.pluginId,
@@ -123,20 +124,9 @@ export function Handoff(props: {
     wantsWorkflow = false
     setWorkflowId(first.id)
   })
-  const workflowItems = () =>
-    (projectWorkflows() ?? []).map((each) => ({
-      id: each.id,
-      label: each.name,
-      group: chosenProject(),
-      active: each.id === workflowId(),
-    }))
-  const workflowsEmpty = () =>
-    projectWorkflows() ? 'This project has no workflow to run. Publish one in Acorn.' : 'Loading workflows…'
 
-  const valueOf = (name: string): string => {
-    const value = values()[name] ?? (item() && workflow() ? seededValues(workflow()!, item()!)[name] : undefined)
-    return value === undefined ? '' : typeof value === 'string' ? value : JSON.stringify(value)
-  }
+  const valueOf = (name: string): string =>
+    inputText(values()[name] ?? (item() && workflow() ? seededValues(workflow()!, item()!)[name] : undefined))
   const ready = () => !!workflow() && itemWorkflowInputsReady(workflow()!.id, workflow()!.inputs, valueOf)
   const cancelWorkflow = () => {
     setWorkflowId('')
@@ -183,33 +173,6 @@ export function Handoff(props: {
     }
   }
 
-  // The run's ID, or null with `problem` saying why there isn't one.
-  const startRun = async (taskId: string, chosen: BridgeWorkflow, inputs: Record<string, DataValue>) => {
-    const asked = { taskId, workflowId: chosen.id, inputs: JSON.stringify(inputs) }
-    const same =
-      lastStart?.taskId === asked.taskId &&
-      lastStart.workflowId === asked.workflowId &&
-      lastStart.inputs === asked.inputs
-    const key = same ? lastStart!.key : crypto.randomUUID()
-    lastStart = { key, ...asked }
-    try {
-      const result = await props.client.call({
-        op: 'workflow.start',
-        nodeId: props.nodeId,
-        taskId,
-        defId: chosen.id,
-        ...(Object.keys(inputs).length ? { inputs } : {}),
-        key,
-      })
-      return result.runId
-    } catch (error) {
-      if (error instanceof CallFailure && isUncertain(error.code))
-        setProblem("The Node didn't confirm the run. Start it again to retry; the Node won't start a second one.")
-      else setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
-      return null
-    }
-  }
-
   // Makes the linked task, then for a run starts the chosen workflow in it. A retry after either step
   // failed reuses both keys, so nothing is made twice.
   const submit = async (run: boolean) => {
@@ -232,7 +195,7 @@ export function Handoff(props: {
       const task = await create(current, forProject)
       if (!task) return
       if (!run) return props.createdTask(task.projectId, task.id, handoffCapture(current))
-      const runId = await startRun(task.id, chosen!, inputs)
+      const runId = await startRun(task.id, chosen!.id, inputs)
       if (runId) props.startedWorkflow(task.projectId, task.id, runId)
     } finally {
       setCreating(false)
@@ -369,15 +332,13 @@ export function Handoff(props: {
                               <Icon name="plus" />
                               Create task
                             </Button>
-                            <Picker
+                            <WorkflowPicker
                               label="Run workflow"
-                              ariaLabel="Run workflow"
-                              size="sm"
+                              name="Run workflow"
+                              workflows={projectWorkflows()}
+                              project={chosenProject()}
                               disabled={creating()}
-                              placeholder="Filter workflows"
-                              emptyText={workflowsEmpty()}
-                              items={workflowItems()}
-                              onPick={setWorkflowId}
+                              pick={setWorkflowId}
                             />
                           </div>
                         }
@@ -385,47 +346,19 @@ export function Handoff(props: {
                         {(chosen) => (
                           <>
                             <hr class="divider" />
-                            <Field label="Workflow" layout="row">
-                              <Picker
-                                label={chosen().name}
-                                ariaLabel="Workflow"
-                                size="sm"
-                                placeholder="Filter workflows"
-                                emptyText={workflowsEmpty()}
-                                items={workflowItems()}
-                                onPick={setWorkflowId}
-                              />
-                            </Field>
-                            <For each={chosen().inputs}>
-                              {(input) => (
-                                <Field label={input.label ?? input.name} required={input.required}>
-                                  <Textarea
-                                    name={`input-${input.name}`}
-                                    rows={2}
-                                    required={input.required}
-                                    placeholder={input.description}
-                                    value={valueOf(input.name)}
-                                    onInput={(value) => setValues((typed) => ({ ...typed, [input.name]: value }))}
-                                  />
-                                </Field>
-                              )}
-                            </For>
-                            <div class="row">
-                              <Button
-                                size="sm"
-                                variant="solid"
-                                tone="accent"
-                                busy={creating()}
-                                disabled={!props.online || !ready()}
-                                onPress={() => void submit(true)}
-                              >
-                                <Icon name="play" />
-                                Start run
-                              </Button>
-                              <Button size="sm" variant="ghost" disabled={creating()} onPress={cancelWorkflow}>
-                                Cancel
-                              </Button>
-                            </div>
+                            <WorkflowForm
+                              workflow={chosen()}
+                              workflows={projectWorkflows()}
+                              project={chosenProject()}
+                              valueOf={valueOf}
+                              edit={(name, value) => setValues((typed) => ({ ...typed, [name]: value }))}
+                              choose={setWorkflowId}
+                              ready={ready()}
+                              busy={creating()}
+                              disabled={!props.online}
+                              start={() => void submit(true)}
+                              cancel={cancelWorkflow}
+                            />
                           </>
                         )}
                       </Show>
