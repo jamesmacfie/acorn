@@ -23,7 +23,7 @@ const AGENT_STATES: Record<string, { label: string; tone: Tone }> = {
   replaying: { label: 'Starting', tone: 'ok' },
   ready: { label: 'Ready', tone: 'idle' },
   working: { label: 'Working', tone: 'ok' },
-  waiting: { label: 'Waiting for an answer', tone: 'warn' },
+  waiting: { label: 'Waiting for you', tone: 'warn' },
   cancelling: { label: 'Stopping', tone: 'idle' },
   reconnecting: { label: 'Reconnecting', tone: 'warn' },
   stopped: { label: 'Stopped', tone: 'idle' },

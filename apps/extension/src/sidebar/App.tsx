@@ -20,6 +20,7 @@ import { bridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { INSTALL_COMMAND, errorGuidance, hostGuidance, installFixes, statusGuidance } from './guidance'
 import { createLocation, type Location } from './location'
+import { NeedsYouButton } from './NeedsYou'
 import { Pairing } from './Pairing'
 import { Settings } from './Settings'
 import { TopBar, type Heading } from './TopBar'
@@ -273,6 +274,19 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
           nav.openSettings()
         }}
         goToTask={() => setGoToTask(true)}
+        needsYou={
+          <Show when={!pairing() && fleet()?.activeNodeId} keyed>
+            {(nodeId) => (
+              <NeedsYouButton
+                client={client}
+                nodeId={nodeId}
+                requests={requests().nodeId === nodeId ? requests().requests : []}
+                online={online()}
+                openConversation={nav.openConversation}
+              />
+            )}
+          </Show>
+        }
         menu={
           <Show when={fleet()?.activeNodeId}>
             {(nodeId) => (

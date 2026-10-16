@@ -30,9 +30,9 @@ import { GoToTask } from './GoToTask'
 import { Agents, Tasks, ThisPage } from './Home'
 import { changeDraft, loadHomeWorkspace, saveHomeWorkspace, type TaskTab } from '../localState'
 import { locationTask, type Navigation } from './location'
+import { NeedsYou } from './NeedsYou'
 import { PluginPanel } from './PluginPanel'
 import type { Heading } from './TopBar'
-import { Waiting } from './Waiting'
 import { Workflows, runsLive } from './Workflows'
 
 // The tab glyph of a plugin panel that names none.
@@ -623,12 +623,12 @@ export function Workspace(props: {
         <Switch>
           <Match when={location().level === 'home'}>
             <div class="view" aria-label="Home">
-              <Waiting
+              <NeedsYou
                 client={props.client}
                 nodeId={nodeId}
                 requests={props.requests}
                 online={props.online}
-                open={(request) => nav.openConversation(request.taskId, request.sessionId)}
+                openConversation={nav.openConversation}
               />
               <Show when={pageMatched()}>
                 <ThisPage

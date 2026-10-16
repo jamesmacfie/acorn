@@ -632,18 +632,10 @@ describe('home', () => {
       ['Inline chats', ['Chat s4']],
     ])
   })
+})
 
-  it('answers a waiting request on Home with the buttons the conversation uses', async () => {
-    const subject = mount()
-    // The background reads what waits as the Node is selected.
-    subject.state.agentRequests.push(permission())
-    await settle(20)
-    const waiting = () => subject.root.querySelector<HTMLElement>('[aria-label="Waiting for you"]')
-    expect(waiting()!.textContent).toContain('Run rm -rf build')
-    expect(waiting()!.textContent).toContain('Fix it')
-    button(waiting()!, 'Allow')!.click()
-    await settle(20)
-    expect([...subject.state.resolutions.values()]).toEqual([{ optionId: 'allow_once' }])
+describe('Needs you', () => {
+  const hint = (subject: ReturnType<typeof mount>) =>
     subject.state.host!.send({
       v: 1,
       event: 'agent',
@@ -653,9 +645,154 @@ describe('home', () => {
       missed: false,
       requests: true,
     })
+  const topButton = (root: HTMLElement) =>
+    root.querySelector<HTMLButtonElement>('header button[aria-label="Needs you"]')
+  // Home's section, or the popover, which draws on the document's body.
+  const homeList = (root: HTMLElement) => root.querySelector<HTMLElement>('.view section[aria-label="Needs you"]')
+  const popover = () => document.querySelector<HTMLElement>('.needs-you-popover')
+  const rows = (list: HTMLElement) => [...list.querySelectorAll<HTMLElement>('li')]
+  const row = (list: HTMLElement, title: string) =>
+    rows(list).find((item) => item.querySelector('.row-title')?.textContent === title)!
+  const press = async (element: HTMLElement) => {
+    element.click()
     await settle(20)
-    // Nothing waits any more, so the section goes.
-    expect(waiting()).toBeNull()
+  }
+  const pressRow = (list: HTMLElement, title: string) => press(row(list, title).querySelector<HTMLElement>('.ui-row')!)
+  const allowOnce = () =>
+    permission({
+      options: [
+        { id: 'allow_once', label: 'Allow once', reject: false },
+        { id: 'reject_once', label: 'Deny', reject: true },
+      ],
+    })
+
+  it('shows the button with the count on Home, a task, and a conversation, and hides it when nothing waits', async () => {
+    const subject = mount()
+    await settle(20)
+    expect(topButton(subject.root)).toBeNull()
+
+    subject.state.agentRequests.push(allowOnce(), permission({ requestId: 'r2', title: 'Second' }))
+    hint(subject)
+    await settle(20)
+    expect(topButton(subject.root)!.textContent).toBe('2')
+    await openTask(subject.root, 'Fix it')
+    expect(topButton(subject.root)!.textContent).toBe('2')
+    await openChat(subject.root, 'Chat s1')
+    expect(topButton(subject.root)!.textContent).toBe('2')
+
+    subject.state.agentRequests.forEach((request) => (request.status = 'resolved'))
+    hint(subject)
+    await settle(20)
+    expect(topButton(subject.root)).toBeNull()
+  })
+
+  it("answers a permission from Home's list in two clicks, shows the result, and then lets it go", async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(allowOnce())
+    await settle(20)
+    const list = homeList(subject.root)!
+    expect(list.querySelector('h2')!.textContent).toBe('Needs you 1')
+    // Collapsed: the request, then its conversation and task.
+    expect(row(list, 'Run rm -rf build').querySelector('.row-meta')!.textContent).toBe('Chat s1 · Fix it')
+    expect(button(list, 'Allow once')).toBeUndefined()
+
+    await pressRow(list, 'Run rm -rf build')
+    expect(row(list, 'Run rm -rf build').textContent).toContain('In /src/acorn')
+    await press(button(list, 'Allow once')!)
+    expect([...subject.state.resolutions.values()]).toEqual([{ optionId: 'allow_once' }])
+    expect(rows(list)[0]!.textContent).toBe('Allowed onceRun rm -rf build')
+
+    // The next pending list drops it, but the result stays a moment first.
+    hint(subject)
+    await settle(20)
+    expect(rows(homeList(subject.root)!)[0]!.textContent).toBe('Allowed onceRun rm -rf build')
+    await new Promise((resolve) => setTimeout(resolve, 1_600))
+    expect(homeList(subject.root)).toBeNull()
+  })
+
+  it('opens from a conversation as a popover, and says when nothing waits', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(allowOnce())
+    await openSession(subject, 's2')
+    await press(topButton(subject.root)!)
+    expect(popover()!.querySelector('h2')!.textContent).toBe('Needs you 1')
+    await pressRow(popover()!, 'Run rm -rf build')
+    await press(button(popover()!, 'Deny')!)
+    expect([...subject.state.resolutions.values()]).toEqual([{ optionId: 'reject_once' }])
+    expect(rows(popover()!)[0]!.textContent).toBe('DeniedRun rm -rf build')
+
+    hint(subject)
+    await new Promise((resolve) => setTimeout(resolve, 1_600))
+    await settle(20)
+    // The button stays while its popover is open, so the popover can say so.
+    expect(popover()!.textContent).toContain('Nothing waits on you.')
+    expect(topButton(subject.root)!.textContent).toBe('0')
+  })
+
+  it('answers a single-choice question in place, and Open chat opens its conversation', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(
+      permission({
+        kind: 'question',
+        title: 'Which size?',
+        detail: null,
+        options: [],
+        questions: [
+          {
+            id: 'size',
+            header: null,
+            prompt: 'Which paper size?',
+            options: [
+              { label: 'A4', description: null },
+              { label: 'Letter', description: null },
+            ],
+            multiple: false,
+            secret: false,
+          },
+        ],
+      }),
+      permission({ requestId: 'r2', title: 'Run it again' }),
+    )
+    await settle(20)
+    const list = homeList(subject.root)!
+    await pressRow(list, 'Which size?')
+    expect(row(list, 'Which size?').textContent).toContain('Which paper size?')
+    await press(button(list, 'A4')!)
+    expect([...subject.state.resolutions.values()]).toEqual([{ answers: { size: 'A4' } }])
+    expect(rows(list)[0]!.textContent).toBe('Answered: A4Which size?')
+
+    await pressRow(list, 'Run it again')
+    await press(button(list, 'Open chat')!)
+    expect(conversationTitle(subject.root)).toBe('Chat s1')
+  })
+
+  it('opens a form in its conversation instead of expanding it', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(
+      permission({
+        kind: 'question',
+        title: 'A few details',
+        detail: null,
+        options: [],
+        questions: [{ id: 'why', header: null, prompt: 'Why?', options: [], multiple: false, secret: false }],
+      }),
+    )
+    await settle(20)
+    await pressRow(homeList(subject.root)!, 'A few details')
+    expect(conversationTitle(subject.root)).toBe('Chat s1')
+    expect(subject.root.querySelector('article.request input[name="answer:why"]')).toBeTruthy()
+  })
+
+  it('shows the answer another client gave first, with no second answer', async () => {
+    const subject = mount()
+    subject.state.agentRequests.push(allowOnce())
+    await settle(20)
+    const list = homeList(subject.root)!
+    await pressRow(list, 'Run rm -rf build')
+    Object.assign(subject.state.agentRequests[0]!, { status: 'resolved', answer: 'Allow once' })
+    await press(button(list, 'Deny')!)
+    expect(subject.state.resolutions.size).toBe(0)
+    expect(rows(list)[0]!.textContent).toBe('Allowed onceRun rm -rf build')
   })
 })
 
@@ -692,7 +829,10 @@ describe('questions and approvals', () => {
     await openSession(subject)
     expect(card(subject.root)!.textContent).toContain('Run rm -rf build')
     expect(card(subject.root)!.textContent).toContain('In /src/acorn')
-    expect(status(subject.root)).toBe('Waiting for an answer')
+    // The amber stripe says it waits, so no line under it does.
+    expect(card(subject.root)!.querySelector('.ui-card')!.getAttribute('data-stripe')).toBe('warn')
+    expect(card(subject.root)!.querySelector('.eyebrow')!.textContent).toBe('Permission')
+    expect(status(subject.root)).toBeUndefined()
 
     button(subject.root, 'Reject')!.click()
     await settle()

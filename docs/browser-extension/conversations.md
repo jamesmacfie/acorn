@@ -65,9 +65,15 @@ The host narrows each row in `bridgeRequest` (`apps/cli/src/browser/agents.ts`):
   scope; or nothing to send. The sidebar shows the request in full, with no buttons, and sends the
   person to the Acorn app. It never makes up an answer.
 
+The conversation draws each request as the desktop's card: an amber stripe while it waits, the kind
+above the title, the detail in a code block, then the form or the buttons. The first button is solid,
+a refusal is a quiet danger button, and the rest are plain. A waiting request has no status line,
+because the stripe says it waits. Once answered, a line says it was sent, answered, or expired. The
+[Needs you list](./notifications.md#the-needs-you-list) answers a request with the same buttons.
+
 `request.resolve` posts to the agents plugin's resolve route with the `key` as its idempotency key. The
-sidebar (`src/sidebar/Requests.tsx`) keeps answers in the card's memory only, never in browser
-storage, and clears them once the Node takes them. Every answer, sent or not, reads the conversation
+sidebar (`createAnswer` in `src/sidebar/Requests.tsx`, shared by the card and the Needs you row) keeps
+answers in the card's memory only, never in browser storage, and clears them once the Node takes them. Every answer, sent or not, reads the conversation
 again. An uncertain failure, as in [writes and retries](#writes-and-retries), keeps the key in memory:
 pressing the same answer again reuses it, so the Node settles the request once. Nothing resends an
 answer on its own, on reconnect or otherwise.

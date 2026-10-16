@@ -22,7 +22,7 @@ const Acorn = () => (
 const GO_TO_TASK_KEYS = formatChord(/Mac/.test(navigator.userAgent) ? 'meta+k' : 'ctrl+k')
 
 // The bar above every level, drawn from where the sidebar is. Home shows the acorn with the selected
-// Node's state as a dot, Go to task, and the Settings gear. A task, a conversation, and Settings show
+// Node's state as a dot, Go to task, Needs you, and the Settings gear. A task, a conversation, and Settings show
 // Back and what they are, and a task's title opens Go to task too.
 export function TopBar(props: {
   location: Location
@@ -32,6 +32,8 @@ export function TopBar(props: {
   status: NodeStatus | null
   // The ⋯ menu for the task or conversation shown, if any.
   menu?: JSX.Element
+  // The Needs you button, on Home, a task, and a conversation.
+  needsYou?: JSX.Element
   ref(element: HTMLElement): void
   back(): void
   openSettings(): void
@@ -61,6 +63,7 @@ export function TopBar(props: {
               <Kbd size="xs">{GO_TO_TASK_KEYS}</Kbd>
             </button>
           </Show>
+          {props.needsYou}
           <button type="button" class="icon" aria-label="Settings" onClick={() => props.openSettings()}>
             <Icon name="settings" />
           </button>
@@ -85,6 +88,7 @@ export function TopBar(props: {
               </Show>
             </span>
           </button>
+          {props.needsYou}
           {props.menu}
         </Match>
         <Match when={props.location.level === 'conversation'}>
@@ -93,6 +97,7 @@ export function TopBar(props: {
             <span class="eyebrow">{props.heading?.eyebrow}</span>
             <strong class="title">{props.heading?.title}</strong>
           </div>
+          {props.needsYou}
           {props.menu}
         </Match>
       </Switch>

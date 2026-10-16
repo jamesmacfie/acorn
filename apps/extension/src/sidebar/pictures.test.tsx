@@ -297,7 +297,7 @@ describe('the sidebar pictures on the site', () => {
     // The panel opens on the page's task; Back shows Home.
     await goHome(root)
     expect(root.querySelector('[aria-label="This page"]')?.textContent).toContain('Retry failed webhooks')
-    expect(root.textContent).toContain('Waiting for you')
+    expect(root.querySelector('.view [aria-label="Needs you"]')).toBeTruthy()
     picture('sidebar-home', root)
   })
 

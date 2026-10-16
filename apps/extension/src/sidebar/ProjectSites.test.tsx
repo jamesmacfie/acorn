@@ -383,22 +383,22 @@ describe('requests waiting on the Node', () => {
     title: `Question ${requestId}`,
     taskTitle: 'Fix login',
   })
+  const needsYou = (root: HTMLElement) => root.querySelector<HTMLElement>('.view [aria-label="Needs you"]')
   const listed = (root: HTMLElement) =>
-    [...root.querySelectorAll('[aria-label="Waiting for you"] [data-testid="waiting-title"]')].map(
-      (row) => row.textContent,
-    )
+    [...(needsYou(root)?.querySelectorAll('.row-title') ?? [])].map((row) => row.textContent)
   const pathSites = [site('p1', 'https://example.com', '/app'), site('p2', 'https://example.com', '/docs')]
 
   it("lists every project's requests, opens the one chosen, and leaves the badge to the page", async () => {
     const { fake, state, root } = mount({ url: 'https://example.com/app/login', sites: pathSites })
-    expect(root.querySelector('[aria-label="Waiting for you"]')).toBeNull()
+    expect(needsYou(root)).toBeNull()
     state.pending = [waiting('r1', 'p1', 't1', 's1'), waiting('r2', 'p2', 't2', 's2')]
     await settle(40)
     expect(listed(root)).toEqual(['Question r1', 'Question r2'])
     // The badge counts only the page's projects.
     expect(fake.badges.get(7)).toBe('1')
 
-    button(root.querySelector('[aria-label="Waiting for you"]')!, 'Open')!.click()
+    // The fake reads no buttons for these, so the row opens its conversation.
+    needsYou(root)!.querySelector<HTMLElement>('.ui-row')!.click()
     await settle(40)
     expect(conversationTitle(root)).toBe('Chat s1')
   })
@@ -696,7 +696,8 @@ describe('Home task list', () => {
   const groups = (root: HTMLElement) =>
     [...root.querySelectorAll('section[aria-label="Tasks"] h3')].map((heading) => heading.textContent)
   const meta = (root: HTMLElement, title: string) => taskRow(root, title)!.querySelector('.row-meta')!.textContent
-  const mark = (root: HTMLElement, title: string) => taskRow(root, title)!.querySelector('.ui-row-leading > *')!
+  const mark = (root: HTMLElement, title: string) =>
+    taskRow(root, title)!.querySelector('.ui-row-leading')!.firstElementChild!
   const filterTasks = async (root: HTMLElement, text: string) => {
     fill(root, 'input[name="task-filter"]', text)
     await settle(20)

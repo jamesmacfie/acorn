@@ -27,7 +27,7 @@ import { OpenInAcorn } from './OpenInAcorn'
 import { openTabs, showPage, tabFor } from './openTabs'
 import { State } from './state'
 
-// Home's sections below Waiting for you. Workspace owns the state they draw.
+// Home's sections below Needs you. Workspace owns the state they draw.
 
 // What the panel knows about the page beside it, in one of three states: a task it belongs to, an
 // item no task holds yet, or a project site with no item. A handoff in progress replaces them, and a

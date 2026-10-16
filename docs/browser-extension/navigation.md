@@ -21,12 +21,12 @@ Home.
 ## Home
 
 Home's top bar holds the acorn, with a dot for the selected Node's state, the **Go to task** button
-with its key, and the Settings gear. The dot is green while the Node answers, amber while its live updates pause, and red when it doesn't
+with its key, the **Needs you** button while an agent waits, and the Settings gear. The dot is green while the Node answers, amber while its live updates pause, and red when it doesn't
 answer. Home lists, top to bottom:
 
-1. **Waiting for you**, only while an agent waits on a request, across every project on the Node.
-   Each request answers in place with the same buttons the conversation uses
-   ([request notifications](./notifications.md#the-waiting-list)).
+1. **Needs you**, only while an agent waits on a request, across every project on the Node. A
+   permission or a single choice answers in place, and anything else opens its conversation
+   ([the Needs you list](./notifications.md#the-needs-you-list)).
 2. **This page**: what Acorn knows about the page, in one of three states: the task it belongs to, an
    item no task holds with its handoff, or the project its site suggests with that project's open
    tasks ([This page](./task-pages.md#this-page)). A page that matches none of them has no
@@ -38,7 +38,8 @@ answer. Home lists, top to bottom:
 
 A task's top bar holds **Back**, then the task's title over its project and branch. A **This page**
 tag follows when the page beside the panel belongs to the task. The title opens
-[Go to task](#go-to-task). The ⋯ at the right holds the task's menu:
+[Go to task](#go-to-task). The **Needs you** button sits before the ⋯ while an agent waits. The ⋯ at
+the right holds the task's menu:
 
 - **Open in Acorn** and **Copy Acorn link** ([the panel's verbs](./handoffs.md#the-panels-verbs)).
 - **Pages**, when the task has any: each pull request, other address, or app a plugin published for
@@ -66,8 +67,8 @@ loads, so it doesn't vanish under the person.
 ## A conversation
 
 A conversation's top bar holds **Back**, then the conversation's title, with its task's title above
-it. A workflow step's conversation shows the step's name, with its run's name above it. The ⋯ at the
-right holds **Open in Acorn**, **Copy Acorn link** ([the panel's
+it. A workflow step's conversation shows the step's name, with its run's name above it. The **Needs
+you** button sits before the ⋯ while an agent waits. The ⋯ at the right holds **Open in Acorn**, **Copy Acorn link** ([the panel's
 verbs](./handoffs.md#the-panels-verbs)), and **Archive chat**. Archiving sends `session.archive`,
 which archives the conversation as the desktop's Archive does, so it leaves every list. The panel
 then goes back to the tab the conversation came from and reads its list again. The composer's toolbar holds the three
