@@ -106,6 +106,8 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     paths: [] as string[],
     // Every session archive, with its key.
     archives: [] as { key: string; body: unknown }[],
+    // Every stop of a session's turn, with its key.
+    cancels: [] as { key: string; body: unknown }[],
     // The body of the last session start.
     lastSessionBody: null as unknown,
     // A task's sessions, where a test names them. Any other task lists s1.
@@ -280,6 +282,12 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         },
         { id: 'orphan', name: 'Orphan', providerId: 'gone', options: {}, instructions: '', source: { kind: 'user' } },
       ])
+    if (url.pathname === '/v1/p/agents/sessions/s1/cancel' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      state.cancels.push({ key: String(req.headers['idempotency-key']), body: JSON.parse(body) })
+      return reply(200, { ok: true })
+    }
     if (url.pathname === '/v1/p/agents/sessions/s1' && req.method === 'PATCH') {
       let body = ''
       for await (const chunk of req) body += chunk
@@ -799,6 +807,15 @@ describe('browser bridge agent operations', () => {
       sessionId: 's1',
     })
     expect(node.state.archives).toEqual([{ key: 'archive-key-1', body: { archived: true } }])
+  })
+
+  it("stops a session's turn through the agents route with the key", async () => {
+    const { call, node } = await selected()
+    expect(await call({ op: 'session.cancel', nodeId: 'node-a', sessionId: 's1', key: 'cancel-key-1' })).toEqual({
+      nodeId: 'node-a',
+      sessionId: 's1',
+    })
+    expect(node.state.cancels).toEqual([{ key: 'cancel-key-1', body: {} }])
   })
 
   it('reports an unanswered write as uncertain, and a retry with the same key makes no second turn', async () => {

@@ -21,6 +21,8 @@ carries none of its code. It narrows each answer to what the sidebar draws:
   session's own user and agent messages, tool calls, and errors are kept, and a tool call keeps only
   its title and status. A person's message lists the attachments its turn sent
   ([page capture](./page-capture.md#sent-screenshots-in-the-conversation)). Its input and output can be megabytes, and a summary never shows them.
+  A workflow step's prompt carries `workflow: true`, so the sidebar can say the workflow sent it. The
+  nudge a step sends after a turn ends without its result doesn't.
   `reach` is the furthest seq the page covered, counting the records left out, and the next read
   starts there. `queued` lists turns accepted but not yet sent to the agent, whose message joins the
   conversation only at dispatch.
@@ -31,6 +33,8 @@ carries none of its code. It narrows each answer to what the sidebar draws:
   logins in its place, then each custom agent on a harness the Node registers. Each row has its
   name, its mark and account icon, what it says under its name, and whether it can start. `refresh`
   asks the Node to check its harnesses again, as the picker's refresh button does.
+- `session.cancel` posts an empty body to the session's `cancel` route, which stops its running turn,
+  as the desktop's **Stop** does. See [the state line](./transcript.md#the-state-line).
 - `session.create` sends `kind: 'interactive'`, the row's `customAgentId` and `account` when it has
   them, and an empty `config`, so the Node applies the same defaults any other client gets. The
   sidebar's **New chat** is the kit's own `Picker`, as on the desktop.
@@ -60,6 +64,11 @@ A task with no conversation shows the kit's `EmptyState` instead: "No chats in t
 
 Picking an agent from **New chat** or **Start a chat** starts the conversation, opens it, and puts
 the cursor in its message box. Opening a conversation any other way leaves the focus alone.
+
+## The conversation
+
+A conversation opens inside its task. Its transcript, folded tool calls, state line with **Stop**, and
+message box are on [the conversation view](./transcript.md).
 
 ## Writes and retries
 

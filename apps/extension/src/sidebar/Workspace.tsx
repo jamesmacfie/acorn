@@ -128,6 +128,9 @@ export function Workspace(props: {
   // Which of the Agents tab's folds are open, by label, for every task. Not stored: a fold opens closed
   // in a new panel.
   const [agentFolds, setAgentFolds] = createSignal<Record<string, boolean>>({})
+  // Which conversations' tool runs are open, by session and run. Not stored either.
+  const [toolFolds, setToolFolds] = createSignal<Record<string, boolean>>({})
+  const foldTools = (key: string, open: boolean) => setToolFolds((folds) => ({ ...folds, [key]: open }))
   // The conversation just started here, whose message box takes the cursor when it opens.
   const [startedSession, setStartedSession] = createSignal<string | null>(null)
   const [problem, setProblem] = createSignal<string | null>(null)
@@ -760,6 +763,8 @@ export function Workspace(props: {
                 online={props.online}
                 hint={props.hint}
                 reconnects={props.reconnects}
+                folds={toolFolds()}
+                fold={foldTools}
               />
             )}
           </Match>
@@ -773,6 +778,8 @@ export function Workspace(props: {
                 online={props.online}
                 hint={props.hint}
                 reconnects={props.reconnects}
+                folds={toolFolds()}
+                fold={foldTools}
               />
             )}
           </Match>

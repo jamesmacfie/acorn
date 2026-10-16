@@ -112,8 +112,6 @@ main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-st
   border-bottom: var(--chrome-divider);
 }
 .view-head .title { font-weight: var(--heading-weight); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.subhead { display: flex; align-items: center; gap: var(--gap-inline); padding: var(--space-3) var(--space-6); border-bottom: var(--divider); }
-.subhead .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Agents with no task to list. */
 .empty { padding: var(--space-6); }
 /* One column no wider than the panel: an auto column grows to its longest unbroken word, so a long
@@ -308,23 +306,18 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .request ul.asked { list-style: disc; padding-left: var(--space-8); }
 
 /* ── Conversation ───────────────────────────────────────────────────────────────────────────── */
-/* Messages read top to bottom: each a card with the speaker as a label, striped like the desktop's,
- * accent for you and green for the agent. A tool call is one muted line behind its state dot. */
-.transcript { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-stack); margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
-.transcript > li:not(.tool) {
-  padding: var(--space-4);
-  background: var(--card-bg);
-  border: var(--surface-border);
-  border-left-width: var(--stripe-w);
-  border-radius: var(--radius-surface);
-}
-.transcript > li.you { border-left-color: var(--accent); }
-.transcript > li.agent { border-left-color: var(--state-ok); }
-.transcript > li.error { border-left-color: var(--danger); }
-.transcript > li > strong { font-size: var(--label-size); font-weight: var(--label-weight); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); color: var(--text-muted); }
-.transcript > li.tool { display: flex; align-items: flex-start; gap: var(--space-3); color: var(--text-muted); font-size: var(--fs-sm); }
-.transcript > li.tool .dot { margin-top: calc((1lh - 8px) / 2); }
-.transcript > li.error p { margin-top: var(--space-1); white-space: pre-wrap; }
+/* Messages read top to bottom, each a kit card. A tool call is one muted line behind its state mark,
+ * and a run of them folds into one line. */
+.transcript, .tool-lines { display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
+.transcript { gap: var(--gap-stack); }
+.tool-lines { gap: var(--space-3); }
+.tool { display: flex; align-items: flex-start; gap: var(--space-3); color: var(--text-muted); font-size: var(--fs-sm); }
+.tool > .ui-icon { flex: none; margin-top: calc((1lh - 1em) / 2); }
+.transcript .ui-fold-summary { font-size: var(--fs-sm); color: var(--text-muted); }
+.transcript .ui-fold > .tool-lines, .transcript .ui-fold + .tool-lines { padding: var(--space-3) 0 0 var(--space-6); }
+.error-text { white-space: pre-wrap; font-size: var(--fs-sm); }
+/* What the agent is doing, above the message box. */
+.activity { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-h-sm); font-size: var(--fs-sm); }
 
 /* Rendered Markdown, on the desktop's .ui-markdown rules (client-core primitives.css). Lists get their
  * markers back from the reset at the top. */
@@ -344,21 +337,13 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .ui-markdown table { display: block; width: max-content; max-width: 100%; overflow-x: auto; margin: var(--space-4) 0; border-collapse: collapse; overflow-wrap: break-word; }
 .ui-markdown :is(th, td) { padding: var(--space-3) var(--space-6); border: var(--chrome-divider); text-align: start; vertical-align: top; }
 .ui-markdown th { background: var(--bg-subtle); font-weight: var(--fw-semibold); }
-.attachments { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); }
-.attachments img { display: block; max-width: 100%; max-height: 160px; object-fit: contain; border: var(--divider); border-radius: var(--radius-control); }
+.attachments { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.attachments .thumb { display: block; height: var(--icon-box); width: auto; border-radius: var(--radius-xs); }
 .composer { position: sticky; bottom: 0; background: var(--bg); border-top: var(--chrome-divider); }
-.toolbar { flex-wrap: nowrap; }
 /* The size toggle sits in the field's top corner, as on the desktop, with the text kept clear of it. */
 .composer .field { position: relative; }
 .composer .field textarea { display: block; width: 100%; padding-right: calc(var(--control-h-sm) + var(--space-4)); }
-.composer .field > button.icon {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  width: var(--control-h-sm);
-  min-height: var(--control-h-sm);
-  color: var(--text-muted);
-}
+.composer .field > .ui-btn { position: absolute; top: var(--space-2); right: var(--space-2); }
 
 /* Each capture is a chip; opening it shows what goes to the agent. */
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }

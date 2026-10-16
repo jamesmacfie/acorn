@@ -339,6 +339,10 @@ describe('architecture boundaries', () => {
         'apps/extension/src/sidebar/Agents.tsx -> plugins/agents/src/contract/runtimeState.ts',
         'session state icon and tone',
       ],
+      [
+        'apps/extension/src/sidebar/Conversation.tsx -> plugins/agents/src/contract/runtimeState.ts',
+        "the state line's working and waiting icons",
+      ],
       ['apps/extension/src/sidebar/main.tsx -> plugins/agents/src/contract/providerMarks.ts', 'harness brand marks'],
       [
         'apps/extension/src/sidebar/TaskRow.tsx -> plugins/agents/src/contract/runtimeState.ts',

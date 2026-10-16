@@ -208,6 +208,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [browser-extension/setup.md](./browser-extension/setup.md) | Installing the extension's development builds and native bridge on macOS, pairing, repair and removal, and every sidebar state with its next step. |
 | [browser-extension/navigation.md](./browser-extension/navigation.md) | The extension sidebar's three levels, Home, a task with its tabs, and a conversation, with the top bar, Back, and the strip under the bars. |
 | [browser-extension/conversations.md](./browser-extension/conversations.md) | The extension's agent operations, change hints, conversation window, send retries, and browser storage. |
+| [browser-extension/transcript.md](./browser-extension/transcript.md) | One conversation in the extension sidebar: the transcript, folded tool calls, the state line with Stop, and the message box's keys. |
 | [browser-extension/page-capture.md](./browser-extension/page-capture.md) | The extension's link, selection, and screenshot captures, page access, sending them, and the attachment operations. |
 | [browser-extension/element-picker.md](./browser-extension/element-picker.md) | The extension's element picker: asking a task's agent about an element on its page, with the element's cleaned HTML, CSS path, and screenshot, and the checks behind it. |
 | [browser-extension/handoffs.md](./browser-extension/handoffs.md) | The task chips plugins put on websites, the extension's handoff card, and the operations that resolve a page and create a linked task. |

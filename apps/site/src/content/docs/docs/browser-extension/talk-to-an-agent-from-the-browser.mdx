@@ -5,6 +5,7 @@ sources:
   - docs/browser-extension/conversations.md
   - docs/browser-extension/setup.md
   - docs/browser-extension/task-pages.md
+  - docs/browser-extension/transcript.md
   - apps/extension/src/sidebar/Agents.tsx
   - apps/extension/src/sidebar/Composer.tsx
   - apps/extension/src/sidebar/Conversation.tsx
@@ -42,10 +43,16 @@ holds **Open in Acorn** and **Copy Acorn link** to open it in the desktop app, a
 which archives it as the desktop does. It shows the newest 200 events, and **Earlier messages** reads
 further back.
 
+Three or more tool calls in a row fold into one line, such as "4 tool calls". Click it to see them. A
+call that failed stays in view under the line, which counts it in red.
+
+While the agent works, a line above the message box says **Working**, with **Stop** to end its turn.
+While it waits on you, the line says **Waiting for you**.
+
 ## Send a message
 
-Type in the box and click **Send**, or press <Keys chord="meta+enter" />. <Keys chord="meta+shift+enter" />
-makes the box bigger. Ctrl works in place of ⌘.
+Type in the box and press <Keys chord="enter" />, or click **Send**. <Keys chord="shift+enter" /> adds
+a line. <Keys chord="meta+shift+enter" /> makes the box bigger. Ctrl works in place of ⌘.
 
 Each conversation keeps its own draft, in the browser, until the Node accepts it. Closing the panel,
 switching conversation, or losing the connection keeps it. Page text or a page link you add waits in
@@ -63,7 +70,7 @@ the same text again can't make a second message: the Node recognizes it and answ
 may already have. Change the text, and it's a new message.
 
 While the Node is away, or the conversation is archived, the panel keeps the draft and turns sending
-off.
+off. The message box says why.
 
 ## Answer the agent
 
@@ -79,5 +86,5 @@ never guesses an answer.
 
 - The panel shows messages, tool calls by title, and errors. It doesn't show a tool's details or
   subagents' work. Open the conversation in the desktop app for those.
-- It shows screenshots a message sent, and names other attachments.
+- It shows the attachments a message sent as chips, each screenshot with its picture.
 - Drafts stay in the browser until sent or cleared. They don't expire.

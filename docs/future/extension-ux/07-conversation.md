@@ -1,7 +1,70 @@
 # Phase 7: the conversation
 
-Date: October 16, 2026. Status: proposed. Depends on [phase 1](./01-navigation.md) and, for the
-request card, [phase 4](./04-needs-you.md).
+Date: October 16, 2026. Status: done on October 17, 2026. Depends on [phase 1](./01-navigation.md)
+and, for the request card, [phase 4](./04-needs-you.md).
+
+## Completion note
+
+Landed on October 17, 2026. The line under the conversation's header is gone. Each message is the
+kit's `Card` with a stripe and an eyebrow naming the sender and the time. A tool call is a line with
+the kit's `Icon`, and three or more in a row fold into the kit's `Fold`, with a failed call kept in
+view under the closed fold. A state line above the message box says **Working** with **Stop**, or
+**Waiting for you**. **Stop** calls the new `session.cancel` bridge operation. Enter sends, Shift with
+Enter adds a line, and the placeholder reads "Ask the agent…". The view is documented on a new page,
+[the conversation view](../../browser-extension/transcript.md), because
+[agent conversations](../../browser-extension/conversations.md) went over 200 lines.
+[Native messaging](../../browser-extension/native-messaging.md),
+[page capture](../../browser-extension/page-capture.md), and the site's page on talking to an agent
+are updated, and the conversation's site picture is regenerated.
+
+Decisions and deviations:
+
+- `conversationItems` returns a `tools` item only for a run of three or more. A shorter run stays as
+  plain `tool` items, so the view never decides whether to fold. The grouping runs after the tool
+  updates are folded, because an update can change a line anywhere in the list.
+- Fold state is a signal in `Workspace.tsx`, keyed by session and run, beside phase 6's fold state,
+  so it lasts while the panel is open and survives leaving the conversation. It's never stored.
+- The fold is the kit's `Fold` at the `sub` level, so it draws the kit's triangle, not the
+  prototype's chevron. The Modern pack sets `--marker-w` to zero, which hides every `Fold`'s
+  triangle, on the desktop too. Give the fold marker its own token in the kit if that matters.
+- "· 1 failed" stays on the fold's line when it's open, too.
+- A workflow step's prompt reads "Workflow". The read had no way to say who sent a message, so
+  `user_message` gained an optional `workflow: true`, which the host sets from the turn's `source`.
+  The nudge a step sends after a turn ends without its result is left as "You"; the desktop calls it
+  "Acorn".
+- The time is the clock time the Node recorded, as on the desktop's cards, not the prototype's age.
+  The extension's Vitest config pins the time zone and locale, as the site's does, so the site's
+  pictures don't depend on the machine.
+- An error is a red-striped card reading "Error", so all three message kinds share one part.
+- A sent attachment is the kit's `Chip`: a screenshot shows its picture in the chip, and anything
+  else shows a paperclip and its name. The large screenshot preview is gone.
+- The tool marks' colours follow the desktop's `agentToolTone`, so a running call turns in the accent
+  colour, not the prototype's green. The state line takes its icons from the contract's
+  `runtimeIcon` and `runtimeTone`, as the Agents tab's rows do.
+- **Stop** shows only while the agent works, as the design says. The desktop also offers it while an
+  agent waits. A failed stop shows the error under the state line. The line has no elapsed time,
+  because the read doesn't carry the turn's start.
+- The hint is the desktop's own words, "⇧↩ for newline", in the kit's `Kbd`. The bar is the kit's
+  `Toolbar` with an empty start, where phase 13's **Context** would go. **Send** is the kit's solid
+  `Button`, which shows its spinner while sending instead of "Sending…".
+- While sending is off, the placeholder says why. Once the box holds a draft and hides the
+  placeholder, the same words show under the box, so a disabled **Send** always has a reason.
+- The size toggle is the kit's `IconButton`, with the desktop's tip and chord.
+
+Sidebar-only, so a plugin can't reach it: `Message`, `ToolLineItem`, and `ToolRun` in
+`Conversation.tsx`, and the `.tool`, `.tool-lines`, `.activity`, `.error-text`, and `.attachments`
+rules in `sidebar.css`. The desktop's own transcript cards and request card live in the agents
+plugin's client, which the plugin doesn't export, so the sidebar builds the same look from the kit's
+`Card`, `Stack`, `Inline`, `Text`, `Icon`, and `Fold`. Moving `Message` and `ToolRun` into the kit
+would let the desktop's transcript fold tool calls too, which the plan's out-of-scope list names.
+
+For later phases:
+
+- Phase 13: the composer's bar is a kit `Toolbar` whose first child is the spacer. Put **Context**
+  before it.
+- Tests: `Conversation.test.tsx`'s `transcript` reads a card as its sender and content without the
+  time. The **a run of tool calls** and **the state line** blocks have `fold`, `toggle`, `lines`, and
+  `activity`. The fake Node answers `session.cancel` by setting the session to `ready`.
 
 ## Goal
 

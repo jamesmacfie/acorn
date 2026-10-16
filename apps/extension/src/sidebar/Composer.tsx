@@ -1,6 +1,8 @@
-import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
+import { For, Show, createSignal, onCleanup, onMount, type JSX } from 'solid-js'
 import { TURN_TEXT_MAX_CHARS } from '@acorn/protocol/extensionBridge.ts'
-import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { Text } from '@acorn/client-core/kit/components/content'
+import { IconButton } from '@acorn/client-core/kit/components/inputs'
+import { Button, Kbd, Toolbar, ToolbarSpacer } from '@acorn/client-core/kit/components/primitives.tsx'
 import { formatChord } from '@acorn/client-core/kit/lib/formatChord'
 import type { BrowserApi } from '../browser'
 import { CallFailure, isUncertain } from '../messages'
@@ -34,26 +36,33 @@ export function Composer(props: {
   client: BridgeClient
   storage: BrowserApi['storage']
   target: DraftTarget
-  // Why sending is off right now, or null.
+  // Why sending is off right now, or null. The message box shows it in place of its placeholder.
   blocked: string | null
   // Put the cursor in the message box when the composer opens.
   focused: boolean
   // A send finished, either way. The conversation reads itself again.
   settled(): void
+  // What the agent is doing, drawn above the message box.
+  activity?: JSX.Element
 }) {
   const target = props.target
   const [draft, setDraft] = createSignal<Draft>({ text: '' })
   const [loaded, setLoaded] = createSignal(false)
   const [sending, setSending] = createSignal(false)
   const [note, setNote] = createSignal<string | null>(null)
-  // The desktop composer's size toggle, with its chords. The panel runs no keymap, so the field reads
-  // its own keys: Command or Control with Enter sends, and with Shift as well toggles the size.
+  // The desktop composer's keys. The panel runs no keymap, so the field reads its own: Enter sends,
+  // Shift with Enter adds a line, and Command or Control with Shift and Enter toggles the size. A key
+  // that ends an input method's composition sends nothing.
   const [expanded, setExpanded] = createSignal(false)
-  const chords = (event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => {
-    if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey) || event.isComposing) return
-    event.preventDefault()
-    if (event.shiftKey) setExpanded((open) => !open)
-    else event.currentTarget.form?.requestSubmit()
+  const keys = (event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => {
+    if (event.key !== 'Enter' || event.isComposing) return
+    if (event.shiftKey && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault()
+      setExpanded((open) => !open)
+    } else if (!event.shiftKey) {
+      event.preventDefault()
+      event.currentTarget.form?.requestSubmit()
+    }
   }
   let mounted = true
   let typed = false
@@ -204,6 +213,7 @@ export function Composer(props: {
 
   return (
     <form class="composer" onSubmit={(event) => void send(event)}>
+      {props.activity}
       <Show when={captures().length}>
         {/* Each capture is a chip; opening it shows exactly what goes to the agent. */}
         <ul class="chips" aria-label="Captures">
@@ -249,29 +259,40 @@ export function Composer(props: {
           name="message"
           rows={expanded() ? 18 : 3}
           maxLength={TURN_TEXT_MAX_CHARS}
-          placeholder="Message the agent"
+          placeholder={props.blocked ?? 'Ask the agent…'}
           value={text()}
           onInput={(event) => edit(event.currentTarget.value)}
-          onKeyDown={chords}
+          onKeyDown={keys}
         />
-        <button
-          type="button"
-          class="icon"
-          aria-label={expanded() ? 'Collapse the message box' : 'Expand the message box'}
-          aria-pressed={expanded()}
-          title={`${expanded() ? 'Collapse' : 'Expand'} ${formatChord('meta+shift+enter')}`}
-          onClick={() => setExpanded((open) => !open)}
+        <IconButton
+          icon={expanded() ? 'minimize-2' : 'maximize-2'}
+          label={expanded() ? 'Collapse the message box' : 'Expand the message box'}
+          pressed={expanded()}
+          tip={expanded() ? 'Collapse' : 'Expand'}
+          tipKey={formatChord('meta+shift+enter')}
+          onPress={() => setExpanded((open) => !open)}
+        />
+      </div>
+      <Toolbar variant="actions" size="sm">
+        <ToolbarSpacer />
+        <Text emphasis="muted">
+          <Kbd size="xs">{formatChord('shift+enter')}</Kbd> for newline
+        </Text>
+        <Button
+          submit
+          variant="solid"
+          tone="accent"
+          size="sm"
+          busy={sending()}
+          disabled={(!text().trim() && !captures().length) || props.blocked !== null}
         >
-          <Icon name={expanded() ? 'minimize-2' : 'maximize-2'} />
-        </button>
-      </div>
-      <div class="row toolbar">
-        <span class="grow" />
-        <button type="submit" disabled={sending() || (!text().trim() && !captures().length) || props.blocked !== null}>
-          {sending() ? 'Sending…' : retrying() ? 'Retry' : 'Send'}
-        </button>
-      </div>
-      <Show when={props.blocked ?? note()}>{(shown) => <p class="notice">{shown()}</p>}</Show>
+          {retrying() ? 'Retry' : 'Send'}
+        </Button>
+      </Toolbar>
+      {/* The placeholder says why sending is off, until a draft in the box hides it. */}
+      <Show when={note() ?? (text() || captures().length ? props.blocked : null)}>
+        {(shown) => <p class="notice">{shown()}</p>}
+      </Show>
     </form>
   )
 }

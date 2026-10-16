@@ -233,6 +233,11 @@ function node() {
         }
         return { result: { nodeId: 'n1', taskId: request.taskId, attachment } }
       }
+      case 'session.cancel': {
+        // As the agents runtime does once the stop lands: the turn ends and the session rests.
+        state.sessions.find((row) => row.id === request.sessionId)!.runtimeState = 'ready'
+        return { result: { nodeId: 'n1', sessionId: request.sessionId } }
+      }
       case 'attachment.delete':
         state.deleted.push(request.attachmentId as string)
         return { result: { nodeId: 'n1', taskId: request.taskId, attachmentId: request.attachmentId, removed: true } }
@@ -287,7 +292,14 @@ const send = (root: HTMLElement) =>
   root
     .querySelector('[aria-label="Conversation"] form.composer')!
     .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-const transcript = (root: HTMLElement) => [...root.querySelectorAll('.transcript li')].map((item) => item.textContent)
+// Each item's text: a card's speaker and then its content, without the time, or a tool line's text.
+const transcript = (root: HTMLElement) =>
+  [...root.querySelectorAll('.transcript > li')].map((item) => {
+    const card = item.querySelector('.ui-card > .ui-stack')
+    if (!card) return item.textContent
+    const [eyebrow, ...content] = [...card.children]
+    return eyebrow!.firstElementChild!.textContent + content.map((part) => part.textContent).join('')
+  })
 const draft = (root: HTMLElement) => root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')?.value
 
 async function openSession(subject: ReturnType<typeof mount>, sessionId = 's1') {
@@ -308,7 +320,7 @@ describe('conversation', () => {
     // Where a message goes: the conversation, under its task, in the top bar.
     expect(subject.root.querySelector('header .eyebrow')!.textContent).toBe('Fix it')
     expect(conversationTitle(subject.root)).toBe('Chat s1')
-    expect(transcript(subject.root)).toEqual(['YouHello from the desktop', 'AgentHi'])
+    expect(transcript(subject.root)).toEqual(['YouHello from the desktop', 'ClaudeHi'])
 
     subject.say('s1', 'A reply another client caused')
     subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1'], tasks: [], missed: false })
@@ -317,8 +329,8 @@ describe('conversation', () => {
     expect(reads.map((request) => request.afterSeq)).toEqual([0, 2])
     expect(transcript(subject.root)).toEqual([
       'YouHello from the desktop',
-      'AgentHi',
-      'AgentA reply another client caused',
+      'ClaudeHi',
+      'ClaudeA reply another client caused',
     ])
   })
 
@@ -351,7 +363,7 @@ describe('conversation', () => {
     delete (page as { clientHeight?: number }).clientHeight
   })
 
-  it('renders messages as Markdown and a tool call as a state dot', async () => {
+  it('renders messages as Markdown and a tool call as a state mark', async () => {
     const subject = mount()
     subject.say('s1', 'Run **the** tests')
     const tool = (seq: number, status: string) =>
@@ -366,14 +378,140 @@ describe('conversation', () => {
     tool(3, 'running')
     subject.state.sessions[0]!.lastEventSeq = 3
     await openSession(subject)
-    expect(subject.root.querySelector('.transcript li.agent strong + .ui-markdown strong')!.textContent).toBe('the')
-    // A finished call is its dot alone; any other state is written beside it.
+    const agent = subject.root.querySelector('.transcript .ui-card[data-stripe="ok"]')!
+    expect(agent.querySelector('.ui-text[data-emphasis="eyebrow"]')!.textContent).toBe('Claude')
+    expect(agent.querySelector('.ui-markdown strong')!.textContent).toBe('the')
+    // A finished call is its mark alone; any other state is written beside it.
     expect(transcript(subject.root).slice(1)).toEqual(['pnpm test 2', 'pnpm test 3 · running'])
-    const dots = [...subject.root.querySelectorAll('.transcript li.tool .dot')]
-    expect(dots.map((dot) => [dot.getAttribute('data-tone'), dot.getAttribute('aria-label')])).toEqual([
-      ['ok', 'completed'],
-      ['active', 'running'],
+    const marks = [...subject.root.querySelectorAll('.transcript li.tool > .ui-icon')]
+    expect(
+      marks.map((mark) => [
+        mark.getAttribute('data-tone'),
+        mark.getAttribute('aria-label'),
+        mark.hasAttribute('data-spin'),
+      ]),
+    ).toEqual([
+      ['ok', 'completed', false],
+      ['accent', 'running', true],
     ])
+  })
+
+  describe('a run of tool calls', () => {
+    const tool = (subject: ReturnType<typeof mount>, seq: number, status = 'completed') => {
+      subject.state.events.get('s1')!.push({
+        id: `s1-t${seq}`,
+        seq,
+        turnId: 'turn',
+        createdAt: seq,
+        event: { type: 'tool', toolId: `tool-${seq}`, title: `Step ${seq}`, status },
+      })
+      subject.state.sessions[0]!.lastEventSeq = seq
+    }
+    const fold = (root: HTMLElement) => root.querySelector<HTMLDetailsElement>('.transcript details.ui-fold')
+    const toggle = async (root: HTMLElement) => {
+      fold(root)!.querySelector('summary')!.click()
+      await settle()
+    }
+    // The lines a reader sees: none inside a closed fold.
+    const lines = (root: HTMLElement) =>
+      [...root.querySelectorAll('.transcript li.tool')].filter((line) => !line.closest('details:not([open])'))
+
+    it('folds four calls into one line, and opening it shows all four', async () => {
+      const subject = mount()
+      for (const seq of [1, 2, 3, 4]) tool(subject, seq)
+      await openSession(subject)
+      expect(fold(subject.root)!.open).toBe(false)
+      expect(fold(subject.root)!.querySelector('summary')!.textContent).toBe('4 tool calls')
+      expect(lines(subject.root)).toEqual([])
+      await toggle(subject.root)
+      expect(fold(subject.root)!.open).toBe(true)
+      expect(lines(subject.root).map((line) => line.textContent)).toEqual(['Step 1', 'Step 2', 'Step 3', 'Step 4'])
+    })
+
+    it('keeps a failed call in view under the closed fold, and counts it', async () => {
+      const subject = mount()
+      for (const seq of [1, 2, 3]) tool(subject, seq, seq === 2 ? 'failed' : 'completed')
+      await openSession(subject)
+      expect(fold(subject.root)!.querySelector('summary')!.textContent).toBe('3 tool calls· 1 failed')
+      expect(lines(subject.root).map((line) => line.textContent)).toEqual(['Step 2 · failed'])
+      const mark = lines(subject.root)[0]!.querySelector('.ui-icon')!
+      expect([mark.getAttribute('data-tone'), mark.getAttribute('aria-label')]).toEqual(['danger', 'failed'])
+      await toggle(subject.root)
+      expect(lines(subject.root)).toHaveLength(3)
+    })
+
+    it('keeps the fold as it was while the run grows, and after leaving the conversation', async () => {
+      const subject = mount()
+      for (const seq of [1, 2, 3]) tool(subject, seq, seq === 3 ? 'running' : 'completed')
+      await openSession(subject)
+      tool(subject, 4)
+      subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1'], tasks: [], missed: false })
+      await settle()
+      expect(fold(subject.root)!.querySelector('summary')!.textContent).toBe('4 tool calls')
+      expect(fold(subject.root)!.open).toBe(false)
+      await toggle(subject.root)
+      tool(subject, 5)
+      subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1'], tasks: [], missed: false })
+      await settle()
+      expect(subject.root.querySelectorAll('.transcript details.ui-fold')).toHaveLength(1)
+      expect(fold(subject.root)!.open).toBe(true)
+      expect(lines(subject.root)).toHaveLength(5)
+      await back(subject.root)
+      await openChat(subject.root, 'Chat s1')
+      expect(fold(subject.root)!.open).toBe(true)
+    })
+
+    it('never folds two calls', async () => {
+      const subject = mount()
+      for (const seq of [1, 2]) tool(subject, seq)
+      await openSession(subject)
+      expect(fold(subject.root)).toBeNull()
+      expect(transcript(subject.root)).toEqual(['Step 1', 'Step 2'])
+    })
+  })
+
+  describe('the state line', () => {
+    const activity = (root: HTMLElement) => root.querySelector('.composer .activity')?.textContent ?? null
+
+    it('says the agent is working, and Stop stops it', async () => {
+      const subject = mount()
+      subject.state.sessions[0]!.runtimeState = 'working'
+      await openSession(subject)
+      expect(activity(subject.root)).toBe('WorkingStop')
+      button(subject.root, 'Stop')!.click()
+      await settle()
+      expect(subject.state.requests.find((request) => request.op === 'session.cancel')).toMatchObject({
+        nodeId: 'n1',
+        sessionId: 's1',
+        key: expect.any(String),
+      })
+      expect(activity(subject.root)).toBeNull()
+    })
+
+    it('says when the agent waits for you, and shows nothing at rest', async () => {
+      const subject = mount()
+      subject.state.sessions[0]!.runtimeState = 'waiting'
+      await openSession(subject)
+      expect(activity(subject.root)).toBe('Waiting for you')
+      expect(button(subject.root, 'Stop')).toBeUndefined()
+      subject.state.sessions[0]!.runtimeState = 'ready'
+      subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1'], tasks: [], missed: false })
+      await settle()
+      expect(activity(subject.root)).toBeNull()
+    })
+
+    it('says why a stop failed', async () => {
+      const subject = mount()
+      subject.state.sessions[0]!.runtimeState = 'working'
+      subject.state.answers.set('session.cancel', () => ({
+        error: { code: 'node_error', message: 'No turn to stop.' },
+      }))
+      await openSession(subject)
+      button(subject.root, 'Stop')!.click()
+      await settle()
+      expect(subject.root.querySelector('.composer .problem[role="alert"]')).toBeTruthy()
+      expect(activity(subject.root)).toBe('WorkingStop')
+    })
   })
 
   it('keeps an unsent draft and the destination when the sidebar closes and opens again', async () => {
@@ -405,7 +543,7 @@ describe('conversation', () => {
     expect(transcript(subject.root)).toEqual([])
     expect(draft(subject.root)).toBe('')
     await openChat(subject.root, 'Chat s1')
-    expect(transcript(subject.root)).toEqual(['AgentOnly in s1'])
+    expect(transcript(subject.root)).toEqual(['ClaudeOnly in s1'])
     expect(draft(subject.root)).toBe('For s1')
   })
 
@@ -456,22 +594,28 @@ describe('conversation', () => {
     expect(transcript(subject.root)).toEqual(['YouFor s1 only'])
   })
 
-  it('sends with Command-Enter and toggles the box size with Command-Shift-Enter', async () => {
+  it('sends with Enter, adds a line with Shift-Enter, and toggles the box size with Command-Shift-Enter', async () => {
     const subject = mount()
     await openSession(subject)
     const box = subject.root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!
-    const press = (init: KeyboardEventInit) =>
-      box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init }))
+    expect(box.placeholder).toBe('Ask the agent…')
+    const press = (init: KeyboardEventInit) => {
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init })
+      box.dispatchEvent(event)
+      return event
+    }
     expect(box.rows).toBe(3)
     press({ metaKey: true, shiftKey: true })
     expect(box.rows).toBe(18)
     button(subject.root, 'Collapse the message box')!.click()
     expect(box.rows).toBe(3)
     type(subject.root, 'Ship it')
-    press({})
+    // Shift-Enter is the field's own new line, and Enter ending a composition is the input method's.
+    expect(press({ shiftKey: true }).defaultPrevented).toBe(false)
+    expect(press({ isComposing: true }).defaultPrevented).toBe(false)
     await settle()
     expect(subject.state.turns.size).toBe(0)
-    press({ metaKey: true })
+    expect(press({}).defaultPrevented).toBe(true)
     await settle()
     expect(subject.state.turns.size).toBe(1)
     expect(draft(subject.root)).toBe('')
@@ -482,14 +626,16 @@ describe('conversation', () => {
     await openSession(subject)
     subject.state.host!.send({ v: 1, event: 'status', status: { nodeId: 'n1', state: 'offline' } })
     await settle()
+    const box = subject.root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!
+    expect(box.placeholder).toBe('Offline. Your draft is kept.')
     type(subject.root, 'Wait for it')
     await settle()
     expect(button(subject.root, 'Send')!.hasAttribute('disabled')).toBe(true)
-    expect(subject.root.textContent).toContain('The Node is not connected')
+    expect(subject.root.querySelector('.composer .notice')!.textContent).toBe('Offline. Your draft is kept.')
     subject.say('s1', 'Said while you were away')
     subject.state.host!.send({ v: 1, event: 'status', status: { nodeId: 'n1', state: 'online' } })
     await settle()
-    expect(transcript(subject.root)).toEqual(['AgentSaid while you were away'])
+    expect(transcript(subject.root)).toEqual(['ClaudeSaid while you were away'])
     expect(button(subject.root, 'Send')!.hasAttribute('disabled')).toBe(false)
   })
 
@@ -1114,7 +1260,7 @@ describe('attachments', () => {
     await openSession(subject)
     expect(written(subject, 'attachment.read')).toMatchObject([{ taskId: 't1', attachmentId: 'a1' }])
     expect(subject.root.querySelector('.transcript img')!.getAttribute('src')).toBe('blob:shot-1')
-    expect(transcript(subject.root)).toEqual(['YouLookAttachment'])
+    expect(transcript(subject.root)).toEqual(['YouLookScreenshot of DocsAttachment'])
     await openChat(subject.root, 'Chat s2')
     expect(revoked).toEqual(['blob:shot-1'])
   })

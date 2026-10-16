@@ -700,6 +700,15 @@ export function createBridge(options: {
         })
         return { nodeId: request.nodeId, sessionId: request.sessionId }
       }
+      case 'session.cancel': {
+        await nodeRequest(request.nodeId, {
+          method: 'POST',
+          path: `${sessionRoute(request.sessionId)}/cancel`,
+          key: request.key,
+          body: {},
+        })
+        return { nodeId: request.nodeId, sessionId: request.sessionId }
+      }
       case 'request.resolve': {
         // The Node settles a request once. An answer to one already settled, from here or another
         // client, comes back as that settled row and reaches no agent.

@@ -145,8 +145,8 @@ read comes back in reply chunks like any large reply.
 
 `session.read` lists what a person's turn sent with its message, as `attachments: [{ id, image, name }]`,
 and drops the `[Attachment: <id>]` lines that name them for the agent. A queued turn carries the same
-list. The conversation reads each image once through `attachment.read` and shows it from an object
-URL. Anything else shows its name. Leaving the conversation revokes every object URL it made, and a
+list. The conversation shows each attachment as a chip with its name. It reads each image once
+through `attachment.read` and shows it in the chip from an object URL. Leaving the conversation revokes every object URL it made, and a
 read that answers after that makes none.
 
 ## Gaps

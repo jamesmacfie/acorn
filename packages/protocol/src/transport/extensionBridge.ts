@@ -225,6 +225,8 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   }),
   // Archives a conversation, as the desktop's Archive does. The Node keeps it, out of every list.
   z.strictObject({ ...envelope, op: z.literal('session.archive'), nodeId, sessionId: rowId, key: operationKey }),
+  // Stops the conversation's running turn, as the desktop's Stop does. The next read shows the stop.
+  z.strictObject({ ...envelope, op: z.literal('session.cancel'), nodeId, sessionId: rowId, key: operationKey }),
   // Answers one request the agent is waiting on. `requestId` is the agents plugin's provider request
   // ID. The key is kept by the sidebar for that request and answer only, never stored, so an answer is
   // sent again only when the person presses it again.
@@ -374,8 +376,8 @@ export type BridgeAttachmentRef = { id: string; image: boolean; name: string | n
 
 export type BridgeConversationEvent =
   // `attachments` lists what the person's turn sent. When it's present, the text no longer carries the
-  // `[Attachment: <id>]` lines that name them for the agent.
-  | { type: 'user_message'; text: string; attachments?: BridgeAttachmentRef[] }
+  // `[Attachment: <id>]` lines that name them for the agent. `workflow` marks a workflow step's prompt.
+  | { type: 'user_message'; text: string; attachments?: BridgeAttachmentRef[]; workflow?: true }
   | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean }
   // `title` and `status` absent mean unchanged, as on the agents plugin's tool call.
   | { type: 'tool'; toolId: string; title?: string; status?: string }
@@ -517,6 +519,7 @@ export type BridgeResults = {
   'session.create': { nodeId: string; session: BridgeAgentSession }
   'turn.submit': { nodeId: string; sessionId: string; turnId: string }
   'session.archive': { nodeId: string; sessionId: string }
+  'session.cancel': { nodeId: string; sessionId: string }
   // The request as the Node holds it after the answer. One already settled comes back unchanged.
   'request.resolve': { nodeId: string; sessionId: string; request: BridgeAgentRequest }
   // Oldest first. Only active tasks' requests: an archived task has no conversation to open.

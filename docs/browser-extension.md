@@ -14,6 +14,8 @@ Topic pages:
   conversation, with the top bar, **Back**, and the strip under the bars at each.
 - [Agent conversations](./browser-extension/conversations.md): the agent operations, change hints,
   the conversation window, send retries, and browser storage.
+- [The conversation view](./browser-extension/transcript.md): the transcript, folded tool calls, the
+  state line with **Stop**, and the message box's keys.
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
   the page's **Add to Acorn chat** entry, page access, sending them, and the attachment operations.
 - [Ask Acorn about an element](./browser-extension/element-picker.md): the element picker and its checks.
