@@ -43,6 +43,7 @@ describe('browser bridge requests', () => {
       { v: 1, id: 'a', op: 'agents.choices', nodeId: 'n1' },
       { v: 1, id: 'a', op: 'agents.choices', nodeId: 'n1', refresh: true },
       { v: 1, id: 'a', op: 'sessions.list', nodeId: 'n1', taskId: 't1' },
+      { v: 1, id: 'a', op: 'sessions.list', nodeId: 'n1', workspaceId: 'w1' },
       { v: 1, id: 'a', op: 'session.read', nodeId: 'n1', sessionId: 's1', afterSeq: 0, limit: 500 },
       {
         v: 1,
@@ -101,6 +102,8 @@ describe('browser bridge requests', () => {
       { v: 1, id: 'a', op: 'node.pair', code: 'X', label: 'L', endpoint: 'https://other.test' },
       { v: 1, id: 'a', op: 'projects.list' },
       { v: 1, id: '', op: 'nodes.list' },
+      { v: 1, id: 'a', op: 'sessions.list', nodeId: 'n1' },
+      { v: 1, id: 'a', op: 'sessions.list', nodeId: 'n1', taskId: 't1', workspaceId: 'w1' },
       { v: 1, id: 'a', op: 'session.read', nodeId: 'n1', sessionId: 's1', afterSeq: 0, limit: 501 },
       { v: 1, id: 'a', op: 'turn.submit', nodeId: 'n1', sessionId: 's1', input: [text('hi')], key: 'short' },
       { v: 1, id: 'a', op: 'turn.submit', nodeId: 'n1', sessionId: 's1', input: [], key: 'k'.repeat(8) },

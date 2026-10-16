@@ -31,8 +31,8 @@ answer. Home lists, top to bottom:
    item no task holds with its handoff, or the project its site suggests with that project's open
    tasks ([This page](./task-pages.md#this-page)). A page that matches none of them has no
    **This page** section.
-3. **Tasks**: one workspace's open tasks, grouped by project. A row opens its task
-   ([Home's task list](./task-pages.md#homes-task-list)).
+3. **Tasks**: one workspace's open tasks, grouped by project, with a filter and each task's agent
+   mark. A row opens its task ([Home's task list](./task-pages.md#homes-task-list)).
 
 ## A task and its tabs
 

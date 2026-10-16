@@ -748,6 +748,10 @@ describe('browser bridge agent operations', () => {
     expect(listed.sessions.map((session: { id: string }) => session.id)).toEqual(['s1'])
     expect(listed.sessions[0]).not.toHaveProperty('config')
     expect(node.state.lastQuery).toBe('?taskId=t1&archived=false&limit=100')
+    // Or every task's in a workspace.
+    const inWorkspace = await call({ op: 'sessions.list', nodeId: 'node-a', workspaceId: 'w1' })
+    expect(inWorkspace).toMatchObject({ workspaceId: 'w1', sessions: [{ id: 's1' }] })
+    expect(node.state.lastQuery).toBe('?workspaceId=w1&archived=false&limit=100')
   })
 
   it('reads a session page and reports a missing session as not found', async () => {

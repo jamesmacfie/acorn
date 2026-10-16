@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, onMount } from 'solid-js'
+import { For, Match, Show, Switch, createEffect, createSignal, onMount } from 'solid-js'
 import type {
   BridgeAgentChoice,
   BridgeAgentSession,
@@ -10,16 +10,21 @@ import type {
   BridgeWorkspace,
 } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { IconButton } from '@acorn/client-core/kit/components/inputs'
+import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
+import { Row } from '@acorn/client-core/kit/components/primitives.tsx'
 import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
-import { runtimeIcon, runtimeTone } from '@acorn/plugin-agents/contract/runtimeState.ts'
-import { itemTaskLink, projectLink } from '../acornLinks'
+import { agentRailMarkers, runtimeIcon, runtimeTone } from '@acorn/plugin-agents/contract/runtimeState.ts'
+import { projectLink } from '../acornLinks'
+import type { BrowserApi } from '../browser'
 import { onHandoffPage, pageHandoffs, type PageHandoff } from '../handoffs'
-import type { PageTask } from '../taskPages'
+import type { AgentCounts, PageTask } from '../taskPages'
 import { AgentPicker, agentChoice } from './agentChoice'
 import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { Handoff } from './Handoff'
 import { OpenInAcorn } from './OpenInAcorn'
+import { openTabs, showPage, tabFor } from './openTabs'
 import { State } from './state'
 
 // Home's sections below Waiting for you. Workspace owns the state they draw.
@@ -40,8 +45,7 @@ export function ThisPage(props: {
   markerHidden(origin: string): boolean
   showMarker(origin: string): void
   projectName(id: string): string
-  // Opens a task's newest conversation, or the new-chat picker when it has none, and opens a task.
-  chat(taskId: string): void
+  agents(taskId: string): AgentCounts
   openTask(taskId: string): void
   handoff: PageHandoff | null
   startHandoff(handoff: PageHandoff): void
@@ -105,46 +109,41 @@ export function ThisPage(props: {
           )}
         </Match>
         <Match when={props.pageTasks.length}>
-          <ul class="rows" aria-label="Page tasks">
+          {/* An app a plugin published for the task, such as a running stack, adds the plugin's state. */}
+          <ul class="task-rows" aria-label="Page tasks">
             <For each={props.pageTasks}>
               {({ task, page }) => (
                 <li>
-                  {/* An app a plugin published for the task is named by its branch, with the
-                      plugin's state, and its link goes to the plugin's pane, which has the logs. */}
-                  <button type="button" class="row-button" onClick={() => props.openTask(task.id)}>
-                    <Show
-                      when={page.status}
-                      fallback={
-                        <>
-                          <strong>{task.title}</strong>
-                          <span class="quiet">
-                            Task in {props.projectName(task.projectId)}
-                            {task.branch ? ` · ${task.branch}` : ''}
-                          </span>
-                        </>
-                      }
-                    >
-                      {(status) => (
-                        <>
-                          <strong>{task.branch ?? task.title}</strong>
-                          <span class="quiet">
-                            Task: {task.title} · {props.projectName(task.projectId)}
-                          </span>
-                          <State tone={status().tone}>
-                            {status().label} {status().state}
-                          </State>
-                        </>
-                      )}
-                    </Show>
-                  </button>
-                  <OpenInAcorn
-                    href={itemTaskLink(props.nodeId, page.source, task.id)}
-                    opensLinks={props.opensLinks}
-                    label={page.status ? 'Logs in Acorn' : undefined}
-                  />
-                  <button type="button" class="quiet" onClick={() => props.chat(task.id)}>
-                    Chat
-                  </button>
+                  <Row
+                    variant="stacked"
+                    onPress={() => props.openTask(task.id)}
+                    leading={<AgentMark agents={props.agents(task.id)} />}
+                    trailing={
+                      <>
+                        <Show when={page.status}>
+                          {(status) => (
+                            <State tone={status().tone}>
+                              {status().label} {status().state}
+                            </State>
+                          )}
+                        </Show>
+                        <Icon name="chevron-right" tone="muted" />
+                      </>
+                    }
+                  >
+                    <strong class="row-title">{task.title}</strong>
+                    <span class="row-meta">
+                      {props.projectName(task.projectId)}
+                      <Show when={task.branch}>
+                        {(branch) => (
+                          <>
+                            {' · '}
+                            <span class="branch">{branch()}</span>
+                          </>
+                        )}
+                      </Show>
+                    </span>
+                  </Row>
                 </li>
               )}
             </For>
@@ -291,9 +290,21 @@ function ProjectOptions(props: { projects: readonly BridgeProject[]; selected: s
   )
 }
 
-// Home's task list: one workspace's open tasks, grouped by project in the workspace's order. A row
-// opens its task, whose ⋯ menu has its links.
+// A task's agents as the desktop marks them: an amber alert while one waits on the person, which wins
+// over the spinner while one works, and an idle dot otherwise.
+function AgentMark(props: { agents: AgentCounts }) {
+  const marker = () => agentRailMarkers({ working: props.agents.working, attention: props.agents.waiting })[0]
+  return (
+    <Show when={marker()} fallback={<span class="idle-dot" aria-hidden="true" />}>
+      {(shown) => <Icon name={shown().icon!} tone={shown().tone} spin={shown().busy} title={shown().label} />}
+    </Show>
+  )
+}
+
+// Home's task list: one workspace's open tasks, grouped by project in the workspace's order, and
+// narrowed by title and branch. A row opens its task, whose ⋯ menu has its links.
 export function Tasks(props: {
+  api: BrowserApi
   workspaces: readonly BridgeWorkspace[] | null
   workspaceId: string | null
   pickWorkspace(id: string): void
@@ -301,9 +312,17 @@ export function Tasks(props: {
   projects: readonly BridgeProject[]
   tasks: readonly BridgePageTask[]
   pageTaskIds: readonly string[]
+  agents(taskId: string): AgentCounts
   openTask(taskId: string): void
 }) {
-  const projectTasks = (projectId: string) => props.tasks.filter((task) => task.projectId === projectId)
+  const tabs = openTabs(props.api)
+  const [filter, setFilter] = createSignal('')
+  const projectTasks = (projectId: string) => {
+    const query = filter().trim().toLowerCase()
+    return props.tasks.filter(
+      (task) => task.projectId === projectId && `${task.title} ${task.branch ?? ''}`.toLowerCase().includes(query),
+    )
+  }
   const listed = () => props.projects.some((project) => projectTasks(project.id).length)
 
   return (
@@ -312,41 +331,90 @@ export function Tasks(props: {
         <h2>Tasks</h2>
         <Show when={props.workspaces}>
           {(workspaces) => (
-            <select
-              name="workspace"
-              aria-label="Workspace"
-              onChange={(event) => props.pickWorkspace(event.currentTarget.value)}
-            >
-              <For each={workspaces()}>
-                {(workspace) => (
-                  <option value={workspace.id} selected={workspace.id === props.workspaceId}>
-                    {workspace.name}
-                  </option>
-                )}
-              </For>
-            </select>
+            <Picker
+              label={workspaces().find((workspace) => workspace.id === props.workspaceId)?.name ?? 'Workspace'}
+              ariaLabel="Workspace"
+              size="sm"
+              variant="ghost"
+              placement="bottom-end"
+              placeholder="Filter workspaces"
+              emptyText="No workspace matches."
+              items={workspaces().map((workspace) => ({
+                id: workspace.id,
+                label: workspace.name,
+                active: workspace.id === props.workspaceId,
+              }))}
+              onPick={props.pickWorkspace}
+            />
           )}
         </Show>
       </div>
-      <Show when={listed()} fallback={<p class="quiet">This workspace has no open tasks.</p>}>
+      <label class="filter">
+        <Icon name="list-filter" tone="muted" />
+        <input
+          name="task-filter"
+          placeholder="Filter tasks"
+          aria-label="Filter tasks"
+          value={filter()}
+          onInput={(event) => setFilter(event.currentTarget.value)}
+        />
+      </label>
+      <Show
+        when={listed()}
+        fallback={
+          <p class="quiet">{filter().trim() ? 'No open task matches.' : 'This workspace has no open tasks.'}</p>
+        }
+      >
         <For each={props.projects}>
           {(project) => (
             <Show when={projectTasks(project.id).length}>
               <h3>{project.name}</h3>
-              <ul class="rows" aria-label={project.name}>
+              <ul class="task-rows" aria-label={project.name}>
                 <For each={projectTasks(project.id)}>
-                  {(task) => (
-                    <li>
-                      <button type="button" class="row-button" onClick={() => props.openTask(task.id)}>
-                        <strong>{task.title}</strong>
-                        <span class="quiet">
-                          {[task.branch, props.pageTaskIds.includes(task.id) && 'This page']
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </span>
-                      </button>
-                    </li>
-                  )}
+                  {(task) => {
+                    const here = () => props.pageTaskIds.includes(task.id)
+                    // One of the task's pages open in another tab, such as its pull request.
+                    const tabPage = () => (here() ? undefined : task.pages.find((page) => tabFor(tabs(), page)))
+                    const agents = () => props.agents(task.id)
+                    return (
+                      <li>
+                        <Row
+                          variant="stacked"
+                          onPress={() => props.openTask(task.id)}
+                          leading={<AgentMark agents={agents()} />}
+                          trailing={
+                            <Show
+                              when={here()}
+                              fallback={
+                                <Show when={tabPage()}>
+                                  {(page) => (
+                                    <IconButton
+                                      icon="arrow-right-left"
+                                      label="Switch to its tab"
+                                      onPress={() => void showPage(props.api, tabs(), page())}
+                                    />
+                                  )}
+                                </Show>
+                              }
+                            >
+                              <span class="here">This page</span>
+                            </Show>
+                          }
+                        >
+                          <span class="row-title">{task.title}</span>
+                          <span class="row-meta">
+                            <Show when={task.branch} fallback="Project checkout">
+                              {(branch) => <span class="branch">{branch()}</span>}
+                            </Show>
+                            <Show when={agents().waiting} fallback={agents().working ? ' · working' : ''}>
+                              {' · '}
+                              <span class="needs-you">needs you</span>
+                            </Show>
+                          </span>
+                        </Row>
+                      </li>
+                    )
+                  }}
                 </For>
               </ul>
             </Show>

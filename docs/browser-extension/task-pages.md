@@ -7,8 +7,8 @@ branch marker on a local app. The [task chip](./handoffs.md#task-chips) on the p
 [toolbar badge](./notifications.md) match from the same list. The code is in
 `apps/cli/src/browser/handoffs.ts` (`taskPages`),
 `apps/extension/src/taskPages.ts`, `apps/extension/src/background/taskPages.ts`, and
-`apps/extension/src/sidebar/Home.tsx`. Home's task list, which lists the same tasks with their links,
-is described here too.
+`apps/extension/src/sidebar/Home.tsx`. Home's task list, which lists the same tasks with their
+agents' state, is described here too.
 
 ## Pages that belong to a task
 
@@ -54,15 +54,15 @@ address reaches the Node only when a handoff resolves it: Home looking up a page
 Home's **This page** section says what Acorn knows about the page beside the panel, in one of four
 states:
 
-1. **A task owns it.** Each task the page belongs to, with its project and branch, **Open in Acorn**
-   on the pane that shows the item, and **Chat**, which opens the task's newest conversation or the
-   new-chat picker. The row opens the task. The panel shows no item state for the page itself. For
-   the task's pull request, the GitHub plugin's **Pull request** tab under the task shows its state,
-   checks, and reviews
-   ([plugin panels](./plugin-panels.md)). On an app a plugin published, the row leads with the branch, then
-   "Task: <title> · <project>", then the plugin's state line, such as **Runn stack running**, and
-   its link reads **Logs in Acorn**: the task on the plugin's pane, `runn` for Runn. When the person
-   hid the branch marker on that origin, the row offers **Show the branch marker on this site**.
+1. **A task owns it.** One row for each task the page belongs to: the
+   [agent mark](#a-tasks-agents), the title in bold, the project and branch, and a chevron. The row
+   opens the task, whose ⋯ menu has its Acorn links
+   ([a task and its tabs](./navigation.md#a-task-and-its-tabs)). The panel shows no item state for
+   the page itself. For the task's pull request, the GitHub plugin's **Pull request** tab under the
+   task shows its state, checks, and reviews ([plugin panels](./plugin-panels.md)). On an app a
+   plugin published, the row adds the plugin's state line before the chevron, such as **Runn stack
+   running**. When the person hid the branch marker on that origin, the section offers **Show the
+   branch marker on this site**.
 2. **An item no task holds.** The page matches a handoff and no task: Home looks the item up and
    opens the handoff card, once for each page and Node, while the Node is online. That's the same for
    a site whose layout has no anchor, for a handoff that declares no anchors, such as Linear's and
@@ -108,13 +108,36 @@ notification, a request's **Open** on Home, and **Add to Acorn chat** open their
 
 Below **This page**, Home lists the open tasks of one workspace, grouped by project in the
 workspace's order. `projects.list` returns each project's workspace and the workspaces in the
-desktop rail's order, and the tasks are the `tasks.pages` list above, so the list costs no extra read.
-The picker beside **Tasks** chooses the workspace. The sidebar keeps the choice per Node in
-`homeWorkspace:<nodeId>` in `storage.local`. With no choice, it shows the page's task's workspace,
-or else the first one.
+desktop rail's order, and the tasks are the `tasks.pages` list above. A project with no open task,
+and a hidden project, has no group. The workspace's name beside **Tasks** opens the kit's picker of
+workspaces. The sidebar keeps the choice per Node in `homeWorkspace:<nodeId>` in `storage.local`.
+With no choice, it shows the page's task's workspace, or else the first one.
 
-A row opens its task. The task's links are in its ⋯ menu
+**Filter tasks** narrows the rows to those whose title or branch contains the text, in any case, and
+hides a project group it leaves empty.
+
+Each row is the kit's stacked row: the [agent mark](#a-tasks-agents), the title, and under it the
+branch in a monospaced face, or "Project checkout" for a task with no branch, then "· needs you" or
+"· working". At the right, a **This page** tag marks the page's own task. Another task with one of
+its pages open in a browser tab, such as its pull request, has an icon button, **Switch to its tab**,
+which brings that tab and its window forward. The row opens its task, whose ⋯ menu has its links
 ([a task and its tabs](./navigation.md#a-task-and-its-tabs)).
+
+### A task's agents
+
+A task's mark is the desktop's: an amber alert while one of its agents waits on the person, a
+spinning loader while one works, and an idle dot otherwise. The alert wins over the spinner. The
+counts come from `agentCounts` in `apps/extension/src/taskPages.ts`, which the task chip and the
+task's **Agents** tab use too. Waiting comes from the requests the sidebar already holds, for every
+task on the Node.
+
+Working comes from the workspace's conversations. While Home is on screen, the sidebar reads them
+with one `sessions.list` by `workspaceId`
+([native messaging](./native-messaging.md#frames-and-operations)). It reads again when the workspace changes,
+when the connection returns, and on an agent hint that names a task in the workspace or a
+conversation it listed. The Node returns the newest 100 unarchived conversations. A working one is
+recent, so the cut drops only idle ones. The page's task in another workspace shows only whether an
+agent waits on the person.
 
 ## The branch marker
 

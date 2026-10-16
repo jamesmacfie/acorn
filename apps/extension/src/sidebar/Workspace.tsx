@@ -99,6 +99,8 @@ export function Workspace(props: {
   const [taskLists, setTaskLists] = createSignal<Record<string, BridgeTask[]>>({})
   // Each task's conversations and workflow runs, as last read.
   const [sessionLists, setSessionLists] = createSignal<Record<string, BridgeAgentSession[]>>({})
+  // Each workspace's conversations, as Home last read them, for its task rows' agent marks.
+  const [workspaceSessions, setWorkspaceSessions] = createSignal<Record<string, BridgeAgentSession[]>>({})
   const [runLists, setRunLists] = createSignal<Record<string, BridgeWorkflowRun[]>>({})
   // Whether the Node runs the workflows plugin, which a failed runs read says it doesn't. Unknown until
   // the first read answers.
@@ -167,6 +169,17 @@ export function Workspace(props: {
     } catch (error) {
       if (taskId() === forTask) report(error)
       return null
+    }
+  }
+
+  // The newest 100 across the workspace's tasks. A working session is a recent one, so the cut drops
+  // only idle ones. If it ever drops working ones, filter the Node's route by state rather than page.
+  const loadWorkspaceSessions = async (workspaceId: string) => {
+    try {
+      const result = await props.client.call({ op: 'sessions.list', nodeId, workspaceId })
+      setWorkspaceSessions((lists) => ({ ...lists, [workspaceId]: result.sessions }))
+    } catch (error) {
+      report(error)
     }
   }
 
@@ -458,6 +471,22 @@ export function Workspace(props: {
     setWorkspaceChoice(id)
     void saveHomeWorkspace(props.api.storage.local, nodeId, id)
   }
+  const homeProjects = () => (projects() ?? []).filter((project) => project.workspaceId === homeWorkspace())
+  // The workspace Home shows, while it shows. Its sessions are read only then.
+  const shownWorkspace = createMemo(() => (location().level === 'home' ? homeWorkspace() : null))
+  // A task's agents, from the shown workspace's sessions. A page's task in another workspace shows only
+  // whether an agent waits on the person, which the Node's requests say for every task.
+  const taskAgents = (id: string) =>
+    agentCounts(
+      id,
+      workspaceSessions()[homeWorkspace() ?? '']?.filter((row) => row.taskId === id),
+      props.requests,
+    )
+  createEffect(
+    on(shownWorkspace, (id) => {
+      if (id) void loadWorkspaceSessions(id)
+    }),
+  )
 
   onMount(async () => {
     setSiteChoices(await loadSiteChoices(props.api.storage.local, nodeId))
@@ -478,6 +507,25 @@ export function Workspace(props: {
         if (!hint.missed && !hint.tasks.includes(id) && !hint.sessions.some(listed)) return
         void loadRuns(id)
         void loadSessions(id)
+      },
+      { defer: true },
+    ),
+  )
+  // The same for Home, when a hinted task or conversation is in the workspace it shows.
+  createEffect(
+    on(
+      () => props.hint,
+      (hint) => {
+        const id = shownWorkspace()
+        if (hint?.nodeId !== nodeId || !id) return
+        const inWorkspace = new Set(homeProjects().map((project) => project.id))
+        const touches =
+          hint.missed ||
+          hint.tasks.some((taskId) =>
+            props.tasks?.some((row) => row.id === taskId && inWorkspace.has(row.projectId)),
+          ) ||
+          hint.sessions.some((sessionId) => workspaceSessions()[id]?.some((row) => row.id === sessionId))
+        if (touches) void loadWorkspaceSessions(id)
       },
       { defer: true },
     ),
@@ -505,6 +553,8 @@ export function Workspace(props: {
       () => props.reconnects,
       () => {
         if (!projects()) void loadProjects()
+        const workspaceId = shownWorkspace()
+        if (workspaceId) void loadWorkspaceSessions(workspaceId)
         const id = taskId()
         if (id) {
           void loadSessions(id)
@@ -592,7 +642,7 @@ export function Workspace(props: {
                   markerHidden={props.markerHidden}
                   showMarker={props.showMarker}
                   projectName={projectName}
-                  chat={(id) => void chatInTask(id)}
+                  agents={taskAgents}
                   openTask={(id) => nav.openTask(id)}
                   handoff={props.handoff}
                   startHandoff={props.startHandoff}
@@ -612,12 +662,14 @@ export function Workspace(props: {
                 />
               </Show>
               <Tasks
+                api={props.api}
                 workspaces={workspaces()}
                 workspaceId={homeWorkspace()}
                 pickWorkspace={pickWorkspace}
-                projects={(projects() ?? []).filter((project) => project.workspaceId === homeWorkspace())}
+                projects={homeProjects()}
                 tasks={props.tasks ?? []}
                 pageTaskIds={props.pageTasks.map(({ task }) => task.id)}
+                agents={taskAgents}
                 openTask={(id) => nav.openTask(id)}
               />
             </div>

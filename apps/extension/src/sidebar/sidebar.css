@@ -64,12 +64,12 @@ ul { list-style: none; margin: 0; padding: 0; }
 button.heading { display: grid; justify-content: stretch; min-height: 0; color: inherit; background: none; border: 0; text-align: start; }
 button.heading:hover { background: var(--bg-hover); }
 .heading .title .ui-icon { margin-inline-start: var(--space-1); vertical-align: -2px; }
-/* Go to task hangs under the bar, as wide as the panel less a margin, with the Node in its footer.
- * The panel's own button and field rules would centre its rows and box its filter. */
+/* The panel's own button and field rules would centre a kit picker's rows and box its filter. */
+.repo-picker-popover .repo-picker-filter { padding-inline: var(--space-3); border: 0; background: none; }
+.repo-picker-popover .repo-picker-name { display: block; min-height: 0; }
+/* Go to task hangs under the bar, as wide as the panel less a margin, with the Node in its footer. */
 .go-to-task { width: calc(100vw - 2 * 4px); max-width: none; }
 .go-to-task .repo-picker-tools { padding-inline: var(--space-5) var(--space-3); }
-.go-to-task .repo-picker-filter { padding-inline: var(--space-3); border: 0; background: none; }
-.go-to-task .repo-picker-name { display: block; min-height: 0; }
 .go-to-task .repo-picker-name > small { font-family: var(--font-mono); }
 .go-to-task-group { padding: var(--space-4) var(--space-6) var(--space-1); font-size: var(--fs-2xs); color: var(--text-muted); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); font-weight: var(--label-weight); }
 .go-to-task-lead { flex: none; display: inline-flex; width: 1em; padding-inline-start: var(--space-2); color: var(--text-muted); }
@@ -174,7 +174,16 @@ h2, h3 {
 /* A New picker row's harness mark and, for a login shown as an icon, the account's icon. */
 .agent-marks { display: inline-flex; align-items: center; gap: var(--space-2); }
 .row-button[aria-current='true'] { box-shadow: inset var(--marker-w) 0 0 var(--accent); padding-left: var(--space-4); }
-.section-head > select { width: auto; max-width: 60%; }
+/* Home's task rows and This page's task, the kit's stacked row: the agent mark beside the title, and
+ * the branch and the agents' state under it. */
+.task-rows .ui-row { padding-inline: var(--space-2); }
+.task-rows .ui-row-leading { width: 14px; justify-content: center; margin-top: 0.2em; }
+.row-title, .row-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-title { font-size: var(--fs); }
+.row-meta { font-size: var(--fs-xs); color: var(--text-muted); }
+.row-meta .branch { font-family: var(--font-mono); }
+.row-meta .needs-you { color: var(--state-warn); }
+.idle-dot { width: 6px; height: 6px; border-radius: var(--radius-circle); border: 1.5px solid var(--text-faint); }
 /* The kit's spinning icon turns on base.css's keyframes, which the panel doesn't load. */
 @keyframes spin { to { transform: rotate(360deg); } }
 .row { display: flex; gap: var(--gap-inline); align-items: center; flex-wrap: wrap; }
@@ -238,6 +247,10 @@ textarea { resize: vertical; }
 form { display: grid; gap: var(--gap-row); }
 label:where(:not([class*='ui-'])) { display: grid; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-muted); }
 label.check { display: flex; align-items: center; gap: var(--space-3); color: var(--text); }
+/* Filter tasks: the field's box holds the filter icon beside the text. */
+.filter { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-h-sm); padding: 0 var(--space-4); border: var(--control-border); border-radius: var(--radius-control); background: var(--input-bg); }
+.filter:focus-within { border-color: var(--accent); }
+.filter > input { flex: 1; min-width: 0; min-height: 0; padding: 0; border: 0; outline: 0; background: none; font-size: var(--fs-sm); }
 fieldset { border: var(--surface-border); border-radius: var(--radius-surface); margin: 0; padding: var(--space-3) var(--space-4); display: grid; gap: var(--space-2); }
 
 .quiet { color: var(--text-muted); }

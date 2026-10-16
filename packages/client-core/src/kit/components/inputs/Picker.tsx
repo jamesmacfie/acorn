@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type Placement } from '../../lib/controls/anchor'
 import PickerRow from './PickerRow'
-import { Button } from './Button'
+import { Button, type ButtonProps } from './Button'
 import { ConfirmButton } from './ConfirmButton'
 import Icon from '../content/Icon'
 import { claimField, FieldProvider, NO_FIELD } from './controlAttrs'
@@ -67,6 +67,8 @@ export type PickerProps<T> = {
   /** The trigger's size, as any Button's. A picker in a bar of `sm` buttons takes `sm` too, or it
    *  stands 6px taller than everything beside it. */
   size?: Extract<Size, 'sm' | 'md'>
+  /** The trigger's look, as any Button's. A picker in a section's heading is a `ghost`. */
+  variant?: ButtonProps['variant']
   disabled?: boolean // greys the button and blocks opening (e.g. repo is fixed in a task view)
   keepOpen?: boolean // stay open after a pick, so the same list can drive a multi-select (isActive marks the chosen ones)
   placement?: Placement // 'bottom-end' for a trigger at the right edge, so the list opens leftward
@@ -137,6 +139,7 @@ export default function Picker<T>(props: PickerProps<T>) {
         id={field?.id}
         describedBy={field?.describedBy()}
         size={props.size}
+        variant={props.variant}
         opens="listbox"
         expanded={open()}
         disabled={props.disabled}

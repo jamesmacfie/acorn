@@ -175,7 +175,19 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('tasks.pages'), nodeId }),
   // The rows of the desktop's New picker. `refresh` asks the Node to check its harnesses again first.
   z.strictObject({ ...envelope, op: z.literal('agents.choices'), nodeId, refresh: z.boolean().optional() }),
-  z.strictObject({ ...envelope, op: z.literal('sessions.list'), nodeId, taskId: rowId }),
+  // One task's sessions, or every task's in one workspace.
+  z
+    .strictObject({
+      ...envelope,
+      op: z.literal('sessions.list'),
+      nodeId,
+      taskId: rowId.optional(),
+      workspaceId: rowId.optional(),
+    })
+    .refine(
+      (request) => (request.taskId === undefined) !== (request.workspaceId === undefined),
+      'Name a task or a workspace.',
+    ),
   z.strictObject({
     ...envelope,
     op: z.literal('session.read'),
@@ -500,7 +512,7 @@ export type BridgeResults = {
   'tasks.list': { nodeId: string; projectId: string; tasks: BridgeTask[] }
   'tasks.pages': { nodeId: string; tasks: BridgePageTask[] }
   'agents.choices': { nodeId: string; choices: BridgeAgentChoice[] }
-  'sessions.list': { nodeId: string; taskId: string; sessions: BridgeAgentSession[] }
+  'sessions.list': { nodeId: string; sessions: BridgeAgentSession[] } & ({ taskId: string } | { workspaceId: string })
   'session.read': BridgeSessionRead
   'session.create': { nodeId: string; session: BridgeAgentSession }
   'turn.submit': { nodeId: string; sessionId: string; turnId: string }

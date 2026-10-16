@@ -14,6 +14,8 @@ import { processIsAlive, readJson, runningManifest } from './state.mjs'
 //   click TEXT           click the button whose text or accessible name is TEXT, such as Back
 //   fill NAME VALUE      type VALUE into the input or text area named NAME, or pick the option of the
 //                        select named NAME whose value or text is VALUE
+//   pick NAME OPTION     open the kit picker whose button's text or accessible name is NAME, such as
+//                        Workspace, and pick its row OPTION
 //   check NAME           toggle the checkbox named NAME
 //   eval EXPRESSION      evaluate EXPRESSION in the sidebar and print the result
 //   pairing-code         ask the session's own Node for a fresh pairing code
@@ -48,6 +50,17 @@ const actions = {
       field.dispatchEvent(new Event('input', { bubbles: true }))
       field.dispatchEvent(new Event('change', { bubbles: true }))
       return 'filled'
+    })()`,
+  pick: (name, option) =>
+    `(async () => {
+      const trigger = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(name)} || b.getAttribute('aria-label') === ${JSON.stringify(name)})
+      if (!trigger) throw new Error('No button reads ' + ${JSON.stringify(name)})
+      trigger.click()
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      const row = [...document.querySelectorAll('.repo-picker-popover .repo-picker-name')].find((b) => b.querySelector('span')?.textContent === ${JSON.stringify(option)})
+      if (!row) throw new Error('No row in the picker reads ' + ${JSON.stringify(option)})
+      row.click()
+      return 'picked'
     })()`,
   check: (name) =>
     `(() => { const input = document.querySelector('input[name=' + ${JSON.stringify(JSON.stringify(name))} + ']'); if (!input) throw new Error('No checkbox is named ' + ${JSON.stringify(name)}); input.click(); return input.checked })()`,
@@ -214,7 +227,7 @@ async function stopSession(manifest) {
 }
 
 async function main() {
-  if (!verb) throw new Error('Pass a verb: open, text, click, fill, check, eval, pairing-code, panel, or stop.')
+  if (!verb) throw new Error('Pass a verb: open, text, click, fill, pick, check, eval, pairing-code, panel, or stop.')
   const manifest = await runningManifest(sessionName)
   if (verb === 'stop') return stopSession(manifest)
   if (verb === 'pairing-code') return pairingCode(manifest)

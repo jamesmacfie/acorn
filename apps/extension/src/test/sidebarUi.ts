@@ -58,14 +58,32 @@ export async function useNode(root: ParentNode, label: string) {
   await back(root)
 }
 
+// Picks a row in the kit picker whose trigger is named `name`. Its list draws in a portal on the body.
+export async function pickFrom(root: ParentNode, name: string, label: string) {
+  await click(button(root, name), `${name} picker`)
+  const rows = [...document.querySelectorAll<HTMLButtonElement>('.repo-picker-popover .repo-picker-name')]
+  await click(
+    rows.find((row) => row.querySelector('span')?.textContent === label),
+    `${label} in the ${name} picker`,
+  )
+}
+
+// What the kit picker named `name` shows as its value.
+export const chosen = (root: ParentNode, name: string) =>
+  button(root, name)?.querySelector('.repo-picker-label')?.textContent
+
+// Home's task rows, each the kit's row with its title.
+export const taskRows = (root: ParentNode) => [
+  ...root.querySelectorAll<HTMLElement>('[aria-label="Home"] [aria-label="Tasks"] .ui-row'),
+]
+
+export const taskRow = (root: ParentNode, title: string) =>
+  taskRows(root).find((row) => row.querySelector('.row-title')?.textContent === title)
+
 // Opens a task from Home's task list.
 export async function openTask(root: ParentNode, title: string) {
   await goHome(root)
-  const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Home"] [aria-label="Tasks"] .row-button')]
-  await click(
-    rows.find((row) => row.querySelector('strong')?.textContent === title),
-    `task row ${title}`,
-  )
+  await click(taskRow(root, title), `task row ${title}`)
 }
 
 // Opens a task from the project's list on This page.

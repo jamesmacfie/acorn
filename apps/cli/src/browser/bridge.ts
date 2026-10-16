@@ -369,8 +369,12 @@ export function createBridge(options: {
   }
 
   // A task's newest hundred sessions, which is one page of the route. Archived sessions are left out.
-  async function taskSessions(nodeId: string, taskId: string): Promise<AgentSession[]> {
-    const query = new URLSearchParams({ taskId, archived: 'false', limit: '100' })
+  // The newest 100 unarchived sessions, the most the Node's route returns.
+  async function listSessions(
+    nodeId: string,
+    scope: { taskId: string } | { workspaceId: string },
+  ): Promise<AgentSession[]> {
+    const query = new URLSearchParams({ ...scope, archived: 'false', limit: '100' })
     return readList<AgentSession>(
       nodeId,
       `${agentsRoute}/sessions?${query}`,
@@ -645,8 +649,10 @@ export function createBridge(options: {
         return { nodeId: request.nodeId, choices: bridgeChoices(providers, agents) }
       }
       case 'sessions.list': {
-        const rows = await taskSessions(request.nodeId, request.taskId)
-        return { nodeId: request.nodeId, taskId: request.taskId, sessions: rows.map(bridgeSession) }
+        // The schema lets through exactly one of the two.
+        const scope = request.taskId ? { taskId: request.taskId } : { workspaceId: request.workspaceId! }
+        const rows = await listSessions(request.nodeId, scope)
+        return { nodeId: request.nodeId, ...scope, sessions: rows.map(bridgeSession) }
       }
       case 'session.read': {
         const query = `?afterSeq=${request.afterSeq}&limit=${request.limit}&fold=1`
@@ -884,7 +890,9 @@ export function createBridge(options: {
         const steps = await readList<WorkflowStepRow>(request.nodeId, runStepsRoute(request.runId), (body) => body)
         // The run's task, and the task of each step the runner gave one of its own.
         const taskIds = new Set([request.taskId, ...steps.flatMap((step) => stepTaskId(step) ?? [])])
-        const sessions = (await Promise.all([...taskIds].map((taskId) => taskSessions(request.nodeId, taskId)))).flat()
+        const sessions = (
+          await Promise.all([...taskIds].map((taskId) => listSessions(request.nodeId, { taskId })))
+        ).flat()
         return { nodeId: request.nodeId, runId: request.runId, steps: bridgeSteps(steps, sessions, bridgeSession) }
       }
       case 'plugin.panel': {

@@ -13,10 +13,14 @@ import {
   openChat,
   openSettings,
   openSiteTask,
+  chosen,
   openTask,
   pick,
+  pickFrom,
   selected,
   shownTask,
+  taskRow,
+  taskRows,
   useNode,
 } from '../test/sidebarUi'
 import { App } from './App'
@@ -65,7 +69,8 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
     // Each Node's tasks with their page addresses, and its handoffs.
     taskPages: [{ id: 't1', title: 'Fix login', branch: null, projectId: 'p1', pages: [] }] as BridgePageTask[],
     handoffs: [] as BridgeHandoff[],
-    // Conversations archived here, which the task's list leaves out.
+    // Every task's conversations, and those archived here, which the lists leave out.
+    sessions: [session] as BridgeAgentSession[],
     archived: [] as string[],
   }
   const nodes = () => ({
@@ -119,12 +124,12 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
           tasks:
             request.projectId === 'p1' ? [{ id: 't1', title: 'Fix login', branch: null }, ...state.addedTasks] : [],
         }
-      case 'sessions.list':
-        return {
-          nodeId,
-          taskId: request.taskId,
-          sessions: request.taskId === 't1' && !state.archived.includes(session.id) ? [session] : [],
-        }
+      case 'sessions.list': {
+        const rows = state.sessions.filter((row) => !state.archived.includes(row.id))
+        return request.workspaceId
+          ? { nodeId, workspaceId: request.workspaceId, sessions: rows }
+          : { nodeId, taskId: request.taskId, sessions: rows.filter((row) => row.taskId === request.taskId) }
+      }
       case 'session.archive':
         state.archived.push(request.sessionId as string)
         return { nodeId, sessionId: request.sessionId }
@@ -452,7 +457,7 @@ describe('This page', () => {
   const agentRows = (root: HTMLElement) =>
     [...root.querySelectorAll('[aria-label="Agents"] .row-button strong')].map((row) => row.textContent)
 
-  it('opens the task a page belongs to, names it, and shows its verbs on Home, matched in the browser', async () => {
+  it('opens the task a page belongs to, names it, and shows it on Home, matched in the browser', async () => {
     const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7/files' })
     state.taskPages = [pullTask]
     await settle(30)
@@ -466,16 +471,12 @@ describe('This page', () => {
 
     await goHome(root)
     expect(thisPage(root).querySelector('strong')!.textContent).toBe('Fix login')
-    expect(thisPage(root).textContent).toContain('Task in Web · fix/login')
-    // A development build copies the link Open in Acorn would follow, onto the pull request's pane.
-    expect(button(thisPage(root), 'Copy Acorn link')!.title).toBe('acorn://n1/t/t1?pane=pr')
+    expect(thisPage(root).querySelector('.row-meta')!.textContent).toBe('Web · fix/login')
     expect(root.querySelector('[aria-label="Current task"]')).toBeNull()
 
-    // Chat opens the task's newest conversation, and Back goes up to the task.
-    button(thisPage(root), 'Chat')!.click()
+    // Its one row opens the task.
+    thisPage(root).querySelector<HTMLElement>('.ui-row')!.click()
     await settle(30)
-    expect(conversationTitle(root)).toBe('Chat s1')
-    await back(root)
     expect(shownTask(root)).toBe('Fix login')
     // A page that matches nothing leaves the task shown, no longer tagged as this page's.
     fake.navigate('https://example.com/')
@@ -571,10 +572,7 @@ describe('This page', () => {
     await settle(30)
     expect(shownTask(root)).toBe('Speed up search')
     await goHome(root)
-    const row = [...root.querySelectorAll<HTMLButtonElement>('section[aria-label="Tasks"] .row-button')].find(
-      (each) => each.querySelector('strong')!.textContent === 'Fix login',
-    )!
-    row.click()
+    taskRow(root, 'Fix login')!.click()
     await settle(20)
     expect(shownTask(root)).toBe('Fix login')
     expect(root.querySelector('.strip')!.textContent).toBe('This page is in Speed up searchSwitch')
@@ -646,7 +644,7 @@ describe('This page', () => {
     expect(root.querySelector('[aria-label="Waiting context"]')!.textContent).toContain('Page goes into the draft')
   })
 
-  it("shows a local app's branch, task, and stack, links to the plugin's pane, and asks for its site", async () => {
+  it("shows a local app's task and stack, and asks for its site", async () => {
     const app = 'https://runn-05ea41.runn.localhost:5104'
     const { fake, state, root } = mount({ url: `${app}/planner` })
     state.taskPages = [
@@ -665,12 +663,10 @@ describe('This page', () => {
     ]
     await settle(30)
     await goHome(root)
-    expect(thisPage(root).querySelector('strong')!.textContent).toBe('fix/login')
-    expect(thisPage(root).textContent).toContain('Task: Fix login · Web')
+    expect(thisPage(root).querySelector('strong')!.textContent).toBe('Fix login')
+    expect(thisPage(root).querySelector('.row-meta')!.textContent).toBe('Web · fix/login')
     expect(thisPage(root).querySelector('.state')!.textContent).toBe('Runn stack running')
     expect(thisPage(root).querySelector('.dot')!.getAttribute('data-tone')).toBe('ok')
-    // Logs in Acorn goes to the Runn pane; a development build copies the link.
-    expect(button(thisPage(root), 'Copy Acorn link')!.title).toBe('acorn://n1/t/t1?pane=runn')
     expect(JSON.stringify(state.requests)).not.toContain('/planner')
 
     // The marker was hidden on this site from its own menu: This page offers it back.
@@ -688,54 +684,145 @@ describe('This page', () => {
 })
 
 describe('Home task list', () => {
-  const task = (id: string, title: string, projectId: string, pages: BridgePageTask['pages'] = []) => ({
+  const task = (
+    id: string,
+    title: string,
+    projectId: string,
+    branch: string | null = null,
+    pages: BridgePageTask['pages'] = [],
+  ) => ({ id, title, branch, projectId, pages })
+  const PULL = { origin: 'https://github.com', pathPrefix: '/acme/web/pull/7', source: 'github' }
+  const titles = (root: HTMLElement) => taskRows(root).map((row) => row.querySelector('.row-title')!.textContent)
+  const groups = (root: HTMLElement) =>
+    [...root.querySelectorAll('section[aria-label="Tasks"] h3')].map((heading) => heading.textContent)
+  const meta = (root: HTMLElement, title: string) => taskRow(root, title)!.querySelector('.row-meta')!.textContent
+  const mark = (root: HTMLElement, title: string) => taskRow(root, title)!.querySelector('.ui-row-leading > *')!
+  const filterTasks = async (root: HTMLElement, text: string) => {
+    fill(root, 'input[name="task-filter"]', text)
+    await settle(20)
+  }
+  const working = (id: string, taskId: string): BridgeAgentSession => ({
+    ...session,
     id,
-    title,
-    branch: null,
-    projectId,
-    pages,
+    taskId,
+    runtimeState: 'working',
   })
-  const tasks = (root: HTMLElement) => root.querySelector('section[aria-label="Tasks"]')!
-  const rows = (root: HTMLElement) =>
-    [...tasks(root).querySelectorAll('.row-button strong')].map((row) => row.textContent)
-  const row = (root: HTMLElement, title: string) =>
-    [...tasks(root).querySelectorAll<HTMLButtonElement>('.row-button')].find(
-      (element) => element.querySelector('strong')!.textContent === title,
-    )!
 
   it("lists one workspace's tasks by project, and remembers the workspace chosen", async () => {
     const { fake, state, root } = mount({ url: 'https://example.com/' })
     state.taskPages = [task('t1', 'Fix login', 'p1'), task('t2', 'Write guide', 'p2'), task('t3', 'Tidy', 'p3')]
     await settle(30)
-    expect(selected(root, 'workspace')).toBe('w1')
-    expect([...tasks(root).querySelectorAll('h3')].map((heading) => heading.textContent)).toEqual(['Web', 'Docs'])
-    expect(rows(root)).toEqual(['Fix login', 'Write guide'])
+    expect(chosen(root, 'Workspace')).toBe('Main')
+    expect(groups(root)).toEqual(['Web', 'Docs'])
+    expect(titles(root)).toEqual(['Fix login', 'Write guide'])
 
-    await pick(root, 'workspace', 'w2')
-    expect(rows(root)).toEqual(['Tidy'])
+    await pickFrom(root, 'Workspace', 'Other')
+    expect(titles(root)).toEqual(['Tidy'])
     expect(fake.storage.get('homeWorkspace:n1')).toBe('w2')
+    // The new workspace's conversations are read for its rows.
+    expect(
+      state.requests.filter((request) => request.op === 'sessions.list').map((request) => request.workspaceId),
+    ).toEqual(['w1', 'w2'])
     await openSettings(root)
     await back(root)
-    expect(selected(root, 'workspace')).toBe('w2')
-    expect(rows(root)).toEqual(['Tidy'])
+    expect(chosen(root, 'Workspace')).toBe('Other')
+    expect(titles(root)).toEqual(['Tidy'])
   })
 
-  it("opens a task from its row, and the page's task from This page", async () => {
-    const { state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
+  it('filters by title and branch, and hides a project left empty', async () => {
+    const { state, root } = mount({ url: 'https://example.com/' })
     state.taskPages = [
-      task('t1', 'Fix login', 'p1', [
-        { origin: 'https://github.com', pathPrefix: '/acme/web/pull/7', source: 'github' },
-      ]),
+      task('t1', 'Fix login', 'p1', 'fix/login'),
       task('t2', 'Write guide', 'p2'),
+      task('t4', 'Tidy styles', 'p1', 'chore/css'),
     ]
     await settle(30)
+    await filterTasks(root, 'CSS')
+    expect(titles(root)).toEqual(['Tidy styles'])
+    expect(groups(root)).toEqual(['Web'])
+    await filterTasks(root, 'guide')
+    expect(titles(root)).toEqual(['Write guide'])
+    expect(groups(root)).toEqual(['Docs'])
+    await filterTasks(root, 'nothing like it')
+    expect(titles(root)).toEqual([])
+    expect(root.querySelector('section[aria-label="Tasks"]')!.textContent).toContain('No open task matches.')
+  })
+
+  it("marks each task's agents: working, waiting on the person over working, or idle", async () => {
+    const { fake, state, root } = mount({ url: 'https://example.com/' })
+    state.taskPages = [task('t1', 'Fix login', 'p1', 'fix/login'), task('t2', 'Write guide', 'p2')]
+    state.sessions = []
+    await settle(30)
+    expect(meta(root, 'Fix login')).toBe('fix/login')
+    expect(mark(root, 'Fix login').classList.contains('idle-dot')).toBe(true)
+    expect(meta(root, 'Write guide')).toBe('Project checkout')
+
+    // Two agents start in Fix login, and the Node's hint names its task: the workspace is read again.
+    state.sessions = [working('s1', 't1'), working('s2', 't1')]
+    fake.hosts[0]!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s1', 's2'], tasks: ['t1'], missed: false })
+    await settle(40)
+    expect(meta(root, 'Fix login')).toBe('fix/login · working')
+    expect(mark(root, 'Fix login').getAttribute('data-spin')).toBe('')
+    expect(mark(root, 'Fix login').getAttribute('aria-label')).toBe('2 agents working')
+    expect(meta(root, 'Write guide')).toBe('Project checkout')
+
+    // One asks for permission. The alert wins while the other still works.
+    state.pending = [
+      {
+        requestId: 'r1',
+        sessionId: 's1',
+        taskId: 't1',
+        projectId: 'p1',
+        kind: 'permission',
+        title: 'Run tests',
+        taskTitle: 'Fix login',
+      },
+    ]
+    fake.hosts[0]!.send({
+      v: 1,
+      event: 'agent',
+      nodeId: 'n1',
+      sessions: ['s1'],
+      tasks: ['t1'],
+      missed: false,
+      requests: true,
+    })
+    await settle(40)
+    expect(meta(root, 'Fix login')).toBe('fix/login · needs you')
+    expect(mark(root, 'Fix login').getAttribute('aria-label')).toBe('1 agent needs you')
+    expect(mark(root, 'Fix login').getAttribute('data-tone')).toBe('warn')
+
+    // A hint about a task in no project of this workspace reads nothing.
+    const reads = () => state.requests.filter((request) => request.op === 'sessions.list').length
+    const before = reads()
+    fake.hosts[0]!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s9'], tasks: ['t9'], missed: false })
+    await settle(40)
+    expect(reads()).toBe(before)
+  })
+
+  it("tags the page's task, offers another task's open tab, and opens a task from its row", async () => {
+    const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
+    const OTHER = { origin: 'https://github.com', pathPrefix: '/acme/web/pull/9', source: 'github' }
+    state.taskPages = [task('t1', 'Fix login', 'p1', null, [PULL]), task('t2', 'Write guide', 'p2', null, [OTHER])]
+    fake.otherTabs = [{ id: 9, windowId: 2, url: 'https://github.com/acme/web/pull/9/files' }]
+    await settle(30)
     await goHome(root)
-    // A row opens its task, and so does the page's task under This page.
-    row(root, 'Write guide').click()
+    expect(taskRow(root, 'Fix login')!.querySelector('.here')!.textContent).toBe('This page')
+    expect(button(taskRow(root, 'Fix login')!, 'Switch to its tab')).toBeUndefined()
+
+    // The switch button brings the other task's pull request forward, without opening the task.
+    button(taskRow(root, 'Write guide')!, 'Switch to its tab')!.click()
+    await settle(20)
+    expect(fake.shownTabs).toEqual([9])
+    expect(fake.focusedWindows).toEqual([2])
+    expect(shownTask(root)).toBeNull()
+
+    taskRow(root, 'Write guide')!.click()
     await settle(30)
     expect(shownTask(root)).toBe('Write guide')
     await goHome(root)
-    root.querySelector<HTMLButtonElement>('[aria-label="This page"] .row-button')!.click()
+    // This page's one row opens the page's task.
+    root.querySelector<HTMLElement>('[aria-label="This page"] .ui-row')!.click()
     await settle(30)
     expect(shownTask(root)).toBe('Fix login')
     expect(

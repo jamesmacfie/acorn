@@ -1,6 +1,51 @@
 # Phase 3: Home's task list
 
-Date: October 16, 2026. Status: proposed. Depends on [phase 1](./01-navigation.md).
+Date: October 16, 2026. Status: done on October 16, 2026. Depends on [phase 1](./01-navigation.md).
+
+## Completion note
+
+Landed on October 16, 2026. Home's task list has the kit's `Picker` for the workspace, a **Filter
+tasks** field, and the kit's stacked `Row` for each task, with the desktop's agent marks. **This
+page** draws the page's task as one row. `sessions.list` takes a `workspaceId` instead of a `taskId`.
+[Home's task list](../../browser-extension/task-pages.md#homes-task-list) is rewritten, with a new
+section on a task's agents.
+
+Decisions and deviations:
+
+- The mark comes from `agentRailMarkers`, the function the task's **Agents** tab marker uses, so the
+  working spinner is the accent tone, not the prototype's green. `AgentMark` in `Home.tsx` draws it,
+  and `AgentCounts` is exported from `taskPages.ts`.
+- The workspace's sessions are read only while Home is on screen: when Home shows, when the workspace
+  changes, on reconnect, and on an agent hint that names a task in the workspace or a session it
+  listed. Opening Home reads them fresh each time.
+- The page's task in another workspace shows only whether an agent waits on the person. Its working
+  state would need a second read.
+- The schema's refinement refuses both IDs and neither. The bridge tests call the host directly and
+  skip the schema, so that check is in `extensionBridge.test.ts`.
+- The kit's `Picker` gained `variant`, passed to its trigger, for the ghost button.
+- The panel's rules that centred Go to task's rows and boxed its filter now apply to every kit picker
+  popover in `sidebar.css`. That also fixes the **New chat** picker's centred rows, which phase 2
+  left for phase 6.
+- On a local app's page, **This page** keeps the plugin's state line, such as **Runn stack running**,
+  before the chevron. **Logs in Acorn**, the link to the plugin's pane, and **Chat** are gone from the
+  row. The task's own tabs show the plugin's panel.
+- `pnpm dev:extension:ui pick NAME OPTION` opens a kit picker and picks a row, such as
+  `pick Workspace Platform`.
+- `arrow-right-left` joined the kit's eager icon set.
+- The site's sidebar pictures are regenerated, and two site pages no longer mention **Chat** on
+  **This page**.
+
+For later phases:
+
+- Phase 2's palette rows can take the same mark. Only the shown workspace's sessions are read, so a
+  palette mark for other workspaces' tasks needs its own read or would show waiting only.
+- Phase 5: **This page** for a task is the `Page tasks` list in `ThisPage`. The project site's list,
+  `SiteProject`, still uses the old `.row-button` rows and the native project select.
+- Phase 6: the **Agents** tab still draws `.row-button.agent-row`. Home's task rows show the kit's
+  stacked row in the sidebar, with `.task-rows`, `.row-title`, and `.row-meta` in `sidebar.css`.
+- Tests: `apps/extension/src/test/sidebarUi.ts` has `pickFrom` and `chosen` for a kit picker, and
+  `taskRows` and `taskRow` for Home's rows. `ProjectSites.test.tsx`'s fake keeps every session in
+  `state.sessions` and answers a workspace read with all of them.
 
 ## Goal
 

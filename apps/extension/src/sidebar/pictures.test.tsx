@@ -208,7 +208,9 @@ function mount(options: { url: string; title: string; paired?: boolean; waiting?
       case 'handoff.resolve':
         return { nodeId: 'n1', url: request.url, items: [handoffItem] }
       case 'sessions.list':
-        return { nodeId: 'n1', taskId: request.taskId, sessions: request.taskId === 't1' ? sessions : [] }
+        return request.workspaceId
+          ? { nodeId: 'n1', workspaceId: request.workspaceId, sessions }
+          : { nodeId: 'n1', taskId: request.taskId, sessions: request.taskId === 't1' ? sessions : [] }
       case 'session.read': {
         const row = sessions.find((candidate) => candidate.id === request.sessionId)!
         const read = row.id === 's1' ? records.filter((record) => record.seq > (request.afterSeq as number)) : []
