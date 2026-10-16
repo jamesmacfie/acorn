@@ -79,7 +79,7 @@ export default function AgentUsageIndicator(props: {
         </Button>
       )}
     >
-      <AgentUsageSection defaultAccounts={props.defaultAccounts} />
+      <AgentUsageSection defaultAccounts={props.defaultAccounts} providers={props.providers} />
     </Popover>
   )
 }

@@ -4,6 +4,7 @@ import {
   Card,
   DescriptionList,
   Fold,
+  Icon,
   IconButton,
   Inline,
   Meter,
@@ -13,6 +14,8 @@ import {
   Text,
 } from '@acorn/plugin-api/ui'
 import type { AgentProviderUsage } from '../../shared/usage'
+import type { AgentProviderDescriptor } from '../../contract/wire.ts'
+import { accountIcon } from '../../shared/accounts'
 import { agentUsageStore } from './usageStore'
 import {
   compactQuotas,
@@ -32,10 +35,13 @@ import { usageMeterTone, usageTone } from '../sessions/stateTone'
 // refresh. Each account sits on its own card, so one account's numbers can't run into the next. A
 // harness with one reading shows it on the card as is. A harness with extra accounts gets a row per
 // account, with a dot and the session and week bars, so the accounts can be compared without
-// opening anything. It is drawn inside a popover, which is why it carries no pane chrome.
+// opening anything. A row follows the harness's "Show accounts as" choice from `providers`, so with
+// icons on it draws the account's icon in place of its name. It is drawn inside a popover, which is
+// why it carries no pane chrome.
 export default function AgentUsageSection(props: {
   showHeader?: boolean
   defaultAccounts?: Readonly<Record<string, string | undefined>>
+  providers?: readonly AgentProviderDescriptor[]
 }) {
   onMount(() => onCleanup(agentUsageStore.init()))
 
@@ -87,12 +93,25 @@ export default function AgentUsageSection(props: {
                 <For each={group.readings}>
                   {(reading) => {
                     const key = `${group.provider}:${usageAccountKey(reading)}`
+                    const icon = () =>
+                      accountIcon(
+                        props.providers?.find((candidate) => candidate.id === group.provider),
+                        reading.accountName ?? null,
+                      )
                     return (
                       <Card pad="sm">
                         <Fold
                           level="sub"
-                          label={usageAccountLabel(reading)}
-                          leading={<StatusDot tone={usageTone(reading.health)} label={reading.health} />}
+                          // The icon names the account for a screen reader, so the label is empty.
+                          label={icon() ? '' : usageAccountLabel(reading)}
+                          leading={
+                            <Inline>
+                              <StatusDot tone={usageTone(reading.health)} label={reading.health} />
+                              <Show when={icon()}>
+                                {(name) => <Icon name={name()} title={usageAccountLabel(reading)} />}
+                              </Show>
+                            </Inline>
+                          }
                           meta={
                             // No pace mark: a bar this short cannot show one legibly.
                             <Inline gap="row">
