@@ -1,11 +1,10 @@
 ---
 // The plugins acorn ships: a card per plugin from src/data/plugins.ts, each linking to its docs page.
-import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import Badge from '../components/Badge.astro'
 import Card from '../components/Card.astro'
 import { PLUGINS, SHIPS_AS } from '../data/plugins.ts'
 import Marketing from '../layouts/Marketing.astro'
+import { lucideIcon } from '../lib/icons'
 import type { PageMeta } from '../meta'
 
 export const meta = {
@@ -18,9 +17,6 @@ export const meta = {
   checked: '68d4f3b5a',
 } satisfies PageMeta
 
-// Lucide's own file for each icon, read at build, so the page ships an inline SVG and no script.
-const require = createRequire(import.meta.url)
-const icon = (name: string) => readFileSync(require.resolve(`lucide-static/icons/${name}.svg`), 'utf8')
 const plugins = Object.values(PLUGINS).sort((a, b) => a.name.localeCompare(b.name))
 ---
 
@@ -36,7 +32,7 @@ const plugins = Object.values(PLUGINS).sort((a, b) => a.name.localeCompare(b.nam
         plugins.map((plugin) => (
           <li>
             <Card title={plugin.name} href={plugin.docs}>
-              <span class="plugin-icon" aria-hidden="true" set:html={icon(plugin.icon)} />
+              <span class="plugin-icon" aria-hidden="true" set:html={lucideIcon(plugin.icon)} />
               <p>{plugin.sentence}</p>
               <Fragment slot="badges">
                 <Badge>{SHIPS_AS[plugin.ships]}</Badge>

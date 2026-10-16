@@ -4,12 +4,14 @@
 interface Props {
   eyebrow: string
   title: string
+  /** On a wide screen, sets the paragraph and the actions beside the headline, so the picture starts higher. */
+  split?: boolean
 }
 
-const { eyebrow, title } = Astro.props
+const { eyebrow, title, split = false } = Astro.props
 ---
 
-<section class="hero">
+<section class="hero" data-split={split || undefined}>
   <p class="eyebrow">{eyebrow}</p>
   <h1>{title}</h1>
   <div class="hero-text"><slot /></div>

@@ -41,7 +41,7 @@ try {
   await waitForServer()
   mkdirSync(OUT, { recursive: true })
   const browser = await chromium.launch({ channel: 'chrome' })
-  // The default Light theme and Terminal pack: a new browser has nothing saved under Appearance.
+  // A new browser in light mode has no choice saved, so the cards draw in the site's light theme.
   const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, colorScheme: 'light' })
   for (const name of names.length > 0 ? names : Object.keys(CARDS)) {
     await page.goto(`${BASE}/lab/og/${name}/`, { waitUntil: 'networkidle' })

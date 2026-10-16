@@ -1,13 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- The ASCII acorn reduced to its cap and its outline, in the default Light and Dark themes' text color. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The app icon's ASCII acorn (Acorn.tsx), one path per row of its 8 by 8 grid, in the text color of
+       the site's Catppuccin Latte and Mocha themes. A cell is 5.5 wide and 7.5 tall. -->
   <style>
-    .cap { fill: #242424; }
-    .outline { fill: none; stroke: #242424; stroke-width: 2.5; stroke-linejoin: round; }
+    g { fill: none; stroke: #4c4f69; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
     @media (prefers-color-scheme: dark) {
-      .cap { fill: #dddddd; }
-      .outline { stroke: #dddddd; }
+      g { stroke: #cdd6f4; }
     }
   </style>
-  <path class="cap" d="M14.5 2h3v4h-3zM3 15C3 9.5 8.5 6 16 6s13 3.5 13 9z" />
-  <path class="outline" d="M6.5 15v4.5L16 29.5l9.5-10V15" />
+  <g>
+    <path d="M30 3Q26.4 5.75 30 8.5M34 3Q37.6 5.75 34 8.5" />
+    <path d="M18.25 15.5h0M22 13.25h3.5M29.25 10.5v2M34.75 10.5v2M38.5 13.25h3.5M45.75 15.5h0" />
+    <path d="M11 23.5L14.5 18M53 23.5L49.5 18M18.25 19h0M23.75 19h0M29.25 19h0M34.75 19h0M40.25 19h0M45.75 19h0M18.25 23h0M23.75 23h0M29.25 23h0M34.75 23h0M40.25 23h0M45.75 23h0" />
+    <path d="M12.75 25.5v2M51.25 25.5v2M16.5 28.25h31" />
+    <path d="M12.75 33v5.5M51.25 33v5.5" />
+    <path d="M16.5 40.5L20 46M47.5 40.5L44 46" />
+    <path d="M22 48L25.5 53.5M42 48L38.5 53.5" />
+    <path d="M27.5 55.5L31 61M36.5 55.5L33 61" />
+  </g>
 </svg>

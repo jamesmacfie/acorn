@@ -1,0 +1,143 @@
+{
+  "meta": {
+    "title": "An agent writing a plugin",
+    "caption": "An agent's turn after you ask for a pane that lists the task's TODO comments.",
+    "terminal": {
+      "columns": 60,
+      "rows": 19
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Card",
+              "props": {},
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "Called plugin_authoring"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n5",
+              "type": "Card",
+              "props": {},
+              "children": [
+                {
+                  "id": "n6",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n7",
+                      "type": "#text",
+                      "props": {
+                        "value": "Wrote todo-comments/acorn-plugin.json"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n8",
+              "type": "Card",
+              "props": {},
+              "children": [
+                {
+                  "id": "n9",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n10",
+                      "type": "#text",
+                      "props": {
+                        "value": "Wrote todo-comments/client.js"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n11",
+              "type": "Card",
+              "props": {},
+              "children": [
+                {
+                  "id": "n12",
+                  "type": "Inline",
+                  "props": {
+                    "gap": "inline"
+                  },
+                  "children": [
+                    {
+                      "id": "n13",
+                      "type": "Text",
+                      "props": {},
+                      "children": [
+                        {
+                          "id": "n14",
+                          "type": "#text",
+                          "props": {
+                            "value": "Asked to install todo-comments"
+                          },
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "n15",
+                      "type": "Badge",
+                      "props": {
+                        "tone": "warn"
+                      },
+                      "children": [
+                        {
+                          "id": "n16",
+                          "type": "#text",
+                          "props": {
+                            "value": "waiting for you"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

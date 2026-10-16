@@ -1,7 +1,7 @@
 ---
 // The wordmark: the ASCII acorn the app draws in its empty states, beside the name, both set as text.
 // The drawing is read from the app's own component, so the two can't differ.
-import source from '@acorn/client-core/kit/components/content/Acorn.tsx?raw'
+import { ACORN_ART } from '../lib/acornArt'
 
 interface Props {
   /** Where the mark links to. The header's goes home. */
@@ -9,11 +9,9 @@ interface Props {
 }
 
 const { href = '/' } = Astro.props
-const art = source.match(/String\.raw`\n?([\s\S]*?)\n?`/)?.[1]
-if (!art) throw new Error('No ASCII acorn found in Acorn.tsx. The wordmark reads it from `String.raw` there.')
 ---
 
 <a class="site-mark" href={href}>
-  <pre aria-hidden="true">{art}</pre>
+  <pre aria-hidden="true">{ACORN_ART}</pre>
   <span>acorn</span>
 </a>
