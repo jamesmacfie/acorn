@@ -16,7 +16,7 @@ sources:
   - apps/tui/src/kit/notify.ts
   - apps/tui/src/kit/copy.ts
   - apps/tui/src/keys/install.ts
-checked: 07aa959a0
+checked: 875fdfd33
 ---
 
 This page lists every environment variable acorn reads that you might set, and the ones acorn sets for
