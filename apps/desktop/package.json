@@ -74,6 +74,7 @@
     "@acorn/node": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
+    "@acorn/plugin-bitbucket": "workspace:*",
     "@acorn/plugin-context": "workspace:*",
     "@acorn/plugin-docker": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",

@@ -124,7 +124,7 @@ and fetches `refs/heads/<sourceBranch>` from it, so `git@bitbucket.org:acme/api.
 that declares a `ref` ignores the fork. Core lowercases the path and refuses an empty, `.`, or `..`
 segment, one that starts with `-`, and any character but a lowercase letter, a digit, `.`, `_`, or `-`.
 An unreadable fork fails with "Could not fetch pull request #12 from alice/api. The fork may be private
-or gone." Pushing still goes to origin.
+or gone." Pushing still goes to origin. [Bitbucket](../bitbucket-integration.md) passes forks this way.
 
 ## Agent context
 

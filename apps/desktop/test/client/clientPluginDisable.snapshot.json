@@ -2,6 +2,7 @@
   "full": {
     "panes": [
       "agents",
+      "bitbucket-pr",
       "context",
       "docker",
       "editor",
@@ -20,6 +21,7 @@
       "source.agents.open",
       "agents.sessions.mark-read",
       "agents.sessions.find",
+      "source.bitbucket.open",
       "context.open",
       "source.docker.open",
       "docker.find",
@@ -47,6 +49,7 @@
     ],
     "sources": [
       "agents",
+      "bitbucket",
       "docker",
       "github",
       "gitlab",
@@ -84,6 +87,8 @@
       "agents:composer-actions",
       "agents:session-header",
       "agents:request-card",
+      "bitbucket:diff-line",
+      "bitbucket:summary-badges",
       "context:section",
       "docker:stats-beside",
       "docker:container",
@@ -104,6 +109,7 @@
       "agents.storage",
       "agents.security",
       "agents.loop-coverage",
+      "bitbucket.push-actions",
       "github.push-actions",
       "gitlab.push-actions",
       "changes.tool-card",
@@ -113,6 +119,7 @@
       "workflows.tool-card"
     ],
     "refPanels": [
+      "bitbucket-pull-request",
       "github-pull",
       "gitlab-merge-request"
     ],
@@ -129,6 +136,7 @@
     ],
     "railMarkers": [
       "agents",
+      "bitbucket-pr-status",
       "docker",
       "pr-status",
       "mr-status",
@@ -154,6 +162,7 @@
     ],
     "contentLinks": [
       "agents.session",
+      "bitbucket.pull-request",
       "github.pull-request",
       "github.repository",
       "gitlab.merge-request",
@@ -163,15 +172,50 @@
       "github",
       "agents/claude",
       "agents/codex",
+      "bitbucket",
       "docker",
       "gitlab"
     ],
     "projectImporters": [
+      "bitbucket",
       "github",
       "gitlab"
     ]
   },
   "owned": {
+    "bitbucket": {
+      "panes": [
+        "bitbucket-pr"
+      ],
+      "commands": [
+        "source.bitbucket.open"
+      ],
+      "sources": [
+        "bitbucket"
+      ],
+      "extensionPoints": [
+        "bitbucket:diff-line",
+        "bitbucket:summary-badges"
+      ],
+      "extensions": [
+        "bitbucket.push-actions"
+      ],
+      "refPanels": [
+        "bitbucket-pull-request"
+      ],
+      "railMarkers": [
+        "bitbucket-pr-status"
+      ],
+      "contentLinks": [
+        "bitbucket.pull-request"
+      ],
+      "brandMarks": [
+        "bitbucket"
+      ],
+      "projectImporters": [
+        "bitbucket"
+      ]
+    },
     "context": {
       "panes": [
         "context"

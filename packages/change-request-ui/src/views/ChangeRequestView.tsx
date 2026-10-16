@@ -21,8 +21,9 @@ export function ChangeRequestView(props: {
   onLinkClick: (event: MouseEvent) => void
   diff: () => JSX.Element
   diffActions?: () => JSX.Element
-  /** The host's step log for a check row the reader opened. */
-  checkPanel: (check: Check, close: () => void) => JSX.Element
+  /** The host's step log for a check row the reader opened. A row opens only when its check has a
+   *  `runId`, so a host whose checks have no log, such as Bitbucket's build statuses, passes none. */
+  checkPanel?: (check: Check, close: () => void) => JSX.Element
 }) {
   const noun = () => props.model.host.noun
   return (
@@ -67,7 +68,7 @@ export function ChangeRequestView(props: {
       />
       {/* The one overlay this view owns: a check's step log, opened from a check row. */}
       <Show when={props.model.openCheck()}>
-        {(check) => props.checkPanel(check(), () => props.model.setOpenCheck(null))}
+        {(check) => props.checkPanel?.(check(), () => props.model.setOpenCheck(null))}
       </Show>
     </>
   )

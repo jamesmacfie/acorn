@@ -55,8 +55,10 @@ export type ReviewEvent = 'comment' | 'approve' | 'request-changes'
 type ChangeRequestActions = {
   comment: (body: string) => Promise<unknown>
   review?: { events: readonly ReviewEvent[]; submit: (event: ReviewEvent, body: string) => Promise<unknown> }
-  addLabel: (name: string) => Promise<unknown>
-  removeLabel: (name: string) => Promise<unknown>
+  /** Both or neither: a host with no labels, such as Bitbucket, leaves them out and the view draws no
+   *  Labels section. */
+  addLabel?: (name: string) => Promise<unknown>
+  removeLabel?: (name: string) => Promise<unknown>
   requestReviewer: (login: string) => Promise<unknown>
   removeReviewer: (login: string) => Promise<unknown>
   setViewed?: (path: string, viewed: boolean) => Promise<unknown>
@@ -68,7 +70,8 @@ type ChangeRequestActions = {
   autoMerge?: { enable: (method: string) => Promise<unknown>; disable: () => Promise<unknown> }
   setDraft?: (draft: boolean) => Promise<unknown>
   close: () => Promise<unknown>
-  reopen: () => Promise<unknown>
+  /** Absent where a closed change request stays closed, as a declined Bitbucket pull request does. */
+  reopen?: () => Promise<unknown>
   /** Re-run a failed check, addressed by its `runId`. */
   rerun?: (runId: number) => Promise<unknown>
 }
@@ -237,7 +240,7 @@ export function createChangeRequestModel(input: ChangeRequestModelInput) {
     mutationFn: () => actions.autoMerge?.disable() ?? unsupported(),
   }))
   const close = createMutation(() => ({ mutationFn: actions.close }))
-  const reopen = createMutation(() => ({ mutationFn: actions.reopen }))
+  const reopen = createMutation(() => ({ mutationFn: () => actions.reopen?.() ?? unsupported() }))
   const draft = createMutation(() => ({
     mutationFn: (isDraft: boolean) => actions.setDraft?.(isDraft) ?? unsupported(),
   }))
@@ -317,8 +320,8 @@ export function createChangeRequestModel(input: ChangeRequestModelInput) {
     review,
     submitComment,
     submitReviewWith,
-    addLabel: (name: string) => run(actions.addLabel(name)),
-    removeLabel: (name: string) => run(actions.removeLabel(name)),
+    addLabel: (name: string) => (actions.addLabel ? run(actions.addLabel(name)) : undefined),
+    removeLabel: (name: string) => (actions.removeLabel ? run(actions.removeLabel(name)) : undefined),
     requestReviewer: (login: string) => run(actions.requestReviewer(login)),
     removeReviewer: (login: string) => run(actions.removeReviewer(login)),
     setViewed: (path: string, viewed: boolean) =>

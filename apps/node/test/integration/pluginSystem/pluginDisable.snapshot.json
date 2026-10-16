@@ -9,6 +9,12 @@
       "agents",
       "agents/data/sessions",
       "agents/data/usage",
+      "bitbucket/browser",
+      "bitbucket/change-requests",
+      "bitbucket/data/pull-requests",
+      "bitbucket/data/steps",
+      "bitbucket/import",
+      "bitbucket/repositories",
       "browser/captures",
       "docker",
       "editor/tasks",
@@ -105,10 +111,12 @@
       "plugin-authoring"
     ],
     "connectionProviders": [
+      "bitbucket",
       "github",
       "gitlab"
     ],
     "integrationProviders": [
+      "bitbucket",
       "github",
       "gitlab"
     ],
@@ -136,6 +144,7 @@
       "agents.transcriptMedia",
       "agents.turns",
       "agents.usageRoute",
+      "bitbucket.mirrorFootprint",
       "browser.captures",
       "core.scheduler",
       "docker.route",
@@ -171,6 +180,7 @@
     ],
     "databases": [
       "agents.sqlite",
+      "bitbucket.sqlite",
       "browser.sqlite",
       "git.sqlite",
       "github.sqlite",
@@ -197,6 +207,28 @@
       ],
       "databases": [
         "browser.sqlite"
+      ]
+    },
+    "bitbucket": {
+      "routes": [
+        "bitbucket/browser",
+        "bitbucket/change-requests",
+        "bitbucket/data/pull-requests",
+        "bitbucket/data/steps",
+        "bitbucket/import",
+        "bitbucket/repositories"
+      ],
+      "connectionProviders": [
+        "bitbucket"
+      ],
+      "integrationProviders": [
+        "bitbucket"
+      ],
+      "capabilities": [
+        "bitbucket.mirrorFootprint"
+      ],
+      "databases": [
+        "bitbucket.sqlite"
       ]
     },
     "docker": {

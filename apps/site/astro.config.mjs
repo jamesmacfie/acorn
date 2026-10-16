@@ -235,6 +235,7 @@ export default defineConfig({
             'docs/built-in-plugins/agents',
             'docs/built-in-plugins/agent-browser',
             'docs/built-in-plugins/agent-cost',
+            'docs/built-in-plugins/bitbucket',
             'docs/built-in-plugins/context',
             'docs/built-in-plugins/database',
             'docs/built-in-plugins/docker',

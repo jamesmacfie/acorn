@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ChangeRequestDetail } from '@acorn/change-request-ui/model'
-import { mergeRequestMarkers } from './railMarker'
+import type { ChangeRequestDetail } from './types'
+import { changeRequestMarkers } from './railMarkers'
 
 const detail = (
   overrides: Partial<NonNullable<ChangeRequestDetail['request']>> = {},
@@ -30,13 +30,13 @@ const detail = (
   ...rest,
 })
 
-describe("the mr pane button's marks", () => {
-  it('shows nothing for an open merge request with nothing to say', () => {
-    expect(mergeRequestMarkers(detail())).toEqual([])
+describe("a change request pane button's marks", () => {
+  it('shows nothing for an open change request with nothing to say', () => {
+    expect(changeRequestMarkers(detail())).toEqual([])
   })
 
   it('marks a running pipeline, an approval, and conflicts in their corners', () => {
-    const marks = mergeRequestMarkers(
+    const marks = changeRequestMarkers(
       detail(
         { conflicting: true },
         {
@@ -52,11 +52,23 @@ describe("the mr pane button's marks", () => {
     ])
   })
 
-  it('shows only the state once the merge request is merged or closed', () => {
-    expect(mergeRequestMarkers(detail({ state: 'merged', conflicting: true }))).toEqual([
+  it('marks a request for changes, which only GitHub and Bitbucket send', () => {
+    const marks = changeRequestMarkers(
+      detail(
+        {},
+        { reviews: [{ id: 'a', author: 'linus', state: 'changes-requested', body: null, submittedAt: null }] },
+      ),
+    )
+    expect(marks).toEqual([
+      expect.objectContaining({ id: 'review', label: 'Changes requested by linus', tone: 'warn' }),
+    ])
+  })
+
+  it('shows only the state once the change request is merged or closed', () => {
+    expect(changeRequestMarkers(detail({ state: 'merged', conflicting: true }))).toEqual([
       expect.objectContaining({ id: 'state', label: 'Merged' }),
     ])
-    expect(mergeRequestMarkers(detail({ state: 'closed' }))).toEqual([
+    expect(changeRequestMarkers(detail({ state: 'closed' }))).toEqual([
       expect.objectContaining({ id: 'state', label: 'Closed' }),
     ])
   })

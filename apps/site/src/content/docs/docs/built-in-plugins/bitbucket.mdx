@@ -1,0 +1,84 @@
+---
+title: Bitbucket
+description: Connect Bitbucket Cloud with an API token, import repositories, review pull requests with their comments and build statuses, merge one, and start a task from one.
+sources:
+  - docs/bitbucket-integration.md
+  - docs/plugins/change-request-ui.md
+  - plugins/bitbucket/src/client/index.ts
+  - plugins/bitbucket/src/node/index.ts
+  - plugins/bitbucket/src/server/provider.ts
+  - packages/change-request-ui/src/views/Overview.tsx
+checked: b924027f0
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Bitbucket plugin connects your bitbucket.org account and brings your repositories' pull requests
+into acorn: the list, each pull request's diff, comments, and build statuses, and the controls to
+review and merge one. It draws them with the same views as the GitHub and GitLab plugins.
+
+<PluginFacts id="bitbucket">
+  <Fragment slot="adds">**Bitbucket** in the left rail, the **Pull request** pane on a task with a Bitbucket pull request, a panel for a pull request a link points to, **Import from Bitbucket** on **Settings** > **Overview**, and the pull request behind acorn's pull request tools for agents.</Fragment>
+  <Fragment slot="needs">A bitbucket.org account, and an Atlassian API token with scopes for Bitbucket.</Fragment>
+  <Fragment slot="reach">Bitbucket's API, with your email and token, and the repositories on the Node. The token is stored encrypted on the Node, and agents never see it.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. Create an API token at id.atlassian.com, under **Security** > **API tokens**, as a token with scopes
+   for Bitbucket. Give it `read:user`, `read:workspace`, `read:repository`, `read:pullrequest`,
+   `write:pullrequest`, and `read:pipeline`.
+
+2. Open **Settings** > **Services**, click **Add connection**, and choose **Bitbucket**. Enter the
+   email you sign in to Bitbucket with and the token. A wrong token says why Bitbucket refused it.
+
+3. Add a project, if it isn't one already. In **Settings** > **Overview**, click **Import from
+   Bitbucket**, and choose **Clone** or **Link folder** for a repository.
+
+4. Click **Bitbucket** in the left rail.
+
+   <Checkpoint>The list shows the repository's open pull requests.</Checkpoint>
+
+</Steps>
+
+## Review a pull request
+
+A pull request opens on its overview, with its changed files and its conversation below, the same way
+a GitHub pull request does. The overview shows its state, author, branches, reviews, and build
+statuses, then the description and reviewers. Comment on a line of the diff to start a thread there,
+and reply or resolve one in place. A review comments, approves, or requests changes.
+
+The merge box offers **Merge**, **Squash and merge**, or **Fast-forward**, and **Close**, which
+declines the pull request. A declined pull request can't be reopened.
+
+The list shows a pull request's build statuses once you've opened it, because Bitbucket answers them
+one pull request at a time. When Bitbucket stops answering, such as at its hourly request limit, the
+list says how old its copy is.
+
+## Start a task from a pull request
+
+Right-click a pull request in the list and choose **Create task**. The task checks out the pull
+request's branch, from the fork when it comes from one, and opens on the **Pull request** pane, ⌘⇧K.
+The browser extension offers **Open in Acorn** on a pull request's page on bitbucket.org, once you
+allow the extension that site.
+
+**Open pull request** under a task's **Changes** tab opens Bitbucket's own form for the task's branch.
+An agent opens one with `pr_create`.
+
+## For agents
+
+acorn's pull request tools, `pr_current`, `pr_checks`, `pr_review_comments`, and `pr_create`, read and
+open the task's pull request on a Bitbucket task. A workflow step that waits for CI waits for the build
+statuses on the pull request's latest commit.
+
+## Limits
+
+- One Bitbucket account per Node. Bitbucket Data Center and Server aren't supported.
+- No labels, drafts you can toggle, or reopening.
+- A build status has no log in acorn.
+- No re-running one Pipelines step. Bitbucket re-runs a whole pipeline or its failed steps.
+- **Search** narrows the loaded list. It doesn't ask Bitbucket.

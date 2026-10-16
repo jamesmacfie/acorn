@@ -4,6 +4,7 @@ export {
   type ChangeRequestHost,
   type ChangeRequestModel,
   type ChangeRequestScope,
+  type ReviewEvent,
 } from './detailModel'
 export { ChangeRequestView } from './ChangeRequestView'
 export { ChangeRequestOverview } from './Overview'

@@ -47,9 +47,9 @@ describe('createCredentialForm error copy', () => {
   })
 
   // A route that passes `detail` to respondError sends prose in `message` and the code only in
-  // `code`. Matching on the message would silently fall through to the generic sentence.
-  it('branches on the code even when the envelope carries its own prose', async () => {
-    const failure = new ApiError('Your workspace is over its seat limit.', 401, 'provider_needs_auth')
-    expect(await submitWith(failure)).toBe('Those credentials were rejected by Linear.')
+  // `code`. A provider that gave a reason, such as Bitbucket's for a wrong token, says it in its words.
+  it("says the provider's own reason when the refusal carries one", async () => {
+    const failure = new ApiError('Bitbucket said: Invalid credentials.', 401, 'provider_needs_auth')
+    expect(await submitWith(failure)).toBe('Bitbucket said: Invalid credentials.')
   })
 })

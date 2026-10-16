@@ -19,7 +19,7 @@ import { openTerminalRenderer, type Renderer } from './renderer'
 //   acorn --node <name>             open a node this device already paired with
 //
 // The shell is whole (docs/tui/chrome.md § The screen): a rail of tasks, a pane strip, a palette, a footer
-// that says what the keyboard will do, and the same twelve client plugins the desktop registers.
+// that says what the keyboard will do, and the same client plugins the desktop registers.
 
 // The boot account and the held lines are `./boot.ts`, which says why they are held and how they
 // also become spans.

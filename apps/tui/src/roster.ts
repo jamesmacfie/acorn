@@ -1,4 +1,5 @@
 import { agentsClientPlugin } from '@acorn/plugin-agents/client/index.ts'
+import { bitbucketClientPlugin } from '@acorn/plugin-bitbucket/client/index.ts'
 import { contextClientPlugin } from '@acorn/plugin-context/client/index.ts'
 import { dockerClientPlugin } from '@acorn/plugin-docker/client/index.ts'
 import { editorClientPlugin } from '@acorn/plugin-editor/client/index.ts'
@@ -14,14 +15,14 @@ import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
-// because that is where a pane comes from on the desktop too. It is the same thirteen the desktop
+// because that is where a pane comes from on the desktop too. It is the same fourteen the desktop
 // registers (docs/tui/plugin-losses.md § What a plugin loses here). A loaded plugin is not on this
 // list: it arrives from a node as a bundle, and the client runtime's `watchPluginChanges` finds it
 // once a node is reachable.
 //
 // ## Why this is its own module, imported after the first frame
 //
-// These imports pull in every pane, source and query module in thirteen plugins. `main.tsx` awaits
+// These imports pull in every pane, source and query module in fourteen plugins. `main.tsx` awaits
 // `App` before it creates a renderer, so holding them in `App.tsx` would evaluate all of that before
 // a cell is drawn. ../scripts/check-startup-graph.mjs fails the build if the roster reaches the
 // startup graph.
@@ -34,6 +35,7 @@ import { initClientPlugins } from '@acorn/client-core/host/registries/extensionP
 export function installRoster(): void {
   initClientPlugins([
     agentsClientPlugin,
+    bitbucketClientPlugin,
     contextClientPlugin,
     dockerClientPlugin,
     editorClientPlugin,

@@ -54,6 +54,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `docker:stats-beside` | `stack`, up to two | `{ container }` |
 | `github:summary-badges` | `stack`, up to four | `{ owner, repo, number }` |
 | `gitlab:summary-badges` | `stack`, up to four | `{ owner, repo, number }`, where `owner` is the group path |
+| `bitbucket:summary-badges` | `stack`, up to four | `{ owner, repo, number }`, where `owner` is the workspace |
 | `core:storage` | `stack`, up to four | `{ nodeId }` |
 | `core:security` | `stack`, up to four | `{ nodeId }`. A section on **Settings > Security and backup**. Agents draws its instruction file check |
 | `core:plugin-page` | `stack`, up to four | `{ pluginId, nodeId }`. A section on one plugin's **Permissions** tab in Settings > Plugins. Agents draws which harnesses the plugin's tool hooks reach |

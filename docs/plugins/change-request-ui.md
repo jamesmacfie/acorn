@@ -13,15 +13,17 @@ The package is `packages/change-request-ui/`. It has two entrypoints:
 | --- | --- |
 | `@acorn/change-request-ui/model` | The neutral types, the check status vocabulary and roll-up, `reviewDecision`, `inlineReviewThreads`, `filterChangeRequests`, `branchReferenceCandidates`, and the two point declarations. No Solid, so a rail marker or a Node test can read it. |
 | `@acorn/change-request-ui/views` | `createChangeRequestModel`, `ChangeRequestView`, `ChangeRequestOverview`, `changeRequestSections`, `ChangeRequestConversation`, `ChangeRequestDiff`, `ChecksPanel`, `ChangeRequestList`, and `useChangedFiles`. |
+| `@acorn/change-request-ui/railMarker` | `changeRequestRailMarker`, the marks on a change request pane's rail button. Its own entrypoint, because a client entry registers it eagerly, and the views would load every shared view at first paint. |
 
 The views never fetch from a code host. Each plugin keeps its queries, mutations, routes, and query
 keys, and maps its own records onto the neutral types. The one exception is Linear enrichment of the
 **Linked issues** section, which goes through the host's ref resolution
 (`refResolutionsOptions` in `@acorn/plugin-api/client`), as GitHub's pane did.
 
-The GitHub and GitLab plugins draw from it. GitHub's mapper is
-`plugins/github/src/client/changeRequest.ts`. GitLab's routes answer the neutral model directly, from
-`plugins/gitlab/src/server/mirror/detail.ts`.
+The GitHub, GitLab, and Bitbucket plugins draw from it. GitHub's mapper is
+`plugins/github/src/client/changeRequest.ts`. GitLab's and Bitbucket's routes answer the neutral model
+directly, from `plugins/gitlab/src/server/mirror/detail.ts` and
+`plugins/bitbucket/src/server/mirror/detail.ts`.
 
 ## The neutral model
 
@@ -47,7 +49,8 @@ A field one host lacks is optional, and the view hides what's absent:
 a reactive root it owns, one per change request, as `prModel` in
 `plugins/github/src/client/pullDetail/prModel.ts` does. The input names:
 
-- The scope: the repository's namespace as `owner` (a GitHub owner or a GitLab group path), its
+- The scope: the repository's namespace as `owner` (a GitHub owner, a GitLab group path, or a
+  Bitbucket workspace), its
   name as `repo`, the number, and the task when there is one.
 - The host: its plugin id, label, noun (`pull request`), number prefix (`#`), avatar function, and a
   function that turns a failed write into a sentence. A failure with code `reauth` offers to reconnect.
@@ -55,14 +58,22 @@ a reactive root it owns, one per change request, as `prModel` in
   labels.
 - The diff document and its segment loader, which the conversation reads for thread snippets once a
   thread has a line to quote.
-- The verbs. `comment`, the label and reviewer verbs, `close`, and `reopen` are required. `review`
-  lists the review events the host has (`comment`, `approve`, `request-changes`). `merge` lists its
-  merge methods. `autoMerge`, `setDraft`, `setViewed`, and `rerun` are optional, and the view draws no
-  control for one that's missing.
+- The verbs. `comment`, the reviewer verbs, and `close` are required. `review` lists the review
+  events the host has (`comment`, `approve`, `request-changes`). `merge` lists its merge methods.
+  `addLabel` with `removeLabel`, `reopen`, `autoMerge`, `setDraft`, `setViewed`, and `rerun` are
+  optional, and the view draws no control for one that's missing. Bitbucket has no labels and can't
+  reopen a declined pull request, so it draws no Labels section and no **Reopen**.
 
 `ChangeRequestView` draws the model as the kit's `Sections`: the overview as the header, the sections,
-and the host's diff as the main region. The host passes its own diff, its own check panel, and an
-optional header such as GitHub's strip of related pull requests.
+and the host's diff as the main region. The host passes its own diff, an optional header such as
+GitHub's strip of related pull requests, and its check panel. A check row opens only when the check
+has a `runId`, so a host whose checks have no log, such as Bitbucket's build statuses, passes no check
+panel.
+
+`changeRequestRailMarker` draws a task's change request state on its pane's rail button: checks,
+review decision, conflicts, and draft, merged, or closed, from `changeRequestMarkers` in the model. The
+host names its pane, how to find the task's change request, the route that answers its detail, and how
+to read its `pr-synced` frame. GitLab's and Bitbucket's buttons use it.
 
 `ChangeRequestDiff` takes a `DiffSource` without its threads, inline chat, or line opener, and adds
 those. It maps `old` and `new` to the viewer's `LEFT` and `RIGHT`, opens an added line in the
@@ -75,8 +86,8 @@ host owns the reads, the search past the loaded pages, each row's checks, and th
 ## Extension points
 
 Each code host opens its own `diff-line` and `summary-badges` points, so GitHub's are
-`github:diff-line` and `github:summary-badges` and GitLab's are `gitlab:diff-line` and
-`gitlab:summary-badges`. Register both with `changeRequestPoints(noun)`. `DIFF_LINE_KEY` is the
+`github:diff-line` and `github:summary-badges`, GitLab's are `gitlab:diff-line` and
+`gitlab:summary-badges`, and Bitbucket's are `bitbucket:diff-line` and `bitbucket:summary-badges`. Register both with `changeRequestPoints(noun)`. `DIFF_LINE_KEY` is the
 `diff-line` key, `file`, `line`, and `side`. A `summary-badges` contributor gets
 `{ owner, repo, number }`, where `owner` is the repository's namespace. A contributor that wants every
 host files the same code against each host's point

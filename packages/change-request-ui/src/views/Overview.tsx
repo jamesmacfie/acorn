@@ -236,7 +236,7 @@ export function ChangeRequestOverview(props: {
                 Convert to draft
               </Button>
             </Show>
-            {/* Reopen exists, so closing is reversible: arm-to-confirm rather than a dialog. */}
+            {/* Arm-to-confirm rather than a dialog, because on most hosts Reopen undoes it. */}
             <ConfirmButton
               variant="ghost"
               size="sm"
@@ -249,7 +249,7 @@ export function ChangeRequestOverview(props: {
           </Inline>
         </Stack>
       </Show>
-      <Show when={!model().readOnly && state() === 'closed'}>
+      <Show when={!model().readOnly && state() === 'closed' && model().actions.reopen}>
         <Inline gap="row">
           <Button disabled={model().reopen.isPending} onPress={() => model().run(model().reopen.mutateAsync())}>
             Reopen

@@ -264,7 +264,9 @@ export function changeRequestSections(input: {
           },
         ]
       : []),
-    { id: 'labels', label: 'Labels', count: model.labels().length, render: () => <Labels model={model} /> },
+    ...(model.actions.addLabel
+      ? [{ id: 'labels', label: 'Labels', count: model.labels().length, render: () => <Labels model={model} /> }]
+      : []),
     ...(model.checks().length
       ? [
           {

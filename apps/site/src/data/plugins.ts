@@ -42,6 +42,15 @@ export const PLUGINS = {
     worksIn: both,
     docs: '/docs/built-in-plugins/agents/',
   },
+  bitbucket: {
+    name: 'Bitbucket',
+    sentence:
+      'Review bitbucket.org pull requests with their comments and build statuses, merge them, and start a task from one.',
+    icon: 'git-pull-request',
+    ships: 'compiled',
+    worksIn: both,
+    docs: '/docs/built-in-plugins/bitbucket/',
+  },
   browser: {
     name: 'Agent browser',
     sentence: 'Gives agents a browser of their own, on the Node, to open, read, and test web pages.',

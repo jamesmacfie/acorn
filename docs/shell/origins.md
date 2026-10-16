@@ -59,7 +59,9 @@ which runs with `allow-scripts allow-same-origin`, can never load an `app://acor
 same-origin with its parent. `style-src 'unsafe-inline'` is required because Shiki emits
 `style="color:#…"` attributes. Remote images are limited to the code hosts' avatar hosts for change
 request authorship (`kit/components/content/UserAvatar.tsx`): GitHub's, and `gitlab.com` with
-`secure.gravatar.com` for GitLab, which serves its uploaded avatars itself and falls back to Gravatar. Development widens the policy in one branch, for
+`secure.gravatar.com` for GitLab, which serves its uploaded avatars itself and falls back to Gravatar, and
+Atlassian's `avatar-management--avatars.us-west-2.prod.public.atl-paas.net` for Bitbucket, whose Gravatar
+links fall back to it. Development widens the policy in one branch, for
 Vite's HMR socket and inline preamble, and a Rust test asserts the packaged policy has neither.
 
 ### The syntax-highlighter worker's separate policy
