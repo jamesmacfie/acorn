@@ -26,6 +26,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | File | Developer handoff | Status |
 | --- | --- | --- |
+| [acorn-sentry.md](./acorn-sentry.md) | Send opted-in errors and sampled traces from release builds to the acorn team's Sentry: a DSN injected at build time, a second consent switch, defaults sized for many installs, a filter that keeps only core and unmodified official plugins, and source map upload. Also lists the other release secrets. | Proposed October 17, 2026. Implementation not started. |
 | [bundle.md](./bundle.md) | Container coordination, platform archives, bundled runtime, Windows operation support, installer, desktop TUI embedding, and macOS signing. | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
 | [context-references.md](./context-references.md) | Attach Acorn context by typing `#agent:name`, `#terminal:name`, or a plugin's category in the agent composer. The **Context** button opens the same list. Covers search, capture at send, terminal output, the plugin contract, and the terminal client. | Proposed October 16, 2026. Implementation not started. |
