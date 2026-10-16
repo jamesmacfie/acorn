@@ -41,7 +41,7 @@ const featureRoutes = routes.filter((route) => route.startsWith('/features/'))
 // Every claim on the landing page and the feature pages links to the docs page that owns it, so a
 // renamed page fails here.
 // shortcut: preview builds only, because most of those docs pages are drafts until their phases publish
-// them; run it on both builds once they're published (docs/future/marketing/08-landing.md).
+// them; run it on both builds once they're published (docs/future/marketing/20-launch.md).
 for (const route of ['/', '/download/', ...featureRoutes]) {
   test(`every link on ${route} goes to a page the build wrote`, async ({ page }) => {
     test.skip(!previewBuild, 'The docs pages these pages link to are drafts, which only a preview build has.')
@@ -127,7 +127,7 @@ test('the changelog feed has an item for every entry on the page', async ({ page
   expect([...feed.matchAll(/<guid[^>]*>[^<]*#([^<]+)<\/guid>/g)].map((match) => match[1])).toEqual(anchors)
 })
 
-// The star count shows from 100 stars (docs/future/marketing/README.md, owner decision 4).
+// The star count shows from 100 stars.
 test('the star button hides the count at 99 stars', async ({ page }) => {
   test.skip(!previewBuild, 'The design gallery is a lab page, which only a preview build has.')
   await page.goto('/lab/design/')

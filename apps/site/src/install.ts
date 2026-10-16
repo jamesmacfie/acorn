@@ -1,5 +1,4 @@
-// The two ways to install acorn that the site offers first (docs/future/marketing/README.md, owner
-// decision 7): build from source (docs/local-development.md) and the standalone Node tarball
+// The two ways to install acorn that the site offers first: build from source (docs/local-development.md) and the standalone Node tarball
 // (docs/node-distribution.md § Install and start). The landing page's install blocks show them.
 export const installMethods = [
   {

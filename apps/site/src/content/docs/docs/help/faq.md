@@ -2,8 +2,8 @@
 title: FAQ
 description: Short answers to the questions people ask first.
 sources:
-  - docs/future/marketing/voice.md
-checked: 1e0ef8b80
+  - LICENSE
+checked: c91b95809
 draft: true
 ---
 
