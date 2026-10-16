@@ -11,7 +11,6 @@ import {
   type JSX,
   type Setter,
 } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
 import { formatChord, formatRelativeTime } from '@acorn/plugin-api/client'
 import {
   Badge,
@@ -35,25 +34,28 @@ import {
   type DiffSnippets,
 } from '@acorn/plugin-api/ui/diff'
 import { ProviderHtml } from '@acorn/plugin-api/ui/host'
-import { githubAvatarUrl } from '../avatar'
-import { reviewRevisionsMatch, reviewThreadLocation } from '../reviewThreadLocation'
-import type { PrModel } from './prModel'
-import type { PullCommit, Thread, ThreadComment } from '../../shared/api'
-import { fetchDiffSegments, pullDiffOptions } from '../queries'
-import { hasRenderableBody, reviewAction, threadComments, type ConversationEntry } from './model'
+import { reviewRevisionsMatch, reviewThreadLocation } from '../model/threads'
+import type { Commit, ReviewState, Thread, ThreadComment } from '../model/types'
+import { hasRenderableBody, reviewAction, threadComments, type ConversationEntry } from '../model/conversation'
+import type { ChangeRequestModel } from './detailModel'
 
-// One turn of a pull request's conversation, as a `Card` in a `Timeline`. Four kinds: a comment, a
+type Avatar = ChangeRequestModel['host']['avatar']
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+// One turn of a change request's conversation, as a `Card` in a `Timeline`. Four kinds: a comment, a
 // review summary, a commit, and a review thread pinned to a file.
 //
 // A turn's byline is drawn at once and its body when the turn comes near the viewport (`near`, from
-// the kit's Timeline.Turn). GitHub's rendered HTML, with its images, and a thread's quoted code are
-// the expensive parts, and building every one on open is slow for a pull with hundreds of threads.
+// the kit's Timeline.Turn). The host's rendered HTML, with its images, and a thread's quoted code are
+// the expensive parts, and building every one on open is slow for one with hundreds of threads.
 
 /** Where a body goes until its turn comes near. Words rather than a blank, so a card is never empty. */
 const NOT_DRAWN = 'Shown when you scroll to it.'
 
 function ConversationEntryItem(props: {
   entry: ConversationEntry
+  avatar: Avatar
   near: Accessor<boolean>
   snippets: DiffSnippets
   locationsVerified: Accessor<boolean>
@@ -65,6 +67,7 @@ function ConversationEntryItem(props: {
       return (
         <ConversationItem
           author={props.entry.comment.author}
+          avatar={props.avatar}
           action="commented"
           body={props.entry.comment.body}
           createdAt={props.entry.createdAt}
@@ -76,6 +79,7 @@ function ConversationEntryItem(props: {
       return (
         <ConversationItem
           author={props.entry.review.author}
+          avatar={props.avatar}
           action={reviewAction(props.entry.review.state)}
           body={props.entry.review.body}
           state={props.entry.review.state}
@@ -85,11 +89,12 @@ function ConversationEntryItem(props: {
         />
       )
     case 'commit':
-      return <CommitItem commit={props.entry.commit} />
+      return <CommitItem commit={props.entry.commit} avatar={props.avatar} />
     case 'thread':
       return (
         <FileThreadItem
           thread={props.entry.thread}
+          avatar={props.avatar}
           near={props.near}
           snippets={props.snippets}
           locationsVerified={props.locationsVerified}
@@ -102,10 +107,15 @@ function ConversationEntryItem(props: {
 
 /** Who did what, when. The header line every turn carries. The verb is words; a review's verdict is
  *  also the colour of its card's stripe. */
-function Byline(props: { author: string | null | undefined; action: string; createdAt: number | null }) {
+function Byline(props: {
+  author: string | null | undefined
+  avatar: Avatar
+  action: string
+  createdAt: number | null
+}) {
   return (
     <Inline>
-      <UserAvatar login={props.author ?? null} src={githubAvatarUrl(props.author)} />
+      <UserAvatar login={props.author ?? null} src={props.avatar(props.author)} />
       <Text emphasis="strong">{props.author ?? 'unknown'}</Text>
       <Text emphasis="muted">{props.action}</Text>
       <Show when={formatRelativeTime(props.createdAt)}>{(age) => <Text emphasis="muted">{age()}</Text>}</Show>
@@ -113,13 +123,13 @@ function Byline(props: { author: string | null | undefined; action: string; crea
   )
 }
 
-function CommitItem(props: { commit: PullCommit }) {
+function CommitItem(props: { commit: Commit; avatar: Avatar }) {
   const author = () => props.commit.author ?? props.commit.authorLogin ?? 'unknown'
   return (
     <Card pad="sm">
       <Stack gap="row">
         <Inline>
-          <UserAvatar login={props.commit.authorLogin} src={githubAvatarUrl(props.commit.authorLogin)} />
+          <UserAvatar login={props.commit.authorLogin} src={props.avatar(props.commit.authorLogin)} />
           <Badge size="xs" tone="accent">
             {props.commit.sha.slice(0, 7)}
           </Badge>
@@ -138,19 +148,20 @@ function CommitItem(props: { commit: PullCommit }) {
 
 function ConversationItem(props: {
   author: string | null
+  avatar: Avatar
   action: string
   body: string | null
-  state?: string | null
+  state?: ReviewState | null
   createdAt?: number | null
   near: Accessor<boolean>
   onLinkClick: (event: MouseEvent) => void
 }) {
   const hasBody = () => hasRenderableBody(props.body)
   const stripe = (): 'accent' | 'ok' | 'danger' => {
-    switch ((props.state ?? '').toUpperCase()) {
-      case 'APPROVED':
+    switch (props.state) {
+      case 'approved':
         return 'ok'
-      case 'CHANGES_REQUESTED':
+      case 'changes-requested':
         return 'danger'
       default:
         return 'accent'
@@ -161,7 +172,12 @@ function ConversationItem(props: {
     <Card pad="sm" stripe={stripe()}>
       <Stack gap="row">
         <Inline>
-          <Byline author={props.author} action={props.action} createdAt={props.createdAt ?? null} />
+          <Byline
+            author={props.author}
+            avatar={props.avatar}
+            action={props.action}
+            createdAt={props.createdAt ?? null}
+          />
           <Show when={hasBody()}>
             <CopyButton text={() => text || props.body || ''} title="Copy comment" />
           </Show>
@@ -193,6 +209,7 @@ const snippetLine = (line: DiffSnippetLine): string => {
 
 function FileThreadItem(props: {
   thread: Thread
+  avatar: Avatar
   near: Accessor<boolean>
   snippets: DiffSnippets
   locationsVerified: Accessor<boolean>
@@ -226,7 +243,12 @@ function FileThreadItem(props: {
     <Card pad="sm" stripe="accent">
       <Stack gap="row">
         <Inline>
-          <Byline author={first()?.author} action="commented" createdAt={first()?.createdAt ?? null} />
+          <Byline
+            author={first()?.author}
+            avatar={props.avatar}
+            action="commented"
+            createdAt={first()?.createdAt ?? null}
+          />
           <Show when={props.thread.outdated === true}>
             <Badge size="xs" tone="neutral">
               Outdated
@@ -275,6 +297,7 @@ function FileThreadItem(props: {
           {(comment, index) => (
             <FileThreadComment
               comment={comment}
+              avatar={props.avatar}
               compact={index() === 0}
               near={props.near}
               onLinkClick={props.onLinkClick}
@@ -288,6 +311,7 @@ function FileThreadItem(props: {
 
 function FileThreadComment(props: {
   comment: ThreadComment
+  avatar: Avatar
   compact: boolean
   near: Accessor<boolean>
   onLinkClick: (event: MouseEvent) => void
@@ -295,7 +319,12 @@ function FileThreadComment(props: {
   return (
     <Stack gap="row">
       <Show when={!props.compact}>
-        <Byline author={props.comment.author} action="commented" createdAt={props.comment.createdAt} />
+        <Byline
+          author={props.comment.author}
+          avatar={props.avatar}
+          action="commented"
+          createdAt={props.comment.createdAt}
+        />
       </Show>
       <Show when={hasRenderableBody(props.comment.body)} fallback={<Text emphasis="muted">No content.</Text>}>
         <Show when={props.near()} fallback={<Text emphasis="muted">{NOT_DRAWN}</Text>}>
@@ -307,13 +336,13 @@ function FileThreadComment(props: {
 }
 
 /** The whole conversation: the comment box, the turns, and the review verbs. */
-export function PrConversation(props: {
-  model: PrModel
+export function ChangeRequestConversation(props: {
+  model: ChangeRequestModel
   onOpenFile: (path: string) => void
   onLinkClick: (event: MouseEvent) => void
 }) {
   const model = () => props.model
-  const { owner, repo, number } = props.model.scope
+  const reviewEvents = () => model().actions.review?.events ?? []
   // Turns by key, the way the agent transcript draws its rows: `For` over the keys, and each turn reads
   // its entry from a signal of its own. Every refetch rebuilds the entries, and `For` over the objects
   // would rebuild every turn with them, dropping a selection, a scroll place and every drawn body.
@@ -334,11 +363,13 @@ export function PrConversation(props: {
   const anchored = createMemo(() =>
     entries().some((entry) => entry.kind === 'thread' && reviewThreadLocation(entry.thread) != null),
   )
-  const diff = createQuery(() => pullDiffOptions(owner, repo, number, anchored()))
-  const locationsVerified = () => reviewRevisionsMatch(model().detail.data, diff.data)
+  createEffect(() => {
+    if (anchored()) model().diff.want()
+  })
+  const locationsVerified = () => reviewRevisionsMatch(model().detail(), model().diff.data())
   const snippets = createDiffSnippets({
-    files: () => diff.data?.document.files,
-    load: (requests, signal) => fetchDiffSegments(owner, repo, requests, signal),
+    files: () => model().diff.data()?.document.files,
+    load: (requests, signal) => model().diff.loadSegments(requests, signal),
   })
   return (
     <Stack gap="section">
@@ -352,33 +383,47 @@ export function PrConversation(props: {
             busy={model().comment.isPending}
             onSubmit={model().submitComment}
           />
-          <ComposerBox
-            placeholder="Leave a review comment…"
-            value={model().reviewBody()}
-            onInput={model().setReviewBody}
-            mentions={model().mentions()}
-            busy={model().review.isPending}
-            submitLabel="Comment"
-            onSubmit={() => model().submitReviewWith('COMMENT')}
-            secondary={
-              <>
-                {/* Approve is the only verb that works on an empty body, so it cannot be the primary
-                    submit — the composer disables that without text. */}
-                <Button busy={model().review.isPending} onPress={() => model().submitReviewWith('APPROVE')}>
-                  Approve
-                </Button>
-                <Button
-                  disabled={model().review.isPending || !model().reviewBody().trim()}
-                  onPress={() => model().submitReviewWith('REQUEST_CHANGES')}
-                >
-                  Request changes
-                </Button>
-              </>
-            }
-          />
+          {/* The review verbs the host has. Approve is the only one that works on an empty body, so
+              it cannot be the primary submit — the composer disables that without text. A host with
+              no review comment draws Approve on its own. */}
+          <Show when={reviewEvents().includes('comment')}>
+            <ComposerBox
+              placeholder="Leave a review comment…"
+              value={model().reviewBody()}
+              onInput={model().setReviewBody}
+              mentions={model().mentions()}
+              busy={model().review.isPending}
+              submitLabel="Comment"
+              onSubmit={() => model().submitReviewWith('comment')}
+              secondary={
+                <>
+                  <Show when={reviewEvents().includes('approve')}>
+                    <Button busy={model().review.isPending} onPress={() => model().submitReviewWith('approve')}>
+                      Approve
+                    </Button>
+                  </Show>
+                  <Show when={reviewEvents().includes('request-changes')}>
+                    <Button
+                      disabled={model().review.isPending || !model().reviewBody().trim()}
+                      onPress={() => model().submitReviewWith('request-changes')}
+                    >
+                      Request changes
+                    </Button>
+                  </Show>
+                </>
+              }
+            />
+          </Show>
+          <Show when={!reviewEvents().includes('comment') && reviewEvents().includes('approve')}>
+            <Inline gap="row">
+              <Button busy={model().review.isPending} onPress={() => model().submitReviewWith('approve')}>
+                Approve
+              </Button>
+            </Inline>
+          </Show>
         </Stack>
       </Show>
-      <Timeline ariaLabel="Pull request conversation">
+      <Timeline ariaLabel={`${capitalize(model().host.noun)} conversation`}>
         <For each={keys()} fallback={<Text emphasis="muted">No comments or commits.</Text>}>
           {(key) => {
             const [entry, set] = createSignal(untrack(byKey).get(key)!)
@@ -389,6 +434,7 @@ export function PrConversation(props: {
                 {(near) => (
                   <ConversationEntryItem
                     entry={entry()}
+                    avatar={model().host.avatar}
                     near={near}
                     snippets={snippets}
                     locationsVerified={locationsVerified}

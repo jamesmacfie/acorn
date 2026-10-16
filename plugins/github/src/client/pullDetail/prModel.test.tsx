@@ -7,7 +7,7 @@ import { contentLinkRegistry } from '@acorn/plugin-api/testkit/client'
 import type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
 import { fileSummariesKey, mentionsKey, pullKey, repoLabelsKey, type PullDetail } from '../../shared/api'
 import { _resetPrModels, prModel } from './prModel'
-import { prSections } from './prSections'
+import { changeRequestSections } from '@acorn/change-request-ui/views'
 
 const provider = vi.hoisted(() => ({
   resolve: vi.fn<(identifiers: readonly string[]) => Promise<PluginRefResolution[]>>(),
@@ -103,7 +103,7 @@ function draw(pull: PullDetail, number = '7') {
           const model = prModel({ owner: 'runn-fast', repo: 'acorn', number, taskId: 't1', readOnly: number !== '7' })
           return (
             <For
-              each={prSections({
+              each={changeRequestSections({
                 model,
                 currentFile: () => undefined,
                 onOpenFile: () => {},

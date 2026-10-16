@@ -1,13 +1,14 @@
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DiffDocumentFile, DiffSegmentRequest } from '@acorn/plugin-api/ui/diff'
+import { ChangeRequestConversation, createChangeRequestModel } from '@acorn/change-request-ui/views'
 import type { PullDetail, Thread } from '../../shared/api'
-import { buildConversationEntries, type ConversationEntry } from './model'
-import type { PrModel } from './prModel'
+import { githubHost, toChangeRequestDetail } from '../changeRequest'
 
-// A pull request's conversation opens without building every turn's body
+// A pull request's conversation, drawn by the shared view from GitHub's mirror rows, opens without
+// building every turn's body
 // (docs/github-integration/surfaces.md § Conversation): each turn keeps its element by `kind:id` key,
 // draws GitHub's HTML once it comes near the viewport, and quotes a thread's code from the one diff
 // segment that holds its line.
@@ -25,31 +26,29 @@ const document: DiffDocumentFile[] = ['a.ts', 'b.ts', 'c.ts'].map((path) => ({
 }))
 const asked: DiffSegmentRequest[][] = []
 
-vi.mock('../queries', () => ({
-  pullDiffOptions: (owner: string, repo: string, number: string, enabled: boolean) => ({
-    queryKey: ['files', owner, repo, number, 'diff'],
-    enabled,
-    queryFn: async () => ({
-      revision: 'base:head',
-      document: { files: document },
-      completeness: { state: 'complete' },
-    }),
-  }),
-  fetchDiffSegments: async (_owner: string, _repo: string, requests: DiffSegmentRequest[]) => {
-    asked.push(requests)
-    return requests.map((request) => ({
-      ...request,
-      rows: Array.from({ length: 10 }, (_, index) => ({
-        kind: 'normal',
-        oldNo: index + 1,
-        newNo: index + 1,
-        raw: `${request.path} line ${index + 1}`,
-      })),
-    }))
+// The shared conversation reads its snippets through the model's `diff`, which GitHub fills from the
+// pull's diff document and the segments route. Both are stood in for here.
+const diff = {
+  revision: 'base:head',
+  document: {
+    schemaVersion: 1,
+    revision: 'base:head',
+    totals: { files: 3, rows: 30, bands: 30, segments: 3, columns: 20 },
+    files: document,
   },
-}))
-
-const { PrConversation } = await import('./Conversation')
+}
+const loadSegments = async (requests: DiffSegmentRequest[]) => {
+  asked.push(requests)
+  return requests.map((request) => ({
+    ...request,
+    rows: Array.from({ length: 10 }, (_, index) => ({
+      kind: 'normal' as const,
+      oldNo: index + 1,
+      newNo: index + 1,
+      raw: `${request.path} line ${index + 1}`,
+    })),
+  }))
+}
 
 // The observer the kit's Timeline uses to say a turn is near. Nothing is near until a test says so.
 let watched: Element[] = []
@@ -112,28 +111,48 @@ afterEach(() => {
   delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver
 })
 
+const idle = async () => {}
+
+function Harness(props: { data: () => PullDetail }) {
+  const model = createChangeRequestModel({
+    scope: { owner: 'acorn', repo: 'web', number: '42', readOnly: true },
+    host: githubHost,
+    draftKey: 'acorn/web/42',
+    detail: () => toChangeRequestDetail(props.data()),
+    detailFailed: () => false,
+    files: () => [],
+    filesLoading: () => false,
+    filesWarning: () => null,
+    mentions: () => [],
+    mentionsLoading: () => false,
+    repoLabels: () => [],
+    labelsLoading: () => false,
+    diff: { data: () => diff, want: () => {}, loadSegments },
+    refresh: () => {},
+    actions: {
+      comment: idle,
+      addLabel: idle,
+      removeLabel: idle,
+      requestReviewer: idle,
+      removeReviewer: idle,
+      close: idle,
+      reopen: idle,
+    },
+  })
+  return <ChangeRequestConversation model={model} onOpenFile={() => {}} onLinkClick={() => {}} />
+}
+
 const mount = (initial: PullDetail) => {
   const [data, setData] = createSignal(initial)
-  const entries = () => buildConversationEntries(data())
-  const model = {
-    scope: { owner: 'acorn', repo: 'web', number: '42' },
-    readOnly: true,
-    conversationEntries: entries,
-    detail: {
-      get data() {
-        return data()
-      },
-    },
-  } as unknown as PrModel
   dispose = render(
     () => (
       <QueryClientProvider client={new QueryClient()}>
-        <PrConversation model={model} onOpenFile={() => {}} onLinkClick={() => {}} />
+        <Harness data={data} />
       </QueryClientProvider>
     ),
     host,
   )
-  return { setData, entries: entries as () => ConversationEntry[] }
+  return { setData }
 }
 
 describe('the pull request conversation', () => {

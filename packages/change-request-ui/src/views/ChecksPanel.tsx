@@ -1,33 +1,33 @@
-import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createSignal, For, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { createQuery } from '@tanstack/solid-query'
-import { jobLogOptions, runJobsOptions } from '../queries'
-import { checkStatusTone, checkStatusWord, FAILED_STATUSES } from './checkStatus'
+import { checkStatusTone, checkStatusWord, FAILED_STATUSES } from '../model/checkStatus'
 import { Button, EmptyState, Fold, Log, Modal, Stack, StatusDot } from '@acorn/plugin-api/ui'
-import { splitJobLog } from './splitJobLog'
 
-// One workflow run's steps, GitHub-Actions style: the steps of the clicked job matched by name,
-// failed ones open, each step's log sliced from the one job-log fetch that fires when the first step
-// opens.
+/** One step of a check's job, with its status in the `Check.status` vocabulary. */
+export type CheckStep = { id: number; name: string; status: string | null }
+
+// One check's steps, failed ones open, each step's log handed over by the host. The host fetches the
+// steps when the panel opens and the log only once a step is open (`onLogWanted`), because a log is
+// the expensive read.
 //
 // The step logs are the kit's `Log` and carry no ANSI colour, because a log is text and the kit draws
 // text in one place.
-export default function ChecksPanel(props: {
-  owner: string
-  repo: string
-  runId: number
-  jobName: string
-  /** The check's page on GitHub, where a reader goes next. */
+export function ChecksPanel(props: {
+  title: string
+  /** Identity of the job the steps belong to. A new one opens its failed steps afresh. */
+  jobKey: () => string | number | null
+  steps: () => CheckStep[]
+  stepsLoading: () => boolean
+  stepsFailed: () => boolean
+  /** Called once, when the first step opens. */
+  onLogWanted: () => void
+  logLoading: () => boolean
+  stepLog: (stepId: number) => string[]
+  /** The check's page on the host, and the host's name for the button. */
   url?: string | null
+  hostLabel: string
   onClose: () => void
 }) {
-  const jobs = createQuery(() => runJobsOptions(props.owner, props.repo, props.runId, true))
-  const job = createMemo(() => {
-    const list = jobs.data?.jobs ?? []
-    return list.find((candidate) => candidate.name === props.jobName) ?? list[0] ?? null
-  })
-  const steps = () => job()?.steps ?? []
-
   const [open, setOpen] = createSignal<Set<number>>(new Set())
   const toggle = (step: number, next: boolean) =>
     setOpen((current) => {
@@ -38,38 +38,32 @@ export default function ChecksPanel(props: {
     })
 
   // Seed the open set once per job: failed steps start expanded.
-  const [seeded, setSeeded] = createSignal<number | null>(null)
+  const [seeded, setSeeded] = createSignal<string | number | null>(null)
   createEffect(() => {
-    const current = job()
-    if (!current || seeded() === current.id) return
+    const key = props.jobKey()
+    if (key == null || seeded() === key) return
     setOpen(
       new Set(
-        current.steps
-          .filter((step) => FAILED_STATUSES.has((step.conclusion ?? '').toLowerCase()))
-          .map((step) => step.number),
+        props
+          .steps()
+          .filter((step) => FAILED_STATUSES.has((step.status ?? '').toLowerCase()))
+          .map((step) => step.id),
       ),
     )
-    setSeeded(current.id)
+    setSeeded(key)
   })
-
-  // Fetch the job log only once a step is open. One fetch covers every step.
-  const anyOpen = () => open().size > 0
-  const log = createQuery(() => jobLogOptions(props.owner, props.repo, job()?.id ?? 0, anyOpen() && !!job()))
-  const split = createMemo(() => (log.data ? splitJobLog(log.data.text, steps()) : null))
-  const stepLog = (step: number): string[] => {
-    const sliced = split()
-    const text = sliced ? (sliced.byStep.get(step) ?? sliced.full) : ''
-    return text ? text.split('\n') : []
-  }
+  createEffect(() => {
+    if (open().size > 0) props.onLogWanted()
+  })
 
   // Portalled, because the pane that opens this sets `contain: layout paint`, which would make a
   // fixed-position overlay inside it a box the size of the pane.
   return (
     <Portal>
-      <Modal size="wide" title={job()?.name ?? props.jobName} onDismiss={props.onClose}>
+      <Modal size="wide" title={props.title} onDismiss={props.onClose}>
         <Modal.Body>
           <Show
-            when={!jobs.isLoading}
+            when={!props.stepsLoading()}
             fallback={
               <EmptyState align="start" busy>
                 Loading steps…
@@ -77,23 +71,23 @@ export default function ChecksPanel(props: {
             }
           >
             <Show
-              when={steps().length}
+              when={props.steps().length}
               fallback={
                 <EmptyState align="start" size="sm">
-                  {jobs.isError ? "Couldn't load this run's steps." : 'This run has no steps.'}
+                  {props.stepsFailed() ? "Couldn't load this run's steps." : 'This run has no steps.'}
                 </EmptyState>
               }
             >
               <Stack gap="row">
-                <For each={steps()}>
+                <For each={props.steps()}>
                   {(step) => {
-                    const status = () => (step.conclusion ?? step.status ?? '').toLowerCase()
+                    const status = () => (step.status ?? '').toLowerCase()
                     return (
                       <Fold
                         level="sub"
                         label={step.name}
-                        open={open().has(step.number)}
-                        onOpenChange={(next) => toggle(step.number, next)}
+                        open={open().has(step.id)}
+                        onOpenChange={(next) => toggle(step.id, next)}
                         meta={
                           <StatusDot
                             tone={checkStatusTone(status())}
@@ -103,14 +97,14 @@ export default function ChecksPanel(props: {
                         }
                       >
                         <Show
-                          when={!log.isLoading}
+                          when={!props.logLoading()}
                           fallback={
                             <EmptyState align="start" busy>
                               Loading log…
                             </EmptyState>
                           }
                         >
-                          <Log lines={stepLog(step.number)} ariaLabel={`${step.name} log`} />
+                          <Log lines={props.stepLog(step.id)} ariaLabel={`${step.name} log`} />
                         </Show>
                       </Fold>
                     )
@@ -127,7 +121,7 @@ export default function ChecksPanel(props: {
           <Show when={props.url}>
             {(url) => (
               <Button variant="solid" href={url()}>
-                Open on GitHub
+                Open on {props.hostLabel}
               </Button>
             )}
           </Show>

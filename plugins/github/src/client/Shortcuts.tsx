@@ -2,7 +2,7 @@ import { createMemo, onCleanup, onMount } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { projectsOptions, registerCommands, registerKeybindings } from '@acorn/plugin-api/client'
-import { useChangedFiles } from './changedFiles'
+import { usePullChangedFiles } from './changedFiles'
 import { githubCommands } from './commands'
 
 // Where this plugin's router-scoped commands get mounted, and the chords that reach them. One instance,
@@ -24,7 +24,7 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
     if (!github()?.owner || !github()?.name || !params.number) return null
     return { owner: github()!.owner, repo: github()!.name, number: params.number }
   })
-  const changedFiles = useChangedFiles(route)
+  const changedFiles = usePullChangedFiles(route)
 
   onMount(() => {
     const commands = registerCommands(

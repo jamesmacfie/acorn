@@ -1,17 +1,16 @@
 import { Show } from 'solid-js'
 import { fileStatusMeta } from '@acorn/plugin-api/client'
 import { Alert, Badge, Checkbox, EmptyState, Row, Rows, Text } from '@acorn/plugin-api/ui'
-import type { PrModel } from './prModel'
-import { incompleteFilesMessage } from '../completeness'
+import type { ChangeRequestModel } from './detailModel'
 
-// The changed files of a pull request, with a warning above them when GitHub's API limit cut the
-// list short.
+// The changed files of a change request, with the host's warning above them when its API limit cut
+// the list short.
 //
 // The list is flat rather than a directory tree, so it keeps the file order the finder and `[` / `]`
 // cycling agree on.
 
-export function PrFileList(props: {
-  model: PrModel
+export function ChangedFileList(props: {
+  model: ChangeRequestModel
   current: () => string | undefined
   onSelect: (path: string) => void
   /** Draw only the rows on screen, in a scroller of the list's own. True where the list is a column
@@ -22,9 +21,7 @@ export function PrFileList(props: {
   const model = () => props.model
   return (
     <>
-      <Show when={incompleteFilesMessage(model().filesCompleteness())}>
-        {(message) => <Alert tone="warn">{message()}</Alert>}
-      </Show>
+      <Show when={model().filesWarning()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
       <Show
         when={model().files().length}
         fallback={
@@ -35,7 +32,7 @@ export function PrFileList(props: {
       >
         <Rows
           virtual={props.virtual}
-          id={`gh-files:${model().scope.owner}/${model().scope.repo}#${model().scope.number}`}
+          id={`cr-files:${model().scope.owner}/${model().scope.repo}#${model().scope.number}`}
           ariaLabel="Changed files"
           items={model()
             .files()
@@ -67,15 +64,18 @@ export function PrFileList(props: {
                 label={item.key}
                 leading={
                   <>
-                    <Checkbox
-                      ariaLabel={`Mark ${item.key} viewed`}
-                      title="Viewed"
-                      checked={!!file()?.viewed}
-                      disabled={model().readOnly}
-                      onChange={(checked) => {
-                        if (!model().readOnly) model().setViewed(item.key, checked)
-                      }}
-                    />
+                    {/* Only a host that keeps a viewed mark offers one. */}
+                    <Show when={model().actions.setViewed}>
+                      <Checkbox
+                        ariaLabel={`Mark ${item.key} viewed`}
+                        title="Viewed"
+                        checked={!!file()?.viewed}
+                        disabled={model().readOnly}
+                        onChange={(checked) => {
+                          if (!model().readOnly) model().setViewed(item.key, checked)
+                        }}
+                      />
+                    </Show>
                     <Badge size="xs" tone={tone()}>
                       {status().letter}
                     </Badge>

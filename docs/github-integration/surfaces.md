@@ -1,7 +1,9 @@
 # GitHub surfaces
 
 This page covers how the GitHub plugin's panes and panels are arranged, the conversation timeline, and
-the two extension points it opens. The client is in `plugins/github/src/client/`.
+the two extension points it opens. The client is in `plugins/github/src/client/`. The pane, list, diff,
+and checks views are the [shared review views](../plugins/change-request-ui.md), drawn over GitHub's
+mirror rows.
 
 ## Surfaces
 
@@ -59,8 +61,8 @@ very busy repository. Search doesn't depend on the mirror and finds them.
 
 ## Conversation
 
-The conversation is `PrConversation` in `plugins/github/src/client/pullDetail/Conversation.tsx`, a kit
-`Timeline` over `buildConversationEntries` in `model.ts`. Its topology is the PR detail, which is
+The conversation is `ChangeRequestConversation` in `packages/change-request-ui/src/views/Conversation.tsx`,
+a kit `Timeline` over `buildConversationEntries` in `packages/change-request-ui/src/model/conversation.ts`. Its topology is the PR detail, which is
 complete when it is served (§ Pull request detail and files), and no route was added for it. Bodies stay
 in that detail, because the diff's inline threads and the Linear reference scan read the same bodies
 anyway, so a separate body route would fetch them twice.

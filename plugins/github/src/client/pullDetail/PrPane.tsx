@@ -1,25 +1,24 @@
 import { createMemo, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import type { Task } from '@acorn/plugin-api/client'
-import { Alert, Button, EmptyState, Icon, IconButton, Menu, Only, Sections, Stack, Tabs } from '@acorn/plugin-api/ui'
-import { useChangedFiles } from '../changedFiles'
+import { Alert, Button, EmptyState, Icon, IconButton, Menu, Only, Stack, Tabs } from '@acorn/plugin-api/ui'
+import { ChangeRequestView } from '@acorn/change-request-ui/views'
+import { usePullChangedFiles } from '../changedFiles'
 import { makeContentLinkHandler } from '../contentLinks'
 import { requestFileScroll, routeKey } from '../fileNavigation'
-import ChecksPanel from '../checks/ChecksPanel'
+import GithubChecksPanel from '../checks/GithubChecksPanel'
 import { DiffForPull, type PullRoute } from '../DiffForPull'
-import { PrOverview } from './PrOverview'
-import { prSections } from './prSections'
 import { prModel, type PrModel } from './prModel'
 import { destinationKind, prTabsModel, type PrTabsModel } from './prTabs'
 import { pullRefKey, taskPullTabTooltip } from './taskPullTabs'
 
-// The PR pane: one pull request, drawn the way the GitHub browse surface draws one, the navigator
-// column beside the diff. Browse reaches the same pair through its own pull list; a task already
-// knows which pull it is about, so the list is a strip of related pulls instead.
+// The PR pane: one pull request, drawn by the shared change request view the GitHub browse surface
+// also draws, the navigator column beside the diff. Browse reaches the same pair through its own pull
+// list; a task already knows which pull it is about, so the list is a strip of related pulls instead.
 //
 // A `single` layout holding one kit node, not the host's `list-detail`: the halves are one surface
 // with a shared model rather than two regions, and the kit's `Sections` arranges them: folds beside
-// the diff on a desktop, a strip of tabs in a terminal. Browse draws the same node from the same list.
+// the diff on a desktop, a strip of tabs in a terminal.
 //
 // A task can be about more than one pull (the one it was made from, the ones that mention it, the
 // ones stacked on it), so the navigator opens with the strip that switches between them.
@@ -149,7 +148,7 @@ export function PrPane(props: { task: Task }) {
   const onLinkClick = makeContentLinkHandler(navigate, { taskId: props.task.id })
   // A pane has no router, so the selected file is held locally and the diff column hears about it
   // through the file-scroll event rather than through `?file=`.
-  const changedFiles = useChangedFiles(
+  const changedFiles = usePullChangedFiles(
     () => {
       const pull = tabs.selected()?.pull
       return pull ? { owner: pull.owner, repo: pull.repo, number: pull.number } : null
@@ -190,57 +189,23 @@ export function PrPane(props: { task: Task }) {
       }
     >
       {(loaded) => (
-        <>
-          <Sections
-            id="github.pull"
-            ariaLabel="Pull request"
-            header={{
-              id: 'details',
-              label: 'Details',
-              render: () => (
-                <Stack gap="section">
-                  <PullStrip tabs={tabs} />
-                  <PrOverview
-                    model={loaded()}
-                    onOpenFile={select}
-                    onLinkClick={onLinkClick}
-                    hideNumber={tabs.tabs().length > 1}
-                  />
-                </Stack>
-              ),
-            }}
-            sections={prSections({
-              model: loaded(),
-              currentFile: changedFiles.currentFile,
-              onOpenFile: select,
-              onLinkClick,
-            })}
-            main={{
-              id: 'diff',
-              label: 'Diff',
-              render: () => (
-                <Show when={diffRoute()} keyed>
-                  {(route) => (
-                    <DiffForPull route={route} router={false} taskId={props.task.id} readOnly={route.readOnly} />
-                  )}
-                </Show>
-              ),
-            }}
-          />
-          {/* The one overlay this pane owns. It is a run's step log, opened from a check row. */}
-          <Show when={loaded().openCheck()}>
-            {(check) => (
-              <ChecksPanel
-                owner={loaded().scope.owner}
-                repo={loaded().scope.repo}
-                runId={check().runId}
-                jobName={check().name}
-                url={check().url}
-                onClose={() => loaded().setOpenCheck(null)}
-              />
-            )}
-          </Show>
-        </>
+        <ChangeRequestView
+          id="github.pull"
+          model={loaded()}
+          header={() => <PullStrip tabs={tabs} />}
+          hideNumber={tabs.tabs().length > 1}
+          currentFile={changedFiles.currentFile}
+          onOpenFile={select}
+          onLinkClick={onLinkClick}
+          diff={() => (
+            <Show when={diffRoute()} keyed>
+              {(route) => <DiffForPull route={route} router={false} taskId={props.task.id} readOnly={route.readOnly} />}
+            </Show>
+          )}
+          checkPanel={(check, close) => (
+            <GithubChecksPanel owner={loaded().scope.owner} repo={loaded().scope.repo} check={check} onClose={close} />
+          )}
+        />
       )}
     </Show>
   )

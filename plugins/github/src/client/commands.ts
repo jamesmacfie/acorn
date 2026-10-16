@@ -9,7 +9,7 @@ import {
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
 import { pullsRoute, type Pull, type PullFile } from '../shared/api'
-import { filterPulls } from './pullList/model'
+import { filterChangeRequests } from '@acorn/change-request-ui/model'
 import { githubBrowsePath, githubCreateRoute } from './clientRoutes'
 
 // This plugin's router-scoped commands, as a function of what the router says. Built here rather than
@@ -146,7 +146,7 @@ export function githubCommands(deps: GithubCommandDeps): ContributedCommand[] {
         const list = await openPulls(context)
         // The browse list's own matcher, so the palette finds a pull request by the same words the
         // filter box does: its number, its title, its author and its branch.
-        return filterPulls(list, text)
+        return filterChangeRequests(list, text, '#')
           .slice(0, MAX_PULL_ROWS)
           .map((pull): CommandSearchItem => ({
             id: String(pull.number),

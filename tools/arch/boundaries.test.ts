@@ -681,8 +681,10 @@ describe('architecture boundaries', () => {
     ])
     // `@acorn/diff-document` beside protocol: a runtime-neutral contract with no host state in it,
     // which a provider's node builds diff documents with and its client hands the viewer
-    // (docs/diff-rendering/document.md § The document).
-    const SHARED = new Set(['@acorn/plugin-api', '@acorn/protocol', '@acorn/diff-document'])
+    // (docs/diff-rendering/document.md § The document). `@acorn/change-request-ui`: the review views
+    // every code host plugin draws over a neutral model, built only on the facade
+    // (docs/plugins/change-request-ui.md).
+    const SHARED = new Set(['@acorn/plugin-api', '@acorn/protocol', '@acorn/diff-document', '@acorn/change-request-ui'])
     const offenders = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))
       .filter((e) => !SHARED.has(e.target.pkg!.name))
@@ -937,6 +939,10 @@ describe('architecture boundaries', () => {
     //
     // Ten roster ids are also core's own words. Where that is the whole reason, the entry says so.
     const NAMES_A_PLUGIN_OK = new Map([
+      // The shared review views: a diff line opens in the `editor` pane, as the changes pane's does, and
+      // the Linked issues section enriches Linear tickets through the host's ref resolution.
+      ['packages/change-request-ui/src/views/ChangeRequestDiff.tsx', "'editor' is the pane a diff line opens in"],
+      ['packages/change-request-ui/src/views/detailModel.ts', "'linear' is the provider of the linked tickets"],
       ['packages/protocol/src/data/dataSources.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/plugin-types/src/contracts/data.ts', 'preview is a published query mode, not the preview plugin'],
       ['packages/plugin-types/src/contracts/coreProjects.ts', "'terminal' is a project setup-script trigger"],

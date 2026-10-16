@@ -25,7 +25,7 @@ import {
 import type { Integration } from '@acorn/protocol/api.ts'
 import { pullRoute, type PullDetail } from '../shared/api'
 import type { PullRef } from '../shared/pullRef'
-import { branchReferenceCandidates } from './pullDetail/branchReferences'
+import { branchReferenceCandidates } from '@acorn/change-request-ui/model'
 import { pullDetailOptions } from './queries'
 
 export type PullTaskTarget = PullRef & {

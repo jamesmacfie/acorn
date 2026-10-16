@@ -18,10 +18,10 @@ import {
   type RailMarker,
   type RailMarkerContribution,
 } from '@acorn/plugin-api/client'
-import { CHECK_TONE, checksState, checksSummary } from '../checks/checkStatus'
+import { CHECK_TONE, checksState, checksSummary, reviewDecision } from '@acorn/change-request-ui/model'
 import { pullRoute, type PullDetail } from '../../shared/api'
 import { formatPullRef, pullRefMatchesTask } from '../../shared/pullRef'
-import { reviewDecision } from './model'
+import { toReview } from '../changeRequest'
 
 const POLL_MS = 60_000
 // Long enough for GitHub to register a pushed commit's checks, which the read right after the push
@@ -50,7 +50,7 @@ export function pullMarkers(detail: PullDetail): RailMarker[] {
       placements: ['top-end'],
     })
   }
-  const review = reviewDecision(detail.reviews)
+  const review = reviewDecision(detail.reviews.map(toReview))
   if (review.state === 'approved')
     markers.push({
       id: 'review',

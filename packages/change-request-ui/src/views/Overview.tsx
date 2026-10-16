@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
 import { clientEvents, formatRelativeTime, railDotProps, splitRefTokens } from '@acorn/plugin-api/client'
-import { CHECK_TONE, checksState, checksSummary } from '../checks/checkStatus'
+import { CHECK_TONE, checksState, checksSummary } from '../model/checkStatus'
 import {
   Alert,
   Badge,
@@ -20,18 +20,18 @@ import {
   UserAvatar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
-import { githubAvatarUrl } from '../avatar'
-import { SUMMARY_BADGES_POINT } from '../extensionPoints'
-import type { PrModel } from './prModel'
+import { changeRequestPointIds, type SummaryBadgesProps } from '../model/points'
+import type { ChangeRequestModel } from './detailModel'
 
-// What this pull request is, what state it is in, and every verb that changes that state.
+// What this change request is, what state it is in, and every verb the host offers to change it.
+// A verb the host has no action for is left out.
 //
 // The header of the surface rather than a section of it, which is why it is not in `prSections` with
 // the rest: a desktop pins it above the folds and a terminal makes it the first tab, and both of those
 // are the host's call.
 //
 // The Solid-rendered twin of the host's `linkifyRefs`: same split, different mechanism, because a
-// pull's title is text this component owns and its body is opaque provider HTML. The kit has a word
+// title is text this component owns and its body is opaque provider HTML. The kit has a word
 // for a clickable run of text, so it writes a node (docs/ui-design/closed-kit.md § The closed kit).
 function RefText(props: { text: string; prefixes: ReadonlyMap<string, string>; onOpen: (id: string) => void }) {
   const parts = createMemo(() => splitRefTokens(props.text, props.prefixes))
@@ -44,29 +44,27 @@ function RefText(props: { text: string; prefixes: ReadonlyMap<string, string>; o
 
 const STATE_WORD = { open: 'Open', draft: 'Draft', closed: 'Closed', merged: 'Merged' } as Record<string, string>
 
-const MERGE_METHODS = [
-  { value: 'squash', label: 'Squash and merge' },
-  { value: 'merge', label: 'Create a merge commit' },
-  { value: 'rebase', label: 'Rebase and merge' },
-]
-const MERGE_METHOD_WORD: Record<string, string> = { squash: 'squash', merge: 'merge commit', rebase: 'rebase' }
-
-export function PrOverview(props: {
-  model: PrModel
+export function ChangeRequestOverview(props: {
+  model: ChangeRequestModel
   /** Show this file in the diff. The Files tab and the browse diff column resolve it differently, so
    *  the surface that has a router passes its own. */
   onOpenFile: (path: string) => void
   /** A link inside provider HTML. Resolved by the host through the surface's own navigator. */
   onLinkClick: (event: MouseEvent) => void
-  /** Leave the number off the title, because a strip above it already names the pull. */
+  /** Leave the number off the title, because a strip above it already names it. */
   hideNumber?: boolean
 }) {
   const model = () => props.model
+  const host = () => model().host
+  const actions = () => model().actions
+  const request = () => model().request()
+  const methodWord = () =>
+    actions().merge?.methods.find((method) => method.value === model().mergeMethod())?.word ?? model().mergeMethod()
 
   const state = () => {
-    const pull = model().pull()
-    if (!pull) return 'open'
-    return pull.draft ? 'draft' : pull.state
+    const current = request()
+    if (!current) return 'open'
+    return current.draft ? 'draft' : current.state
   }
   const stateTone = (): 'ok' | 'accent' | 'neutral' =>
     state() === 'open' ? 'ok' : state() === 'draft' ? 'neutral' : 'accent'
@@ -98,17 +96,17 @@ export function PrOverview(props: {
   }
 
   const facts = createMemo(() => {
-    const pull = model().pull()
-    const age = formatRelativeTime(pull?.updatedAt ?? null)
+    const current = request()
+    const age = formatRelativeTime(current?.updatedAt ?? null)
     return [
       { label: 'State', value: <Badge tone={stateTone()}>{STATE_WORD[state()]}</Badge> },
-      ...(pull?.author
+      ...(current?.author
         ? [
             {
               label: 'Author',
               value: (
-                <Chip leading={<UserAvatar login={pull.author} src={githubAvatarUrl(pull.author)} />}>
-                  {pull.author}
+                <Chip leading={<UserAvatar login={current.author} src={host().avatar(current.author)} />}>
+                  {current.author}
                 </Chip>
               ),
             },
@@ -119,12 +117,12 @@ export function PrOverview(props: {
         wide: true,
         value: (
           <Inline>
-            <Chip reveal title={pull?.headRef ?? 'head'}>
-              {pull?.headRef ?? 'head'}
+            <Chip reveal title={current?.headRef ?? 'head'}>
+              {current?.headRef ?? 'head'}
             </Chip>
             <Text emphasis="muted">→</Text>
-            <Chip reveal title={pull?.baseRef ?? 'base'}>
-              {pull?.baseRef ?? 'base'}
+            <Chip reveal title={current?.baseRef ?? 'base'}>
+              {current?.baseRef ?? 'base'}
             </Chip>
           </Inline>
         ),
@@ -138,20 +136,16 @@ export function PrOverview(props: {
   return (
     <Stack gap="section">
       <Stack>
-        <Heading {...(props.hideNumber ? {} : { eyebrow: `#${model().scope.number}` })}>
-          <RefText
-            text={model().pull()?.title ?? ''}
-            prefixes={model().refPrefixes()}
-            onOpen={model().showLinearIssue}
-          />
+        <Heading {...(props.hideNumber ? {} : { eyebrow: `${host().prefix}${model().scope.number}` })}>
+          <RefText text={request()?.title ?? ''} prefixes={model().refPrefixes()} onOpen={model().showLinearIssue} />
         </Heading>
         <Facts items={facts()} />
-        {/* Room for other plugins beside github's own facts: a deploy, a stack, a release train.
-            `stack`, so github's own overview stays and a contributor is added to it. */}
+        {/* Room for other plugins beside the host's own facts: a deploy, a stack, a release train.
+            `stack`, so the host's own overview stays and a contributor is added to it. */}
         <Slot
-          point={SUMMARY_BADGES_POINT}
+          point={changeRequestPointIds(host().pluginId).summaryBadges}
           taskId={model().scope.taskId}
-          props={() => ({
+          props={(): SummaryBadgesProps => ({
             owner: model().scope.owner,
             repo: model().scope.repo,
             number: model().scope.number,
@@ -159,19 +153,19 @@ export function PrOverview(props: {
         />
       </Stack>
 
-      {/* A related pull is only looked at. Without this the merge box and pickers simply vanished. */}
+      {/* A related one is only looked at. Without this the merge box and pickers simply vanished. */}
       <Show when={model().readOnly}>
         <Text emphasis="muted" wrap>
-          Related pull request. Open it from its own task or the pull request list to act on it.
+          Related {host().noun}. Open it from its own task or the {host().noun} list to act on it.
         </Text>
       </Show>
 
       {/* Two rows, left-aligned so they do not wrap in the navigator: the one primary for this state,
           then the quieter verbs. A draft cannot merge, so its primary is the way out of draft. */}
-      <Show when={!model().readOnly && state() !== 'closed'}>
+      <Show when={!model().readOnly && state() !== 'closed' && state() !== 'merged'}>
         <Stack gap="row">
           <Inline gap="row" wrap>
-            <Show when={model().pull()?.draft}>
+            <Show when={request()?.draft && actions().setDraft}>
               <Button
                 variant="solid"
                 disabled={model().draft.isPending}
@@ -180,7 +174,7 @@ export function PrOverview(props: {
                 Ready for review
               </Button>
             </Show>
-            <Show when={!model().pull()?.draft && model().pull()?.autoMergeEnabled}>
+            <Show when={!request()?.draft && request()?.autoMergeEnabled && actions().autoMerge}>
               <Button
                 disabled={model().autoMergeDisable.isPending}
                 onPress={() => model().run(model().autoMergeDisable.mutateAsync())}
@@ -189,28 +183,25 @@ export function PrOverview(props: {
               </Button>
               <Text emphasis="muted">Merges on its own when checks pass.</Text>
             </Show>
-            {/* A blocked pull keeps the verb it had. "Merge when ready" would turn on auto-merge,
+            {/* A blocked one keeps the verb it had. "Merge when ready" would turn on auto-merge,
                 which fails on a repository that does not allow it, and choosing its primary is a
                 product call nobody has made. */}
             <Show
-              when={
-                !model().pull()?.draft &&
-                !model().pull()?.autoMergeEnabled &&
-                model().pull()?.mergeStateStatus === 'BLOCKED'
-              }
+              when={!request()?.draft && !request()?.autoMergeEnabled && request()?.mergeBlocked && actions().autoMerge}
             >
               <Button
                 disabled={model().autoMergeEnable.isPending}
                 onPress={() => model().run(model().autoMergeEnable.mutateAsync())}
               >
-                Enable auto-merge ({MERGE_METHOD_WORD[model().mergeMethod()] ?? model().mergeMethod()})
+                Enable auto-merge ({methodWord()})
               </Button>
             </Show>
             <Show
               when={
-                !model().pull()?.draft &&
-                !model().pull()?.autoMergeEnabled &&
-                model().pull()?.mergeStateStatus !== 'BLOCKED'
+                !request()?.draft &&
+                !request()?.autoMergeEnabled &&
+                !(request()?.mergeBlocked && actions().autoMerge) &&
+                actions().merge
               }
             >
               <Button
@@ -222,18 +213,20 @@ export function PrOverview(props: {
                 Merge
               </Button>
             </Show>
-            <Show when={!model().pull()?.draft && !model().pull()?.autoMergeEnabled}>
+            <Show
+              when={!request()?.draft && !request()?.autoMergeEnabled && (actions().merge?.methods.length ?? 0) > 1}
+            >
               <Select
                 width="auto"
                 label="Merge method"
                 value={model().mergeMethod()}
                 onChange={(value) => model().setMergeMethod(value)}
-                options={MERGE_METHODS}
+                options={actions().merge!.methods.map(({ value, label }) => ({ value, label }))}
               />
             </Show>
           </Inline>
           <Inline gap="row" wrap>
-            <Show when={!model().pull()?.draft}>
+            <Show when={!request()?.draft && actions().setDraft}>
               <Button
                 variant="ghost"
                 size="sm"
@@ -247,7 +240,7 @@ export function PrOverview(props: {
             <ConfirmButton
               variant="ghost"
               size="sm"
-              confirmLabel="Close pull request?"
+              confirmLabel={`Close ${host().noun}?`}
               disabled={model().close.isPending}
               onConfirm={() => model().run(model().close.mutateAsync())}
             >
@@ -270,7 +263,7 @@ export function PrOverview(props: {
               ? {
                   actions: (
                     <Button onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
-                      Reconnect GitHub
+                      Reconnect {host().label}
                     </Button>
                   ),
                 }
@@ -292,7 +285,7 @@ export function PrOverview(props: {
             }
           >
             <Rows
-              id={`gh-conflicts:${model().scope.number}`}
+              id={`cr-conflicts:${model().scope.number}`}
               ariaLabel="Conflicting files"
               items={model()
                 .conflicts()!

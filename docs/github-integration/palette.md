@@ -32,8 +32,8 @@ They are registered per mount from `plugins/github/src/client/Shortcuts.tsx` rat
 `ctx.commands`, because every one of the six needs the router: which project is routed, which pull
 request is open, and where to navigate. A plugin's `init` runs at boot with no router in scope. The
 decisions are still built in `commands.ts` out of eight accessors the component passes in, for the
-reason `plugins/github/src/client/pullList/model.ts` exists: a decision worth testing should not need
-a DOM to reach. The rail-source command needs no router and is registered the ordinary way.
+reason `filterChangeRequests` lives in `packages/change-request-ui/src/model/filter.ts`: a decision
+worth testing should not need a DOM to reach. The rail-source command needs no router and is registered the ordinary way.
 
 **The changed-file finder is a `search` command on the shared palette session.** These rules hold:
 

@@ -7,7 +7,7 @@ import {
   checkStatusWord,
   checksState,
   checksSummary,
-} from '../checks/checkStatus'
+} from '../model/checkStatus'
 import {
   Button,
   Chip,
@@ -24,26 +24,25 @@ import {
   type KitSection,
 } from '@acorn/plugin-api/ui'
 import { ProviderHtml } from '@acorn/plugin-api/ui/host'
-import type { Label } from '../../shared/api'
-import { githubAvatarUrl } from '../avatar'
-import { PrConversation } from './Conversation'
-import { PrFileList } from './PrFiles'
-import type { PrModel } from './prModel'
+import type { Label } from '../model/types'
+import { ChangeRequestConversation } from './Conversation'
+import { ChangedFileList } from './FileList'
+import type { ChangeRequestModel } from './detailModel'
 
-// What a pull request is made of, as a list a host arranges
+// What a change request is made of, as a list a host arranges
 // (`Sections`, docs/ui-design/closed-kit.md § The closed kit). The list is here once, and each host
 // decides what a section is: a fold beside the diff on a desktop, a tab in a terminal.
 //
 // A section that has nothing to say is left out rather than drawn empty. That is a decision about the
-// pull request rather than about the screen, which is why it is made here and not in either host: a
+// change request rather than about the screen, which is why it is made here and not in either host: a
 // repository with no Linear links has no Linked issues tab, on any host.
 
 // The copy button is the section's action, in its header, and reads the text this body hands the
 // model.
-function Description(props: { model: PrModel; onLinkClick: (event: MouseEvent) => void }) {
+function Description(props: { model: ChangeRequestModel; onLinkClick: (event: MouseEvent) => void }) {
   return (
     <ProviderHtml
-      html={props.model.pull()?.body ?? ''}
+      html={props.model.request()?.body ?? ''}
       refs={props.model.refPrefixes()}
       onLinkClick={props.onLinkClick}
       onText={props.model.setDescriptionText}
@@ -51,7 +50,7 @@ function Description(props: { model: PrModel; onLinkClick: (event: MouseEvent) =
   )
 }
 
-function LinkedIssues(props: { model: PrModel }) {
+function LinkedIssues(props: { model: ChangeRequestModel }) {
   const model = () => props.model
   return (
     <Stack gap="row">
@@ -68,7 +67,7 @@ function LinkedIssues(props: { model: PrModel }) {
         </Inline>
       </Show>
       <Rows
-        id={`gh-integrations:${model().scope.number}`}
+        id={`cr-integrations:${model().scope.number}`}
         ariaLabel="Linked issues"
         items={model()
           .linearRefs()
@@ -111,7 +110,7 @@ function LinkedIssues(props: { model: PrModel }) {
   )
 }
 
-function Labels(props: { model: PrModel }) {
+function Labels(props: { model: ChangeRequestModel }) {
   const model = () => props.model
   return (
     <Stack>
@@ -121,7 +120,7 @@ function Labels(props: { model: PrModel }) {
             {(label) => (
               <Chip
                 reveal
-                color={label.color ? `#${label.color}` : undefined}
+                color={label.color ?? undefined}
                 {...(model().readOnly ? {} : { onRemove: () => model().removeLabel(label.name) })}
               >
                 {label.name}
@@ -146,11 +145,11 @@ function Labels(props: { model: PrModel }) {
   )
 }
 
-function Checks(props: { model: PrModel }) {
+function Checks(props: { model: ChangeRequestModel }) {
   const model = () => props.model
   return (
     <Rows
-      id={`gh-checks:${model().scope.number}`}
+      id={`cr-checks:${model().scope.number}`}
       ariaLabel="Checks"
       items={model()
         .checks()
@@ -164,17 +163,13 @@ function Checks(props: { model: PrModel }) {
             density="compact"
             label={check()?.name}
             leading={<StatusDot tone={checkStatusTone(check()?.status)} />}
-            {...(check()?.runId != null
-              ? {
-                  onPress: () =>
-                    model().setOpenCheck({ runId: check()!.runId!, name: check()!.name, url: check()!.url }),
-                }
-              : {})}
+            {...(check()?.runId != null ? { onPress: () => model().setOpenCheck(check()!) } : {})}
             meta={<Text emphasis="muted">{checkStatusWord(check()?.status)}</Text>}
             trailing={
               <Show
                 when={
                   !model().readOnly &&
+                  model().actions.rerun &&
                   FAILED_STATUSES.has((check()?.status ?? '').toLowerCase()) &&
                   check()?.runId != null
                 }
@@ -197,7 +192,7 @@ function Checks(props: { model: PrModel }) {
   )
 }
 
-function Reviewers(props: { model: PrModel }) {
+function Reviewers(props: { model: ChangeRequestModel }) {
   const model = () => props.model
   return (
     <Stack>
@@ -207,7 +202,7 @@ function Reviewers(props: { model: PrModel }) {
             {(login) => (
               <Chip
                 reveal
-                leading={<UserAvatar login={login} src={githubAvatarUrl(login)} />}
+                leading={<UserAvatar login={login} src={model().host.avatar(login)} />}
                 {...(model().readOnly ? {} : { onRemove: () => model().removeReviewer(login) })}
               >
                 {login}
@@ -226,7 +221,7 @@ function Reviewers(props: { model: PrModel }) {
           rowLabel={(login) => login}
           isActive={() => false}
           onSelect={(login) => model().requestReviewer(login)}
-          leading={(login) => <UserAvatar login={login} src={githubAvatarUrl(login)} />}
+          leading={(login) => <UserAvatar login={login} src={model().host.avatar(login)} />}
         />
       </Show>
     </Stack>
@@ -234,14 +229,14 @@ function Reviewers(props: { model: PrModel }) {
 }
 
 /**
- * The pull request's sections, in reading order, for whichever host is drawing them.
+ * The change request's sections, in reading order, for whichever host is drawing them.
  *
  * Rebuilt on every read rather than memoised: the counts come off the model's own queries, and a
  * section list that does not follow them is a tab that says "Checks 0" while the checks are on the
  * screen behind it.
  */
-export function prSections(input: {
-  model: PrModel
+export function changeRequestSections(input: {
+  model: ChangeRequestModel
   /** Which file the diff is showing, so the Files section can mark it. */
   currentFile: () => string | undefined
   onOpenFile: (path: string) => void
@@ -249,7 +244,7 @@ export function prSections(input: {
 }): KitSection[] {
   const model = input.model
   return [
-    ...(model.pull()?.body
+    ...(model.request()?.body
       ? [
           {
             id: 'description',
@@ -291,13 +286,15 @@ export function prSections(input: {
       id: 'files',
       label: 'Files',
       count: model.files().length,
-      render: () => <PrFileList model={model} current={input.currentFile} onSelect={input.onOpenFile} />,
+      render: () => <ChangedFileList model={model} current={input.currentFile} onSelect={input.onOpenFile} />,
     },
     {
       id: 'conversation',
       label: 'Conversation',
       count: model.conversationEntries().length,
-      render: () => <PrConversation model={model} onOpenFile={input.onOpenFile} onLinkClick={input.onLinkClick} />,
+      render: () => (
+        <ChangeRequestConversation model={model} onOpenFile={input.onOpenFile} onLinkClick={input.onLinkClick} />
+      ),
     },
   ]
 }

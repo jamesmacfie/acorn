@@ -1,0 +1,29 @@
+{
+  "name": "@acorn/change-request-ui",
+  "version": "1.0.0",
+  "description": "The review views every code host plugin draws: change request lists, detail, diffs with review threads, and checks, over a provider-neutral model.",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./model": "./src/model/public.ts",
+    "./views": "./src/views/public.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/plugin-api": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "@solidjs/router": "^0.16.1",
+    "@tanstack/solid-query": "^5.101.0",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.11"
+  }
+}

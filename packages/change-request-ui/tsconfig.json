@@ -1,0 +1,8 @@
+{
+  // Client code: Solid views a code host plugin's client half draws, so DOM and vite/client.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client"]
+  },
+  "include": ["src"]
+}

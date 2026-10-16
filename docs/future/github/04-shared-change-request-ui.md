@@ -1,5 +1,52 @@
 # Phase 4: share the review views as a second code host needs them
 
+## Completion note
+
+October 16, 2026. Done, with [phase 5](./05-gitlab-plugin.md) drawing from it.
+
+What landed:
+
+- `packages/change-request-ui/` (`@acorn/change-request-ui`), with two entrypoints. `./model` holds the
+  neutral types, the check status vocabulary and roll-up, `reviewDecision`, `inlineReviewThreads`,
+  `filterChangeRequests`, `branchReferenceCandidates`, and `changeRequestPoints`. `./views` holds
+  `createChangeRequestModel`, `ChangeRequestView`, the overview, sections, conversation, file list,
+  `ChangeRequestDiff`, `ChecksPanel`, `ChangeRequestList`, and `useChangedFiles`.
+  [Shared review views](../../plugins/change-request-ui.md) documents it.
+- The GitHub plugin draws its PR pane, browse detail, pull list, diff, and checks panel from the
+  package. `plugins/github/src/client/changeRequest.ts` maps its mirror rows, and `prModel` builds the
+  shared model from its queries and writes. Its copies of the views, the check status table, the
+  conversation model, the list filter, and the point declarations are deleted.
+- GitHub registers its `diff-line` and `summary-badges` points through `changeRequestPoints`.
+- GitHub's view tests run against the shared views: the conversation, overview, Linked issues, diff,
+  PR pane, and browse detail tests. The pure tests moved into the package with their assertions.
+
+Decisions and deviations:
+
+- The views take a model and callbacks and never call a code host. The one read they make is Linear
+  enrichment through the host's ref resolution, as GitHub's pane did. `tools/arch/boundaries.test.ts`
+  lists the package as a library plugins may import, and excuses its `linear` and `editor` literals.
+- A library can't import a plugin, so `ChangeRequestDiff` restates the agents plugin's inline diff
+  origin as a structural type. The host passes `clientCapability(AGENTS_INLINE_DIFF)`, and that
+  assignment is the type check that keeps the two shapes together.
+- The views were extracted in one change, shaped against the GitLab plugin of phase 5, rather than one
+  change per view. The create form wasn't extracted. GitLab's push action opens gitlab.com's own form
+  instead, so no second host needs it.
+- Optional verbs replace GitHub branches in the views: `merge`, `autoMerge`, `setDraft`, `setViewed`,
+  `rerun`, and the review events a host lists. A missing verb hides its control.
+- A thread's side is `old` or `new` in the model. `ChangeRequestDiff` maps it to the viewer's `LEFT`
+  and `RIGHT`.
+- Two small behavior changes on GitHub: a merged pull no longer shows the merge box, and the `Rows`
+  ids for files, checks, conflicts, and linked issues start with `cr-` instead of `gh-`.
+
+For later phases:
+
+- A new code host maps its records onto `@acorn/change-request-ui/model`, builds the model with
+  `createChangeRequestModel`, and draws `ChangeRequestView`, `ChangeRequestDiff`, `ChecksPanel`, and
+  `ChangeRequestList`. It registers its points with `changeRequestPoints(noun)`.
+- The related-pull strip and its task model stay in the GitHub plugin.
+- Already red at the base and untouched: the `pluginDisable` and `routeRegistry` goldens in
+  `apps/node`, knip's `proposalChanges`, and three `docPaths` entries for `dist` files.
+
 Date: October 16, 2026. Status: proposed. Runs alongside [phase 5](./05-gitlab-plugin.md).
 
 ## Goal

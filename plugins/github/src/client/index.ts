@@ -1,7 +1,7 @@
 import { lazy } from 'solid-js'
 import { type ClientPlugin, setSelectedSource } from '@acorn/plugin-api/client'
 import { pullRefMatchesTask } from '../shared/pullRef'
-import { DIFF_LINE_KEY, SUMMARY_BADGES_MAX } from './extensionPoints'
+import { changeRequestPoints } from '@acorn/change-request-ui/model'
 import { prFiltersSlice } from './pullList/filterStore'
 import { prPaneContribution } from './pullDetail/paneContribution'
 import { prRailMarkerContribution } from './pullDetail/railMarker'
@@ -95,23 +95,9 @@ export const githubClientPlugin: ClientPlugin = {
     // CI, review, conflicts, and draft or merged state, in the corners of that pane's button.
     ctx.railMarkers.register(prRailMarkerContribution)
     // The two places another plugin may come into a pull request
-    // (docs/plugins/cooperative-extension-points.md § Cooperative extension points). Marks on a line of
-    // the diff, keyed the way the shared viewer keys a row; and room beside the state and checks on the
-    // overview, where the owner's own facts stay and a contributor is added to them.
-    ctx.extensionPoints.register({
-      id: 'diff-line',
-      label: 'Pull request diff line',
-      kind: 'annotation',
-      key: [...DIFF_LINE_KEY],
-      max: 4,
-    })
-    ctx.extensionPoints.register({
-      id: 'summary-badges',
-      label: 'Pull request summary',
-      kind: 'remote',
-      mode: 'stack',
-      max: SUMMARY_BADGES_MAX,
-    })
+    // (docs/plugins/cooperative-extension-points.md § Cooperative extension points), declared by the
+    // shared review package so every code host opens the same pair.
+    for (const point of changeRequestPoints('Pull request')) ctx.extensionPoints.register(point)
     // The one place this plugin comes into somebody else's surface: "Open pull request" under the
     // Changes tab's branch bar, offered on a task whose branch has an upstream and no pull request
     // yet. The git plugin opened the point; this is the line that fills it.

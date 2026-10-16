@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { checkStatusWord, checksSummary } from './checkStatus'
 
 describe('check status words', () => {
-  it('names every status GitHub sends, in any case', () => {
+  it('names every status in the vocabulary, in any case', () => {
     expect(checkStatusWord('SUCCESS')).toBe('Passed')
     expect(checkStatusWord('FAILURE')).toBe('Failed')
     expect(checkStatusWord('IN_PROGRESS')).toBe('Running')

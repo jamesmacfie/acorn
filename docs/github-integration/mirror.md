@@ -123,7 +123,8 @@ asynchronous blob reads. A refresh makes a resource with a different revision st
 and file refreshes announce `plugin:github:pr-synced`; the active pull model invalidates detail, file
 summaries, and the diff document. This lets open panes converge through the Node's refresh mechanism.
 
-`plugins/github/src/client/reviewThreadLocation.ts` owns eligibility. A thread needs explicit
+`reviewThreadLocation` in `packages/change-request-ui/src/model/threads.ts` owns eligibility, over the
+neutral threads GitHub's mapper produces. A thread needs explicit
 `outdated: false`, a current path, a LEFT or RIGHT side, and a current line. Detail and diff must carry
 the same verified revision before the plugin supplies inline threads or requests conversation snippets.
 Outdated and unverified threads remain in history. No client timer, file-body scan, or historical

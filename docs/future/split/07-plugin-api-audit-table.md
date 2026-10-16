@@ -190,12 +190,12 @@ Outside plugins call them, and the published packages are out of scope for this 
 | `ui/diff: synth` | git | Keep | Diff document model, shared by every diff view |
 | `ui: HistoryMark` | git | Keep | Closed-kit component or its type |
 | `ui: historyLayout` | git | Keep | Closed-kit component or its type |
-| `client: CHECK_TONE` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts` |
-| `client: FAILED_STATUSES` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts` |
-| `client: checkStatusTone` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts` |
-| `client: checkStatusWord` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts` |
-| `client: checksState` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts` |
-| `client: checksSummary` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts` |
+| `client: CHECK_TONE` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts`, moved to `packages/change-request-ui/src/model/checkStatus.ts` |
+| `client: FAILED_STATUSES` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts`, moved to `packages/change-request-ui/src/model/checkStatus.ts` |
+| `client: checkStatusTone` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts`, moved to `packages/change-request-ui/src/model/checkStatus.ts` |
+| `client: checkStatusWord` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts`, moved to `packages/change-request-ui/src/model/checkStatus.ts` |
+| `client: checksState` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts`, moved to `packages/change-request-ui/src/model/checkStatus.ts` |
+| `client: checksSummary` | github | Moved | GitHub check-run vocabulary in the core kit. Now `plugins/github/src/client/checks/checkStatus.ts`, moved to `packages/change-request-ui/src/model/checkStatus.ts` |
 | `node: diffDocumentBlobKey` | github | Moved | Keys of GitHub's pull request blob cache. Now `plugins/github/src/server/blobKeys.ts` |
 | `node: fileBodyBlobKey` | github | Moved | Keys of GitHub's pull request blob cache. Now `plugins/github/src/server/blobKeys.ts` |
 | `node: patchBlobKey` | github | Moved | Keys of GitHub's pull request blob cache. Now `plugins/github/src/server/blobKeys.ts` |

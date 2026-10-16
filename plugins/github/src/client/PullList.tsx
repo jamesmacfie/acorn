@@ -1,94 +1,43 @@
-import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import {
   activateTaskSignals,
-  clientEvents,
-  contextMenuItems,
-  formatRelativeTime,
   integrationsOptions,
   pathForTask,
   projectsOptions,
-  railDotProps,
   registerContextMenuItems,
-  runContextMenuItem,
   tasksOptions,
   workspaceForProject,
   workspacesOptions,
   type ItemRowTarget,
 } from '@acorn/plugin-api/client'
-import { CHECK_TONE, checksState, checksSummary } from './checks/checkStatus'
-import {
-  Alert,
-  Button,
-  EmptyState,
-  Icon,
-  Inline,
-  Input,
-  Menu,
-  Row,
-  RowActions,
-  Rows,
-  sidebarCollapsed,
-  StatusDot,
-  Tabs,
-  Text,
-  FilterBar,
-  UserAvatar,
-} from '@acorn/plugin-api/ui'
+import { sidebarCollapsed } from '@acorn/plugin-api/ui'
 import { debounce } from '@acorn/plugin-api/client'
 import {
   DEFAULT_COMMAND_SEARCH_DEBOUNCE_MS,
   DEFAULT_COMMAND_SEARCH_MIN_QUERY,
   MAX_COMMAND_SEARCH_QUERY,
 } from '@acorn/protocol/commands.ts'
+import { filterChangeRequests } from '@acorn/change-request-ui/model'
+import { ChangeRequestList, type ChangeRequestListStatus } from '@acorn/change-request-ui/views'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
 import { closedPullsInfiniteOptions, pullDetailOptions, pullSearchOptions, pullsOptions } from './queries'
 import { type Pull } from '../shared/api'
-import { filterPulls } from './pullList/model'
 import { prFilterFor, setPrFilter } from './pullList/filterStore'
 import { githubBrowsePath } from './clientRoutes'
 import { activeTaskForPull, promotePullToTask } from './pullTasks'
 import { readFailure } from './actionErrors'
-import { githubAvatarUrl } from './avatar'
+import { githubHost, toSummary } from './changeRequest'
 
-// Draft / open / closed, as one glyph. The list route only ever reports `open` or `closed`: GitHub's
-// REST list calls a merged PR closed and the closed page carries no merged_at, so a merged PR wears
-// the closed icon here. The detail header, which reads the GraphQL mirror, still says "merged".
-// Open draws no glyph, or the Open tab would say "open" on every row.
-const prState = (pull: Pull): 'draft' | 'open' | 'closed' =>
-  pull.draft ? 'draft' : pull.state === 'open' ? 'open' : 'closed'
-const PR_STATE_MARK = {
-  draft: { icon: 'git-pull-request-draft', word: 'Draft' },
-  closed: { icon: 'git-pull-request-closed', word: 'Closed' },
-} as const
-
-/** The checks dot, always drawn so every row's leading marks line up. Muted when there are none. */
-function ChecksDot(props: { checks: readonly { status: string | null }[] }) {
-  return (
-    <Show when={props.checks.length} fallback={<StatusDot tone="muted" tip="No checks" />}>
-      <StatusDot
-        {...railDotProps(CHECK_TONE[checksState(props.checks)])}
-        label={checksSummary(props.checks)}
-        tip={checksSummary(props.checks)}
-      />
-    </Show>
-  )
-}
-
-// "14m ago" says less in less room as "14m". The row's tip carries the age in full.
-const shortAge = (at: number | null) => formatRelativeTime(at).replace(/ ago$/, '')
-
-const LIST_TABS = [
-  { id: 'open', label: 'Open' },
-  { id: 'closed', label: 'Closed' },
-]
+// The list route only ever reports `open` or `closed`: GitHub's REST list calls a merged PR closed and
+// the closed page carries no merged_at, so a merged PR wears the closed icon here. The detail header,
+// which reads the GraphQL mirror, still says "merged".
 
 // The pull-request list for the routed repository. Access checks live on the server.
 //
-// The list is a `Rows` collection with `virtual`, so the scroller, the row placement, the arrows,
-// type-ahead and the place it keeps across a refetch are all the kit's
-// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
+// The rows are the shared change request list's. This is GitHub's half: the open mirror, the closed
+// pages, GitHub's search, the per-row checks from the warmed detail cache, and the row menu.
 export default function PullList() {
   const params = useParams()
   // The same signal the source's list column reads, so the rows narrow exactly when the column does.
@@ -179,7 +128,7 @@ export default function PullList() {
     return search.isError ? 'failed' : 'done'
   }
   const shown = createMemo(() => {
-    const local = filterPulls(list(), searchText())
+    const local = filterChangeRequests(list(), searchText(), '#')
     if (searchStatus() !== 'done') return local
     const seen = new Set(local.map((pull) => pull.number))
     return [...local, ...(search.data?.pulls ?? []).filter((pull) => !seen.has(pull.number))]
@@ -191,13 +140,7 @@ export default function PullList() {
     }
     return undefined
   }
-  const items = createMemo(() =>
-    shown().map((pull) => ({
-      key: String(pull.number),
-      label: `#${pull.number} ${pull.title}`,
-    })),
-  )
-  const byNumber = createMemo(() => new Map(shown().map((pull) => [String(pull.number), pull])))
+  const byNumber = createMemo(() => new Map(shown().map((pull) => [pull.number, pull])))
   // A pull's own URL, or nothing at all without a project to hang it off. An empty project builds
   // `/p//42`, which is not a broken path but a different one: the empty segment falls out of the split
   // and `/p/:projectId` matches with the pull number as the project. The shell then finds no such
@@ -247,7 +190,7 @@ export default function PullList() {
   // `body` comes from the warmed detail cache when the row has one, because the list route does not
   // carry a pull's body and asking for a hundred of them to fill a menu nobody opened would be a
   // worse trade than a menu that sometimes starts a workflow with the title alone.
-  const rowTarget = (pull: Pull, body?: string | null): ItemRowTarget => ({
+  const rowTarget = (pull: Pick<Pull, 'number' | 'title'>, body?: string | null): ItemRowTarget => ({
     location: 'item.row',
     id: String(pull.number),
     title: `#${pull.number} ${pull.title}`,
@@ -304,231 +247,59 @@ export default function PullList() {
   }
   onCleanup(cancelRowPrefetch)
 
+  const status = (): ChangeRequestListStatus => {
+    if (ready()) return { kind: 'ready' }
+    if (!githubConnected() && (isError() || repoKnown())) return { kind: 'disconnected' }
+    if (isError())
+      return {
+        kind: 'failed',
+        reason: listFailure(),
+        reconnect: listErrorCode() === 'reauth',
+        retry: () => void retry(),
+      }
+    return { kind: 'loading' }
+  }
+
   return (
-    <>
-      <Show when={!collapsed()}>
-        <Tabs
-          tabs={LIST_TABS}
-          active={tab()}
-          onChange={setTab}
-          idPrefix="github-pulls"
-          ariaLabel="Pull request state"
-        />
-        {/* Under the strip rather than beside it. Open and Closed choose which list this is; the filter
-            is about the list that choice produced, and squeezed into the tab row it had no room and no
-            inset of its own. */}
-        <FilterBar ariaLabel="Search pull requests" busy={searchStatus() === 'searching'}>
-          <Input
-            kind="filter"
-            label="Search pull requests"
-            placeholder="Search…"
-            value={filter()}
-            onInput={setFilter}
-          />
-        </FilterBar>
-        <Show when={shown().length ? searchNotice() : undefined}>
-          {(notice) => (
-            <EmptyState align="start" size="sm">
-              {notice()}
-            </EmptyState>
-          )}
-        </Show>
-      </Show>
-      <Show when={taskError()}>{(text) => <Alert>{text()}</Alert>}</Show>
-      <Show
-        when={ready()}
-        fallback={
-          <Show
-            when={!githubConnected() && (isError() || repoKnown())}
-            fallback={
-              <Show
-                when={isError()}
-                fallback={
-                  <EmptyState align="start" size="sm" busy>
-                    Loading…
-                  </EmptyState>
-                }
-              >
-                <EmptyState
-                  align="start"
-                  size="sm"
-                  title="Couldn't load pull requests."
-                  action={
-                    <Show
-                      when={listErrorCode() === 'reauth'}
-                      fallback={
-                        <Button size="sm" onPress={() => void retry()}>
-                          Try again
-                        </Button>
-                      }
-                    >
-                      <Button
-                        size="sm"
-                        onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}
-                      >
-                        Reconnect GitHub
-                      </Button>
-                    </Show>
-                  }
-                >
-                  {listFailure()}
-                </EmptyState>
-              </Show>
-            }
-          >
-            <EmptyState
-              align="start"
-              title="GitHub isn't connected"
-              action={
-                <Button onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
-                  Connect GitHub
-                </Button>
-              }
-            >
-              Connect GitHub to see this project's pull requests.
-            </EmptyState>
-          </Show>
-        }
-      >
-        <Show
-          when={items().length}
-          fallback={
-            // The search bar's spinner stands in while GitHub answers.
-            <Show when={searchStatus() !== 'searching'}>
-              <EmptyState align="start" size="sm">
-                {searchStatus() === 'idle'
-                  ? tab() === 'open'
-                    ? 'No open pull requests.'
-                    : 'No closed pull requests.'
-                  : searchStatus() === 'failed'
-                    ? "No loaded pull requests match, and GitHub couldn't be searched."
-                    : 'No pull requests match.'}
-              </EmptyState>
-            </Show>
-          }
-        >
-          <Rows
-            virtual
-            rowHeight={collapsed() ? 'rail' : 'default'}
-            id={`github-pulls:${owner()}/${repo()}:${tab()}`}
-            ariaLabel="Pull requests"
-            items={items()}
-            selected={params.number ?? null}
-            onSelect={open}
-            onActivate={open}
-          >
-            {(item, itemProps, selected, place) => {
-              // Not `byNumber().get(item.key)!`. A row outlives the list it was built from by one
-              // update: when the pull list refetches, a row whose pull has left the map runs its
-              // accessors once more before it is disposed. A throw there takes the whole list down,
-              // which in a terminal is a browse panel that goes blank and says nothing.
-              const pull = () => byNumber().get(item.key)
-              // Reactively read the warmed detail cache (enabled:false → no fetch) so the rolled-up
-              // checks dot appears as prefetchOpenPulls seeds each pull. No checks → no dot.
-              const detail = createQuery(() => pullDetailOptions(owner(), repo(), item.key, false))
-              const checks = () => detail.data?.checks ?? []
-              return (
-                <Show when={pull()}>
-                  {(pull) => (
-                    <Row
-                      item={itemProps}
-                      // `href` keeps the real link for middle-click and copy address; `onPress` routes
-                      // the plain click.
-                      {...(pullPath(item.key) ? { href: pullPath(item.key)! } : {})}
-                      onPress={() => open(item.key)}
-                      selected={selected()}
-                      onHover={(entered) => (entered ? queueRowPrefetch(pull().number) : cancelRowPrefetch())}
-                      offset={place.offset}
-                      height={place.height}
-                      title={pull().title}
-                      tip={pull().title}
-                      tipAt={pull().updatedAt ?? undefined}
-                      label={item.label}
-                      // Collapsed: the author's avatar over the number, which is how a pull request is
-                      // named in conversation. The checks dot stays, because "is it green" is the
-                      // other thing worth seeing at a glance, and it costs no width sitting beside
-                      // the avatar. The state glyph and the age go; the title is the tooltip.
-                      //
-                      // Both marks fit the row's existing height, which is not negotiable here: this
-                      // list is virtualized and its row height is a number read off the document
-                      // root, so a taller row would tear the scroll range.
-                      collapsed={
-                        collapsed() ? (
-                          <>
-                            <Inline gap="inline">
-                              <UserAvatar login={pull().author} src={githubAvatarUrl(pull().author)} />
-                              <Show when={checks().length}>
-                                <StatusDot
-                                  {...railDotProps(CHECK_TONE[checksState(checks())])}
-                                  label={checksSummary(checks())}
-                                />
-                              </Show>
-                            </Inline>
-                            <Text emphasis="muted">#{item.key}</Text>
-                          </>
-                        ) : undefined
-                      }
-                      leading={
-                        <>
-                          <ChecksDot checks={checks()} />
-                          <Show
-                            when={
-                              prState(pull()) !== 'open'
-                                ? PR_STATE_MARK[prState(pull()) as 'draft' | 'closed']
-                                : undefined
-                            }
-                          >
-                            {(mark) => <Icon name={mark().icon} title={mark().word} size={14} />}
-                          </Show>
-                          {/* The author column is gone, so the avatar carries the login on hover. */}
-                          <UserAvatar login={pull().author} src={githubAvatarUrl(pull().author)} />
-                        </>
-                      }
-                      meta={<Text emphasis="muted">{shortAge(pull().updatedAt)}</Text>}
-                      trailing={
-                        <Show when={contextMenuItems('item.row', rowTarget(pull())).length}>
-                          <RowActions ariaLabel={`Actions for pull request #${item.key}`}>
-                            {(menu) => (
-                              <For each={contextMenuItems('item.row', rowTarget(pull()))}>
-                                {(row) => (
-                                  <Menu.Item
-                                    context={menu}
-                                    tone={row.tone ?? 'neutral'}
-                                    onSelect={() => runContextMenuItem(row, rowTarget(pull(), detail.data?.pull?.body))}
-                                  >
-                                    {row.label}
-                                  </Menu.Item>
-                                )}
-                              </For>
-                            )}
-                          </RowActions>
-                        </Show>
-                      }
-                    >
-                      {/* The number leads the title and keeps its width; the title gives way. */}
-                      <Text emphasis="mono" tone="muted">
-                        #{item.key}
-                      </Text>
-                      <Text>{pull().title}</Text>
-                    </Row>
-                  )}
-                </Show>
-              )
-            }}
-          </Rows>
-        </Show>
-        {/* Load-more only on closed; hidden while filtering, since the filter only sees loaded pages. */}
-        <Show when={tab() === 'closed' && closedPulls.hasNextPage && !filter().trim()}>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={closedPulls.isFetchingNextPage}
-            onPress={() => void closedPulls.fetchNextPage()}
-          >
-            {closedPulls.isFetchingNextPage ? 'Loading…' : 'Load more'}
-          </Button>
-        </Show>
-      </Show>
-    </>
+    <ChangeRequestList
+      host={githubHost}
+      idPrefix="github-pulls"
+      collapsed={collapsed}
+      tab={tab}
+      setTab={setTab}
+      filter={filter}
+      setFilter={setFilter}
+      searching={() => searchStatus() === 'searching'}
+      notice={searchNotice}
+      emptyText={() =>
+        searchStatus() === 'idle'
+          ? tab() === 'open'
+            ? 'No open pull requests.'
+            : 'No closed pull requests.'
+          : searchStatus() === 'failed'
+            ? "No loaded pull requests match, and GitHub couldn't be searched."
+            : 'No pull requests match.'
+      }
+      taskError={taskError}
+      status={status}
+      rows={() => shown().map(toSummary)}
+      listKey={() => `${owner()}/${repo()}:${tab()}`}
+      selected={() => params.number ?? null}
+      href={pullPath}
+      onOpen={open}
+      onHover={(number, entered) => (entered ? queueRowPrefetch(number) : cancelRowPrefetch())}
+      rowDetail={(number) => {
+        // Reactively read the warmed detail cache (enabled:false → no fetch) so the rolled-up
+        // checks dot appears as prefetchOpenPulls seeds each pull. No checks → no dot.
+        const detail = createQuery(() => pullDetailOptions(owner(), repo(), number, false))
+        return { checks: () => detail.data?.checks ?? [], body: () => detail.data?.pull?.body }
+      }}
+      rowTarget={(row, body) => rowTarget(byNumber().get(row.number) ?? row, body)}
+      loadMore={{
+        shown: () => tab() === 'closed' && !!closedPulls.hasNextPage && !filter().trim(),
+        busy: () => closedPulls.isFetchingNextPage,
+        run: () => void closedPulls.fetchNextPage(),
+      }}
+    />
   )
 }

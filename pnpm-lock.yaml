@@ -686,6 +686,37 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.3.4(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1))
 
+  packages/change-request-ui:
+    dependencies:
+      '@acorn/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@solidjs/router':
+        specifier: ^0.16.1
+        version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
+    devDependencies:
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.3.4(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1)
+      vite-plugin-solid:
+        specifier: ^2.11.12
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.3.4(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1))
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.3.4(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.1))
+
   packages/client-core:
     dependencies:
       '@acorn/dashboards-core':
@@ -1497,6 +1528,9 @@ importers:
 
   plugins/github:
     dependencies:
+      '@acorn/change-request-ui':
+        specifier: workspace:*
+        version: link:../../packages/change-request-ui
       '@acorn/diff-document':
         specifier: workspace:*
         version: link:../../packages/diff-document

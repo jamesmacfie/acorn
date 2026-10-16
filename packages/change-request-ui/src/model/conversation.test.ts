@@ -1,13 +1,12 @@
-import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
-import type { PullDetail, Thread } from '../../shared/api'
-import { buildConversationEntries, hasRenderableBody, reviewAction, reviewDecision } from './model'
+import type { ChangeRequestDetail, Review, Thread } from './types'
+import { buildConversationEntries, hasRenderableBody, reviewAction, reviewDecision } from './conversation'
 
-const baseDetail = (overrides: Partial<PullDetail> = {}): PullDetail => ({
-  pull: null,
+const baseDetail = (overrides: Partial<ChangeRequestDetail> = {}): ChangeRequestDetail => ({
+  request: null,
   labels: [],
   reviews: [],
-  requestedReviewers: [],
+  reviewers: [],
   comments: [],
   commits: [],
   checks: [],
@@ -15,7 +14,7 @@ const baseDetail = (overrides: Partial<PullDetail> = {}): PullDetail => ({
   ...overrides,
 })
 
-const thread = (id: string, path = 'src/app.ts', line = 2, side: 'LEFT' | 'RIGHT' | null = 'RIGHT'): Thread => ({
+const thread = (id: string, path = 'src/app.ts', line = 2, side: 'old' | 'new' | null = 'new'): Thread => ({
   threadId: id,
   path,
   line,
@@ -24,18 +23,18 @@ const thread = (id: string, path = 'src/app.ts', line = 2, side: 'LEFT' | 'RIGHT
   comments: [{ id: `${id}:c1`, databaseId: 1, author: 'octo', body: '<p>note</p>', createdAt: 30 }],
 })
 
-describe('pull detail model', () => {
+describe('change request conversation', () => {
   it('maps review states and filters empty commented summaries', () => {
-    expect(reviewAction('CHANGES_REQUESTED')).toBe('requested changes')
-    expect(reviewAction('CUSTOM_STATE')).toBe('custom state')
+    expect(reviewAction('changes-requested')).toBe('requested changes')
+    expect(reviewAction(null)).toBe('reviewed')
     expect(hasRenderableBody('<p>&nbsp;</p>')).toBe(false)
     expect(hasRenderableBody('<pre>code</pre>')).toBe(true)
 
     const entries = buildConversationEntries(
       baseDetail({
         reviews: [
-          { id: 'r1', author: 'a', state: 'COMMENTED', body: '<p>&nbsp;</p>', submittedAt: 10 },
-          { id: 'r2', author: 'b', state: 'APPROVED', body: null, submittedAt: 20 },
+          { id: 'r1', author: 'a', state: 'commented', body: '<p>&nbsp;</p>', submittedAt: 10 },
+          { id: 'r2', author: 'b', state: 'approved', body: null, submittedAt: 20 },
         ],
       }),
     )
@@ -46,7 +45,7 @@ describe('pull detail model', () => {
   it('sorts reviews, comments, commits, and non-empty threads by first visible time', () => {
     const entries = buildConversationEntries(
       baseDetail({
-        reviews: [{ id: 'r1', author: 'a', state: 'APPROVED', body: null, submittedAt: 20 }],
+        reviews: [{ id: 'r1', author: 'a', state: 'approved', body: null, submittedAt: 20 }],
         comments: [{ id: 'c1', author: 'c', body: '<p>comment</p>', createdAt: 10 }],
         commits: [{ sha: 'abc1234', message: 'ship it', author: 'Ada', authorLogin: 'ada', committedAt: 25 }],
         threads: [thread('t1')],
@@ -57,7 +56,7 @@ describe('pull detail model', () => {
   })
 
   it('keys every turn by its kind and id, whatever arrives, changes or ties around it', () => {
-    const review = { id: 'x1', author: 'a', state: 'APPROVED', body: null, submittedAt: 20 }
+    const review = { id: 'x1', author: 'a', state: 'approved' as const, body: null, submittedAt: 20 }
     const comment = { id: 'x1', author: 'c', body: '<p>one</p>', createdAt: 20 }
     const first = buildConversationEntries(
       baseDetail({ reviews: [review], comments: [comment], threads: [thread('t1')] }),
@@ -104,7 +103,7 @@ describe('pull detail model', () => {
       reviews: Array.from({ length: 1000 }, (_, i) => ({
         id: `r${i}`,
         author: 'octo',
-        state: 'APPROVED',
+        state: 'approved',
         body: null,
         submittedAt: i + 1000,
       })),
@@ -131,7 +130,7 @@ describe('pull detail model', () => {
 })
 
 describe('reviewDecision', () => {
-  const review = (author: string, state: string, submittedAt: number) => ({
+  const review = (author: string, state: Review['state'], submittedAt: number): Review => ({
     id: `${author}-${submittedAt}`,
     author,
     state,
@@ -140,7 +139,7 @@ describe('reviewDecision', () => {
   })
 
   it("counts each author's latest verdict, and a change request outweighs approvals", () => {
-    expect(reviewDecision([review('ada', 'APPROVED', 1), review('grace', 'CHANGES_REQUESTED', 2)])).toEqual({
+    expect(reviewDecision([review('ada', 'approved', 1), review('grace', 'changes-requested', 2)])).toEqual({
       state: 'changes-requested',
       reviewers: ['grace'],
     })
@@ -149,21 +148,21 @@ describe('reviewDecision', () => {
   it("lets a later approval replace the same author's change request, and ignores plain comments", () => {
     expect(
       reviewDecision([
-        review('grace', 'CHANGES_REQUESTED', 1),
-        review('grace', 'APPROVED', 3),
-        review('ada', 'COMMENTED', 4),
+        review('grace', 'changes-requested', 1),
+        review('grace', 'approved', 3),
+        review('ada', 'commented', 4),
       ]),
     ).toEqual({ state: 'approved', reviewers: ['grace'] })
   })
 
   it('reads the reviews in time order, whatever order they arrive in', () => {
-    expect(reviewDecision([review('grace', 'APPROVED', 5), review('grace', 'CHANGES_REQUESTED', 1)]).state).toBe(
+    expect(reviewDecision([review('grace', 'approved', 5), review('grace', 'changes-requested', 1)]).state).toBe(
       'approved',
     )
   })
 
   it('drops a dismissed review and says when nobody has decided', () => {
-    expect(reviewDecision([review('grace', 'CHANGES_REQUESTED', 1), review('grace', 'DISMISSED', 2)])).toEqual({
+    expect(reviewDecision([review('grace', 'changes-requested', 1), review('grace', 'dismissed', 2)])).toEqual({
       state: 'none',
       reviewers: [],
     })

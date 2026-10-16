@@ -1,6 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PrOverview } from './PrOverview'
+import { ChangeRequestOverview } from '@acorn/change-request-ui/views'
+import { GITHUB_MERGE_METHODS, githubHost } from '../changeRequest'
 import type { PrModel } from './prModel'
 
 // A bare `CRA-404` in a pull title is clickable, and clicking it opens the ticket. The host learns
@@ -29,14 +30,20 @@ vi.mock('@tanstack/solid-query', () => ({
 const opened: string[] = []
 
 // Read-only, open, no body and no labels, checks or refs, so the only thing rendered below the
-// heading is the facts table. Cast because `PrModel` is what `build()` returns: nothing here needs
-// the mutations the toolbar would have asked for.
+// heading is the facts table. Cast because `PrModel` is what the shared model builder returns: nothing
+// here needs the mutations the toolbar would have asked for. The host and its verbs are GitHub's.
 const idle = { isPending: false, mutateAsync: async () => {} }
 const model = (title: string, overrides: Record<string, unknown> = {}): PrModel =>
   ({
     scope: { taskId: 't1', owner: 'runn-fast', repo: 'acorn', number: 7 },
+    host: githubHost,
+    actions: {
+      merge: { methods: GITHUB_MERGE_METHODS, run: async () => {} },
+      autoMerge: { enable: async () => {}, disable: async () => {} },
+      setDraft: async () => {},
+    },
     readOnly: true,
-    pull: () => ({ title, state: 'open', draft: false, updatedAt: null }),
+    request: () => ({ title, state: 'open', draft: false, updatedAt: null }),
     fileSummary: () => ({ count: 0, additions: 0, deletions: 0 }),
     reviewers: () => [],
     reviewDecision: () => ({ state: 'none', reviewers: [] }),
@@ -75,7 +82,10 @@ afterEach(() => {
 
 const draw = (title: string, overrides?: Record<string, unknown>) => {
   disposers.push(
-    render(() => <PrOverview model={model(title, overrides)} onOpenFile={() => {}} onLinkClick={() => {}} />, host),
+    render(
+      () => <ChangeRequestOverview model={model(title, overrides)} onOpenFile={() => {}} onLinkClick={() => {}} />,
+      host,
+    ),
   )
   return host
 }
@@ -122,7 +132,7 @@ describe('the merge box', () => {
   it('offers Ready for review instead of Merge on a draft', () => {
     const node = draw('Fix the rail', {
       readOnly: false,
-      pull: () => ({ title: 'Fix the rail', state: 'open', draft: true, updatedAt: null }),
+      request: () => ({ title: 'Fix the rail', state: 'open', draft: true, updatedAt: null }),
     })
     expect(named(node, 'Merge')).toBeUndefined()
     expect(named(node, 'Ready for review')?.dataset.variant).toBe('solid')

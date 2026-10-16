@@ -2,22 +2,19 @@ import { createMemo, createSignal, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import { projectsOptions } from '@acorn/plugin-api/client'
-import { EmptyState, IconButton, Sections } from '@acorn/plugin-api/ui'
-import { useChangedFiles } from './changedFiles'
+import { EmptyState, IconButton } from '@acorn/plugin-api/ui'
+import { ChangeRequestView } from '@acorn/change-request-ui/views'
+import { usePullChangedFiles } from './changedFiles'
 import { makeContentLinkHandler } from './contentLinks'
 import { requestFileScroll, routeKey } from './fileNavigation'
 import { fileSummariesKey, pullDiffKey, pullKey, pullsPrefixKey } from '../shared/api'
 import { forceRefreshPull } from './queries'
-import ChecksPanel from './checks/ChecksPanel'
+import GithubChecksPanel from './checks/GithubChecksPanel'
 import { DiffForPull, type PullRoute } from './DiffForPull'
 import { prModel } from './pullDetail/prModel'
-import { PrOverview } from './pullDetail/PrOverview'
-import { prSections } from './pullDetail/prSections'
 
-// One pull request, on the browse surface: the navigator and the diff together. The split is the
-// `Sections` node's, so the surface that knows what a pull request is made of says so, and the host
-// decides whether that is folds beside a diff or a strip of tabs
-// (docs/ui-design/closed-kit.md § The closed kit). `PrPane` makes the same call from a task.
+// One pull request, on the browse surface: the navigator and the diff together, drawn by the shared
+// change request view. `PrPane` draws the same view from a task.
 export default function PullDetail() {
   const params = useParams()
   const navigate = useNavigate()
@@ -32,7 +29,7 @@ export default function PullDetail() {
 
   const model = createMemo(() => (ready() ? prModel({ owner: owner(), repo: repo(), number: number() }) : null))
   // Browse owns a route, so the selected file is `?file=` and the diff column reads it back.
-  const changedFiles = useChangedFiles(() => (ready() ? { owner: owner(), repo: repo(), number: number() } : null))
+  const changedFiles = usePullChangedFiles(() => (ready() ? { owner: owner(), repo: repo(), number: number() } : null))
   const selectFile = (path: string) => {
     changedFiles.selectFile(path)
     requestFileScroll({ routeKey: routeKey(owner(), repo(), number()), path })
@@ -88,59 +85,37 @@ export default function PullDetail() {
         >
           {(loaded) => (
             <Show
-              when={loaded().pull()}
+              when={loaded().request()}
               fallback={
-                <EmptyState align="start" busy={!loaded().detail.isError}>
-                  {loaded().detail.isError ? 'Not found.' : 'Loading…'}
+                <EmptyState align="start" busy={!loaded().detailFailed()}>
+                  {loaded().detailFailed() ? 'Not found.' : 'Loading…'}
                 </EmptyState>
               }
             >
-              <Sections
+              <ChangeRequestView
                 id="github.pull"
-                ariaLabel="Pull request"
-                header={{
-                  id: 'details',
-                  label: 'Details',
-                  render: () => <PrOverview model={loaded()} onOpenFile={selectFile} onLinkClick={onLinkClick} />,
-                }}
-                sections={prSections({
-                  model: loaded(),
-                  currentFile: changedFiles.currentFile,
-                  onOpenFile: selectFile,
-                  onLinkClick,
-                })}
-                main={{
-                  id: 'diff',
-                  label: 'Diff',
-                  actions: () => (
-                    <IconButton
-                      icon="refresh-cw"
-                      tip="Refresh pull request"
-                      label="Refresh pull request"
-                      busy={refreshing()}
-                      onPress={() => void refresh()}
-                    />
-                  ),
-                  render: () => (
-                    <Show when={diffRoute()} keyed>
-                      {(route) => <DiffForPull route={route} router />}
-                    </Show>
-                  ),
-                }}
-              />
-              {/* The one overlay this surface owns: a run's step log, opened from a check row. */}
-              <Show when={loaded().openCheck()}>
-                {(check) => (
-                  <ChecksPanel
-                    owner={owner()}
-                    repo={repo()}
-                    runId={check().runId}
-                    jobName={check().name}
-                    url={check().url}
-                    onClose={() => loaded().setOpenCheck(null)}
+                model={loaded()}
+                currentFile={changedFiles.currentFile}
+                onOpenFile={selectFile}
+                onLinkClick={onLinkClick}
+                diffActions={() => (
+                  <IconButton
+                    icon="refresh-cw"
+                    tip="Refresh pull request"
+                    label="Refresh pull request"
+                    busy={refreshing()}
+                    onPress={() => void refresh()}
                   />
                 )}
-              </Show>
+                diff={() => (
+                  <Show when={diffRoute()} keyed>
+                    {(route) => <DiffForPull route={route} router />}
+                  </Show>
+                )}
+                checkPanel={(check, close) => (
+                  <GithubChecksPanel owner={owner()} repo={repo()} check={check} onClose={close} />
+                )}
+              />
               {/* No reference panel here. The shell owns both the registry and the invocation
                   (client-core/host/registries/panes/refPanels.ts and refPanelHost.tsx), so this only asks. */}
             </Show>

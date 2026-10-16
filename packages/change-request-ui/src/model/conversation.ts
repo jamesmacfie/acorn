@@ -1,4 +1,4 @@
-import type { Comment, PullCommit, PullDetail, Review, Thread } from '../../shared/api'
+import type { ChangeRequestDetail, Comment, Commit, Review, ReviewState, Thread } from './types'
 
 export function hasRenderableBody(body: string | null | undefined): boolean {
   if (!body) return false
@@ -11,44 +11,39 @@ export function hasRenderableBody(body: string | null | undefined): boolean {
   )
 }
 
-export function reviewAction(state: string | null): string {
-  switch ((state ?? '').toUpperCase()) {
-    case 'APPROVED':
-      return 'approved'
-    case 'CHANGES_REQUESTED':
-      return 'requested changes'
-    case 'COMMENTED':
-      return 'reviewed'
-    case 'DISMISSED':
-      return 'dismissed review'
-    default:
-      return state ? state.toLowerCase().replaceAll('_', ' ') : 'reviewed'
-  }
+const REVIEW_ACTIONS: Record<ReviewState, string> = {
+  approved: 'approved',
+  'changes-requested': 'requested changes',
+  commented: 'reviewed',
+  dismissed: 'dismissed review',
+  pending: 'started a review',
 }
+
+export const reviewAction = (state: ReviewState | null): string => (state ? REVIEW_ACTIONS[state] : 'reviewed')
 
 export type ReviewDecision = { state: 'changes-requested' | 'approved' | 'none'; reviewers: string[] }
 
 /**
- * Where the reviews stand, the way GitHub decides it: each author's latest approval, change request
- * or dismissal counts, and a plain comment changes nothing. One change request outweighs any number
- * of approvals. `reviewers` names whoever holds the winning state.
+ * Where the reviews stand: each author's latest approval, change request or dismissal counts, and a
+ * plain comment changes nothing. One change request outweighs any number of approvals. `reviewers`
+ * names whoever holds the winning state.
  */
 export function reviewDecision(reviews: readonly Review[]): ReviewDecision {
-  const latest = new Map<string, string>()
+  const latest = new Map<string, ReviewState>()
   for (const review of [...reviews].sort((a, b) => (a.submittedAt ?? 0) - (b.submittedAt ?? 0))) {
-    const state = (review.state ?? '').toUpperCase()
-    if (!review.author || (state !== 'APPROVED' && state !== 'CHANGES_REQUESTED' && state !== 'DISMISSED')) continue
+    const state = review.state
+    if (!review.author || (state !== 'approved' && state !== 'changes-requested' && state !== 'dismissed')) continue
     latest.set(review.author, state)
   }
-  const holding = (wanted: string) => [...latest].filter(([, state]) => state === wanted).map(([author]) => author)
-  const blocking = holding('CHANGES_REQUESTED')
+  const holding = (wanted: ReviewState) => [...latest].filter(([, state]) => state === wanted).map(([author]) => author)
+  const blocking = holding('changes-requested')
   if (blocking.length) return { state: 'changes-requested', reviewers: blocking }
-  const approving = holding('APPROVED')
+  const approving = holding('approved')
   return approving.length ? { state: 'approved', reviewers: approving } : { state: 'none', reviewers: [] }
 }
 
 function shouldShowReviewSummary(review: Review): boolean {
-  return hasRenderableBody(review.body) || (review.state ?? '').toUpperCase() !== 'COMMENTED'
+  return hasRenderableBody(review.body) || review.state !== 'commented'
 }
 
 function byTime<T extends { createdAt: number | null }>(a: T, b: T): number {
@@ -64,24 +59,23 @@ function firstThreadComment(thread: Thread): Thread['comments'][number] | undefi
 const threadCreatedAt = (thread: Thread) => firstThreadComment(thread)?.createdAt ?? null
 
 // `key` is the turn's identity in the conversation's Timeline: the kind and the provider's id, so a
-// commit SHA, a review's node id and a comment's id can never collide. It survives a refetch, a body
-// arriving and a sort tie, which is what lets a turn keep its element
-// (docs/github-integration/surfaces.md § Conversation).
+// commit SHA, a review's id and a comment's id can never collide. It survives a refetch, a body
+// arriving and a sort tie, which is what lets a turn keep its element.
 export type ConversationEntry =
   | { kind: 'review'; id: string; key: string; createdAt: number | null; review: Review }
   | { kind: 'comment'; id: string; key: string; createdAt: number | null; comment: Comment }
-  | { kind: 'commit'; id: string; key: string; createdAt: number | null; commit: PullCommit }
+  | { kind: 'commit'; id: string; key: string; createdAt: number | null; commit: Commit }
   | { kind: 'thread'; id: string; key: string; createdAt: number | null; thread: Thread }
 
 type Unkeyed<T> = T extends unknown ? Omit<T, 'key'> : never
 
 /**
- * Every turn of a pull request's conversation, oldest first. The sort is stable, so turns with the
+ * Every turn of a change request's conversation, oldest first. The sort is stable, so turns with the
  * same time keep the order they are listed in here. A provider id seen twice in one kind gets a
  * numbered key rather than a duplicate one, numbered by that same order, so the list never falls back
  * to keying by position.
  */
-export function buildConversationEntries(data: PullDetail | undefined): ConversationEntry[] {
+export function buildConversationEntries(data: ChangeRequestDetail | undefined): ConversationEntry[] {
   if (!data) return []
   const entries: Unkeyed<ConversationEntry>[] = [
     ...data.reviews
