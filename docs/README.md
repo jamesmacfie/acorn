@@ -148,6 +148,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [site/agent-outputs.md](./site/agent-outputs.md) | The public site's search palette, page titles and descriptions, social cards, the Markdown copy of each docs page, `llms.txt`, and the agent guide. |
 | [site/built-in-plugins.md](./site/built-in-plugins.md) | The public site's list of the plugins acorn ships, each plugin's facts box, and the test that keeps both whole. |
 | [site/design.md](./site/design.md) | How the public site looks: its stylesheet on acorn's tokens, fonts, mark, Appearance control, components, contrast check, and the landing page's Lighthouse scores. |
+| [site/marketing-copy.md](./site/marketing-copy.md) | How the marketing pages read: the landing page's one joke, and the marks of a generated page they leave out. |
 | [site/specimens.md](./site/specimens.md) | Specimens on the public site: plugin tree code both hosts draw, the generators that commit and check it, and the scoped stylesheet. |
 | [site/plugin-guides.md](./site/plugin-guides.md) | The public site's plugin guides: the example plugins in `examples/plugins/`, the harness that installs and runs them, and how a guide shows their code and pictures. |
 | [site/references.md](./site/references.md) | The public site's generated reference pages: command-line help, keyboard shortcuts, configuration files, environment variables, and the published schemas, and the check behind each. |
@@ -207,7 +208,9 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [browser-extension.md](./browser-extension.md) | The Chrome and Firefox extension, its native bridge, the native messaging contract, pairing, and sidebar states. |
 | [browser-extension/native-messaging.md](./browser-extension/native-messaging.md) | The frames, operations, and events between the extension's background and its native host, and the frame limits the host enforces. |
 | [browser-extension/setup.md](./browser-extension/setup.md) | Installing the extension's development builds and native bridge on macOS, pairing, repair and removal, and every sidebar state with its next step. |
+| [browser-extension/navigation.md](./browser-extension/navigation.md) | The extension sidebar's three levels, Home, a task with its tabs, and a conversation, with the top bar, Back, and the strip under the bars. |
 | [browser-extension/conversations.md](./browser-extension/conversations.md) | The extension's agent operations, change hints, conversation window, send retries, and browser storage. |
+| [browser-extension/transcript.md](./browser-extension/transcript.md) | One conversation in the extension sidebar: the transcript, folded tool calls, the state line with Stop, and the message box's keys. |
 | [browser-extension/page-capture.md](./browser-extension/page-capture.md) | The extension's link, selection, and screenshot captures, page access, sending them, and the attachment operations. |
 | [browser-extension/element-picker.md](./browser-extension/element-picker.md) | The extension's element picker: asking a task's agent about an element on its page, with the element's cleaned HTML, CSS path, and screenshot, and the checks behind it. |
 | [browser-extension/handoffs.md](./browser-extension/handoffs.md) | The task chips plugins put on websites, the extension's handoff card, and the operations that resolve a page and create a linked task. |
@@ -263,7 +266,8 @@ Each landing page in the tables above has topic pages in a folder of the same na
 - [shell.md](./shell.md): [The renderer bridge and the connection broker](./shell/bridge-and-broker.md),
   [The Node child and shell telemetry](./shell/node-child.md),
   [Origins and schemes](./shell/origins.md), [Build and packaging](./shell/packaging.md),
-  [The shell process](./shell/process.md), [Host-owned webviews](./shell/webviews.md).
+  [The shell process](./shell/process.md), [Test installers](./shell/test-installers.md),
+  [Host-owned webviews](./shell/webviews.md).
 - [tui.md](./tui.md): [Terminal chrome](./tui/chrome.md), [Terminal focus](./tui/focus.md),
   [Terminal footer and key trace](./tui/footer.md), [Terminal host switch](./tui/host-switch.md),
   [Terminal keys](./tui/keys.md), [Terminal navigation](./tui/navigation.md),
@@ -455,6 +459,20 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 - [Pull request panel in the browser extension](./future/extension-github-panel.md) and [Docker
   panel in the browser extension](./future/extension-docker-panel.md).
+
+## Browser extension sidebar rework proposal
+
+- [Rework the browser extension's sidebar](./future/extension-ux/README.md), with phases for
+  [navigation](./future/extension-ux/01-navigation.md), [Go to task and
+  menus](./future/extension-ux/02-go-to-task-and-menus.md), [Home](./future/extension-ux/03-home.md),
+  [Needs you](./future/extension-ux/04-needs-you.md), [This page](./future/extension-ux/05-this-page.md),
+  [the Agents tab](./future/extension-ux/06-agents-tab.md), [the
+  conversation](./future/extension-ux/07-conversation.md), [the Runs tab](./future/extension-ux/08-runs-tab.md),
+  [plugin panels](./future/extension-ux/09-plugin-panels.md), [Settings](./future/extension-ux/10-settings.md),
+  [connecting](./future/extension-ux/11-connect.md), [the page's chip and
+  marker](./future/extension-ux/12-on-the-page.md), and [a Context
+  picker](./future/extension-ux/13-context-picker.md), then [plugin reuse
+  passes](./future/extension-ux/plugin-reuse.md).
 
 ## Lessons from OpenCode proposal
 

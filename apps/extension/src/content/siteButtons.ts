@@ -50,7 +50,9 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--text); outline-
   background: var(--menu); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
 .marker .menu { top: auto; bottom: calc(100% + 4px); }
 .menu[hidden] { display: none; }
-.menu > button, .menu > a { height: 32px; white-space: nowrap; }
+.menu > button, .menu > a { height: 32px; gap: 8px; white-space: nowrap; }
+.menu svg { flex: none; opacity: 0.7; }
+.sep { height: 1px; margin: 4px 0; background: var(--line); }
 .menu > button:hover, .menu > a:hover { background: var(--fill); }
 .note { margin: 4px 10px; color: var(--text); opacity: 0.7; font: 400 12px/1.4 system-ui, sans-serif;
   white-space: normal; }
@@ -58,6 +60,29 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--text); outline-
 // Acorn's mark, as a line drawing that reads at the size of a button's icon.
 const MARK =
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 1.5v2M2.5 7h11c0-2.5-2.5-3.5-5.5-3.5S2.5 4.5 2.5 7zM4 7v3l4 4.5 4-4.5V7"/></svg>'
+
+// The menus' icons, from the kit's Lucide set, inline because this script can't import the registry.
+const lucide = (shapes: string): string =>
+  `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes}</svg>`
+const ICONS = {
+  'panel-right': lucide('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>'),
+  'message-square-plus': lucide(
+    '<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/>',
+  ),
+  crosshair: lucide('<circle cx="12" cy="12" r="10"/><path d="M22 12h-4M6 12H2M12 6V2M12 22v-4"/>'),
+  'arrow-up-right': lucide('<path d="M7 7h10v10"/><path d="M7 17 17 7"/>'),
+  copy: lucide(
+    '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  ),
+  plus: lucide('<path d="M5 12h14"/><path d="M12 5v14"/>'),
+  workflow: lucide(
+    '<rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/>',
+  ),
+  'eye-off': lucide(
+    '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+  ),
+}
+type IconName = keyof typeof ICONS
 
 // The element picker's script, injected beside this one, shares this global.
 const scope = globalThis as {
@@ -147,35 +172,57 @@ if (api && !scope.acornSiteButtons) {
   const menuItems = () => {
     const items: HTMLElement[] = []
     let close = () => {}
+    // A separator asked for goes in before the next item, so a menu missing some entries never starts,
+    // ends, or doubles one.
+    let gap = false
+    const push = (element: HTMLElement): void => {
+      if (gap && items.length) {
+        const line = document.createElement('div')
+        line.className = 'sep'
+        items.push(line)
+      }
+      gap = false
+      items.push(element)
+    }
+    // The icon is constant markup; the text goes in as text.
+    const entry = (element: HTMLElement, icon: IconName, text: string): HTMLElement => {
+      element.innerHTML = ICONS[icon]
+      element.append(document.createElement('span'))
+      element.lastElementChild!.textContent = text
+      push(element)
+      return element
+    }
     // An item closes the menu, unless it says what it did in place.
-    const add = (text: string, action: (element: HTMLElement) => void, keepOpen = false): void => {
+    const add = (icon: IconName, text: string, action: (element: HTMLElement) => void, keepOpen = false): void => {
       const element = document.createElement('button')
       element.type = 'button'
-      element.textContent = text
       element.addEventListener('click', (event) => {
         if (!trusted(event)) return
         if (!keepOpen) close()
         action(element)
       })
-      items.push(element)
+      entry(element, icon, text)
     }
     return {
       items,
       add,
+      separator(): void {
+        gap = true
+      },
       // A plain link, which the browser hands to the desktop app.
       link(href: string): void {
         const open = document.createElement('a')
         open.href = href
-        open.textContent = 'Open in Acorn ↗'
         open.addEventListener('click', () => close())
-        items.push(open)
+        entry(open, 'arrow-up-right', 'Open in Acorn')
       },
       copy(href: string): void {
         add(
+          'copy',
           'Copy Acorn link',
           (element) => {
             void navigator.clipboard.writeText(href).then(
-              () => (element.textContent = 'Copied'),
+              () => (element.lastElementChild!.textContent = 'Copied'),
               () => undefined,
             )
           },
@@ -186,7 +233,7 @@ if (api && !scope.acornSiteButtons) {
         const note = document.createElement('p')
         note.className = 'note'
         note.textContent = text
-        items.push(note)
+        push(note)
       },
       bind(closeMenu: () => void): void {
         close = closeMenu
@@ -204,7 +251,11 @@ if (api && !scope.acornSiteButtons) {
     items: HTMLElement[],
     split: boolean,
   ) => {
-    for (const element of items) element.setAttribute('role', element.tagName === 'P' ? 'note' : 'menuitem')
+    for (const element of items)
+      element.setAttribute(
+        'role',
+        element.tagName === 'P' ? 'note' : element.tagName === 'DIV' ? 'separator' : 'menuitem',
+      )
     const menu = document.createElement('div')
     menu.className = 'menu'
     menu.setAttribute('role', 'menu')
@@ -242,20 +293,24 @@ if (api && !scope.acornSiteButtons) {
     // The plugin's label stays in the accessible name, beside what the chip shows.
     main.setAttribute('aria-label', `${main.textContent} (${button.label})`)
 
-    // The menu: the task's verbs, or with no task the two ways to start one, as the desktop's row menu
-    // offers them. In Firefox, where a page can't open the sidebar, it says how to open it.
+    // The menu: the task's verbs in the panel's order, or with no task the two ways to start one, as the
+    // panel's issue card offers them. In Firefox, where a page can't open the sidebar, it says how to
+    // open it.
     const menu = menuItems()
     const chipClick = (action: 'show' | 'chat') => report({ type: 'acorn:chip', key: button.key, action })
     if (task) {
-      if (page.opensPanel) menu.add('Show in side panel', () => chipClick('show'))
+      if (page.opensPanel) {
+        menu.add('panel-right', 'Show in side panel', () => chipClick('show'))
+        menu.add('message-square-plus', 'New chat about this page', () => chipClick('chat'))
+      }
+      menu.add('crosshair', 'Ask about an element', pickElement)
+      menu.separator()
       if (task.link && page.opensLinks) menu.link(task.link)
-      if (page.opensPanel) menu.add('New chat about this page', () => chipClick('chat'))
-      menu.add('Ask about an element', pickElement)
       if (task.link) menu.copy(task.link)
       if (!page.opensPanel) menu.note('To open the panel on this task, click Acorn in the toolbar.')
     } else {
-      menu.add('Create task', () => report({ type: 'acorn:handoff', key: button.key, start: 'task' }))
-      menu.add('Start workflow…', () => report({ type: 'acorn:handoff', key: button.key, start: 'workflow' }))
+      menu.add('plus', 'Create task', () => report({ type: 'acorn:handoff', key: button.key, start: 'task' }))
+      menu.add('workflow', 'Run workflow…', () => report({ type: 'acorn:handoff', key: button.key, start: 'workflow' }))
       if (!page.opensPanel) menu.note('Then click Acorn in the toolbar to open the panel.')
     }
 
@@ -285,11 +340,13 @@ if (api && !scope.acornSiteButtons) {
 
     const menu = menuItems()
     const markerClick = (action: 'show' | 'hide') => report({ type: 'acorn:marker', action })
-    if (page.opensPanel) menu.add('Show in side panel', () => markerClick('show'))
+    if (page.opensPanel) menu.add('panel-right', 'Show in side panel', () => markerClick('show'))
+    menu.add('crosshair', 'Ask about an element', pickElement)
+    menu.separator()
     if (shown.link && page.opensLinks) menu.link(shown.link)
-    menu.add('Ask about an element', pickElement)
     if (shown.link) menu.copy(shown.link)
-    menu.add('Hide on this site', () => markerClick('hide'))
+    menu.separator()
+    menu.add('eye-off', 'Hide on this site', () => markerClick('hide'))
     if (!page.opensPanel) menu.note('To open the panel on this task, click Acorn in the toolbar.')
     const setOpen = attachMenu(host, root, chip, main, menu.items, page.opensPanel)
     menu.bind(() => setOpen(false))

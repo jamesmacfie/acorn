@@ -167,19 +167,23 @@ export function Picker<T>(props: PickerProps<T>) {
   const rows = () => {
     if (props.items) {
       const needle = query().trim().toLowerCase()
-      return props.items
-        .filter((item) => !needle || `${item.label} ${item.note ?? ''}`.toLowerCase().includes(needle))
-        .map((item) => ({
-          label: item.label,
-          description: item.note,
-          active: item.active,
-          disabled: item.disabled,
-          pick: () => props.onPick?.(item.id),
-        }))
+      const kept = props.items.filter(
+        (item) => !needle || `${item.label} ${item.note ?? ''}`.toLowerCase().includes(needle),
+      )
+      return kept.map((item, index) => ({
+        label: item.label,
+        description: item.note,
+        // A group's label goes over the first of its rows the filter keeps.
+        heading: item.group !== kept[index - 1]?.group ? item.group : undefined,
+        active: item.active,
+        disabled: item.disabled,
+        pick: () => props.onPick?.(item.id),
+      }))
     }
     return (props.results?.(query()) ?? []).map((item) => ({
       label: props.rowLabel?.(item) ?? '',
       description: props.rowDescription?.(item),
+      heading: undefined,
       active: props.isActive?.(item) ?? false,
       disabled: props.isDisabled?.(item) ?? false,
       pick: () => props.onSelect?.(item),
@@ -211,16 +215,21 @@ export function Picker<T>(props: PickerProps<T>) {
           <Show when={rows().length} fallback={<Line role="muted">{props.emptyText}</Line>}>
             <For each={rows()}>
               {(row) => (
-                <PickerRow
-                  label={row.label}
-                  description={row.description}
-                  active={row.active}
-                  disabled={row.disabled}
-                  onSelect={() => {
-                    row.pick()
-                    if (!props.keepOpen) context.close()
-                  }}
-                />
+                <>
+                  <Show when={row.heading}>
+                    <Line role="muted">{row.heading!}</Line>
+                  </Show>
+                  <PickerRow
+                    label={row.label}
+                    description={row.description}
+                    active={row.active}
+                    disabled={row.disabled}
+                    onSelect={() => {
+                      row.pick()
+                      if (!props.keepOpen) context.close()
+                    }}
+                  />
+                </>
               )}
             </For>
           </Show>

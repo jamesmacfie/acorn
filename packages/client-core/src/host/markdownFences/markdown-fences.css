@@ -1,5 +1,5 @@
 /* A fence another plugin can draw (host/markdownFences/MarkdownFences.tsx). The toggle sits in the
-   fence's top-right corner beside the copy button, which copy.css places at the corner itself. Both stay
+   fence's top-right corner beside the copy button, which primitives.css places at the corner itself. Both stay
    on top of a viewer, so the viewer starts below them and scrolls inside a bounded box. */
 .markdown-fence-toggle {
   position: absolute;

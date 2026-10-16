@@ -76,8 +76,7 @@ svg.glyph,
 /* The unstyled list. */
 .list-reset { list-style: none; margin: 0; padding: 0; }
 
-/* Spinning glyph (agent-working indicators). */
-@keyframes spin { to { transform: rotate(360deg); } }
+/* Spinning glyph (agent-working indicators). The `spin` keyframes are in primitives.css. */
 .spin { display: inline-block; animation: spin 1s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 

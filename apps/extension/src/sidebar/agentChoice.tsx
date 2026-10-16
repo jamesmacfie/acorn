@@ -1,6 +1,7 @@
 import { Show, createSignal } from 'solid-js'
 import type { BridgeAgentChoice, BridgeAgentSession } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { IconButton } from '@acorn/client-core/kit/components/inputs'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import { CallFailure, choiceKey, isUncertain } from '../messages'
 import type { BridgeClient } from './bridgeClient'
@@ -66,16 +67,27 @@ export function agentChoice(client: BridgeClient, nodeId: string) {
 
 // The desktop's New picker, in the kit's own Picker: a filter, each row's mark and account icon over
 // its name and what it runs, and a refresh that checks the harnesses again. A pick starts the chat.
+// `label` is the button's, such as New chat in a section's header. `solid` makes it the view's one
+// action, as in an empty state.
 export function AgentPicker(props: {
+  label: string
+  solid?: boolean
   agents: ReturnType<typeof agentChoice>
   disabled: boolean
   pick(choice: BridgeAgentChoice): void
 }) {
   return (
     <Picker<BridgeAgentChoice>
-      label={props.agents.starting() ? 'Starting…' : 'New chat'}
-      ariaLabel="New chat"
+      label={
+        <>
+          <Icon name="plus" />
+          <span>{props.agents.starting() ? 'Starting…' : props.label}</span>
+        </>
+      }
+      ariaLabel={props.label}
       size="sm"
+      variant={props.solid ? 'solid' : undefined}
+      placement="bottom-end"
       placeholder="Filter agents…"
       emptyText={
         props.agents.choices() ? 'No managed providers available.' : 'Checking which agents this Node can run…'
@@ -99,15 +111,7 @@ export function AgentPicker(props: {
       disabled={props.disabled}
       onSelect={props.pick}
       tools={
-        <button
-          type="button"
-          class="icon"
-          aria-label="Refresh provider health"
-          title="Refresh provider health"
-          onClick={() => void props.agents.load(true)}
-        >
-          <Icon name="refresh-cw" />
-        </button>
+        <IconButton icon="refresh-cw" label="Refresh provider health" onPress={() => void props.agents.load(true)} />
       }
     />
   )

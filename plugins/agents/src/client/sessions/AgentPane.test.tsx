@@ -155,7 +155,9 @@ afterEach(() => {
 
 describe('session account usage', () => {
   const usageButton = () => host.querySelector<HTMLButtonElement>('button[aria-label="Agent utilization"]')!
-  const selectedTab = () => document.querySelector('[role="tab"][aria-selected="true"]')?.textContent
+  // The popover's account rows; the one that starts open is the account the session runs on.
+  const openAccounts = () =>
+    [...document.querySelectorAll('details[open] .ui-section-header-label')].map((label) => label.textContent)
 
   it('uses the selected session account in the header and popover, and follows session changes', async () => {
     const [selected, setSelected] = createSignal(session({ config: { account: 'work' } }))
@@ -164,20 +166,12 @@ describe('session account usage', () => {
     expect(usageButton().textContent).toContain('Claude Code · work 30%')
     usageButton().click()
     await settle()
-    expect(selectedTab()).toBe('work')
-    document.querySelectorAll<HTMLElement>('[role="tab"]')[1]!.click()
-    await settle()
-    expect(selectedTab()).toBe('personal')
-    expect(usageButton().textContent).toContain('Claude Code · work 30%')
-
-    document.querySelectorAll<HTMLElement>('[role="tab"]')[0]!.click()
-    await settle()
-    expect(selectedTab()).toBe('Usual sign-in')
+    expect(openAccounts()).toEqual(['work'])
 
     setSelected(session({ id: 'sess-2', config: { account: 'personal' } }))
     await settle()
     expect(usageButton().textContent).toContain('Claude Code · personal 70%')
-    expect(selectedTab()).toBe('personal')
+    expect(openAccounts()).toEqual(['personal'])
   })
 
   it('uses the usual sign-in for a session without a named account', async () => {
@@ -186,7 +180,7 @@ describe('session account usage', () => {
     expect(usageButton().textContent).toContain('Claude Code 80%')
     usageButton().click()
     await settle()
-    expect(selectedTab()).toBe('Usual sign-in')
+    expect(openAccounts()).toEqual(['Usual sign-in'])
   })
 })
 

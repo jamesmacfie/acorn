@@ -58,12 +58,13 @@ export function taskPages(deps: {
 }) {
   let nodeId: string | null = null
   let up = false
-  let tasks: BridgePageTask[] = []
+  // Null until the selected Node's list is read, so the sidebar can tell no tasks from not read yet.
+  let tasks: BridgePageTask[] | null = null
   // The conversations of each followed task: absent until read.
   let sessions = new Map<string, BridgeAgentSession[]>()
   let followed = new Set<string>()
 
-  const show = (next: BridgePageTask[]): void => {
+  const show = (next: BridgePageTask[] | null): void => {
     tasks = next
     deps.broadcast({ type: 'taskPages', nodeId, tasks })
     deps.changed()
@@ -118,7 +119,7 @@ export function taskPages(deps: {
       nodeId = next
       sessions = new Map()
       followed = new Set()
-      show([])
+      show(null)
       if (next && up) await readTasks()
     },
     status(status: NodeStatus): void {
@@ -146,7 +147,7 @@ export function taskPages(deps: {
       if (changed === nodeId) void readTasks()
     },
     get tasks(): readonly BridgePageTask[] {
-      return tasks
+      return tasks ?? []
     },
     // The tasks open pages belong to now. A task new to the set has its conversations read.
     follow(taskIds: ReadonlySet<string>): void {

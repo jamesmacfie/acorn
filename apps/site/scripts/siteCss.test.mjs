@@ -1,4 +1,4 @@
-// The site takes every color from acorn's theme tokens, so a theme the visitor picks restyles all of it.
+// The site takes every color from acorn's theme tokens, so the light and dark themes restyle all of it.
 // This fails on a color written into the site's own styles: src/styles/site.css and the <style> blocks
 // in its components, layouts, and lab pages. The wireframes are grey boxes on purpose, so they're left out.
 import assert from 'node:assert/strict'

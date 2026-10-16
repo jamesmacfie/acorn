@@ -36,13 +36,16 @@ export const pageTasks = (tasks: readonly BridgePageTask[], url: string | undefi
 export const appTask = (tasks: readonly BridgePageTask[], url: string | undefined): PageTask | null =>
   pageTasks(tasks, url).find(({ page }) => page.status) ?? null
 
+export type AgentCounts = { waiting: number; working: number }
+
 // How many of a task's agents wait on the person, and how many of the rest are working. A conversation
-// waits while the Node holds a request from it. The task chip and the sidebar's Agents tab count alike.
+// waits while the Node holds a request from it. The task chip, Home's task rows, and the sidebar's
+// Agents tab count alike.
 export function agentCounts(
   taskId: string,
   sessions: readonly BridgeAgentSession[] | undefined,
   requests: readonly BridgePendingRequest[],
-): { waiting: number; working: number } {
+): AgentCounts {
   const waiting = new Set(requests.filter((request) => request.taskId === taskId).map((request) => request.sessionId))
   const working = (sessions ?? []).filter(
     (session) => session.runtimeState === 'working' && !waiting.has(session.id),

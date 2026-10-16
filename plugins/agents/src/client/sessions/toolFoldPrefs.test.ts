@@ -72,6 +72,8 @@ describe('createAgentToolFoldSetting', () => {
   // query cache and stops there.
   it('stores a toggle under sticky', async () => {
     const { queryClient, fold } = setting('sticky')
+    // savePref only patches a cache that already holds the Node's answer.
+    queryClient.setQueryData(prefsKey, {})
     fold.onToggle(true)
     await Promise.resolve()
     expect(queryClient.getQueryData<Record<string, string>>(prefsKey)?.[PrefKeys.agentToolFold]).toBe(

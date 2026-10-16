@@ -12,6 +12,6 @@ export const BOOKS = [
     name: 'components',
     written: 'src/content/components',
     docs: 'docs/components',
-    components: ['Appearance', 'Badge', 'IconSet', 'ReferenceTable', 'Specimen', 'SpecimenCode', 'ThemeSwatches'],
+    components: ['Badge', 'IconSet', 'ReferenceTable', 'Specimen', 'SpecimenCode', 'ThemeSwatches'],
   },
 ]

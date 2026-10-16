@@ -20,66 +20,76 @@ body {
 p { margin: 0; }
 ul { list-style: none; margin: 0; padding: 0; }
 
-/* ── Navigation ─────────────────────────────────────────────────────────────────────────────── */
-/* The desktop rail's controls on their side, pinned to the bottom edge: the same square boxes, with a
- * divider after each and the active stripe on top. Settings sits apart at the far end. The body leaves
- * room for the bar, and the composer sticks just above it. */
-body { padding-bottom: var(--pane-head-h); }
-.rail {
-  position: fixed;
-  inset: auto 0 0;
-  display: flex;
-  height: var(--pane-head-h);
-  border-top: var(--chrome-divider);
-  background: var(--bg-subtle);
-}
-.rail .tabrail-tab {
-  width: var(--tabrail-w);
-  height: 100%;
-  padding: 0;
-  border-radius: 0;
-  border-bottom: 0;
-  border-left: 0;
-  border-right: var(--divider);
-  border-top: var(--stripe-w) solid transparent;
-}
-.rail .tabrail-tab:last-child { margin-left: auto; border-right: 0; border-left: var(--divider); }
-.rail .tabrail-tab.active { border-top-color: var(--rail-accent, var(--accent)); }
-
-/* ── Header ─────────────────────────────────────────────────────────────────────────────────── */
-/* Pinned to the top edge so it stays in reach as the view scrolls, above the sticky composer. The top
- * rule separates it from the browser's own panel bar, which an extension can't colour. */
+/* ── Top bar ────────────────────────────────────────────────────────────────────────────────── */
+/* Pinned to the top edge so it stays in reach as the view scrolls. The top rule separates it from the
+ * browser's own panel bar, which an extension can't colour. */
 .top {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
   display: flex;
   align-items: center;
-  gap: var(--gap-inline);
+  gap: var(--space-2);
   height: var(--pane-head-h);
-  padding: 0 var(--space-6);
+  padding: 0 var(--space-4) 0 var(--space-3);
   background: var(--bg-subtle);
   border-top: var(--chrome-divider);
   border-bottom: var(--chrome-divider);
 }
-/* A view's name in the desktop pane header's label style, with a list's count beside it. An open
- * conversation's title reads as a title instead, with its task as the small label above. */
-.heading { flex: 1; display: grid; min-width: 0; }
-.heading :is(h1, .eyebrow) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.heading h1, .heading .eyebrow {
-  margin: 0;
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  text-transform: var(--label-transform);
-  letter-spacing: var(--label-tracking);
+/* The acorn, with the selected Node's state as a dot on its corner. */
+.mark { position: relative; flex: none; display: grid; place-items: center; width: var(--control-h); height: var(--control-h); color: var(--text); }
+.mark svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.mark .dot { position: absolute; right: 4px; bottom: 5px; width: 7px; height: 7px; border: 1.5px solid var(--bg-subtle); }
+/* A task's title over its project and branch, or a conversation's under its task, in small type. */
+.heading { flex: 1; display: grid; min-width: 0; padding: var(--space-1) var(--space-2); line-height: 1.3; }
+.heading > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.heading .title { font-size: var(--fs); font-weight: var(--fw-semibold); }
+.heading .detail { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); color: var(--text-muted); }
+.heading .eyebrow { font-size: var(--fs-2xs); color: var(--text-muted); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); font-weight: var(--label-weight); }
+.here { display: inline-flex; align-items: center; gap: 3px; }
+.here::before { content: ''; width: 6px; height: 6px; border-radius: var(--radius-circle); background: var(--accent); }
+/* Home's Go to task, a kit button that fills the bar like a search field. A task's title, a bare kit
+ * button laid out as the heading, opens it too. Both start from `bare`, which the style packs leave
+ * alone, so they look the same in every pack. */
+.go-to-task-button { flex: 1; display: flex; min-width: 0; }
+.go-to-task-button > .ui-btn {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  text-align: start;
+  min-height: var(--control-h-sm);
+  padding: 0 var(--space-2) 0 var(--space-4);
   color: var(--text-muted);
+  background: var(--bg);
+  border: var(--control-border);
 }
-.heading .eyebrow { font-size: var(--fs-2xs); }
-.heading .count, h3 .count { margin-left: var(--space-2); color: var(--text-faint); }
-.heading[data-eyebrow] h1 { font-size: var(--fs); font-weight: var(--heading-weight); text-transform: none; letter-spacing: 0; color: var(--text); }
-.menu { position: relative; }
-.menu summary { list-style: none; }
-.menu summary::-webkit-details-marker { display: none; }
+.go-to-task-button > .ui-btn:hover:not(:disabled) { color: var(--text); background: var(--bg); border-color: var(--accent); }
+/* The bar's icon buttons draw their mark at the icon size in the text colour, as the bar's other marks. */
+.top .ui-btn[data-icon-only] { color: var(--text); font-size: var(--icon-size); }
+.heading:has(> .ui-btn) { padding: 0; }
+.heading > .ui-btn { display: grid; justify-content: stretch; gap: 0; min-width: 0; padding: var(--space-1) var(--space-2); color: inherit; line-height: inherit; text-align: start; }
+.heading > .ui-btn > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.heading > .ui-btn:hover:not(:disabled) { color: inherit; background: var(--bg-hover); }
+.heading .title .ui-icon { margin-inline-start: var(--space-1); vertical-align: -2px; }
+/* Go to task hangs under the bar, as wide as the panel less a margin, with the Node in its footer. Its
+ * filter follows a search icon, so it needs less of the kit's inset. */
+.go-to-task { width: calc(100vw - 2 * 4px); max-width: none; }
+.go-to-task .repo-picker-tools { padding-inline: var(--space-5) var(--space-3); }
+.go-to-task .repo-picker-filter { padding-inline: var(--space-3); }
+.go-to-task .repo-picker-name > small { font-family: var(--font-mono); }
+.go-to-task-lead { flex: none; display: inline-flex; width: 1em; padding-inline-start: var(--space-2); color: var(--text-muted); }
+.go-to-task .repo-picker-footer { gap: var(--space-3); padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6); font-size: var(--fs-sm); }
+.go-to-task .repo-picker-footer .dot { width: 7px; height: 7px; }
+/* A task's tabs stay under the bar as the view scrolls. */
+main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-sticky); background: var(--bg-subtle); }
+
+/* One line under the bars when the page isn't what the panel shows, or the Node is offline. */
+.strip { display: flex; align-items: center; gap: var(--space-3); min-height: 38px; padding: var(--space-2) var(--space-4) var(--space-2) var(--space-6); border-bottom: var(--chrome-divider); font-size: var(--fs-sm); }
+.strip b { font-weight: var(--fw-semibold); }
+.strip .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip[data-tone='bad'] { background: color-mix(in srgb, var(--danger) 8%, var(--bg)); }
+
+/* A capture, as a small rounded label. */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -92,56 +102,38 @@ body { padding-bottom: var(--pane-head-h); }
   cursor: pointer;
   font-size: var(--fs-sm);
 }
-.menu summary.chip::after { content: '▾'; color: var(--text-muted); }
-.menu-items {
-  position: absolute;
-  right: 0;
-  top: calc(100% + var(--space-2));
-  z-index: 1;
-  min-width: 12rem;
-  display: grid;
-  padding: var(--space-2);
-  background: var(--popover-bg);
-  border: var(--surface-border);
-  border-radius: var(--radius-popover);
-  box-shadow: var(--elev-menu);
-}
-.menu-items button { justify-content: flex-start; background: transparent; color: var(--text); border-color: transparent; }
-.menu-items button:hover:not(:disabled) { background: var(--bg-hover); }
-.menu-items button[aria-current='true'] { font-weight: var(--fw-semibold); }
 
-/* One line under the header for anything wrong, with the next step. */
+/* One line under the bars for anything wrong, with the next step. */
 .banner { padding: var(--space-4) var(--space-6); border-bottom: var(--chrome-divider); }
-.banner > :is(.command, p) { flex-basis: 100%; }
-.command code { font-family: var(--font-mono); color: var(--text); }
+
+/* ── Getting connected ──────────────────────────────────────────────────────────────────────── */
+/* Each screen is the kit's empty state, its action as wide as the panel with its parts centred. */
+.connect .ui-empty { padding-block: var(--space-10) var(--space-6); }
+.connect .ui-empty-action { align-self: stretch; flex-direction: column; text-align: start; }
+.connect .ui-empty-action > .ui-stack { align-items: center; }
+.connect .ui-empty-action > .ui-stack > :is(.ui-card, form, .ui-btn:has(.install-command)) { align-self: stretch; }
+.connect .ui-empty-action :is(.ui-inline, .ui-chiprow) { justify-content: center; }
+.connect form .ui-inline > :first-child { flex: 1; }
+/* The install command: a `$`, the command, and the copy mark, the whole block one button. */
+.install-command { display: flex; align-items: center; gap: var(--space-4); width: 100%; }
+.install-command > .ui-text:nth-child(2) { flex: 1; text-align: start; }
 
 /* ── Views and sections ─────────────────────────────────────────────────────────────────────── */
-.view-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--row-h);
-  padding: 0 var(--space-4);
-  border-bottom: var(--chrome-divider);
-}
-.view-head .title { font-weight: var(--heading-weight); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.subhead { display: flex; align-items: center; gap: var(--gap-inline); padding: var(--space-3) var(--space-6); border-bottom: var(--divider); }
-.subhead .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Agents with no task to list. */
+/* A line in place of a list: loading, empty, or why it failed. */
 .empty { padding: var(--space-6); }
 /* One column no wider than the panel: an auto column grows to its longest unbroken word, so a long
  * command in the transcript widened the conversation past the composer and the panel. */
 .view > section, .conversation-body, .composer { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-row); padding: var(--space-6); }
 .view > section { border-bottom: var(--chrome-divider); }
-/* Home on a page that matches nothing: the Acorn mark alone, in the middle of the panel. */
 /* A lone button in a section or form keeps its own width rather than the column's. */
-:is(.view > section, .view > section > section, form) > button { justify-self: start; }
-/* Settings: the desktop's tab strip, narrow enough for five tabs, over one padded column per tab. */
-.settings .ui-tab { min-width: 0; padding: 0 var(--space-4); }
-.settings .ui-tab-panel > section, .sites > section { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-row); }
-.sites { gap: var(--gap-section); }
-.sites .section-head { align-items: center; }
-.sites .section-head > button { flex: none; white-space: nowrap; }
+:is(.view > section, .view > section > section, form) > .ui-btn { justify-self: start; }
+/* Settings: a setting's control takes its own width. The kit's fixed control column is sized for the
+ * desktop's page and squeezes the label in a panel this narrow. Pairing's done screen has the same rows. */
+:is(.settings, .connect) { --setting-control-w: max-content; }
+/* Add a site's Match: a narrower inset, so the four kinds fit the dialog on one line where they can. */
+[role='dialog'] .ui-segment { padding-inline: var(--space-2); }
+/* A theme's colour, in Settings' theme picker. */
+.swatch { display: inline-block; flex: none; width: 12px; height: 12px; border: var(--control-border); border-radius: var(--radius-chip); vertical-align: -1px; }
 h2, h3 {
   margin: 0;
   font-size: var(--label-size);
@@ -152,47 +144,21 @@ h2, h3 {
 }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-inline); }
 
-/* Rows: 36 px, with dividers between them. */
-.rows > li {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-inline);
-  min-height: var(--row-h);
-  border-bottom: var(--divider);
-}
-.rows > li:last-child { border-bottom: 0; }
-.rows > li > div, .row-button { display: grid; min-width: 0; }
-.rows span, .rows strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row-button {
-  flex: 1;
-  width: 100%;
-  min-height: var(--row-h);
-  padding: var(--space-2) 0;
-  justify-content: stretch;
-  text-align: left;
-  font-weight: var(--fw-normal);
-  background: transparent;
-  color: var(--text);
-  border: 0;
-  border-radius: 0;
-}
-.row-button:hover:not(:disabled) { background: var(--bg-hover); }
-/* An agent row, the desktop's stacked row: the state icon beside the title, and the provider's logo,
- * model, and state in words under it. */
-.row-button.agent-row { display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-3) var(--space-2); }
-.agent-row > .ui-icon { margin-top: 0.2em; }
-.agent-text { flex: 1; display: grid; gap: var(--space-1); min-width: 0; }
-.agent-meta { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: var(--fs-sm); }
 /* A New picker row's harness mark and, for a login shown as an icon, the account's icon. */
 .agent-marks { display: inline-flex; align-items: center; gap: var(--space-2); }
-.row-button[aria-current='true'] { box-shadow: inset var(--marker-w) 0 0 var(--accent); padding-left: var(--space-4); }
-/* A Home task row, with its links open under it. */
-.rows > li.task { flex-direction: column; align-items: stretch; gap: 0; }
-.task-links { display: grid; gap: var(--space-2); padding: 0 0 var(--space-3) var(--space-4); font-size: var(--fs-sm); }
-.task-links > li > .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.section-head > select { width: auto; max-width: 60%; }
-/* The kit's spinning icon turns on base.css's keyframes, which the panel doesn't load. */
-@keyframes spin { to { transform: rotate(360deg); } }
+/* Home's task rows, This page's task, and a task's conversations, the kit's stacked row: a state mark
+ * beside the title, and a line of detail under it. A section's own padding takes the place of the
+ * row's, except on the Agents tab, whose rows sit under the kit's section headers. */
+.task-rows .ui-row { padding-inline: var(--space-2); }
+:is(.task-rows, .agent-rows) .ui-row-leading { width: 14px; justify-content: center; margin-top: 0.2em; }
+.row-title, .row-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-title { font-size: var(--fs); }
+.row-meta { font-size: var(--fs-xs); color: var(--text-muted); }
+.row-meta .branch { font-family: var(--font-mono); }
+.row-meta .needs-you { color: var(--state-warn); }
+/* A conversation's provider logo beside its model. */
+.agent-meta { display: flex; align-items: center; gap: var(--space-2); }
+.idle-dot { width: 6px; height: 6px; border-radius: var(--radius-circle); border: 1.5px solid var(--text-faint); }
 .row { display: flex; gap: var(--gap-inline); align-items: center; flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
 
@@ -202,42 +168,12 @@ h2, h3 {
 .dot[data-tone='ok'] { background: var(--state-ok); border-color: var(--state-ok); }
 .dot[data-tone='warn'] { background: var(--state-warn); border-color: var(--state-warn); }
 .dot[data-tone='bad'] { background: var(--state-bad); border-color: var(--state-bad); }
-.dot[data-tone='active'] { background: var(--accent); border-color: var(--accent); animation: dot-pulse 1s var(--ease-in-out) infinite; }
-@keyframes dot-pulse { 50% { opacity: 0.25; } }
-@media (prefers-reduced-motion: reduce) { .dot[data-tone='active'] { animation: none; } }
 
-/* ── Controls: 32 px buttons, inputs on the same rung ───────────────────────────────────────── */
-/* An `acorn://` link is an anchor, so the browser hands it to the desktop app, drawn as a button. The
- * kit's own controls (`ui-` classes) keep the desktop's look, so these plain-element rules skip them.
- * The selector weighs nothing, so any rule with a class beats it: a row, a menu item, a rail tab, or
- * a picker row draws as itself, not as an accent-filled button. */
-:where(button, a.button):where(:not([class*='ui-'])) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  min-height: var(--control-h);
-  padding: var(--pad-control);
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--accent-fg);
-  background: var(--accent);
-  border: var(--control-bw) solid var(--accent);
-  border-radius: var(--radius-control);
-  cursor: pointer;
-  transition: var(--transition-color);
-}
-a.button { text-decoration: none; white-space: nowrap; }
-button:disabled { opacity: 0.5; cursor: default; }
-:is(button, a.button).quiet { color: var(--text); background: var(--bg); border: var(--control-border); }
-:is(button, a.button).quiet:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
-:is(button, a.button).link { min-height: 0; padding: 0; background: transparent; border: 0; color: var(--text-muted); }
-:is(button, a.button).link:hover:not(:disabled) { color: var(--text); }
-button.icon { width: var(--control-h); padding: 0; background: transparent; color: var(--text); border-color: transparent; font-size: var(--fs-lg); }
-button.icon:hover:not(:disabled) { background: var(--bg-hover); }
-button.icon[aria-pressed='true'] { background: var(--bg-selected); }
-button.icon svg { width: var(--icon-size); height: var(--icon-size); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-input:not([type='checkbox']):where(:not([class*='ui-'])), select:where(:not([class*='ui-'])), textarea:where(:not([class*='ui-'])) {
+/* ── Fields: inputs on the buttons' rung ────────────────────────────────────────────────────── */
+/* Every button is the kit's. The last plain fields take these rules, which skip the kit's own: every
+ * `ui-` class and the picker's `repo-picker-` parts. The selectors weigh nothing, so any rule with a
+ * class beats them. */
+:where(input:not([type='checkbox']), select, textarea):where(:not([class*='ui-'], [class*='repo-picker-'])) {
   min-width: 0;
   min-height: var(--control-h);
   padding: var(--space-2) var(--space-4);
@@ -254,82 +190,103 @@ textarea { resize: vertical; }
 form { display: grid; gap: var(--gap-row); }
 label:where(:not([class*='ui-'])) { display: grid; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-muted); }
 label.check { display: flex; align-items: center; gap: var(--space-3); color: var(--text); }
+/* Filter tasks: the field's box holds the filter icon beside the text. */
+.filter { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-h-sm); padding: 0 var(--space-4); border: var(--control-border); border-radius: var(--radius-control); background: var(--input-bg); }
+.filter:focus-within { border-color: var(--accent); }
+.filter > input { flex: 1; min-width: 0; min-height: 0; padding: 0; border: 0; outline: 0; background: none; font-size: var(--fs-sm); }
 fieldset { border: var(--surface-border); border-radius: var(--radius-surface); margin: 0; padding: var(--space-3) var(--space-4); display: grid; gap: var(--space-2); }
 
 .quiet { color: var(--text-muted); }
 .problem { color: var(--danger); }
 .notice { color: var(--text-muted); }
-/* A short label beside a name, such as the Node on this Mac. */
-.tag { padding: 0 var(--space-2); border: var(--control-border); border-radius: var(--radius-chip); font-size: var(--fs-xs); color: var(--text-muted); }
 ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
-.handoff, .sites { display: grid; gap: var(--gap-row); }
 
-/* ── Waiting for you ────────────────────────────────────────────────────────────────────────── */
-.waiting { display: grid; gap: var(--space-3); }
-.waiting + .waiting { padding-top: var(--gap-row); border-top: var(--divider); }
-.request {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-5);
+/* ── This page ──────────────────────────────────────────────────────────────────────────────── */
+/* A field's caption beside its picker, small and muted, as one column of labels. Runs' workflow form
+   shares them. */
+:is(.this-page, .run-form) .ui-field[data-layout='row'] > .ui-field-label { flex: none; width: 74px; }
+:is(.this-page, .run-form) .ui-field-label { font-size: var(--fs-xs); color: var(--text-muted); }
+/* The issue card: the item's logo, key, and title, then its project and what to do with it. */
+:is(.handoff, .run-form) .ui-card { display: grid; gap: var(--space-5); }
+.item-head { display: flex; align-items: flex-start; gap: var(--space-4); }
+.item-head > .ui-icon { flex: none; margin-top: var(--space-1); }
+.item-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.item-id { display: flex; align-items: center; gap: var(--space-3); min-width: 0; font-size: var(--fs-xs); color: var(--text-muted); }
+.item-id b { font-family: var(--font-mono); font-weight: var(--fw-semibold); color: var(--text); }
+.item-title { line-height: 1.35; }
+.hint { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); color: var(--text-muted); }
+.handoff .divider { margin: 0; border: 0; border-top: var(--divider); }
+/* The item waiting for a task's next chat, above its Agents tab's list or centred in its empty state. */
+.pending-item { display: grid; justify-items: start; gap: var(--space-2); }
+.ui-empty .pending-item { justify-items: center; }
+.agents > .pending { padding: var(--space-4) var(--pane-pad) 0; }
+
+/* ── Runs ───────────────────────────────────────────────────────────────────────────────────── */
+/* Run workflow's form, under the Runs header, laid out as This page's card. */
+.run-form { padding: 0 var(--pane-pad) var(--space-4); }
+
+/* ── Needs you ──────────────────────────────────────────────────────────────────────────────── */
+/* The top bar's amber button, with the count of requests waiting: a bare kit button, so the packs
+ * leave its colours alone. */
+.needs-you-button { flex: none; display: flex; }
+.needs-you-button > .ui-btn {
+  gap: var(--space-2);
+  min-height: var(--control-h-sm);
+  padding: 0 var(--space-4);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--state-warn);
+  background: color-mix(in srgb, var(--state-warn) 10%, var(--bg));
   border: var(--bw) solid var(--state-warn);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-chip);
 }
-.request[data-status='resolved'], .request[data-status='expired'] { border-color: var(--border); }
-.request pre.detail { margin: 0; font: var(--fs-sm) / var(--lh-tight) var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
+.needs-you-button > .ui-btn:hover:not(:disabled) { color: var(--state-warn); background: color-mix(in srgb, var(--state-warn) 18%, var(--bg)); border-color: var(--state-warn); }
+/* Its popover holds the list against its own edge. */
+.ui-popover:has(> .needs-you-popover) { padding: 0; }
+.needs-you-popover { width: 340px; max-width: 100%; max-height: 420px; overflow: auto; }
+.needs-you { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-row); }
+.needs-you-popover > .needs-you { padding: var(--space-4) var(--space-3); }
+.needs-you-count { margin-inline-start: var(--space-2); color: var(--state-warn); }
+.needs-you .ui-row-trailing { gap: var(--space-2); }
+/* An expanded row's detail and buttons, in line with its title. */
+.row-answer { display: grid; gap: var(--space-4); padding: 0 var(--space-2) var(--space-4) calc(var(--space-2) + 14px + var(--space-4)); }
+.choices > .ui-btn[data-variant='bare'] { min-height: var(--control-h-sm); }
+
+/* A request in a conversation, in the desktop's card. */
+.request .ui-card { display: grid; gap: var(--space-3); }
+.request .eyebrow { font-size: var(--fs-2xs); color: var(--text-muted); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); font-weight: var(--label-weight); }
 .request ul.asked { list-style: disc; padding-left: var(--space-8); }
 
 /* ── Conversation ───────────────────────────────────────────────────────────────────────────── */
-/* Messages read top to bottom: each a card with the speaker as a label, striped like the desktop's,
- * accent for you and green for the agent. A tool call is one muted line behind its state dot. */
-.transcript { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-stack); margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
-.transcript > li:not(.tool) {
-  padding: var(--space-4);
-  background: var(--card-bg);
-  border: var(--surface-border);
-  border-left-width: var(--stripe-w);
-  border-radius: var(--radius-surface);
-}
-.transcript > li.you { border-left-color: var(--accent); }
-.transcript > li.agent { border-left-color: var(--state-ok); }
-.transcript > li.error { border-left-color: var(--danger); }
-.transcript > li > strong { font-size: var(--label-size); font-weight: var(--label-weight); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); color: var(--text-muted); }
-.transcript > li.tool { display: flex; align-items: flex-start; gap: var(--space-3); color: var(--text-muted); font-size: var(--fs-sm); }
-.transcript > li.tool .dot { margin-top: calc((1lh - 8px) / 2); }
-.transcript > li.error p { margin-top: var(--space-1); white-space: pre-wrap; }
+/* Messages read top to bottom, each a kit card. A tool call is one muted line behind its state mark,
+ * and a run of them folds into one line. */
+.transcript, .tool-lines { display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; padding: 0; list-style: none; overflow-wrap: anywhere; }
+.transcript { gap: var(--gap-stack); }
+.tool-lines { gap: var(--space-3); }
+.tool { display: flex; align-items: flex-start; gap: var(--space-3); color: var(--text-muted); font-size: var(--fs-sm); }
+.tool > .ui-icon { flex: none; margin-top: calc((1lh - 1em) / 2); }
+.transcript .ui-fold-summary { font-size: var(--fs-sm); color: var(--text-muted); }
+.transcript .ui-fold > .tool-lines, .transcript .ui-fold + .tool-lines { padding: var(--space-3) 0 0 var(--space-6); }
+.error-text { white-space: pre-wrap; font-size: var(--fs-sm); }
+/* What the agent is doing, above the message box. */
+.activity { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-h-sm); font-size: var(--fs-sm); }
 
-/* Rendered Markdown, on the desktop's .ui-markdown rules (client-core primitives.css). Lists get their
- * markers back from the reset at the top. */
-.ui-markdown { font-size: var(--fs-sm); line-height: var(--lh); }
+/* Rendered Markdown sits on the kit's own .ui-markdown rules (client-core primitives.css). These put
+ * back what the panel's reset and its section headings take away, and trim a message card's edges. */
 .ui-markdown > :first-child { margin-top: var(--space-1); }
 .ui-markdown > :last-child { margin-bottom: 0; }
-.ui-markdown p { margin: var(--space-3) 0; }
 .ui-markdown ul { list-style: disc; }
 .ui-markdown ol { list-style: decimal; }
 .ui-markdown :is(ul, ol) { margin: var(--space-3) 0; padding-left: var(--space-8); }
-.ui-markdown :is(pre, code) { font-family: var(--font-mono); background: var(--bg-subtle); border-radius: var(--radius); }
-.ui-markdown pre { margin: var(--space-3) 0; padding: var(--space-4); overflow-x: auto; border: var(--surface-border); }
-.ui-markdown pre code { background: none; }
+.ui-markdown pre { margin: var(--space-3) 0; }
 .ui-markdown :is(h1, h2, h3, h4, h5, h6) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); font-weight: var(--fw-semibold); color: var(--text); text-transform: none; letter-spacing: normal; }
-.ui-markdown a { color: var(--accent); }
-.ui-markdown blockquote { margin: var(--space-4) 0; padding-left: var(--space-5); border-left: var(--surface-bw) solid var(--border); color: var(--text-muted); }
-.ui-markdown table { display: block; width: max-content; max-width: 100%; overflow-x: auto; margin: var(--space-4) 0; border-collapse: collapse; overflow-wrap: break-word; }
-.ui-markdown :is(th, td) { padding: var(--space-3) var(--space-6); border: var(--chrome-divider); text-align: start; vertical-align: top; }
-.ui-markdown th { background: var(--bg-subtle); font-weight: var(--fw-semibold); }
-.attachments { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); }
-.attachments img { display: block; max-width: 100%; max-height: 160px; object-fit: contain; border: var(--divider); border-radius: var(--radius-control); }
-.composer { position: sticky; bottom: var(--pane-head-h); background: var(--bg); border-top: var(--chrome-divider); }
-.toolbar { flex-wrap: nowrap; }
+.attachments { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.attachments .thumb { display: block; height: var(--icon-box); width: auto; border-radius: var(--radius-xs); }
+.composer { position: sticky; bottom: 0; background: var(--bg); border-top: var(--chrome-divider); }
 /* The size toggle sits in the field's top corner, as on the desktop, with the text kept clear of it. */
 .composer .field { position: relative; }
 .composer .field textarea { display: block; width: 100%; padding-right: calc(var(--control-h-sm) + var(--space-4)); }
-.composer .field > button.icon {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  width: var(--control-h-sm);
-  min-height: var(--control-h-sm);
-  color: var(--text-muted);
-}
+.composer .field > .ui-btn { position: absolute; top: var(--space-2); right: var(--space-2); }
 
 /* Each capture is a chip; opening it shows what goes to the agent. */
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
@@ -340,16 +297,11 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .chip summary { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; list-style: none; overflow: hidden; }
 .chip summary::-webkit-details-marker { display: none; }
 .chip summary strong { font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chip button.icon { width: var(--control-h-sm); min-height: var(--control-h-sm); font-size: var(--fs); }
 .chip .thumb { height: var(--icon-box); width: auto; border-radius: var(--radius-xs); }
 .chip .quiet { display: block; overflow-wrap: anywhere; font-size: var(--fs-xs); }
 .chip blockquote, .chip pre.context { margin: var(--space-2) 0 0; padding-left: var(--space-4); border-left: var(--bw-strong) solid var(--border); white-space: pre-wrap; font: inherit; max-height: 8.5em; overflow: auto; }
-/* A plugin panel's status detail and log lines, as the plugin wrote them. */
-.panel-block pre { margin: 0; font: var(--fs-sm) / var(--lh-tight) var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24em; overflow: auto; }
-/* Log lines sit on a tinted box so they read as output, not as the panel's own words. */
-.panel-block pre.logs { padding: var(--space-3) var(--space-4); background: var(--bg-subtle); border: var(--bw) solid var(--border); border-radius: var(--radius); }
-/* The section already pads the panel's edge, so the kit's own pad on group labels and rows would indent them past the status line. */
-.panel-block :is(.section-header, .ui-row) { padding-inline: 0; }
-/* An address that opens reads as plain text until it's hovered. */
-.panel-block a.address { text-decoration: none; }
-.panel-block a.address:hover { color: var(--text); text-decoration: underline; }
+/* A plugin panel's header: the status block's label and lines, with Refresh and Open in Acorn at the right. */
+.panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); padding: var(--space-5) var(--pane-pad) 0; }
+.panel-head > .ui-stack { flex: 1; min-width: 0; }
+/* Log lines scroll inside their section rather than stretching the panel. */
+.panel-blocks .ui-log-lines { max-height: 24em; }

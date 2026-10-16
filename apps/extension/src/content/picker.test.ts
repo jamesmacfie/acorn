@@ -61,6 +61,7 @@ let answer: (message: AskMessage) => unknown
 const OPENED: AskOpened = {
   ok: true,
   pickId: 'pick-1',
+  task: 'Fix billing rounding',
   sessions: [{ id: 's1', title: 'Billing rounding' }],
   agents: [
     { key: 'claude::', label: 'Claude' },
@@ -95,7 +96,20 @@ function person(type: string, target: EventTarget, extra: Record<string, unknown
 }
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 const field = () => box()!.querySelector('textarea')!
-const [conversation, agent] = [0, 1].map((index) => () => box()!.querySelectorAll('select')[index]!)
+const to = () => box()!.querySelector<HTMLButtonElement>('.to')!
+const menu = () => box()!.querySelector<HTMLElement>('[role="menu"]')!
+// The To menu's groups and rows, a group's heading in brackets, as the person reads them.
+const menuLines = () =>
+  [...menu().children].flatMap((line) =>
+    line.className === 'sep' ? [] : line.className === 'group' ? [`[${line.textContent}]`] : [line.textContent],
+  )
+const row = (name: string) =>
+  [...menu().querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find((each) => each.textContent === name)!
+// The person opens To and picks the row reading `name`.
+function sendTo(name: string) {
+  person('click', to(), {}, to())
+  person('click', row(name), {}, row(name))
+}
 const send = () => box()!.querySelector<HTMLButtonElement>('.send')!
 const note = () => box()!.querySelector<HTMLElement>('.note')!
 const type = (text: string) => {
@@ -130,9 +144,15 @@ describe('the element picker', () => {
     expect(box()!.getAttribute('aria-label')).toBe('Ask Acorn about this element')
     expect(box()!.dataset.theme).toBe('light')
     expect(root!.activeElement).toBe(box()!.querySelector('textarea'))
-    const selects = [...box()!.querySelectorAll('select')]
-    expect(selects.map((select) => select.getAttribute('aria-label'))).toEqual(['Conversation', 'Agent'])
-    expect([...box()!.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Cancel', 'Send'])
+    // jsdom lays nothing out, so the element is 0 by 0.
+    expect(box()!.querySelector('.element')!.textContent).toBe('button.save · 0 × 0')
+    expect(box()!.querySelector('.element svg')).not.toBeNull()
+    expect([...box()!.querySelectorAll('.bar > button')].map((button) => button.textContent)).toEqual([
+      'New chat · Claude · work',
+      'esc',
+      'Send ↵',
+    ])
+    expect(box()!.querySelector('.cancel')!.getAttribute('aria-label')).toBe('Cancel')
   })
 
   it('lets the person point at an element when there is no right-click to use', () => {
@@ -198,13 +218,19 @@ describe('the element picker', () => {
     await asked('.save')
     expect(sent).toEqual([{ type: 'acorn:ask.open', rect: { x: 0, y: 0, width: 0, height: 0 }, devicePixelRatio: 1 }])
     expect(note().hidden).toBe(true)
-    expect([...conversation().options].map((option) => [option.value, option.textContent])).toEqual([
-      ['', 'New chat'],
-      ['s1', 'Billing rounding'],
-    ])
-    expect(conversation().value).toBe('')
-    expect(agent().value).toBe('claude:work:')
-    expect(agent().hidden).toBe(false)
+    // To names the remembered agent's new chat, and its menu holds every destination.
+    expect(to().getAttribute('aria-label')).toBe('To: New chat · Claude · work')
+    expect(menu().hidden).toBe(true)
+    person('click', to(), {}, to())
+    expect(menu().hidden).toBe(false)
+    expect(to().getAttribute('aria-expanded')).toBe('true')
+    expect(menuLines()).toEqual(['[New chat]', 'Claude', 'Claude · work', '[Fix billing rounding]', 'Billing rounding'])
+    expect(row('Claude · work').getAttribute('aria-checked')).toBe('true')
+    // A click elsewhere in the box closes it, and leaves focus where the click put it.
+    field().focus()
+    person('click', box()!, {}, box()!)
+    expect(menu().hidden).toBe(true)
+    expect(root!.activeElement).toBe(field())
     expect(send().disabled).toBe(true)
 
     type('  Why is this here?  ')
@@ -231,9 +257,11 @@ describe('the element picker', () => {
 
   it('sends to a chosen conversation on Enter, and keeps Shift+Enter for a new line', async () => {
     await asked('.save')
-    conversation().value = 's1'
-    conversation().dispatchEvent(new Event('change'))
-    expect(agent().hidden).toBe(true)
+    sendTo('Billing rounding')
+    expect(menu().hidden).toBe(true)
+    expect(root!.activeElement).toBe(to())
+    expect(to().textContent).toBe('Billing rounding')
+    expect(row('Billing rounding').getAttribute('aria-checked')).toBe('true')
     type('Why?')
     person('keydown', field(), { key: 'Enter', shiftKey: true }, field())
     await settle()
@@ -241,6 +269,38 @@ describe('the element picker', () => {
     person('keydown', field(), { key: 'Enter' }, field())
     await settle()
     expect(sent[1]).toMatchObject({ type: 'acorn:ask.send', sessionId: 's1', agent: null })
+  })
+
+  it('closes the To menu on Escape, then the box', async () => {
+    await asked('.save')
+    person('click', to(), {}, to())
+    person('keydown', document.body, { key: 'Escape' })
+    expect(menu().hidden).toBe(true)
+    expect(box()).not.toBeNull()
+    // So does a click on the page.
+    person('click', to(), {}, to())
+    person('click', document.body, {}, document)
+    expect(menu().hidden).toBe(true)
+    person('keydown', document.body, { key: 'Escape' })
+    expect(drawn()).toBeNull()
+  })
+
+  it('starts a new chat with another agent, and says when nothing can take the question', async () => {
+    await asked('.save')
+    sendTo('Claude')
+    expect(to().textContent).toBe('New chat · Claude')
+    type('Why?')
+    person('click', send(), {}, send())
+    await settle()
+    expect(sent.at(-1)).toMatchObject({ type: 'acorn:ask.send', sessionId: null, agent: 'claude::' })
+
+    answer = (message) =>
+      message.type === 'acorn:ask.open' ? { ...OPENED, sessions: [], agents: [], agent: null } : { ok: true }
+    await asked('.save')
+    expect(to().textContent).toBe('No agent can start on this Node')
+    expect(to().disabled).toBe(true)
+    type('Why?')
+    expect(send().disabled).toBe(true)
   })
 
   it("keeps the box open with the background's reason, and forgets the pick on Escape", async () => {

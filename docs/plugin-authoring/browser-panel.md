@@ -19,7 +19,7 @@ Declare it in the manifest. The manifest also needs a `node` entry:
 | Field | Meaning |
 | --- | --- |
 | `label` | The nav item's label and the panel's title, 1 to 40 characters. |
-| `glyph` | A Lucide icon name for the nav item. Without one, the nav item shows a generic panel icon. |
+| `glyph` | A Lucide icon name for the nav item, or `brand:<your plugin ID>` for the logo in your manifest's `icon`. Without one, the nav item shows a generic panel icon. |
 | `pane` | A task-scoped pane in the same manifest, which **Open in Acorn** opens on the task. Without one, the task opens on whichever pane it showed last. |
 | `route` | A `GET` route inside your own `/v1/p/<pluginId>/` namespace. |
 
@@ -43,7 +43,7 @@ caller whose credential is bound to one task.
 
 | Block | Fields |
 | --- | --- |
-| `status` | `label`, `state`, `severity`, and an optional `detail`, shown as preformatted text |
+| `status` | `label`, `state`, `severity`, and an optional `detail`. The first block, when it's a `status` block, heads the panel |
 | `links` | `title`, and `links`, at most 16, each `{ label, url }` with an optional `ready` |
 | `rows` | `title`, and `rows`, at most 64, each `{ label, state, severity }` |
 | `logs` | `title`, `sources`, at most 32, each `{ id, label }`, the `source` the lines came from or `null`, and `lines`, at most 200 |
@@ -62,6 +62,14 @@ answer over 512 KiB. The panel then shows an error and keeps the last view it ha
 has to ship in Acorn before a plugin can send it.
 
 The extension draws everything as plain text, never as markup.
+
+Put a `status` block first to head the panel. Its `state` shows as a badge in the severity's colour,
+and its `detail` as lines under the label. The first line is the panel's subtitle, in bold, so put
+the line that names the thing there, such as a pull request's title. Every later line is muted, in
+the order you send them. The extension reads nothing else in the text: no markup, and no line drawn
+differently for what it holds. Any other `status` block draws as a row.
+A `danger` header marks the panel's tab. Rows and statuses get an icon by severity, so send `info`
+for a passing state. [Plugin panels](../browser-extension/plugin-panels.md#the-panel) has the table.
 
 ## When the panel is read
 

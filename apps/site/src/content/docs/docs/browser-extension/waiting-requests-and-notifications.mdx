@@ -1,19 +1,19 @@
 ---
 title: Waiting requests and notifications
-description: How the browser extension tells you an agent is waiting on you, with the toolbar badge, the Waiting for you list, and notifications from your operating system.
+description: How the browser extension tells you an agent is waiting on you, with the toolbar badge, the Needs you list, and notifications from your operating system.
 sources:
   - docs/browser-extension/notifications.md
   - apps/extension/src/background/requestBadge.ts
-  - apps/extension/src/sidebar/Waiting.tsx
+  - apps/extension/src/sidebar/NeedsYou.tsx
   - apps/extension/src/sidebar/Settings.tsx
   - apps/extension/src/pageScope.ts
-checked: 07aa959a0
+checked: '68053b2e9'
 ---
 
 import SidebarPicture from '../../../../components/SidebarPicture.astro'
 
 When an agent stops to ask you something, such as permission to run a command, the browser extension
-can tell you while you're on another page. This page covers the toolbar badge, the **Waiting for you**
+can tell you while you're on another page. This page covers the toolbar badge, the **Needs you**
 list, and notifications from your operating system.
 
 ## The toolbar badge
@@ -25,16 +25,19 @@ page you're on. A page's projects are the task it belongs to, and the projects i
 The badge works with the panel closed, and goes to zero at once when the Node stops answering. It needs
 no access to the site, only the tab's address.
 
-## The Waiting for you list
+## The Needs you list
 
-**Waiting for you**, at the top of Home, lists every request waiting on the Node, across all its
-projects, not only this page's. It's there only while something waits.
+**Needs you** lists every request waiting on the Node, across all its projects, not only this
+page's. It's at the top of Home while something waits, and a task's **Agents** tab starts with that
+task's requests. On every other screen, the amber **Needs you** button in the top bar shows the count
+and opens the same list.
 
 <SidebarPicture id="sidebar-home" />
 
-Requests are grouped by conversation, under the task's name. Answer each one in place, with the same
-buttons the conversation shows, or click **Open** to go to the conversation. A group goes once nothing
-in it waits.
+Each row names the request, then its conversation and task. Click a permission or a single choice to
+see its detail and buttons, and answer it there: two clicks from any screen. The row shows what you
+chose, such as **Allowed once**, then leaves. A form or any other request opens its conversation
+instead, and **Open chat** does the same from an open row.
 
 So the badge says what waits for this page, and the list says what waits anywhere.
 
@@ -43,7 +46,7 @@ So the badge says what waits for this page, and the list says what waits anywher
 Notifications are off until you turn them on:
 
 1. In the panel, open **Settings** > **Notifications**.
-2. Tick **Notify me when an agent waits on the projects of the page I'm on**.
+2. Turn on **When an agent needs you**.
 3. Allow notifications when the browser asks.
 
 You then get one notification for each request that waits in the projects of a page you have open in

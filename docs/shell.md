@@ -38,7 +38,9 @@ terminal bytes, dialogs, notifications, the broker, the fleet, and adopting a pr
 [Host-owned webviews](./shell/webviews.md) covers the preview and plugin webviews, their history and
 lifetime, and the preview URL.
 
-[Build and packaging](./shell/packaging.md) covers staging, bundle verification, the Windows
-installer, CI permissions, Rust dependency findings, and the signing gates.
+[Build and packaging](./shell/packaging.md) covers staging, bundle verification, CI permissions, Rust
+dependency findings, and the signing gates.
+
+[Test installers](./shell/test-installers.md) covers the Windows installer and the Linux AppImages.
 
 [Native overlays](./native-overlays.md) covers drawing host floating UI over native pages on macOS.

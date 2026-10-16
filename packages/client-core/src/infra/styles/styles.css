@@ -25,7 +25,6 @@
 @import './topbar.css';
 @import './overlays.css';
 @import './integrations.css';
-@import './copy.css';
 @import './tabs.css';
 
 /* Hide scrollbars everywhere; scrolling still works. Electron/Chromium only. */

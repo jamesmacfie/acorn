@@ -108,9 +108,11 @@ import missing from its list and on a listed import that's gone. Add the reason 
 - **Desktop and terminal.** `TaskView.tsx` opens a terminal profile through `sessionsClient`, the create
   and list half of terminal's client, so the shell can't write to, attach to, or kill a session.
 - **Extension and agents.** The sidebar draws a session's state with `runtimeState`, marks the Agents
-  tab with it, and registers the harness marks from `providerMarks`.
-- **Extension and workflows.** The sidebar prefills a workflow's inputs from the page's item with
-  `itemInputs`, and draws runs and steps with `statusDisplay`.
+  tab, each task row, and a conversation's state line with it, and registers the harness marks from
+  `providerMarks`.
+- **Extension and workflows.** The sidebar prefills a workflow's inputs from the page's item, and
+  parses and checks the inputs of a start in a task, with `itemInputs`. It draws runs and steps with
+  `statusDisplay`.
 - **Node and three plugins.** `composition.ts` runs agents', terminal's, and workflows' startup
   reconcile through their `runtime` and `runner` capabilities.
 - **Terminal client and terminal.** `Sessions.tsx` and `sessionPty.ts` draw the terminal drawer

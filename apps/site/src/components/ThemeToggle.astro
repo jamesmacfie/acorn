@@ -1,0 +1,30 @@
+---
+// The light and dark switch. AppearanceScript applies and saves the choice. Without script the switch
+// can't apply, so it stays hidden until its script runs.
+import { Icon } from '@astrojs/starlight/components'
+---
+
+<button type="button" class="button theme-toggle" aria-label="Dark theme" aria-pressed="false" data-theme-toggle hidden>
+  <Icon name="sun" class="theme-toggle-light" />
+  <Icon name="moon" class="theme-toggle-dark" />
+</button>
+
+<script>
+  declare global {
+    interface Window {
+      acornAppearance: { toggle(): void }
+    }
+  }
+
+  const root = document.documentElement
+  const toggles = [...document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]')]
+  // A page can hold two switches, the header's and the narrow-screen menu's, and the system can change
+  // the scheme too, so every switch follows what's applied.
+  const sync = () => toggles.forEach((toggle) => toggle.setAttribute('aria-pressed', String(root.dataset.colorScheme === 'dark')))
+  for (const toggle of toggles) {
+    toggle.addEventListener('click', () => window.acornAppearance.toggle())
+    toggle.hidden = false
+  }
+  new MutationObserver(sync).observe(root, { attributeFilter: ['data-color-scheme'] })
+  sync()
+</script>

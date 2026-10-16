@@ -12,12 +12,14 @@ interface Props {
   id: SnapshotId
   /** Set when the page shows this scene more than once, so each copy's ids stay unique on the page. */
   instance?: string
+  /** Replaces the scene's own caption, for a page that points at one part of the window. */
+  caption?: string
 }
 
 const pages = import.meta.glob<string>('../generated/snapshots/*.html', { eager: true, query: '?raw', import: 'default' })
 const frames = import.meta.glob<CellFrame>('../generated/snapshots/*.cells.json', { eager: true, import: 'default' })
 
-const { id, instance } = Astro.props
+const { id, instance, caption } = Astro.props
 const scene = SNAPSHOTS[id]
 const captured = pages[`../generated/snapshots/${id}.html`]
 // The capture prefixes every id with the scene (docs/site/snapshots.md), so a second copy renames
@@ -36,7 +38,7 @@ if (scene.host === 'terminal' ? !cells : html === undefined) {
 <SnapshotFrame
   host={scene.host}
   title={scene.title}
-  caption={scene.caption}
+  caption={caption ?? scene.caption}
   size={cells && `${cells.columns}×${cells.rows}`}
 >
   {

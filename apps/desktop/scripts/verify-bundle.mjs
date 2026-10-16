@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { targetTriple } from './node-runtime.mjs'
 import { verifyResources, verifyRuntime } from './bundle-inventory.mjs'
+import { verifyLinuxBundle } from './verify-linux-bundle.mjs'
 import { verifyWindowsBundle } from './verify-windows-bundle.mjs'
 
 // What a built `.app` has to contain before anybody installs it (docs/shell/packaging.md § Build and packaging).
@@ -29,6 +30,10 @@ const bundle = process.argv[2]
   : resolve(PKG, 'src-tauri/target', process.env.ACORN_TARGET_TRIPLE ? `${triple}/release` : 'release', 'bundle')
 if (process.platform === 'win32') {
   verifyWindowsBundle(PKG, bundle)
+  process.exit(0)
+}
+if (process.platform === 'linux') {
+  verifyLinuxBundle(PKG, bundle)
   process.exit(0)
 }
 const app = readdirSync(join(bundle, 'macos'), { withFileTypes: true })

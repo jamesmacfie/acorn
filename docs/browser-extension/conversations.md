@@ -13,13 +13,16 @@ The agent operations are thin calls to the agents plugin's routes, with that plu
 (`plugins/agents/src/contract/wire.ts`). The host imports them for types only, so the CLI bundle
 carries none of its code. It narrows each answer to what the sidebar draws:
 
-- A session row keeps its IDs, title, kind, `runtimeState`, `attention`, `lastEventSeq`, and
-  `archivedAt`, and drops `config`.
+- A session row keeps its IDs, title, kind, `runtimeState`, `attention`, `lastEventSeq`,
+  `archivedAt`, and `updatedAt`. It drops `config`, after reading the model and its reasoning effort
+  out of it as one line, such as `Opus · High`.
 - `session.read` asks the session route for `afterSeq`, `limit`, and `fold=1`, so each tool call
   arrives as one record. Each record keeps its ID, seq, turn, and `foldedThroughSeq`. Only the
   session's own user and agent messages, tool calls, and errors are kept, and a tool call keeps only
   its title and status. A person's message lists the attachments its turn sent
   ([page capture](./page-capture.md#sent-screenshots-in-the-conversation)). Its input and output can be megabytes, and a summary never shows them.
+  A workflow step's prompt carries `workflow: true`, so the sidebar can say the workflow sent it. The
+  nudge a step sends after a turn ends without its result doesn't.
   `reach` is the furthest seq the page covered, counting the records left out, and the next read
   starts there. `queued` lists turns accepted but not yet sent to the agent, whose message joins the
   conversation only at dispatch.
@@ -30,9 +33,42 @@ carries none of its code. It narrows each answer to what the sidebar draws:
   logins in its place, then each custom agent on a harness the Node registers. Each row has its
   name, its mark and account icon, what it says under its name, and whether it can start. `refresh`
   asks the Node to check its harnesses again, as the picker's refresh button does.
+- `session.cancel` posts an empty body to the session's `cancel` route, which stops its running turn,
+  as the desktop's **Stop** does. See [the state line](./transcript.md#the-state-line).
 - `session.create` sends `kind: 'interactive'`, the row's `customAgentId` and `account` when it has
   them, and an empty `config`, so the Node applies the same defaults any other client gets. The
   sidebar's **New chat** is the kit's own `Picker`, as on the desktop.
+
+## A task's Agents tab
+
+`Agents` in `apps/extension/src/sidebar/Agents.tsx` lays out the tab as the desktop's Agents sidebar
+does. From the top:
+
+1. **Needs you**, with the task's waiting requests, drawn only while one waits. Its rows leave out the
+   task's title, since the tab already names it ([the Needs you list](./notifications.md#the-needs-you-list)).
+2. **Managed sessions**, the kit's `Section`, with **New chat** in its header.
+3. **Workflow runs** and **Inline chats**, each the kit's `Fold` with its count, closed until the
+   person opens it. A fold with no rows isn't drawn. The panel remembers which folds are open until it
+   closes, for every task, and never stores it.
+
+Each conversation is the kit's stacked `Row`. It leads with the state icon from the agents plugin's
+`runtimeIcon` and `runtimeTone`, which turns while the agent works. While the agent waits on the
+person, the amber alert takes its place and trails the row too. The icon's accessible name is the
+state's words, because the row doesn't write them out. Under the title sit the provider's logo, or its
+ID when it has none, and the model. The row ends with the time since `updatedAt`, such as "2m ago",
+which moves on each minute. A press opens the conversation.
+
+A task with no conversation shows the kit's `EmptyState` instead: "No chats in this task", then the
+[item waiting for the first chat](./handoffs.md#the-item-waiting-for-the-first-chat) as a chip, then
+**Start a chat**. An item waiting on a task that has conversations shows above **Managed sessions**.
+
+Picking an agent from **New chat** or **Start a chat** starts the conversation, opens it, and puts
+the cursor in its message box. Opening a conversation any other way leaves the focus alone.
+
+## The conversation
+
+A conversation opens inside its task. Its transcript, folded tool calls, state line with **Stop**, and
+message box are on [the conversation view](./transcript.md).
 
 ## Writes and retries
 
@@ -65,9 +101,15 @@ The host narrows each row in `bridgeRequest` (`apps/cli/src/browser/agents.ts`):
   scope; or nothing to send. The sidebar shows the request in full, with no buttons, and sends the
   person to the Acorn app. It never makes up an answer.
 
+The conversation draws each request as the desktop's card: an amber stripe while it waits, the kind
+above the title, the detail in a code block, then the form or the buttons. The first button is solid,
+a refusal is a quiet danger button, and the rest are plain. A waiting request has no status line,
+because the stripe says it waits. Once answered, a line says it was sent, answered, or expired. The
+[Needs you list](./notifications.md#the-needs-you-list) answers a request with the same buttons.
+
 `request.resolve` posts to the agents plugin's resolve route with the `key` as its idempotency key. The
-sidebar (`src/sidebar/Requests.tsx`) keeps answers in the card's memory only, never in browser
-storage, and clears them once the Node takes them. Every answer, sent or not, reads the conversation
+sidebar (`createAnswer` in `src/sidebar/Requests.tsx`, shared by the card and the Needs you row) keeps
+answers in the card's memory only, never in browser storage, and clears them once the Node takes them. Every answer, sent or not, reads the conversation
 again. An uncertain failure, as in [writes and retries](#writes-and-retries), keeps the key in memory:
 pressing the same answer again reuses it, so the Node settles the request once. Nothing resends an
 answer on its own, on reconnect or otherwise.
@@ -114,12 +156,13 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
   screenshot's attachment ID once the Node holds it. It sits apart from the text because the text is
   saved on each keystroke and a screenshot can be megabytes. The background adds a selection here
   for [Add to Acorn chat](./page-capture.md#add-to-acorn-chat), and an open composer shows it.
-- `destination:<nodeId>`: the current task on that Node, with its project, and the conversation open
-  over Home, if any. The panel restores both when it opens and when Settings closes. Only the person's
-  own choices are saved, including the conversation **Add to Acorn chat** added a selection to.
-- `taskViews:<nodeId>`: what the sidebar last showed for each task, `{ tab, sessionId, runId }` by
-  task ID, for [moving between pages](./task-pages.md#moving-between-pages). It keeps the 50 tasks
-  used most recently.
+- `destination:<nodeId>`: the task the panel last showed on that Node, with its project, and the
+  conversation open in it, if any. A workflow step's conversation is kept as its task. Home and
+  Settings leave it alone, so a selection always has a conversation to go to. The panel returns to it
+  when it opens, and **Add to Acorn chat** saves the conversation it added a selection to.
+- `taskViews:<nodeId>`: the tab last picked under each task, `{ tab }` by task ID, for
+  [moving between pages](./task-pages.md#moving-between-pages). It keeps the 50 tasks used most
+  recently. A view stored by an older build may name the Runs tab `workflows`, which reads as `runs`.
 - `appearance`: the panel's `{ theme, style }`, with `theme` null to follow the system's light or dark
   ([appearance](./setup.md#appearance)).
 - `handoffs`: the selected Node's [handoffs](./handoffs.md#task-chips), `{ nodeId, handoffs }`,

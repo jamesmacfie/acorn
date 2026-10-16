@@ -48,6 +48,9 @@ const CITED = /`([A-Za-z0-9_./@-]+)`/g
 // like repo paths because that is the layout under the root (docs/data-layer.md).
 const isDataRoot = (path: string) => path.endsWith('.sqlite')
 
+// A build writes `dist/`, so its files exist only after a build, and a fresh checkout has none.
+const isBuildOutput = (path: string) => path.includes('/dist/')
+
 // A review is dated evidence. Rewriting one so a path resolves would falsify what was true when it
 // was written, so reviews are read-only here and excluded.
 const REVIEWS: string[] = ['docs/security/review-2026-10-01.md']
@@ -74,7 +77,7 @@ describe('docs cite paths that exist', () => {
         while ((match = CITED.exec(line))) {
           const path = match[1]
           if (!ROOTS.some((root) => path.startsWith(root))) continue
-          if (!/\.[a-z]+$/.test(path) || isDataRoot(path)) continue
+          if (!/\.[a-z]+$/.test(path) || isDataRoot(path) || isBuildOutput(path)) continue
           checked += 1
           if (existsSync(join(ROOT, path))) continue
           if (GONE.some((marker) => lower.includes(marker))) continue

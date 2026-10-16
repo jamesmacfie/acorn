@@ -5,6 +5,7 @@ import {
   type BrowserHandoff,
   type BrowserPanel,
   type BrowserPanelView,
+  type PluginIcon,
 } from '../plugin/handoffs.ts'
 import {
   siteAssociationSchema,
@@ -167,15 +168,28 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   }),
   z.strictObject({ ...envelope, op: z.literal('node.select'), nodeId: nodeId.nullable() }),
   z.strictObject({ ...envelope, op: z.literal('node.forget'), nodeId }),
+  // This browser's name for the Node. Nothing on the Node or in other clients changes.
+  z.strictObject({ ...envelope, op: z.literal('node.rename'), nodeId, label: z.string().trim().min(1).max(120) }),
   // Bound to the node it was asked of. The host refuses it once that node is no longer selected.
   z.strictObject({ ...envelope, op: z.literal('projects.list'), nodeId }),
-  z.strictObject({ ...envelope, op: z.literal('tasks.list'), nodeId, projectId: rowId }),
   // Every active task's page addresses, so the browser matches the page to its task itself and no
   // page address goes to the Node for it (docs/browser-extension/task-pages.md).
   z.strictObject({ ...envelope, op: z.literal('tasks.pages'), nodeId }),
   // The rows of the desktop's New picker. `refresh` asks the Node to check its harnesses again first.
   z.strictObject({ ...envelope, op: z.literal('agents.choices'), nodeId, refresh: z.boolean().optional() }),
-  z.strictObject({ ...envelope, op: z.literal('sessions.list'), nodeId, taskId: rowId }),
+  // One task's sessions, or every task's in one workspace.
+  z
+    .strictObject({
+      ...envelope,
+      op: z.literal('sessions.list'),
+      nodeId,
+      taskId: rowId.optional(),
+      workspaceId: rowId.optional(),
+    })
+    .refine(
+      (request) => (request.taskId === undefined) !== (request.workspaceId === undefined),
+      'Name a task or a workspace.',
+    ),
   z.strictObject({
     ...envelope,
     op: z.literal('session.read'),
@@ -211,6 +225,10 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     input: turnInputSchema,
     key: operationKey,
   }),
+  // Archives a conversation, as the desktop's Archive does. The Node keeps it, out of every list.
+  z.strictObject({ ...envelope, op: z.literal('session.archive'), nodeId, sessionId: rowId, key: operationKey }),
+  // Stops the conversation's running turn, as the desktop's Stop does. The next read shows the stop.
+  z.strictObject({ ...envelope, op: z.literal('session.cancel'), nodeId, sessionId: rowId, key: operationKey }),
   // Answers one request the agent is waiting on. `requestId` is the agents plugin's provider request
   // ID. The key is kept by the sidebar for that request and answer only, never stored, so an answer is
   // sent again only when the person presses it again.
@@ -301,7 +319,7 @@ export type BridgeProject = { id: string; name: string; path: string | null; hid
 export type BridgeWorkspace = { id: string; name: string }
 export type BridgeNodes = { nodes: NodeRecord[]; activeNodeId: string | null; status: NodeStatus | null }
 
-export type BridgeTask = { id: string; title: string; branch: string | null }
+type BridgeTask = { id: string; title: string; branch: string | null }
 
 // An address a task is known by, in the project sites' grammar: an exact origin and a path prefix
 // matched by whole segments, so a pull request's address covers its tabs and one at `/` covers the
@@ -362,8 +380,8 @@ export type BridgeAttachmentRef = { id: string; image: boolean; name: string | n
 
 export type BridgeConversationEvent =
   // `attachments` lists what the person's turn sent. When it's present, the text no longer carries the
-  // `[Attachment: <id>]` lines that name them for the agent.
-  | { type: 'user_message'; text: string; attachments?: BridgeAttachmentRef[] }
+  // `[Attachment: <id>]` lines that name them for the agent. `workflow` marks a workflow step's prompt.
+  | { type: 'user_message'; text: string; attachments?: BridgeAttachmentRef[]; workflow?: true }
   | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean }
   // `title` and `status` absent mean unchanged, as on the agents plugin's tool call.
   | { type: 'tool'; toolId: string; title?: string; status?: string }
@@ -496,14 +514,16 @@ export type BridgeResults = {
   'node.collect': NodeRecord | null
   'node.select': BridgeNodes
   'node.forget': BridgeNodes
+  'node.rename': BridgeNodes
   'projects.list': { nodeId: string; projects: BridgeProject[]; workspaces: BridgeWorkspace[] }
-  'tasks.list': { nodeId: string; projectId: string; tasks: BridgeTask[] }
   'tasks.pages': { nodeId: string; tasks: BridgePageTask[] }
   'agents.choices': { nodeId: string; choices: BridgeAgentChoice[] }
-  'sessions.list': { nodeId: string; taskId: string; sessions: BridgeAgentSession[] }
+  'sessions.list': { nodeId: string; sessions: BridgeAgentSession[] } & ({ taskId: string } | { workspaceId: string })
   'session.read': BridgeSessionRead
   'session.create': { nodeId: string; session: BridgeAgentSession }
   'turn.submit': { nodeId: string; sessionId: string; turnId: string }
+  'session.archive': { nodeId: string; sessionId: string }
+  'session.cancel': { nodeId: string; sessionId: string }
   // The request as the Node holds it after the answer. One already settled comes back unchanged.
   'request.resolve': { nodeId: string; sessionId: string; request: BridgeAgentRequest }
   // Oldest first. Only active tasks' requests: an archived task has no conversation to open.
@@ -512,7 +532,8 @@ export type BridgeResults = {
   // `data` is the content as base64, or null when it isn't an image or passes ATTACHMENT_MAX_BYTES.
   'attachment.read': { nodeId: string; taskId: string; attachment: BridgeAttachment; data: string | null }
   'attachment.delete': { nodeId: string; taskId: string; attachmentId: string; removed: boolean }
-  'handoffs.list': { nodeId: string; handoffs: BridgeHandoff[]; panels: BridgePanel[] }
+  // `icons` holds the logo of each plugin that declares a handoff or a panel, to register as `brand:<pluginId>`.
+  'handoffs.list': { nodeId: string; handoffs: BridgeHandoff[]; panels: BridgePanel[]; icons: PluginIcon[] }
   'handoff.resolve': { nodeId: string; url: string; items: BridgeHandoffItem[] }
   // `created` is false when an active task in that project was already linked, which is answered instead.
   'handoff.create': { nodeId: string; task: BridgeTask & { projectId: string }; created: boolean }

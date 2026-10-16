@@ -1,18 +1,21 @@
 ---
-// The landing page. Every claim links
-// to the docs page that owns it, and every picture is a specimen or a shell snapshot.
+// The landing page, told in four chapters: the loop a task goes through, the window it happens in, the
+// plugins that window is made of, and what acorn keeps safe. Every claim links to the docs page that
+// owns it, and every picture is a specimen or a shell snapshot.
 import { Code } from '@astrojs/starlight/components'
 import Card from '../components/Card.astro'
-import Feature from '../components/Feature.astro'
 import Hero from '../components/Hero.astro'
 import InstallBlock from '../components/InstallBlock.astro'
 import Snapshot from '../components/Snapshot.astro'
 import SoftwareApplication from '../components/SoftwareApplication.astro'
 import Specimen from '../components/Specimen.astro'
 import Tour from '../components/Tour.astro'
+import { PLUGINS } from '../data/plugins.ts'
 import Marketing from '../layouts/Marketing.astro'
 import { installMethods } from '../install'
+import { ACORN_ART } from '../lib/acornArt'
 import { readGithub } from '../lib/github'
+import { lucideIcon } from '../lib/icons'
 import type { PageMeta } from '../meta'
 import { GITHUB } from '../nav'
 import type { SnapshotId } from '../snapshots'
@@ -23,10 +26,17 @@ export const meta = {
   sources: [
     'docs/features.md',
     'docs/workspaces-and-tasks.md',
+    'docs/workspaces-and-tasks/task-creation.md',
     'docs/workspaces-and-tasks/archive.md',
     'docs/managed-agents.md',
     'docs/tui.md',
     'docs/command-palette-and-shortcuts.md',
+    'docs/panes.md',
+    'docs/extensibility.md',
+    'docs/first-party-plugins.md',
+    'docs/plugins/agent-install.md',
+    'docs/workflows.md',
+    'docs/browser-extension.md',
     'docs/security/credentials.md',
     'docs/security/audit.md',
     'docs/security/plugin-bundles.md',
@@ -35,14 +45,15 @@ export const meta = {
     'docs/local-development.md',
     'docs/agent-tools/plugin-tools.md',
     'packages/create-acorn-plugin/index.mjs',
+    'apps/site/src/data/plugins.ts',
   ],
-  checked: 'b8c018a90',
+  checked: '3f99b39fc',
 } satisfies PageMeta
 
 const steps = [
   {
     title: 'Open a task',
-    text: 'A task is one piece of work on one project, on its own branch. acorn creates its Git worktree the first time something needs the files.',
+    text: 'A task is one piece of work on one project. Give it a title, and acorn names a branch after it and creates its Git worktree the first time something needs the files.',
     specimen: 'task-rows',
     href: '/docs/using/tasks-and-worktrees/',
     link: 'Tasks and worktrees',
@@ -56,15 +67,15 @@ const steps = [
   },
   {
     title: 'Review and ship',
-    text: 'Read the diff, open the pull request, and merge it without leaving the task. Archive the task and acorn stops its agents and terminals and removes its worktree.',
+    text: 'Read the diff, open the pull request, and merge it without leaving the task. Archive the task and acorn stops its agents and terminals and removes its worktree, mess and all.',
     specimen: 'ship',
     href: '/docs/using/archive-and-restore/',
     link: 'Archive and restore',
   },
 ]
 
-// One tab per feature group, in phase 1's ranking. The page shows `hero` and `fleet` twice, so the tour's
-// copies take an instance.
+// One tab per feature group, in features.ts's order, leaving out the groups the chapters below cover:
+// the two clients, plugins, and Nodes.
 const tour: { id: string; label: string; snapshot: SnapshotId; text: string; href: string; link: string }[] = [
   {
     id: 'tasks',
@@ -77,8 +88,8 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
   {
     id: 'agents',
     label: 'Agents',
-    snapshot: 'hero',
-    text: "Claude Code and Codex run as managed sessions in the task's worktree. Each session keeps its transcript, usage, and requests, and a delegated session can share the task or start a child task with its own worktree.",
+    snapshot: 'context',
+    text: "Claude Code and Codex run as managed sessions in the task's worktree, each with its transcript, usage, and requests. The Context pane is where you choose what the task tells them, and see how big it is.",
     href: '/features/agents/',
     link: 'More about agents',
   },
@@ -91,14 +102,6 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     link: 'More about review',
   },
   {
-    id: 'desktop-and-terminal',
-    label: 'Desktop and terminal',
-    snapshot: 'terminal-small',
-    text: 'The terminal client is a second window onto the same Node, drawing the same panes in character cells. One command palette and one set of keyboard commands serve both clients.',
-    href: '/features/desktop-and-terminal/',
-    link: 'More about the two clients',
-  },
-  {
     id: 'task-tools',
     label: 'Task tools',
     snapshot: 'database',
@@ -107,33 +110,28 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     link: 'More about task tools',
   },
   {
-    id: 'plugins',
-    label: 'Plugins',
-    snapshot: 'permissions',
-    text: 'Every pane in acorn comes from a plugin, and a plugin you install works the same way. Its permissions are listed in Settings, and each device decides whether to run it.',
-    href: '/features/plugins/',
-    link: 'More about plugins',
-  },
-  {
-    id: 'nodes',
-    label: 'Nodes',
-    snapshot: 'fleet',
-    text: 'A Node holds your workspaces and runs your agents. The desktop app starts one on your computer, and Fleet home shows every Node you pair with it.',
-    href: '/features/nodes/',
-    link: 'More about Nodes',
-  },
-  {
-    id: 'browser-automation-security',
-    label: 'Browser, automation, and security',
+    id: 'browser',
+    label: 'Browser',
     snapshot: 'browser',
-    text: 'The Chrome and Firefox extension shows the task behind the page you’re on and sends pages, selections, and screenshots to an agent. Workflows run agent, terminal, and check steps, with gates where a person decides.',
+    text: "The Chrome and Firefox extension shows the task behind the page you're on, and sends pages, selections, and screenshots to an agent.",
     href: '/features/browser/',
     link: 'More about the browser extension',
   },
+  {
+    id: 'automation',
+    label: 'Workflows',
+    snapshot: 'workflow',
+    text: 'Workflows run agent, terminal, and check steps as a graph, with gates where a person decides. Run one on a schedule or from a script.',
+    href: '/features/automation/',
+    link: 'More about automation',
+  },
 ]
 
-// The pane entry `npm create acorn-plugin` writes, for a plugin named Hello
-// (packages/create-acorn-plugin/index.mjs). The specimen beside it is the pane it draws.
+const plugins = Object.values(PLUGINS).sort((a, b) => a.name.localeCompare(b.name))
+
+// The command that scaffolds a plugin named Hello, and the pane entry it writes
+// (packages/create-acorn-plugin/index.mjs). The specimen beside them is the pane it draws.
+const scaffold = [{ label: 'Terminal', commands: ['npm create acorn-plugin hello-pane'] }]
 const paneEntry = `"frames": [{
   "target": "pane",
   "id": "hello",
@@ -146,20 +144,45 @@ const paneEntry = `"frames": [{
   }
 }]`
 
-const guides = [
-  ['/docs/build-plugins/ui/add-a-pane/', 'Add a pane', 'A view in the task’s row of panes.'],
-  ['/docs/build-plugins/ui/add-a-source-to-the-left-rail/', 'Add a source to the left rail', 'A list to browse, with items you can open.'],
-  ['/docs/build-plugins/ui/add-commands-and-keybindings/', 'Add commands and keybindings', 'Rows in the command palette, and keys for them.'],
-  ['/docs/build-plugins/node/give-agents-tools/', 'Give agents tools', 'Tools your agent sessions can call.'],
-  ['/docs/build-plugins/node/add-a-harness/', 'Add a harness', 'Another agent program for acorn to run.'],
-  ['/docs/build-plugins/ui/add-a-theme-or-a-style-pack/', 'Add a theme or a style pack', 'Colors, or a whole look.'],
+// What a plugin can add, by where it shows up. Each is a guide's own title.
+const canAdd = [
+  {
+    label: 'In the window',
+    guides: [
+      ['/docs/build-plugins/ui/add-a-pane/', 'Add a pane'],
+      ['/docs/build-plugins/ui/add-a-source-to-the-left-rail/', 'Add a source to the left rail'],
+      ['/docs/build-plugins/ui/add-commands-and-keybindings/', 'Add commands and keybindings'],
+      ['/docs/build-plugins/ui/add-a-settings-page/', 'Add a settings page'],
+      ['/docs/build-plugins/ui/put-a-badge-in-the-top-bar-or-task-footer/', 'Put a badge in the top bar or task footer'],
+      ['/docs/build-plugins/ui/add-to-another-plugins-view/', "Add to another plugin's view"],
+      ['/docs/build-plugins/ui/replace-the-top-bar-rail-or-pane-switcher/', 'Replace the top bar, rail, or pane switcher'],
+      ['/docs/build-plugins/ui/add-a-theme-or-a-style-pack/', 'Add a theme or a style pack'],
+      ['/docs/build-plugins/ui/draw-your-own-pixels-in-a-frame/', 'Draw your own pixels in a frame'],
+    ],
+  },
+  {
+    label: 'On the Node',
+    guides: [
+      ['/docs/build-plugins/node/give-agents-tools/', 'Give agents tools'],
+      ['/docs/build-plugins/node/add-task-context/', 'Add task context'],
+      ['/docs/build-plugins/node/act-on-agent-turns-with-hooks/', 'Act on agent turns with hooks'],
+      ['/docs/build-plugins/node/add-a-harness/', 'Add a harness'],
+      ['/docs/build-plugins/node/ship-custom-agents-and-skills/', 'Ship custom agents and skills'],
+      ['/docs/build-plugins/node/add-a-workflow-step/', 'Add a workflow step'],
+      ['/docs/build-plugins/node/run-work-on-a-schedule/', 'Run work on a schedule'],
+      ['/docs/build-plugins/node/connect-a-service/', 'Connect a service'],
+      ['/docs/build-plugins/node/add-a-command-line-command/', 'Add a command-line command'],
+    ],
+  },
 ]
 
-const security = [
+const trust = [
   ['/docs/security/the-trust-model/', 'Agents get a scoped token', 'An agent gets a token that reaches only its own task. acorn never puts your GitHub token or API keys in its environment.'],
   ['/docs/security/credentials-and-secrets/', 'Credentials are encrypted', 'Stored credentials are encrypted at rest and never returned by the Node. Backups leave them out.'],
   ['/docs/security/plugin-trust-and-permissions/', 'Plugins are sandboxed', 'An installed plugin draws from a sandbox and gets only the permissions you accept, on each device.'],
   ['/docs/security/telemetry-and-privacy/', 'Telemetry is off', 'Telemetry is off by default. Nothing leaves the machine unless you turn it on and add a destination.'],
+  ['/docs/nodes/run-a-standalone-node/', 'Run it on a server', 'The desktop app runs a Node on your computer. Pair a standalone Node on a server and use it from either client or the command line.'],
+  [GITHUB, 'Open source', 'The code is on GitHub under the MIT license.'],
 ]
 
 const faq = [
@@ -214,79 +237,153 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
 <Marketing title="A workspace for working with coding agents" meta={meta}>
   <SoftwareApplication slot="head" release={release} />
-  <Hero slot="hero" eyebrow="Claude Code and Codex" title="A workspace for working with coding agents, one task at a time.">
+  <Hero slot="hero" title="Let your agents go nuts." split>
     <p>
-      Open a task and acorn gives it a branch, a Git worktree, terminals, and agent sessions, with the diff and the pull
-      request in the panes beside them. Use it from the desktop app or from your terminal. It's the same workspace either
-      way.
+      acorn is a workspace for Claude Code and Codex. Each task gets its own branch, worktree, terminals, and agent
+      sessions, so your agents make their mess somewhere safe. Read the diff, merge the pull request, and archive the
+      rest.
+    </p>
+    <p class="hero-meta">
+      <a href="/docs/start/install/">macOS · Windows</a> ·{' '}
+      <a href="/docs/start/desktop-and-terminal/">terminal client</a> · <a href={`${GITHUB}/blob/main/LICENSE`}>MIT</a>
     </p>
     <Fragment slot="actions">
       <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
       <a class="button" href="/docs/">Read the docs</a>
     </Fragment>
-    <div slot="picture" class="hero-stack">
-      <p class="clients">
-        <a href="/docs/start/install/">The desktop app</a> for macOS and Windows,{' '}
-        <a href="/docs/start/desktop-and-terminal/">the terminal client</a>,{' '}
-        <a href="/docs/automation/the-command-line/">the command line</a>, and{' '}
-        <a href="/docs/browser-extension/set-up-the-extension/">the browser extension</a>.
-      </p>
-      <InstallBlock id="hero-install" methods={installMethods} />
-      <div class="hero-shot">
-        <div class="tabs" role="tablist" aria-label="Client" data-tabs hidden>
-          <button type="button" role="tab" aria-controls="hero-shot-desktop">Desktop</button>
-          <button type="button" role="tab" aria-controls="hero-shot-terminal">Terminal</button>
-        </div>
-        <div id="hero-shot-desktop" role="tabpanel" aria-label="Desktop"><Snapshot id="hero" /></div>
-        <div id="hero-shot-terminal" role="tabpanel" aria-label="Terminal"><Snapshot id="hero-terminal" /></div>
-        <p class="hero-shot-caption">The same task in both clients.</p>
+    <div slot="picture" class="hero-shot">
+      <div class="tabs" role="tablist" aria-label="Client" data-tabs hidden>
+        <button type="button" role="tab" aria-controls="hero-shot-desktop">Desktop</button>
+        <button type="button" role="tab" aria-controls="hero-shot-terminal">Terminal</button>
       </div>
+      <div id="hero-shot-desktop" role="tabpanel" aria-label="Desktop"><Snapshot id="hero" /></div>
+      <div id="hero-shot-terminal" role="tabpanel" aria-label="Terminal"><Snapshot id="hero-terminal" /></div>
     </div>
   </Hero>
 
-  <section class="section">
-    <h2>How it works</h2>
-    <div class="features">
+  <section class="section chapter" aria-labelledby="loop">
+    <header class="chapter-head">
+      <h2 id="loop">Every mess gets its own branch.</h2>
+      <p class="lede">
+        The usual task gets a branch and a worktree of its own, so agents on different tasks work in different checkouts
+        and don't trip over each other.
+      </p>
+    </header>
+    <ol class="loop">
       {
-        steps.map((step, index) => (
-          <Feature number={index + 1} level={3} title={step.title} href={step.href} link={step.link}>
+        steps.map((step) => (
+          <li>
+            <h3>{step.title}</h3>
             <p>{step.text}</p>
-            <Specimen slot="picture" id={step.specimen} />
-          </Feature>
+            <a href={step.href}>{step.link}</a>
+            <Specimen id={step.specimen} />
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section class="section chapter" aria-labelledby="window">
+    <header class="chapter-head">
+      <h2 id="window">You can close a few windows now.</h2>
+      <p class="lede">The pull request, the terminals, and the other tools a task needs open as panes inside it.</p>
+    </header>
+    <Tour tabs={tour}>
+      {tour.map((tab) => <Snapshot slot={tab.id} id={tab.snapshot} />)}
+    </Tour>
+  </section>
+
+  <section class="section chapter band" aria-labelledby="plugins">
+    <header class="chapter-head">
+      <h2 id="plugins">Take it apart.</h2>
+      <p class="lede">
+        Every pane in that window comes from a plugin, and so do the terminal drawer and most of the icons on its rails.
+        A plugin you install uses the same seams, and draws in both clients.{' '}
+        <a href="/features/plugins/">More about plugins</a>
+      </p>
+    </header>
+
+    <div class="xray">
+      <Snapshot
+        id="hero"
+        instance="plugins"
+        caption="The task from the top of the page, with what plugins draw outlined: the Git and Agent panes, the Terminal drawer, five sources on the left rail, and every pane's button on the right."
+      />
+    </div>
+
+    <div class="wall-head">
+      <h3>What ships with acorn</h3>
+      <a href="/plugins/">See what each one adds</a>
+    </div>
+    <ul class="wall">
+      {
+        plugins.map((plugin) => (
+          <li>
+            <span class="wall-icon" aria-hidden="true" set:html={lucideIcon(plugin.icon)} />
+            <a href={plugin.docs}>{plugin.name}</a>
+          </li>
+        ))
+      }
+      <li class="wall-yours">
+        <span class="wall-icon" aria-hidden="true" set:html={lucideIcon('plus')} />
+        <a href="/docs/build-plugins/start/build-your-first-plugin/">Yours</a>
+      </li>
+    </ul>
+
+    <h3 class="build-head">Then add your own.</h3>
+    <div class="build">
+      <div class="build-path">
+        <h4>Start from the scaffold</h4>
+        <p>
+          <code>npm create acorn-plugin</code> writes a plugin with one pane. This is the pane's entry in its manifest,
+          beside the pane it draws in each client.{' '}
+          <a href="/docs/build-plugins/start/build-your-first-plugin/">Build your first plugin</a>
+        </p>
+        <InstallBlock id="scaffold" methods={scaffold} />
+        <Code code={paneEntry} lang="json" title="acorn-plugin.json" />
+      </div>
+      <Specimen id="starter-pane" />
+      <div class="build-path">
+        <h4>Or ask your agent</h4>
+        <p>
+          Ask an agent in any task for "a pane that lists this task's TODO comments". It reads your Node's plugin
+          vocabulary with <code>plugin_authoring</code>, writes the package, and asks to install it. Nothing installs
+          until you approve. In development mode, the Node reloads the plugin each time the agent saves.{' '}
+          <a href="/docs/build-plugins/start/have-your-agent-build-it/">Have your agent build it</a>
+        </p>
+      </div>
+      <Specimen id="plugin-turn" />
+    </div>
+
+    <div class="can">
+      <h4>What a plugin can add</h4>
+      {
+        canAdd.map((group) => (
+          <div class="can-group">
+            <p class="eyebrow">{group.label}</p>
+            <ul>
+              {group.guides.map(([href, title]) => (
+                <li>
+                  <a href={href}>{title}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))
       }
     </div>
   </section>
 
-  <section class="section">
-    <h2>What acorn does</h2>
-    <Tour tabs={tour}>
-      {tour.map((tab) => <Snapshot slot={tab.id} id={tab.snapshot} instance={tab.snapshot === 'hero' || tab.snapshot === 'fleet' ? 'tour' : undefined} />)}
-    </Tour>
-  </section>
-
-  <section class="section">
-    <h2>Two clients, one workspace</h2>
-    <p>
-      The desktop app and the terminal client draw the same components, so a plugin written once works in both. Here's
-      one plugin's pane, drawn by each. <a href="/docs/start/desktop-and-terminal/">Desktop and terminal</a>
-    </p>
-    <Specimen id="issues-pane" both />
-  </section>
-
-  <section class="section">
-    <h2>Add what's missing</h2>
-    <p>
-      A plugin adds a pane with one entry in its manifest. This is the entry <code>npm create acorn-plugin</code> writes,
-      beside the pane it draws.
-    </p>
-    <div class="split">
-      <Code code={paneEntry} lang="json" title="acorn-plugin.json" />
-      <Specimen id="starter-pane" />
-    </div>
-    <ul class="cards">
+  <section class="section chapter" aria-labelledby="trust">
+    <header class="chapter-head">
+      <h2 id="trust">The agents don't get your keys.</h2>
+      <p class="lede">
+        Your code stays on the machine that runs the Node, and acorn limits what the agents and plugins there can reach.
+      </p>
+    </header>
+    <ul class="cells">
       {
-        guides.map(([href, title, text]) => (
+        trust.map(([href, title, text]) => (
           <li>
             <Card title={title} href={href}>
               <p>{text}</p>
@@ -295,38 +392,14 @@ const getAcorn = release ? 'Download' : 'Get acorn'
         ))
       }
     </ul>
-    <p>
-      Or ask your agent to write it. acorn's agents read the plugin vocabulary from your Node with the{' '}
-      <code>plugin_authoring</code> tool. <a href="/docs/build-plugins/start/have-your-agent-build-it/">Have your agent build it</a>
-    </p>
   </section>
 
-  <section class="section">
-    <h2>Your machine, your keys</h2>
-    <div class="cards">
-      {
-        security.map(([href, title, text]) => (
-          <Card title={title} href={href}>
-            <p>{text}</p>
-          </Card>
-        ))
-      }
+  <section class="section faq" aria-labelledby="questions">
+    <div class="faq-head">
+      <h2 id="questions">Questions</h2>
+      <a href="/docs/help/faq/">More in the FAQ</a>
     </div>
-  </section>
-
-  <section class="section">
-    <h2>Run it anywhere</h2>
-    <p>
-      The desktop app runs a Node on your machine. Pair others, including a{' '}
-      <a href="/docs/nodes/run-a-standalone-node/">standalone Node on a server</a>, and use any of them from the desktop
-      app, the terminal client, or the command line. <a href="/docs/nodes/">Nodes</a>
-    </p>
-    <div class="fleet"><Snapshot id="fleet" /></div>
-  </section>
-
-  <section class="section">
-    <h2>Questions</h2>
-    <div class="faq">
+    <div class="faq-list">
       {
         faq.map((item) => (
           <details>
@@ -340,13 +413,16 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     </div>
   </section>
 
-  <section class="section">
-    <h2>Get acorn</h2>
-    <InstallBlock id="footer-install" methods={installMethods} />
-    <div class="actions">
-      <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
-      <a class="button" href="/docs/">Read the docs</a>
+  <section class="section finale band" aria-labelledby="get-acorn">
+    <div class="finale-text">
+      <h2 id="get-acorn">Give them a task.</h2>
+      <InstallBlock id="footer-install" methods={installMethods} />
+      <div class="actions">
+        <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
+        <a class="button" href="/docs/">Read the docs</a>
+      </div>
     </div>
+    <pre class="finale-art" aria-hidden="true">{ACORN_ART}</pre>
   </section>
 </Marketing>
 
@@ -355,13 +431,10 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 </script>
 
 <style>
-  .hero-stack {
-    display: grid;
-    gap: var(--space-8);
-  }
-  .hero-stack > * {
-    margin: 0;
-    min-inline-size: 0;
+  /* ── Hero ── */
+  .hero-meta {
+    margin-block-start: var(--space-8);
+    font-size: var(--fs-sm);
   }
   .hero-shot {
     display: grid;
@@ -371,24 +444,397 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     margin: 0;
     min-inline-size: 0;
   }
-  .hero-shot-caption {
-    font-size: var(--fs-sm);
-  }
-  .split {
+
+  /* ── Chapters ──
+     Each of the four opens with a display heading and a lede. There's no label above the heading,
+     because a caps label over every heading is a mark of a generated page. */
+  .chapter-head {
     display: grid;
-    gap: var(--space-10);
-    align-items: start;
+    gap: var(--space-8);
+    justify-items: start;
   }
-  .split > * {
+  .chapter-head > * {
+    margin: 0;
+  }
+  .chapter h2,
+  .finale h2 {
+    max-inline-size: 20ch;
+    font-size: var(--site-fs-display);
+    /* Mono at display size reads loose, as the hero's headline does. */
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+  }
+  .lede {
+    max-inline-size: 60ch;
+    font-size: var(--fs-xl);
+  }
+  .chapter h3 {
+    margin: 0;
+    font-size: var(--fs-xl);
+  }
+  .chapter h4 {
+    margin: 0;
+    font-size: var(--fs-lg);
+  }
+
+  /* A chapter on its own band runs the subtle background to the window's edges. The shadow paints past
+     the column without widening the page, and the clip keeps it off the chapters above and below. */
+  .band {
+    margin-block-start: var(--site-section);
+    padding-block: var(--site-section);
+    background: var(--bg-subtle);
+    box-shadow: 0 0 0 100vmax var(--bg-subtle);
+    clip-path: inset(0 -100vmax);
+  }
+
+  /* ── The loop ──
+     The three steps side by side on a wide screen, each under a length of track. The accent fills the
+     track left to right as the steps scroll through the window: one task moving from open to merged. */
+  .loop {
+    display: grid;
+    gap: var(--site-section) var(--space-11);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .loop > li {
+    position: relative;
+    display: grid;
+    gap: var(--space-6);
+    align-content: start;
+    justify-items: start;
+    padding-block-start: var(--space-10);
+    view-timeline-name: --step;
+  }
+  .loop > li > * {
+    margin: 0;
     min-inline-size: 0;
   }
+  .loop > li > :global(.specimen) {
+    justify-self: stretch;
+    margin-block-start: var(--space-6);
+  }
+  .loop > li::before,
+  .loop > li::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    border-block-start: var(--bw-strong) solid var(--border-strong);
+  }
+  .loop > li::after {
+    border-color: var(--accent);
+    transform-origin: left;
+  }
+  /* Side by side, the steps share their rows, so the titles, the links, and the frames line up across
+     them, and each frame fills its row. The steps carry no numbers, because the list and the
+     track already give the order. */
   @media (min-width: 64rem) {
-    .split {
-      grid-template-columns: 1fr 1fr;
+    .loop {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      row-gap: var(--space-6);
+    }
+    .loop > li {
+      grid-row: span 4;
+      grid-template-rows: subgrid;
+      row-gap: var(--space-6);
+    }
+    .loop > li > :global(.specimen) {
+      display: flex;
+      flex-direction: column;
+      align-self: stretch;
+    }
+    .loop > li > :global(.specimen .views) {
+      flex: 1;
     }
   }
-  .fleet {
-    max-inline-size: 48rem;
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      /* Each length of track fills while its step's top rises through the window, the next a little
+         after the one before, so side by side they fill left to right. */
+      .loop > li::after {
+        animation: fill-track linear both;
+        animation-timeline: --step;
+        animation-timing-function: var(--ease-out);
+      }
+      .loop > li:nth-child(1)::after {
+        animation-range: cover 5vh cover 35vh;
+      }
+      .loop > li:nth-child(2)::after {
+        animation-range: cover 20vh cover 50vh;
+      }
+      .loop > li:nth-child(3)::after {
+        animation-range: cover 35vh cover 65vh;
+      }
+    }
+  }
+  @keyframes fill-track {
+    from {
+      scale: 0 1;
+    }
+  }
+
+  /* ── Plugins ──
+     The hero's window again, with each part a plugin draws outlined in the accent. The selectors name
+     each part by what the capture itself calls it, such as the Git pane's "Git list", so a new capture
+     keeps them. The rail's Home and Archive aren't plugins, so they stay plain. */
+  /* How far the outlines and names have come in, from 0 to 1. Registered, so it animates, and it starts
+     at 1, so without the animation everything shows. */
+  @property --xray {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 1;
+  }
+  .xray
+    :global(
+      :is(
+          .pane:has(> [aria-label='Git list']),
+          .pane:has(> [aria-label='Agent list']),
+          .ui-drawer,
+          [data-source-id='git'],
+          [data-source-id='docker'],
+          [data-source-id='workflows'],
+          [data-source-id='agents'],
+          [data-source-id='memory'],
+          .pane-switcher .tabrail-tab:not(.tabrail-bottom)
+        )
+    ) {
+    outline: calc(var(--xray) * var(--bw-strong)) dashed var(--accent);
+    outline-offset: calc(-1 * var(--bw-strong));
+  }
+  /* The three big parts carry their plugin's name. The window draws at 1440 pixels and scales down, so
+     the name is set large enough to read once it has. */
+  .xray :global(.pane) {
+    position: relative;
+  }
+  .xray :global(:is(.pane:has(> [aria-label='Git list']), .pane:has(> [aria-label='Agent list']), .ui-drawer))::after {
+    position: absolute;
+    inset: auto var(--space-6) var(--space-6) auto;
+    z-index: 1;
+    padding: var(--space-3) var(--space-5);
+    font-family: var(--font-mono);
+    font-size: 1.25rem;
+    font-weight: var(--fw-bold);
+    line-height: 1;
+    color: var(--bg);
+    background: var(--text);
+    opacity: var(--xray);
+  }
+  .xray :global(.pane:has(> [aria-label='Git list']))::after {
+    content: 'git';
+  }
+  .xray :global(.pane:has(> [aria-label='Agent list']))::after {
+    content: 'agents';
+  }
+  .xray :global(.ui-drawer)::after {
+    content: 'terminal';
+  }
+  /* On a phone the window is a quarter of its size, too small for the names, so the caption says it. */
+  @media (max-width: 49.99rem) {
+    .xray :global(.window *)::after {
+      display: none;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      .xray {
+        view-timeline-name: --xray-view;
+      }
+      .xray :global(.window) {
+        animation: show-plugins linear both;
+        animation-timeline: --xray-view;
+        /* While the window's top rises from near the bottom of the screen to near the top. */
+        animation-range: cover 15vh cover 60vh;
+      }
+    }
+  }
+  @keyframes show-plugins {
+    from {
+      --xray: 0;
+    }
+  }
+
+  .wall-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4) var(--space-10);
+    margin-block-start: var(--space-11);
+  }
+  /* A hairline grid: each cell draws its own end and bottom rules and the list draws the first ones, so
+     a short last row just stops. */
+  .wall,
+  .cells {
+    display: grid;
+    max-inline-size: none;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-block-start: var(--divider);
+    border-inline-start: var(--divider);
+  }
+  .wall > li,
+  .cells > li {
+    position: relative;
+    border-inline-end: var(--divider);
+    border-block-end: var(--divider);
+  }
+  .wall {
+    grid-template-columns: repeat(auto-fill, minmax(min(10rem, 50%), 1fr));
+  }
+  .wall > li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+    padding: var(--space-6) var(--space-7);
+    font-size: var(--fs);
+    line-height: var(--lh-tight);
+  }
+  .wall a {
+    text-decoration: none;
+  }
+  /* The whole cell is its link. */
+  .wall a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  .wall > li:hover,
+  .wall > li:has(a:focus-visible),
+  .cells > li:hover,
+  .cells > li:has(a:focus-visible) {
+    background: var(--bg);
+    box-shadow: inset var(--stripe-w) 0 var(--accent);
+  }
+  .wall-icon {
+    display: block;
+    flex: none;
+    inline-size: 1.125rem;
+    block-size: 1.125rem;
+    color: var(--accent);
+  }
+  .wall-icon :global(svg) {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+  .wall-yours {
+    font-weight: var(--fw-semibold);
+    background: var(--bg);
+    outline: var(--bw-strong) dashed var(--accent);
+    outline-offset: calc(-1 * var(--bw-strong));
+  }
+
+  /* A break inside the chapter, smaller than the one between chapters. Set here, because `.chapter h3`
+     zeroes a heading's margin. */
+  .chapter h3.build-head {
+    margin-block-start: calc(2 * var(--space-11));
+    font-size: var(--site-fs-h2);
+  }
+  /* Two rows, each with its words on the left and the picture they describe beside them, both starting
+     on the same line. */
+  .build {
+    display: grid;
+    gap: calc(2 * var(--space-11));
+    align-items: start;
+  }
+  .build > * {
+    min-inline-size: 0;
+  }
+  .build-path {
+    display: grid;
+    gap: var(--space-8);
+    min-inline-size: 0;
+  }
+  .build-path > * {
+    margin: 0;
+    min-inline-size: 0;
+  }
+  .build-path > p {
+    max-inline-size: var(--site-measure);
+  }
+  .build-path > :global(.install) {
+    max-inline-size: none;
+  }
+  @media (min-width: 64rem) {
+    .build {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .can {
+    display: grid;
+    gap: var(--space-10);
+    padding-block-start: var(--space-11);
+    border-block-start: var(--chrome-divider);
+  }
+  .can-group {
+    display: grid;
+    gap: var(--space-6);
+  }
+  .can-group > * {
+    margin: 0;
+  }
+  /* A dense list, read down then across: the guides as a contents page. */
+  .can ul {
+    columns: 3 16rem;
+    column-gap: var(--space-11);
+    max-inline-size: none;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--fs-md);
+  }
+  .can li {
+    padding-block: var(--space-3);
+    break-inside: avoid;
+  }
+  .can li::before {
+    content: '→ ';
+    content: '→ ' / '';
+  }
+  @media (min-width: 64rem) {
+    .can {
+      grid-template-columns: 1fr 1fr;
+    }
+    .can > h4 {
+      grid-column: 1 / -1;
+    }
+    .can ul {
+      columns: 1;
+    }
+  }
+
+  /* ── Trust ── */
+  .cells {
+    grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
+  }
+  .cells :global(.card) {
+    block-size: 100%;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  /* ── Questions ── */
+  .faq {
+    align-items: start;
+  }
+  .faq-head {
+    display: grid;
+    gap: var(--space-6);
+    justify-items: start;
+  }
+  .faq-head > * {
+    margin: 0;
+  }
+  .faq-head h2 {
+    font-size: var(--site-fs-display);
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+  }
+  .faq-list {
+    border-block-start: var(--divider);
   }
   .faq details {
     padding-block: var(--space-6);
@@ -398,7 +844,50 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     font-weight: var(--fw-semibold);
     cursor: pointer;
   }
-  .faq p {
+  .faq details p {
+    max-inline-size: var(--site-measure);
     margin-block-end: 0;
+  }
+  @media (min-width: 64rem) {
+    .faq {
+      grid-template-columns: 1fr 2fr;
+    }
+  }
+
+  /* ── Get acorn ──
+     The last band meets the footer, so it takes up the page's own bottom padding. */
+  .finale {
+    align-items: center;
+    margin-block-end: calc(-1 * var(--site-section));
+  }
+  .finale-text {
+    display: grid;
+    gap: var(--space-10);
+    justify-items: start;
+    min-inline-size: 0;
+  }
+  .finale-text > * {
+    margin: 0;
+  }
+  .finale-text > :global(.install) {
+    justify-self: stretch;
+  }
+  /* The acorn from the header, at the size of a sign. */
+  .finale-art {
+    justify-self: center;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: clamp(1.75rem, 1rem + 2vw, 2.75rem);
+    line-height: 1;
+  }
+  @media (min-width: 64rem) {
+    .finale {
+      grid-template-columns: 3fr 2fr;
+    }
+  }
+  @media (max-width: 63.99rem) {
+    .finale-art {
+      display: none;
+    }
   }
 </style>

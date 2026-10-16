@@ -55,6 +55,8 @@ function core(root: string, home: string, failEmail: boolean | 'throw-email' | '
           child.stdin.on('error', () => {})
           const stdout: Buffer[] = [],
             stderr: Buffer[] = []
+          // Git can exit without reading stdin, which gives EPIPE. Its exit code is the answer, as in core's runner.
+          child.stdin.on('error', () => undefined)
           child.stdin.end(opts.stdin ?? '')
           child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
           child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))

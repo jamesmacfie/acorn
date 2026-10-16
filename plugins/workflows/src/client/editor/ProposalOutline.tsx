@@ -12,7 +12,7 @@ import { stepSummary } from './outlineModel'
 
 /** What the proposal does to the draft: renamed or changed definition fields, each proposed step's
  *  status, and the names of the steps it removes. */
-export function proposalChanges(base: WorkflowDef, candidate: WorkflowDef) {
+function proposalChanges(base: WorkflowDef, candidate: WorkflowDef) {
   const before = new Map(base.steps.map((step) => [stepIdentity(step), step]))
   const kept = new Set(candidate.steps.map(stepIdentity))
   const fields = [...new Set([...Object.keys(base), ...Object.keys(candidate)])]

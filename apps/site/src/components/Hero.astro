@@ -1,16 +1,18 @@
 ---
-// The top of a marketing page: an eyebrow, the headline, a paragraph in the default slot, the actions,
-// and a picture under them at the page's full width.
+// The top of a marketing page: an optional eyebrow, the headline, a paragraph in the default slot, the
+// actions, and a picture under them at the page's full width.
 interface Props {
-  eyebrow: string
+  eyebrow?: string
   title: string
+  /** On a wide screen, sets the paragraph and the actions beside the headline, so the picture starts higher. */
+  split?: boolean
 }
 
-const { eyebrow, title } = Astro.props
+const { eyebrow, title, split = false } = Astro.props
 ---
 
-<section class="hero">
-  <p class="eyebrow">{eyebrow}</p>
+<section class="hero" data-split={split || undefined}>
+  {eyebrow && <p class="eyebrow">{eyebrow}</p>}
   <h1>{title}</h1>
   <div class="hero-text"><slot /></div>
   {Astro.slots.has('actions') && <div class="actions"><slot name="actions" /></div>}

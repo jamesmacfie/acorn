@@ -3,6 +3,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
+import { prefsKey } from '@acorn/protocol/api.ts'
 import { PrefKeys, savePref, type Task } from '@acorn/plugin-api/client'
 import {
   extensionPointRegistry,
@@ -225,6 +226,8 @@ const mount = (drawer: { task?: () => Task; open?: () => boolean; defaultProfile
   const host = document.createElement('div')
   document.body.append(host)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  // savePref only patches a cache that already holds the Node's answer.
+  client.setQueryData(prefsKey, {})
   void savePref(client, PrefKeys.terminalRailDefault, drawer.defaultProfile ?? '')
   cleanups.push(
     render(

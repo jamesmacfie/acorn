@@ -35,15 +35,15 @@ route. This is one array element:
 | `anchors` | Up to 4 CSS selectors, each at most 200 characters. The chip goes at the end of the first element that matches and is drawn. A selector can't contain `{`, `}`, `;`, `<`, or a control character. Leave it empty to offer the handoff in the sidebar only. |
 | `resolve` | A route inside this plugin's own `/v1/p/<pluginId>/` namespace. |
 
-A plugin may declare up to 4. The Node refuses the whole manifest when a rule fails, as it does for
-any other contribution.
+A plugin may declare up to 4. The Node refuses the whole manifest when a rule fails, as for any other.
+
+The sidebar's item card shows your plugin's logo, the manifest's top-level `icon`, or else a document.
 
 A compiled plugin declares the same descriptors on `NodePlugin.browserHandoffs`, beside `emits`.
 Both tiers pass the same schema and the same route check, so the extension can't tell them apart.
 GitHub is the compiled example: its descriptor is in `plugins/github/src/node/index.ts`, and its route,
-loaded on first use, in `plugins/github/src/server/browserHandoff.ts`.
-Linear is the loaded example: its descriptor is in `plugins/linear/acorn-plugin.config.mjs` and its
-route in `plugins/linear/src/server/browserHandoff.ts`.
+loaded on first use, in `plugins/github/src/server/browserHandoff.ts`. Linear is the loaded example: its
+descriptor is in `plugins/linear/acorn-plugin.config.mjs` and its route in `plugins/linear/src/server/browserHandoff.ts`.
 `packages/node-core/src/server/plugins/__fixtures__/handoffPlugin.mjs` is a minimal loaded one.
 
 ## The resolve route

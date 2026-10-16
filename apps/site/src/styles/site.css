@@ -1,6 +1,6 @@
 /* The site's stylesheet, written against acorn's own design tokens, which virtual:acorn-ui.css puts on
-   <html>. The theme and style pack a visitor picks set those tokens, so they restyle the site and every
-   specimen together. A color, font, or length the app has a token for comes from that token. The few
+   <html>. The site draws in Catppuccin Latte or Mocha (AppearanceScript.astro) in the Terminal style
+   pack, and those tokens style the site and every specimen together. A color, font, or length the app has a token for comes from that token. The few
    the app has no token for are the --site-* ones below. scripts/siteCss.test.mjs fails on a color
    written here, and scripts/contrast.test.mjs checks the pairs of colors the site sets text in. */
 
@@ -38,13 +38,19 @@
   /* The widest a page's content runs: where a pane stops widening in the app. */
   --site-width: var(--pane-measure);
   --site-gutter: var(--space-11);
+  /* The header bar, taller than the app's top bar: a page needs more air round its links than a pane. */
+  --site-bar-h: 4rem;
+  /* The docs page's table of contents, at any screen width. */
+  --site-toc-width: 15rem;
   /* A line of prose. */
   --site-measure: 70ch;
   --site-lh-prose: 1.7;
   /* The space between two sections of a marketing page. */
   --site-section: calc(3 * var(--space-11));
   /* Type above the app's largest size, --fs-xl, which no app surface needs. */
-  --site-fs-hero: clamp(2rem, 1.25rem + 3vw, 3.5rem);
+  --site-fs-hero: clamp(2.5rem, 1.25rem + 4.5vw, 4.75rem);
+  /* A landing page chapter's heading: under the hero's, well over a section's. */
+  --site-fs-display: clamp(2rem, 1.4rem + 2.2vw, 3.25rem);
   --site-fs-h1: 2rem;
   --site-fs-h2: 1.5rem;
 }
@@ -115,11 +121,14 @@
   --sl-line-height: var(--site-lh-prose);
   --sl-line-height-headings: var(--lh-tight);
 
-  --sl-nav-height: var(--topbar-h);
+  --sl-nav-height: var(--site-bar-h);
+  --sl-nav-pad-x: var(--space-10);
   --sl-nav-pad-y: 0;
   --sl-menu-button-size: var(--control-h);
-  /* Wide enough for a line of prose and a specimen or code block beside nothing. */
-  --sl-content-width: 52rem;
+  --sl-sidebar-pad-x: var(--space-10);
+  /* A docs page's column fills the space between the sidebars, with room either side. */
+  --sl-content-width: 100%;
+  --sl-content-pad-x: clamp(var(--space-9), 4vw, 4rem);
 }
 
 /* ── Page ──────────────────────────────────────────────────────────────────────────────────────
@@ -157,7 +166,11 @@
     letter-spacing: var(--heading-tracking);
     text-transform: var(--heading-transform);
     line-height: var(--lh-tight);
+    text-wrap: balance;
     color: var(--text);
+  }
+  :where(p):not(.acorn-ui *) {
+    text-wrap: pretty;
   }
   :where(a):not(.acorn-ui *) {
     color: var(--text);
@@ -272,7 +285,8 @@ select {
 }
 
 /* ── Header ────────────────────────────────────────────────────────────────────────────────────
-   A chrome bar, as the app's top bar is. On a docs page Starlight's frame draws the bar itself. Below
+   A chrome bar, as the app's top bar is. On a docs page Starlight's frame draws the bar itself, full
+   width over the sidebars. On a marketing page the bar's contents line up with the page's. Below
    Starlight's 50rem breakpoint the links fold into a menu, so the two kinds of page fold together. */
 .site-bar {
   position: relative;
@@ -280,12 +294,20 @@ select {
   background: var(--bg-subtle);
   border-block-end: var(--chrome-divider);
 }
+.site-bar > .site-header {
+  /* The page's width less its gutters, because .site-page's width includes them. */
+  max-inline-size: calc(var(--site-width) - 2 * var(--site-gutter));
+  margin-inline: auto;
+}
 .site-header {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
-  block-size: var(--topbar-h);
+  gap: var(--space-8);
+  block-size: var(--site-bar-h);
   font-size: var(--fs);
+}
+.site-header .site-mark {
+  margin-inline-end: var(--space-6);
 }
 .site-header-links {
   display: flex;
@@ -396,31 +418,14 @@ select {
   border-radius: var(--radius-control);
 }
 
-/* The Appearance control: a popover under the bar's end, or two fields in place. */
-.appearance-fields:is(:not([popover]), :popover-open) {
-  display: grid;
-  gap: var(--space-6);
+/* The light and dark switch: a square button showing the scheme it switches to. */
+.theme-toggle {
+  inline-size: var(--control-h);
+  padding: 0;
 }
-.appearance-fields[popover] {
-  inset: calc(var(--topbar-h) + var(--space-2)) var(--space-6) auto auto;
-  margin: 0;
-  padding: var(--pad-surface);
-  min-inline-size: 16rem;
-  color: var(--text);
-  background: var(--popover-bg);
-  border: var(--surface-border);
-  border-radius: var(--radius-popover);
-  box-shadow: var(--elev-popover);
-}
-.appearance-fields label {
-  display: grid;
-  gap: var(--space-2);
-}
-.appearance-fields label > span {
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-tracking);
-  text-transform: var(--label-transform);
+:root[data-color-scheme='dark'] .theme-toggle-dark,
+:root:not([data-color-scheme='dark']) .theme-toggle-light {
+  display: none;
 }
 
 /* ── Footer ──────────────────────────────────────────────────────────────────────────────────── */
@@ -429,13 +434,14 @@ select {
   border-block-start: var(--chrome-divider);
 }
 .site-foot > .site-footer {
-  max-inline-size: var(--site-width);
+  /* Lines up with the page, as the header does. */
+  max-inline-size: calc(var(--site-width) - 2 * var(--site-gutter));
   margin-inline: auto;
 }
 .site-footer {
   display: grid;
   gap: var(--space-11);
-  padding-block: var(--space-11);
+  padding-block: calc(2 * var(--space-11)) var(--space-11);
   font-size: var(--fs);
   line-height: var(--lh);
 }
@@ -475,7 +481,7 @@ select {
 .site-page {
   max-inline-size: var(--site-width);
   margin-inline: auto;
-  padding: var(--space-11) var(--site-gutter) var(--site-section);
+  padding: calc(2 * var(--space-11)) var(--site-gutter) var(--site-section);
 }
 .site-page > * + * {
   margin-block-start: var(--space-8);
@@ -511,11 +517,14 @@ select {
   min-inline-size: 0;
 }
 .hero h1 {
-  max-inline-size: 24ch;
+  max-inline-size: 18ch;
   font-size: var(--site-fs-hero);
+  /* Mono at display size reads loose, so the hero's own line pulls in. */
+  letter-spacing: -0.04em;
+  line-height: 1.05;
 }
 .hero-text {
-  max-inline-size: var(--site-measure);
+  max-inline-size: 58ch;
   font-size: var(--fs-xl);
 }
 .hero-text > * {
@@ -524,6 +533,26 @@ select {
 .hero-picture {
   justify-self: stretch;
   margin-block-start: var(--space-10);
+}
+/* A split hero: the headline on the left, and the paragraph and actions in a column beside it, both
+   starting under the eyebrow when there is one. */
+@media (min-width: 64rem) {
+  .hero[data-split] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+    column-gap: calc(2 * var(--space-11));
+  }
+  .hero[data-split] > .eyebrow {
+    grid-column: 1 / -1;
+  }
+  .hero[data-split] > h1 {
+    grid-row: span 2;
+  }
+  .hero[data-split] > .hero-text {
+    font-size: var(--fs-lg);
+  }
+  .hero[data-split] > .hero-picture {
+    grid-column: 1 / -1;
+  }
 }
 
 .features {
@@ -762,10 +791,24 @@ ul.cards {
 }
 
 /* ── Docs ────────────────────────────────────────────────────────────────────────────────────── */
-/* Prose keeps a reading measure. Anything Starlight's prose styles leave alone, such as a specimen, a
-   code block, or a reference table, and a Markdown table, may take the content column's full width. */
-.sl-markdown-content > :not(.not-content, .expressive-code, table) {
-  max-inline-size: var(--site-measure);
+/* Where Starlight shows the table of contents beside the page, it gets a fixed width and the page's
+   column takes the rest. Starlight would widen the contents with the screen. */
+@media (min-width: 72rem) {
+  /* The sidebar itself is fixed, so it's as wide as the screen unless it's given the width too. */
+  .right-sidebar-container,
+  .right-sidebar {
+    inline-size: var(--site-toc-width);
+  }
+  [data-has-sidebar][data-has-toc] .main-pane {
+    inline-size: calc(100% - var(--site-toc-width));
+  }
+  .right-sidebar-panel {
+    padding: var(--space-10) var(--space-8);
+  }
+  .right-sidebar-panel .sl-container {
+    inline-size: auto;
+    max-inline-size: none;
+  }
 }
 .sl-markdown-content :is(h1, h2, h3, h4) {
   font-family: var(--font-display);
@@ -821,12 +864,53 @@ ul.cards {
   color: var(--text);
 }
 
-.sl-markdown-content table {
+/* Tables: a Markdown table and a reference table share one frame, a bordered box with a label row on
+   top and rules between the cells. Starlight draws a Markdown table as a scrolling block, which can't
+   fill the column, so it's a table again on a wide screen. */
+.sl-markdown-content table:not(:where(.not-content *)),
+.reference table {
+  display: table;
+  inline-size: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: var(--fs);
   line-height: var(--lh);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
 }
-.sl-markdown-content th {
+.sl-markdown-content :is(th, td):not(:where(.not-content *)),
+.reference :is(th, td) {
+  padding: var(--space-5) var(--space-6);
+  text-align: start;
+  vertical-align: top;
+  border-block-end: var(--divider);
+}
+/* A long word or identifier breaks only when its column is squeezed, so a wide table still fits the
+   page. Code sets its own wrapping, which would hold the column at its longest identifier. */
+.sl-markdown-content td:not(:where(.not-content *)),
+.reference td,
+:is(.sl-markdown-content, .reference) td code {
+  overflow-wrap: anywhere;
+}
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) + :is(th, td),
+.reference :is(th, td) + :is(th, td) {
+  border-inline-start: var(--divider);
+}
+.sl-markdown-content tbody tr:last-child > :is(th, td),
+.reference tbody tr:last-child > :is(th, td) {
+  border-block-end: 0;
+}
+.sl-markdown-content th:not(:where(.not-content *)),
+.reference thead th {
   background: var(--bg-subtle);
+}
+.sl-markdown-content thead th:not(:where(.not-content *)),
+.reference thead th {
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+  border-block-end: var(--chrome-divider);
 }
 /* A built-in plugin's facts box: the fact's name stays on one line beside its value. */
 .plugin-facts th {
@@ -841,28 +925,11 @@ ul.cards {
   font-size: var(--fs);
   line-height: var(--lh);
 }
-.reference table {
-  inline-size: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-.reference :is(th, td) {
-  padding: var(--space-4) var(--space-6);
-  text-align: start;
-  vertical-align: top;
-  border-block-end: var(--divider);
-}
 /* The header stays under the site's bar while its table scrolls past. */
 .reference thead th {
   position: sticky;
   inset-block-start: var(--sl-nav-height, 0);
   z-index: 1;
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  letter-spacing: var(--label-tracking);
-  text-transform: var(--label-transform);
-  background: var(--bg-subtle);
-  border-block-end: var(--chrome-divider);
 }
 .reference tbody th {
   font-weight: var(--fw-normal);
@@ -877,9 +944,16 @@ ul.cards {
 .reference tr:target {
   box-shadow: inset var(--stripe-w) 0 var(--accent);
 }
-/* A narrow screen scrolls the table sideways, which sticky headers can't ride along with. */
-@media (max-width: 49.99rem) {
+/* A narrower screen scrolls a table sideways, which a sticky header can't ride along with. A reference
+   table's keys stay on one line, so it needs the room sooner. */
+@media (max-width: 71.99rem) {
   .reference {
+    overflow-x: auto;
+  }
+}
+@media (max-width: 49.99rem) {
+  .sl-markdown-content table:not(:where(.not-content *)) {
+    display: block;
     overflow-x: auto;
   }
 }
@@ -909,10 +983,18 @@ span.acorn-ui > .ui-kbd {
   margin-inline-end: var(--space-3);
 }
 
-/* The sidebar's group labels read as the app's labels, and the menu a narrow screen opens there carries
-   the header's links. */
+/* The sidebar's group labels read as the app's labels, over flush rows. The current page is marked as
+   the table of contents marks the current heading, and a group inside a group is indented on a rule.
+   The menu a narrow screen opens there carries the header's links. */
 .sidebar-content {
+  padding-block: var(--space-10);
   font-size: var(--fs);
+}
+.sidebar-content .top-level > li + li {
+  margin-block-start: var(--space-10);
+}
+.sidebar-content summary {
+  padding: 0 var(--space-5) var(--space-3);
 }
 .sidebar-content .group-label .large {
   font-size: var(--label-size);
@@ -920,13 +1002,39 @@ span.acorn-ui > .ui-kbd {
   letter-spacing: var(--label-tracking);
   text-transform: var(--label-transform);
 }
+.sidebar-content ul ul li {
+  margin-inline-start: 0;
+  padding-inline-start: 0;
+  border-inline-start: 0;
+}
+.sidebar-content ul ul ul {
+  margin-block: var(--space-2);
+  margin-inline-start: var(--space-5);
+  border-inline-start: var(--divider);
+}
+.sidebar-content a {
+  padding: var(--space-3) var(--space-5);
+  color: var(--text);
+  border-radius: 0;
+}
+.sidebar-content a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
 .sidebar-content a[aria-current='page'] {
-  border-radius: var(--radius-control);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+  background: var(--bg-subtle);
+  box-shadow: inset var(--stripe-w) 0 var(--accent);
 }
 .sidebar-menu {
   gap: var(--space-8);
   padding-block-end: var(--space-8);
   border-block-end: var(--chrome-divider);
+}
+/* The links carry the sidebar rows' own padding, so they need no gap. */
+.sidebar-menu nav {
+  gap: 0;
 }
 .sidebar-menu nav a {
   text-decoration: none;
@@ -953,6 +1061,16 @@ mobile-starlight-toc .toggle {
   font-weight: var(--label-weight);
   letter-spacing: var(--label-tracking);
   text-transform: var(--label-transform);
+}
+starlight-toc h2 {
+  margin-block-end: var(--space-5);
+}
+/* Square, because Chrome leaks the accent rule along a rounded link's bottom edge. */
+starlight-toc a {
+  padding-block: var(--space-2);
+  border-radius: 0;
+  font-size: var(--fs);
+  line-height: var(--lh);
 }
 starlight-toc a[aria-current='true'] {
   font-weight: var(--fw-semibold);

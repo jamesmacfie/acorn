@@ -4539,7 +4539,7 @@
               "description": "The panel's name in the sidebar's navigation."
             },
             "glyph": {
-              "description": "A Lucide icon name for the navigation item.",
+              "description": "A Lucide icon name for the navigation item, or `brand:<id>` for the plugin's logo.",
               "type": "string",
               "minLength": 1,
               "maxLength": 64

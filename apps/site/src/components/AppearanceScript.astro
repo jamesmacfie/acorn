@@ -1,48 +1,46 @@
 ---
-// Sets the visitor's saved theme and style pack on <html> before the page draws, so a reload never
-// flashes another theme. With no theme saved, `data-theme` stays off and the token files' system
-// preference block picks light or dark, as it does in the app. `data-color-scheme` tells the code
-// blocks which of their two syntax themes to draw (`expressiveCode` in astro.config.mjs).
-// Goes early in <head>, inline, so it runs before anything paints.
+// Sets the site's theme on <html> before the page draws, so a reload never flashes the other one. The
+// site draws in two of acorn's themes, Catppuccin Latte for light and Catppuccin Mocha for dark, and
+// always in the Terminal style pack, the default that needs no `data-style`. With no choice saved it
+// follows the system's light or dark mode. `data-color-scheme` tells the code blocks which of their two
+// syntax themes to draw (ec.config.mjs). Goes early in <head>, inline, so it runs before anything paints.
 import appearances from 'virtual:acorn-ui/appearances'
 
-const themes = appearances.themes.map(({ id }) => id)
-const styles = appearances.styles.map(({ id }) => id)
-const { dark } = appearances
+const themes = { light: 'catppuccin-latte', dark: 'catppuccin-mocha' }
+// An id the app no longer has would leave the site in its plain default colors, so the build stops.
+for (const id of Object.values(themes)) {
+  if (!appearances.themes.some((theme) => theme.id === id)) throw new Error(`acorn has no theme with the id ${id}.`)
+}
 ---
 
-<script is:inline define:vars={{ themes, styles, dark }}>
+<script is:inline define:vars={{ themes }}>
   const root = document.documentElement
   const system = matchMedia('(prefers-color-scheme: dark)')
   // Storage can be switched off. Then a choice lasts until the page closes.
-  const unsaved = {}
-  const read = (key) => {
+  let unsaved = null
+  const read = () => {
     try {
-      return localStorage.getItem(`acorn-${key}`)
+      return localStorage.getItem('acorn-scheme')
     } catch {
-      return unsaved[key] ?? null
+      return unsaved
     }
   }
   const apply = () => {
-    // An id the site doesn't know would leave a theme half applied, so it counts as no choice.
-    const theme = themes.includes(read('theme')) ? read('theme') : null
-    const style = styles.includes(read('style')) ? read('style') : null
-    if (theme) root.dataset.theme = theme
-    else delete root.dataset.theme
-    if (style) root.dataset.style = style
-    else delete root.dataset.style
-    root.dataset.colorScheme = (theme ? dark.includes(theme) : system.matches) ? 'dark' : 'light'
+    const saved = read()
+    const scheme = saved === 'light' || saved === 'dark' ? saved : system.matches ? 'dark' : 'light'
+    root.dataset.theme = themes[scheme]
+    root.dataset.colorScheme = scheme
   }
   apply()
   system.addEventListener('change', apply)
   window.acornAppearance = {
-    /** Saves a choice and applies it. An empty value goes back to the default. */
-    save(key, value) {
+    /** Switches to the other scheme and saves it. */
+    toggle() {
+      const scheme = root.dataset.colorScheme === 'dark' ? 'light' : 'dark'
       try {
-        if (value) localStorage.setItem(`acorn-${key}`, value)
-        else localStorage.removeItem(`acorn-${key}`)
+        localStorage.setItem('acorn-scheme', scheme)
       } catch {
-        unsaved[key] = value
+        unsaved = scheme
       }
       apply()
     },

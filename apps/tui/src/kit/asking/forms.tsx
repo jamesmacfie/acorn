@@ -103,6 +103,7 @@ export function Field(props: {
   hint?: string
   error?: string
   help?: string
+  required?: boolean
   layout?: 'stack' | 'row' | 'split'
   group?: boolean
   children: JSX.Element
@@ -110,7 +111,7 @@ export function Field(props: {
   return (
     <box flexDirection={props.layout === 'row' ? 'row' : 'column'} gap={props.layout === 'row' ? 1 : 0}>
       <Show when={props.label}>
-        <Line role="muted">{props.label!}</Line>
+        <Line role="muted">{props.required ? `${props.label} *` : props.label!}</Line>
       </Show>
       {props.children}
       <Show when={props.hint}>

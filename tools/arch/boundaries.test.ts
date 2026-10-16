@@ -336,17 +336,22 @@ describe('architecture boundaries', () => {
       ],
       // The extension sidebar draws agent sessions.
       [
-        'apps/extension/src/sidebar/Home.tsx -> plugins/agents/src/contract/runtimeState.ts',
+        'apps/extension/src/sidebar/Agents.tsx -> plugins/agents/src/contract/runtimeState.ts',
         'session state icon and tone',
       ],
-      ['apps/extension/src/sidebar/main.tsx -> plugins/agents/src/contract/providerMarks.ts', 'harness brand marks'],
       [
-        'apps/extension/src/sidebar/App.tsx -> plugins/agents/src/contract/runtimeState.ts',
-        'marks the Agents tab while agents work',
+        'apps/extension/src/sidebar/Conversation.tsx -> plugins/agents/src/contract/runtimeState.ts',
+        "the state line's working and waiting icons",
+      ],
+      ['apps/extension/src/sidebar/main.tsx -> plugins/agents/src/contract/providerMarks.ts', 'harness brand marks'],
+      ['apps/extension/src/sidebar/state.tsx -> plugins/agents/src/contract/toolTone.ts', "a tool call's tone"],
+      [
+        'apps/extension/src/sidebar/TaskRow.tsx -> plugins/agents/src/contract/runtimeState.ts',
+        "marks a task row with its agents' state",
       ],
       [
         'apps/extension/src/sidebar/Workspace.tsx -> plugins/agents/src/contract/runtimeState.ts',
-        'the Agents tab marker state',
+        'marks the Agents tab while agents work',
       ],
       // The extension sidebar starts and draws workflow runs.
       [
@@ -354,7 +359,11 @@ describe('architecture boundaries', () => {
         "prefills a workflow's inputs from the page's item",
       ],
       [
-        'apps/extension/src/sidebar/Workflows.tsx -> plugins/workflows/src/contract/statusDisplay.ts',
+        'apps/extension/src/sidebar/Runs.tsx -> plugins/workflows/src/contract/itemInputs.ts',
+        "parses and checks a workflow's inputs before a start in a task",
+      ],
+      [
+        'apps/extension/src/sidebar/Runs.tsx -> plugins/workflows/src/contract/statusDisplay.ts',
         'run and step glyphs, tones, and elapsed times',
       ],
       // The Node composition root runs startup work through these capabilities.
@@ -788,7 +797,7 @@ describe('architecture boundaries', () => {
       // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
       // `LinkPreviewHost` (docs/frontend/startup-budget.md). The token and style pack stylesheets, which
       // the browser extension loads without the app's own stylesheet.
-      '@acorn/client-core': 194, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, and TreeHost for the site's component pages.
+      '@acorn/client-core': 196, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, and the anchored popover and focus restore the sidebar's Go to task draws on.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
       // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
       // public site's plugin reference reads to check its examples and list the grants.

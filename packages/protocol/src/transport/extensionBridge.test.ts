@@ -38,11 +38,12 @@ describe('browser bridge requests', () => {
       { v: 1, id: 'a', op: 'node.pair', code: 'ABCD-1234', label: 'Laptop' },
       { v: 1, id: 'a', op: 'node.select', nodeId: null },
       { v: 1, id: 'a', op: 'node.forget', nodeId: 'n1' },
+      { v: 1, id: 'a', op: 'node.rename', nodeId: 'n1', label: 'Studio Mac' },
       { v: 1, id: 'a', op: 'projects.list', nodeId: 'n1' },
-      { v: 1, id: 'a', op: 'tasks.list', nodeId: 'n1', projectId: 'p1' },
       { v: 1, id: 'a', op: 'agents.choices', nodeId: 'n1' },
       { v: 1, id: 'a', op: 'agents.choices', nodeId: 'n1', refresh: true },
       { v: 1, id: 'a', op: 'sessions.list', nodeId: 'n1', taskId: 't1' },
+      { v: 1, id: 'a', op: 'sessions.list', nodeId: 'n1', workspaceId: 'w1' },
       { v: 1, id: 'a', op: 'session.read', nodeId: 'n1', sessionId: 's1', afterSeq: 0, limit: 500 },
       {
         v: 1,
@@ -101,6 +102,8 @@ describe('browser bridge requests', () => {
       { v: 1, id: 'a', op: 'node.pair', code: 'X', label: 'L', endpoint: 'https://other.test' },
       { v: 1, id: 'a', op: 'projects.list' },
       { v: 1, id: '', op: 'nodes.list' },
+      { v: 1, id: 'a', op: 'sessions.list', nodeId: 'n1' },
+      { v: 1, id: 'a', op: 'sessions.list', nodeId: 'n1', taskId: 't1', workspaceId: 'w1' },
       { v: 1, id: 'a', op: 'session.read', nodeId: 'n1', sessionId: 's1', afterSeq: 0, limit: 501 },
       { v: 1, id: 'a', op: 'turn.submit', nodeId: 'n1', sessionId: 's1', input: [text('hi')], key: 'short' },
       { v: 1, id: 'a', op: 'turn.submit', nodeId: 'n1', sessionId: 's1', input: [], key: 'k'.repeat(8) },
@@ -113,6 +116,9 @@ describe('browser bridge requests', () => {
       submit([context('x'.repeat(300_000)), context('x'.repeat(300_000))]),
       submit(Array.from({ length: 9 }, (_, index) => ({ type: 'image', attachmentId: `a${index}` }))),
       { ...submit([text('hi')]), source: 'plugin' },
+      // A Node's name has the limits pairing puts on one.
+      { v: 1, id: 'a', op: 'node.rename', nodeId: 'n1', label: '   ' },
+      { v: 1, id: 'a', op: 'node.rename', nodeId: 'n1', label: 'x'.repeat(121) },
       // An account is a folder name and part of a shell line, so only its own grammar passes.
       ...['../other', 'Work', ''].map((account) => ({
         v: 1,

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { access, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   checkedMcpPublication,
@@ -10,7 +10,6 @@ import {
   McpPackageInstaller,
   mcpFileDigest,
   mcpTreeDigest,
-  trustedNpmCli,
   type McpPackagePlan,
 } from './mcpPackageInstall'
 
@@ -133,7 +132,12 @@ describe('exact managed MCP packages', () => {
     )
     await writeFile(join(source, 'index.js'), 'module.exports = true\n')
     await writeFile(join(source, 'install.js'), "require('node:fs').writeFileSync(process.env.CANARY_PATH, 'ran')\n")
-    const npmPath = await trustedNpmCli()
+    // The npm that ships beside the running Node. This tests npm's own integrity check, not
+    // trustedNpmCli's ownership rules, which a CI runner's shared tool cache can fail.
+    const npmPath =
+      process.platform === 'win32'
+        ? join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js')
+        : join(dirname(process.execPath), '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')
     const npm = (cwd: string, args: string[]) =>
       spawnSync(process.execPath, [npmPath, ...args], {
         cwd,

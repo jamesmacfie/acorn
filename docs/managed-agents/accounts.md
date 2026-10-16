@@ -65,14 +65,15 @@ accounts. `PUT /v1/p/agents/providers/:providerId/default-account` saves it,
 and the provider descriptor reports it as `defaultAccount`.
 
 Each account row has a display name field and an icon picker. The display name replaces the
-folder's name everywhere Acorn shows the account, including the plan usage tabs. Clear it to go back to
+folder's name everywhere Acorn shows the account, including the plan usage rows. Clear it to go back to
 the folder's name. The folder itself keeps its name, because the CLI finds its login and its sessions
 by the folder's path, and sessions and routes keep naming the account by it.
 
 The section has one **Show accounts as** switch, with **Name** and **Icon**, for every harness. With
-**Icon** on, the **New** menu, the empty pane's cards, the task sidebar's session rows, and the
-session header draw an account's icon in place of its name. An account with no icon keeps its name.
-The palette, search, the usage tabs, and screen readers still use the name.
+**Icon** on, the **New** menu, the empty pane's cards, the task sidebar's session rows, the session
+header, the plan usage button, and the plan usage panel's account rows draw an account's icon in
+place of its name. An account with no icon keeps its name. The palette, search, and screen readers
+still use the name.
 
 Display names and icons live in an `.accounts.json` file beside each harness's `.default`, which drops
 an account's entry when the account goes (`AgentAccounts.details`). The switch is a `.show-as` file at
@@ -97,11 +98,13 @@ A collector registered with `accounts: true` is asked once for each account, wit
 folder, and not for the CLI's own login, which starts no new session once accounts exist
 (`createAgentUsageService` in `server/usage/service.ts`). A harness without accounts is read as
 before. Each reading is its own row, labeled with the account name and carrying `accountName`. The
-plan usage panel groups a harness's readings and draws a tab per account, so the numbers below are
-one account's at a time (`usageGroups` in `client/usage/usageModel.ts`). The button that opens the
-panel shows one figure per harness. For the selected session's harness, it shows that session's
-account and opens the panel on that account's tab. Other harnesses show their default account.
-Switching sessions updates the reading and the initial tab. You can choose another account's tab
+plan usage panel groups a harness's readings and draws one row per account (`usageGroups` in
+`client/usage/usageModel.ts`). A closed row shows a health dot, the account name, and small bars for
+the session and the week, so you can compare accounts without opening anything. Opening a row shows
+the account line, any error, and the full quota rows. The button that opens the panel shows one
+figure per harness. For the selected session's harness, it shows that session's account and opens
+the panel with that account's row open. Other harnesses open their default account's row. Switching
+sessions opens the new account's row, and a row you opened or closed yourself keeps your choice
 while the panel is open.
 
 `claude auth login` signs a folder in without running Claude Code's first-run setup, so the CLI

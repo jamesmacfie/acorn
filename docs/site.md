@@ -143,7 +143,7 @@ formatted by hand, to the same style.
 The site is a Cloudflare Worker with static assets and no script, configured in `apps/site/wrangler.jsonc`.
 `.github/workflows/site.yml` deploys it. The workflow runs on a pull request or a push to `main` that
 touches the site or anything it reads from, such as `docs/`, `packages/protocol/`, or the kit. It
-type-checks the site, then builds and tests the production build and the preview build.
+type-checks the site, then builds and tests the production and preview builds side by side.
 
 - On a pull request, it uploads the preview build as a Worker version with the alias `pr-<number>`,
   and writes the preview URL to the job summary. Preview responses carry `X-Robots-Tag: noindex`. A

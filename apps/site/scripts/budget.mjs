@@ -26,6 +26,14 @@ const STATIC_IMPORT = /\b(?:import|export)\s*(?:[^'"();]*?\bfrom\s*)?["']([^"']+
 
 const brotli = (text) => brotliCompressSync(text).length
 
+// Most pages share the same stylesheets and scripts, and compressing them again for every page took
+// most of the run. Keyed by the file's full path, so each built site measures its own files.
+const fileSizes = new Map()
+const fileBrotli = (file) => {
+  if (!fileSizes.has(file)) fileSizes.set(file, brotli(readFileSync(file)))
+  return fileSizes.get(file)
+}
+
 function attr(tag, name) {
   const match = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'))
   return match ? (match[1] ?? match[2] ?? match[3]) : undefined
@@ -79,7 +87,7 @@ function measure(dist, page) {
     }
   }
 
-  const fileBytes = (paths) => [...paths].reduce((sum, path) => sum + brotli(readFileSync(join(dist, path))), 0)
+  const fileBytes = (paths) => [...paths].reduce((sum, path) => sum + fileBrotli(join(dist, path)), 0)
   const inlineJs = [...html.matchAll(INLINE_SCRIPT)]
     .filter(([, attrs, body]) => body.trim() && !/\bsrc\s*=|type\s*=\s*["']?application\/(ld\+)?json/i.test(attrs))
     .reduce((sum, [, , body]) => sum + brotli(body), 0)

@@ -9,7 +9,8 @@ sources:
   - apps/extension/src/sidebar/Composer.tsx
   - apps/extension/src/sidebar/Workspace.tsx
   - apps/extension/src/sidebar/Home.tsx
-checked: 07aa959a0
+  - apps/extension/src/sidebar/Agents.tsx
+checked: '68053b2e9'
 ---
 
 The extension can put what's on the page into an agent conversation: text you selected, the page's
@@ -20,26 +21,28 @@ This page covers each way in, what the agent receives, and which pages the exten
 
 1. Select text on the page, right-click it, and choose **Add to Acorn chat**.
 
-   The panel opens on the current task's conversation, the one you last had open, or its newest, with
+   The panel opens on the conversation you last had open, or the newest in the task you last opened, with
    the text in the draft as a **Selected text** chip.
 
 2. Add a message if you like, and click **Send**.
 
-If there's nowhere for the text to go, such as no task chosen yet, or a task with no conversation, the
+If there's nowhere for the text to go, such as no task opened yet, or a task with no conversation, the
 panel opens and says so in one line, and adds nothing.
 
 ## Add the page's link
 
 On a page that belongs to a task, open the task chip's menu and choose **New chat about this page**
 ([Task chips and handoffs](/docs/browser-extension/task-chips-and-handoffs/#the-task-chip)). The panel
-opens on the task, and says the page **goes into the draft of the conversation you open next**. Open
-or start a conversation, and the link is in its draft as a **Page** chip. **Leave it out** drops it.
+opens on the task's **Agents** tab, with the page as a chip that **goes with your first message**.
+Open or start a conversation in that task, and the link is in its draft as a **Page** chip. The ×
+on the chip drops it.
 
 ## Add an item from a site
 
-After **Chat** or **Create task** on the handoff card, the item, such as the pull request with its
-description, waits in the same way and joins the next conversation's draft as an **Item** chip. The
-same item added twice is one chip.
+After **Create task** on the handoff card, the item, such as the pull request with its description,
+waits on the new task's **Agents** tab in the same way and joins its first conversation's draft as an
+**Item** chip. It waits only in that task, even after you close the panel. The same item added twice
+is one chip.
 
 ## Send a screenshot
 
@@ -68,7 +71,7 @@ It can read a page when:
 
 - You clicked the Acorn toolbar button on that tab, until it goes to another page.
 - You used **Add to Acorn chat** or **Ask Acorn about this element** on it.
-- You allowed its site in the panel's **Settings** > **Permissions**. That covers text and links, but
+- You turned on its site's switch in the panel's **Settings** > **Sites**. That covers text and links, but
   not screenshots, which need the toolbar button or a right-click entry.
 
 Clicking inside the panel grants nothing. With no access, the panel asks you to click the toolbar

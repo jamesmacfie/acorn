@@ -14,7 +14,7 @@ export const custody = (dir: string = configDir()): Custody => {
   return { tokens, fleet: new FleetStore(dir, tokens) }
 }
 
-export { configDir, dataRootDir } from './paths'
+export { configDir, dataRootDir, desktopDataRootDir } from './paths'
 export { knownNodeId, runningNode, usableLocalToken } from './attach'
 export { pairInteractively } from './pair'
 export { AmbiguousNodeError, rememberedNode } from './selection'

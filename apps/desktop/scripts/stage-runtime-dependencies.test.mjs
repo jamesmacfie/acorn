@@ -51,7 +51,7 @@ it.each(targets)('keeps only node-pty assets for %s', (triple) => {
     if (selected.platform === 'win32') {
       for (const file of ['conpty.node', 'conpty_console_list.node', 'conpty/conpty.dll', 'winpty.dll']) asset(source, `${prefix}${file}`)
       for (const file of ['conpty/OpenConsole.exe', 'winpty-agent.exe']) asset(source, `${prefix}${file}`, true)
-    } else asset(source, `${prefix}spawn-helper`, true)
+    } else if (selected.platform === 'darwin') asset(source, `${prefix}spawn-helper`, true)
   }
   // Windows arm64 is present in the package, though Acorn does not release that target.
   asset(source, 'prebuilds/win32-arm64/pty.node')
@@ -69,7 +69,7 @@ it.each(targets)('keeps only node-pty assets for %s', (triple) => {
   if (chosen.platform === 'win32') {
     expect(existsSync(join(staged, prefix, 'conpty/conpty.dll'))).toBe(true)
     expect(statSync(join(staged, prefix, 'winpty-agent.exe')).mode & 0o111).not.toBe(0)
-  } else expect(statSync(join(staged, prefix, 'spawn-helper')).mode & 0o111).not.toBe(0)
+  } else if (chosen.platform === 'darwin') expect(statSync(join(staged, prefix, 'spawn-helper')).mode & 0o111).not.toBe(0)
 })
 
 it('rejects missing target assets and unreviewed node-pty layouts', () => {

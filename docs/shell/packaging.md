@@ -1,7 +1,8 @@
 # Build and packaging
 
-This page covers how the desktop bundle is built and checked, the Windows installer, CI permissions,
-Rust dependency findings, and the signing gates. Read it before you change staging, the release
+This page covers how the desktop bundle is built and checked, CI permissions, Rust dependency
+findings, and the signing gates. [Test installers](test-installers.md) covers the Windows and Linux
+builds. Read it before you change staging, the release
 workflow, or signing. It's part of [desktop shell](../shell.md).
 
 ## Build and packaging
@@ -23,7 +24,8 @@ directory and omits the other reviewed prebuild directories. It checks the selec
 `spawn-helper`, and Windows ConPTY and winpty assets before copying. Licenses and executable modes
 remain in the package. Other package graphs retain their installed files and dependency edges.
 Linux has no prebuild in the installed 1.1.0 package, so Linux staging requires a local Linux build
-with `build/Release/pty.node` and `spawn-helper`. A cross-target stage with an unqualified local addon
+with `build/Release/pty.node`. Only macOS needs `spawn-helper`. On Linux, node-pty calls `forkpty`
+directly and never builds it. A cross-target stage with an unqualified local addon
 fails because node-pty's loader would choose it before a target prebuild. Staging also omits
 node-pty's `deps/`, `third_party/`, and `src/` folders. They're build inputs, including the Windows-only
 winpty and ConPTY sources, and the staged app never rebuilds the addon. A node-pty version or layout
@@ -83,9 +85,10 @@ is compiled in and no endpoint is set. A Rust test fails if any of the three goe
 checkout and in a bundle. `scripts/rebuild-node-abi.mjs` builds it. SQLite is `node:sqlite`. The
 standalone Node ships separately as a tarball ([standalone Node distribution](../node-distribution.md)).
 
-`.github/workflows/build-desktop.yml` builds macOS Apple silicon and Windows x64 for a `v*` tag or a
+`.github/workflows/build-desktop.yml` builds macOS Apple silicon, Windows x64, and Linux x64 and arm64
+for a `v*` tag or a
 manual dispatch of `.github/workflows/ci.yml`, after that workflow's Linux job passes for the same
-commit. Pushes to main run the unsigned desktop tests and build no installer. Both jobs build the
+commit. Pushes to main run the unsigned desktop tests and build no installer. Every job builds the
 bundle inputs once, run the boot test and the Rust suite against them before the bundler, and package
 the same output. Artifacts are kept for one day. Publishing is refused while builds are ad-hoc signed.
 
@@ -113,28 +116,6 @@ Without the bundled executable, the Node that runs a Claude session needs Claude
 ([harnesses](../managed-agents/harnesses.md#claude-code)). Other optional dependencies keep their own
 target rules, so Sharp's and ripgrep's platform packages still ship. The
 [runtime packaging evidence](../testing/runtime-packaging-2026-10-09.md) records the bytes removed.
-
-### Windows test installer
-
-The Windows job uploads `acorn-windows-x64`, an NSIS setup executable and its updater signature, and
-the macOS job uploads `acorn-dmg`. Both belong to the Actions run, and nothing publishes a GitHub
-release. Windows Authenticode signing isn't configured.
-
-`apps/desktop/src-tauri/tauri.windows.conf.json` selects NSIS, a Windows icon, per-user install, and the
-WebView2 bootstrapper, which downloads WebView2 if it's missing. Staging fetches the pinned Windows
-`node.exe` and checks its SHA-256. The runtime installs beside `acorn-desktop.exe`, and the helper,
-service, CLI, plugins, and renderer install under the same directory. The helper's origin gate expects
-`http://app.localhost` on Windows.
-
-The target needs Git on `PATH`. The service makes the local Node's TLS certificate in process, so no
-OpenSSL is needed, and the target needs no Node, pnpm, Rust, or compiler.
-
-Windows distribution verification installs the setup executable into a temporary directory, compares
-the installed resources with staging, checks the Node version and digest, and runs the helper boot test
-against the install with host executables removed from `PATH`. It checks an authenticated broker
-request and the WebSocket secret and origin gates, then uninstalls. Run it on a disposable build host,
-because NSIS also writes shortcuts and uninstall data. It doesn't drive the WebView2 window or test
-connections between machines.
 
 ## CI permissions and signing credentials
 

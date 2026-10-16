@@ -1,31 +1,21 @@
-import { For, Match, Show, Switch, createEffect, createSignal, onMount } from 'solid-js'
-import type {
-  BridgeAgentChoice,
-  BridgeAgentSession,
-  BridgeHandoff,
-  BridgePageTask,
-  BridgePendingRequest,
-  BridgeProject,
-  BridgeTask,
-  BridgeTaskPage,
-  BridgeWorkspace,
-} from '@acorn/protocol/extensionBridge.ts'
+import { For, Match, Show, Switch, createEffect, createSignal } from 'solid-js'
+import type { BridgeHandoff, BridgePageTask, BridgeProject, BridgeWorkspace } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
-import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
-import { runtimeIcon, runtimeTone } from '@acorn/plugin-agents/contract/runtimeState.ts'
+import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
+import { Button, Field } from '@acorn/client-core/kit/components/primitives.tsx'
+import { projectLink } from '../acornLinks'
 import type { BrowserApi } from '../browser'
-import { itemTaskLink, projectLink, taskLink } from '../acornLinks'
 import { onHandoffPage, pageHandoffs, type PageHandoff } from '../handoffs'
-import type { PageTask } from '../taskPages'
-import { AgentPicker, agentChoice } from './agentChoice'
+import type { AgentCounts, PageTask } from '../taskPages'
 import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { Handoff } from './Handoff'
 import { OpenInAcorn } from './OpenInAcorn'
-import { openTabs, showPage, tabFor } from './openTabs'
+import { openTabs } from './openTabs'
 import { State } from './state'
+import { PageTaskRow, TaskRow } from './TaskRow'
 
-// Home's sections below Waiting for you. Workspace owns the state they draw.
+// Home's sections below Needs you. Workspace owns the state they draw.
 
 // What the panel knows about the page beside it, in one of three states: a task it belongs to, an
 // item no task holds yet, or a project site with no item. A handoff in progress replaces them, and a
@@ -33,6 +23,7 @@ import { State } from './state'
 // docs/browser-extension/task-pages.md.
 export function ThisPage(props: {
   client: BridgeClient
+  api: BrowserApi
   nodeId: string
   online: boolean
   opensLinks: boolean
@@ -43,41 +34,32 @@ export function ThisPage(props: {
   markerHidden(origin: string): boolean
   showMarker(origin: string): void
   projectName(id: string): string
-  // Opens a task's newest conversation, or the new-chat picker when it has none.
-  chat(projectId: string, taskId: string): void
-  // Shows Agents, which lists the page's task's conversations.
-  showAgents(): void
+  projectWorkspace(id: string): string | undefined
+  agents(taskId: string): AgentCounts
+  openTask(taskId: string): void
   handoff: PageHandoff | null
   startHandoff(handoff: PageHandoff): void
   dismissHandoff(): void
-  openHandoffTask(projectId: string, taskId: string, capture: PageCapture): void
-  createdHandoffTask(projectId: string, taskId: string, capture: PageCapture): void
+  createdHandoffTask(projectId: string, taskId: string, item: PageCapture): void
   startedHandoffWorkflow(projectId: string, taskId: string, runId: string): void
-  waitingContext: PageCapture | null
-  dropWaitingContext(): void
   projects: readonly BridgeProject[] | null
   suggested: readonly string[]
   // The page is on a site tied to a project, or the person chose a project for it.
   onSite: boolean
-  // The page matches several projects and the person hasn't chosen one.
-  several: boolean
   project: string | null
   pickProject(id: string | null): void
-  tasks: readonly BridgeTask[] | null
-  currentTaskId: string | null
-  pickTask(projectId: string, taskId: string): void
+  // The open tasks of the project shown for a project site, and the tasks the page belongs to.
+  tasks: readonly BridgePageTask[]
+  pageTaskIds: readonly string[]
 }) {
   const offers = () => pageHandoffs(props.handoffs, props.pageUrl)
   const host = () => (props.pageUrl && URL.canParse(props.pageUrl) ? new URL(props.pageUrl).host : '')
 
-  // Home looks up the item on the page beside it, once per page and Node, so a card the person
-  // dismissed stays closed. A page several handoffs match waits for the person to pick one.
-  let lookedUp = ''
+  // Home looks up the item on the page beside it. A page several handoffs match waits for the person
+  // to pick one.
   createEffect(() => {
-    const key = `${props.nodeId} ${props.pageUrl}`
     const only = offers().length === 1 ? offers()[0]! : null
-    if (!only || props.handoff || props.pageTasks.length || !props.online || key === lookedUp) return
-    lookedUp = key
+    if (!only || props.handoff || props.pageTasks.length || !props.online) return
     props.startHandoff({
       pluginId: only.pluginId,
       handoffId: only.id,
@@ -88,7 +70,7 @@ export function ThisPage(props: {
   })
 
   return (
-    <section aria-label="This page">
+    <section class="this-page" aria-label="This page">
       <div class="section-head">
         <h2>This page</h2>
         <span class="quiet">{host()}</span>
@@ -103,7 +85,10 @@ export function ThisPage(props: {
               onPage={onHandoffPage(props.handoffs, handoff, props.pageUrl)}
               online={props.online}
               opensLinks={props.opensLinks}
-              openTask={props.openHandoffTask}
+              projectName={props.projectName}
+              projectWorkspace={props.projectWorkspace}
+              agents={props.agents}
+              openTask={props.openTask}
               createdTask={props.createdHandoffTask}
               startedWorkflow={props.startedHandoffWorkflow}
               dismiss={props.dismissHandoff}
@@ -111,67 +96,50 @@ export function ThisPage(props: {
           )}
         </Match>
         <Match when={props.pageTasks.length}>
-          <ul class="rows" aria-label="Page tasks">
+          {/* An app a plugin published for the task, such as a running stack, adds the plugin's state. */}
+          <ul class="task-rows" aria-label="Page tasks">
             <For each={props.pageTasks}>
               {({ task, page }) => (
-                <li>
-                  {/* An app a plugin published for the task is named by its branch, with the
-                      plugin's state, and its link goes to the plugin's pane, which has the logs. */}
-                  <button type="button" class="row-button" onClick={() => props.showAgents()}>
-                    <Show
-                      when={page.status}
-                      fallback={
-                        <>
-                          <strong>{task.title}</strong>
-                          <span class="quiet">
-                            Task in {props.projectName(task.projectId)}
-                            {task.branch ? ` · ${task.branch}` : ''}
-                          </span>
-                        </>
-                      }
-                    >
+                <PageTaskRow
+                  title={task.title}
+                  project={props.projectName(task.projectId)}
+                  branch={task.branch}
+                  agents={props.agents(task.id)}
+                  state={
+                    <Show when={page.status}>
                       {(status) => (
-                        <>
-                          <strong>{task.branch ?? task.title}</strong>
-                          <span class="quiet">
-                            Task: {task.title} · {props.projectName(task.projectId)}
-                          </span>
-                          <State tone={status().tone}>
-                            {status().label} {status().state}
-                          </State>
-                        </>
+                        <State tone={status().tone}>
+                          {status().label} {status().state}
+                        </State>
                       )}
                     </Show>
-                  </button>
-                  <OpenInAcorn
-                    href={itemTaskLink(props.nodeId, page.source, task.id)}
-                    opensLinks={props.opensLinks}
-                    label={page.status ? 'Logs in Acorn' : undefined}
-                  />
-                  <button type="button" class="quiet" onClick={() => props.chat(task.projectId, task.id)}>
-                    Chat
-                  </button>
-                </li>
+                  }
+                  onPress={() => props.openTask(task.id)}
+                />
               )}
             </For>
           </ul>
           <For each={props.pageTasks.filter(({ page }) => page.status && props.markerHidden(page.origin))}>
             {({ page }) => (
-              <button type="button" class="link" onClick={() => props.showMarker(page.origin)}>
-                Show the branch marker on this site
-              </button>
+              <Button
+                label="Show the branch marker on this site"
+                variant="bare"
+                onPress={() => props.showMarker(page.origin)}
+              />
             )}
           </For>
         </Match>
-        {/* A dismissed card, a page several handoffs match, or an offline Node leaves it to a click. */}
+        {/* A page several handoffs match, or an offline Node, leaves it to a click. */}
         <Match when={offers().length}>
           <div class="row">
             <span class="quiet grow">No task in Acorn for this yet.</span>
             <For each={offers()}>
               {(handoff) => (
-                <button
-                  type="button"
-                  onClick={() =>
+                <Button
+                  label="Look up in Acorn"
+                  variant="solid"
+                  tone="accent"
+                  onPress={() =>
                     props.startHandoff({
                       pluginId: handoff.pluginId,
                       handoffId: handoff.id,
@@ -179,9 +147,7 @@ export function ThisPage(props: {
                       url: props.pageUrl!,
                     })
                   }
-                >
-                  Look up in Acorn
-                </button>
+                />
               )}
             </For>
           </div>
@@ -190,100 +156,85 @@ export function ThisPage(props: {
           <SiteProject {...props} />
         </Match>
       </Switch>
-      <Show when={props.waitingContext}>
-        {(capture) => (
-          <div class="notice row" aria-label="Waiting context">
-            <span class="grow">{capture().title} goes into the draft of the conversation you open next.</span>
-            <button type="button" class="quiet" onClick={() => props.dropWaitingContext()}>
-              Leave it out
-            </button>
-          </div>
-        )}
-      </Show>
     </section>
   )
 }
 
-// A page on a project's site with no item: the project its associations suggest, its open tasks to
-// make current, and New task, which opens the project in the desktop app.
+// A page on a project's site with no item: a project picker that lists the projects the site's
+// associations suggest first, the chosen project's open tasks, and New task in Acorn, which opens the
+// project in the desktop app.
 function SiteProject(props: {
+  api: BrowserApi
   nodeId: string
   opensLinks: boolean
   projects: readonly BridgeProject[] | null
+  projectWorkspace(id: string): string | undefined
   suggested: readonly string[]
-  several: boolean
   project: string | null
   pickProject(id: string | null): void
-  tasks: readonly BridgeTask[] | null
-  currentTaskId: string | null
-  pickTask(projectId: string, taskId: string): void
+  tasks: readonly BridgePageTask[]
+  pageTaskIds: readonly string[]
+  agents(taskId: string): AgentCounts
+  openTask(taskId: string): void
 }) {
+  const tabs = openTabs(props.api)
+  // Suggested projects first, each group in the Node's order.
+  const items = (projects: readonly BridgeProject[]) =>
+    [true, false].flatMap((suggested) =>
+      projects
+        .filter((project) => props.suggested.includes(project.id) === suggested)
+        .map((project) => ({
+          id: project.id,
+          label: project.name,
+          note: props.projectWorkspace(project.id),
+          ...(props.suggested.length ? { group: suggested ? 'Suggested for this page' : 'Other projects' } : {}),
+          active: project.id === props.project,
+        })),
+    )
+
   return (
     <>
       <Show when={props.projects} fallback={<p class="quiet">Projects show once the Node answers.</p>}>
         {(loaded) => (
-          <label>
-            Project
-            <select name="project" onChange={(event) => props.pickProject(event.currentTarget.value || null)}>
-              <option value="" selected={!props.project}>
-                Choose a project
-              </option>
-              <Show
-                when={props.suggested.length}
-                fallback={<ProjectOptions projects={loaded()} selected={props.project} />}
-              >
-                <optgroup label="Suggested for this page">
-                  <ProjectOptions
-                    projects={loaded().filter((row) => props.suggested.includes(row.id))}
-                    selected={props.project}
-                  />
-                </optgroup>
-                <optgroup label="Other projects">
-                  <ProjectOptions
-                    projects={loaded().filter((row) => !props.suggested.includes(row.id))}
-                    selected={props.project}
-                  />
-                </optgroup>
-              </Show>
-            </select>
-          </label>
+          <Field label="Project" layout="row">
+            <Picker
+              label={loaded().find((project) => project.id === props.project)?.name ?? 'Choose a project'}
+              ariaLabel="Project"
+              size="sm"
+              placeholder="Filter projects"
+              emptyText="No project matches."
+              items={items(loaded())}
+              onPick={props.pickProject}
+            />
+          </Field>
         )}
-      </Show>
-      <Show when={props.several}>
-        <p class="notice">Several projects match this page. Choose one.</p>
       </Show>
       <Show when={props.project}>
         {(projectId) => (
           <>
-            <Show when={props.tasks} fallback={<p class="quiet">Loading tasks…</p>}>
-              {(tasks) => (
-                <Show when={tasks().length} fallback={<p class="quiet">This project has no open tasks.</p>}>
-                  <ul class="rows" aria-label="Tasks">
-                    <For each={tasks()}>
-                      {(task) => (
-                        <li>
-                          <button
-                            type="button"
-                            class="row-button"
-                            aria-current={task.id === props.currentTaskId}
-                            onClick={() => props.pickTask(projectId(), task.id)}
-                          >
-                            <strong>{task.title}</strong>
-                            <Show when={task.branch}>{(branch) => <span class="quiet">{branch()}</span>}</Show>
-                          </button>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                </Show>
-              )}
+            <Show when={props.tasks.length} fallback={<p class="quiet">This project has no open tasks.</p>}>
+              <ul class="task-rows" aria-label="Tasks">
+                <For each={props.tasks}>
+                  {(task) => (
+                    <TaskRow
+                      api={props.api}
+                      tabs={tabs()}
+                      task={task}
+                      here={props.pageTaskIds.includes(task.id)}
+                      agents={props.agents(task.id)}
+                      openTask={props.openTask}
+                    />
+                  )}
+                </For>
+              </ul>
             </Show>
-            <OpenInAcorn
-              href={projectLink(props.nodeId, projectId())}
-              opensLinks={props.opensLinks}
-              label="New task in Acorn"
-              class="quiet"
-            />
+            <div class="row">
+              <OpenInAcorn
+                href={projectLink(props.nodeId, projectId())}
+                opensLinks={props.opensLinks}
+                label="New task in Acorn"
+              />
+            </div>
           </>
         )}
       </Show>
@@ -291,44 +242,10 @@ function SiteProject(props: {
   )
 }
 
-function ProjectOptions(props: { projects: readonly BridgeProject[]; selected: string | null }) {
-  return (
-    <For each={props.projects}>
-      {(row) => (
-        <option value={row.id} selected={row.id === props.selected}>
-          {row.name}
-        </option>
-      )}
-    </For>
-  )
-}
-
-// Where a task's link goes, as its row names it: a plugin's app by its state, any other page by its
-// address without the scheme.
-function PageLabel(props: { page: BridgeTaskPage }) {
-  return (
-    <Show
-      when={props.page.status}
-      fallback={<span class="grow">{`${new URL(props.page.origin).host}${props.page.pathPrefix}`}</span>}
-    >
-      {(status) => (
-        <span class="grow">
-          <State tone={status().tone}>
-            {status().label} {status().state}
-          </State>
-        </span>
-      )}
-    </Show>
-  )
-}
-
-// Home's task list: one workspace's open tasks, grouped by project in the workspace's order. A row
-// shows the task's links, each switching to its open tab or opening a new one. The page's own task
-// shows Agents instead, as its row under This page does.
+// Home's task list: one workspace's open tasks, grouped by project in the workspace's order, and
+// narrowed by title and branch. A row opens its task, whose ⋯ menu has its links.
 export function Tasks(props: {
   api: BrowserApi
-  nodeId: string
-  opensLinks: boolean
   workspaces: readonly BridgeWorkspace[] | null
   workspaceId: string | null
   pickWorkspace(id: string): void
@@ -336,18 +253,18 @@ export function Tasks(props: {
   projects: readonly BridgeProject[]
   tasks: readonly BridgePageTask[]
   pageTaskIds: readonly string[]
-  currentTaskId: string | null
-  showAgents(): void
-  chat(projectId: string, taskId: string): void
+  agents(taskId: string): AgentCounts
+  openTask(taskId: string): void
 }) {
   const tabs = openTabs(props.api)
-  const [expanded, setExpanded] = createSignal<string | null>(null)
-  const projectTasks = (projectId: string) => props.tasks.filter((task) => task.projectId === projectId)
-  const listed = () => props.projects.some((project) => projectTasks(project.id).length)
-  const open = (task: BridgePageTask) => {
-    if (props.pageTaskIds.includes(task.id)) props.showAgents()
-    else setExpanded((shown) => (shown === task.id ? null : task.id))
+  const [filter, setFilter] = createSignal('')
+  const projectTasks = (projectId: string) => {
+    const query = filter().trim().toLowerCase()
+    return props.tasks.filter(
+      (task) => task.projectId === projectId && `${task.title} ${task.branch ?? ''}`.toLowerCase().includes(query),
+    )
   }
+  const listed = () => props.projects.some((project) => projectTasks(project.id).length)
 
   return (
     <section aria-label="Tasks">
@@ -355,227 +272,61 @@ export function Tasks(props: {
         <h2>Tasks</h2>
         <Show when={props.workspaces}>
           {(workspaces) => (
-            <select
-              name="workspace"
-              aria-label="Workspace"
-              onChange={(event) => props.pickWorkspace(event.currentTarget.value)}
-            >
-              <For each={workspaces()}>
-                {(workspace) => (
-                  <option value={workspace.id} selected={workspace.id === props.workspaceId}>
-                    {workspace.name}
-                  </option>
-                )}
-              </For>
-            </select>
+            <Picker
+              label={workspaces().find((workspace) => workspace.id === props.workspaceId)?.name ?? 'Workspace'}
+              ariaLabel="Workspace"
+              size="sm"
+              variant="ghost"
+              placement="bottom-end"
+              placeholder="Filter workspaces"
+              emptyText="No workspace matches."
+              items={workspaces().map((workspace) => ({
+                id: workspace.id,
+                label: workspace.name,
+                active: workspace.id === props.workspaceId,
+              }))}
+              onPick={props.pickWorkspace}
+            />
           )}
         </Show>
       </div>
-      <Show when={listed()} fallback={<p class="quiet">This workspace has no open tasks.</p>}>
+      <label class="filter">
+        <Icon name="list-filter" tone="muted" />
+        <input
+          name="task-filter"
+          placeholder="Filter tasks"
+          aria-label="Filter tasks"
+          value={filter()}
+          onInput={(event) => setFilter(event.currentTarget.value)}
+        />
+      </label>
+      <Show
+        when={listed()}
+        fallback={
+          <p class="quiet">{filter().trim() ? 'No open task matches.' : 'This workspace has no open tasks.'}</p>
+        }
+      >
         <For each={props.projects}>
           {(project) => (
             <Show when={projectTasks(project.id).length}>
               <h3>{project.name}</h3>
-              <ul class="rows" aria-label={project.name}>
+              <ul class="task-rows" aria-label={project.name}>
                 <For each={projectTasks(project.id)}>
                   {(task) => (
-                    <li class="task">
-                      <button
-                        type="button"
-                        class="row-button"
-                        aria-current={task.id === props.currentTaskId}
-                        aria-expanded={props.pageTaskIds.includes(task.id) ? undefined : expanded() === task.id}
-                        onClick={() => open(task)}
-                      >
-                        <strong>{task.title}</strong>
-                        <span class="quiet">
-                          {[task.branch, props.pageTaskIds.includes(task.id) && 'This page']
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </span>
-                      </button>
-                      <Show when={expanded() === task.id}>
-                        <ul class="task-links" aria-label={`${task.title} links`}>
-                          <For each={task.pages}>
-                            {(page) => (
-                              <li class="row">
-                                <PageLabel page={page} />
-                                <button
-                                  type="button"
-                                  class="quiet"
-                                  onClick={() => void showPage(props.api, tabs(), page)}
-                                >
-                                  {tabFor(tabs(), page) ? 'Switch to tab' : 'Open'}
-                                </button>
-                              </li>
-                            )}
-                          </For>
-                          <li class="row">
-                            <Show when={!task.pages.length}>
-                              <span class="quiet grow">No links for this task.</span>
-                            </Show>
-                            <OpenInAcorn
-                              href={taskLink(props.nodeId, task.id)}
-                              opensLinks={props.opensLinks}
-                              class="quiet"
-                            />
-                            <button type="button" class="quiet" onClick={() => props.chat(task.projectId, task.id)}>
-                              Chat
-                            </button>
-                          </li>
-                        </ul>
-                      </Show>
-                    </li>
+                    <TaskRow
+                      api={props.api}
+                      tabs={tabs()}
+                      task={task}
+                      here={props.pageTaskIds.includes(task.id)}
+                      agents={props.agents(task.id)}
+                      openTask={props.openTask}
+                    />
                   )}
                 </For>
               </ul>
             </Show>
           )}
         </For>
-      </Show>
-    </section>
-  )
-}
-
-// The kinds of conversation a task has, grouped and named as the desktop app's Agents sidebar groups them.
-const SESSION_GROUPS: { label: string; has(session: BridgeAgentSession): boolean }[] = [
-  { label: 'Managed sessions', has: (session) => !session.inline && session.kind !== 'workflow' },
-  { label: 'Workflow runs', has: (session) => !session.inline && session.kind === 'workflow' },
-  { label: 'Inline chats', has: (session) => session.inline },
-]
-
-// A provider's logo, when the agents plugin has one for it (main.tsx registers them).
-const providerMark = (providerId: string) =>
-  brandMarkRegistry.get(`agents/${providerId}`) ? `brand:agents/${providerId}` : undefined
-
-// Every conversation in the Agents task, grouped by kind. A row is the desktop's: the state as an icon,
-// the title, and the provider, model, and state in words, with a mark when the agent waits on the
-// person. A row opens it, and New chat's picker starts another.
-export function Agents(props: {
-  client: BridgeClient
-  nodeId: string
-  taskId: string
-  online: boolean
-  sessions: readonly BridgeAgentSession[] | null
-  requests: readonly BridgePendingRequest[]
-  open(sessionId: string): void
-  started(session: BridgeAgentSession): void
-}) {
-  const waiting = (sessionId: string) => props.requests.some((request) => request.sessionId === sessionId)
-
-  return (
-    <section aria-label="Agents">
-      <Show when={props.sessions} fallback={<p class="quiet">Loading conversations…</p>}>
-        {(sessions) => (
-          <Show when={sessions().length} fallback={<p class="quiet">This task has no conversation yet.</p>}>
-            <For each={SESSION_GROUPS}>
-              {(group) => {
-                const rows = () => sessions().filter(group.has)
-                return (
-                  <Show when={rows().length}>
-                    <h3>{group.label}</h3>
-                    <ul class="rows" aria-label={group.label}>
-                      <For each={rows()}>
-                        {(session) => {
-                          const icon = () => runtimeIcon(session.runtimeState)
-                          return (
-                            <li>
-                              <button type="button" class="row-button agent-row" onClick={() => props.open(session.id)}>
-                                {/* The loader turns, as a working session's does on the desktop. */}
-                                <Icon
-                                  name={icon()}
-                                  tone={runtimeTone(session.runtimeState)}
-                                  spin={icon() === 'loader-circle'}
-                                />
-                                <span class="agent-text">
-                                  <strong>{session.title}</strong>
-                                  <span class="quiet agent-meta">
-                                    <Show when={providerMark(session.providerId)}>
-                                      {(mark) => <Icon name={mark()} tone="brand" />}
-                                    </Show>
-                                    <span>
-                                      {[session.providerId, session.model, session.runtimeState]
-                                        .filter(Boolean)
-                                        .join(' · ')}
-                                    </span>
-                                  </span>
-                                </span>
-                                <Show when={waiting(session.id)}>
-                                  <Icon name="circle-alert" tone="warn" title="Waiting for you" />
-                                </Show>
-                              </button>
-                            </li>
-                          )
-                        }}
-                      </For>
-                    </ul>
-                  </Show>
-                )
-              }}
-            </For>
-          </Show>
-        )}
-      </Show>
-      <NewChat
-        client={props.client}
-        nodeId={props.nodeId}
-        taskId={props.taskId}
-        online={props.online}
-        started={props.started}
-      />
-    </section>
-  )
-}
-
-// Starts a conversation in one task from the agent the person picks.
-function NewChat(props: {
-  client: BridgeClient
-  nodeId: string
-  taskId: string
-  online: boolean
-  started(session: BridgeAgentSession): void
-}) {
-  const agents = agentChoice(props.client, props.nodeId)
-  onMount(() => void agents.load())
-
-  const start = async (choice: BridgeAgentChoice) => {
-    const session = await agents.start(props.taskId, choice)
-    if (session) props.started(session)
-  }
-
-  return (
-    <>
-      <div class="row">
-        <AgentPicker agents={agents} disabled={!props.online} pick={(choice) => void start(choice)} />
-      </div>
-      <Show when={agents.problem()}>
-        {(message) => (
-          <p class="problem" role="alert">
-            {message()}
-          </p>
-        )}
-      </Show>
-    </>
-  )
-}
-
-// The task the person last used. It stays here whatever page is showing, so a capture always has a
-// conversation to go to.
-export function CurrentTask(props: { task: BridgeTask | null; projectName: string | null }) {
-  return (
-    <section aria-label="Current task">
-      <h2>Current task</h2>
-      <Show when={props.task} fallback={<p class="quiet">No task yet. Choose one under This page.</p>}>
-        {(task) => (
-          <p>
-            <strong>{task().title}</strong>
-            <span class="quiet">
-              {' '}
-              {props.projectName}
-              {task().branch ? ` · ${task().branch}` : ''}
-            </span>
-          </p>
-        )}
       </Show>
     </section>
   )

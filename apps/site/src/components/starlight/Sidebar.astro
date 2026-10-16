@@ -1,10 +1,10 @@
 ---
 // Starlight's sidebar, split in two: a Build plugins page sees that section's groups, and every other
 // docs page sees the rest. Below Starlight's 50rem breakpoint the sidebar is the page's menu, so it
-// also carries the header's links and the Appearance control.
+// also carries the header's links and the light and dark switch.
 import SidebarPersister from '@astrojs/starlight/components/SidebarPersister.astro'
 import SidebarSublist from '@astrojs/starlight/components/SidebarSublist.astro'
-import Appearance from '../Appearance.astro'
+import ThemeToggle from '../ThemeToggle.astro'
 import { GITHUB, headerLinks, isBuildPath, sectionOf } from '../../nav'
 
 const { sidebar } = Astro.locals.starlightRoute
@@ -26,7 +26,7 @@ const current = sectionOf(Astro.url.pathname)
     }
     <a href={GITHUB}>Star acorn on GitHub</a>
   </nav>
-  <Appearance id="appearance-sidebar" inline />
+  <ThemeToggle />
 </div>
 <SidebarPersister>
   <SidebarSublist sublist={entries} />

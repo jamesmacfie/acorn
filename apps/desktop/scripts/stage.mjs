@@ -85,7 +85,6 @@ const FRAME_STYLES = [
   'infra/styles/base.css',
   'infra/styles/primitives.css',
   'infra/styles/overlays.css',
-  'infra/styles/copy.css',
   'infra/styles/tabs.css',
   // The delegated tooltip bubble. A frame mounts its own listener, `mountFrameTips` from
   // client-core/kit/lib/controls/frameTips.ts, because the shell's singleton cannot see into another document. It

@@ -20,25 +20,51 @@ const HOST_STYLE = 'all:initial;position:fixed;inset:0;z-index:2147483647;pointe
 const STYLES = `
 .outline { position: fixed; box-sizing: border-box; border: 2px solid #2f81f7; border-radius: 3px;
   background: rgba(47, 129, 247, 0.12); }
-.box { position: fixed; pointer-events: auto; box-sizing: border-box; width: 320px; max-width: calc(100vw - 16px);
+.box { position: fixed; pointer-events: auto; box-sizing: border-box; width: 340px; max-width: calc(100vw - 16px);
   display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line);
   border-radius: 8px; background: var(--menu); color: var(--text); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   font: 400 13px/1.4 system-ui, sans-serif; }
 .box[data-theme='light'] { --text: #242424; --fill: #f6f8fa; --line: #d0d7de; --menu: #ffffff; }
 .box[data-theme='dark'] { --text: #dddddd; --fill: #21262d; --line: #3d444d; --menu: #161b22; }
-textarea, select, button { box-sizing: border-box; margin: 0; border: 1px solid var(--line); border-radius: 6px;
+textarea, button { box-sizing: border-box; margin: 0; border: 1px solid var(--line); border-radius: 6px;
   background: var(--fill); color: inherit; font: inherit; }
 textarea { min-height: 64px; padding: 6px 8px; resize: vertical; }
-select, button { height: 28px; }
-.choices, .actions { display: flex; gap: 8px; }
-select { flex: 1; min-width: 0; }
-.actions { justify-content: flex-end; }
-button { padding: 0 12px; cursor: pointer; }
+button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; cursor: pointer; }
 button:disabled { opacity: 0.5; cursor: default; }
+svg { flex: none; }
+.element { display: flex; align-items: center; gap: 6px; opacity: 0.7;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.icon { display: contents; }
+.element span, .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar { position: relative; display: flex; align-items: center; gap: 6px; }
+.to { min-width: 0; max-width: 100%; font-size: 12px; }
+.cancel { margin-left: auto; padding: 0 4px; border-color: transparent; background: none; opacity: 0.6;
+  font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.send { border-color: #2f81f7; background: #2f81f7; color: #ffffff; font-weight: 600; }
+.menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 1; min-width: 220px; max-width: 100%;
+  max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; padding: 4px 0;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--menu); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
+.menu.up { top: auto; bottom: calc(100% + 4px); }
+.menu[hidden], .to[hidden] { display: none; }
+.menu button { flex: none; height: 30px; border: 0; border-radius: 0; background: none; }
+.menu button:hover, .menu [aria-checked='true'] { background: var(--fill); }
+.group { padding: 6px 10px 2px; opacity: 0.6; font-size: 11px; }
+.sep { height: 1px; margin: 4px 0; background: var(--line); }
 .note { margin: 0; }
-.send { border-color: #2f81f7; background: #2f81f7; color: #ffffff; }
 :focus-visible { outline: 2px solid #2f81f7; outline-offset: 1px; }
 `
+// The box's icons, from the kit's Lucide set, inline because this script can't import the registry.
+const lucide = (shapes: string): string =>
+  `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes}</svg>`
+const BUBBLE =
+  '<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/>'
+const ICONS = {
+  crosshair: lucide('<circle cx="12" cy="12" r="10"/><path d="M22 12h-4M6 12H2M12 6V2M12 22v-4"/>'),
+  plus: lucide('<path d="M5 12h14"/><path d="M12 5v14"/>'),
+  'message-square': lucide(BUBBLE),
+  'message-square-plus': lucide(`${BUBBLE}<path d="M12 8v6"/><path d="M9 11h6"/>`),
+  'chevron-down': lucide('<path d="m6 9 6 6 6-6"/>'),
+}
 // The box's space from the element and from the viewport's edges, in CSS pixels.
 const GAP = 8
 // What the box says when the background has no screenshot of the element.
@@ -70,6 +96,10 @@ function cleanHtml(element: Element): string {
   const more = Math.ceil((bytes.byteLength - kept) / 1024)
   return `${new TextDecoder().decode(bytes.subarray(0, kept))}<!-- truncated by Acorn: ${more} KiB more -->`
 }
+
+// What the box calls the element: its tag, with its `id` or its first class.
+const elementName = (element: Element): string =>
+  element.localName + (element.id ? `#${element.id}` : element.classList[0] ? `.${element.classList[0]}` : '')
 
 // The shortest selector that matches only this element: its `id`, else its `data-testid`, else
 // `nth-of-type` steps up to the nearest ancestor with a unique `id`, or to `body`.
@@ -111,6 +141,9 @@ if (api && !scope.acornPicker) {
   let box: HTMLElement | null = null
   // The background's name for the open box, once it answers.
   let pickId: string | null = null
+  // Closes the box's To menu, and says whether it was open. Escape and a pick put focus back on To; a
+  // click elsewhere leaves it where the click put it.
+  let closeMenu: (refocus?: boolean) => boolean = () => false
 
   const message = (sent: AskMessage): Promise<unknown> => api.runtime.sendMessage(sent).catch(() => undefined)
   const cancel = (id: string) => void message({ type: 'acorn:ask.cancel', pickId: id })
@@ -147,6 +180,7 @@ if (api && !scope.acornPicker) {
   const stop = (): void => {
     if (pickId) cancel(pickId)
     pickId = null
+    closeMenu = () => false
     hovering = false
     target = null
     outline.hidden = true
@@ -179,17 +213,28 @@ if (api && !scope.acornPicker) {
     box.setAttribute('aria-label', 'Ask Acorn about this element')
     box.dataset.theme = darkPage(document.body ?? document.documentElement) ? 'dark' : 'light'
     box.innerHTML =
+      `<div class="element">${ICONS.crosshair}<span></span></div>` +
       '<textarea aria-label="Question" placeholder="Ask about this element" rows="3" maxlength="20000"></textarea>' +
-      '<div class="choices"><select aria-label="Conversation"></select><select aria-label="Agent"></select></div>' +
-      '<div class="actions"><button type="button" class="cancel">Cancel</button>' +
-      '<button type="button" class="send" disabled>Send</button></div>' +
+      `<div class="bar"><button type="button" class="to" aria-haspopup="menu" aria-expanded="false" disabled hidden><span class="icon"></span><span class="label"></span>${ICONS['chevron-down']}</button>` +
+      '<div class="menu" role="menu" aria-label="To" hidden></div>' +
+      '<button type="button" class="cancel" aria-label="Cancel">esc</button>' +
+      '<button type="button" class="send" disabled>Send <span aria-hidden="true">↵</span></button></div>' +
       '<p class="note" role="status" hidden></p>'
+    const { width: shownWidth, height: shownHeight } = element.getBoundingClientRect()
+    box.querySelector('.element span')!.textContent =
+      `${elementName(element)} · ${Math.round(shownWidth)} × ${Math.round(shownHeight)}`
     box.querySelector('.cancel')!.addEventListener('click', cancelled)
     const opened = box
     const question = box.querySelector('textarea')!
-    const [conversation, agent] = [...box.querySelectorAll('select')] as [HTMLSelectElement, HTMLSelectElement]
+    const to = box.querySelector<HTMLButtonElement>('.to')!
+    const menu = box.querySelector<HTMLElement>('.menu')!
     const send = box.querySelector<HTMLButtonElement>('.send')!
     const note = box.querySelector<HTMLElement>('.note')!
+    // Where the question goes: a conversation, or a new chat with an agent row, and what To calls it.
+    // Null until the background answers, and when no agent can start and the task has no conversation.
+    type Destination = { sessionId: string | null; agent: string | null; label: string }
+    let destination: Destination | null = null
+    const rows: { button: HTMLButtonElement; choice: Destination }[] = []
     let ready = false
     let sending = false
     const say = (line: string | null): void => {
@@ -197,17 +242,89 @@ if (api && !scope.acornPicker) {
       note.hidden = !line
       place()
     }
-    // The agent is chosen only for a new chat.
     const update = (): void => {
-      agent.hidden = conversation.value !== ''
-      send.disabled = !ready || sending || !question.value.trim() || (!conversation.value && !agent.value)
+      send.disabled = !ready || sending || !question.value.trim() || !destination
     }
-    // Conversation titles are the Node's, so they go in as text.
-    const option = (value: string, label: string): HTMLOptionElement => {
-      const added = document.createElement('option')
-      added.value = value
-      added.textContent = label
-      return added
+    // To shows the destination. Names are the Node's, so they go in as text.
+    const showTo = (icon: keyof typeof ICONS, label: string): void => {
+      to.querySelector('.icon')!.innerHTML = ICONS[icon]
+      to.querySelector('.label')!.textContent = label
+      to.setAttribute('aria-label', `To: ${label}`)
+    }
+    const choose = (choice: Destination): void => {
+      destination = choice
+      showTo(choice.agent ? 'message-square-plus' : 'message-square', choice.label)
+      for (const row of rows) row.button.setAttribute('aria-checked', String(row.choice === choice))
+      update()
+    }
+    const setMenu = (open: boolean): void => {
+      menu.hidden = !open
+      to.setAttribute('aria-expanded', String(open))
+      if (!open) return
+      // Above the bar when the box sits too low for the menu to fit under it.
+      menu.classList.toggle('up', to.getBoundingClientRect().bottom + menu.offsetHeight + GAP > innerHeight)
+      menu.querySelector<HTMLElement>('[aria-checked="true"]')?.focus()
+    }
+    closeMenu = (refocus = false) => {
+      if (menu.hidden) return false
+      setMenu(false)
+      if (refocus) to.focus()
+      return true
+    }
+    // The person's own click on To or a row. The click stays here, so the box and the page, which
+    // close the menu on any other click, don't see it.
+    const own = (event: Event): boolean => {
+      event.preventDefault()
+      event.stopPropagation()
+      return event.isTrusted
+    }
+    to.addEventListener('click', (event) => own(event) && setMenu(menu.hidden === true))
+
+    // The menu: a new chat with each agent that can start, then the task's conversations under its title.
+    const group = (heading: string, icon: keyof typeof ICONS, choices: (Destination & { row: string })[]): void => {
+      if (!choices.length) return
+      if (menu.childElementCount) menu.append(Object.assign(document.createElement('div'), { className: 'sep' }))
+      menu.append(Object.assign(document.createElement('div'), { className: 'group', textContent: heading }))
+      for (const choice of choices) {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.setAttribute('role', 'menuitemradio')
+        button.innerHTML = ICONS[icon]
+        button.append(choice.row)
+        button.addEventListener('click', (event) => {
+          if (!own(event)) return
+          choose(choice)
+          closeMenu(true)
+        })
+        rows.push({ button, choice })
+        menu.append(button)
+      }
+    }
+    const fillMenu = (answer: Extract<AskOpened, { ok: true }>): void => {
+      group(
+        'New chat',
+        'plus',
+        answer.agents.map((agent) => ({
+          sessionId: null,
+          agent: agent.key,
+          label: `New chat · ${agent.label}`,
+          row: agent.label,
+        })),
+      )
+      group(
+        answer.task || 'This task',
+        'message-square',
+        answer.sessions.map((session) => {
+          const title = session.title || 'Untitled chat'
+          return { sessionId: session.id, agent: null, label: title, row: title }
+        }),
+      )
+      // The remembered agent's new chat, else the first agent's.
+      const first = rows.find((row) => row.choice.agent === answer.agent) ?? rows.find((row) => row.choice.agent)
+      if (first) choose(first.choice)
+      else showTo('message-square', 'No agent can start on this Node')
+      to.disabled = !rows.length
+      to.hidden = false
     }
 
     // The background screenshots the element, so the box shows only once it has, two frames after the
@@ -227,13 +344,7 @@ if (api && !scope.acornPicker) {
       if (!answer?.ok) return say(answer?.reason ?? "Acorn didn't answer. Reload the page, then try again.")
       if (!answer.screenshot) say(NO_SCREENSHOT)
       pickId = answer.pickId
-      conversation.append(
-        option('', 'New chat'),
-        ...answer.sessions.map((session) => option(session.id, session.title || 'Untitled chat')),
-      )
-      if (answer.agents.length) agent.append(...answer.agents.map((each) => option(each.key, each.label)))
-      else agent.append(option('', 'No agent can start on this Node'))
-      agent.value = answer.agent ?? ''
+      fillMenu(answer)
       ready = true
       update()
     }
@@ -252,8 +363,8 @@ if (api && !scope.acornPicker) {
         html: cleanHtml(element),
         selector: cssPath(element),
         size: { width: Math.round(width), height: Math.round(height) },
-        sessionId: conversation.value || null,
-        agent: conversation.value ? null : agent.value || null,
+        sessionId: destination!.sessionId,
+        agent: destination!.agent,
       })) as AskSent | undefined
       if (box !== opened) return
       sending = false
@@ -281,8 +392,8 @@ if (api && !scope.acornPicker) {
       void submit()
     })
     question.addEventListener('input', update)
-    conversation.addEventListener('change', update)
-    agent.addEventListener('change', update)
+    // Any other click in the box closes the To menu.
+    box.addEventListener('click', () => closeMenu())
     // What the person types stays out of the page's own shortcuts. The page's capture-phase listeners
     // still see it first, which nothing in the box can stop.
     for (const type of ['keydown', 'keyup', 'keypress']) box.addEventListener(type, (event) => event.stopPropagation())
@@ -333,11 +444,14 @@ if (api && !scope.acornPicker) {
       if (event.key !== 'Escape' || !event.isTrusted || !(hovering || box)) return
       event.preventDefault()
       event.stopImmediatePropagation()
-      stop()
+      // Escape closes the To menu first, then the box.
+      if (!closeMenu(true)) stop()
     },
     true,
   )
   // Scrolls inside the page's own panes too.
+  // A click on the page closes the To menu.
+  document.addEventListener('click', () => closeMenu())
   window.addEventListener('scroll', place, true)
   window.addEventListener('resize', place)
   // A tab switch or a navigation closes the box.

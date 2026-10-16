@@ -5,6 +5,9 @@ export default defineConfig({
   testDir: './tests',
   outputDir: './test-results',
   fullyParallel: true,
+  // Playwright's default is half the cores, which is two on CI's four-core runner. Most of these tests
+  // only load a page and wait on the browser.
+  workers: process.env.CI ? 4 : undefined,
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? 'github' : 'list',
   use: {

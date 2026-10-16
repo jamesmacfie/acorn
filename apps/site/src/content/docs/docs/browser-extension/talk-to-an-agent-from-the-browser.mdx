@@ -5,11 +5,12 @@ sources:
   - docs/browser-extension/conversations.md
   - docs/browser-extension/setup.md
   - docs/browser-extension/task-pages.md
-  - apps/extension/src/sidebar/Home.tsx
+  - docs/browser-extension/transcript.md
+  - apps/extension/src/sidebar/Agents.tsx
   - apps/extension/src/sidebar/Composer.tsx
   - apps/extension/src/sidebar/Conversation.tsx
   - apps/extension/src/sidebar/Requests.tsx
-checked: 07aa959a0
+checked: '68053b2e9'
 ---
 
 import Keys from '../../../../components/Keys.astro'
@@ -21,33 +22,46 @@ answering the agent, and what happens when a send doesn't go through.
 
 ## Open a conversation
 
-The panel works on one task at a time: the task the page belongs to, such as the task holding the pull
-request you're on ([Task chips and handoffs](/docs/browser-extension/task-chips-and-handoffs/#match-a-page-to-its-task)).
+The panel works on one task at a time, and the bar at its top names it. It opens on the task the page
+belongs to, such as the task holding the pull request you're on
+([Task chips and handoffs](/docs/browser-extension/task-chips-and-handoffs/#match-a-page-to-its-task)).
+Click a task on Home to open another. **Back** goes up a level, from a conversation to its task and from
+a task to Home.
 
-- **Agents** in the bar at the bottom of the panel lists that task's conversations, grouped as
-  **Managed sessions**, **Workflow runs**, and **Inline chats**, each with its agent, its state, and
-  whether it waits on you. Click one to open it.
-- **Chat** on the task's row in Home's **This page** opens the task's newest conversation.
-- **New chat** starts one, with the same choices as the desktop app's **New**: each harness or named
-  login, then each custom agent.
+- The task's **Agents** tab lists its conversations under **Managed sessions**, each with its state as
+  an icon, its agent and model, and how long ago it last changed. **Workflow runs** and **Inline
+  chats** sit below as folds, closed until you open them. Requests waiting on you in this task head the
+  tab. Click a conversation to open it.
+- **New chat**, at the right of **Managed sessions**, starts one, with the same choices as the desktop
+  app's **New**: each harness or named login, then each custom agent. A task with no conversation shows
+  **Start a chat** instead. The new conversation opens with the cursor in its message box.
 
 <SidebarPicture id="sidebar-conversation" />
 
-A conversation opens over Home, with a back arrow, the task's name, and **Open in Acorn** and **Copy
-Acorn link** to open it in the desktop app. It shows the newest 200 events, and **Earlier messages**
-reads further back.
+A conversation opens inside its task, with **Back** and its title under the task's name. Its ⋯ menu
+holds **Open in Acorn** and **Copy Acorn link** to open it in the desktop app, and **Archive chat**,
+which archives it as the desktop does. It shows the newest 200 events, and **Earlier messages** reads
+further back.
+
+Three or more tool calls in a row fold into one line, such as "4 tool calls". Click it to see them. A
+call that failed stays in view under the line, which counts it in red.
+
+While the agent works, a line above the message box says **Working**, with **Stop** to end its turn.
+While it waits on you, the line says **Waiting for you**.
 
 ## Send a message
 
-Type in the box and click **Send**, or press <Keys chord="meta+enter" />. <Keys chord="meta+shift+enter" />
-makes the box bigger. Ctrl works in place of ⌘.
+Type in the box and press <Keys chord="enter" />, or click **Send**. <Keys chord="shift+enter" /> adds
+a line. <Keys chord="meta+shift+enter" /> makes the box bigger. Ctrl works in place of ⌘.
 
 Each conversation keeps its own draft, in the browser, until the Node accepts it. Closing the panel,
 switching conversation, or losing the connection keeps it. Page text or a page link you add waits in
 the draft as a chip ([Send pages, selections, and screenshots](/docs/browser-extension/send-pages-selections-and-screenshots/)).
 
-When you move to a page of another task, the panel switches to what you last had open for that task.
-On a page that belongs to no task, the conversation stays open, so you can add that page to it.
+An open conversation stays open as you move between pages, so you can add the page you're on to it. On a
+page of another task, a line under the top bar names that task, and **Switch** opens it. With no
+conversation open, a page of another task opens that task, on the tab you last used there. A page that
+belongs to no task leaves the panel where it is.
 
 ## When a send doesn't go through
 
@@ -56,7 +70,7 @@ the same text again can't make a second message: the Node recognizes it and answ
 may already have. Change the text, and it's a new message.
 
 While the Node is away, or the conversation is archived, the panel keeps the draft and turns sending
-off.
+off. The message box says why.
 
 ## Answer the agent
 
@@ -72,5 +86,5 @@ never guesses an answer.
 
 - The panel shows messages, tool calls by title, and errors. It doesn't show a tool's details or
   subagents' work. Open the conversation in the desktop app for those.
-- It shows screenshots a message sent, and names other attachments.
+- It shows the attachments a message sent as chips, each screenshot with its picture.
 - Drafts stay in the browser until sent or cleared. They don't expire.

@@ -29,9 +29,10 @@ export function nativePackageFilter(name, source, target) {
     throw new Error(`node-pty has a host-specific build that cannot be staged for ${target.triple}`)
   }
 
+  // Only macOS goes through spawn-helper. Linux calls forkpty directly, and node-pty never builds it there.
   const needed = target.platform === 'win32'
     ? ['conpty.node', 'pty.node', 'conpty_console_list.node', 'conpty/conpty.dll', 'conpty/OpenConsole.exe', 'winpty.dll', 'winpty-agent.exe']
-    : ['pty.node', 'spawn-helper']
+    : target.platform === 'darwin' ? ['pty.node', 'spawn-helper'] : ['pty.node']
   const hasPrebuild = needed.every((file) => existsSync(join(prebuilds, selectedDir, file)))
   const hasLocalBuild = target.platform !== 'win32' && hostMatches
     && needed.every((file) => existsSync(join(source, 'build', 'Release', file)))

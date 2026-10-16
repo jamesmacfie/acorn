@@ -54,7 +54,7 @@ pnpm dev:extension:ui -- --session my-change stop
 `open` loads the sidebar page in a tab. There it has the same extension APIs as in the panel. `text`
 prints its visible text. `click` finds a button by its text, and `fill` and `check` find an input by
 its `name`. `fill` also types into a text area, such as `message`, and picks a select's option by its
-value or text, as in `fill session "Fix the flaky test"`. `eval EXPRESSION` runs code in the page. `pairing-code` asks the session's own Node for a
+value or text, as in `fill session "Fix the flaky test"`. `pick Workspace Platform` opens the kit picker named Workspace and picks its row Platform. `eval EXPRESSION` runs code in the page. `pairing-code` asks the session's own Node for a
 fresh code. In Chrome, `panel URL` opens the address with the panel beside it, and the other verbs
 then act on the panel. Leave out `--session` when exactly one session is running.
 

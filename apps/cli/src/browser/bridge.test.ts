@@ -6,7 +6,7 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { custody } from '@acorn/custody/local'
+import { custody, desktopDataRootDir } from '@acorn/custody/local'
 import { ensureCert } from '@acorn/node-core/server/transport'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
@@ -94,6 +94,7 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     panels: [] as Record<string, unknown>[],
     // Undefined models a Node older than the code host list.
     codeHosts: undefined as string[] | undefined,
+    icons: [] as Record<string, unknown>[],
     pluginAnswers: new Map<string, unknown>(),
     createdTasks: [] as { key: string; body: Record<string, unknown> }[],
     projects: [{ id: 'p1', name: `${nodeId} project`, path: '/src/p1', workspaceId: 'w', sort: 0, hidden: false }],
@@ -106,6 +107,10 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     configWrites: [] as { projectId: string; patch: unknown }[],
     // Every path the host asked for, in order.
     paths: [] as string[],
+    // Every session archive, with its key.
+    archives: [] as { key: string; body: unknown }[],
+    // Every stop of a session's turn, with its key.
+    cancels: [] as { key: string; body: unknown }[],
     // The body of the last session start.
     lastSessionBody: null as unknown,
     // A task's sessions, where a test names them. Any other task lists s1.
@@ -177,6 +182,7 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         taskAddresses: state.taskAddresses,
         panels: state.panels,
         codeHosts: state.codeHosts,
+        icons: state.icons,
       })
     if (state.pluginAnswers.has(url.pathname)) {
       const answer = state.pluginAnswers.get(url.pathname)
@@ -285,6 +291,18 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         },
         { id: 'orphan', name: 'Orphan', providerId: 'gone', options: {}, instructions: '', source: { kind: 'user' } },
       ])
+    if (url.pathname === '/v1/p/agents/sessions/s1/cancel' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      state.cancels.push({ key: String(req.headers['idempotency-key']), body: JSON.parse(body) })
+      return reply(200, { ok: true })
+    }
+    if (url.pathname === '/v1/p/agents/sessions/s1' && req.method === 'PATCH') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      state.archives.push({ key: String(req.headers['idempotency-key']), body: JSON.parse(body) })
+      return reply(200, { ...agentSession('s1'), archivedAt: 5 })
+    }
     if (url.pathname === '/v1/p/agents/sessions/s1')
       return reply(200, {
         session: agentSession('s1'),
@@ -612,8 +630,12 @@ describe('browser bridge local discovery', () => {
     const node = await fakeNode(nodeId)
     // The desktop app's root, under a stand-in home folder, holds a running Node.
     const home = dataRoot({}, mkdtempSync(join(tmpdir(), 'acorn-bridge-home-')))
-    dataRoot({ nodeId, port: portOf(node.endpoint) }, join(home, 'Library/Application Support/com.acorn.desktop/node'))
+    // Every variable the platform's app data folder reads, so no run touches the real desktop root.
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
+    vi.stubEnv('XDG_CONFIG_HOME', '')
+    vi.stubEnv('APPDATA', '')
+    dataRoot({ nodeId, port: portOf(node.endpoint) }, desktopDataRootDir())
     const { call } = bridge()
 
     vi.stubEnv('ACORN_DATA_DIR', mkdtempSync(join(tmpdir(), 'acorn-bridge-empty-')))
@@ -691,6 +713,18 @@ describe('browser bridge selection', () => {
     await call({ op: 'node.select', nodeId: 'node-a' })
     expect(await call({ op: 'node.forget', nodeId: 'node-a' })).toEqual({ nodes: [], activeNodeId: null, status: null })
   })
+
+  it('renames a Node for this browser and keeps its pairing and selection', async () => {
+    const { call } = await paired()
+    await call({ op: 'node.select', nodeId: 'node-a' })
+    const renamed = await call({ op: 'node.rename', nodeId: 'node-a', label: 'Studio Mac' })
+    expect(renamed).toMatchObject({ activeNodeId: 'node-a', nodes: [{ nodeId: 'node-a', label: 'Studio Mac' }] })
+    expect((await call({ op: 'nodes.list' })).nodes[0]).toMatchObject({ label: 'Studio Mac' })
+    expect(await call({ op: 'projects.list', nodeId: 'node-a' })).toMatchObject({ nodeId: 'node-a' })
+    await expect(call({ op: 'node.rename', nodeId: 'missing', label: 'Gone' })).rejects.toMatchObject({
+      code: 'unknown_node',
+    })
+  })
 })
 
 describe('browser bridge agent operations', () => {
@@ -700,13 +734,8 @@ describe('browser bridge agent operations', () => {
     return subject
   }
 
-  it('lists one project tasks, the agent profiles, and a task sessions', async () => {
+  it('lists the agent profiles and a task sessions', async () => {
     const { call, node } = await selected()
-    expect(await call({ op: 'tasks.list', nodeId: 'node-a', projectId: 'p1' })).toEqual({
-      nodeId: 'node-a',
-      projectId: 'p1',
-      tasks: [{ id: 't1', title: 'Fix it', branch: 'fix' }],
-    })
     // The desktop's New rows: the harness, then each custom agent on a harness this Node registers.
     expect(await call({ op: 'agents.choices', nodeId: 'node-a' })).toEqual({
       nodeId: 'node-a',
@@ -743,6 +772,10 @@ describe('browser bridge agent operations', () => {
     expect(listed.sessions.map((session: { id: string }) => session.id)).toEqual(['s1'])
     expect(listed.sessions[0]).not.toHaveProperty('config')
     expect(node.state.lastQuery).toBe('?taskId=t1&archived=false&limit=100')
+    // Or every task's in a workspace.
+    const inWorkspace = await call({ op: 'sessions.list', nodeId: 'node-a', workspaceId: 'w1' })
+    expect(inWorkspace).toMatchObject({ workspaceId: 'w1', sessions: [{ id: 's1' }] })
+    expect(node.state.lastQuery).toBe('?workspaceId=w1&archived=false&limit=100')
   })
 
   it('reads a session page and reports a missing session as not found', async () => {
@@ -781,6 +814,24 @@ describe('browser bridge agent operations', () => {
       key: 'create-key-2',
     })
     expect(node.state.lastSessionBody).toMatchObject({ customAgentId: 'reviewer', account: 'work', config: {} })
+  })
+
+  it('archives a session through the agents route with the key', async () => {
+    const { call, node } = await selected()
+    expect(await call({ op: 'session.archive', nodeId: 'node-a', sessionId: 's1', key: 'archive-key-1' })).toEqual({
+      nodeId: 'node-a',
+      sessionId: 's1',
+    })
+    expect(node.state.archives).toEqual([{ key: 'archive-key-1', body: { archived: true } }])
+  })
+
+  it("stops a session's turn through the agents route with the key", async () => {
+    const { call, node } = await selected()
+    expect(await call({ op: 'session.cancel', nodeId: 'node-a', sessionId: 's1', key: 'cancel-key-1' })).toEqual({
+      nodeId: 'node-a',
+      sessionId: 's1',
+    })
+    expect(node.state.cancels).toEqual([{ key: 'cancel-key-1', body: {} }])
   })
 
   it('reports an unanswered write as uncertain, and a retry with the same key makes no second turn', async () => {
@@ -1230,9 +1281,11 @@ describe('browser bridge handoffs', () => {
     return subject
   }
 
-  it('lists the declared handoffs without their routes', async () => {
+  it('lists the declared handoffs without their routes, and the logos that pass the manifest rule', async () => {
     const { call, node } = await selected()
     node.state.handoffs.push({ ...node.state.handoffs[0], id: 'stray', resolve: '/v1/p/agents/sessions' })
+    const icon = { pluginId: 'tracker', d: 'M2 2h20v20H2z', color: '#5e6ad2' }
+    node.state.icons.push(icon, { pluginId: 'sneaky', d: 'M0 0', color: 'url(https://sneaky.example/)' })
     expect(await call({ op: 'handoffs.list', nodeId: 'node-a' })).toEqual({
       nodeId: 'node-a',
       handoffs: [
@@ -1245,6 +1298,7 @@ describe('browser bridge handoffs', () => {
         },
       ],
       panels: [],
+      icons: [icon],
     })
   })
 

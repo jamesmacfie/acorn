@@ -1,10 +1,10 @@
 # Request notifications in the browser extension
 
 This page covers how the [browser extension](../browser-extension.md) tells a person that an agent is
-waiting on them: the toolbar badge, the **Waiting for you** list in the sidebar, and opt-in OS
+waiting on them: the toolbar badge, the **Needs you** list in the sidebar, and opt-in OS
 notifications. It covers where the waiting requests come from, which page each one belongs to, what
 the extension keeps, and the native operation. The background's side is in
-`apps/extension/src/background/requestBadge.ts`, the sidebar's in `src/sidebar/Waiting.tsx`, and the
+`apps/extension/src/background/requestBadge.ts`, the sidebar's in `src/sidebar/NeedsYou.tsx`, and the
 shared page rule in `src/pageScope.ts`.
 
 ## Where the requests come from
@@ -67,24 +67,39 @@ choices change in `storage.local`.
 The count goes to zero at once when the host stops, the selected Node goes offline, a read fails, or
 the selection moves to another Node. A count is never older than the Node's own state.
 
-## The waiting list
+## The Needs you list
 
-**Waiting for you** sits at the top of the sidebar's Home view, and shows only while a request waits.
-It lists every waiting request on the selected Node, across its projects, not only the page's: the
-badge says what waits for this page, and the list says what waits anywhere.
+The list shows every waiting request on the selected Node, across its projects, not only the page's:
+the badge says what waits for this page, and the list says what waits anywhere. It shows in three
+places, drawn by the same component:
 
-The requests are grouped by conversation, under the task's name. `requests.pending` names a request
-without its buttons or questions, so for each conversation the list reads `session.read` with an
-`afterSeq` past the end, which carries the conversation's requests and no events. Each request then
-answers in place with the conversation's own request card, keys and settling included
-([answering the agent](./conversations.md#answering-the-agent)). **Open** makes the request's task
-current and opens its conversation. A conversation's group goes once nothing in it waits.
+- At the top of Home, as a **Needs you** section with its count, while something waits.
+- At the top of a task's **Agents** tab, with that task's requests only, while one waits. Its rows
+  leave out the task's title.
+- In the top bar of Home, a task, and a conversation, as an amber **Needs you** button with the count.
+  It opens the list in a popover. The button isn't drawn while nothing waits, or during pairing or in
+  Settings. A popover left open after the last request goes says "Nothing waits on you."
+
+Each request is a row: its title, then its conversation's title and its task's, then an icon for its
+kind. `requests.pending` names a request without its buttons, questions, or conversation title, so
+the panel reads `session.read` with an `afterSeq` past the end for each waiting conversation whenever
+the pending list changes. That read carries the conversation's requests and no events. Every list on
+screen shares it, so the popover over Home reads nothing twice.
+
+A click expands a row the sidebar can answer in place: a request with buttons and no form, or a form
+of one single-choice question, whose choices become the buttons. The expanded row shows the request's
+detail, its buttons, and **Open chat**. Any other request, a form, several choices, app access, or one
+the sidebar can't answer, opens its conversation instead. Answering sends `request.resolve` as the
+conversation's card does, keys and settling included
+([answering the agent](./conversations.md#answering-the-agent)). The row then shows a green check and
+the result, such as "Allowed once", "Denied", or "Answered: A4", for about 1.5 seconds, and the next
+pending list drops it. When another client answered first, the row shows that answer instead.
 
 ## OS notifications
 
-OS notifications are off until the person ticks, in the sidebar's Settings, **Notify me when an agent waits on the projects of the
-page I'm on**. The tick asks the browser for the optional `notifications` permission, and unticking it
-removes the permission. The permission is the only setting, so turning it off in the browser's
+OS notifications are off until the person turns on **When an agent needs you**, under
+**Notifications** in the sidebar's Settings. The switch asks the browser for the optional
+`notifications` permission, and turning it off removes the permission. The permission is the only setting, so turning it off in the browser's
 settings turns it off here too. It's local to the browser profile and separate from the Node's
 associations.
 

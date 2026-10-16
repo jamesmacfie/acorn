@@ -27,6 +27,12 @@ export default defineConfig(({ mode }) => {
       solid(),
       {
         name: 'acorn:extension-manifest',
+        // The background injects both content scripts into one page's isolated world, where classic
+        // scripts share a global scope, so each runs in its own function or one's minified names
+        // overwrite the other's.
+        renderChunk(code, chunk) {
+          return CONTENT_SCRIPTS.includes(chunk.name) ? `(() => {\n${code}\n})()\n` : null
+        },
         generateBundle(_options, bundle) {
           // The background injects each content script as one classic script, which can't import. A
           // shared chunk would break it in every page, so the build fails instead.

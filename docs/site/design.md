@@ -1,14 +1,14 @@
 # The public site's design
 
-This page covers how `apps/site` looks and why: the stylesheet, the fonts, the mark, the Appearance
-control, the components, Starlight's replaced parts, and the checks that hold the design to the app.
+This page covers how `apps/site` looks and why: the stylesheet, the fonts, the mark, the light and dark
+themes, the components, Starlight's replaced parts, and the checks that hold the design to the app.
 Read it before you style a page or add a component. [The public site](../site.md) covers running and
-deploying it.
+deploying it, and [marketing copy](./marketing-copy.md) covers how the marketing pages read.
 
 The site is built from acorn's own design tokens. The only color on a page is the color acorn draws:
-the site's chrome uses the theme's text, background, border, and accent tokens, so in the default Light
-theme it's black on white with grey rules. A visitor who picks a theme or a style pack restyles the
-site and every specimen at once, because both read the same tokens.
+the site's chrome uses the theme's text, background, border, and accent tokens, so in Catppuccin Latte
+it's slate on pale grey with a blue accent. The light and dark switch restyles the site and every
+specimen at once, because both read the same tokens.
 
 ## The stylesheets
 
@@ -24,7 +24,7 @@ Starlight loads both through `customCss` in `apps/site/astro.config.mjs`. A mark
 
 `site.css` uses the app's tokens for every color, font, space, size, radius, border, shadow, and
 duration. A value the app has no token for is a `--site-*` token at the top of the file, such as the
-hero headline size and the 70-character prose measure. The sheet also points Starlight's own
+hero headline size, the header bar's height, and the width of a docs page's table of contents. The sheet also points Starlight's own
 `--sl-*` palette and type at acorn's tokens, so Starlight's parts follow the theme too.
 
 The document defaults, such as the body's font and link color, sit in a cascade layer called
@@ -78,20 +78,21 @@ Add a range when the site starts writing a character outside it.
 `apps/site/src/components/Mark.astro` draws the wordmark: the ASCII acorn from the app's empty states,
 set as text beside `acorn`. It reads the drawing from
 `packages/client-core/src/kit/components/content/Acorn.tsx`, so the two can't differ.
-`apps/site/public/favicon.svg` is the same drawing reduced to the cap and the outline.
+`apps/site/public/favicon.svg` is the same drawing as vector strokes, one path per row of its grid,
+so it stays sharp at 16 pixels.
 
 ## Appearance
 
-The header's **Appearance** control offers the app's 12 themes and 4 style packs, with the app's labels,
-read from `features/settings/builtInThemes.ts` and `features/settings/uiStyles.ts` in client-core. A
-theme's choice of light or dark comes from `--is-dark: 1` in its token block.
+The site draws in two of the app's themes, Catppuccin Latte for light and Catppuccin Mocha for dark,
+always in the Terminal style pack. The header's light and dark switch (`ThemeToggle.astro`) flips
+between them. The site never sets `data-style`, so every page and specimen draws in Terminal, the
+default.
 
-`apps/site/src/components/AppearanceScript.astro` runs inline in `<head>`. It reads the
-saved choice from `localStorage` under `acorn-theme` and `acorn-style` and sets `data-theme`,
-`data-style`, and `data-color-scheme` on `<html>` before the first frame, so a reload never flashes
-another theme. With no theme saved, `data-theme` stays off and the token files' system preference
-block picks light or dark, as it does in the app. Code blocks read `data-color-scheme` to pick
-github-light or github-dark (`apps/site/ec.config.mjs`).
+`apps/site/src/components/AppearanceScript.astro` runs inline in `<head>`. It reads the saved choice
+from `localStorage` under `acorn-scheme`, or follows the system's light or dark mode when there's
+none, and sets `data-theme` and `data-color-scheme` on `<html>` before the first frame, so a reload
+never flashes the other theme. The build fails if either theme id is missing from the app. Code blocks
+read `data-color-scheme` to pick github-light or github-dark (`apps/site/ec.config.mjs`).
 
 ## Components
 
@@ -101,9 +102,9 @@ The components are in `apps/site/src/components/`. Each has a comment that says 
 | --- | --- |
 | `SiteHeader`, `SiteFooter` | The header and the footer on every page. Below 50rem the header's links fold into a menu. |
 | `GitHubStars` | **Star on GitHub**, a plain link to the repository. It shows the star count, read at build time, from 100 stars. |
-| `Hero` | Eyebrow, headline, paragraph, and optional actions and picture. A marketing page puts it in the layout's `hero` slot. |
+| `Hero` | Headline, paragraph, and an optional eyebrow, actions, and picture. The landing page leaves the eyebrow out. A marketing page puts it in the layout's `hero` slot. With `split`, the paragraph and actions sit beside the headline on a wide screen, so the picture starts higher. |
 | `InstallBlock` | A tab per install method, its commands after a prompt, and **Copy**. |
-| `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window. A specimen switches between its desktop and terminal views with tabs, or shows them side by side with `both`. |
+| `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window. A specimen switches between its desktop and terminal views with tabs, or shows them side by side with `both`. Either takes a `caption` that replaces its own. |
 | `Snapshot`, `Cells` | A [shell snapshot](./snapshots.md) in its frame, and a terminal's cells, which specimens and snapshots share. |
 | `Feature`, `Tour`, `Card` | A numbered feature section, the landing page's tabbed tour, and a card. `Feature` takes `level={3}` under a section's own heading. A `Feature` with no picture keeps to the reading measure. |
 | `DownloadPage`, `BuildFromSource` | The download page, in `apps/site/src/layouts/`, for a release or for none, and its Build from source section. `src/scripts/platform.ts` moves the visitor's platform first. |
@@ -117,12 +118,29 @@ Callouts are Starlight's asides, restyled in `site.css` as the kit's banner `Ale
 writes `class="callout"` for the same look. Steps are
 Starlight's `<Steps>`. Tabs and copy buttons share two small scripts in `apps/site/src/scripts/`.
 
+## Motion
+
+The site moves only where the motion says something, with the app's motion tokens, and nothing moves
+under reduced motion: `site.css` sets the duration tokens to zero there.
+
+The landing page has two scroll-linked animations, CSS scroll-driven animations with no script. The
+track over the three steps of a task fills left to right as they scroll up the screen, and the
+plugins chapter's window outlines what plugins draw as it comes into view. Each sits inside
+`@media (prefers-reduced-motion: no-preference)` and `@supports (animation-timeline: view())`, and
+the static styles are the finished state, so a browser without scroll timelines shows the full track
+and every outline.
+
+The outlined window is the hero's snapshot again. Its selectors name each part by what the capture
+calls it, such as the Git pane's `Git list` region, so a new capture keeps the outlines in place. If a
+capture renames a pane, its outline and name disappear rather than land on the wrong part.
+
 ## Starlight's replaced parts
 
 `apps/site/src/components/starlight/` replaces Starlight's `Header`, `Sidebar`, `PageTitle`, `Footer`,
 `ThemeProvider`, and `ThemeSelect`. The `Footer` draws previous and next with the site's own
 `Pagination`. The table of contents and the prose column keep Starlight's markup and take the site's
-look from `site.css`. Search is the site's own `Search` component.
+look from `site.css`. The prose column fills the space between the sidebars, and the table of contents
+keeps a fixed width beside it. Search is the site's own `Search` component.
 
 There are two sidebars. A page under `/docs/build-plugins/` or `/docs/components/` sees the Build
 plugins groups, and every other docs page sees the rest (`isBuildPath` in `apps/site/src/nav.ts`).
@@ -168,4 +186,4 @@ These pages build in `pnpm dev:site` and in preview builds only:
 | `/lab/design/landing/` | The landing page wireframe, restyled with the components. |
 | `/lab/og/<card>/` | One social card alone, at 1200 by 630, for a screenshot. |
 
-Pick a theme and a style pack under **Appearance** on any of them.
+Switch between light and dark in the header on any of them.
