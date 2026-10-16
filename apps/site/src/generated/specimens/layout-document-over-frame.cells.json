@@ -1,0 +1,16 @@
+{"columns":50,"rows":14,"lines":[
+[{"text":"┌────────────────────────────────────────────────┐","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"document region","fg":"muted"},{"text":"                                 "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                "},{"text":"│","fg":"accent"}],
+[{"text":"└────────────────────────────────────────────────┘","fg":"accent"}],
+[{"text":"┌────────────────────────────────────────────────┐"}],
+[{"text":"│"},{"text":"frame region","fg":"muted"},{"text":"                                    │"}],
+[{"text":"│                                                │"}],
+[{"text":"└────────────────────────────────────────────────┘"}]
+]}

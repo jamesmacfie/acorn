@@ -1,0 +1,45 @@
+---
+title: Compatibility and versions
+description: How plugin API majors work, what acorn promises a plugin, and what it doesn't.
+sources:
+  - docs/plugins/publishing.md
+  - docs/plugins/forward-compatibility.md
+  - docs/plugins/activation.md
+checked: '498833615'
+---
+
+acorn has one version number a plugin cares about: the plugin API major. Your manifest's `apiVersion`
+says which majors your plugin works with, and acorn loads it only when that range includes its own.
+
+{/* facts */}
+
+## Writing apiVersion
+
+`apiVersion` is a range over majors, not a version of your plugin:
+
+- One major, such as `"@API_MAJOR@"`.
+- A list of majors, such as `"2 || 3"`.
+- An inclusive span, such as `"2-4"`.
+
+Declare a major only after you've tested your plugin against an acorn that speaks it. A range that
+doesn't parse is refused, never read as "any".
+
+## The promise
+
+A plugin that loads under a plugin API major keeps loading under it. The promise covers the manifest
+contract, the published declarations in `acorn-plugin-types`, and the published SDK, `acorn-plugin-sdk`.
+A change that removes something from them, or changes its shape, needs a new major.
+
+Adding is not breaking. A new contribution key, a new field, or a new verb arrives within a major, and an
+older acorn skips a key it doesn't know rather than refusing your manifest.
+
+## What isn't promised
+
+- That the major won't move.
+- That an older major keeps working after it moves.
+- A deprecation period before it does.
+- That an older acorn draws a new field or menu location inside a key it knows. A release that predates
+  a value may refuse that one entry.
+
+The npm versions of `acorn-plugin-types` and `acorn-plugin-sdk` are separate from the major. Your
+plugin's own `version` is yours.

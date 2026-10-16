@@ -1,0 +1,81 @@
+---
+title: "Appearance: themes and styles"
+description: Pick one of acorn's 12 themes and 4 style packs, follow the system's light or dark mode, and use plugin themes.
+sources:
+  - docs/ui-design/appearance.md
+  - docs/command-palette-and-shortcuts/commands.md
+  - packages/client-core/src/features/settings/AppearanceSettings.tsx
+  - packages/client-core/src/features/settings/builtInThemes.ts
+  - packages/client-core/src/features/settings/uiStyles.ts
+  - packages/client-core/src/infra/styles/tokens-theme.css
+checked: 90ded85ca
+---
+
+import Appearance from '../../../../components/Appearance.astro'
+import Specimen from '../../../../components/Specimen.astro'
+
+This page covers acorn's look: themes, which set the colors, and style packs, which set the shapes,
+type, and spacing. You pick each one separately, so any theme works with any style.
+
+## Try them here
+
+This site is drawn with acorn's own stylesheets, so the picker below changes it the way the app's
+setting changes the app. Pick a theme and a style, and the page and the picture under it follow.
+
+<Appearance id="appearance-docs" inline />
+
+<Specimen id="ship" />
+
+## Themes
+
+There are 12 themes, three light and nine dark:
+
+| Light | Dark |
+| --- | --- |
+| Light | Dark |
+| Solarized Light | Solarized Dark |
+| Catppuccin Latte | Catppuccin Frappé, Catppuccin Macchiato, and Catppuccin Mocha |
+| | Monokai, Nord, One Dark, and Dracula |
+
+## Style packs
+
+| Style | What it looks like |
+| --- | --- |
+| **Terminal**, the default | Flat, square, monospaced, dense. |
+| **Modern** | Sans type, rounded cards, soft elevation. |
+| **Cozy** | Warm serif, roomy spacing, low density. |
+| **Cute** | Rounded, playful, springy. |
+
+## Change the appearance
+
+1. Open **Settings** > **General** > **Appearance**.
+2. Under **Style**, choose a style pack.
+3. Under **Theme**, choose a theme. To follow your system's light and dark mode, turn on **Match the
+   system's light or dark mode**, then choose a **Light theme** and a **Dark theme**.
+
+The window changes as you pick. The same choices are in the command palette, under **Appearance**.
+Appearance belongs to this device, so it stays the same whichever Node you're using.
+
+## Plugin themes and style packs
+
+A plugin can add themes and style packs. They're listed beside the built-in ones, with the plugin that
+added them.
+
+A plugin theme is colors only, and a plugin style pack sets only shapes, type, and spacing from a fixed
+set of values, so neither can break the layout or reach outside its job.
+
+When the plugin behind your choice is turned off, removed, untrusted, or on a Node that's out of reach,
+acorn falls back: a theme to **Light** or **Dark**, and a style pack to **Terminal**. Your choice is
+kept, and it comes back when the plugin does.
+
+## In the terminal
+
+The terminal client draws with your terminal's own colors: acorn's roles map to the terminal's 16-color
+palette, so it follows your terminal's theme. Style packs set shapes, type, and spacing, which a
+terminal doesn't draw, so they don't apply there.
+
+## Limits
+
+- A plugin theme can set colors, and nothing else.
+- A plugin style pack can't change icons.
+- The terminal client has no theme or style setting of its own.

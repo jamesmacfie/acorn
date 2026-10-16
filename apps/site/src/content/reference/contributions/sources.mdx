@@ -1,0 +1,134 @@
+---
+title: sources
+description: "Sources on acorn's left rail, with a list of items from your route."
+sources:
+  - docs/plugin-authoring/ui-contributions.md
+  - docs/plugins/descriptors.md
+  - docs/tui/sources-and-settings.md
+checked: '498833615'
+---
+
+A rail source is an icon on acorn's left rail and the list it opens. You declare the source and a
+route on your Node half that answers its items, and acorn draws the list with its own components, so it
+searches, scrolls, and takes the keyboard like any other source. What picking a row does is an action
+verb you name in `onSelect`.
+
+A plugin with no Node half can give a `tree` instead: two entries from its client bundle that draw the
+list and the detail.
+
+<Specimen id="list-detail" caption="The kit's rows beside a detail view. The host draws each item your route answers as one of these rows." />
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "issue",
+        "label": "Issue",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "issue"
+          }
+        }
+      }
+    ],
+    "sources": [
+      {
+        "id": "issues",
+        "label": "Issues",
+        "order": 300,
+        "items": "/v1/p/acme/issues",
+        "onSelect": {
+          "verb": "openPane",
+          "pane": "issue"
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "scope": "project",
+        "id": "issue",
+        "label": "Issue",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "issue"
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "id": "issue-route",
+        "path": "/p/:projectId/x/acme/issue/:issueId",
+        "surface": "issue",
+        "item": "issueId"
+      }
+    ],
+    "sources": [
+      {
+        "id": "issues",
+        "label": "Issues",
+        "glyph": "list-todo",
+        "order": 300,
+        "projectScoped": true,
+        "items": "/v1/p/acme/issues",
+        "search": "/v1/p/acme/issues/search",
+        "onSelect": {
+          "verb": "navigate",
+          "surface": "issue"
+        },
+        "emptyState": {
+          "message": "Nothing is assigned to you.",
+          "action": {
+            "verb": "openUrl",
+            "url": "https://acme.example/new"
+          },
+          "actionLabel": "New issue"
+        },
+        "statusAnnotations": true,
+        "refresh": 300
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The terminal client draws the same list in its Browse panel, with `/` to filter it, and the detail
+in the main area. It leaves out the create-task menu on a row and any dashboard panels beside the list.
+
+## Mistakes
+
+- Give `items` or `tree`, never both. `search` needs `items`.
+- `order` is required. Load order never places a source.
+- `emptyState` shows when your route answers with no items, not when it fails. Don't say "nothing assigned" after an error.
+
+## Guide
+
+[Add a source to the left rail](/docs/build-plugins/ui/add-a-source-to-the-left-rail/) walks through it from start to finish.

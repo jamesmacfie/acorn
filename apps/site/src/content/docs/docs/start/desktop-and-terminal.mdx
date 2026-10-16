@@ -1,0 +1,108 @@
+---
+title: Desktop and terminal
+description: The desktop app and the terminal client, what's the same, what differs, and how to start the terminal client.
+sources:
+  - docs/tui.md
+  - docs/tui/process.md
+  - docs/tui/chrome.md
+  - docs/tui/navigation.md
+  - docs/ui-design/shell-hierarchy.md
+  - docs/first-party-plugins/terminal.md
+  - docs/features.md
+checked: 90ded85ca
+---
+
+import Snapshot from '../../../../components/Snapshot.astro'
+import Keys from '../../../../components/Keys.astro'
+import Specimen from '../../../../components/Specimen.astro'
+
+acorn has two clients you work in: the desktop app and the terminal client. This page covers what
+they share, where they differ, and how to start the terminal client against a Node that's already
+running. Read it if you live in a terminal, or work over SSH.
+
+## The same workspace in two places
+
+Both clients draw the same panes from the same code, and both talk to a Node. Open a task in the
+desktop app, then run `acorn` in a terminal on the same machine, and you see the same task, the same
+agent sessions, and the same diff. A change in one shows in the other.
+
+<Snapshot id="hero-terminal" />
+
+Plugins don't write a terminal version of their UI. A plugin's pane is a tree of acorn's components,
+and each client draws that tree its own way: the desktop in HTML, the terminal in character cells.
+
+<Specimen id="issues-pane" both />
+
+## What differs
+
+| | Desktop app | Terminal client |
+| --- | --- | --- |
+| Panes | A row of panes side by side | One pane at a time, with a strip of pane labels above it |
+| Left side | A rail of icons, then tasks | Three framed panels: **Menu** (sources), **Browse** (what's under the chosen source), and **Tasks** |
+| Overlays | The palette, Settings, and dialogs float over the window | Each takes the screen under the top bar, and the pane underneath keeps its place |
+| Keys | Shortcuts use Cmd on macOS | The same shortcuts use Ctrl, because a terminal never passes Cmd through |
+| Help with keys | <Keys chord="meta+/" /> opens a sheet of what the keyboard does here | The footer line always lists what the keys do, and `?` opens the full sheet |
+| Notifications | Bell, sound, system notification, and a count on the app icon | `◔ N` at the right of the top bar, `n` for the inbox, and a terminal notification or bell |
+
+The terminal draws one pane because two panes at 80 columns would be two 40-column panes, too narrow
+for the kit's components.
+
+## What a terminal can't draw
+
+| | In the terminal client |
+| --- | --- |
+| Editor | The file tree, search, and tabs work. Editing opens your own `$EDITOR` in the pane instead of acorn's editor. |
+| Preview | Absent. It needs a browser view. |
+| Terminal drawer | Absent. A terminal session still draws wherever a pane holds one. |
+| Agents | Running agents works. Attaching a file, saving one out, and **Continue in terminal** don't. |
+| Archive | A task can't be archived from the terminal client. Use the desktop app. |
+| Settings | Every page is listed, in the same groups and order. Pages built from the kit and the **Notifications** page work. Any other page says to open it in the desktop app. |
+| Workspace icons | Not drawn. The terminal shows names. |
+
+Everything else crosses whole, including Changes, Notes, Context, Memory, GitHub review, workflows, and
+the database and HTTP panes.
+
+## Keys in the terminal client
+
+These keys work anywhere outside a text field:
+
+| Key | What it does |
+| --- | --- |
+| <Keys chord="ctrl+k" /> | Open the command palette, from anywhere but inside a running terminal session. |
+| `?` | Open the sheet of every key that works here. |
+| `w` or `p` | Switch workspace or project. |
+| `;` | Go back to the last workspace. |
+| `/` | Hide or show the left column. In a source's list, `/` filters it instead. |
+| `n` | Open the notification inbox. |
+| `t` | Open the open task's terminal sessions. |
+| `q` | Quit. If this client started the Node, it asks first. |
+| Tab and Shift+Tab | Move between regions of the screen. |
+| Esc | Step back: close an overlay, or leave a region. |
+
+A key with no modifier goes to whatever has focus, so typing into a message box never fires a shortcut.
+
+## Start the terminal client against a running Node
+
+`acorn` with no arguments looks for a Node on this machine. It uses `ACORN_DATA_DIR` if you set it,
+then the desktop app's data, then a checkout's development data.
+
+- **A Node is running.** `acorn` attaches to it. When you quit, the Node keeps running.
+- **No Node is running.** `acorn` starts one and stops it when you quit.
+- **The desktop app's Node.** The first time, `acorn` asks to pair, because that Node belongs to the
+  desktop app. It prints three words, and the desktop app shows a dialog with the same words. Check that
+  they match, and click **Allow**. To pair with a code instead, open **Settings** > **Machines** >
+  **Nodes** and choose **Pair another client**.
+- **A Node on another machine.** Run `acorn --node https://host:port`. acorn shows the Node's six
+  identity words: compare them with the words the Node printed when it started, then enter its pairing
+  code. acorn remembers the Node, so next time `acorn --node <name>` is enough.
+
+If the Node later refuses your saved token, because the device was removed or its data was reset,
+`acorn` forgets the token and asks you to pair again.
+
+## Limits
+
+- acorn's components are laid out for a terminal of at least 80 by 24.
+- It has no folder picker. Add a project by typing its absolute path.
+- It can't run a browser view, so the Preview pane and pages that draw a web view stay in the desktop app.
+- Its notification settings come from the `ACORN_TUI_NOTIFY` environment variable, set to `off`,
+  `bell`, `terminal`, or `both`, the default.

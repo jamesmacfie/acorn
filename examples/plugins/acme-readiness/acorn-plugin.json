@@ -1,0 +1,43 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-readiness",
+  "name": "Acme release readiness",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "node": "./dist/node.js",
+  "permissions": {
+    "api": [],
+    "events": [],
+    "node": {
+      "core": [],
+      "capabilities": [],
+      "secrets": false,
+      "exec": false,
+      "net": []
+    }
+  },
+  "contributions": {
+    "dataSources": [
+      {
+        "sourceId": "acme-readiness",
+        "name": "Acme release readiness",
+        "singular": "Task",
+        "plural": "Tasks",
+        "identityScope": "Built from its inputs",
+        "handler": "/v1/p/acme-readiness/source",
+        "titlePointer": "/title",
+        "inputs": {
+          "tasks": {
+            "source": "core:tasks",
+            "label": "Tasks"
+          },
+          "deploys": {
+            "source": "acme-data:deploys",
+            "label": "Acme deploys"
+          }
+        }
+      }
+    ]
+  }
+}

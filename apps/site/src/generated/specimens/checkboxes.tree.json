@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "title": "Checkbox",
+    "caption": "A checked box, an empty one with a hint, and a switch.",
+    "terminal": {
+      "columns": 50,
+      "rows": 4
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Checkbox",
+              "props": {
+                "label": "Run checks on push",
+                "checked": true
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "Checkbox",
+              "props": {
+                "label": "Notify reviewers",
+                "hint": "Posts in the team channel."
+              },
+              "children": []
+            },
+            {
+              "id": "n4",
+              "type": "Checkbox",
+              "props": {
+                "label": "Auto-deploy",
+                "switch": true,
+                "checked": true
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

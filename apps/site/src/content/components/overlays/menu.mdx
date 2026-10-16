@@ -1,0 +1,27 @@
+---
+title: Menu
+description: A list of choices that opens from a trigger. A tree can't draw one.
+sources:
+  - packages/client-core/src/kit/components/overlays/Menu.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`Menu` opens from a trigger, which is a function, and its items are a function too. Neither can cross from a tree, so a tree draws nothing with it. A plugin adds rows to acorn's own menus through its manifest, and a row's actions through `RowActions`.
+
+<Specimen id="row-actions" caption="A row's menu, which RowActions draws for a tree." />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="row-actions" />
+
+## Related
+
+- [`RowActions`](/docs/components/collections/row-actions/), for a row's menu.
+- [`Select`](/docs/components/inputs/select/), for a choice from a list.
+
+## Mistakes
+
+- Sending `Menu` from a tree. Its trigger is dropped, and the node fails. For more information, see [Add rows to context menus](/docs/build-plugins/ui/add-rows-to-context-menus/).

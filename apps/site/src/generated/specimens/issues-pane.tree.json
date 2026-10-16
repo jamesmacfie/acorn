@@ -1,0 +1,237 @@
+{
+  "meta": {
+    "title": "Issues",
+    "caption": "One plugin's pane: the same tree, drawn by the desktop app and by the terminal client.",
+    "terminal": {
+      "columns": 60,
+      "rows": 4
+    },
+    "width": 560
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Table",
+          "props": {},
+          "children": [
+            {
+              "id": "n2",
+              "type": "TableRow",
+              "props": {
+                "head": true
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "Issue"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n5",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "Title"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n7",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n8",
+                      "type": "#text",
+                      "props": {
+                        "value": "State"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n9",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n10",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n11",
+                      "type": "#text",
+                      "props": {
+                        "value": "FW-12"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n12",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n13",
+                      "type": "#text",
+                      "props": {
+                        "value": "Webhooks give up"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n14",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n15",
+                      "type": "#text",
+                      "props": {
+                        "value": "In progress"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n16",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n17",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n18",
+                      "type": "#text",
+                      "props": {
+                        "value": "FW-14"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n19",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n20",
+                      "type": "#text",
+                      "props": {
+                        "value": "VAT on EU invoices"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n21",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n22",
+                      "type": "#text",
+                      "props": {
+                        "value": "In review"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n23",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n24",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n25",
+                      "type": "#text",
+                      "props": {
+                        "value": "FW-15"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n26",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n27",
+                      "type": "#text",
+                      "props": {
+                        "value": "Slow overdue query"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n28",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n29",
+                      "type": "#text",
+                      "props": {
+                        "value": "Todo"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

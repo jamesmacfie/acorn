@@ -1,0 +1,87 @@
+---
+// A built-in plugin page in phase 13's shape: one sentence, a picture, the facts box, setup steps with a
+// checkpoint, then a section per task and the settings table. The Database facts are phase 13's
+// example; the settings rows are draft.
+import Docs from './_Docs.astro'
+
+const facts = [
+  ['Adds', 'The Database pane, palette commands, two workflow steps, and a command-line command.'],
+  ['Ships as', 'An installed package, on by default.'],
+  ['Works in', 'Desktop and terminal.'],
+  ['Needs', 'A PostgreSQL connection URL, from the project’s .env or a script. For generating SQL: an API key or an agent command line.'],
+  ['Can reach', 'Generated from the manifest: each permission it asks for, with what it’s for.'],
+]
+const toc = [
+  'Set it up',
+  'Use it',
+  'From the command palette',
+  'For agents',
+  'In workflows',
+  'Settings',
+  'In the terminal',
+  'Limits',
+]
+---
+
+<Docs title="Database" section="docs" toc={toc}>
+  <p>Browse and edit a PostgreSQL database from a task, and run SQL against it.</p>
+  <div class="box breakout" style="aspect-ratio: 16 / 9">Specimen or snapshot: the Database pane with a table open</div>
+  <div class="breakout table-scroll">
+    <table>
+      <tbody>
+        {
+          facts.map(([fact, text]) => (
+            <tr>
+              <th scope="row">{fact}</th>
+              <td>{text}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+  <h2 id="set-it-up">Set it up</h2>
+  <ol class="steps">
+    <li>Put DATABASE_URL in the project's .env, or set a connection script in the project's settings.</li>
+    <li>Open a task on that project.</li>
+    <li>
+      Open the Database pane and press Connect.
+      <p class="callout"><b>Checkpoint</b> The table list shows the database's tables.</p>
+    </li>
+  </ol>
+  <h2 id="use-it">Use it</h2>
+  <p class="tag">One section per task, each with a verb heading: browse rows, edit a value, run SQL, save a query, generate SQL.</p>
+  <h2 id="from-the-command-palette">From the command palette</h2>
+  <p class="tag">Its commands, as a list.</p>
+  <h2 id="for-agents">For agents</h2>
+  <p class="tag">The agent tools and context sections it adds.</p>
+  <h2 id="in-workflows">In workflows</h2>
+  <p class="tag">Its two step kinds.</p>
+  <h2 id="settings">Settings</h2>
+  <p class="tag">Draft rows. Phase 13 reads them from the settings reference.</p>
+  <div class="breakout table-scroll">
+    <table>
+      <thead>
+        <tr><th>Setting</th><th>Where</th><th>What it changes</th><th>Stored</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Connection script</td>
+          <td>Settings > Workspaces and projects > the project</td>
+          <td>A script that prints the connection URL.</td>
+          <td>Per project, on the Node</td>
+        </tr>
+        <tr>
+          <td>Connection order</td>
+          <td>Settings > Workspaces and projects > the project</td>
+          <td>Which source wins: project configuration, the task's .env, or the Node's environment.</td>
+          <td>Per project, on the Node</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <h2 id="in-the-terminal">In the terminal</h2>
+  <p>The terminal client draws the same pane, with nothing missing.</p>
+  <h2 id="limits">Limits</h2>
+  <p>PostgreSQL only. Draft: the row caps and timeouts from the source doc.</p>
+</Docs>

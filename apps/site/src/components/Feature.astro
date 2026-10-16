@@ -1,0 +1,26 @@
+---
+// One feature: its number, a heading, a paragraph in the default slot, a link into the docs, and its
+// picture, if it has one. On a wide screen the picture sits beside the text, on alternate sides down a
+// `.features` list.
+interface Props {
+  number: number
+  title: string
+  href: string
+  link: string
+  /** The heading's level: 3 when the features sit under a section's own heading. */
+  level?: 2 | 3
+}
+
+const { number, title, href, link, level = 2 } = Astro.props
+const Heading = `h${level}` as const
+---
+
+<section class="feature">
+  <div class="feature-text">
+    <p class="eyebrow">{String(number).padStart(2, '0')}</p>
+    <Heading>{title}</Heading>
+    <slot />
+    <a href={href}>{link}</a>
+  </div>
+  {Astro.slots.has('picture') && <div class="feature-picture"><slot name="picture" /></div>}
+</section>

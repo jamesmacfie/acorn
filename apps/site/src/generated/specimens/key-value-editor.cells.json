@@ -1,0 +1,6 @@
+{"columns":60,"rows":4,"lines":[
+[{"text":"Name","attrs":["bold"]},{"text":" "},{"text":"Value","attrs":["bold"]}],
+[{"text":"[ ] Accept                       application/json"}],
+[{"text":"[ ] X-Request-Id                 deploy-42"}],
+[{"text":"[x] "},{"text":"Name","fg":"muted"},{"text":"                         "},{"text":"Value","fg":"muted"}]
+]}

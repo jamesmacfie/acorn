@@ -1,0 +1,109 @@
+---
+import Card from '../../components/Card.astro'
+import Feature from '../../components/Feature.astro'
+import Snapshot from '../../components/Snapshot.astro'
+import Specimen from '../../components/Specimen.astro'
+import { FEATURES } from '../../features'
+import FeaturePage from '../../layouts/FeaturePage.astro'
+import type { PageMeta } from '../../meta'
+
+export const meta = {
+  description: FEATURES.plugins.sentence,
+  sources: [
+    'docs/extensibility.md',
+    'docs/extensibility/runtime.md',
+    'docs/extensibility/ui-and-cooperation.md',
+    'docs/plugin-map.md',
+    'docs/contribution-kinds.md',
+    'docs/panes.md',
+    'docs/github-integration/surfaces.md',
+    'docs/plugins/agent-install.md',
+    'docs/security/node-plugin-security.md',
+    'docs/security/plugin-bundles.md',
+    'docs/tui/plugin-losses.md',
+    'docs/first-party-plugins/terminal.md',
+  ],
+  checked: '663359ff7',
+} satisfies PageMeta
+
+const guides = [
+  ['/docs/build-plugins/ui/add-a-pane/', 'Add a pane', 'A view in the task’s row of panes.'],
+  ['/docs/build-plugins/ui/add-a-source-to-the-left-rail/', 'Add a source to the left rail', 'A list to browse, with items you can open.'],
+  ['/docs/build-plugins/ui/add-commands-and-keybindings/', 'Add commands and keybindings', 'Rows in the command palette, and keys for them.'],
+  ['/docs/build-plugins/ui/add-a-settings-page/', 'Add a settings page', 'A page of its own in Settings.'],
+  ['/docs/build-plugins/node/give-agents-tools/', 'Give agents tools', 'Tools your agent sessions can call.'],
+  ['/docs/build-plugins/node/add-a-harness/', 'Add a harness', 'Another agent program for acorn to run.'],
+  ['/docs/build-plugins/node/add-a-workflow-step/', 'Add a workflow step', 'A step kind with its own form.'],
+  ['/docs/build-plugins/node/connect-a-service/', 'Connect a service', 'An account acorn holds the credential for.'],
+  ['/docs/build-plugins/node/add-a-data-source/', 'Add a data source', 'Typed records for dashboards and workflows.'],
+  ['/docs/build-plugins/ui/add-a-theme-or-a-style-pack/', 'Add a theme or a style pack', 'Colors, or a whole look.'],
+]
+---
+
+<FeaturePage feature="plugins" meta={meta} related={['desktop-and-terminal', 'security', 'task-tools']} docs={{ href: '/docs/build-plugins/start/build-your-first-plugin/', label: 'Build your first plugin' }}>
+  <Specimen slot="picture" id="issues-pane" both />
+
+  <Feature number={1} title="Most of acorn is plugins" href="/docs/build-plugins/start/how-plugins-work/" link="How plugins work">
+    <p>
+      Git, GitHub, the Agent pane, the editor, and workflows are all plugins. Database, HTTP, Linear, and Rollbar ship
+      with acorn as installed packages, and run through the same loader, sandbox, and permission checks as a plugin
+      you install yourself.
+    </p>
+  </Feature>
+
+  <Feature number={2} title="Drawn with acorn's own components" href="/docs/build-plugins/start/choose-how-your-plugin-draws/" link="Choose how your plugin draws">
+    <p>
+      A plugin's pane code runs in a worker and sends a tree of acorn's components, which the app draws. So the pane
+      gets the app's keys, focus, screen reader labels, and themes, and the terminal client draws it too. A plugin
+      that needs its own pixels can draw a web page in a frame instead, on the desktop only.
+    </p>
+  </Feature>
+
+  <Feature number={3} title="What a plugin can add" href="/docs/build-plugins/reference/contributions/" link="Contributions">
+    <p>Each of these is an entry in the plugin's manifest, and each has a guide.</p>
+    <ul class="cards">
+      {
+        guides.map(([href, title, text]) => (
+          <li>
+            <Card title={title} href={href}>
+              <p>{text}</p>
+            </Card>
+          </li>
+        ))
+      }
+    </ul>
+  </Feature>
+
+  <Feature number={4} title="Plugins extending each other" href="/docs/build-plugins/ui/add-to-another-plugins-view/" link="Add to another plugin's view">
+    <p>
+      A plugin can open places in its own view for others to fill. GitHub takes marks on the lines of a pull
+      request's diff and badges on its overview, and the Context pane takes a section from any plugin. Each
+      contribution draws on both clients, from the same code.
+    </p>
+  </Feature>
+
+  <Feature number={5} title="Permissions you accept on each device" href="/docs/security/plugin-trust-and-permissions/" link="Plugin trust and permissions">
+    <p>
+      An installed plugin's manifest lists what it needs, and its Node half runs in a worker that gets only those
+      grants. Each device decides whether to run a plugin's exact bytes, and an update asks again with what changed.
+      acorn doesn't review or sign plugins. The decision is yours, on each device.
+    </p>
+    <Snapshot slot="picture" id="permissions" />
+  </Feature>
+
+  <Feature number={6} title="Ask your agent to write one" href="/docs/build-plugins/start/have-your-agent-build-it/" link="Have your agent build it">
+    <p>
+      acorn's agents read the plugin vocabulary from your Node with the <code>plugin_authoring</code> tool. When the
+      plugin is ready, the agent asks to install it, and nothing is installed until you approve it.
+    </p>
+  </Feature>
+
+  <Fragment slot="terminal">
+    <p>
+      A plugin's tree draws in the terminal client with no extra code, and a graph becomes an indented list. What
+      the terminal can't draw is a frame: a plugin's own web page shows as one line that points at the desktop app.
+      The terminal client asks the same trust question before it runs a plugin.{' '}
+      <a href="/docs/start/desktop-and-terminal/">Desktop and terminal</a>
+    </p>
+  </Fragment>
+</FeaturePage>

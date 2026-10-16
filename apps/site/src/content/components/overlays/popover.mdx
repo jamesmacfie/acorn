@@ -1,0 +1,27 @@
+---
+title: Popover
+description: A panel that opens beside its trigger. A tree can't draw one.
+sources:
+  - packages/client-core/src/kit/components/overlays/Popover.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`Popover` opens from a trigger, which is a function that can't cross from a tree, so a tree draws nothing with it. A tree shows more on demand with a `Fold`, or asks with a `Modal`.
+
+<Specimen id="fold" caption="A tree shows more on demand with a Fold." />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="fold" />
+
+## Related
+
+- [`Fold`](/docs/components/grouping/fold/), for content the reader opens.
+- [`Modal`](/docs/components/overlays/modal/), for a task over the pane.
+
+## Mistakes
+
+- Sending `Popover` from a tree. Its trigger is dropped, and the node fails.

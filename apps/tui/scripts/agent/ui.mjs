@@ -10,7 +10,7 @@ function parseArgs(argv) {
     else rest.push(argv[index])
   }
   const [command, ...args] = rest
-  if (!command) throw new Error('Usage: agent:ui -- [--session NAME] status|snapshot|press KEY|type TEXT|paste TEXT|resize COLS ROWS|stop')
+  if (!command) throw new Error('Usage: agent:ui -- [--session NAME] status|snapshot|cells|press KEY|type TEXT|paste TEXT|resize COLS ROWS|stop')
   return { session, command, args }
 }
 
@@ -27,11 +27,12 @@ async function main() {
   } else if (command === 'resize') {
     if (args.length !== 2) throw new Error('Usage: resize COLS ROWS')
     payload = { cols: Number(args[0]), rows: Number(args[1]) }
-  } else if (args.length || !['status', 'snapshot', 'stop'].includes(command)) {
+  } else if (args.length || !['status', 'snapshot', 'cells', 'stop'].includes(command)) {
     throw new Error(`Unknown command or extra arguments: ${command}`)
   }
   const result = await requestSession(manifest, command, payload)
   if (command === 'snapshot') process.stdout.write(`${result.text}\n`)
+  else if (command === 'cells') process.stdout.write(`${JSON.stringify(result)}\n`)
   else process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
 }
 

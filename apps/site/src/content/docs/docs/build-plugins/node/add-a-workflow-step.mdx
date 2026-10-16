@@ -1,0 +1,116 @@
+---
+title: Add a workflow step
+description: Add a step kind workflows can run, with a form acorn draws from your description, checked fields, and typed output a later step can bind to.
+sources:
+  - docs/workflows/step-kinds.md
+  - docs/plugin-authoring/the-node-half.md
+  - plugins/workflows/src/shared/workflowContracts.ts
+  - examples/plugins/acme-data/node/index.js
+  - examples/plugins/acme-data/server/step.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll add a kind of step workflows can run, answered by your Node half, with a form acorn draws for
+it on the desktop and in the terminal.
+
+## The result
+
+**Record an Acme deploy** is in the workflow editor's list of steps, with an **Environment** select and
+a **Commit** field. In a run, the step records a deploy and hands `{ deployId, environment }` to the
+steps after it. It draws in the run like any other step:
+
+<Specimen id="workflow-run" caption="A workflow run, one row per step. A contributed step draws the same way, with its label and output." />
+
+In a workflow file, the step is named by its qualified kind:
+
+```toml title=".acorn/workflows/ship.toml"
+[[steps]]
+id = "record"
+name = "Record the deploy"
+kind = "acme-data:record-deploy"
+after = ["build"]
+
+[steps.with]
+environment = "staging"
+sha = "${steps.build.output}"
+```
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-data`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-data).
+
+## Steps
+
+<Steps>
+
+1. **Describe the step and write its handler.** `describe` is the form: a label, an icon, a
+   description, the fields, and what the output holds. The handler gets the run, with `with` already
+   rendered, and answers how the step ended.
+
+   <ExampleCode file="acme-data/server/step.js" region="step" />
+
+   - A field's `id` is its key in the step's `with` table.
+   - `templates: true` lets a text field take `${inputs.x}` and `${steps.x.output}`, which acorn fills
+     in before your handler runs.
+   - Answer `{ status: "done" }` with `structured` for typed output, or `{ status: "failed", error }` with
+     a sentence the person can act on.
+
+2. **Put it in the workflows point.** acorn names it `<your plugin id>:<id>`, here
+   `acme-data:record-deploy`, which is what a saved workflow stores.
+
+   <ExampleCode file="acme-data/node/index.js" region="step-kind" />
+
+3. **Check it.** Install the plugin, open the workflow editor, and add a step: **Record an Acme deploy**
+   is in the list. Leave **Commit** empty and the editor marks it before the workflow can run.
+
+</Steps>
+
+## The fields acorn draws
+
+A field is one of these, and acorn draws each the same way on both hosts:
+
+| Type | Draws |
+| --- | --- |
+| `text` | One line |
+| `textarea` | Several lines |
+| `prompt` | Several lines that take templates by default |
+| `number` | A number, with `min` and `max` |
+| `boolean` | A switch |
+| `select` | A choice from `options`, or from an `optionsRoute` on your Node half that answers `{ options }` |
+
+acorn checks `required`, `min`, `max`, and a fixed select's choices before it calls your handler, and
+before it calls an optional `validate(step, context)` that returns sentences for anything else wrong.
+So the handler can trust the shape, and check only what it means.
+
+## Mistakes
+
+- Renaming the step's id. A saved workflow names the old one, and stops running until the step is
+  back.
+- A description missing its label, icon, fields, or output. acorn leaves the step out and logs which
+  part is missing. The rest of your plugin still works.
+- Reading the other plugin's code at `init`. Resolve anything you need inside the handler, so a
+  restarted plugin can't leave you holding an old copy.
+- Reporting an HTTP error as a failure when it's an answer. A later `decide` step can branch on it.
+
+## In the terminal
+
+The terminal client's workflow editor draws the same form from your description, and its runs show the
+same step.
+
+## Limits
+
+- A step has no component of its own. A field that needs one, such as a nested object, belongs in the
+  workflow file's `with` table as written.
+- A step kind runs on the Node, with no window, so it can't ask the person anything. A workflow's
+  human gate does that.
+- Progress shows as the latest `{ type: "progress", text }` event the handler emits.
+
+## Reference
+
+[Write a workflow](/docs/automation/write-a-workflow/) and
+[Steps, gates, and budgets](/docs/automation/steps-gates-and-budgets/) are what the person sees.

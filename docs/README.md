@@ -115,6 +115,7 @@ the whole plugin system in one page.
 | [database.md](./database.md) | The database plugin: the Postgres browser and SQL editor. |
 | [mcp.md](./mcp.md) | The MCP server: a stdio child that calls the node over loopback. |
 | [mcp/managed-servers.md](./mcp/managed-servers.md) | Exact npm MCP installation, consent, and live tool catalogue review. |
+| [mcp/sign-in.md](./mcp/sign-in.md) | Signing in to a remote MCP server once per Node, the token relay, and the browser's return trip. |
 
 ## Plugins
 
@@ -141,6 +142,15 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [local-development/profiling.md](./local-development/profiling.md) | Timing a cold start and a task switch. |
 | [local-development/packaged-stacks.md](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
 | [local-development/formatting.md](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, the `git blame` ignore file, and carrying a branch across a formatting commit. |
+| [site.md](./site.md) | The public site in `apps/site`: running, building, checking, and deploying it, and adding a page. |
+| [site/agent-outputs.md](./site/agent-outputs.md) | The public site's search palette, page titles and descriptions, social cards, the Markdown copy of each docs page, `llms.txt`, and the agent guide. |
+| [site/built-in-plugins.md](./site/built-in-plugins.md) | The public site's list of the plugins acorn ships, each plugin's facts box, and the test that keeps both whole. |
+| [site/design.md](./site/design.md) | How the public site looks: its stylesheet on acorn's tokens, fonts, mark, Appearance control, components, contrast check, and the landing page's Lighthouse scores. |
+| [site/specimens.md](./site/specimens.md) | Specimens on the public site: plugin tree code both hosts draw, the generators that commit and check it, and the scoped stylesheet. |
+| [site/plugin-guides.md](./site/plugin-guides.md) | The public site's plugin guides: the example plugins in `examples/plugins/`, the harness that installs and runs them, and how a guide shows their code and pictures. |
+| [site/references.md](./site/references.md) | The public site's generated reference pages: command-line help, keyboard shortcuts, configuration files, environment variables, and the published schemas, and the check behind each. |
+| [site/releases.md](./site/releases.md) | What the public site reads from GitHub at build time, the download page's release files, and the hand-written changelog and its feed. |
+| [site/snapshots.md](./site/snapshots.md) | Shell snapshots on the public site: the invented fixture, the scenes, how the capture drives the running apps, and adding a scene. |
 | [testing.md](./testing.md) | The way into the tests: the commands, focused runs, and the topic pages. |
 | [testing/commands.md](./testing/commands.md) | Every test command, concurrency limits, caching, timeouts, and coverage measurement. |
 | [testing/layers.md](./testing/layers.md) | What each runtime's suites cover, composition-root tests, and the testkit. |

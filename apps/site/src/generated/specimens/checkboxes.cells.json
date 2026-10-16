@@ -1,0 +1,6 @@
+{"columns":50,"rows":4,"lines":[
+[{"text":"[x] Run checks on push"}],
+[{"text":"[ ] Notify reviewers "},{"text":"Posts in the team channel.","fg":"muted"}],
+[{"text":"[x] Auto-deploy"}],
+[]
+]}

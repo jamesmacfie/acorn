@@ -1,0 +1,239 @@
+{
+  "meta": {
+    "title": "Table",
+    "caption": "A table with a header row and three rows.",
+    "terminal": {
+      "columns": 50,
+      "rows": 7
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Table",
+          "props": {},
+          "children": [
+            {
+              "id": "n2",
+              "type": "TableRow",
+              "props": {
+                "head": true
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "Check"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n5",
+                  "type": "TableHead",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "Status"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n7",
+                  "type": "TableHead",
+                  "props": {
+                    "priority": "low"
+                  },
+                  "children": [
+                    {
+                      "id": "n8",
+                      "type": "#text",
+                      "props": {
+                        "value": "Time"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n9",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n10",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n11",
+                      "type": "#text",
+                      "props": {
+                        "value": "lint"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n12",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n13",
+                      "type": "#text",
+                      "props": {
+                        "value": "passed"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n14",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n15",
+                      "type": "#text",
+                      "props": {
+                        "value": "48s"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n16",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n17",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n18",
+                      "type": "#text",
+                      "props": {
+                        "value": "unit tests"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n19",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n20",
+                      "type": "#text",
+                      "props": {
+                        "value": "passed"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n21",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n22",
+                      "type": "#text",
+                      "props": {
+                        "value": "3m 12s"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n23",
+              "type": "TableRow",
+              "props": {},
+              "children": [
+                {
+                  "id": "n24",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n25",
+                      "type": "#text",
+                      "props": {
+                        "value": "e2e"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n26",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n27",
+                      "type": "#text",
+                      "props": {
+                        "value": "running"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n28",
+                  "type": "TableCell",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n29",
+                      "type": "#text",
+                      "props": {
+                        "value": "1m 05s"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

@@ -1,0 +1,68 @@
+---
+title: Built-in plugins
+description: Every plugin that ships with acorn, what it adds, where it works, and how to turn one off.
+sources:
+  - docs/first-party-plugins.md
+  - docs/first-party-plugins/terminal.md
+  - docs/plugins/activation.md
+  - docs/plugins/distribution.md
+  - apps/site/src/data/plugins.ts
+checked: 68d4f3b5a
+---
+
+import { PLUGINS, SHIPS_AS } from '../../../../data/plugins.ts'
+
+export const plugins = Object.values(PLUGINS).sort((a, b) => a.name.localeCompare(b.name))
+
+Most of what acorn does comes from plugins, and these are the ones it ships. This page lists them all,
+with where each one works. Each plugin's page says what it needs from you, how to set it up, and what it
+can reach.
+
+## Every plugin acorn ships
+
+<table>
+  <thead>
+    <tr>
+      <th scope="col">Plugin</th>
+      <th scope="col">What it adds</th>
+      <th scope="col">Works in</th>
+    </tr>
+  </thead>
+  <tbody>
+    {plugins.map((plugin) => (
+      <tr>
+        <th scope="row"><a href={plugin.docs}>{plugin.name}</a></th>
+        <td>{plugin.sentence}</td>
+        <td>{plugin.worksIn}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+Some are part of the app, and the rest are installed packages that come with it. You can't tell the two
+apart in use. Each page's facts box says which it is, because it decides what the page can tell you about
+the plugin's permissions: an installed package can reach only what its manifest asks for, and its page
+lists each permission with what it's for. A plugin that's part of the app is trusted like the rest of
+acorn. The Onboarding plugin is the first-run wizard, which [Install](/docs/start/install/#the-first-run-setup)
+covers.
+
+## Turn a plugin off
+
+Open **Settings** > **Plugins** > **Installed**, click **Manage** on the plugin, and turn off **Enabled**
+on its **Overview** tab. The switch is per Node. The plugin stops at the Node's next start, and until
+then the page shows that a restart is waiting. Its data stays on the Node, so turning it back on picks up
+where it left off. Agents, Memory, Notes, and Terminal have no switch, because the rest of acorn depends
+on them. Context and Onboarding run only in your client, so they aren't on the list and stay on. The installed packages acorn ships have no **Update** or uninstall button: they update with
+acorn. [Settings: Plugins](/docs/settings/plugins/) lists the rest of a plugin's page.
+
+## In the terminal
+
+Every plugin here works in the terminal client except Preview, and Sentry telemetry's settings page. The
+terminal client draws the other panes from the same code as the desktop. Each plugin's page has an **In the terminal** section for what's
+different. [Desktop and terminal](/docs/start/desktop-and-terminal/) covers what a terminal can't draw.
+
+## Limits
+
+- A plugin you turn off stays off on that Node only. Other Nodes keep their own choice.
+- The list covers what acorn ships. Plugins you install yourself are on **Settings** > **Plugins** >
+  **Installed** beside these, and acorn doesn't review them.

@@ -1,0 +1,6 @@
+{"columns":60,"rows":4,"lines":[
+[{"text":"Environment","fg":"muted"},{"text":" staging"}],
+[{"text":"Commit     ","fg":"muted"},{"text":" 3f9a2c1"}],
+[{"text":"Started    ","fg":"muted"},{"text":" 12 minutes ago"}],
+[{"text":"Duration   ","fg":"muted"},{"text":" 2m 14s"}]
+]}

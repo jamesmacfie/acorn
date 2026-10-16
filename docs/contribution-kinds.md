@@ -129,7 +129,7 @@ the owner declared. The `plugin_authoring` tool lists every point's props and ke
 | Hover and diagnostics for a language | `documentServices` | Routes | Editor; a tie needs the person's pick | **Diagnostics** checks the saved file |
 
 Every tree runs in the contributor's worker with its own permissions and reads through its own
-routes. [An extension example](./plugin-authoring/extension-example.md) declares nine of these.
+routes. [An extension example](./plugin-authoring/extension-example.md) declares ten of these.
 
 ## The slot vocabulary
 

@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "title": "frame-beside-document",
+    "caption": "The same two regions, side by side.",
+    "terminal": {
+      "columns": 90,
+      "rows": 4
+    },
+    "width": 640
+  },
+  "layout": {
+    "name": "frame-beside-document",
+    "label": "Deploys",
+    "regions": [
+      "document",
+      "frame"
+    ]
+  }
+}

@@ -1,0 +1,105 @@
+---
+// One specimen, as the desktop and the terminal draw it (docs/site/specimens.md). Everything here is
+// committed generator output in src/generated/specimens/; nothing runs the specimen's code. By default
+// a Desktop and Terminal tab switch between the two. `both` shows them side by side instead.
+import 'virtual:acorn-ui.css'
+import Cells, { type CellFrame } from './Cells.astro'
+
+interface Props {
+  id: string
+  both?: boolean
+  /** Replaces the specimen's own caption, for a page that shows a kit node standing for what the host draws. */
+  caption?: string
+}
+
+type Recorded = { meta: { title: string; caption: string; width: number } }
+
+const trees = import.meta.glob<Recorded>('../generated/specimens/*.tree.json', { eager: true, import: 'default' })
+const pages = import.meta.glob<string>('../generated/specimens/*.html', { eager: true, query: '?raw', import: 'default' })
+const frames = import.meta.glob<CellFrame>('../generated/specimens/*.cells.json', { eager: true, import: 'default' })
+
+const { id, both = false, caption } = Astro.props
+const file = (extension: string) => `../generated/specimens/${id}${extension}`
+const tree = trees[file('.tree.json')]
+const html = pages[file('.html')]
+const cells = frames[file('.cells.json')]
+if (!tree || html === undefined || !cells) {
+  throw new Error(`There's no specimen "${id}". Add apps/site/specimens/<group>/${id}.tsx, then run UPDATE_SPECIMENS=1 pnpm --filter @acorn/site specimens.`)
+}
+const { meta } = tree
+
+// shortcut: ids come from the specimen id, so one specimen shown twice on a page repeats them; count
+// per page if a page ever needs that.
+const desktop = `specimen-${id}-desktop`
+const terminal = `specimen-${id}-terminal`
+// Side by side, each view is a labeled group rather than a tab's panel.
+const role = both ? 'group' : 'tabpanel'
+---
+
+<figure class="specimen frame not-content" class:list={{ both }} aria-label={meta.title}>
+  <div class="frame-bar">
+    <span class="frame-title">{meta.title}</span>
+    {
+      !both && (
+        <div class="tabs" role="tablist" aria-label="Host" data-tabs hidden>
+          <button type="button" role="tab" aria-controls={desktop}>
+            Desktop
+          </button>
+          <button type="button" role="tab" aria-controls={terminal}>
+            Terminal
+          </button>
+        </div>
+      )
+    }
+  </div>
+  <div class="views">
+    <div class="view" id={desktop} role={role} aria-label="Desktop">
+      {both && <span class="frame-size">Desktop</span>}
+      <div class="acorn-ui" style={`max-inline-size: ${meta.width}px`} set:html={html} />
+    </div>
+    <div class="view terminal" id={terminal} role={role} aria-label="Terminal">
+      <Cells cells={cells} />
+      <span class="frame-size">{both && 'Terminal '}{cells.columns}×{cells.rows}</span>
+    </div>
+  </div>
+  <figcaption class="frame-caption">{caption ?? meta.caption}</figcaption>
+</figure>
+
+<script>
+  import '../scripts/tabs'
+</script>
+
+<style>
+  .view {
+    position: relative;
+    padding: var(--pane-pad);
+    overflow-x: auto;
+  }
+  .view .frame-size {
+    position: absolute;
+    inset: var(--space-2) var(--space-4) auto auto;
+  }
+  /* A modal covers the window in the app. Here it draws in its frame, so it never covers the page. */
+  .view :global(.overlay-backdrop) {
+    position: relative;
+    padding-block: var(--space-4);
+  }
+  /* Side by side on a wide screen, one above the other on a narrow one. The terminal sizes its text to
+     fit its column, as a terminal snapshot does: a cell is 0.6em wide in a monospace face. */
+  .both .views {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  }
+  .both .view {
+    padding-block-start: calc(var(--pane-pad) + var(--space-8));
+  }
+  .both .terminal {
+    container-type: inline-size;
+  }
+  .both .terminal :global(.cells) {
+    font-size: min(var(--term-fs), calc(100cqi / var(--columns) / 0.6));
+  }
+  .both .view .frame-size {
+    inset-inline: var(--space-4) auto;
+  }
+</style>

@@ -1,0 +1,150 @@
+---
+title: Act on agent turns with hooks
+description: Stop an agent's tool call, hold it for the person, or add a note the model reads after it runs, with the hook points acorn and its plugins open.
+sources:
+  - docs/plugins/hooks.md
+  - docs/managed-agents/loop-hooks.md
+  - packages/plugin-types/src/contracts/agents.ts
+  - examples/plugins/acme-agent/acorn-plugin.json
+  - examples/plugins/acme-agent/node.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll make your plugin decide something before or after an agent acts: refuse a command, ask the
+person first, or tell the model something once a tool has run.
+
+## The result
+
+When Claude Code tries `git push --force`, the call never runs, and the model reads why in the same
+turn:
+
+```text
+Blocked by acme-agent: Push with --force-with-lease, so you never overwrite work you haven’t seen.
+```
+
+After it edits a file, the model reads "You changed a file. Run the tests before you finish." beside
+the edit's result. The plugin's page in **Settings** > **Plugins** has an **Agents it reaches** section
+saying which harnesses send it every tool call.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-agent`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-agent).
+
+## Hook points and modes
+
+A hook is a moment the owner of a feature opens to other plugins, and the answers it accepts there:
+
+| Mode | Your route answers | What happens |
+| --- | --- | --- |
+| `observe` | Anything | Nothing. Your route hears it and can't change it |
+| `transform` | `{ payload }` | The changed payload replaces the old one, if it keeps the owner's shape |
+| `veto` | `{ ok: true }` or `{ ok: false, reason }` | A refusal stops it, credited to your plugin |
+| `ask` | `{ ask: true, reason }` | The person decides on a card that names your plugin |
+
+The points acorn and its plugins open:
+
+| Point | Allows | When |
+| --- | --- | --- |
+| `agents:before-tool` | observe, veto, ask | Before a bridged harness runs any tool |
+| `agents:after-tool` | observe, transform | After it ran one. Only `note` may change |
+| `agents:before-permission` | observe, veto | Before a harness's own permission prompt reaches the person |
+| `agents:before-send` | observe, transform, veto | Before the person's message goes to the agent |
+| `core:before-tool-call` | observe, veto | Before one of acorn's own tools runs. A timeout refuses it |
+| `core:before-snapshot` | observe, transform, veto | Before task context is put together |
+| `core:worktree-created` | observe, transform | After a task's worktree is made |
+| `core:task-archiving` | observe, transform | While a task is archived, before its worktree goes |
+| `core:task-deleted` | observe | After tasks are deleted |
+| `git:before-commit` | observe, transform, veto | Before a commit in the Changes pane |
+| `git:before-push` | observe, veto | Before a push |
+| `terminal:before-run-target` | observe, veto | Before a run target starts |
+| `workflows:before-step` | observe, veto | Before a workflow step runs |
+| `editor:before-save` | observe, transform, veto | Before Editor saves a file |
+
+Claude Code and Codex send every tool call through `before-tool` and `after-tool`, on a Node that has
+acorn's bridge for them. Other harnesses have only `before-permission`.
+
+## Steps
+
+<Steps>
+
+1. **Declare the handlers.** Each is an `extensions` entry with a `point`, a `mode` the point allows,
+   and a `route` on your Node half.
+
+   <ExampleCode file="acme-agent/acorn-plugin.json" pick={['contributions.extensions']} />
+
+2. **Answer them.** acorn posts the payload to your route: the tool's `kind`, `command`, `paths`,
+   `toolName`, and the task and session it's in. Answer within 5 seconds.
+
+   <ExampleCode file="acme-agent/node.js" region="hooks" />
+
+3. **Install it.** The plugin's **Permissions** tab lists each handler under **What it may do**, marked
+   as wide reach, in acorn's words, such as stopping a tool call in the agents plugin. A device's trust
+   prompt shows the same lines when it asks about the plugin.
+
+4. **Check it.** Start a Claude Code session in a task and ask it to force push. The transcript shows
+   the refusal with your reason.
+
+</Steps>
+
+## What a hook may change
+
+- A veto stops the call. The model reads the reason, and can try another way.
+- An ask holds the call on a permission card for up to 570 seconds. **Reject** stops it. **Allow** isn't
+  a yes: the harness's own permission check still runs.
+- A transform on `after-tool` sets `note`, at most 4,096 characters. acorn ignores any other field you
+  change.
+- Nothing approves a call. A hook can make a session stricter, and never runs a tool on the person's
+  behalf.
+
+## Mistakes
+
+- A slow route. On the agent points, a handler that times out or throws is skipped and the call goes
+  ahead, so a stalled plugin never blocks an agent. `core:before-tool-call` is the one point where a
+  timeout refuses.
+- A veto that needs the conversation's history. Your route sees one call at a time, and handlers never
+  see each other's answers.
+- Matching a command exactly. `git push -f origin main` and `git push --force` are both a force push,
+  so match the flag.
+
+A mode the point doesn't allow gets nothing, and a handler names one:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "extensions": [{ "id": "guard", "point": "agents:before-tool", "label": "Guard",
+      "route": "/v1/p/acme/hooks/before-tool" }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "extensions": [{ "id": "guard", "point": "agents:before-tool", "label": "Guard",
+      "route": "/v1/p/acme/hooks/before-tool", "mode": "veto" }]
+  }
+}
+```
+
+## In the terminal
+
+Hooks run on the Node, so a session in the terminal client is held to them too, and an ask's card
+appears there.
+
+## Limits
+
+- Up to 16 `extensions` entries per plugin, hooks and every other kind together.
+- A hook runs on the Node, never in a window, and never on a stream such as terminal output or
+  keystrokes.
+- An agent you start yourself in a terminal isn't a managed session, so only its harness's own hooks
+  apply.
+
+## Reference
+
+[extensions](/docs/build-plugins/reference/contributions/extensions/) has every field of a handler.

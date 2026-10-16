@@ -1,0 +1,9 @@
+{"columns":50,"rows":7,"lines":[
+[{"text":"Check           ","attrs":["bold"]},{"text":" "},{"text":"Status          ","attrs":["bold"]},{"text":" "},{"text":"Time            ","attrs":["bold"]}],
+[{"text":"lint             passed           48s"}],
+[{"text":"unit tests       passed           3m 12s"}],
+[{"text":"e2e              running          1m 05s"}],
+[],
+[],
+[]
+]}

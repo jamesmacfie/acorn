@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "title": "FindBar",
+    "caption": "A find bar on the third of twelve matches.",
+    "terminal": {
+      "columns": 50,
+      "rows": 1
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "FindBar",
+          "props": {
+            "query": "redirect",
+            "count": {
+              "current": 3,
+              "total": 12
+            },
+            "placeholder": "Find in log"
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

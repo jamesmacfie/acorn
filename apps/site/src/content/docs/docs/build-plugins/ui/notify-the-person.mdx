@@ -1,0 +1,93 @@
+---
+title: Notify the person
+description: Raise a notice in the notification bell, or keep an item in the inbox until it's resolved, and when to use each.
+sources:
+  - docs/plugin-map.md
+  - docs/notifications/rows-and-targets.md
+  - docs/plugins/freshness.md
+  - examples/plugins/acme-tracker/acorn-plugin.json
+  - examples/plugins/acme-tracker/server/routes.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll tell the person something from your Node half, in one of two ways: a notice, which says
+something happened, or an attention item, which stays in the inbox until the condition is resolved.
+
+## The result
+
+Both draw in acorn's notification bell, so there's no picture of the example's own: see
+[Notifications and the inbox](/docs/using/notifications-and-the-inbox/). In the Acme tracker example,
+creating an issue raises **ACME-23 created**, and each issue waiting for review is an item under
+**Needs you**: **ACME-14 is waiting for review**.
+
+## Before you start
+
+You need a plugin with a Node half ([Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/)).
+The code is from
+[`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker).
+
+## Choose one
+
+| | A notice | An attention item |
+| --- | --- | --- |
+| Says | Something happened | Something is waiting on you |
+| Raised by | `ctx.events.notice()` from your code | An `attention` route acorn reads |
+| Goes away | When the person reads it | When your route stops answering it, or, for `info`, when acknowledged |
+| Example | An import finished | A review is waiting |
+
+## Raise a notice
+
+<Steps>
+
+1. **Call `ctx.events.notice()`** with a `title`, an optional `detail`, and the `taskId` it's about,
+   if any.
+
+   <ExampleCode file="acme-tracker/server/routes.js" region="notice" />
+
+2. **Check it.** Run **New Acme issue** from the palette in a task. The bell gets a row, **ACME-23
+   created**, with the title you typed. Clicking it opens the task, then your plugin's rail source.
+
+</Steps>
+
+## Keep an item in the inbox
+
+<Steps>
+
+1. **Declare an `attention` entry** with the route that answers the items.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.attention']} />
+
+2. **Answer the items.** Each is `{ id, title, detail?, severity, at, taskId? }`, where `at` is epoch
+   milliseconds for the row's relative time. A `warn` or `danger` item stays until your route stops
+   answering it, so stop answering when it's resolved.
+
+   <ExampleCode file="acme-tracker/server/routes.js" region="attention" />
+
+3. **Check it.** Open the bell. **ACME-14 is waiting for review** is under **Needs you**.
+
+</Steps>
+
+## Mistakes
+
+- A notice for a lasting condition gets read and forgotten. Make it an attention item.
+- An attention item for a one-off event never goes away. Make it a notice.
+- A `target` or `kind` on a notice from a plugin you install is dropped. acorn points the row at your
+  own rail source, or at the Settings page that lists your plugin.
+
+## In the terminal
+
+The terminal client's inbox, <kbd>n</kbd>, lists the same notices and attention items.
+
+## Limits
+
+- A row carries display strings only. It can't open another plugin's view.
+- An attention route is read on its `refresh` interval, at least 30 seconds, and when you call
+  `ctx.events.status()`.
+
+## Reference
+
+- [attention](/docs/build-plugins/reference/contributions/attention/)
+- [The Node context](/docs/build-plugins/reference/the-node-context/) has `events.notice`.

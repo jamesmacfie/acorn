@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "title": "Input",
+    "caption": "A text input with a value, an empty one with a placeholder, and one marked invalid.",
+    "terminal": {
+      "columns": 50,
+      "rows": 3
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Input",
+              "props": {
+                "label": "Branch name",
+                "value": "fix-login-redirect"
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "Input",
+              "props": {
+                "label": "Reviewer",
+                "placeholder": "Search people"
+              },
+              "children": []
+            },
+            {
+              "id": "n4",
+              "type": "Input",
+              "props": {
+                "label": "Port",
+                "value": "70000",
+                "invalid": true
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

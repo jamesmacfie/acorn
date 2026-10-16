@@ -1,0 +1,27 @@
+---
+title: Chip
+description: A label the reader can select, press, or remove.
+sources:
+  - packages/client-core/src/kit/components/inputs/Chip.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Chip` for a tag, a filter, or a person that the reader can act on. With `onRemove` it draws its own remove control.
+
+<Specimen id="badges-and-chips" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="badges-and-chips" />
+
+## Related
+
+- [`ChipRow`](/docs/components/collections/chip-row/), for a row of chips.
+- [`Badge`](/docs/components/content/badge/), for a label that doesn't act.
+
+## Mistakes
+
+- Coloring a chip with a hex `color` when a tone says it. Use `tone`, which both hosts draw.

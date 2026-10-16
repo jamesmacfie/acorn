@@ -1,0 +1,7 @@
+{"columns":60,"rows":5,"lines":[
+[{"text":" ","fg":"accent","bg":"hover"},{"text":" ","bg":"hover"},{"text":"Webhooks give up after one retry","bg":"hover","attrs":["inverse"]},{"text":"                  ACME-12","bg":"hover"}],
+[{"text":" ","fg":"accent"},{"text":" VAT missing on EU invoices                        ACME-14"}],
+[{"text":" ","fg":"accent"},{"text":" Overdue invoice query is slow                     ACME-15"}],
+[],
+[]
+]}

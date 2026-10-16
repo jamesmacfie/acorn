@@ -1,0 +1,28 @@
+---
+title: Link
+description: Text that goes somewhere when pressed.
+sources:
+  - packages/client-core/src/kit/components/content/Link.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Link` for text that opens a web page or acts. An `href` must be an HTTPS address, and the host opens it. For a place inside acorn, send `onPress` and ask the host.
+
+<Specimen id="headings-and-links" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="headings-and-links" />
+
+## Related
+
+- [`Button`](/docs/components/inputs/button/), for an action that isn't a destination.
+- [`Text`](/docs/components/content/text/), for words that don't act.
+
+## Mistakes
+
+- Passing an `http:` or a relative `href`. The host drops any `href` that isn't HTTPS.
+- Putting the explanation in `tip`. The terminal has no hover and draws nothing for it.

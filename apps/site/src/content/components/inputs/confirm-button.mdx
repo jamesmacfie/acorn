@@ -1,0 +1,27 @@
+---
+title: ConfirmButton
+description: A button that asks for a second press before it acts.
+sources:
+  - packages/client-core/src/kit/components/inputs/ConfirmButton.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `ConfirmButton` for an action that's hard to undo, such as delete. The first press arms it and shows `confirmLabel`, and the second sends `onConfirm`.
+
+<Specimen id="confirm-button" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="confirm-button" />
+
+## Related
+
+- [`Button`](/docs/components/inputs/button/), for an action that doesn't ask.
+- [`Modal`](/docs/components/overlays/modal/), for a confirmation that needs words.
+
+## Mistakes
+
+- Listening for `onPress` to act. Act on `onConfirm`, which comes only after the second press.

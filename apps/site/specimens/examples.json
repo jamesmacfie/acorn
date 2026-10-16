@@ -1,0 +1,378 @@
+[
+  {
+    "id": "hello-pane",
+    "example": "hello-pane",
+    "entry": "pane",
+    "meta": {
+      "title": "Hello pane",
+      "caption": "The tutorial's pane: a heading, a line of text, and two buttons that ask the Node half.",
+      "terminal": {
+        "columns": 60,
+        "rows": 8
+      },
+      "width": 520
+    }
+  },
+  {
+    "id": "acme-tracker-list",
+    "example": "acme-tracker",
+    "entry": "list",
+    "props": {
+      "sourceId": "issues",
+      "region": "list",
+      "collapsed": false
+    },
+    "meta": {
+      "title": "Acme issues: the list",
+      "caption": "The rail source's list tree, with the first issue selected.",
+      "terminal": {
+        "columns": 60,
+        "rows": 5
+      },
+      "width": 360
+    }
+  },
+  {
+    "id": "acme-tracker-list-collapsed",
+    "example": "acme-tracker",
+    "entry": "list",
+    "props": {
+      "sourceId": "issues",
+      "region": "list",
+      "collapsed": true
+    },
+    "meta": {
+      "title": "Acme issues at icon width",
+      "caption": "The same list tree with the column collapsed: each row is its collapsedIcon, a Lucide icon, named in a tooltip. The terminal client has no icon width, so it keeps the titles.",
+      "terminal": {
+        "columns": 20,
+        "rows": 4
+      },
+      "width": 64
+    }
+  },
+  {
+    "id": "acme-tracker-detail",
+    "example": "acme-tracker",
+    "entry": "detail",
+    "props": {
+      "sourceId": "issues",
+      "region": "detail"
+    },
+    "meta": {
+      "title": "Acme issues: the detail",
+      "caption": "The detail tree beside the list, drawing the selected issue.",
+      "terminal": {
+        "columns": 60,
+        "rows": 6
+      },
+      "width": 520
+    }
+  },
+  {
+    "id": "acme-tracker-pane-header",
+    "example": "acme-tracker",
+    "entry": "paneHeader",
+    "props": {
+      "taskId": "t1",
+      "projectId": "p1"
+    },
+    "meta": {
+      "title": "Tracker: the header region",
+      "caption": "The pane's header region: one tree.",
+      "terminal": {
+        "columns": 60,
+        "rows": 2
+      },
+      "width": 520
+    }
+  },
+  {
+    "id": "acme-tracker-pane",
+    "example": "acme-tracker",
+    "entry": "pane",
+    "props": {
+      "taskId": "t1",
+      "projectId": "p1"
+    },
+    "meta": {
+      "title": "Tracker: the body region",
+      "caption": "The pane's body region: another tree from the same bundle.",
+      "terminal": {
+        "columns": 80,
+        "rows": 5
+      },
+      "width": 560
+    }
+  },
+  {
+    "id": "acme-tracker-settings",
+    "example": "acme-tracker",
+    "entry": "settings",
+    "meta": {
+      "title": "Acme tracker settings",
+      "caption": "The settings page's tree. The host draws the plugin strip above it.",
+      "terminal": {
+        "columns": 70,
+        "rows": 10
+      },
+      "width": 560
+    }
+  },
+  {
+    "id": "acme-tracker-panel",
+    "example": "acme-tracker",
+    "entry": "panel",
+    "props": {
+      "item": "ACME-14"
+    },
+    "meta": {
+      "title": "Acme issue ACME-14",
+      "caption": "The reference panel's tree. The host draws the panel around it, with its title and close button.",
+      "terminal": {
+        "columns": 60,
+        "rows": 5
+      },
+      "width": 400
+    }
+  },
+  {
+    "id": "acme-review-tool-card",
+    "example": "acme-review",
+    "entry": "toolCard",
+    "props": {
+      "taskId": "t1",
+      "defaultOpen": true,
+      "tool": {
+        "title": "acme-review_files",
+        "status": "completed",
+        "output": "{\"files\":[\"billing/webhooks/deliver.py\",\"billing/invoices/vat.py\"]}"
+      }
+    },
+    "meta": {
+      "title": "A tool card in an agent session",
+      "caption": "acme-review's tree in Agents' tool card point, drawing its own tool's output.",
+      "terminal": {
+        "columns": 60,
+        "rows": 3
+      },
+      "width": 480
+    }
+  },
+  {
+    "id": "acme-review-interrupt",
+    "example": "acme-review",
+    "entry": "interrupt",
+    "props": {
+      "session": {
+        "id": "s1",
+        "running": true
+      }
+    },
+    "meta": {
+      "title": "A control in the terminal's toolbar",
+      "caption": "acme-review's Interrupt button, drawn beside the terminal's own Stop.",
+      "terminal": {
+        "columns": 30,
+        "rows": 1
+      },
+      "width": 240
+    }
+  },
+  {
+    "id": "acme-review-docs-preview",
+    "example": "acme-review",
+    "entry": "docsPreview",
+    "props": {
+      "url": "https://docs.example.com/guide/review"
+    },
+    "meta": {
+      "title": "A link preview",
+      "caption": "acme-review's preview of a docs.example.com link, read from its own route.",
+      "terminal": {
+        "columns": 50,
+        "rows": 2
+      },
+      "width": 360
+    }
+  },
+  {
+    "id": "acme-review-checklist",
+    "example": "acme-review",
+    "entry": "checklist",
+    "props": {
+      "blockId": "b1",
+      "language": "review",
+      "text": "billing/webhooks/deliver.py\nbilling/invoices/vat.py",
+      "revision": 1
+    },
+    "meta": {
+      "title": "A review fence",
+      "caption": "A ```review fence in an agent's reply, drawn as a checklist.",
+      "terminal": {
+        "columns": 50,
+        "rows": 3
+      },
+      "width": 400
+    }
+  },
+  {
+    "id": "acme-review-csv-file",
+    "example": "acme-review",
+    "entry": "csvFile",
+    "props": {
+      "taskId": "t1",
+      "path": "rates.csv",
+      "text": "region,rate,since\neu,20%,2024-01\nuk,20%,2021-01\nno,25%,2023-07\n",
+      "revision": 1
+    },
+    "meta": {
+      "title": "rates.csv in Editor",
+      "caption": "acme-review's viewer for .csv files. Editor keeps the Source toggle and the tab.",
+      "terminal": {
+        "columns": 50,
+        "rows": 5
+      },
+      "width": 400
+    }
+  },
+  {
+    "id": "acme-review-pane",
+    "example": "acme-review",
+    "entry": "pane",
+    "props": {
+      "taskId": "t1",
+      "projectId": "p1"
+    },
+    "before": [
+      {
+        "path": "/v1/p/acme-review/add",
+        "method": "POST",
+        "body": {
+          "resource": {
+            "kind": "file",
+            "taskId": "t1",
+            "projectId": "p1",
+            "path": "billing/webhooks/deliver.py",
+            "directory": false,
+            "readOnly": false
+          }
+        }
+      }
+    ],
+    "meta": {
+      "title": "Review",
+      "caption": "acme-review's pane, written in JSX with the SDK and built into one file.",
+      "terminal": {
+        "columns": 50,
+        "rows": 3
+      },
+      "width": 400
+    }
+  },
+  {
+    "id": "acme-board-card",
+    "example": "acme-points/acme-board",
+    "entry": "card",
+    "props": {
+      "projectId": "p1",
+      "item": "c1"
+    },
+    "meta": {
+      "title": "The board's card",
+      "caption": "acme-board's own tree. Its point's regions draw above and below it.",
+      "terminal": {
+        "columns": 50,
+        "rows": 2
+      },
+      "width": 400
+    }
+  },
+  {
+    "id": "acme-links-summary",
+    "example": "acme-points/acme-links",
+    "entry": "summary",
+    "props": {
+      "surface": "card",
+      "projectId": "p1",
+      "item": "c1"
+    },
+    "meta": {
+      "title": "The card summary point",
+      "caption": "acme-links's tree, drawn by the host in the region acme-board mounted above its card.",
+      "terminal": {
+        "columns": 50,
+        "rows": 1
+      },
+      "width": 400
+    }
+  },
+  {
+    "id": "acme-switcher",
+    "example": "acme-switcher",
+    "entry": "switcher",
+    "props": {
+      "task": {
+        "id": "t1",
+        "title": "Retry webhooks",
+        "projectId": "p1"
+      },
+      "maximized": null,
+      "panes": [
+        {
+          "id": "agents",
+          "label": "Agent",
+          "icon": "bot",
+          "shown": true,
+          "pinned": true,
+          "shortcut": "⌘1",
+          "markers": []
+        },
+        {
+          "id": "git",
+          "label": "Changes",
+          "icon": "git-branch",
+          "shown": true,
+          "pinned": false,
+          "shortcut": "⌘2",
+          "markers": []
+        },
+        {
+          "id": "editor",
+          "label": "Editor",
+          "icon": "file-code",
+          "shown": false,
+          "pinned": false,
+          "shortcut": "⌘3",
+          "markers": []
+        },
+        {
+          "id": "acme-tracker",
+          "label": "Tracker",
+          "icon": "list-todo",
+          "shown": false,
+          "pinned": false,
+          "markers": [
+            {
+              "id": "m1",
+              "label": "Linked to an Acme issue",
+              "tone": "accent",
+              "placements": [
+                "top-end"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "meta": {
+      "title": "A replacement pane switcher",
+      "caption": "acme-switcher's tree in the right rail's pane switcher slot, drawn from the host's pane data.",
+      "terminal": {
+        "columns": 40,
+        "rows": 6
+      },
+      "width": 280
+    }
+  }
+]

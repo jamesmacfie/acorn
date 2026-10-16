@@ -1,0 +1,77 @@
+{
+  "meta": {
+    "title": "Tabs",
+    "caption": "A tab strip with the second tab active, and its panel.",
+    "terminal": {
+      "columns": 50,
+      "rows": 4
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Pane",
+          "props": {},
+          "children": [
+            {
+              "id": "n2",
+              "type": "Tabs",
+              "props": {
+                "idPrefix": "tabs",
+                "ariaLabel": "Pull request",
+                "active": "checks",
+                "tabs": [
+                  {
+                    "id": "overview",
+                    "label": "Overview"
+                  },
+                  {
+                    "id": "checks",
+                    "label": "Checks"
+                  },
+                  {
+                    "id": "files",
+                    "label": "Files"
+                  }
+                ]
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "TabPanel",
+              "props": {
+                "idPrefix": "tabs",
+                "id": "checks",
+                "active": "checks"
+              },
+              "children": [
+                {
+                  "id": "n4",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n5",
+                      "type": "#text",
+                      "props": {
+                        "value": "All 12 checks passed."
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

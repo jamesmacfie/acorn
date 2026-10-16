@@ -1,0 +1,77 @@
+---
+// The plugins acorn ships: a card per plugin from src/data/plugins.ts, each linking to its docs page.
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import Badge from '../components/Badge.astro'
+import Card from '../components/Card.astro'
+import { PLUGINS, SHIPS_AS } from '../data/plugins.ts'
+import Marketing from '../layouts/Marketing.astro'
+import type { PageMeta } from '../meta'
+
+export const meta = {
+  description: 'The plugins acorn ships, what each adds, and where it works, each linked to its docs page.',
+  sources: [
+    'docs/first-party-plugins.md',
+    'docs/first-party-plugins/terminal.md',
+    'apps/site/src/data/plugins.ts',
+  ],
+  checked: '68d4f3b5a',
+} satisfies PageMeta
+
+// Lucide's own file for each icon, read at build, so the page ships an inline SVG and no script.
+const require = createRequire(import.meta.url)
+const icon = (name: string) => readFileSync(require.resolve(`lucide-static/icons/${name}.svg`), 'utf8')
+const plugins = Object.values(PLUGINS).sort((a, b) => a.name.localeCompare(b.name))
+---
+
+<Marketing title="Plugins" meta={meta}>
+  <p class="lede">
+    Most of acorn is plugins. These are the ones it ships, and every one is on when you install it. Each card
+    links to its docs page, which says what it needs from you and what it can reach.
+  </p>
+  <section class="section">
+    <h2>What ships with acorn</h2>
+    <ul class="cards">
+      {
+        plugins.map((plugin) => (
+          <li>
+            <Card title={plugin.name} href={plugin.docs}>
+              <span class="plugin-icon" aria-hidden="true" set:html={icon(plugin.icon)} />
+              <p>{plugin.sentence}</p>
+              <Fragment slot="badges">
+                <Badge>{SHIPS_AS[plugin.ships]}</Badge>
+                <Badge>{plugin.worksIn}</Badge>
+              </Fragment>
+            </Card>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+  <section class="section">
+    <h2>Build your own</h2>
+    <p>
+      A plugin you write uses the same seams as these. It draws with acorn's components in the desktop app and
+      the terminal client, runs its Node half in a sandbox, and gets only the permissions its manifest asks for and
+      you accept.
+    </p>
+    <p><a href="/features/plugins/">See what a plugin can add</a></p>
+  </section>
+</Marketing>
+
+<style>
+  .lede {
+    max-inline-size: var(--site-measure);
+  }
+  .plugin-icon {
+    display: block;
+    order: -1;
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+    color: var(--accent);
+  }
+  .plugin-icon :global(svg) {
+    inline-size: 100%;
+    block-size: 100%;
+  }
+</style>

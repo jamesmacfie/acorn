@@ -1,0 +1,107 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-board",
+  "name": "Acme board",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "node": "./node.js",
+  "client": "./client.js",
+  "permissions": {
+    "api": [],
+    "events": [],
+    "node": {
+      "core": [],
+      "capabilities": [],
+      "secrets": false,
+      "exec": false,
+      "net": []
+    }
+  },
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "board",
+        "label": "Board",
+        "glyph": "kanban",
+        "order": 840,
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "board"
+          }
+        }
+      },
+      {
+        "target": "pane",
+        "scope": "project",
+        "id": "card",
+        "label": "Card",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "card"
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "id": "card-route",
+        "path": "/p/:projectId/x/acme-board/card/:cardId",
+        "surface": "card",
+        "item": "cardId"
+      }
+    ],
+    "sources": [
+      {
+        "id": "cards",
+        "label": "Board",
+        "glyph": "kanban",
+        "order": 410,
+        "items": "/v1/p/acme-board/cards",
+        "onSelect": {
+          "verb": "navigate",
+          "surface": "card"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "id": "open",
+        "kind": "action",
+        "title": "Open the board",
+        "category": "pane",
+        "action": {
+          "verb": "openPane",
+          "pane": "board"
+        }
+      }
+    ],
+    "extensionPoints": [
+      {
+        "id": "card-links",
+        "label": "Linked items",
+        "kind": "rows",
+        "location": "pane.footer",
+        "surface": "board"
+      },
+      {
+        "id": "card-summary",
+        "label": "Card summary",
+        "kind": "remote",
+        "mode": "stack",
+        "max": 2,
+        "mounts": [
+          {
+            "surface": "card",
+            "region": "header"
+          }
+        ]
+      }
+    ]
+  }
+}

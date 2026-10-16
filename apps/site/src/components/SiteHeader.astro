@@ -1,0 +1,49 @@
+---
+// The site header, on marketing pages and docs pages alike: the wordmark, the section links, search,
+// Appearance, and the GitHub star button. Below 768 pixels the links fold into a menu. A docs page has
+// Starlight's sidebar menu there instead, which carries the same links (Sidebar.astro), so it passes
+// `menu={false}`.
+import Appearance from './Appearance.astro'
+import GitHubStars from './GitHubStars.astro'
+import Mark from './Mark.astro'
+import Search from './Search.astro'
+import { GITHUB, headerLinks, sectionOf } from '../nav'
+
+interface Props {
+  menu?: boolean
+}
+
+const { menu = true } = Astro.props
+const current = sectionOf(Astro.url.pathname)
+const links = headerLinks.map((link) => ({ ...link, current: link.id === current ? ('page' as const) : undefined }))
+---
+
+<div class="site-header">
+  <Mark />
+  <nav class="site-header-links" aria-label="Site">
+    {links.map((link) => <a href={link.href} aria-current={link.current}>{link.label}</a>)}
+  </nav>
+  <Search />
+  <div class="site-header-tools">
+    <Appearance id="appearance-header" />
+    <GitHubStars />
+  </div>
+  {
+    menu && (
+      <details class="site-header-menu">
+        <summary class="button">Menu</summary>
+        <div>
+          <nav aria-label="Site">
+            {links.map((link) => (
+              <a href={link.href} aria-current={link.current}>
+                {link.label}
+              </a>
+            ))}
+          </nav>
+          <Appearance id="appearance-menu" inline />
+          <a href={GITHUB}>Star acorn on GitHub</a>
+        </div>
+      </details>
+    )
+  }
+</div>

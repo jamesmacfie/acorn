@@ -1,0 +1,100 @@
+---
+import Feature from '../../components/Feature.astro'
+import Snapshot from '../../components/Snapshot.astro'
+import Specimen from '../../components/Specimen.astro'
+import { FEATURES } from '../../features'
+import FeaturePage from '../../layouts/FeaturePage.astro'
+import type { PageMeta } from '../../meta'
+
+export const meta = {
+  description: FEATURES.review.sentence,
+  sources: [
+    'docs/github-integration.md',
+    'docs/github-integration/surfaces.md',
+    'docs/github-integration/reads-and-writes.md',
+    'docs/github-integration/mirror.md',
+    'docs/diff-rendering.md',
+    'docs/diff-rendering/geometry.md',
+    'docs/diff-rendering/loading.md',
+    'docs/diff-rendering/review.md',
+    'docs/diff-rendering/changes-pane.md',
+    'docs/git-client/history.md',
+    'docs/git-client/operations.md',
+    'docs/git-client/stashes.md',
+    'docs/git-client/conflicts.md',
+    'docs/git-client/explanations.md',
+    'docs/first-party-plugins/terminal.md',
+    'docs/tui/plugin-losses.md',
+    'plugins/github/src/client/pullDetail/PrOverview.tsx',
+    'plugins/github/src/client/pullDetail/prSections.tsx',
+    'plugins/github/src/client/checks/ChecksPanel.tsx',
+  ],
+  checked: '663359ff7',
+} satisfies PageMeta
+---
+
+<FeaturePage feature="review" meta={meta} related={['tasks', 'agents', 'automation']} docs={{ href: '/docs/built-in-plugins/github/', label: 'Read about GitHub' }}>
+  <Snapshot slot="picture" id="review" />
+
+  <Feature number={1} title="The pull request, inside its task" href="/docs/built-in-plugins/github/" link="GitHub">
+    <p>
+      Connect GitHub and a task's pull request opens in its own pane: the state, reviewers, labels, linked issues,
+      and description, then the conversation as a timeline of comments, reviews, commits, and file threads, beside
+      the diff. Comment, review, and request reviewers from the same pane. The GitHub source in the rail lists a
+      repository's pull requests, and makes a task from one.
+    </p>
+  </Feature>
+
+  <Feature number={2} title="Checks, their logs, and re-runs" href="/docs/built-in-plugins/github/" link="GitHub">
+    <p>
+      Each check sits in the overview with its status. Press one to open its GitHub Actions job, with the failed
+      steps open and each step's log under it. A failed check has a <strong>Re-run</strong> button.
+    </p>
+  </Feature>
+
+  <Feature number={3} title="Merge from the pane" href="/docs/built-in-plugins/github/" link="GitHub">
+    <p>
+      <strong>Merge</strong> sits beside its method: squash, a merge commit, or rebase. A draft offers{' '}
+      <strong>Ready for review</strong> instead, and <strong>Convert to draft</strong> and <strong>Close</strong>{' '}
+      sit under it.
+    </p>
+    <Specimen slot="picture" id="ship" />
+  </Feature>
+
+  <Feature number={4} title="A diff viewer for big changes" href="/docs/built-in-plugins/git/" link="Git">
+    <p>
+      The pull request, the compare view, and the Changes tab share one diff viewer. Read it unified or split, with
+      the changed words marked inside each changed line and review threads under the lines they're on. Filter files
+      by name and mark them viewed. Viewed marks stay in acorn and aren't sent to GitHub. The viewer loads a diff a
+      segment at a time, and reads a pull request up to GitHub's 3,000-file limit.
+    </p>
+  </Feature>
+
+  <Feature number={5} title="Stage, commit, and push in the task" href="/docs/built-in-plugins/git/" link="Git">
+    <p>
+      The task's Git pane opens on <strong>Changes</strong>: every changed file stacked in one list, a checkbox to
+      stage each file or group, and a commit box. One button pushes, pulls, fetches, or publishes the branch,
+      whichever its state calls for. <strong>History</strong>, <strong>Stashes</strong>, and{' '}
+      <strong>Worktrees</strong> sit beside it, and <strong>Explain commit</strong> asks a model to summarize the
+      commit you selected.
+    </p>
+  </Feature>
+
+  <Feature number={6} title="Merge, rebase, and resolve a conflict" href="/docs/built-in-plugins/git/" link="Git">
+    <p>
+      From a commit or a branch, merge it into the task, rebase the task onto it, cherry-pick it, or revert it. acorn
+      refuses while the checkout has uncommitted changes or an agent is working in it. A conflicted file opens with
+      its base, ours, and theirs beside an editable result, labeled with what each side is, and{' '}
+      <strong>Save and stage</strong> writes the result and stages it.
+    </p>
+  </Feature>
+
+  <Fragment slot="terminal">
+    <p>
+      The pull request pane, the Git pane, and the diff draw in the terminal client too, with other plugins' marks on
+      diff lines. The conflict result is a text area there instead of an editor. GitHub's changed-file and pull request
+      searches need the desktop app.{' '}
+      <a href="/docs/start/desktop-and-terminal/">Desktop and terminal</a>
+    </p>
+  </Fragment>
+</FeaturePage>

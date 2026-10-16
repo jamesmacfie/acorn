@@ -1,0 +1,27 @@
+---
+// Every shell snapshot, for review in any theme and style pack (docs/site.md § Shell snapshots). A
+// Starlight page, like the specimen gallery, so the snapshots sit in the docs page's own styles.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro'
+import Snapshot from '../components/Snapshot.astro'
+import { SNAPSHOTS, type SnapshotId } from '../snapshots'
+
+const ids = Object.keys(SNAPSHOTS) as SnapshotId[]
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Shell snapshots',
+    description: 'Every shell snapshot, desktop and terminal.',
+    sources: ['docs/site.md'],
+    checked: '54356a9ea',
+    // Lab pages stay out of search.
+    pagefind: false,
+    tableOfContents: false,
+  }}
+>
+  <p>
+    Each snapshot is a whole acorn window, captured from a running app on the site's fixture. Pick a theme and a
+    style pack under <strong>Appearance</strong> to see them all in it.
+  </p>
+  {ids.map((id) => <Snapshot id={id} />)}
+</StarlightPage>

@@ -1,0 +1,194 @@
+---
+title: Install
+description: Every way to get acorn running on your machine, and the setup that runs the first time.
+sources:
+  - README.md
+  - docs/node-distribution.md
+  - docs/cli.md
+  - docs/cli/local-service.md
+  - docs/local-development.md
+  - docs/tui/process.md
+  - docs/workspaces-and-tasks/projects.md
+  - docs/shell/packaging.md
+  - apps/desktop/src-tauri/tauri.conf.json
+  - apps/desktop/src/client/CliSettings.tsx
+  - plugins/onboarding/src/client/OnboardingWizard.tsx
+  - plugins/onboarding/src/client/AiSetup.tsx
+  - plugins/onboarding/src/client/GithubConnect.tsx
+  - packages/client-core/src/features/fleet/NodeChip.tsx
+checked: 90ded85ca
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+
+This page covers every way to get acorn onto your machine, what each needs, and the short setup that
+runs the first time. Read it before the [quick start](/docs/start/quick-start-first-project-first-task-first-agent/).
+The [download page](/download/) lists the same routes in brief.
+
+## What you need
+
+| To run | You need |
+| --- | --- |
+| The desktop app | macOS 12 or later, or Windows on x64. Git on your `PATH`. |
+| acorn from a checkout | Git, pnpm 11, a Rust toolchain, and Node.js 22.23.2 or later in branch 22, 24.18.1 or later in branch 24, or 26.5.1 or later in branch 26. |
+| The terminal client or a standalone Node | Node.js in the same range. On Linux, the usual build tools, because `node-pty` compiles when you install. |
+| Agents | Claude Code or Codex installed on the machine that runs the Node, signed in with its own login. acorn downloads neither. |
+
+You don't need an API key to run agents. A key for OpenAI or Anthropic is optional, for features such
+as writing SQL or commit messages.
+
+## Build from source
+
+This route needs no release. The desktop app it starts runs on macOS and Windows.
+
+<Steps>
+
+1. Clone the repository and install its dependencies.
+
+   ```sh
+   git clone https://github.com/jamesmacfie/acorn
+   cd acorn && pnpm install --frozen-lockfile
+   ```
+
+2. Rebuild the one native module for the pinned Node.js runtime, then start the desktop app.
+
+   ```sh
+   pnpm rebuild:node && pnpm dev
+   ```
+
+   <Checkpoint>The acorn window opens, and the first-run setup appears over it.</Checkpoint>
+
+</Steps>
+
+`pnpm dev` runs acorn from your checkout and keeps its data in `apps/node/.acorn/`. To build an app you
+can keep, run `pnpm dist`, which packages the desktop app, or `pnpm pack:node`, which builds the
+standalone Node.
+
+## Install the desktop app
+
+When the [download page](/download/) offers a desktop build for your machine, download it and open it.
+
+- **macOS.** Drag acorn to Applications. The build is signed without an Apple Developer ID, so Apple
+  hasn't notarized it and a double-click won't open it. On macOS 14 or earlier, Control-click acorn,
+  choose **Open**, then **Open** again. On macOS 15 or later, open it once, then click **Open Anyway**
+  in System Settings, under **Privacy & Security**.
+- **Windows.** The installer isn't signed either, so Windows may stop it. Click **More info**, then
+  **Run anyway**. It installs for your user only, and downloads Microsoft's WebView2 if it's missing.
+
+The first time it opens, the desktop app starts a Node on your machine and shows the first-run setup.
+
+## Get the terminal client and the command line
+
+`acorn` with no arguments opens the terminal client. With a command, such as `acorn task list`, it
+works on a Node from your shell or a script. There are three ways to get it:
+
+- **From the desktop app.** Open **Settings** > **Command line** and click **Add acorn to PATH**. Open a
+  new terminal afterwards. This copy runs commands only, not the terminal client, and it uses the
+  desktop app's Node.
+- **From a checkout.** Build both, then run the launcher:
+
+  ```sh
+  pnpm --filter @acorn/cli build
+  pnpm --filter @acorn/tui build
+  node apps/cli/bin/acorn.mjs
+  ```
+
+- **From the standalone Node.** Its folder holds both. Run `node bin/acorn.mjs` inside it.
+
+The terminal client opens the Node this machine already uses: the desktop app's, if it's installed. If
+no Node is running, it starts one and stops it when you quit. A Node the desktop app started belongs
+to the desktop app, so the first time, the terminal client asks to pair. It prints three words, and the
+desktop app opens a dialog with the same words. Click **Allow** there. [Desktop and
+terminal](/docs/start/desktop-and-terminal/) covers the rest.
+
+## Run a standalone Node
+
+A standalone Node runs acorn's Node without the desktop app, on a server or any machine you reach over
+the network. You pair the desktop app, the terminal client, or the command line with it. Build it with
+`pnpm pack:node` in a checkout, which writes `apps/node/release/acorn-node-<version>.tar.gz`, then
+unpack and start it:
+
+```sh
+tar -xzf acorn-node-*.tar.gz
+cd acorn-node
+npm ci --omit=dev
+npm rebuild
+node scripts/prune-runtime.mjs
+ACORN_DATA_DIR=/var/lib/acorn-node npm start
+```
+
+When it starts, it prints its address, its certificate fingerprint as six words, and a pairing code.
+Pair a client with the code only after you've checked that the six words match the ones the client
+shows. The Node answers only on `127.0.0.1` until you choose an address to advertise, so it isn't on
+your network by accident.
+
+To run agents there, install Claude Code or Codex on that machine and put it on the Node's `PATH`.
+[Run a standalone Node](/docs/nodes/run-a-standalone-node/) covers running it as a service, and
+[Pair a device or a remote Node](/docs/nodes/pair-a-device-or-a-remote-node/) covers pairing.
+
+## The first-run setup
+
+When a Node has no projects, the desktop app opens **Set up acorn**. It takes about a minute, and it
+opens only once: finishing and skipping both mark it done. Everything it offers is also in Settings.
+
+<Steps>
+
+1. **Welcome.** Click **Get started**.
+
+2. **Layout.** Choose **Keep each project separate** or **Group projects into workspaces**, then click
+   **Continue**. Each choice shows a small picture of example projects arranged that way. Separate is
+   the default. You can group projects into workspaces later, with **Group projects** on **Settings** >
+   **Projects** > **Overview**, but you can't separate grouped projects again. This step doesn't appear when the Node
+   already has an answer.
+
+3. **Add a project.** Click **Open a folder** and choose a folder on this computer. A project doesn't
+   need Git or GitHub, but acorn uses them when they're there. When this Node can sign in to GitHub,
+   the step also offers **Connect GitHub**. Click **Get a code**, then **Open GitHub**, and enter the
+   code there. acorn never sees your password. Then pick repositories to clone or link, and click
+   **Done adding**.
+
+   <Checkpoint>The step lists what you've added, and its button reads **Continue**.</Checkpoint>
+
+4. **Name.** Check each project's name. Renaming a project doesn't change its folder. If you chose
+   workspaces, pick a workspace for each project here, or choose **New workspace…** to make one.
+
+5. **Generate with AI.** acorn can write commit messages, SQL queries, and workflows for you. This
+   step lists the AI tools it found on this computer, such as Claude Code, and marks the ones that
+   aren't installed. To use an API key instead, pick a provider under **Add an API key**, paste the key,
+   and click **Connect**. acorn stores the key on this computer and sends it only to the provider. This
+   step never blocks you: click **Continue** with nothing set, and add a key later under **Settings** >
+   **AI models**.
+
+6. **Ready.** The step lists four shortcuts to start with. Click **Open acorn**.
+
+   <Checkpoint>The window opens on the first project you added.</Checkpoint>
+
+</Steps>
+
+**Skip setup** at the foot of every step closes the wizard and marks it done. If you skip before adding
+a project, the window shows **Add a project** under the top bar until you add one.
+
+## Check that it worked
+
+- The top bar's first picker names your project, or your workspace if you grouped them.
+- The dot near the top bar's right end is green. Hover over it to read the Node's name and state, such
+  as **Live**.
+- **Settings** > **Machines** > **Nodes** lists this computer's Node.
+
+## In the terminal
+
+Run `acorn` with no arguments. When the Node has no projects, the terminal client opens **Set up
+acorn**. It asks the same layout question, adds a project from an absolute path on the Node's machine,
+and creates your first task. There's no folder picker in a terminal, so type the path.
+
+## Limits
+
+- The desktop app is signed ad hoc, without an Apple Developer ID or a Windows certificate, so macOS
+  and Windows warn before they open it.
+- The desktop app runs on macOS and Windows. On Linux, run the terminal client and a standalone Node.
+- The browser extension isn't in a browser store. You build it from a checkout and load it into Chrome
+  or Firefox on macOS. [Set up the extension](/docs/browser-extension/set-up-the-extension/) has the
+  steps.
+- A Node on another machine can't use your desktop's folder picker. Add its projects by typing a path
+  on that machine.

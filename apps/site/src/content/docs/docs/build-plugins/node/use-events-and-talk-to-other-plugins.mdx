@@ -1,0 +1,143 @@
+---
+title: Use events and talk to other plugins
+description: Hear core's events, publish your own, declare what you emit, share a capability with get and require, and read state again after a reconnect.
+sources:
+  - docs/plugin-authoring/events-and-capabilities.md
+  - docs/plugins/events.md
+  - docs/plugins/activation.md
+  - examples/plugins/acme-data/acorn-plugin.json
+  - examples/plugins/acme-data/node/index.js
+  - examples/plugins/acme-tracker/acorn-plugin.json
+  - examples/plugins/acme-tracker/node/index.js
+  - examples/plugins/acme-tracker/server/routes.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll make your Node half hear what happens in acorn, tell other plugins when your data changes, and
+offer other plugins a function to call.
+
+## The result
+
+Two example plugins work together without importing each other. acme-data records a pending staging
+deploy whenever a commit lands on a task's branch, and announces it. acme-tracker hears that, and its
+mark on the task row gains the deploy, such as **2 Acme issue(s), staging deploy pending**.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-data`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-data)
+and [`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker).
+
+## Choose one
+
+- An **event** says "this changed, read it again". It carries a little state, fans out to whoever
+  listens, and waits for nobody.
+- A **capability** answers a question: a function another plugin calls and gets a result from.
+
+## Steps
+
+<Steps>
+
+1. **Ask for the core event.** Every event you hear is named in `permissions.events`, and the person
+   sees one line for each when they install.
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['permissions.events']} />
+
+2. **Hear it.** `ctx.events.on` fires whether or not a window is open. `head:changed` says a task's
+   branch moved, and carries the new commit, so the listener needs nothing else:
+
+   <ExampleCode file="acme-data/node/index.js" region="subscribe" />
+
+   Keep a listener short, and catch failures in any work it starts. The host removes it when your
+   plugin stops.
+
+3. **Declare what you announce.** A top-level `emits` lists your verbs. Another plugin can hear only a
+   verb you list.
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['emits']} />
+
+4. **Announce it after the write.** Your channel is `plugin:<your id>:<verb>`. `ctx.events.status()`
+   beside it tells every client to read your own badges and marks again.
+
+   <ExampleCode file="acme-data/node/index.js" region="publish" />
+
+5. **Provide a capability.** Its id starts with your plugin id. Register it in `init`.
+
+   <ExampleCode file="acme-data/node/index.js" region="provide" />
+
+6. **Use both from the other plugin.** acme-tracker asks for the verb and the capability by name:
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['permissions']} />
+
+   It resolves the capability on each call, never once in `init`, and treats an event as "read again",
+   never as the data itself:
+
+   <ExampleCode file="acme-tracker/node/index.js" region="consume" />
+
+   `get` answers `undefined` when acme-data isn't installed, is off, or hasn't started yet, and the
+   tracker carries on without deploys. `require` throws instead, for a capability you can't work
+   without. Pair it with `requires.plugins`, so the other plugin starts first and the install says it's
+   needed.
+
+7. **Check it.** Install both, commit in a task, and watch the task row's mark change. Turn acme-data
+   off: the mark loses the deploy, and nothing fails.
+
+</Steps>
+
+## Events have no replay
+
+An event is sent once, to whoever is listening at that moment. Nothing stores it. A listener that
+starts late, restarts, or loses its connection misses what happened in between. So:
+
+- Never keep state you only learn from events. Read it from its owner when you start, and again when
+  an event says it changed.
+- Never use an event as a job queue. Write the job to your database, and use the event to say "look".
+- Make a payload state, such as "the branch is at `f00dfeed`", not a step, such as "one more commit".
+  A missed frame then heals on the next one.
+
+## Mistakes
+
+- Listening to a core event you didn't name in `permissions.events`. `on` throws, so you find out at
+  start.
+- Sending on another plugin's channel, or on core's. `send` throws: a plugin you install may only send
+  on its own `plugin:<id>:` channel.
+- Listening to a verb the other plugin doesn't list in `emits`. When that plugin is running, `on`
+  throws. When it isn't, you hear nothing, with no error.
+- Importing another plugin's code or opening its database. Neither works from your worker. Use its
+  capability.
+
+A verb in `emits` is a short word, not a channel:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "emits": [{ "verb": "plugin:acme:deploys-changed", "description": "A deploy changed" }]
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "emits": [{ "verb": "deploys-changed", "description": "A deploy changed" }]
+}
+```
+
+## In the terminal
+
+Events and capabilities live on the Node, so the terminal client sees their effects the same way.
+
+## Limits
+
+- Core publishes 12 events, from `plugins:changed` to `worktree:status-changed`.
+  [Permissions](/docs/build-plugins/reference/permissions/) lists them under **Event channels**.
+- Some things are never events: file saves, terminal output, keystrokes, and request bodies. A plugin
+  that wants file changes watches files on its Node half.
+- A capability call crosses from one plugin's worker to another's, so pass and return plain data.
+
+## Reference
+
+[Manifest reference](/docs/build-plugins/reference/manifest-reference/) has `emits` and `requires`,
+[Permissions](/docs/build-plugins/reference/permissions/) has `permissions.events` and
+`permissions.node.capabilities`, and [The Node context](/docs/build-plugins/reference/the-node-context/)
+has `ctx.events` and `ctx.capabilities`.

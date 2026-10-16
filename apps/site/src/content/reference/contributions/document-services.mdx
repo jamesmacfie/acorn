@@ -1,0 +1,73 @@
+---
+title: documentServices
+description: "Hover and diagnostics for Editor's files in one language."
+sources:
+  - docs/editor/document-surface.md
+  - docs/tui/plugin-losses.md
+checked: '498833615'
+---
+
+A document service adds hover text and diagnostics to Editor's files in one language, from routes on
+your Node half. Editor POSTs the live text and a revision, and draws what you answer. When two plugins
+serve one language, the person picks one for each Node, and until then neither runs.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "documentServices": [
+      {
+        "id": "acme-lang",
+        "label": "Acme",
+        "languageId": "yaml",
+        "diagnostics": {
+          "route": "/v1/p/acme/lint"
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "documentServices": [
+      {
+        "id": "acme-lang",
+        "label": "Acme",
+        "languageId": "yaml",
+        "hover": {
+          "route": "/v1/p/acme/hover"
+        },
+        "diagnostics": {
+          "route": "/v1/p/acme/lint"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+In the terminal client, a document region offers **Inspect position** and **Diagnostics**, and Editor's
+**Diagnostics** checks the saved file.
+
+## Mistakes
+
+- Echo the `revision` you were sent, or Editor drops the answer as stale.
+- Diagnostics are read only. There are no fixes.
+
+## Guide
+
+[Add hover and diagnostics for a language](/docs/build-plugins/node/add-hover-and-diagnostics-for-a-language/) walks through it from start to finish.

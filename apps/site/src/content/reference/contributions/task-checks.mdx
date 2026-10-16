@@ -1,0 +1,63 @@
+---
+title: taskChecks
+description: "Checks the host runs before it archives a task."
+sources:
+  - docs/plugins/task-checks.md
+  - docs/plugin-authoring/contributions.md
+checked: '498833615'
+---
+
+A task check runs when someone is about to archive a task, which removes its worktree. acorn asks every
+plugin's check and shows the answers in one dialog. Your route answers a concern, or `{ "concern": null }`
+when there's nothing to say. A concern can offer a cleanup, which your `apply` route runs if the person
+leaves its box ticked.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "taskChecks": [
+      {
+        "id": "containers",
+        "check": "/v1/p/acme/checks/containers"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "taskChecks": [
+      {
+        "id": "containers",
+        "check": "/v1/p/acme/checks/containers",
+        "apply": "/v1/p/acme/checks/containers/stop"
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The terminal client can't archive a task, so task checks run only from the desktop app.
+
+## Mistakes
+
+- Answer `{ "concern": null }` fast. It's the common case, and the person is waiting.
+- Without `apply`, acorn draws no checkbox, even if your concern offers an action.
+
+## Guide
+
+[Check a task before it's archived](/docs/build-plugins/node/check-a-task-before-its-archived/) walks through it from start to finish.

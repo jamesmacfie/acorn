@@ -1,0 +1,123 @@
+---
+title: Bring a website's item into a task
+description: Put acorn's chip on your site's pages, look the page's item up with the person's account, and let them start a linked task from the browser extension.
+sources:
+  - docs/plugin-authoring/browser-handoffs.md
+  - docs/browser-extension/handoffs.md
+  - packages/protocol/src/plugin/handoffs.ts
+  - examples/plugins/acme-browser/acorn-plugin.json
+  - examples/plugins/acme-browser/node.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import SidebarPicture from '../../../../../components/SidebarPicture.astro'
+
+You'll make the browser extension recognize your site's pages: a chip on an issue's page that starts a
+task linked to the issue, and names that task once it exists.
+
+## The result
+
+On `https://example.com/issues/ACME-12`, the extension draws a chip at the end of the page's heading.
+It reads **Start task** until a task holds the issue, then the task's name. Clicking it opens the
+panel's handoff card, the same one GitHub's pull requests get:
+
+<SidebarPicture id="sidebar-handoff" />
+
+The person picks a project and clicks **Create task**. acorn makes a task linked to the issue, with
+the issue's description waiting in the first conversation's draft.
+
+## Before you start
+
+Read [Connect a service](/docs/build-plugins/node/connect-a-service/): a handoff looks the item up with
+one of the person's connections. The code is from
+[`examples/plugins/acme-browser`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-browser).
+You'll need the [browser extension](/docs/browser-extension/set-up-the-extension/) paired with your
+Node to see it.
+
+## Steps
+
+<Steps>
+
+1. **Declare the handoff.** It's data only: you ship no browser code. The extension owns the chip, its
+   look, when it appears, and what a click does.
+
+   <ExampleCode file="acme-browser/acorn-plugin.json" pick={['contributions.browserHandoffs']} />
+
+   - `match` lists the pages, `https://` only. A `{capture}` stands for one path segment, and a page
+     must have as many segments as the pattern.
+   - `anchors` are CSS selectors. The chip goes at the end of the first one that matches and is drawn.
+     Leave the list empty to offer the handoff in the panel only.
+   - `label` is the chip's accessible name, drawn as text.
+
+2. **Resolve the page.** The extension posts the page's `url` and the `captures` from your pattern.
+   Treat the captures as the only thing the page tells you, and look the item up with the person's own
+   connections. Ask every connection: two accounts that can both see the issue are two items.
+
+   <ExampleCode file="acme-browser/node.js" region="resolve" />
+
+   Each item has the `identifier`, `url`, and `title` the card shows, the `connection` that found it,
+   the `projects` it may go in, the task `seed`, and optional `context` for the agent to read.
+
+3. **Give each link the item's address.** A link with `ref.url` is how a page finds its task later, in
+   the browser, with no call to your route.
+
+4. **Check it.** Install the plugin, connect Acme Issues, and open an issue's page with the extension
+   allowed on the site. The chip appears. Create a task, reload, and the chip names it.
+
+</Steps>
+
+## What acorn does with your answer
+
+The extension never sees your route or your seed. The Node finds tasks that already hold one of the
+seed's links, shows the projects by name, and on **Create task** resolves the page again before it
+creates anything. It refuses a project outside your `projects`, unless the person tied the site to that
+project, and answers an existing linked task instead of making a second.
+
+## Mistakes
+
+- Reading the page's text, or trusting `url` over `captures`. The captures came from your own pattern.
+- Answering 401 for a key the service refused. The extension reads 401 as the Node refusing the
+  browser, and asks the person to pair again. Answer 403 with what to do.
+- Anchors you haven't seen on the live site, signed in, at more than one window width. A missing
+  anchor means no chip, and the panel still offers the handoff.
+- A seed link with no `ref.url`. The task can be found by resolving, but no page shows its chip.
+
+One pattern covers one number of path segments:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "browserHandoffs": [{ "id": "issue", "label": "Open in Acorn",
+      "match": ["http://example.com/issues/{key}"], "anchors": [], "resolve": "/v1/p/acme/browser/issue" }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "browserHandoffs": [{ "id": "issue", "label": "Open in Acorn",
+      "match": ["https://example.com/issues/{key}"], "anchors": [], "resolve": "/v1/p/acme/browser/issue" }]
+  }
+}
+```
+
+## In the terminal
+
+This is a browser extension feature. A task created from the browser is a task like any other, in
+both apps.
+
+## Limits
+
+- Up to 4 handoffs per plugin, 8 patterns and 4 anchors each.
+- An answer is at most 8 items and 256 KiB. An item's `context` is at most 16,000 characters.
+- The page's address reaches the Node only when a handoff looks the item up.
+
+## Reference
+
+[browserHandoffs](/docs/build-plugins/reference/contributions/browser-handoffs/) has every field.
+[Task chips and handoffs](/docs/browser-extension/task-chips-and-handoffs/) is what the person sees.

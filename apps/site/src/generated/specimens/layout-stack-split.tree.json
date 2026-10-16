@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "title": "stack-split",
+    "caption": "Two stacked regions with a handle between them.",
+    "terminal": {
+      "columns": 50,
+      "rows": 14
+    },
+    "width": 400
+  },
+  "layout": {
+    "name": "stack-split",
+    "label": "Deploys",
+    "regions": [
+      "top",
+      "bottom"
+    ]
+  }
+}

@@ -33,6 +33,10 @@
       ],
       "includeEntryExports": false
     },
+    "apps/site": {
+      // Starlight loads the route middleware by path (`routeMiddleware` in apps/site/astro.config.mjs).
+      "entry": ["src/routeData.ts"]
+    },
     "packages/client-core": {
       // Type-level checks that nothing imports.
       "entry": ["src/host/frames/verbs.ts"]
@@ -66,11 +70,16 @@
     // A tool reads the default export.
     "**/*.config.{ts,mjs}": ["exports"],
     "plugins/{drizzle,vitest}.shared.ts": ["exports"],
+    // An example plugin's Node half. The host imports its default export, and nothing in the repository does.
+    // A built one's entry also exports its source for the build's manifest script.
+    "examples/plugins/**/{node.js,node/index.js,src/index.ts}": ["exports"],
     "apps/node/test/__fixtures__/**": ["exports"],
     // A type-level test declares its assertions as types nothing imports.
     "**/*.test-d.ts": ["exports", "types"],
     // `acorn-plugin.config.mjs` names the factory as a string (`factory: 'httpPlugin'`).
     "plugins/{database,http,linear,model-providers,nodes-file,rollbar,sentry-telemetry}/src/node/index.ts": ["exports"],
+    // Starlight imports the route middleware's `onRequest` by path.
+    "apps/site/src/routeData.ts": ["exports"],
     // JSX runtimes. Solid's compiler emits calls to these names, set by `moduleName` in the build.
     "apps/tui/src/tree/renderer.ts": ["exports", "types"],
     "packages/client-core/src/host/frames/remoteSolid.ts": ["exports", "types"],

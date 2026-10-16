@@ -1,0 +1,179 @@
+---
+title: Add a data source
+description: Serve typed records that dashboards and workflows read, with fields, starter panels, and paging, or build a derived source from sources acorn already reads.
+sources:
+  - docs/data-sources.md
+  - docs/data-sources/authoring-controls.md
+  - docs/plugin-authoring/derived-sources.md
+  - docs/data-sources/derived-sources.md
+  - examples/plugins/acme-data/acorn-plugin.json
+  - examples/plugins/acme-data/server/source.js
+  - examples/plugins/acme-data/server/routes.js
+  - examples/plugins/acme-readiness/acorn-plugin.json
+  - examples/plugins/acme-readiness/src/source.ts
+  - examples/plugins/acme-readiness/src/index.ts
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll make your plugin's records something a dashboard panel can show and a workflow can read: a
+typed data source, answered by your Node half.
+
+## The result
+
+**Acme deploys** is a source under **Add panel** > **Start from data**, with a starter panel,
+**Deploys by environment**, that counts deploys per environment. A workflow's **Find records** step
+can read it too. **Acme release readiness**, a derived source, shows each task and how far its work
+has shipped, built from acorn's tasks and acme-data's deploys.
+
+## Before you start
+
+Read [Store data](/docs/build-plugins/node/store-data/). The code is from
+[`examples/plugins/acme-data`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-data)
+and [`examples/plugins/acme-readiness`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-readiness).
+
+## Choose one
+
+- A **typed source** serves records you have: your own table, or a service's API. You describe the
+  fields and answer each read.
+- A **derived source** builds records from sources acorn already reads, such as tasks and pull
+  requests. The SDK answers the reads, and acorn reads the inputs with the person's accounts, so your
+  code never sees a credential.
+
+## Steps: a typed source
+
+<Steps>
+
+1. **Declare it.** The handler is one route, and every operation posts to it.
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['contributions.dataSources']} />
+
+2. **Describe the records.** `describe` answers the record's JSON schema and what each field means:
+
+   <ExampleCode file="acme-data/server/source.js" region="describe" />
+
+   - `origin: "declared"` is a field every record has. `display` says how to show it, and `role` marks
+     the title, status, and when it changed.
+   - `choices` lists a field's values, each with a `tone` and a `rank` that columns inherit.
+   - `query` on a field lists the operators your handler applies, such as `eq`, and whether it can
+     sort. Leave it out and acorn never sends a filter you'd have to apply. Dashboards still filter and
+     group the rows they read.
+   - `operations` says which reads you answer. `consistency` is one sentence on how fresh the records
+     are.
+
+3. **Offer a starter panel.** A starter is a panel plan the launcher offers with your source. Its scope
+   names no workspace: acorn moves it onto the one the person picks, then checks it against your
+   description.
+
+   <ExampleCode file="acme-data/server/source.js" region="starter" />
+
+4. **Answer the reads.** A `query` gets a cursor and a page size. Answer a page of records, and `more`
+   with the next cursor until the last page, which is `complete`:
+
+   <ExampleCode file="acme-data/server/source.js" region="query" />
+
+   A record that names a `taskId` opens its task when someone presses the row.
+
+5. **Route the operations.**
+
+   <ExampleCode file="acme-data/server/routes.js" region="source" />
+
+6. **Check it.** Install, open **Home**, click **Add panel** > **Start from data**, and pick **Acme
+   deploys**. **Deploys by environment** is offered. **Refresh preview** reads your route.
+
+</Steps>
+
+## Steps: a derived source
+
+<Steps>
+
+1. **Start from the scaffold.** `npm create acorn-plugin acme-readiness -- --data-source` asks what a
+   row is and which sources it reads, and writes a package that builds with Vite and tests with Vitest.
+
+2. **Write the rules.** `defineDerivedSource` takes the inputs, the fields, and a `query` function. Each
+   input is a read-only handle: `all()` reads every page.
+
+   <ExampleCode file="acme-readiness/src/source.ts" region="source" />
+
+   The field builders write each field's label, display, and schema together, and the record type
+   follows from them, so a missing field is a compile error. `opens` is the input record a row opens.
+
+3. **Serve it.**
+
+   <ExampleCode file="acme-readiness/src/index.ts" />
+
+4. **Build, install, and approve the inputs.** `npm run build` bundles the SDK into `dist/node.js`, and
+   writes the manifest's source entry from the code, so the inputs the person approves are the ones it
+   reads. The trust prompt lists each input under **Reads your data**, and the plugin reads nothing
+   until it's approved.
+
+   <ExampleCode file="acme-readiness/acorn-plugin.json" pick={['node', 'contributions.dataSources']} />
+
+5. **Test it** with fake inputs, as [Test your plugin](/docs/build-plugins/node/test-your-plugin/)
+   shows.
+
+</Steps>
+
+## Identity, reach, and coverage
+
+- **Identity.** A source with a `providerId` reads one of the person's connections per panel. Declare
+  an `identity` operation, and acorn asks your route who the account is, so a panel can filter on
+  **You**.
+- **Reach.** A source that maps records to projects with `projectScope` is limited to the projects the
+  workspace links, and each record gets its project.
+- **Coverage.** Say whether you serve a `snapshot`, what's true now, or `events`, a history with a
+  retention. A dashboard warns when a time window reaches before what you cover.
+- **Discovery.** A plugin whose sources depend on the account, such as one per board, adds
+  `dataSourceDiscoveries`, and a discovery route lists them, up to 100 a page.
+
+## Mistakes
+
+- Advertising an operator you don't apply. acorn trusts the field's `query`, and never filters behind
+  your back.
+- A record id that changes between reads. Panels and details find a record by it.
+- Returning the same record twice across pages, or the same cursor twice. acorn refuses the read.
+- A record over 256 KiB. It fails rather than being cut.
+
+A derived source's inputs must be other plugins' sources, named `<pluginId>:<sourceId>`:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./dist/node.js",
+  "contributions": {
+    "dataSources": [{ "sourceId": "readiness", "name": "Readiness", "singular": "Task", "plural": "Tasks",
+      "identityScope": "Built from its inputs", "handler": "/v1/p/acme/source",
+      "inputs": { "tasks": { "source": "tasks", "label": "Tasks" } } }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./dist/node.js",
+  "contributions": {
+    "dataSources": [{ "sourceId": "readiness", "name": "Readiness", "singular": "Task", "plural": "Tasks",
+      "identityScope": "Built from its inputs", "handler": "/v1/p/acme/source",
+      "inputs": { "tasks": { "source": "core:tasks", "label": "Tasks" } } }]
+  }
+}
+```
+
+## In the terminal
+
+The terminal client doesn't draw dashboards. A workflow that reads your source runs on the Node, so it
+works whichever app started it.
+
+## Limits
+
+- Up to 32 sources and 8 discoveries per plugin, 10 starter panels per source, and 8 inputs per derived
+  source.
+- A read is at most 100 pages, 5,000 records, 16 MiB, and 60 seconds. A preview is one page of 25.
+- A derived source can't write through its inputs, and its `actions` are always empty.
+
+## Reference
+
+[dataSources](/docs/build-plugins/reference/contributions/data-sources/) and
+[dataSourceDiscoveries](/docs/build-plugins/reference/contributions/data-source-discoveries/) have every
+field. [Dashboards](/docs/automation/dashboards/) is what the person sees.

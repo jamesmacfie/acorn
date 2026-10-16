@@ -1,0 +1,16 @@
+{
+  "name": "acme-readiness",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build && node scripts/manifest.mjs",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "acorn-plugin-sdk": "^1.1.0",
+    "acorn-plugin-types": "^1.0.0",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,131 @@
+---
+title: Add to another plugin's view
+description: Fill a point another plugin opened in its view, with rows, marks, a tree, or a rectangle, using the owner's consent from its manifest.
+sources:
+  - docs/plugin-authoring/extensions.md
+  - docs/plugins/cooperative-extension-points.md
+  - docs/plugins/remote-points.md
+  - docs/plugins/detail-regions.md
+  - docs/plugin-authoring/extension-example.md
+  - examples/plugins/acme-review/acorn-plugin.json
+  - examples/plugins/acme-review/src/client.tsx
+  - examples/plugins/acme-review/node.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll put something of yours inside another plugin's view: a tool card in an agent session, a mark on
+a file in Editor, a section above a Linear issue. The other plugin opens the place, called an extension
+point, and you fill it.
+
+## The result
+
+The Acme review example replaces Agents' card for its own agent tool. Agents still draws the card's
+frame. The body is Acme review's tree, drawing the tool's output:
+
+<Specimen id="acme-review-tool-card" />
+
+## Before you start
+
+Finish [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/). The code is from
+[`examples/plugins/acme-review`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-review),
+which fills ten places in other plugins' views. It's written in JSX with the SDK and built into one file
+([Use the SDK and JSX](/docs/build-plugins/ui/use-the-sdk-and-jsx/)), but every point works the same from
+a hand-written `client.js`.
+
+## Find the point
+
+A point's ID is `<owner>:<point>`, such as `agents:tool-card`. Three places list the points on the Node
+you run:
+
+- [Extension points](/docs/build-plugins/reference/extension-points/), with each point's kind, props,
+  key, and what the terminal client does.
+- **Settings** > **Advanced** > **Extension points**, with each point's contributors and why a tree
+  last failed.
+- The `plugin_authoring` agent tool.
+
+The point's kind says what you send it:
+
+| Kind | You send | acorn draws |
+| --- | --- | --- |
+| `rows` | `items`, a route that answers rows | A list under the owner's pane |
+| `annotation` | `items`, a route that answers marks for a batch of keys | Marks on the owner's items |
+| `remote` | `remote`, an entry in your bundle | Your tree, inside the owner's view |
+| `rectangle` | `frame`, an `inline` frame of yours | Your pixels, beside the owner's |
+
+## Steps
+
+<Steps>
+
+1. **Declare the extension.** Name the point, a label the person sees in Settings, and one carrier.
+   `matches` narrows a `replace` point to the keys you draw: here, one tool's name.
+
+   <ExampleCode file="acme-review/acorn-plugin.json" pick={['contributions.agentTools', 'contributions.extensions#tool-card']} />
+
+2. **Draw the tree.** The tree gets the owner's props, here `{ tool, taskId, defaultOpen }`, and
+   reads anything else from your own routes.
+
+   <ExampleCode file="acme-review/src/client.tsx" region="tool-card" />
+
+3. **Add a mark.** An `annotation` point takes `items`, a route your Node half answers for every key
+   on screen at once. Editor's `editor:file` is keyed `{ taskId, path }`:
+
+   <ExampleCode file="acme-review/acorn-plugin.json" pick={['contributions.extensions#marks']} />
+
+4. **Add a section above another plugin's detail view.** A loaded owner opens a point with `mounts`,
+   and acorn draws your tree above or below its view. Linear's `linear:issue-summary` gets
+   `{ surface, item }`, where `item` is the issue's key:
+
+   <ExampleCode file="acme-review/src/client.tsx" region="issue-review" />
+
+5. **Check it.** Save. Ask an agent in a task to call `acme-review_files`, and its card lists the files
+   under review. **Settings** > **Advanced** > **Extension points** lists Acme review under each point it
+   fills.
+
+</Steps>
+
+## Consent
+
+The owner's manifest decides what its points accept: their kind, how many contributors draw, which keys
+they match, and which actions a tree may ask for. Your manifest names the point, so the trust prompt
+shows the person which plugins yours reaches into. Your tree runs in your worker with your permissions.
+It never sees the owner's other data, and the owner never sees your nodes.
+
+## Mistakes
+
+`matches` is for a `remote` or a `frame`. A route-backed extension has none:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [{ "id": "marks", "point": "editor:file", "label": "Review", "items": "/v1/p/acme/marks",
+      "matches": ["*.ts"] }]
+  }
+}
+```
+
+- An extension names exactly one carrier: `items`, `remote`, `frame`, or `route`.
+- If the owner isn't installed or is off, your extension draws nothing and reports nothing. Check
+  **Settings** > **Advanced** > **Extension points**.
+- When your tree fails in a `replace` point, the owner draws its own default.
+
+## In the terminal
+
+The terminal client mounts the same trees in cells, and draws marks as dots and counts. A `rectangle`
+is one muted line that names the point. [Extension points](/docs/build-plugins/reference/extension-points/)
+says what each point does in the terminal.
+
+## Limits
+
+- Grafting is one level deep: a tree you draw in another plugin's point can't open a point of its own.
+- A `remote` point's owner keeps its controls, such as Editor's **Source** toggle.
+- An annotation point accepts at most 4,096 rows from one answer.
+
+## Reference
+
+- [extensions](/docs/build-plugins/reference/contributions/extensions/)
+- [Extension points](/docs/build-plugins/reference/extension-points/)

@@ -1,0 +1,27 @@
+---
+title: Badge
+description: A small label that marks a state.
+sources:
+  - packages/client-core/src/kit/components/content/Badge.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Badge` for a short state beside something: `passing`, `draft`, `review`. Its tone says what the state means.
+
+<Specimen id="badges-and-chips" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="badges-and-chips" />
+
+## Related
+
+- [`Chip`](/docs/components/content/chip/), for a label the reader can press or remove.
+- [`StatusDot`](/docs/components/content/status-dot/), for a state with no word.
+
+## Mistakes
+
+- Putting a badge inside a `TableCell`. The terminal draws it as `[object Object]`, so put the text in the cell.

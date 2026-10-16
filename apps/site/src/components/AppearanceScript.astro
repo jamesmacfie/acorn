@@ -1,0 +1,50 @@
+---
+// Sets the visitor's saved theme and style pack on <html> before the page draws, so a reload never
+// flashes another theme. With no theme saved, `data-theme` stays off and the token files' system
+// preference block picks light or dark, as it does in the app. `data-color-scheme` tells the code
+// blocks which of their two syntax themes to draw (`expressiveCode` in astro.config.mjs).
+// Goes early in <head>, inline, so it runs before anything paints.
+import appearances from 'virtual:acorn-ui/appearances'
+
+const themes = appearances.themes.map(({ id }) => id)
+const styles = appearances.styles.map(({ id }) => id)
+const { dark } = appearances
+---
+
+<script is:inline define:vars={{ themes, styles, dark }}>
+  const root = document.documentElement
+  const system = matchMedia('(prefers-color-scheme: dark)')
+  // Storage can be switched off. Then a choice lasts until the page closes.
+  const unsaved = {}
+  const read = (key) => {
+    try {
+      return localStorage.getItem(`acorn-${key}`)
+    } catch {
+      return unsaved[key] ?? null
+    }
+  }
+  const apply = () => {
+    // An id the site doesn't know would leave a theme half applied, so it counts as no choice.
+    const theme = themes.includes(read('theme')) ? read('theme') : null
+    const style = styles.includes(read('style')) ? read('style') : null
+    if (theme) root.dataset.theme = theme
+    else delete root.dataset.theme
+    if (style) root.dataset.style = style
+    else delete root.dataset.style
+    root.dataset.colorScheme = (theme ? dark.includes(theme) : system.matches) ? 'dark' : 'light'
+  }
+  apply()
+  system.addEventListener('change', apply)
+  window.acornAppearance = {
+    /** Saves a choice and applies it. An empty value goes back to the default. */
+    save(key, value) {
+      try {
+        if (value) localStorage.setItem(`acorn-${key}`, value)
+        else localStorage.removeItem(`acorn-${key}`)
+      } catch {
+        unsaved[key] = value
+      }
+      apply()
+    },
+  }
+</script>

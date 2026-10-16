@@ -55,7 +55,8 @@ pnpm dev:extension:ui -- --session my-change stop
 prints its visible text. `click` finds a button by its text, and `fill` and `check` find an input by
 its `name`. `fill` also types into a text area, such as `message`, and picks a select's option by its
 value or text, as in `fill session "Fix the flaky test"`. `eval EXPRESSION` runs code in the page. `pairing-code` asks the session's own Node for a
-fresh code. Leave out `--session` when exactly one session is running.
+fresh code. In Chrome, `panel URL` opens the address with the panel beside it, and the other verbs
+then act on the panel. Leave out `--session` when exactly one session is running.
 
 The driver talks CDP to Chrome and WebDriver BiDi to Firefox, at the endpoint in `session.json`. It
 ends each BiDi session, because Firefox allows one at a time. It can't open the panel itself, because
@@ -66,9 +67,9 @@ that takes a toolbar click.
 The driver's `open` shows the sidebar in a tab, which makes that tab the active one, so a capture
 from it reads the sidebar itself. Capture checks need the real panel beside the page:
 
-- **Chrome.** Open the page with CDP's `/json/new?URL`. Then send the browser-level CDP command
-  `Extensions.triggerAction` with the extension ID and the page's `tab` target from
-  `Target.getTargets`. It runs the toolbar click: the panel opens with `activeTab` for that page.
+- **Chrome.** The driver's `panel URL` does this. It opens the page with CDP's `/json/new?URL`, then
+  sends the browser-level CDP command `Extensions.triggerAction` with the extension ID and the page's
+  `tab` target from `Target.getTargets`. It runs the toolbar click: the panel opens with `activeTab` for that page.
   Close any sidebar tab first, and the driver's verbs act on the panel. A click inside the panel
   grants no access, and a persistent site grant needs Chrome's own prompt, which CDP can't answer.
 - **Firefox.** WebDriver BiDi can't click the toolbar, and Firefox counts only real input as a

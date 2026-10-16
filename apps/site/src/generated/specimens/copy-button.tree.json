@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "title": "CopyButton",
+    "caption": "A commit hash and the button that copies it.",
+    "terminal": {
+      "columns": 40,
+      "rows": 1
+    },
+    "width": 320
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Inline",
+          "props": {
+            "gap": "inline"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Text",
+              "props": {
+                "emphasis": "mono"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "3f9a2c1"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "CopyButton",
+              "props": {
+                "text": "3f9a2c1",
+                "title": "Copy the commit hash",
+                "always": true
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

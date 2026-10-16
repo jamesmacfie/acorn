@@ -1,0 +1,51 @@
+---
+// Every wireframe at 375 pixels wide, side by side, so the phone layouts can be read without resizing a
+// window.
+import './wireframe.css'
+import { wireframe } from './_nav'
+import { templates } from './_templates'
+
+const pages = templates.flatMap((template) => template.pages)
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wireframes at 375 pixels · acorn</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <main class="stack" style="padding: 16px">
+      <h1>Wireframes at 375 pixels</h1>
+      <p><a href="/lab/wireframes/">All wireframes</a> · Scroll sideways for the next template.</p>
+      <div class="phones">
+        {
+          pages.map(([label, page]) => (
+            <figure class="stack">
+              <figcaption>
+                <a href={wireframe(page)}>{label}</a>
+              </figcaption>
+              <iframe src={wireframe(page)} title={`${label} at 375 pixels`} loading="lazy" />
+            </figure>
+          ))
+        }
+      </div>
+    </main>
+  </body>
+</html>
+
+<style>
+  .phones {
+    display: flex;
+    gap: 24px;
+    overflow-x: auto;
+    padding-block-end: 16px;
+  }
+  iframe {
+    inline-size: 375px;
+    block-size: 812px;
+    border: 1px solid #000;
+  }
+</style>

@@ -2,9 +2,6 @@
 // vocabulary below is derived rather than written, and what it leaves out, see
 // docs/agent-tools/plugin-tools.md § plugin_authoring, docs/plugins/agent-install.md § Teaching the
 // agent, and docs/plugin-authoring.md.
-import { z } from 'zod'
-import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
-import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import {
   PLUGIN_CONTEXT_SECTION_MAX_BYTES,
   PLUGIN_CONTEXT_SECTION_MAX_TOKENS,
@@ -24,58 +21,10 @@ import {
   type PluginBridgeWebviewRequest,
 } from '@acorn/protocol/plugin/bridge.ts'
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
+import { pluginManifestVocabulary, type PluginManifestVocabulary } from '@acorn/protocol/plugin/vocabulary.ts'
 import { DETAIL_REGIONS } from '@acorn/protocol/extensionPoints.ts'
-import { PUBLIC_EXTENSION_POINTS, type PublicExtensionPoint } from '@acorn/protocol/publicExtensionPoints.ts'
+import type { PublicExtensionPoint } from '@acorn/protocol/publicExtensionPoints.ts'
 import { NODE_CORE_FACETS } from '../plugins/coreFacets.ts'
-
-// ── Derived from the manifest schema ──────────────────────────────────────────────────────────────
-//
-// `z.toJSONSchema` rather than reaching into `_def`: the same projection the tool registry uses for
-// MCP input schemas, so a zod bump cannot turn it into a runtime throw. `unrepresentable: 'any'`
-// because the manifest is full of refinements with no JSON Schema spelling. The fields this module
-// reads, keys, caps, enums and literal verbs, all have one.
-type JsonSchema = {
-  properties?: Record<string, JsonSchema>
-  items?: JsonSchema
-  oneOf?: JsonSchema[]
-  anyOf?: JsonSchema[]
-  required?: string[]
-  enum?: string[]
-  const?: string
-  maxItems?: number
-  type?: string | string[]
-}
-
-let cached: JsonSchema | null = null
-const manifestJsonSchema = (): JsonSchema =>
-  (cached ??= z.toJSONSchema(pluginManifestShape, {
-    target: 'draft-7',
-    io: 'input',
-    unrepresentable: 'any',
-  }) as JsonSchema)
-
-const at = (schema: JsonSchema | undefined, ...path: string[]): JsonSchema | undefined =>
-  path.reduce<JsonSchema | undefined>((node, key) => node?.properties?.[key], schema)
-
-/**
- * One field off a descriptor's items, where the items may be a union of kinds.
- *
- * A command is five shapes (action, group, search, input, setting), so `items.properties` is only there
- * for the descriptors that are one shape. The first member carrying the field is the answer, because a
- * field two members both declare has the same shape in both (@acorn/protocol/plugin/contract.ts).
- */
-const field = (items: JsonSchema | undefined, name: string): JsonSchema | undefined =>
-  items?.properties?.[name] ??
-  (items?.anyOf ?? items?.oneOf ?? []).map((member) => member.properties?.[name]).find(Boolean)
-
-// A discriminated union of `{ verb: '<literal>' }` objects, read back as the literal set. zod emits
-// `oneOf` for a discriminated union under draft-7, and `anyOf` is the fallback if that changes. The
-// test asserts the result is non-empty, so a silent [] cannot ship.
-const verbs = (schema: JsonSchema | undefined): string[] =>
-  (schema?.oneOf ?? schema?.anyOf ?? [])
-    .map((option) => option.properties?.verb?.const ?? '')
-    .filter(Boolean)
-    .sort()
 
 // ── Derived from the bridge wire union ────────────────────────────────────────────────────────────
 //
@@ -131,28 +80,7 @@ const API_METHODS = { GET: 1, POST: 1, PUT: 1, PATCH: 1, DELETE: 1 } satisfies R
 
 // ── The projection ────────────────────────────────────────────────────────────────────────────────
 
-export type PluginAuthoringVocabulary = {
-  apiMajor: string
-  manifest: {
-    file: string
-    required: string[]
-    optional: string[]
-    contributionCaps: Record<string, number>
-    // Contributions that are one route on the plugin's node half rather than a list.
-    contributionRoutes: string[]
-    // Contributions that are one object rather than a list, such as `browserPanel` and `codeHost`.
-    contributionObjects: string[]
-    frameTargets: string[]
-    slots: string[]
-    contextMenuLocations: string[]
-    extensionPointLocations: string[]
-    coreSlots: string[]
-    commandCategories: string[]
-    themeTokens: string[]
-  }
-  actions: { railOnSelect: string[]; commandsAndBadges: string[] }
-  /** Every point another plugin can fill. Registered in client code, so read from protocol's list. */
-  points: readonly PublicExtensionPoint[]
+export type PluginAuthoringVocabulary = Omit<PluginManifestVocabulary, 'nodePermissions'> & {
   permissions: { node: string[]; core: string[]; note: string }
   bridge: {
     version: number
@@ -164,47 +92,13 @@ export type PluginAuthoringVocabulary = {
   }
 }
 
-/** What this node's own schemas say a plugin may declare, right now. Nothing here is written down twice. */
+/** The shared manifest vocabulary, plus this node's core facets and the frame bridge's messages. */
 export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
-  const schema = manifestJsonSchema()
-  const contributions = at(schema, 'contributions')
-  const required = schema.required ?? []
-  const kinds = Object.entries(contributions?.properties ?? {})
-  const caps = kinds.flatMap(([key, value]) => (value.maxItems === undefined ? [] : [[key, value.maxItems] as const]))
+  const { nodePermissions, ...manifest } = pluginManifestVocabulary()
   return {
-    apiMajor: PLUGIN_API_MAJOR,
-    manifest: {
-      file: 'acorn-plugin.json',
-      required: [...required].sort(),
-      optional: Object.keys(schema.properties ?? {})
-        .filter((key) => !required.includes(key))
-        .sort(),
-      contributionCaps: Object.fromEntries(caps),
-      contributionRoutes: kinds.filter(([, value]) => value.type === 'string').map(([key]) => key),
-      contributionObjects: kinds.filter(([, value]) => value.type === 'object').map(([key]) => key),
-      frameTargets: at(contributions, 'frames')?.items?.properties?.target?.enum ?? [],
-      slots: at(contributions, 'slots')?.items?.properties?.slot?.enum ?? [],
-      // Read off the schema, not hand-typed. A guessed member is a contribution that parses on a newer
-      // node and never appears on this one.
-      contextMenuLocations: at(contributions, 'contextMenus')?.items?.properties?.location?.enum ?? [],
-      extensionPointLocations: at(contributions, 'extensionPoints')?.items?.properties?.location?.enum ?? [],
-      coreSlots: at(contributions, 'frames')?.items?.properties?.coreSlot?.enum ?? [],
-      commandCategories: field(at(contributions, 'commands')?.items, 'category')?.enum ?? [],
-      // A `themes` entry must carry exactly these token names, and a theme missing one is refused at
-      // parse. Read off the strict object the schema builds from the palette
-      // (@acorn/protocol/themeTokens.ts), so a new token reaches the agent with no edit here.
-      themeTokens: at(contributions, 'themes')?.items?.properties?.tokens?.required ?? [],
-    },
-    actions: {
-      // The two unions, read off the descriptors that carry them. A rail source's `onSelect` is the only
-      // site with the full set in scope, and a command's `action` is the narrow one every context-free
-      // surface takes.
-      railOnSelect: verbs(at(contributions, 'sources')?.items?.properties?.onSelect),
-      commandsAndBadges: verbs(field(at(contributions, 'commands')?.items, 'action')),
-    },
-    points: PUBLIC_EXTENSION_POINTS,
+    ...manifest,
     permissions: {
-      node: Object.keys(at(schema, 'permissions', 'node')?.properties ?? {}),
+      node: nodePermissions,
       core: [...NODE_CORE_FACETS],
       // No list of grantable `permissions.api` scopes: that allowlist lives in the client and the node
       // cannot import it (docs/agent-tools/plugin-tools.md § plugin_authoring). The `note` below says what makes an

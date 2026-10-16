@@ -1,0 +1,5 @@
+{"columns":60,"rows":3,"lines":[
+[{"text":"[draft] "},{"text":"[review]","fg":"accent"},{"text":" "},{"text":"[passing]","fg":"ok"},{"text":" "},{"text":"[flaky]","fg":"warn"},{"text":" "},{"text":"[failing]","fg":"danger"}],
+[{"text":"(frontend) "},{"text":"(agents)","attrs":["bold"]},{"text":" "},{"text":"(needs triage)","fg":"warn"}],
+[]
+]}

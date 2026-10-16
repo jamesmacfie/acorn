@@ -1,0 +1,40 @@
+---
+title: Trees and events
+description: The tree a plugin draws with acorn's components, and the events it gets back.
+sources:
+  - docs/plugins/tree-contract.md
+  - docs/plugins/remote-trees.md
+checked: '498833615'
+---
+
+A tree is UI your client bundle describes and acorn draws. Your code runs in a worker with no DOM and
+builds a tree of acorn's own component names. acorn draws it with the same components it uses itself,
+on the desktop as HTML and in the terminal client as cells. So one tree is a pane in both clients, with
+acorn's keyboard handling, focus, and themes.
+
+You write a tree with Solid and the nodes from `acorn-plugin-sdk/remote`. Each change becomes a batch of
+mutations sent over the bridge.
+
+{/* facts */}
+
+## The batch rules
+
+A tree changes in batches. acorn applies a batch whole or not at all: it checks each operation against
+the tree the earlier operations left, and an unknown node, a cycle, or a tree too deep refuses the whole
+batch. A refused batch leaves a row on your plugin's page in Settings, saying why. The sizes each batch
+and tree may reach are on [Limits](/docs/build-plugins/reference/limits/).
+
+## What's dropped on the way
+
+acorn checks every prop as it arrives and draws the node without the ones it refuses:
+
+- A prop holding a function, a cycle, or a class instance is dropped in your worker, before it's sent.
+  The exception is a handler under one of the event names above.
+- Any other prop starting with `on` is dropped. There are no key or pointer events, because a terminal
+  has neither.
+- `class`, `className`, `style`, and `classList` are refused. A role prop holding a raw color is
+  refused too: you pick a role, and the host picks the color.
+- An `href` keeps only an explicit `https` address.
+- Text is always text. Markup inside a string is drawn as characters.
+
+A node this host can't draw shows a labeled placeholder, and the rest of the tree draws.

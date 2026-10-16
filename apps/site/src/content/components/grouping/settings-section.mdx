@@ -1,0 +1,28 @@
+---
+title: SettingsSection
+description: A titled group on a settings page.
+sources:
+  - packages/client-core/src/kit/components/layout/SettingsSection.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `SettingsSection` for one group of settings, with a label, a description, and a `SettingRow` per setting. Its `id` is an anchor on the page, so search can land on it.
+
+<Specimen id="settings-section" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="settings-section" />
+
+## Related
+
+- [`SettingRow`](/docs/components/grouping/setting-row/), for each setting in it.
+- [`Section`](/docs/components/grouping/section/), for a group outside settings.
+
+## Mistakes
+
+- Reusing an `id` on one page. Two sections with one anchor send search to the first.
+- Drawing a danger zone with a red frame. Set `tone="danger"`, and the terminal draws the label in the danger color instead.

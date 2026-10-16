@@ -1,0 +1,9 @@
+{"columns":60,"rows":7,"lines":[
+[{"text":"Release notes","attrs":["bold"]}],
+[],
+[{"text":"Sign-in now keeps the next parameter. See "},{"text":"the issue","fg":"accent"}],
+[{"text":"(https://linear.app/acme/issue/ACO-12)","fg":"muted"},{"text":"."}],
+[],
+[{"text":"  • Fixes the redirect loop"}],
+[{"text":"  • Adds a test for deep links"}]
+]}

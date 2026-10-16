@@ -1,0 +1,18 @@
+---
+// The device config file's fields, read from the published schema, which packages/plugin-types
+// generates from the parser and checks has a description on every field.
+import schema from '../../../../packages/plugin-types/acorn-device.schema.json'
+import ReferenceTable from './ReferenceTable.astro'
+
+type Property = { type?: string | string[]; anyOf?: unknown[]; description?: string }
+const properties = schema.properties as Record<string, Property>
+const type = (property: Property) => (Array.isArray(property.type) ? property.type.join(' or ') : (property.type ?? 'any'))
+---
+
+<ReferenceTable
+  head={['Key', 'Type', 'What it does']}
+  rows={Object.entries(properties).map(([key, property]) => ({
+    id: `device-${key}`,
+    cells: [key, type(property), property.description ?? ''],
+  }))}
+/>

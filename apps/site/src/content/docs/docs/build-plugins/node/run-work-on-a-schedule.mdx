@@ -1,0 +1,124 @@
+---
+title: Run work on a schedule
+description: Declare periodic work the Node runs for your plugin with no window open, with the 300-second floor, the person's overrides, and what the trust prompt says.
+sources:
+  - docs/schedules/plugin-schedules.md
+  - packages/protocol/src/plugin/manifest/runtimeDescriptors.ts
+  - packages/protocol/src/runtime/schedules.ts
+  - examples/plugins/acme-data/acorn-plugin.json
+  - examples/plugins/acme-data/server/routes.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll have the Node run part of your plugin on a timer, such as syncing from a service, whether or not
+anyone has acorn open.
+
+## The result
+
+**Sync deploys from Acme Cloud** is a row in **Settings** > **Automation** > **Schedules**, owned by the
+plugin. It says how often it runs, when it last ran and how that went, and when it runs next, with a
+switch to pause it, **Run now**, and **History**.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-data`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-data).
+
+## Steps
+
+<Steps>
+
+1. **Declare the schedule.** `run` is a route on your Node half. `cadence` is `{ "every": seconds }`,
+   `{ "daily": "HH:MM" }`, or `{ "weekly": { "day": 0-6, "at": "HH:MM" } }`, in the Node's local time.
+   `timeout` is in seconds.
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['contributions.schedules']} />
+
+2. **Do the work in the route.** The Node posts `{ scheduleId }` as its own service, with no window
+   open. It reads only whether you succeeded: answer 2xx when the run worked, and anything else when it
+   didn't.
+
+   <ExampleCode file="acme-data/server/routes.js" region="schedule" />
+
+   A failed run backs off, and the schedule's row shows the error. The Node keeps running.
+
+3. **Install it.** The plugin's **Permissions** tab, and the trust prompt when a device asks, list the
+   schedule under **Declared**, with when it runs:
+
+   ```text
+   Run “Sync deploys from Acme Cloud” on the node every 15 minutes, with nobody watching
+   ```
+
+   An update that changes the cadence asks again.
+
+4. **Check it.** Open **Settings** > **Automation** > **Schedules** and press **Run now** on the row.
+   **History** shows the run.
+
+</Steps>
+
+## Why the Node runs it
+
+A schedule has to run when no window is open, and the Node is the part of acorn that's always there.
+Declaring it, rather than starting your own timer, lets acorn show it, pause it, retune it, keep its
+history, and stop it when your plugin stops.
+
+## What the person controls
+
+- **Pause.** The switch on the row. A pause wins over anything your manifest says, so a plugin can't
+  unpause itself by declaring again.
+- **Cadence.** The person can run it less often than you asked. Their choice wins over yours, and both
+  stay at or above the floor.
+- **Off.** Turning your plugin off stops its schedules and keeps their history and pause. Turning it
+  back on picks up where they were.
+
+The name, the route, and the timeout are yours. Someone who wants a schedule to do something else
+makes one of their own.
+
+## Mistakes
+
+- Starting your own `setInterval` in `init`. Nobody can see it or pause it, and it keeps running through
+  a failed reload.
+- Expecting `{ "every": 60 }` to run every minute. A plugin's schedule runs at most every 300 seconds,
+  whatever it asks.
+- A `timeout` in milliseconds. It's seconds, up to 300.
+- A run that waits on the person. Nobody's there. Raise a [notice](/docs/build-plugins/ui/notify-the-person/)
+  instead.
+
+A schedule's route is one of your own:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "schedules": [{ "id": "sync", "name": "Sync deploys", "run": "/v1/core/sync", "cadence": { "every": 900 } }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "schedules": [{ "id": "sync", "name": "Sync deploys", "run": "/v1/p/acme/schedules/sync", "cadence": { "every": 900 } }]
+  }
+}
+```
+
+## In the terminal
+
+Schedules run on the Node, so they run whichever app is open, or none. **Schedules** in Settings opens
+in the desktop app.
+
+## Limits
+
+- Up to 4 schedules per plugin.
+- At most once every 300 seconds, and at most once a week for `every`.
+- `timeout` is 1 to 300 seconds, and 60 when you leave it out.
+
+## Reference
+
+[schedules](/docs/build-plugins/reference/contributions/schedules/) has every field.
+[Schedules](/docs/automation/schedules/) is what the person sees.

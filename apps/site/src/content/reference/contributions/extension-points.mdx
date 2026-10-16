@@ -1,0 +1,135 @@
+---
+title: extensionPoints
+description: "Places in your own views that other plugins may fill."
+sources:
+  - docs/plugins/cooperative-extension-points.md
+  - docs/plugins/hooks.md
+  - docs/tui/plugin-losses.md
+checked: '498833615'
+---
+
+An extension point opens part of one of your views to other plugins. You say what kind of thing they
+may bring and where it goes, and acorn draws what they contribute. Nothing reaches into a view that
+didn't open a point.
+
+- `rows`: a strip of rows from each contributor's route, at a `location` on one of your panes.
+- `annotation`: marks keyed by your items, such as a status on a row.
+- `remote`: a tree from each contributor's bundle, drawn where your own tree places a `Slot`, or above
+  and below your views with `mounts`.
+- `rectangle`: a contributor's `inline` frame.
+- `hook`: a chance for other plugins' Node halves to watch, change, or stop one of your actions.
+
+## A minimal example
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "board",
+        "label": "Board",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "board"
+          }
+        }
+      }
+    ],
+    "extensionPoints": [
+      {
+        "id": "card-actions",
+        "label": "Card actions",
+        "kind": "rows",
+        "location": "pane.footer",
+        "surface": "board"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "board",
+        "label": "Board",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "board"
+          }
+        }
+      }
+    ],
+    "extensionPoints": [
+      {
+        "id": "card-actions",
+        "label": "Card actions",
+        "kind": "rows",
+        "location": "pane.footer",
+        "surface": "board"
+      },
+      {
+        "id": "card-view",
+        "label": "Card view",
+        "kind": "remote",
+        "mode": "replace",
+        "selector": "mime",
+        "accepts": [
+          "text/markdown"
+        ],
+        "actions": [
+          "refresh"
+        ]
+      },
+      {
+        "id": "before-move",
+        "label": "Before a card moves",
+        "kind": "hook",
+        "payload": {
+          "card": "string",
+          "column": "string"
+        },
+        "allows": [
+          "observe",
+          "veto"
+        ],
+        "timeoutMs": 2000,
+        "onTimeout": "allow",
+        "collect": true
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The terminal client draws contributors in the same places: rows as a list under the pane, trees in
+cells, and marks as dots and counts. A `rectangle` contribution draws as one muted line naming the point.
+
+## Mistakes
+
+- `location` and `surface` are for `rows` and `rectangle` only.
+- A `hook` needs `payload`. An `annotation` needs `key`.
+- A contributor names your point as `<yourId>:<id>`, so renaming it breaks theirs.
+
+## Guide
+
+[Open your view to other plugins](/docs/build-plugins/ui/open-your-view-to-other-plugins/) walks through it from start to finish.

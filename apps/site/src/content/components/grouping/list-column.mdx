@@ -1,0 +1,30 @@
+---
+title: ListColumn
+description: The list side of a ListDetail, which scrolls its own rows.
+sources:
+  - packages/client-core/src/kit/components/layout/ListDetail.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`ListColumn` holds the rows of a `ListDetail`, or any column of rows. It scrolls itself, and `label` names it for a screen reader.
+
+<Specimen id="list-detail" />
+
+<Specimen id="row" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="list-detail" />
+
+## Related
+
+- [`ListDetail`](/docs/components/grouping/list-detail/), for the split around it.
+- [`Row`](/docs/components/collections/row/), for each item.
+- [`DetailColumn`](/docs/components/grouping/detail-column/), for the other side.
+
+## Mistakes
+
+- Leaving out `label`. The column is a landmark, and a landmark needs a name.

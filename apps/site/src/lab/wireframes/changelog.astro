@@ -1,0 +1,68 @@
+---
+// The changelog: every entry on one page, newest first, each with an anchor. An entry that changes the
+// plugin API carries a callout for plugin authors. Draft copy from docs/release-notes.md.
+import Page from './_Page.astro'
+
+const entries = [
+  {
+    id: '2026-10-12-browser-rules',
+    date: 'October 12, 2026',
+    title: 'Project settings drop browser rules',
+    summary: 'Project settings no longer offer browser rules.',
+    changes: [['Removed', 'Browser rules in project settings.']],
+    plugins: 'Plugin API 5 removes BrowserRule, ProjectConfig.browserRules, and the preview.rules capability. A plugin that uses none of them needs only a manifest range that covers 5, such as "4 || 5".',
+  },
+  {
+    id: '2026-10-02-memory-library',
+    date: 'October 2, 2026',
+    title: 'Read, edit, and import memories',
+    summary: 'The Memory page lists, searches, edits, deletes, and restores what agents saved, with each memory’s history.',
+    changes: [
+      ['Added', 'The Memory page, with search and history.'],
+      ['Added', 'Import a folder of Claude memory files, choosing to skip or overwrite each collision.'],
+    ],
+  },
+  {
+    id: 'acorn-1',
+    date: 'The acorn-1 baseline',
+    title: 'The first build: desktop app, terminal client, command line, and standalone Node',
+    summary: 'GitHub review, workspaces and tasks, terminals and managed agents, workflows, and the plugin kit.',
+    changes: [['Added', 'Everything in the baseline, summarized in a paragraph per area.']],
+  },
+]
+---
+
+<Page title="Changelog" current="changelog">
+  <main class="wrap">
+    <section class="section" style="border-top: 0">
+      <h1>Changelog</h1>
+      <p>What changed in acorn, newest first. <a href="#">RSS feed</a></p>
+    </section>
+    {
+      entries.map((entry) => (
+        <article class="section" id={entry.id}>
+          <div class="stack">
+            <p>
+              <a href={`#${entry.id}`}>{entry.date}</a>
+            </p>
+            <h2>{entry.title}</h2>
+            <p>{entry.summary}</p>
+            <ul class="stack" style="padding: 0; list-style: none">
+              {entry.changes.map(([kind, text]) => (
+                <li>
+                  <span class="tag">{kind}</span> {text}
+                </li>
+              ))}
+            </ul>
+            {entry.plugins && (
+              <aside class="callout">
+                <b>Plugin authors</b>
+                <p>{entry.plugins}</p>
+              </aside>
+            )}
+          </div>
+        </article>
+      ))
+    }
+  </main>
+</Page>

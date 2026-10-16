@@ -1,0 +1,28 @@
+---
+title: Limits
+description: The sizes, times, and rates acorn holds a plugin to, and what happens at each one.
+sources:
+  - docs/plugin-authoring/the-bridge.md
+  - docs/plugins/tree-contract.md
+  - docs/agent-tools/loaded-tools.md
+checked: '498833615'
+---
+
+Every limit here is a number in acorn's code, read when this page is built. Each one is generous for a
+plugin doing honest work, and each protects the person from a plugin that isn't. Caps on how many of
+each contribution a manifest declares are on [Contributions](/docs/build-plugins/reference/contributions/),
+and bounds on each field are on its own page.
+
+{/* facts */}
+
+## What happens at a limit
+
+- **A manifest past a bound** doesn't load. The plugin's row in Settings names the field.
+- **A frame past a bridge budget** loses its port, and acorn shows a "plugin misbehaving" message in its
+  place until it's opened again.
+- **A frame that never answers the handshake** is replaced with a "failed to start" message.
+- **A tree batch past a limit** is dropped whole, with a row on your plugin's page. A queue that overflows
+  fails that tree, which needs mounting again.
+- **An agent tool or context section past its time or size** fails that one call, and acorn doesn't retry
+  it.
+- **A schedule asking to run more often** runs at the floor instead.

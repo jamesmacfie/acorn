@@ -139,32 +139,75 @@ const localId = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/, 'id must be lowercase
 const pluginRoute = z.string().min(1).max(256)
 
 export const pluginAgentToolDescriptorSchema = z.object({
-  id: localId,
-  description: z.string().min(1).max(500),
-  inputSchema: boundedPluginToolSchema,
-  risk: z.enum(['read', 'write', 'execute']),
-  scope: z.literal('task').default('task'),
-  handler: pluginRoute,
-  requiresSession: z.boolean().default(false),
-  timeoutMs: z.number().int().min(100).max(PLUGIN_TOOL_TIMEOUT_MAX_MS).default(10_000),
+  id: localId.describe(
+    "The tool's ID, in lowercase snake case starting with a letter. Agents see it as `<pluginId>_<id>`.",
+  ),
+  description: z
+    .string()
+    .min(1)
+    .max(500)
+    .describe('What the tool does and when to call it. Agents read this to choose it, and the trust prompt shows it.'),
+  inputSchema: boundedPluginToolSchema.describe(
+    "A JSON Schema for the tool's arguments, of type `object`. Only a small set of keywords is accepted, within size and depth limits.",
+  ),
+  risk: z
+    .enum(['read', 'write', 'execute'])
+    .describe("How much the tool can change. The person's tool tiers decide whether agents may call it."),
+  scope: z.literal('task').default('task').describe("Always `task`: the tool runs for one task's agents."),
+  handler: pluginRoute.describe(
+    'A POST route on your Node half the host calls with the arguments. The host sends the verified task and session, and never retries.',
+  ),
+  requiresSession: z
+    .boolean()
+    .default(false)
+    .describe('Hide the tool from a caller without a signed task and session, such as a terminal session.'),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(100)
+    .max(PLUGIN_TOOL_TIMEOUT_MAX_MS)
+    .default(10_000)
+    .describe('How long a call may take, in milliseconds.'),
   maxOutputBytes: z
     .number()
     .int()
     .min(1_024)
     .max(PLUGIN_TOOL_OUTPUT_MAX_BYTES)
-    .default(64 * 1024),
+    .default(64 * 1024)
+    .describe('The largest answer the host accepts, in bytes.'),
 })
 
 export const pluginContextSectionDescriptorSchema = z.object({
-  id: localId,
-  label: z.string().min(1).max(80),
-  scope: z.literal('task').default('task'),
-  order: z.number().int().min(0).max(100_000),
-  read: pluginRoute,
-  defaultIncluded: z.boolean().default(false),
-  timeoutMs: z.number().int().min(100).max(PLUGIN_CONTEXT_TIMEOUT_MAX_MS).default(5_000),
-  maxBytes: z.number().int().min(1_024).max(PLUGIN_CONTEXT_SECTION_MAX_BYTES),
-  maxTokens: z.number().int().min(256).max(PLUGIN_CONTEXT_SECTION_MAX_TOKENS),
+  id: localId.describe("The section's ID, in lowercase snake case starting with a letter."),
+  label: z.string().min(1).max(80).describe("The section's name in the task's context list."),
+  scope: z.literal('task').default('task').describe("Always `task`: the section is part of one task's context."),
+  order: z.number().int().min(0).max(100_000).describe('Where the section sits in the context. Lower comes first.'),
+  read: pluginRoute.describe(
+    'A route on your Node half that answers `{ items, compact, unavailable? }`: reference data and short text, never markup.',
+  ),
+  defaultIncluded: z
+    .boolean()
+    .default(false)
+    .describe('Whether a task includes the section before the person chooses.'),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(100)
+    .max(PLUGIN_CONTEXT_TIMEOUT_MAX_MS)
+    .default(5_000)
+    .describe('How long the read may take, in milliseconds.'),
+  maxBytes: z
+    .number()
+    .int()
+    .min(1_024)
+    .max(PLUGIN_CONTEXT_SECTION_MAX_BYTES)
+    .describe('The most bytes the section may add.'),
+  maxTokens: z
+    .number()
+    .int()
+    .min(256)
+    .max(PLUGIN_CONTEXT_SECTION_MAX_TOKENS)
+    .describe('The most tokens the section may add.'),
 })
 
 export type PluginAgentToolDescriptor = z.infer<typeof pluginAgentToolDescriptorSchema>

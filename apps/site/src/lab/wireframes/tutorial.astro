@@ -1,0 +1,47 @@
+---
+// The tutorial page: numbered steps from phase 16, each ending in a checkpoint that says what the
+// reader should see. The commands and checkpoints are draft.
+import Docs from './_Docs.astro'
+import { slug } from './_nav'
+
+const steps = [
+  ['Scaffold the plugin', 'npm create acorn-plugin hello-pane', 'A hello-pane folder with acorn-plugin.json, node/index.js, and client.js.'],
+  ['Read the three files', '', 'You can say what the manifest, the Node half, and the client half each do.'],
+  ['Install it from its folder', '', 'The trust prompt names the permissions the manifest asks for. Accept it.'],
+  ['Open the pane', '', 'Run Open hello-pane from the command palette. The pane shows a heading and a button.'],
+  ['Change the tree', '', 'Edit the heading in client.js and reload. The pane shows the new heading.'],
+  ['Add a route on the Node half', '', 'Press the button. The pane shows the greeting the route returned.'],
+  ['Open the task in the terminal client', 'acorn', 'The same pane, drawn in the terminal.'],
+  ['Turn on development mode', '', 'Edit and save. The pane reloads with no prompt.'],
+  ['Where to go next', '', 'Links to the guides for each place a plugin draws.'],
+]
+---
+
+<Docs title="Build your first plugin" section="build" toc={steps.map(([title]) => title)}>
+  <p>Write a plugin that adds a pane to a task, with a route on the Node, and see it in both clients.</p>
+  <p>It takes about 20 minutes. You need acorn running and Node.js on your machine.</p>
+  <ol class="steps">
+    {
+      steps.map(([title, command, checkpoint]) => (
+        <li>
+          <div class="stack">
+            <h2 id={slug(title)}>{title}</h2>
+            <p>One or two sentences on what this step does and why.</p>
+            {command && (
+              <div class="code">
+                <div>
+                  <span>Terminal</span>
+                  <span>Copy</span>
+                </div>
+                <pre>$ {command}</pre>
+              </div>
+            )}
+            <p class="callout">
+              <b>Checkpoint</b> {checkpoint}
+            </p>
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+</Docs>

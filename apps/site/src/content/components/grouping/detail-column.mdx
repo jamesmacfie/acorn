@@ -1,0 +1,27 @@
+---
+title: DetailColumn
+description: The detail side of a ListDetail.
+sources:
+  - packages/client-core/src/kit/components/layout/ListDetail.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`DetailColumn` holds the detail of whatever is selected in the list beside it. It scrolls unless you say otherwise.
+
+<Specimen id="list-detail" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="list-detail" />
+
+## Related
+
+- [`ListDetail`](/docs/components/grouping/list-detail/), for the split around it.
+- [`ListColumn`](/docs/components/grouping/list-column/), for the list side.
+
+## Mistakes
+
+- Drawing the selection's detail before anything is selected. Draw an `EmptyState` in the column until the reader picks a row.

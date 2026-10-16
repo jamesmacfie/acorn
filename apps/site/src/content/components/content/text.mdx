@@ -1,0 +1,29 @@
+---
+title: Text
+description: A run of text, with an emphasis and a tone.
+sources:
+  - packages/client-core/src/kit/components/content/Text.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Text` for any run of words. `emphasis` says how it carries, such as `muted` or `strong`, and `tone` says what it means.
+
+<Specimen id="text" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="text" />
+
+## Related
+
+- [`Heading`](/docs/components/content/heading/), for a document heading.
+- [`Link`](/docs/components/content/link/), for text that goes somewhere.
+- [`Markdown`](/docs/components/content/markdown/), for formatted prose.
+
+## Mistakes
+
+- Leaving a bare string beside a heading. In the terminal a string outside `Text` overprints the line it sits on, so wrap it.
+- Using `emphasis="mono"` to mean code in the terminal. A terminal is monospaced already, so it draws plain.

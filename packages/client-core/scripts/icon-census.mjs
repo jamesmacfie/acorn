@@ -20,6 +20,8 @@ import { fileURLToPath } from 'node:url'
 const CLIENT_CORE = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const REPO = resolve(CLIENT_CORE, '../..')
 const DEFAULT_ROOTS = ['packages', 'plugins', 'apps'].map((dir) => join(REPO, dir))
+// The public site draws its icons when it builds, so a name it spells never reaches the app's startup chunk.
+const SKIP_PATHS = new Set([join(REPO, 'apps/site')])
 const DEFAULT_EAGER = join(CLIENT_CORE, 'src/kit/tokens/iconNodes.eager.json')
 const LUCIDE = join(CLIENT_CORE, 'node_modules/lucide-static/icon-nodes.json')
 
@@ -45,8 +47,8 @@ function sourceFiles(root) {
   const out = []
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue
       const path = join(dir, entry.name)
+      if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name) || SKIP_PATHS.has(path)) continue
       if (entry.isDirectory()) walk(path)
       else if (SOURCE.test(entry.name) && !IS_TEST.test(entry.name)) out.push(path)
     }

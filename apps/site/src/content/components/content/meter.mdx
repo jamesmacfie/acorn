@@ -1,0 +1,28 @@
+---
+title: Meter
+description: A bar or a pie that shows how full something is.
+sources:
+  - packages/client-core/src/kit/components/content/Meter.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Meter` for a fraction from 0 to 1, such as context used or budget spent. `mark` puts a marker at a threshold, and `shape="pie"` draws one small pie.
+
+<Specimen id="meters" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="meters" />
+
+## Related
+
+- [`Spinner`](/docs/components/content/spinner/), for work with no known end.
+- [`Badge`](/docs/components/content/badge/), for a state rather than an amount.
+
+## Mistakes
+
+- Passing a percentage. `value` is a fraction, so 62 percent is `0.62`.
+- Leaving out `label`. The meter needs one for a screen reader.

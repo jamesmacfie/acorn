@@ -1,0 +1,53 @@
+---
+title: Themes and style packs
+description: The built-in color themes and style packs, how they change every component, and how a plugin adds its own.
+sources:
+  - docs/ui-design/appearance.md
+  - docs/ui-design/tokens.md
+  - packages/client-core/src/infra/styles/tokens-theme.css
+checked: afced2661
+---
+
+This page shows every built-in theme and style pack, and what each changes in a plugin's components.
+Read it to see how your components look in each, or before you add a theme or a pack of your own.
+
+A theme sets colors. A style pack sets shape: corner radius, type, spacing, density, and motion. The
+person chooses each one separately, in **Settings** > **General** > **Appearance**, and a component
+follows both, because its props name roles and never a color or a size.
+
+## Themes
+
+Each theme's own colors, as `tokens-theme.css` sets them.
+
+{/* facts */}
+
+## Compare the packs
+
+Choose a theme and a style pack here, and the components below change as they do in the app. The
+choice changes this whole site.
+
+<Appearance id="appearance-components" inline />
+
+<Specimen id="pane" />
+
+<Specimen id="buttons" />
+
+## Add a theme or a pack
+
+A plugin adds a theme as data: a value for each of the 22 palette colors in its manifest, and whether
+it's dark. It adds a style pack as a partial set of shape tokens, each from a fixed list of values. The
+host checks both and writes the CSS itself, so no plugin's CSS reaches the app. For more information,
+see [Add a theme or a style pack](/docs/build-plugins/ui/add-a-theme-or-a-style-pack/).
+
+## In the terminal
+
+A theme's colors become the terminal's palette slots: the default, gray, accent, green, yellow, and
+red, plus bold. A style pack changes nothing in the terminal, because a cell has no radius, padding,
+or font.
+
+## Limits
+
+- A plugin's theme can't set the colors acorn derives from the palette, such as `--danger`, and can't
+  say it's dark while it draws light colors. The host sets that from the theme's `dark` flag.
+- A plugin's pack can't change icons or the monospace font, and one value outside its list refuses the
+  whole pack.

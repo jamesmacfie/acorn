@@ -1,0 +1,49 @@
+---
+title: Roles and tokens
+description: The meanings a component's props take in place of colors, sizes, and spacing, and what each host draws for each one.
+sources:
+  - docs/ui-design/appearance.md
+  - docs/ui-design/tokens.md
+  - packages/client-core/src/kit/tokens/roles.ts
+  - packages/client-core/src/kit/tokens/tokens.ts
+checked: afced2661
+---
+
+This page lists every role a component's props can take, and what the desktop and the terminal each
+draw for every value. Read it when you set a tone, a gap, a size, or an emphasis.
+
+A plugin names a meaning, and each host decides what that meaning looks like. `tone="danger"` is the
+theme's red on the desktop and the terminal palette's red in cells. `gap="section"` is the section gap
+the current style pack sets on the desktop, and one blank line in a terminal. Neither host lets a
+plugin name a pixel or a color, because the terminal has no value for 8 pixels or for `#e5484d`, and
+a theme the person chose would stop applying.
+
+<Specimen id="text" />
+
+## How a prop takes a role
+
+A prop named for a role takes that role's values and nothing else. A value outside the list, such as
+`tone="red"` or `gap={8}`, is dropped, and the component draws as if you'd left the prop out. Most
+props take the role they're named for. Two don't: `gap` and `pad` take a space, and `emphasis` takes
+a text role.
+
+The desktop column is the CSS custom property the role resolves to. The theme sets the colors and the
+style pack sets the rest, so the same role follows both of the person's choices. For more information,
+see [Themes and style packs](/docs/components/themes-and-style-packs/).
+
+{/* facts */}
+
+## In the terminal
+
+- `muted` is the palette's own gray, not the terminal's dim attribute. Dim blends text toward the
+  background, which on a light terminal reads as white on white.
+- Every radius is ignored, because a cell has no corners to round.
+- A size is one line high whatever it is. Padding is ignored.
+- `mono` is ignored, because a terminal is monospaced already.
+
+## Limits
+
+- A component takes the roles its props name, and some take only part of a role. `Button`'s `tone`
+  takes `neutral`, `accent`, `warn`, and `danger`. Each component's page lists what its props take.
+- There's no role for a brand's color. An `Icon` with `tone="brand"` draws a brand mark in its own
+  color. Anything else that needs a brand's exact color belongs in a frame.

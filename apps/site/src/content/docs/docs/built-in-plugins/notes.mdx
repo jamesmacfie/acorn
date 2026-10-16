@@ -1,0 +1,79 @@
+---
+title: Notes
+description: The plugin behind the Notes pane, for Markdown notes on a task, a workspace or project, or everywhere, which you can hand to an agent.
+sources:
+  - docs/notes-and-memory.md
+  - plugins/notes/src/client/index.ts
+  - plugins/notes/src/client/commands.ts
+  - plugins/notes/src/server/agentTools.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+The Notes plugin adds the Notes pane, where you keep Markdown notes on a task, on a workspace or
+project, or for everywhere, and include them in what an agent gets about its task.
+
+<Snapshot id="notes" />
+
+<PluginFacts id="notes">
+  <Fragment slot="adds">The **Notes** pane, two palette commands, a **Notes** section in the task's context, and tools agents use to read and write notes.</Fragment>
+  <Fragment slot="needs">Nothing.</Fragment>
+  <Fragment slot="reach">Its own Markdown files on the Node, under `notes/` in the Node's data folder.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+There's nothing to set up.
+
+<Steps>
+
+1. Open a task, and click **Notes** in the pane switcher, or press ⇧⌘D.
+
+   <Checkpoint>The pane lists the task's **Scratchpad**, with your workspace or project's notes and your notes for everywhere below it.</Checkpoint>
+
+</Steps>
+
+## Use it
+
+[Notes](/docs/using/notes/) covers the pane in full:
+
+- [Where a note lives](/docs/using/notes/#where-a-note-lives): task, workspace or project, and
+  everywhere.
+- [Write a note](/docs/using/notes/#write-a-note), with **Edit** and **Preview**.
+- [Send a note to an agent](/docs/using/notes/#send-a-note-to-an-agent) with **Include in the agent's
+  context**.
+
+## From the command palette
+
+| Command | What it does |
+| --- | --- |
+| **Find a note** | Searches all three scopes at once, and opens the note you pick. |
+| **Create a task note** | Asks for a title, and creates the note on the current task. |
+
+## For agents
+
+The notes you include reach the agent in the task's context, under **Notes**. Agents also have four
+tools: `notes_list` and `notes_read` read notes, and `notes_append` and `notes_write` add to or replace
+one. The two that write are **Write tools**, on by default, and a note an agent writes is marked as the
+agent's ([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)). An agent can't
+include a note in its own context: that box is yours.
+
+## Settings
+
+The Notes plugin has no settings.
+
+## In the terminal
+
+The terminal client draws the same Notes pane, with the same scopes and controls, and the same palette
+commands.
+
+## Limits
+
+- Two clients editing one note at once don't merge. The last save wins.
+- Notes stay on the Node they were written on.
+- The plugin can't be turned off, because other parts of acorn, such as task context and tasks made from
+  pull requests, depend on it.

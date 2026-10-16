@@ -1,0 +1,30 @@
+---
+// One social card alone on a 1200 by 630 page, for scripts/og.mjs to screenshot, in the theme and style
+// pack saved under Appearance on any other page.
+import 'virtual:acorn-ui.css'
+import '../../styles/site.css'
+import AppearanceScript from '../../components/AppearanceScript.astro'
+import SocialCard from '../../components/SocialCard.astro'
+import { CARDS } from '../../og'
+
+export const getStaticPaths = () => Object.entries(CARDS).map(([card, props]) => ({ params: { card }, props }))
+
+const { section, title, description } = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1200" />
+    <AppearanceScript />
+    <title>{title} card · acorn</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <main>
+      <h1 class="sr-only">{title} card</h1>
+      <SocialCard section={section} title={title} description={description} />
+    </main>
+  </body>
+</html>

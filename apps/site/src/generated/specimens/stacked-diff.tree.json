@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "title": "StackedDiff",
+    "caption": "One file's patch: its head, a hunk, two lines added, and one removed.",
+    "terminal": {
+      "columns": 70,
+      "rows": 7
+    },
+    "width": 560
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "StackedDiff",
+          "props": {
+            "path": "src/login.ts",
+            "patch": "@@ -1,3 +1,4 @@\n import { session } from \"./session\"\n-const next = \"/\"\n+const next = params.get(\"next\") ?? \"/\"\n+if (!next.startsWith(\"/\")) throw new Error(\"Bad redirect\")\n redirect(next)\n"
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

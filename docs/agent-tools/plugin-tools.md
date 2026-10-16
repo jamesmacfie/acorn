@@ -11,9 +11,11 @@ a manifest can be checked without parsing prose.
 
 Its rule is to never answer a plugin API question from memory, so everything is derived at call time.
 The manifest keys, each contribution's cap, the two closed action verb sets, the frame targets, the
-host slots, and the command categories come from `z.toJSONSchema(pluginManifestShape)`. The
-`permissions.node` blocks come from the same schema, and the `core` facet list from
-`server/plugins/permissions.ts`. The frame bridge's message kinds and methods are read off the wire
+host slots, the command categories, and the `permissions.node` blocks come from
+`z.toJSONSchema(pluginManifestShape)`, through `pluginManifestVocabulary` in
+`packages/protocol/src/plugin/vocabulary.ts`. The public site's plugin reference calls the same
+function, so an agent and a reader see the same facts ([generated references](../site/references.md)).
+The `core` facet list comes from `NODE_CORE_FACETS` in `server/plugins/coreFacets.ts`. The frame bridge's message kinds and methods are read off the wire
 union in `@acorn/protocol/plugin/bridge.ts` through `satisfies`, so a new message kind is a compile
 error. Only the process is hand-written. `pluginAuthoring.test.ts` derives every list again and
 checks it reached the text.

@@ -125,8 +125,8 @@ host passes an override, so tests and `pnpm dev:node` can pin a list without wri
 ## Install and start
 
 ```sh
-tar -xzf acorn-node-*.tgz
-cd acorn-node-*
+tar -xzf acorn-node-*.tar.gz
+cd acorn-node
 npm ci --omit=dev
 npm rebuild
 node scripts/prune-runtime.mjs

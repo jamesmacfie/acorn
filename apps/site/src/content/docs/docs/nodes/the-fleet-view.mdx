@@ -1,0 +1,94 @@
+---
+title: The fleet view
+description: See every Node you're paired with on one screen, switch between them, and know what acorn shows when one is offline.
+sources:
+  - docs/architecture/fleet.md
+  - docs/notifications.md
+  - docs/tui/process.md
+  - packages/client-core/src/features/fleet/FleetHome.tsx
+  - packages/client-core/src/features/fleet/NodeChip.tsx
+  - packages/client-core/src/infra/node/freshness.ts
+  - packages/client-core/src/host/registries/commands/navigationCommands.ts
+checked: 07aa959a0
+---
+
+import Snapshot from '../../../../components/Snapshot.astro'
+
+With more than one Node paired, the desktop app shows them together: a **Fleet** view in the left rail,
+a Node picker in the top bar, and searches and a bell that cover every Node. This page covers each, and
+what acorn shows when a Node doesn't answer.
+
+<Snapshot id="fleet" />
+
+## Open the fleet
+
+Click **Fleet** in the left rail. It appears once a second Node is paired, so with one Node there's
+nothing extra on screen.
+
+Each Node has a card:
+
+| On the card | What it says |
+| --- | --- |
+| The name | What this device calls the Node, with **This computer** on the desktop app's own Node and **Active** on the one you're working in. |
+| The state | **Live**, or what's wrong. See [Node states](#node-states). |
+| The address | Where this device reaches it. |
+| **Tasks** | How many tasks it has. A dash means it hasn't answered yet, not that it has none. |
+| **Needs you** | How many things on it are waiting for you, such as an agent's question. |
+| **Last seen** | When it last answered. |
+
+Plugins can add their own counts to a card. **Make active** switches the app to that Node, and
+**Reconnect** tries again to reach it.
+
+## Switch Nodes
+
+The Node picker in the top bar lists every paired Node, with **Add a node**. Pick one to work in it. The left rail, the
+panes, and the palette then show that Node's workspaces and tasks. **Switch node** in the command
+palette's **Go to** group does the same.
+
+## Name a Node
+
+Each device keeps its own name for a Node. Rename one in **Settings** > **Machines** > **Nodes** with
+**Rename** on its row. The name you give when you pair is the first one.
+
+## See what needs you on every Node
+
+The bell's **Needs you** section lists what's waiting across every Node, such as an approval or an
+agent's question, each labeled with its Node. Clicking one takes you to that Node and the thing
+waiting.
+
+The palette's **Go to** searches look across every Node too, with each row labeled. Picking a task on
+another Node switches to that Node first.
+
+## Node states
+
+| State | What it means |
+| --- | --- |
+| **Live** | It's answering, and what you see is current. |
+| **Refreshing** | It's answering, and acorn is reading again. |
+| **Stale** | What you see is from earlier. It says how long ago. |
+| **Offline** | It isn't answering. acorn shows what it last read, and says when that was. |
+| **Error** | It answered, with an error. |
+| **Starting** | The desktop app's own Node is still starting. |
+| **Identity changed** | Its certificate isn't the one you paired with, and acorn has stopped connecting ([Pair a device or a remote Node](/docs/nodes/pair-a-device-or-a-remote-node/#if-a-nodes-identity-changes)). |
+| **Version mismatch** | It and this app can't talk to each other. Update the older one. |
+
+## When a Node is offline
+
+- What acorn last read from it stays on screen, marked with its state and age.
+- Views that cover every Node, such as Fleet and the bell, show the Nodes that answered, with a banner
+  that names the one that didn't. The page doesn't fail.
+- Changes to something on that Node fail at once and say so. A message you were typing stays as a
+  draft. acorn doesn't queue the change to send later.
+- When a Node comes back, acorn reconnects by itself. **Reconnect** tries straight away.
+
+## In the terminal
+
+The terminal client works with one Node at a time: the one it starts with. It has no Fleet view. Start
+it with `acorn --node <name>` to use another.
+
+## Limits
+
+- Nothing moves between Nodes. A task stays on the Node it was made on.
+- Two Nodes can't be open side by side in one window. The window shows the active one, and Fleet shows
+  a summary of each.
+- The Node picker and Fleet appear only with two or more Nodes paired.

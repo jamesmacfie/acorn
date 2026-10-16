@@ -1,0 +1,73 @@
+---
+title: browserHandoffs
+description: "Buttons the browser extension draws on a website."
+sources:
+  - docs/plugin-authoring/browser-handoffs.md
+checked: '498833615'
+---
+
+A browser handoff is a button acorn's browser extension draws on a website, such as a pull request
+page, that hands the page's item to a task. You declare the pages, the label, and where the button goes,
+and a route on your Node half turns the page into items. The extension draws the button, so none of your
+code runs in the browser.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "browserHandoffs": [
+      {
+        "id": "issue",
+        "label": "Open in acorn",
+        "match": [
+          "https://acme.example/{team}/issue/{id}"
+        ],
+        "resolve": "/v1/p/acme/handoff"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "browserHandoffs": [
+      {
+        "id": "issue",
+        "label": "Open in acorn",
+        "match": [
+          "https://acme.example/{team}/issue/{id}",
+          "https://*.acme.example/issue/{id}"
+        ],
+        "anchors": [
+          "header .issue-actions",
+          "main h1"
+        ],
+        "resolve": "/v1/p/acme/handoff"
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+This is a browser extension feature, not a client one.
+
+## Mistakes
+
+- When no `anchors` match, after a site redesign, the extension's sidebar still offers the handoff.
+
+## Guide
+
+[Bring a website's item into a task](/docs/build-plugins/node/bring-a-websites-item-into-a-task/) walks through it from start to finish.

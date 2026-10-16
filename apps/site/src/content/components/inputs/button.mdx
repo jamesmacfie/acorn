@@ -1,0 +1,29 @@
+---
+title: Button
+description: An action button.
+sources:
+  - packages/client-core/src/kit/components/inputs/Button.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Button` for an action. `variant` sets its weight, `tone` its meaning, and `onPress` is what the press sends. A `Button` with an `href` is a link that looks like a button.
+
+<Specimen id="buttons" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="buttons" />
+
+## Related
+
+- [`IconButton`](/docs/components/inputs/icon-button/), for a button whose face is an icon.
+- [`ConfirmButton`](/docs/components/inputs/confirm-button/), for an action that asks first.
+- [`Link`](/docs/components/content/link/), for text that goes somewhere.
+
+## Mistakes
+
+- Using `iconOnly` with an icon child. Use `IconButton`, which takes the icon name and a required label.
+- Sending a prop as `undefined`. The host refuses the whole batch, so leave the prop out.

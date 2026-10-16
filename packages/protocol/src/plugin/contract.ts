@@ -4,7 +4,7 @@
 import { z } from 'zod'
 import { ACORN_BASELINE } from '../baseline.ts'
 import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../data/dataSourceContributions.ts'
-import { PLUGIN_API_RANGE_RE } from './apiVersion.ts'
+import { PLUGIN_API_MAJOR, PLUGIN_API_RANGE_RE } from './apiVersion.ts'
 import { pluginCliCommandDescriptorSchema } from './cliCommands.ts'
 import { browserHandoffDescriptor, browserPanelDescriptor } from './handoffs.ts'
 import {
@@ -65,29 +65,49 @@ const customAgentDescriptor = z.object({
     .string()
     .min(1)
     .max(64)
-    .regex(/^[a-z0-9][a-z0-9-]*$/),
-  name: z.string().min(1).max(100),
-  glyph: z.string().min(1).max(64).optional(),
-  description: z.string().min(1).max(500).optional(),
+    .regex(/^[a-z0-9][a-z0-9-]*$/)
+    .describe("The agent's ID, in lowercase letters, digits, and dashes. The host makes it `<pluginId>:<id>`."),
+  name: z.string().min(1).max(100).describe('The name the person picks the agent by.'),
+  glyph: z.string().min(1).max(64).optional().describe('A Lucide icon name, or a `brand:` mark.'),
+  description: z.string().min(1).max(500).optional().describe('One line about what the agent is for.'),
   // A harness id: `claude`, `codex`, another plugin's `<pluginId>:<harnessId>`, or the bare id of a
   // harness this manifest declares, which the host qualifies.
-  harness: z.string().min(1).max(130),
+  harness: z
+    .string()
+    .min(1)
+    .max(130)
+    .describe(
+      "The harness it runs on: `claude`, `codex`, another plugin's `<pluginId>:<harnessId>`, or the ID of a harness this manifest declares.",
+    ),
   // Provider option id to value, the same table a session default is. A value the harness does not
   // advertise is dropped when the session starts, with a line in the transcript.
   options: z
     .record(z.string().min(1).max(200), z.string().max(500))
     .refine((value) => Object.keys(value).length <= 20, 'at most 20 options')
-    .default({}),
+    .default({})
+    .describe(
+      "Provider options to start with, by option ID. An option the harness doesn't offer is dropped when the session starts, with a line in the transcript.",
+    ),
   // Shown in full in the trust prompt, and a changed text asks again.
-  instructions: z.string().min(1).max(16_000).optional(),
-  maxToolRisk: z.enum(['read', 'write', 'execute']).optional(),
+  instructions: z
+    .string()
+    .min(1)
+    .max(16_000)
+    .optional()
+    .describe(
+      "Text for the agent's system prompt. The trust prompt shows it in full, and a version that changes it asks the person again.",
+    ),
+  maxToolRisk: z
+    .enum(['read', 'write', 'execute'])
+    .optional()
+    .describe("The riskiest of acorn's own tools the agent may call: `read`, `write`, or `execute`."),
 })
 
 // The Git hosts whose repositories this plugin names, such as `gitlab.com` (docs/plugins/code-hosts.md).
 // The provider is the plugin's own id, so two providers can't collide. Hosts are bare lowercase names,
 // with no scheme or port, because core compares them with the host it parses from a remote.
 export const codeHostDescriptor = z.object({
-  label: z.string().min(1).max(64),
+  label: z.string().min(1).max(64).describe("The host's name as a person reads it, such as `GitLab`."),
   hosts: z
     .array(
       z
@@ -99,7 +119,8 @@ export const codeHostDescriptor = z.object({
         ),
     )
     .min(1)
-    .max(16),
+    .max(16)
+    .describe('Bare lowercase host names, such as `gitlab.com`, with no scheme or port.'),
   // How core treats this host's change requests, its pull or merge requests. Every field is optional.
   changeRequest: z
     .object({
@@ -111,14 +132,33 @@ export const codeHostDescriptor = z.object({
         .max(200)
         .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*\{number\}[A-Za-z0-9._/-]*$/, 'a ref is a path holding {number} once')
         .refine((ref) => !ref.includes('..'), 'a ref has no ..')
-        .optional(),
+        .optional()
+        .describe(
+          'The ref acorn fetches to check one out, holding `{number}` once, such as `merge-requests/{number}/head`. Without it, acorn fetches the source branch.',
+        ),
       // What a person calls one, such as `merge request`, and the mark before its number in a title.
-      label: z.string().min(1).max(64).optional(),
-      prefix: z.string().min(1).max(4).optional(),
+      label: z
+        .string()
+        .min(1)
+        .max(64)
+        .optional()
+        .describe('What a person calls one in an error, such as `merge request`. Defaults to `change request`.'),
+      prefix: z
+        .string()
+        .min(1)
+        .max(4)
+        .optional()
+        .describe('The mark before its number in a task title, such as `!`. Defaults to `#`.'),
       // The client pane that shows one. A task whose primary change request is on this host opens on it.
-      pane: z.string().min(1).max(64).optional(),
+      pane: z
+        .string()
+        .min(1)
+        .max(64)
+        .optional()
+        .describe('The pane that shows one. A task whose main change request is on this host opens on it.'),
     })
-    .optional(),
+    .optional()
+    .describe("How acorn treats this host's pull or merge requests. Every field is optional."),
 })
 export type CodeHostDescriptor = z.infer<typeof codeHostDescriptor>
 
@@ -128,57 +168,183 @@ export type CodeHostDescriptor = z.infer<typeof codeHostDescriptor>
 // The caps are product judgements, not storage limits. Eight is "as many as a plugin has rail sources"
 // and four is "a handful"; a package that wants more is describing an app rather than an integration.
 const contributionsShape = z.looseObject({
-  frames: z.array(frameSurface).max(32).default([]),
-  sources: z.array(sourceDescriptor).max(8).default([]),
-  slots: z.array(slotDescriptor).max(8).default([]),
-  commands: z.array(commandDescriptor).max(32).default([]),
-  keybindings: z.array(keybindingDescriptor).max(32).default([]),
-  attention: z.array(attentionDescriptor).max(4).default([]),
-  nodeStats: z.array(nodeStatDescriptor).max(4).default([]),
-  contentLinks: z.array(contentLinkDescriptor).max(16).default([]),
-  routes: z.array(clientRouteDescriptor).max(8).default([]),
-  agentContexts: z.array(agentContextDescriptor).max(4).default([]),
-  refResolvers: z.array(refResolverDescriptor).max(4).default([]),
-  themes: z.array(themeDescriptor).max(8).default([]),
-  styles: z.array(styleDescriptor).max(8).default([]),
+  frames: z
+    .array(frameSurface)
+    .max(32)
+    .default([])
+    .describe(
+      "Surfaces your client bundle draws: panes, reference panels, settings pages, importers, overlays, webviews, core replacements, and rectangles for another plugin's point. `target` says which.",
+    ),
+  sources: z
+    .array(sourceDescriptor)
+    .max(8)
+    .default([])
+    .describe('Sources on the left rail. The host draws the list from your route, or your tree draws it.'),
+  slots: z
+    .array(slotDescriptor)
+    .max(8)
+    .default([])
+    .describe("Badges the host draws in the top bar or in a task's footer, from your route."),
+  commands: z
+    .array(commandDescriptor)
+    .max(32)
+    .default([])
+    .describe('Entries in the command palette: an action, a group, a search, a line of input, or a setting.'),
+  keybindings: z.array(keybindingDescriptor).max(32).default([]).describe('Default shortcuts for your commands.'),
+  attention: z
+    .array(attentionDescriptor)
+    .max(4)
+    .default([])
+    .describe('Routes whose items appear in the notification inbox.'),
+  nodeStats: z
+    .array(nodeStatDescriptor)
+    .max(4)
+    .default([])
+    .describe("Numbers on a Node's card on Fleet home, read from your route."),
+  contentLinks: z
+    .array(contentLinkDescriptor)
+    .max(16)
+    .default([])
+    .describe('Links in acorn that open your pane, reference panel, or overlay, matched by URL.'),
+  routes: z
+    .array(clientRouteDescriptor)
+    .max(8)
+    .default([])
+    .describe('App URLs that open one of your project panes on an item.'),
+  agentContexts: z
+    .array(agentContextDescriptor)
+    .max(4)
+    .default([])
+    .describe("Entries in an agent composer's context list, each a snapshot your routes provide."),
+  refResolvers: z
+    .array(refResolverDescriptor)
+    .max(4)
+    .default([])
+    .describe("Routes that turn your items' identifiers into labels, for surfaces that show them."),
+  themes: z
+    .array(themeDescriptor)
+    .max(8)
+    .default([])
+    .describe('Color themes for Settings > Appearance, written as token values. You write no CSS.'),
+  styles: z
+    .array(styleDescriptor)
+    .max(8)
+    .default([])
+    .describe('Style packs for Settings > Appearance, written as token values the host checks.'),
   // A plugin can declare more than eight rail surfaces; keep the total bounded.
-  contextMenus: z.array(contextMenuDescriptor).max(32).default([]),
+  contextMenus: z
+    .array(contextMenuDescriptor)
+    .max(32)
+    .default([])
+    .describe("Rows on acorn's context menus, such as a task row, an Editor file, or selected text."),
   // Higher than the other caps: a plugin that opens a pane, a slot in it, a hook before it acts and an
   // annotation on its rows is describing one integration, not four.
-  extensionPoints: z.array(extensionPointDescriptor).max(16).default([]),
-  extensions: z.array(extensionDescriptor).max(16).default([]),
+  extensionPoints: z
+    .array(extensionPointDescriptor)
+    .max(16)
+    .default([])
+    .describe('Places in your own views that other plugins may fill.'),
+  extensions: z
+    .array(extensionDescriptor)
+    .max(16)
+    .default([])
+    .describe("What you add to another plugin's extension point: rows, a tree, a rectangle, marks, or a hook handler."),
   // Hover and diagnostics for Editor's files in one language (`documentServiceDescriptor`).
-  documentServices: z.array(documentServiceDescriptor).max(8).default([]),
-  dataSources: z.array(dataSourceRegistrationSchema).max(32).optional(),
-  dataSourceDiscoveries: z.array(dataSourceDiscoverySchema).max(8).optional(),
-  schedules: z.array(scheduleDescriptor).max(4).default([]),
-  taskChecks: z.array(taskCheckDescriptor).max(4).default([]),
+  documentServices: z
+    .array(documentServiceDescriptor)
+    .max(8)
+    .default([])
+    .describe("Hover and diagnostics for Editor's files in one language, from your routes."),
+  dataSources: z
+    .array(dataSourceRegistrationSchema)
+    .max(32)
+    .optional()
+    .describe('Typed data sources your Node half serves, for dashboards and workflows.'),
+  dataSourceDiscoveries: z
+    .array(dataSourceDiscoverySchema)
+    .max(8)
+    .optional()
+    .describe('Routes that list data sources your plugin can offer, found when someone asks.'),
+  schedules: z
+    .array(scheduleDescriptor)
+    .max(4)
+    .default([])
+    .describe('Work the Node runs for your plugin on a cadence, with no client open.'),
+  taskChecks: z
+    .array(taskCheckDescriptor)
+    .max(4)
+    .default([])
+    .describe('Checks the host runs before it archives a task, each with an optional cleanup.'),
   // Audit verbs. The ctx twin is `ctx.audit`, and both feeders land in the same registry.
-  auditActions: z.array(auditActionDescriptor).max(8).default([]),
+  auditActions: z
+    .array(auditActionDescriptor)
+    .max(8)
+    .default([])
+    .describe(
+      'Verbs your Node half may write to the audit log with `ctx.audit.record`. An undeclared verb is refused.',
+    ),
   // Managed agent harnesses. The ctx twin is the `agents.harnessRegistry` capability. See
   // docs/managed-agents/harnesses.md § Harnesses.
-  harnesses: z.array(harnessDescriptor).max(4).default([]),
+  harnesses: z
+    .array(harnessDescriptor)
+    .max(4)
+    .default([])
+    .describe('Agent programs acorn can run as managed sessions. You declare the program, and acorn runs it.'),
   // Custom agents. The ctx twin is the `agents.customAgentRegistry` capability. See
   // docs/managed-agents/custom-agents.md § Custom agents.
-  customAgents: z.array(customAgentDescriptor).max(8).default([]),
+  customAgents: z
+    .array(customAgentDescriptor)
+    .max(8)
+    .default([])
+    .describe('Saved agents a person can start: a harness, its options, and instructions.'),
   // Procedures agents load by name. The host reads each folder, and agents delivers them on every
   // session start (docs/managed-agents/skills.md § Skills).
-  skills: z.array(skillDescriptor).max(16).default([]),
+  skills: z
+    .array(skillDescriptor)
+    .max(16)
+    .default([])
+    .describe('Folders holding a `SKILL.md` that every managed agent session can load by name.'),
   // Node-runtime carriers. The host adapts these into the same registries compiled contributions use.
-  agentTools: z.array(pluginAgentToolDescriptorSchema).max(16).default([]),
-  contextSections: z.array(pluginContextSectionDescriptorSchema).max(8).default([]),
-  cliCommands: z.array(pluginCliCommandDescriptorSchema).max(16).default([]),
+  agentTools: z
+    .array(pluginAgentToolDescriptorSchema)
+    .max(16)
+    .default([])
+    .describe('Tools agents can call, each answered by a route on your Node half.'),
+  contextSections: z
+    .array(pluginContextSectionDescriptorSchema)
+    .max(8)
+    .default([])
+    .describe("Sections of a task's context, each read from a route on your Node half."),
+  cliCommands: z
+    .array(pluginCliCommandDescriptorSchema)
+    .max(16)
+    .default([])
+    .describe('Commands under `acorn plugin`, each answered by a `/cli/<name>` route on your Node half.'),
   // Buttons the browser extension draws on a website, each resolved by a route on this plugin's node
   // half (./handoffs.ts). Compiled plugins declare the same thing on `NodePlugin.browserHandoffs`.
-  browserHandoffs: z.array(browserHandoffDescriptor).max(4).default([]),
+  browserHandoffs: z
+    .array(browserHandoffDescriptor)
+    .max(4)
+    .default([])
+    .describe("Buttons the browser extension draws on a website, which hand the page's item to a task."),
   // A GET route on this plugin's node half listing the exact origins its tasks' apps answer at now, for
   // the browser extension (./handoffs.ts `taskAddressList`).
-  taskAddresses: pluginRoute.optional(),
+  taskAddresses: pluginRoute
+    .optional()
+    .describe(
+      "A GET route on your Node half listing the local origins your tasks' apps answer at, for the browser extension.",
+    ),
   // A read-only sidebar panel in the browser extension, served as a view by a GET route on this
   // plugin's node half (./handoffs.ts `browserPanelView`). One per plugin.
-  browserPanel: browserPanelDescriptor.optional(),
+  browserPanel: browserPanelDescriptor
+    .optional()
+    .describe(
+      "A read-only panel in the browser extension's sidebar for a task, served by a route on your Node half. One per plugin.",
+    ),
   // Compiled plugins declare the same thing on `NodePlugin.codeHost`.
-  codeHost: codeHostDescriptor.optional(),
+  codeHost: codeHostDescriptor
+    .optional()
+    .describe('The Git hosts whose repositories your plugin names, and how acorn treats their change requests.'),
 })
 
 // Every contribution kind a manifest may declare, as a runtime list.
@@ -189,13 +355,23 @@ const contributionsShape = z.looseObject({
 // docs/contribution-kinds.md, which a test holds against this list.
 export const CONTRIBUTION_KINDS = Object.keys(contributionsShape.shape).sort() as readonly string[]
 
-const contributions = contributionsShape.prefault({})
+const contributions = contributionsShape
+  .prefault({})
+  .describe(
+    "Everything your plugin adds to acorn, by kind. A key this acorn doesn't know is reported and skipped, so a manifest written for a newer acorn still loads.",
+  )
 
 // The permissions block as a whole, named so the wire projection can be inferred from it. This is what
 // the trust dialog renders and the owner consents to. `api` scopes stay unvalidated strings: an unknown
 // scope is one this acorn can't grant, which the bridge denies rather than the manifest rejecting.
 const manifestPermissions = z.object({
-  api: z.array(z.string().min(1).max(64)).max(64).default([]),
+  api: z
+    .array(z.string().min(1).max(64))
+    .max(64)
+    .default([])
+    .describe(
+      "acorn API scopes your frames and trees may call through the bridge. Your own routes need none. A scope this acorn doesn't know is denied when you call it, not refused here.",
+    ),
   events: z
     .array(
       z
@@ -205,8 +381,13 @@ const manifestPermissions = z.object({
         .regex(/^[a-z][a-z0-9:._-]*$/i),
     )
     .max(64)
-    .default([]),
-  node: nodePermissions.prefault({}),
+    .default([])
+    .describe(
+      "Event channels your frames and trees may subscribe to: a core channel such as `task.changed`, or another plugin's `plugin:<id>:<verb>` when that plugin declares the verb in `emits`.",
+    ),
+  node: nodePermissions
+    .prefault({})
+    .describe("What your Node half may reach. Anything you don't list here is missing from `ctx`."),
 })
 
 // What a plugin announces on its own `plugin:<id>:<verb>` channel that *other* plugins may subscribe
@@ -215,8 +396,15 @@ const manifestPermissions = z.object({
 // what gives the settings page a line to render. The description is the author's own words and is
 // shown as text, never as trust-prompt copy.
 const pluginEmitSchema = z.object({
-  verb: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/, 'a verb is lowercase, starts with a letter, and holds no colon'),
-  description: z.string().min(1).max(200),
+  verb: z
+    .string()
+    .regex(/^[a-z][a-z0-9-]{0,63}$/, 'a verb is lowercase, starts with a letter, and holds no colon')
+    .describe("The event's verb, sent on `plugin:<id>:<verb>`: lowercase, starting with a letter, with no colon."),
+  description: z
+    .string()
+    .min(1)
+    .max(200)
+    .describe("What the event means. The plugin's settings page shows it as plain text."),
 })
 export type PluginEmit = z.infer<typeof pluginEmitSchema>
 
@@ -224,13 +412,28 @@ const manifestShape = z.object({
   // The JSON Schema an editor validates this file against (plugin-types' pluginSchema test generates it,
   // and create-acorn-plugin writes the key). Declared so it is a known key rather than one the
   // forward-compatibility report has to name on every scaffolded plugin. Nothing reads it at load time.
-  $schema: z.string().max(200).optional(),
-  id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
-  name: z.string().min(1).max(120),
+  $schema: z
+    .string()
+    .max(200)
+    .optional()
+    .describe("The JSON Schema your editor checks this file against. acorn doesn't read it."),
+  id: z
+    .string()
+    .regex(ID_RE, `plugin id must match ${ID_RE.source}`)
+    .describe(
+      "The plugin's permanent ID: 2 to 32 lowercase letters, digits, and dashes, starting with a letter. It names your routes and your storage, so a new ID is a new plugin.",
+    ),
+  name: z
+    .string()
+    .min(1)
+    .max(120)
+    .describe("The plugin's name, as Settings and the agent tool list show it. The trust prompt shows the `id`."),
   // The plugin's own logo, registered by the host under `brand:<id>` so every contribution in this
   // manifest can name it as a `glyph`. Top level beside `name` because it identifies the package,
   // where `glyph` stays per-contribution.
-  icon: brandMark.optional(),
+  icon: brandMark
+    .optional()
+    .describe("The plugin's logo, registered as `brand:<id>`, so any contribution can name it as its glyph."),
   // The plural feeder, for a package that hosts several brands. Keys become the suffix in
   // `brand:<pluginId>/<key>`; the host stamps the prefix, so the key namespace is private to the plugin.
   icons: z
@@ -243,20 +446,47 @@ const manifestShape = z.object({
       brandMark,
     )
     .refine((marks) => Object.keys(marks).length <= 16, 'too many icons')
-    .optional(),
-  version: z.string().min(1).max(64),
-  baseline: z.literal(ACORN_BASELINE),
-  emits: z.array(pluginEmitSchema).max(32).default([]),
+    .optional()
+    .describe(
+      'More brand marks, for a package that shows several brands, at most 16. The key `github` becomes `brand:<id>/github`.',
+    ),
+  version: z
+    .string()
+    .min(1)
+    .max(64)
+    .describe(
+      "Your plugin's own version, such as `1.2.0`. Another plugin's `requires` entry compares its range with this version's major.",
+    ),
+  baseline: z
+    .literal(ACORN_BASELINE)
+    .describe(`The acorn baseline this manifest is written for. It must be \`${ACORN_BASELINE}\`.`),
+  emits: z
+    .array(pluginEmitSchema)
+    .max(32)
+    .default([])
+    .describe(
+      'Event verbs your plugin announces, so other plugins can subscribe to them. Your own frames and trees hear your events without this.',
+    ),
   // The client apps this plugin runs in. Absent means every app. Any string is kept, so an app a later
   // build adds is reported as unknown instead of failing the manifest (./clients.ts).
-  clients: z.array(z.string().min(1).max(32)).min(1, 'must name at least one app, or be left out').max(8).optional(),
+  clients: z
+    .array(z.string().min(1).max(32))
+    .min(1, 'must name at least one app, or be left out')
+    .max(8)
+    .optional()
+    .describe(
+      'The apps your client half runs in: `desktop`, `terminal`, or both. Leave it out to run in every app, because an empty list is refused.',
+    ),
   // A range over plugin API majors, not a single number: '3', '2 || 3', '2-4'. Held to the shape
   // here so a typo fails the manifest with a reason instead of loading nowhere (./apiVersion.ts).
   apiVersion: z
     .string()
     .min(1)
     .max(16)
-    .regex(PLUGIN_API_RANGE_RE, 'apiVersion must be a major or a range of majors, such as "3" or "2 || 3"'),
+    .regex(PLUGIN_API_RANGE_RE, 'apiVersion must be a major or a range of majors, such as "3" or "2 || 3"')
+    .describe(
+      `The plugin API majors your plugin works with: one major such as \`"${PLUGIN_API_MAJOR}"\`, a list such as \`"${Number(PLUGIN_API_MAJOR) - 1} || ${PLUGIN_API_MAJOR}"\`, or a span such as \`"${Number(PLUGIN_API_MAJOR) - 1}-${PLUGIN_API_MAJOR}"\`. A range that leaves out acorn's major doesn't load.`,
+    ),
   // What this package needs from the rest of the node before it can work.
   //
   // Without it a plugin that consumes another plugin's capability has no way to say so, and the failure
@@ -272,25 +502,49 @@ const manifestShape = z.object({
       plugins: z
         .array(
           z.object({
-            id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
+            id: z
+              .string()
+              .regex(ID_RE, `plugin id must match ${ID_RE.source}`)
+              .describe('The ID of the plugin yours needs.'),
             version: z
               .string()
               .min(1)
               .max(16)
               .regex(PLUGIN_API_RANGE_RE, 'version must be a major or a range of majors, such as "3" or "2 || 3"')
-              .optional(),
+              .optional()
+              .describe(
+                "A range over the needed plugin's major, written like `apiVersion`. Leave it out to accept any version.",
+              ),
           }),
         )
         .max(16)
-        .default([]),
+        .default([])
+        .describe(
+          'Each plugin yours needs. When one is missing or the wrong major, the plugin list says which before anything runs.',
+        ),
     })
-    .prefault({}),
-  node: entry.optional(),
-  client: entry.optional(),
+    .prefault({})
+    .describe('What your plugin needs from the rest of the Node before it can work.'),
+  node: entry
+    .optional()
+    .describe(
+      "Your Node half's entry file, relative to the plugin folder, such as `node/index.js`. Leave it out when the plugin has no Node half.",
+    ),
+  client: entry
+    .optional()
+    .describe(
+      'Your client bundle, one JavaScript file relative to the plugin folder, which draws your frames and trees.',
+    ),
   // Loaded-plugin storage is host-opened and host-migrated. The same confinement rule as the code
   // entrypoints keeps its DDL chain inside the installed package.
-  migrations: entry.optional(),
-  permissions: manifestPermissions.prefault({}),
+  migrations: entry
+    .optional()
+    .describe(
+      'Your folder of Drizzle migrations, relative to the plugin folder. acorn opens your SQLite file and runs them in order. Never edit one that has shipped.',
+    ),
+  permissions: manifestPermissions
+    .prefault({})
+    .describe('What your plugin may reach. The person accepts these on each device when they install it.'),
   contributions,
 })
 // `pluginManifestSchema` in node-core wraps this with the cross-field refinements (route confinement, surface

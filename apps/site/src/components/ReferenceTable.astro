@@ -1,0 +1,47 @@
+---
+// A reference table, such as the manifest's fields: a header that stays in view while the reader
+// scrolls, and an anchor on every row so a link can land on one field.
+interface Props {
+  /** The column headings. */
+  head: string[]
+  /** One row per entry. `id` is its anchor, and its first cell is drawn as code, linking to `href` when
+   *  there is one and to the row's own anchor otherwise. The other cells are text, where a span in
+   *  backticks is drawn as code and `[words](/path/)` as a link. */
+  rows: { id: string; href?: string; cells: string[] }[]
+}
+
+const { head, rows } = Astro.props
+// Search ranks the name a row describes, such as a field or a variable, near a heading, so a search for
+// it lands here before the pages that mention it. A heading's weight is 6 or 7.
+const KEY_WEIGHT = 5
+
+const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const withCode = (text: string) =>
+  escape(text)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((\/[^)\s]*)\)/g, '<a href="$2">$1</a>')
+---
+
+<div class="reference not-content">
+  <table>
+    <thead>
+      <tr>{head.map((heading) => <th scope="col">{heading}</th>)}</tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((row) => (
+          <tr id={row.id}>
+            <th scope="row" data-pagefind-weight={KEY_WEIGHT}>
+              <a href={row.href ?? `#${row.id}`}>
+                <code>{row.cells[0]}</code>
+              </a>
+            </th>
+            {row.cells.slice(1).map((cell) => (
+              <td set:html={withCode(cell)} />
+            ))}
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>

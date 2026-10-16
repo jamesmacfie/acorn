@@ -1,0 +1,37 @@
+{
+  "meta": {
+    "title": "EmptyState",
+    "caption": "An empty list, with a title and a line saying what fills it.",
+    "terminal": {
+      "columns": 60,
+      "rows": 4
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "EmptyState",
+          "props": {
+            "title": "No deploys yet"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "#text",
+              "props": {
+                "value": "Deploys for this project show here once one runs."
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

@@ -2,6 +2,7 @@
   "name": "acorn",
   "description": "The acorn monorepo: an agent workspace built as a desktop shell, a Node service, and a tree of plugins.",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@11.0.0",
   "//engines": "The security floor for Node's permission model, shared with node-runtime.json and @acorn/protocol/nodeRuntime.ts. scripts/pack-node.mjs copies this range into the standalone artifact.",
   "engines": {
@@ -28,6 +29,7 @@
     "dev:remote": "node scripts/remote-node.mjs",
     "dev:node": "pnpm --filter @acorn/node dev:node",
     "dev:plugin": "pnpm --filter @acorn/node dev:plugin",
+    "dev:site": "pnpm --filter @acorn/site dev",
     "dist": "pnpm --filter @acorn/desktop dist",
     "format": "oxfmt",
     "lint": "oxlint && oxfmt --check && knip --no-config-hints && turbo run lint --continue",

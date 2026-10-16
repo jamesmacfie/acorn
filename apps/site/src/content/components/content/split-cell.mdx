@@ -1,0 +1,26 @@
+---
+title: SplitCell
+description: One half of a line in a side-by-side diff. Desktop only.
+sources:
+  - packages/client-core/src/kit/diff/DiffRows.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`SplitCell` draws the old or the new half of a changed line in a split diff. The terminal has no split diff, because side by side needs 160 columns, and draws nothing for it.
+
+<Specimen id="split-cells" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="split-cells" />
+
+## Related
+
+- [`DiffLine`](/docs/components/content/diff-line/), for a unified line, which both hosts draw.
+
+## Mistakes
+
+- Using split cells for a diff that must read in the terminal. Use `StackedDiff`, which is unified.

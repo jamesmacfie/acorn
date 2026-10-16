@@ -1,0 +1,74 @@
+---
+title: Put your pane in the right rail
+description: How your pane gets a button in the pane switcher on the right rail, and what its icon, label, order, and chord do.
+sources:
+  - docs/panes/layout.md
+  - docs/panes/contributions.md
+  - docs/plugins/commands.md
+  - examples/plugins/acme-tracker/acorn-plugin.json
+checked: dfb0bd69b
+---
+
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+The right rail is the pane switcher: one button for each pane a task can show. There's no separate
+contribution for it. A plugin reaches the right rail by adding a pane, and this page says how each
+part of the pane's entry shows up there.
+
+## The result
+
+The host draws the switcher, so the picture is the window's own: see the right edge of the window in
+[The window: top bar, rails, and drawer](/docs/using/the-window-top-bar-rails-and-drawer/). Your pane's
+button sits among acorn's own, with your icon and your label in its tooltip.
+
+## Before you start
+
+You need a pane ([Add a pane](/docs/build-plugins/ui/add-a-pane/)).
+
+## Steps
+
+1. **Give the pane an icon and a label.** `glyph` is the button's icon, a Lucide name or a brand
+   mark, and `label` is its name in the tooltip and the palette. `order` places the button: lower
+   comes first.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.frames#acme-tracker']} />
+
+2. **Give it a chord.** Add a command that opens the pane, and a keybinding for it
+   ([Add commands and keybindings](/docs/build-plugins/ui/add-commands-and-keybindings/)), so the
+   person can bring the pane up from the keyboard.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.commands#open', 'contributions.keybindings']} />
+
+3. **Check it.** Save, open a task, and find the button on the right edge of the window. Click it to
+   show the pane. Right-click it for **Pin**, which keeps the pane in the task's row, and the other
+   layout actions.
+
+## What the person controls
+
+- **Pinning, showing, and moving.** The person pins the pane, shows or hides it, and moves it in the
+  row. acorn saves that per task and Node, keyed by your pane's `id`. Renaming the `id` loses it.
+- **Which tasks offer it.** `availability` names a route of yours that says, for each task, whether
+  the pane applies. A pane without it is offered on every task.
+- **The whole switcher.** A plugin can offer a replacement for the switcher itself, which the person
+  chooses in Settings ([Replace the top bar, rail, or pane switcher](/docs/build-plugins/ui/replace-the-top-bar-rail-or-pane-switcher/)).
+
+## Mistakes
+
+- `glyph` is a name, not a path or an SVG. An unknown name draws as text.
+- `showInSwitcher: false` hides the button. The pane still opens from a command.
+
+## In the terminal
+
+The terminal client has no right rail. Panes are a strip of labels above the one pane it shows, and
+your pane is there by its `label`.
+
+## Limits
+
+- A plugin can't add a button that isn't a pane, or reorder acorn's own.
+- Status marks on the button come from the `core:pane` point
+  ([Mark tasks, sources, and panes](/docs/build-plugins/ui/mark-tasks-sources-and-panes/)).
+
+## Reference
+
+[frames](/docs/build-plugins/reference/contributions/frames/) has `glyph`, `order`, `showInSwitcher`,
+and `availability`.

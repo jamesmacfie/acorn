@@ -1,0 +1,79 @@
+---
+title: One kit, two hosts
+description: Why a plugin draws with a closed list of components, and how the desktop and the terminal each draw them.
+sources:
+  - docs/ui-design/closed-kit.md
+  - docs/ui-design/every-node.md
+  - packages/client-core/src/kit/tokens/support.ts
+  - packages/protocol/src/tree/props.ts
+checked: afced2661
+---
+
+This section covers the components a plugin draws its UI with. Read this page first if you write a
+plugin that draws a tree. It explains why the list is closed, so you know why there's no `style` prop
+before you go looking for one.
+
+A plugin's tree names components and gives them props. It never draws pixels. The desktop app draws
+each component with its own HTML, and the terminal client draws the same component in cells. One tree
+gives you the pane below on both.
+
+<Specimen id="pane" both />
+
+## Why the list is closed
+
+The kit is one list of components, and a plugin can't add to it. If a plugin could name a pixel, a
+color, or a CSS class, the terminal would have to guess what that meant, and the plugin would work in
+one client only. So a component's props are meanings: a tone, an emphasis, one of three or four sizes,
+a gap. Text, counts, flags, and handlers are the rest.
+
+A component joins the list only when all four of these hold:
+
+1. Two or more plugins need it, or a built-in pane can't be built without it.
+2. Someone has written what it draws at 80 columns by 24 rows in monochrome, and the terminal has a
+   component that draws that. A thing nobody can write that sentence for is a rectangle, not a
+   component.
+3. Its props are meanings, never a pixel, a color, a class, or a style.
+4. If it's something a plugin adds to another view, one sentence written by acorn describes it in the
+   trust prompt, and a person would knowingly accept that sentence.
+
+## How a tree reaches each host
+
+Your plugin's tree runs in a Web Worker with no DOM. Each time the tree changes, the worker sends a
+batch of changes: a node added, a prop set, a node removed. A node is a component name and its props,
+as plain data.
+
+The host checks every prop before a component sees it:
+
+- A function crosses only under one of the 12 event names, such as `onPress` or `onChange`. The host
+  turns it into a handler that posts the event back to your tree. Any other prop that starts with
+  `on`, such as `onInput` or `onKeyDown`, is dropped.
+- `class`, `style`, `children` as a prop, and the other ways into the host's markup are dropped.
+  [What the kit refuses](/docs/components/what-the-kit-refuses/) lists them.
+- A prop that takes a role, such as `tone` or `gap`, must hold one of that role's values, or it's
+  dropped. [Roles and tokens](/docs/components/roles-and-tokens/) lists them.
+- An `href` must be an HTTPS address.
+- Everything else must be plain JSON. A prop set to `undefined` isn't, and the host refuses the whole
+  batch, so leave a prop out rather than sending it empty.
+
+Then each host draws the node with its own component. A name this acorn doesn't have draws a labeled
+placeholder, and the tree around it still draws.
+
+## Support levels
+
+Each component has a level on each host, so you can predict what a host draws without running it. A
+component's page gives both levels, what a reduced one loses, and the terminal's 80 by 24 sentence.
+
+{/* facts */}
+
+## Limits
+
+- Six components can't be drawn from a tree at all, because a prop they need is a function that
+  can't cross: [`Rows`](/docs/components/collections/rows/),
+  [`Menu`](/docs/components/overlays/menu/), [`Popover`](/docs/components/overlays/popover/),
+  [`Sections`](/docs/components/grouping/sections/),
+  [`SplitHandle`](/docs/components/grouping/split-handle/), and
+  [`DiffPane`](/docs/components/content/diff-pane/). Shell code draws them. Each page says what a tree
+  uses instead.
+- A prop that holds an element in shell code takes text from a tree. A tree can't put a component in
+  a prop, only in children.
+- The terminal has no hover, so a tip draws nothing there. Put what matters in text, or in `help`.

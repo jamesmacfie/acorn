@@ -1,0 +1,27 @@
+---
+title: Select
+description: A choice from a list of options.
+sources:
+  - packages/client-core/src/kit/components/inputs/Select.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Select` for one choice from a short list. Each option is `{ value, label }`, and `onChange` sends the chosen value.
+
+<Specimen id="select" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="select" />
+
+## Related
+
+- [`SegmentedControl`](/docs/components/inputs/segmented-control/), for two to four choices that stay in view.
+- [`Picker`](/docs/components/inputs/picker/), for a long list the reader searches.
+
+## Mistakes
+
+- Using a select for a long list of people or files. Use a `Picker`, which filters as the reader types.

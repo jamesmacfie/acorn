@@ -1,0 +1,84 @@
+{
+  "meta": {
+    "title": "Clients and a Node",
+    "caption": "The desktop app, the terminal client, and the command line all talk to one Node.",
+    "terminal": {
+      "columns": 60,
+      "rows": 4
+    },
+    "width": 680
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Graph",
+          "props": {
+            "id": "clients-and-node",
+            "ariaLabel": "Clients and a Node",
+            "nodes": [
+              {
+                "id": "Desktop app",
+                "label": "Desktop app",
+                "detail": "On your device"
+              },
+              {
+                "id": "Terminal client",
+                "label": "Terminal client",
+                "detail": "On your device"
+              },
+              {
+                "id": "Command line",
+                "label": "Command line",
+                "detail": "On your device"
+              },
+              {
+                "id": "node",
+                "label": "Node",
+                "detail": "Your data, worktrees, and agents",
+                "tone": "accent"
+              }
+            ],
+            "edges": [
+              {
+                "from": "Desktop app",
+                "to": "node"
+              },
+              {
+                "from": "Terminal client",
+                "to": "node"
+              },
+              {
+                "from": "Command line",
+                "to": "node"
+              }
+            ],
+            "positions": {
+              "Desktop app": {
+                "x": 0,
+                "y": 0
+              },
+              "Terminal client": {
+                "x": 210,
+                "y": 0
+              },
+              "Command line": {
+                "x": 420,
+                "y": 0
+              },
+              "node": {
+                "x": 210,
+                "y": 130
+              }
+            }
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

@@ -14,6 +14,8 @@ of plugins. This page tells you where to look and how to check your work.
   [docs/local-development.md](./docs/local-development.md) hold the full test and dev workflows.
 - [docs/writing-docs.md](./docs/writing-docs.md) says where a doc goes, the house style, how to split
   a long page, and how to cite a doc from code. Read it before you add or move a doc.
+- When you change a doc or a source file, follow
+  [when the public site cites your doc](./docs/writing-docs.md#when-the-public-site-cites-your-doc).
 - `docs/future/` holds designs for work that hasn't shipped. Its README lists every one.
 
 Before you change code, find the runtime that owns it. Trace the data from its source through the

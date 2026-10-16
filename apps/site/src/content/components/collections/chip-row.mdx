@@ -1,0 +1,27 @@
+---
+title: ChipRow
+description: A row of chips, wrapping, with one tab stop.
+sources:
+  - packages/client-core/src/kit/components/layout/ChipRow.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Put chips in a `ChipRow`. It wraps them onto more lines when they don't fit, and the arrow keys move between them.
+
+<Specimen id="badges-and-chips" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="badges-and-chips" />
+
+## Related
+
+- [`Chip`](/docs/components/content/chip/), for each chip.
+- [`Inline`](/docs/components/grouping/inline/), for a run of other things.
+
+## Mistakes
+
+- Putting chips in an `Inline`. Each one becomes its own tab stop, where a `ChipRow` is one.

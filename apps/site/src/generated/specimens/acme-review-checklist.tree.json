@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "title": "A review fence",
+    "caption": "A ```review fence in an agent's reply, drawn as a checklist.",
+    "terminal": {
+      "columns": 50,
+      "rows": 3
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "inline"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Text",
+              "props": {
+                "emphasis": "strong"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Review checklist"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Text",
+              "props": {},
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "billing/webhooks/deliver.py"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Text",
+              "props": {},
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "#text",
+                  "props": {
+                    "value": "billing/invoices/vat.py"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

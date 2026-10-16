@@ -164,6 +164,7 @@ async function main() {
     const request = async (message) => {
       const command = message?.command
       if (command === 'snapshot') return await screen.snapshot()
+      if (command === 'cells') return await screen.cells()
       if (command === 'status') return { name, status: 'ready', appPid: app.pid, cols: options.cols, rows: options.rows, dataDir, configDir, keyboard: options.keyboard }
       if (command === 'press') {
         if (typeof message.key !== 'string') throw new Error('press requires a key.')

@@ -1,0 +1,211 @@
+---
+title: Git
+description: Stage, commit, push, and pull from the Changes tab, read history, stashes, and worktrees, and merge, rebase, cherry-pick, revert, and resolve conflicts.
+sources:
+  - docs/diff-rendering/changes-pane.md
+  - docs/git-client/history.md
+  - docs/git-client/operations.md
+  - docs/git-client/conflicts.md
+  - docs/git-client/stashes.md
+  - docs/git-client/worktrees.md
+  - docs/git-client/refs-remotes-settings.md
+  - docs/git-client/explanations.md
+  - plugins/git/src/client/index.ts
+  - plugins/git/src/client/paneContribution.ts
+  - plugins/git/src/client/HistoryBrowse.tsx
+  - plugins/git/src/client/GitSettings.tsx
+  - plugins/git/src/client/changes/ChangesPane.tsx
+  - plugins/git/src/client/changes/commitEditor.tsx
+  - plugins/git/src/client/changes/commands.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+The Git plugin adds the Git pane to every task in a Git project: the task's uncommitted changes with their
+diff, a commit box, and push and pull, then its history, stashes, and worktrees. A **Git** source in the
+left rail browses the whole repository.
+
+<Snapshot id="hero" />
+
+<PluginFacts id="git">
+  <Fragment slot="adds">The **Git** pane, with **Changes**, **History**, **Stashes**, and **Worktrees** tabs, **Git** in the left rail, palette commands, **Settings** > **Features** > **Git** and **Git display**, line blame in the Editor, and tools agents use to read the task's changes.</Fragment>
+  <Fragment slot="needs">A project that's a Git repository. To push and pull, a remote named `origin`.</Fragment>
+  <Fragment slot="reach">The task's repository on the Node, through `git`.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+There's nothing to set up for a Git project.
+
+<Steps>
+
+1. Open a task, and click **Git** in the pane switcher, or press ⌘⇧G.
+
+   <Checkpoint>The pane opens on **Changes**, listing the task's changed files with their diff, or **No changes. Everything is committed.**</Checkpoint>
+
+</Steps>
+
+The Git pane doesn't show on a task whose project isn't a Git repository.
+
+## Stage and commit
+
+**Changes** lists the task's files in three groups, **Conflicts**, **Tracked**, and **Untracked**, with
+every file's diff in one column beside them. Click a file to scroll to it.
+
+- **Stage.** Tick a file, or a group, to stage it. A file staged and then edited again shows a
+  half-ticked box, and ticking it stages the rest. The header's buttons stage every change or unstage
+  everything.
+- **Discard.** A file's menu has **Discard**, which puts it back the way the last commit has it. An
+  untracked file is deleted.
+- **Comment.** Write a review note on a line of the diff, then **Send to agent** to hand your notes to
+  the task's agent.
+
+Type in **Commit message**, then click the button below it. It reads **Commit tracked** when nothing is
+staged, which commits every change to a tracked file, and **Commit** when something is. ⌘Enter commits
+from the message box. The chevron beside it holds **Amend the last commit**, **Add a sign-off line**,
+and **Skip git hooks**, for this commit only. ⌘⌥Enter amends.
+
+To have the message written for you, click **Write the commit message**, the icon beside the message box.
+If the box has text, it asks **Replace?** first. With more than one backend, **Choose who writes the
+message** picks one. It sends the diff the next commit would take
+([Model providers and generating text](/docs/agents/model-providers-and-generating-text/)).
+
+## Push, pull, and publish
+
+Beside the branch name, one button names the next thing to do:
+
+| It reads | When | What it does |
+| --- | --- | --- |
+| **Publish** | The branch has no upstream | Pushes the branch and sets its upstream. |
+| **Pull** | The branch is behind | Pulls, fast-forward only unless you choose rebase in Settings. |
+| **Push** | The branch is ahead | Pushes. |
+| **Fetch** | The branch is level | Asks `origin` what's moved. |
+
+When a branch is both behind and ahead, it reads **Pull**, because a push would fail. A force push uses a
+lease on the remote state you saw, so it can't overwrite work you haven't fetched.
+
+The header's **Check next commit for secrets** and **Check outgoing commits** run the secret checks a
+commit or push would run, and list what they find by file, line, and rule, never the value. With
+**Block publication with secret findings** on, Commit and Push run them first
+([Credentials and secrets](/docs/security/credentials-and-secrets/)).
+
+## Read history
+
+**History** lists the commits reachable from the task's branch, 100 at a time, with a graph of their
+lanes. Search by message, author, or commit hash from the menu beside the search field. Select a commit
+to see its diff against its parent. A merge commit lets you choose which parent.
+
+**Explain commit** asks a model to summarize the selected commit, from its message, up to 60 file
+summaries, and 40 KiB of its diff. It changes nothing, and runs only when you press it.
+
+## Use stashes
+
+**Stashes** lists the repository's stashes, each with its diff and any untracked files it captured.
+
+- **Create stash** needs a message. **Include untracked** adds untracked files, and **Keep staged
+  changes** leaves the index as it is.
+- **Apply** keeps the stash, and **Pop** removes it after applying. Both refuse a task with uncommitted
+  changes. A conflict keeps the stash.
+- **Drop** deletes a stash after you confirm.
+- **Explain stash** summarizes it, as **Explain commit** does.
+
+## See worktrees
+
+**Worktrees** lists every worktree of the repository: the main checkout and each task's, with its
+branch, last commit, and changed files. The task's own row shows its recorded branch beside what's
+checked out. Open a task from its row.
+
+## Merge, rebase, cherry-pick, and revert
+
+In **History**, open a commit's menu, or select a branch under **Refs** in the left rail's Git source,
+and choose:
+
+| Entry | What runs in the task's checkout |
+| --- | --- |
+| **Merge into task…** | `git merge --no-edit` |
+| **Rebase task onto this…** | `git rebase` |
+| **Cherry-pick into task…** | `git cherry-pick` |
+| **Revert in task…** | `git revert --no-edit` |
+
+The dialog shows the commit and the task's branch and HEAD. It refuses when the task has uncommitted
+changes, when another operation is stopped, when HEAD moved since the dialog read it, or while an agent
+turn, a workflow run, or setup is working in the checkout. A merge commit offers no cherry-pick or
+revert, because that needs a parent acorn won't guess.
+
+## Resolve conflicts
+
+While an operation is stopped, a banner names it and lists the conflicted files. It reads Git's own
+state, so an operation you started in a terminal shows too.
+
+1. Select a conflicted file. The resolver shows the base, ours, and theirs versions, labeled with what
+   each is for this operation, above an editable result.
+2. Edit the result, or start from one side with **Use base**, **Use ours**, or **Use theirs**. When a
+   side deleted the file, it offers **Take deletion**.
+3. Click **Save and stage**, then **Back**. acorn refuses a result that still has `<<<<<<<` or `>>>>>>>`
+   lines.
+4. When no file is left, click **Continue**. **Skip commit** skips the stopped commit, and **Abort**
+   undoes the operation after you confirm.
+
+During a rebase, "ours" is the branch you're rebasing onto and "theirs" is the task's commit. The labels
+say so. The result is the Editor's draft of the same file, so you can finish it in either place.
+
+## From the command palette
+
+| Command | What it does |
+| --- | --- |
+| **Commit the working tree** | Commits, as the commit button does. |
+| **Amend the last commit** | Amends the last commit with the message box's text. |
+| **Fetch from origin** | Fetches. |
+| **Pull this branch** | Pulls. |
+| **Push this branch** | Pushes, and sets the upstream. |
+
+Fetch, pull, and push have no keyboard shortcut, and force push isn't a command.
+
+## For agents
+
+Agents read the task's changes with `local_changes`, `local_diff`, and `git_log`. All three only read:
+agents commit and push from a terminal, not through acorn. Your review notes reach an agent when you
+click **Send to agent**. In a transcript, a card for an agent's file edit shows its diff.
+
+## Settings
+
+**Settings** > **Features** > **Git** is stored on the Node
+([Settings: Features](/docs/settings/features/)):
+
+| Setting | What it changes | Default |
+| --- | --- | --- |
+| **Author name**, **Author email** | The Git identity for a **Repository**, written to the **Write scope** you pick: **Repository local** or **Node user global**. | What Git already has |
+| **Pull strategy** | **Fast-forward only** or **Rebase**. | Fast-forward only |
+| **Auto-fetch** | Fetches each repository every five minutes. | Off |
+
+**Settings** > **Features** > **Git display** is stored on this device:
+
+| Setting | What it changes | Default |
+| --- | --- | --- |
+| **History graph** | Shows the lanes beside commits in **History**. | On |
+| **Diff presentation** | **Unified** or **Split** diffs, in Git and Changes. | Unified |
+
+**Settings** > **Features** > **Editor** > **Show line blame** turns off the Git blame the Editor shows
+after the cursor's line ([Editor](/docs/built-in-plugins/editor/#settings)).
+
+## In the terminal
+
+The terminal client draws the same Git pane and tabs. The commit message box, **Commit tracked**, and
+**Publish** are in the pane's list column. The conflict resolver's result is a text area, with **Save and
+stage** above it.
+
+<Snapshot id="terminal-small" />
+
+## Limits
+
+- Push and pull use `origin` only.
+- You stage whole files. There's no hunk or line staging.
+- The task's branch is fixed. To work on another branch, start a task.
+- A revision shows at most 500 changed files.
+- History search looks at the newest 5,000 commits.
+- The conflict resolver edits UTF-8 text up to 512 KiB. Resolve a binary or larger file in a terminal,
+  then stage it.

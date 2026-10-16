@@ -1,0 +1,157 @@
+---
+title: HTTP
+description: Send HTTP requests from the API pane, keep them with a task or the project, and fill them in with variables, secrets, and commands.
+sources:
+  - docs/http-client.md
+  - docs/http-client/client.md
+  - plugins/http/acorn-plugin.config.mjs
+  - plugins/http/src/tree/HttpList.tsx
+  - plugins/http/src/tree/HttpDetail.tsx
+  - plugins/http/src/tree/RequestTabs.tsx
+  - plugins/http/src/tree/ResponseView.tsx
+  - plugins/http/src/tree/HttpVariables.tsx
+  - plugins/http/src/tree/SaveRequestModal.tsx
+  - plugins/http/src/server/send.ts
+  - plugins/http/src/server/workflowStep.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The HTTP plugin adds the **API** pane, where you build and send HTTP requests and keep them with a task
+or with the project.
+
+<PluginFacts id="http">
+  <Fragment slot="adds">The **API** pane in each task, an **API** source in the left rail that lists the project's saved requests, three palette commands, **Variables** under **Settings** > **Features** > **API requests**, a source for the agent's **Context** picker, and a workflow step.</Fragment>
+  <Fragment slot="needs">Nothing. Requests go out from the Node's machine.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. Open a task, and click **API** in the pane switcher, or press ⌘⇧H.
+
+2. The pane opens on a blank request. Type a URL such as `https://example.com` in **URL**, and click
+   **Send**.
+
+   <Checkpoint>The response shows its status, time, and size, such as **200 OK 106 ms 577 B**, with **Body**, **Headers**, and **Timeline** tabs.</Checkpoint>
+
+</Steps>
+
+## Build a request
+
+A request has a **Method**, a **URL**, and five tabs:
+
+| Tab | What it holds |
+| --- | --- |
+| **Params** | The URL's query string, one row per parameter. |
+| **Body** | **None**, **JSON**, **Text**, or **Form (URL-encoded)**. |
+| **Headers** | One row per header. |
+| **Auth** | **None**, **Basic** with a **Username** and **Password**, **Bearer token** with a **Token**, or **API key** with a **Key** and **Value**, sent in a **Header** or the **Query string**. |
+| **Vars** | Values for this request only, which replace a project variable of the same name. |
+
+To start from a curl command, paste it into the URL field and press Enter: the whole request fills in.
+**Copy as curl** goes the other way.
+
+**New request** starts another. Click **Send**. The response view shows the **Body**, laid out when
+it's JSON, with **Copy body**, then **Headers**, and **Timeline**, which lists what was sent and what came back under **Sent** and
+**Received**. A response that followed a redirect is marked **Redirected**. A body over 5 MB is cut off,
+and says so.
+
+## Save a request
+
+A request you start in a task is marked **In this task**, and one with changes is marked **Unsaved**.
+Click **Save…**, give it a **Name** and, if you like, a
+**Folder** such as `auth/admin`, and choose where to **Keep in**:
+
+- **This task**: it stays with the task, marked **In this task**, and goes when you archive it.
+- **The project**: every task in the project can use it.
+
+The list of saved requests is folded at the pane's left edge. Click the arrow there to open it. To
+rename a saved request or move it to the project, click its name above the tabs. In the list, the
+copy icon duplicates a request, and the delete icon, clicked twice, deletes it.
+
+Edits you haven't saved stay in the pane while acorn is open. When you leave a request with unsaved
+edits, the list offers it under **Recover unsaved edits**. They're kept only in memory, so quitting acorn
+loses them.
+
+## Use variables
+
+Write `{{NAME}}` in the URL, a header, the body, or an auth field, and acorn fills it in when you send.
+Three come from the task:
+
+| Variable | Value |
+| --- | --- |
+| `{{worktree}}` | The task's worktree folder. |
+| `{{branch}}` | The task's branch. |
+| `{{taskId}}` | The task's ID. |
+
+The rest are the project's. Open the list's **Variables** tab, or **Settings** > **Features** > **API
+requests** and pick the project, click **Add variable**, and choose its **Kind**:
+
+| Kind | What it does |
+| --- | --- |
+| **Text** | Used exactly as typed. |
+| **Secret** | Stored encrypted. The field stays blank once it's saved, and leaving it blank keeps the value. |
+| **Command** | Runs a shell command in the task's worktree when a request uses it. The last line it prints is the value. |
+
+A request's own **Vars** win over the project's, and the project's win over the task's three. A command
+runs only when a request uses its variable, and not at all when the request's **Vars** replace it. Each
+command has 15 seconds.
+
+## What acorn keeps from whom
+
+- The URL, headers, body, auth, and variables of every saved request are encrypted with the Node's key.
+- Only your devices can send. Agents and the MCP server can't use the pane to make requests or read
+  secrets.
+- In the response's **Timeline** and in errors, acorn hides the values of secret and command variables.
+  The response's own body and headers are what the server sent, and aren't changed.
+
+## From the command palette
+
+The commands sit in an **API** group.
+
+| Command | What it does |
+| --- | --- |
+| **Find a saved request** | Searches this project's saved requests by name and folder, and opens the one you pick beside the rail. |
+| **New request** | Starts a blank request in the API pane. |
+| **Import a curl command** | Saves a pasted curl command as a request in the task, and opens it. Nothing is sent. |
+
+## For agents
+
+To show an agent the shape of your saved requests, open **Context** below the agent's message box,
+choose **Saved API requests**, and pick the requests. The agent gets each request's method, URL path,
+query keys, folder, header names, and auth and body modes. Header values, auth, bodies, variables, and
+query values are left out.
+
+## In workflows
+
+**Call an HTTP endpoint** sends one request with the project's variables and hands the response on. It
+takes a **Method**, a **URL**, **Headers** as one `Name: value` per line, a **Body type**, and a
+**Body**. A 4xx or 5xx response is a result, not a failure. In the run, the step shows the status, the
+headers, and the body. Each send from a workflow is recorded in the audit log as **Workflow sent an
+HTTP request** ([The audit log](/docs/security/the-audit-log/)).
+
+## Settings
+
+**Settings** > **Features** > **API requests** holds each project's variables, behind a project picker.
+It's stored on the Node ([Settings: Features](/docs/settings/features/)). Settings > Plugins lists the
+plugin as **API requests**.
+
+## In the terminal
+
+The terminal client draws the same pane, request list, and variables. **Settings** > **Features** >
+**API requests** opens only in the desktop app, so edit variables from the list's **Variables** tab.
+
+## Limits
+
+- One 30-second deadline covers filling in the variables, sending, and reading the response.
+- A response body over 5 MB is cut off.
+- The timeline shows the final URL and whether a redirect happened, not each hop.
+- A request that was sent can't be undone by cancelling.
+- Unsaved edits live only in memory.
+- **Call an HTTP endpoint** has no **Auth** field. Put the header in **Headers**, or write `auth` in the
+  workflow's file.

@@ -1,0 +1,21 @@
+---
+// Stands in for a picture that doesn't exist yet, such as a shell snapshot, and says what it will be.
+interface Props {
+  label: string
+}
+---
+
+<div class="placeholder"><span class="eyebrow">Placeholder</span><span>{Astro.props.label}</span></div>
+
+<style>
+  .placeholder {
+    display: grid;
+    place-content: center;
+    gap: var(--space-3);
+    min-block-size: 16rem;
+    padding: var(--pad-surface);
+    text-align: center;
+    font-size: var(--fs);
+    background: var(--bg-subtle);
+  }
+</style>

@@ -1,0 +1,90 @@
+---
+import Feature from '../../components/Feature.astro'
+import Snapshot from '../../components/Snapshot.astro'
+import Specimen from '../../components/Specimen.astro'
+import { FEATURES } from '../../features'
+import FeaturePage from '../../layouts/FeaturePage.astro'
+import type { PageMeta } from '../../meta'
+
+export const meta = {
+  description: FEATURES.agents.sentence,
+  sources: [
+    'docs/managed-agents.md',
+    'docs/managed-agents/accounts.md',
+    'docs/managed-agents/providers.md',
+    'docs/managed-agents/transcript.md',
+    'docs/managed-agents/attachments.md',
+    'docs/managed-agents/steering.md',
+    'docs/managed-agents/delegation.md',
+    'docs/managed-agents/custom-agents.md',
+    'docs/notes-and-memory.md',
+    'docs/notes-and-memory/memory-page.md',
+    'plugins/agent-cost/README.md',
+    'docs/first-party-plugins/terminal.md',
+  ],
+  checked: '663359ff7',
+} satisfies PageMeta
+---
+
+<FeaturePage feature="agents" meta={meta} related={['tasks', 'review', 'security']} docs={{ href: '/docs/agents/agent-sessions/', label: 'Read about agent sessions' }}>
+  <Snapshot slot="picture" id="hero" />
+
+  <Feature number={1} title="Claude Code and Codex, on their own logins" href="/docs/agents/harnesses-and-defaults/" link="Harnesses and defaults">
+    <p>
+      acorn runs Claude Code and Codex as managed sessions in a task, working in the task's worktree. Each signs in
+      with its own command-line login. Add a second account, such as work beside personal, and acorn gives it its own
+      folder and shows the sign-in command to run. The session header shows an estimated cost, and the Agent pane
+      shows how much of each plan's window is left.
+    </p>
+  </Feature>
+
+  <Feature number={2} title="Read every step, and answer what it waits on" href="/docs/agents/agent-sessions/" link="Agent sessions">
+    <p>
+      The transcript draws each tool call as one card, and a file edit opens onto its diff. When the agent asks for a
+      permission or asks you a question, the request draws where it asked, as buttons, a list, or a text box, and the
+      session waits for your answer. Attach files and images to a message, and pictures the agent makes draw inline.
+    </p>
+    <Specimen slot="picture" id="agent-turn" />
+  </Feature>
+
+  <Feature number={3} title="Queue the next message, or steer the turn" href="/docs/agents/steering-queues-and-follow-ups/" link="Steering, queues, and follow-ups">
+    <p>
+      Send a message while the agent works and it waits in the queue for the next turn. Press <strong>Steer</strong>{' '}
+      instead, or <strong>Steer now</strong> on a queued row, and the agent reads it after its current step. The
+      transcript marks where it did.
+    </p>
+  </Feature>
+
+  <Feature number={4} title="Hand work to another session" href="/docs/agents/delegation-and-subagents/" link="Delegation and subagents">
+    <p>
+      A session can start another managed session and give it work, either on the same task or in a child task with a
+      worktree of its own. It can queue more turns, wait, read what the child found, or cancel it. The child's first
+      message carries a copy of the notes from the task that started it.
+    </p>
+  </Feature>
+
+  <Feature number={5} title="Save a setup as a custom agent" href="/docs/agents/custom-agents/" link="Custom agents">
+    <p>
+      A custom agent is a saved start: a harness, its options such as the model, instructions added to its system
+      prompt, and a ceiling on which of acorn's tools it may call. It shows under <strong>New</strong> in the Agent
+      pane and in the command palette.
+    </p>
+  </Feature>
+
+  <Feature number={6} title="Memory you can read and undo" href="/docs/using/memory/" link="Memory">
+    <p>
+      Agents save what they learn as Markdown files for later sessions. The project's <strong>Memory</strong> page
+      lists and searches them, lets you edit one, and keeps its last 20 versions. <strong>Recent changes</strong>{' '}
+      shows who changed what, and links an agent's change to its session, with <strong>Undo</strong> beside the
+      newest change to each memory.
+    </p>
+  </Feature>
+
+  <Fragment slot="terminal">
+    <p>
+      The terminal client runs the same Agent pane: open a session, answer what it's waiting on, send and steer turns.
+      Attaching a file, exporting a transcript, saving an artifact, <strong>Continue in terminal</strong>, and the
+      agent settings pages need the desktop app. <a href="/docs/start/desktop-and-terminal/">Desktop and terminal</a>
+    </p>
+  </Fragment>
+</FeaturePage>

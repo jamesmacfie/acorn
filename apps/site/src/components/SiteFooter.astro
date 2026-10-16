@@ -1,0 +1,35 @@
+---
+// The site footer: the sitemap in four columns, the license, the newest release once there is one, and
+// the star button.
+import { readGithub } from '../lib/github'
+import GitHubStars from './GitHubStars.astro'
+import Mark from './Mark.astro'
+import { footerColumns, GITHUB } from '../nav'
+
+const { release } = await readGithub()
+---
+
+<div class="site-footer">
+  <div class="site-footer-columns">
+    {
+      footerColumns.map((column) => (
+        <nav aria-label={column.label}>
+          <p class="eyebrow">{column.label}</p>
+          <ul>
+            {column.links.map(([label, href]) => (
+              <li>
+                <a href={href}>{label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ))
+    }
+  </div>
+  <div class="site-footer-line">
+    <Mark />
+    <a href={`${GITHUB}/blob/main/LICENSE`}>MIT license</a>
+    {release && <a href="/changelog/">{release.tag}</a>}
+    <GitHubStars />
+  </div>
+</div>

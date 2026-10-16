@@ -1,0 +1,9 @@
+{"columns":60,"rows":7,"lines":[
+[],
+[{"text":"REVIEWERS","fg":"muted"},{"text":" "},{"text":"2","fg":"muted"}],
+[{"text":"People asked to review this pull request.","fg":"muted"}],
+[{"text":"alex, sam"}],
+[],
+[{"text":"Description","attrs":["bold"]}],
+[{"text":"Signing in from a deep link now returns to that link."}]
+]}

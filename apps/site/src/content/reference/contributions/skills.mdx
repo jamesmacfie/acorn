@@ -1,0 +1,59 @@
+---
+title: skills
+description: "Folders holding a SKILL.md that every managed agent session can load."
+sources:
+  - docs/managed-agents/skills.md
+  - docs/plugin-authoring/the-manifest.md
+checked: '498833615'
+---
+
+A skill is a procedure an agent loads by name when a task calls for it: a folder in your package
+holding a `SKILL.md`, the same shape Claude Code reads. acorn checks each one when it loads your package,
+and the person approves each skill on the Node.
+
+## A minimal example
+
+```json manifest
+{
+  "contributions": {
+    "skills": [
+      {
+        "id": "release-notes",
+        "path": "./skills/release-notes"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "contributions": {
+    "skills": [
+      {
+        "id": "release-notes",
+        "path": "./skills/release-notes"
+      },
+      {
+        "id": "triage",
+        "path": "./skills/triage"
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+Skills are approved on the Node, so the terminal client asks about them too, even for a plugin whose
+`clients` leaves the terminal out.
+
+## Guide
+
+[Ship custom agents and skills](/docs/build-plugins/node/ship-custom-agents-and-skills/) walks through it from start to finish.

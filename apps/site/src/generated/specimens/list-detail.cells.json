@@ -1,0 +1,8 @@
+{"columns":100,"rows":6,"lines":[
+[{"text":" ","fg":"accent","bg":"hover"},{"text":" ","bg":"hover"},{"text":"Redirect loop","bg":"hover","attrs":["inverse"]},{"text":"    ","bg":"hover"},{"text":" │"},{"text":"Redirect loop","attrs":["bold"]}],
+[{"text":" ","fg":"accent"},{"text":" Flaky upload      │Signing in from a deep link sends the browser back to the sign-in page."}],
+[{"text":" ","fg":"accent"},{"text":" Slow first paint  │"}],
+[{"text":"                    │"}],
+[{"text":"                    │"}],
+[{"text":"                    │"}]
+]}

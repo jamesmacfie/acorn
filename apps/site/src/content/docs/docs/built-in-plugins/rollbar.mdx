@@ -1,0 +1,103 @@
+---
+title: Rollbar
+description: Connect Rollbar, list active errors in the rail, read an error's occurrences and stack trace, and start a task from one.
+sources:
+  - docs/integrations/rollbar.md
+  - docs/integrations/settings.md
+  - docs/integrations/project-sources.md
+  - docs/agent-tools/tracker-tools.md
+  - plugins/rollbar/acorn-plugin.config.mjs
+  - plugins/rollbar/src/server/provider.ts
+  - plugins/rollbar/src/tree/RollbarItemView.tsx
+  - packages/client-core/src/features/settings/ConnectionProjectMap.tsx
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Rollbar plugin brings your Rollbar errors into acorn: the active ones in the left rail, each with
+its occurrences and stack trace, and the errors a task is about in its own pane.
+
+<PluginFacts id="rollbar">
+  <Fragment slot="adds">The **Rollbar errors** source in the left rail, the **Rollbar** pane on a task linked to an error, a palette command, a section in the task's context, and a tool agents use to read a linked error.</Fragment>
+  <Fragment slot="needs">A Rollbar project access token with read scope, one per Rollbar project, followed by a workspace or project.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. In Rollbar, open your project's **Settings** > **Project Access Tokens**, and copy a token with read
+   scope.
+
+2. In acorn, open **Settings** > **Services**, click **Add connection**, and choose **Rollbar**.
+
+3. Paste the token in **Project access token (read)**, and click **Connect**. acorn checks the token
+   with Rollbar before it saves it.
+
+4. On the connection's page, under **Where it shows up**, choose the Rollbar project, choose the
+   workspace or project that should follow it, and click **Follow**.
+
+   <Checkpoint>The left rail shows **Rollbar errors**, listing the project's active errors.</Checkpoint>
+
+</Steps>
+
+A token reads one Rollbar project, so connect one token for each project you want to see.
+
+## Read an error
+
+The rail lists each active error with its level, its title, and how many times it happened. Click one to
+open it beside the list.
+
+- **Overview** shows how many times it happened, when it was first and last seen, its framework, who
+  it's assigned to, and the version it was resolved in. Under **Newest occurrence** it shows that
+  occurrence's message and stack trace.
+- **Occurrences** lists recent occurrences. Choose one to see its trace, request, context, and server.
+
+Before acorn stores or shows an occurrence, it keeps only the fields it needs and drops the rest, such as
+the person, headers, cookies, and request bodies. The refresh button reads the error again from Rollbar.
+
+The rail's **Search** asks Rollbar, so it reaches past the errors the list holds. A word matches the
+start of a title, and `#123` finds an error by its number.
+
+## Start a task from an error
+
+Right-click an error in the rail, and choose **Create task…**. **New task** creates a task with the
+error's title. Rollbar suggests no branch, so give it one. **Attach to task** links the error to a task
+you have. [Tasks and worktrees](/docs/using/tasks-and-worktrees/#create-a-task-from-a-pull-request-or-an-issue)
+has the dialog.
+
+A task linked to an error has a **Rollbar** pane, which lists its **Linked Rollbar errors**. Press ⌘⇧O
+to open it.
+
+## From the command palette
+
+**Find a Rollbar item** searches the active errors your current project follows, and opens the one you
+pick beside the rail. It filters the list acorn already holds, so it doesn't call Rollbar as you type.
+
+## For agents
+
+An error linked to the task is in the task's context, under **Issues**. Agents in that task can read a
+linked error with its newest occurrence and stack trace, through acorn's issue tools
+([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)). They can't comment on
+it, and can act only on errors linked to their task.
+
+## Settings
+
+The connection's page under **Settings** > **Services** holds its **Name**, **Replace key**, an
+**Enabled** switch, **Where it shows up**, and **Disconnect**
+([Settings: Connections](/docs/settings/connections/#services)).
+
+## In the terminal
+
+The terminal client draws the same rail source, error view, and pane. Connect Rollbar from the desktop
+app.
+
+## Limits
+
+- acorn reads Rollbar. It doesn't resolve, assign, or comment on an error.
+- The rail lists active errors only, and refreshes them every two minutes.
+- An occurrence shows at most 10 trace chains, 200 frames, 7 lines of code a frame, and 8 KiB a string.
+- Search matches the start of words, so it can miss an error the list matched by part of a word.

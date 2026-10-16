@@ -1,0 +1,8 @@
+{"columns":60,"rows":6,"lines":[
+[{"text":"Webhooks give up after one retry","attrs":["bold"]}],
+[{"text":"[In progress]","fg":"accent"},{"text":" "},{"text":"ACME-12","fg":"muted"}],
+[{"text":"A failed delivery is retried once, then dropped. Retry with"}],
+[{"text":"backoff for an hour."}],
+[],
+[]
+]}

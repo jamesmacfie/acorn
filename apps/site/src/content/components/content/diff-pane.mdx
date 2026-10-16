@@ -1,0 +1,27 @@
+---
+title: DiffPane
+description: The full diff viewer. A tree can't draw one.
+sources:
+  - packages/client-core/src/features/diff/DiffPane.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`DiffPane` is the viewer behind the Changes and pull request panes. Its `source` is an object of functions the host builds, and a function can't cross from a tree, so a tree draws nothing with it.
+
+<Specimen id="stacked-diff" caption="A tree draws a patch with StackedDiff." />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="stacked-diff" />
+
+## Related
+
+- [`StackedDiff`](/docs/components/content/stacked-diff/), for one file's patch from a tree.
+- [`FileHead`](/docs/components/content/file-head/), for a file's header line.
+
+## Mistakes
+
+- Sending `DiffPane` from a tree. Its source is dropped, and the node fails.

@@ -1,0 +1,127 @@
+{
+  "meta": {
+    "title": "Pane",
+    "caption": "A pane with a header, a body that takes the room left, and a toolbar along the bottom.",
+    "terminal": {
+      "columns": 60,
+      "rows": 6
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Pane",
+          "props": {},
+          "children": [
+            {
+              "id": "n2",
+              "type": "SectionHeader",
+              "props": {
+                "level": "pane",
+                "count": 3
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Deploys"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Stack",
+              "props": {
+                "grow": true,
+                "gap": "row"
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "staging · 12 minutes ago"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n7",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n8",
+                      "type": "#text",
+                      "props": {
+                        "value": "production · yesterday"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n9",
+                  "type": "Text",
+                  "props": {
+                    "emphasis": "muted"
+                  },
+                  "children": [
+                    {
+                      "id": "n10",
+                      "type": "#text",
+                      "props": {
+                        "value": "preview · failed"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n11",
+              "type": "Toolbar",
+              "props": {
+                "variant": "actions"
+              },
+              "children": [
+                {
+                  "id": "n12",
+                  "type": "ToolbarSpacer",
+                  "props": {},
+                  "children": []
+                },
+                {
+                  "id": "n13",
+                  "type": "Button",
+                  "props": {
+                    "label": "Deploy",
+                    "variant": "solid",
+                    "tone": "accent"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

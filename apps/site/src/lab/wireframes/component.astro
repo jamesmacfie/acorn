@@ -1,0 +1,74 @@
+---
+// A component page in phase 18's shape: the specimen with its Desktop and Terminal tabs, the props, how
+// each host draws it, and an example. Facts for Button from ButtonProps, NODE_SUPPORT, NODE_FOCUS, and
+// docs/ui-design/every-node.md; the example is the specimen's own source.
+import Specimen from '../../components/Specimen.astro'
+import example from '../../../specimens/kit/buttons.tsx?raw'
+import Docs from './_Docs.astro'
+
+const props = [
+  ['label', 'string', 'No', 'The accessible name, and the visible one when the button has nothing inside it.'],
+  ['variant', "'solid' | 'outline' | 'ghost' | 'bare'", 'No', 'How much the button stands out.'],
+  ['tone', "'neutral' | 'accent' | 'warn' | 'danger'", 'No', 'What pressing it means.'],
+  ['size', "'xs' | 'sm' | 'md'", 'No', '`xs` is the size for a control inside the top bar.'],
+  ['busy', 'boolean', 'No', 'Shows that the press is still running.'],
+  ['disabled', 'boolean', 'No', "Can't be pressed or focused."],
+  ['submit', 'boolean', 'No', 'Submits the form it sits in.'],
+  ['pressed', 'boolean', 'No', 'Held in, as a toggle.'],
+]
+---
+
+<Docs title="Button" current="Button" section="build" toc={['On each host', 'Props', 'Example', 'Related']}>
+  <p>A control that does one thing when pressed.</p>
+  <div class="breakout">
+    <Specimen id="buttons" />
+  </div>
+  <h2 id="on-each-host">On each host</h2>
+  <div class="breakout table-scroll">
+    <table>
+      <thead>
+        <tr><th>Host</th><th>Support</th><th>What it draws</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Desktop</td><td>Full</td><td>The kit's button, in the current theme and style pack.</td></tr>
+        <tr>
+          <td>Terminal</td>
+          <td>Full</td>
+          <td>[ label ], or [l]abel with a mnemonic. An icon-only button draws its label.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Focus: a stop. Tab reaches it, and Enter or Space presses it. Events: press.</p>
+  <h2 id="props">Props</h2>
+  <div class="breakout table-scroll">
+    <table>
+      <thead>
+        <tr><th>Prop</th><th>Type</th><th>Required</th><th>What it does</th></tr>
+      </thead>
+      <tbody>
+        {
+          props.map(([name, type, required, text]) => (
+            <tr id={`prop-${name}`}>
+              <td>
+                <a href={`#prop-${name}`}>{name}</a>
+              </td>
+              <td>{type}</td>
+              <td>{required}</td>
+              <td>{text}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+  <h2 id="example">Example</h2>
+  <div class="code">
+    <div><span>apps/site/specimens/kit/buttons.tsx</span><span>Copy</span></div>
+    <pre set:text={example} />
+  </div>
+  <h2 id="related">Related</h2>
+  <ul>
+    <li><a href="#">IconButton</a> · <a href="#">ConfirmButton</a> · <a href="#">ToggleButton</a></li>
+  </ul>
+</Docs>

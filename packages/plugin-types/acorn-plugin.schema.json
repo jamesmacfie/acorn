@@ -5,28 +5,34 @@
   "type": "object",
   "properties": {
     "$schema": {
+      "description": "The JSON Schema your editor checks this file against. acorn doesn't read it.",
       "type": "string",
       "maxLength": 200
     },
     "id": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9-]{1,31}$"
+      "pattern": "^[a-z][a-z0-9-]{1,31}$",
+      "description": "The plugin's permanent ID: 2 to 32 lowercase letters, digits, and dashes, starting with a letter. It names your routes and your storage, so a new ID is a new plugin."
     },
     "name": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 120
+      "maxLength": 120,
+      "description": "The plugin's name, as Settings and the agent tool list show it. The trust prompt shows the `id`."
     },
     "icon": {
+      "description": "The plugin's logo, registered as `brand:<id>`, so any contribution can name it as its glyph.",
       "type": "object",
       "properties": {
         "d": {
           "type": "string",
           "minLength": 1,
           "maxLength": 4096,
-          "pattern": "^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\\s+-]+$"
+          "pattern": "^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\\s+-]+$",
+          "description": "One SVG path's `d` attribute, drawn in a 24 by 24 box. A whole SVG file is refused."
         },
         "color": {
+          "description": "The brand's color as six-digit hex, such as `#24292f`. Any other CSS color is refused.",
           "type": "string",
           "pattern": "^#[0-9a-f]{6}$"
         }
@@ -36,6 +42,7 @@
       ]
     },
     "icons": {
+      "description": "More brand marks, for a package that shows several brands, at most 16. The key `github` becomes `brand:<id>/github`.",
       "type": "object",
       "propertyNames": {
         "type": "string",
@@ -50,9 +57,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 4096,
-            "pattern": "^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\\s+-]+$"
+            "pattern": "^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\\s+-]+$",
+            "description": "One SVG path's `d` attribute, drawn in a 24 by 24 box. A whole SVG file is refused."
           },
           "color": {
+            "description": "The brand's color as six-digit hex, such as `#24292f`. Any other CSS color is refused.",
             "type": "string",
             "pattern": "^#[0-9a-f]{6}$"
           }
@@ -65,14 +74,17 @@
     "version": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 64
+      "maxLength": 64,
+      "description": "Your plugin's own version, such as `1.2.0`. Another plugin's `requires` entry compares its range with this version's major."
     },
     "baseline": {
       "type": "string",
-      "const": "acorn-1"
+      "const": "acorn-1",
+      "description": "The acorn baseline this manifest is written for. It must be `acorn-1`."
     },
     "emits": {
       "default": [],
+      "description": "Event verbs your plugin announces, so other plugins can subscribe to them. Your own frames and trees hear your events without this.",
       "maxItems": 32,
       "type": "array",
       "items": {
@@ -80,12 +92,14 @@
         "properties": {
           "verb": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            "pattern": "^[a-z][a-z0-9-]{0,63}$",
+            "description": "The event's verb, sent on `plugin:<id>:<verb>`: lowercase, starting with a letter, with no colon."
           },
           "description": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 200,
+            "description": "What the event means. The plugin's settings page shows it as plain text."
           }
         },
         "required": [
@@ -95,6 +109,7 @@
       }
     },
     "clients": {
+      "description": "The apps your client half runs in: `desktop`, `terminal`, or both. Leave it out to run in every app, because an empty list is refused.",
       "minItems": 1,
       "maxItems": 8,
       "type": "array",
@@ -108,14 +123,17 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 16,
-      "pattern": "^\\d{1,4}(-\\d{1,4})?(\\s*\\|\\|\\s*\\d{1,4}(-\\d{1,4})?)*$"
+      "pattern": "^\\d{1,4}(-\\d{1,4})?(\\s*\\|\\|\\s*\\d{1,4}(-\\d{1,4})?)*$",
+      "description": "The plugin API majors your plugin works with: one major such as `\"5\"`, a list such as `\"4 || 5\"`, or a span such as `\"4-5\"`. A range that leaves out acorn's major doesn't load."
     },
     "requires": {
+      "description": "What your plugin needs from the rest of the Node before it can work.",
       "default": {},
       "type": "object",
       "properties": {
         "plugins": {
           "default": [],
+          "description": "Each plugin yours needs. When one is missing or the wrong major, the plugin list says which before anything runs.",
           "maxItems": 16,
           "type": "array",
           "items": {
@@ -123,9 +141,11 @@
             "properties": {
               "id": {
                 "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{1,31}$"
+                "pattern": "^[a-z][a-z0-9-]{1,31}$",
+                "description": "The ID of the plugin yours needs."
               },
               "version": {
+                "description": "A range over the needed plugin's major, written like `apiVersion`. Leave it out to accept any version.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 16,
@@ -140,26 +160,31 @@
       }
     },
     "node": {
+      "description": "Your Node half's entry file, relative to the plugin folder, such as `node/index.js`. Leave it out when the plugin has no Node half.",
       "type": "string",
       "minLength": 1,
       "maxLength": 256
     },
     "client": {
+      "description": "Your client bundle, one JavaScript file relative to the plugin folder, which draws your frames and trees.",
       "type": "string",
       "minLength": 1,
       "maxLength": 256
     },
     "migrations": {
+      "description": "Your folder of Drizzle migrations, relative to the plugin folder. acorn opens your SQLite file and runs them in order. Never edit one that has shipped.",
       "type": "string",
       "minLength": 1,
       "maxLength": 256
     },
     "permissions": {
+      "description": "What your plugin may reach. The person accepts these on each device when they install it.",
       "default": {},
       "type": "object",
       "properties": {
         "api": {
           "default": [],
+          "description": "acorn API scopes your frames and trees may call through the bridge. Your own routes need none. A scope this acorn doesn't know is denied when you call it, not refused here.",
           "maxItems": 64,
           "type": "array",
           "items": {
@@ -170,6 +195,7 @@
         },
         "events": {
           "default": [],
+          "description": "Event channels your frames and trees may subscribe to: a core channel such as `task.changed`, or another plugin's `plugin:<id>:<verb>` when that plugin declares the verb in `emits`.",
           "maxItems": 64,
           "type": "array",
           "items": {
@@ -180,11 +206,13 @@
           }
         },
         "node": {
+          "description": "What your Node half may reach. Anything you don't list here is missing from `ctx`.",
           "default": {},
           "type": "object",
           "properties": {
             "core": {
               "default": [],
+              "description": "Core facets your Node half gets on `ctx.core`, such as `git` or `tasks`. A facet you leave out isn't on `ctx.core`, so your first call to it throws a `TypeError`.",
               "maxItems": 64,
               "type": "array",
               "items": {
@@ -194,6 +222,7 @@
             },
             "capabilities": {
               "default": [],
+              "description": "Other plugins' capabilities your Node half may call, such as `editor.files`. Name the plugin that provides each one in `requires.plugins` too.",
               "maxItems": 64,
               "type": "array",
               "items": {
@@ -203,14 +232,17 @@
             },
             "secrets": {
               "default": false,
+              "description": "Lets your Node half store and read credentials through `ctx.core.secrets`.",
               "type": "boolean"
             },
             "exec": {
               "default": false,
+              "description": "Lets your Node half run programs through `ctx.core.proc`, the process broker.",
               "type": "boolean"
             },
             "net": {
               "default": [],
+              "description": "Hosts your Node half may reach with `fetch`, such as `api.linear.app`. A request to any other host fails, and so does a raw socket.",
               "maxItems": 64,
               "type": "array",
               "items": {
@@ -220,9 +252,11 @@
             },
             "sockets": {
               "default": false,
+              "description": "Unrestricted socket access, for a protocol that can't go through `fetch`. It's a broad grant, so ask for `net` instead whenever `fetch` will do.",
               "type": "boolean"
             },
             "env": {
+              "description": "Environment variables your Node half inherits from the Node, by name. Without them it gets a base environment that holds no credentials.",
               "maxItems": 32,
               "type": "array",
               "items": {
@@ -233,6 +267,7 @@
               }
             },
             "files": {
+              "description": "Files outside your plugin's folder that your Node half may open. A path inside acorn's own data folder is refused.",
               "maxItems": 16,
               "type": "array",
               "items": {
@@ -242,10 +277,12 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 128,
-                    "pattern": "^[A-Z_][A-Z0-9_]*$"
+                    "pattern": "^[A-Z_][A-Z0-9_]*$",
+                    "description": "The environment variable that holds the file's path. The host reads it when your Node half starts, so the manifest never holds one machine's path."
                   },
                   "access": {
                     "default": "read",
+                    "description": "`read`, or `read-write` to let your Node half replace the file too.",
                     "type": "string",
                     "enum": [
                       "read",
@@ -263,11 +300,13 @@
       }
     },
     "contributions": {
+      "description": "Everything your plugin adds to acorn, by kind. A key this acorn doesn't know is reported and skipped, so a manifest written for a newer acorn still loads.",
       "default": {},
       "type": "object",
       "properties": {
         "frames": {
           "default": [],
+          "description": "Surfaces your client bundle draws: panes, reference panels, settings pages, importers, overlays, webviews, core replacements, and rectangles for another plugin's point. `target` says which.",
           "maxItems": 32,
           "type": "array",
           "items": {
@@ -284,10 +323,12 @@
                   "overlay",
                   "coreSlot",
                   "inline"
-                ]
+                ],
+                "description": "What the surface is: a `pane`, a reference panel, a settings page, a project importer, a `webview`, an `overlay`, a replacement for one of acorn's own surfaces, or an `inline` rectangle for another plugin's point."
               },
               "scope": {
                 "default": "task",
+                "description": "For a `pane`: whether it belongs to a task, or to a project beside your rail list.",
                 "type": "string",
                 "enum": [
                   "task",
@@ -297,35 +338,43 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The surface's ID, unique in this manifest. A pane's ID is stored in people's layouts, so don't rename it."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The surface's name, in the pane switcher, Settings, or the trust prompt."
               },
               "glyph": {
                 "default": "puzzle",
+                "description": "A Lucide icon name, or a `brand:` mark.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "order": {
                 "default": 500,
+                "description": "Where it sits among its siblings. Lower comes first.",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100000
               },
               "showInSwitcher": {
+                "description": "Set `false` to leave a pane out of the switcher, so only a command opens it.",
                 "type": "boolean"
               },
               "readsArchived": {
+                "description": "For a task pane that draws only from stored history: show it on archived tasks too.",
                 "type": "boolean"
               },
               "statusAnnotations": {
+                "description": "For a task pane: let other plugins put status marks on its switcher button, through the `core:pane` point.",
                 "type": "boolean"
               },
               "availability": {
+                "description": "For a task pane: a GET route that answers `{ [taskId]: boolean }`, so the pane hides on tasks it has nothing for. A task left out is hidden too.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
@@ -334,6 +383,7 @@
                 "default": [
                   "desktop"
                 ],
+                "description": "The screen sizes the surface works at.",
                 "minItems": 1,
                 "maxItems": 2,
                 "type": "array",
@@ -346,11 +396,13 @@
                 }
               },
               "providerId": {
+                "description": "For a reference panel or task pane: the integration it shows items from. A task pane with one hides on tasks with no link from that integration.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "group": {
+                "description": "For `settings`: `workspace` makes a workspace settings page.",
                 "type": "string",
                 "enum": [
                   "general",
@@ -358,6 +410,7 @@
                 ]
               },
               "category": {
+                "description": "For `settings`: the Settings group the page sits in. Defaults to Features, and an unknown value is reported and ignored.",
                 "type": "string",
                 "enum": [
                   "general",
@@ -369,6 +422,7 @@
                 ]
               },
               "settingsScope": {
+                "description": "For `settings`: what a change on the page affects. Defaults to `node`.",
                 "type": "string",
                 "enum": [
                   "device",
@@ -384,9 +438,11 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 64
-                }
+                },
+                "description": "Words Settings search matches besides the label."
               },
               "sections": {
+                "description": "For `settings`: the page's sections, each a search result and a link target. IDs must differ.",
                 "maxItems": 16,
                 "type": "array",
                 "items": {
@@ -394,12 +450,14 @@
                   "properties": {
                     "id": {
                       "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+                      "description": "The section's anchor, matching a `SettingsSection` on the page."
                     },
                     "label": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 80
+                      "maxLength": 80,
+                      "description": "The section's name in search results."
                     },
                     "keywords": {
                       "maxItems": 16,
@@ -408,7 +466,8 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 64
-                      }
+                      },
+                      "description": "Words Settings search matches besides the label."
                     }
                   },
                   "required": [
@@ -418,6 +477,7 @@
                 }
               },
               "railSourceVisibility": {
+                "description": "For `settings`: your own sources that get a **Show in left rail** switch above the page.",
                 "maxItems": 16,
                 "type": "array",
                 "items": {
@@ -427,6 +487,7 @@
                 }
               },
               "coreSlot": {
+                "description": "For `coreSlot`, and required there: which of acorn's surfaces you offer to draw. The person chooses it in Settings, and acorn draws its own again if yours fails.",
                 "type": "string",
                 "enum": [
                   "rail.taskList",
@@ -436,6 +497,7 @@
                 ]
               },
               "placesSlots": {
+                "description": "For a `rail` or `topbar` replacement: the nested slot your surface places, so Settings can warn when you leave it out.",
                 "maxItems": 1,
                 "type": "array",
                 "items": {
@@ -447,16 +509,19 @@
                 }
               },
               "url": {
+                "description": "For `webview`: the page it opens. Give `url` or `urlSource`, not both.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 2048
               },
               "urlSource": {
+                "description": "For `webview`: a route on your Node half that answers `{ url }`, when the start page depends on the task.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
               },
               "hosts": {
+                "description": "For `webview`, and required there: the hosts the page may visit, including through redirects. The trust prompt lists them.",
                 "minItems": 1,
                 "maxItems": 32,
                 "type": "array",
@@ -467,6 +532,7 @@
                 }
               },
               "layout": {
+                "description": "For a `pane`: the host's arrangement, filled from `regions`. Leave it out for one frame that fills the pane.",
                 "type": "string",
                 "enum": [
                   "single",
@@ -480,6 +546,7 @@
                 ]
               },
               "regions": {
+                "description": "With `layout`: what fills each of the layout's regions, by region name: `\"frame\"`, a `remote` tree, or a `document`.",
                 "type": "object",
                 "propertyNames": {
                   "type": "string",
@@ -497,12 +564,14 @@
                       "properties": {
                         "kind": {
                           "type": "string",
-                          "const": "remote"
+                          "const": "remote",
+                          "description": "A tree your client bundle draws with the host's components."
                         },
                         "entry": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 64
+                          "maxLength": 64,
+                          "description": "The `mountTree` entry that draws this region."
                         }
                       },
                       "required": [
@@ -516,10 +585,12 @@
                       "properties": {
                         "kind": {
                           "type": "string",
-                          "const": "document"
+                          "const": "document",
+                          "description": "A document the host's editor draws, read and written through your routes."
                         },
                         "languageId": {
                           "default": "plaintext",
+                          "description": "The document's language, for highlighting, in LSP's spelling such as `typescript`.",
                           "type": "string",
                           "enum": [
                             "plaintext",
@@ -551,23 +622,28 @@
                         "read": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 256
+                          "maxLength": 256,
+                          "description": "A GET route that answers `{ text }`. The host fills in `:taskId` and `:projectId`, and no other parameter."
                         },
                         "write": {
+                          "description": "A PUT route sent `{ text }` when the person saves. Leave it out for a read-only document.",
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 256
                         },
                         "completions": {
+                          "description": "Completions while the person types.",
                           "type": "object",
                           "properties": {
                             "route": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 256
+                              "maxLength": 256,
+                              "description": "A POST route sent the text and cursor position that answers completion items."
                             },
                             "triggerCharacters": {
                               "default": [],
+                              "description": "Characters that open the completion list mid-word, such as `.`.",
                               "maxItems": 8,
                               "type": "array",
                               "items": {
@@ -582,12 +658,14 @@
                           ]
                         },
                         "hover": {
+                          "description": "Text shown when the person hovers over the document.",
                           "type": "object",
                           "properties": {
                             "route": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 256
+                              "maxLength": 256,
+                              "description": "A POST route on your Node half, sent the live text and its `revision`. Echo the revision in the answer."
                             }
                           },
                           "required": [
@@ -595,12 +673,14 @@
                           ]
                         },
                         "diagnostics": {
+                          "description": "Errors and warnings drawn in the document.",
                           "type": "object",
                           "properties": {
                             "route": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 256
+                              "maxLength": 256,
+                              "description": "A POST route on your Node half, sent the live text and its `revision`. Echo the revision in the answer."
                             }
                           },
                           "required": [
@@ -617,10 +697,12 @@
                 }
               },
               "collapsible": {
+                "description": "For a `list-detail` pane: let the person collapse the list.",
                 "type": "boolean"
               },
               "claimsKeys": {
                 "default": [],
+                "description": "Shortcuts your frame keeps instead of passing to acorn. Each needs meta, ctrl, or alt, and acorn's own are refused. Your code may claim fewer, never more.",
                 "maxItems": 32,
                 "type": "array",
                 "items": {
@@ -631,6 +713,7 @@
               },
               "destinations": {
                 "default": [],
+                "description": "Views in other plugins your tree may ask to open, each named here so the trust prompt shows it.",
                 "maxItems": 8,
                 "type": "array",
                 "items": {
@@ -639,19 +722,23 @@
                     "id": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 64
+                      "maxLength": 64,
+                      "description": "The destination's ID, which your tree names when it asks to go there."
                     },
                     "label": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 120
+                      "maxLength": 120,
+                      "description": "What the trust prompt calls the destination."
                     },
                     "targetKind": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 64
+                      "maxLength": 64,
+                      "description": "The kind of thing it opens, which the plugin that owns that view presents."
                     },
                     "noticeKind": {
+                      "description": "The notice kind sent with it, when it isn't the plugin default.",
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 64
@@ -675,6 +762,7 @@
         },
         "sources": {
           "default": [],
+          "description": "Sources on the left rail. The host draws the list from your route, or your tree draws it.",
           "maxItems": 8,
           "type": "array",
           "items": {
@@ -683,15 +771,18 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The source's ID, unique in this manifest."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The source's name on the rail and in the palette."
               },
               "glyph": {
                 "default": "puzzle",
+                "description": "A Lucide icon name, or a `brand:` mark, for the rail.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
@@ -699,35 +790,42 @@
               "order": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 100000
+                "maximum": 100000,
+                "description": "Where the source sits on the rail. Lower comes first. Required, because load order never decides it."
               },
               "providerId": {
+                "description": "Shows the source only while this integration is connected.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "items": {
+                "description": "A GET route on your Node half that answers the rail's rows. Give `items` or `tree`, not both.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
               },
               "search": {
+                "description": "A GET route that searches the same list, sent the person's `q`. Needs `items`.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
               },
               "tree": {
+                "description": "Two trees from your client bundle that draw the list and its detail, for a source with no Node half. Give `items` or `tree`, not both.",
                 "type": "object",
                 "properties": {
                   "list": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The `mountTree` entry that draws the list."
                   },
                   "detail": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The `mountTree` entry that draws the selected row's detail."
                   }
                 },
                 "required": [
@@ -737,35 +835,43 @@
                 "additionalProperties": false
               },
               "projectScoped": {
+                "description": "Set it when the list depends on the open project. The rail then shows a project picker and sends `?project=` to `items`.",
                 "type": "boolean"
               },
               "showInRailByDefault": {
+                "description": "Whether the desktop rail shows the source's icon before the person chooses. Defaults to `true`.",
                 "type": "boolean"
               },
               "requiresGitProject": {
+                "description": "Shows the source only while the workspace has a project that's a Git repository.",
                 "type": "boolean"
               },
               "statusAnnotations": {
+                "description": "Lets other plugins put status marks on the source's rail icon, through the `core:source` point.",
                 "type": "boolean"
               },
               "defaultPane": {
+                "description": "The task pane a task from this source opens on the first time. It must be one of your own task panes.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "onSelect": {
+                "description": "What picking a row does. It takes every action verb.",
                 "oneOf": [
                   {
                     "type": "object",
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openPane"
+                        "const": "openPane",
+                        "description": "Opens one of your task panes in the open task. The clicked row's ID goes with it."
                       },
                       "pane": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of a `pane` this manifest declares under `frames`."
                       }
                     },
                     "required": [
@@ -778,7 +884,8 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openTask"
+                        "const": "openTask",
+                        "description": "Goes to the task the clicked row names. Only a dashboard row names one, and a row that names no task gets a toast saying so."
                       }
                     },
                     "required": [
@@ -790,12 +897,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "navigate"
+                        "const": "navigate",
+                        "description": "Goes to one of your project panes for the clicked row, at the address its `routes` entry declares. Needs a selected row and a project."
                       },
                       "surface": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of a `scope: 'project'` pane this manifest declares."
                       }
                     },
                     "required": [
@@ -808,12 +917,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "runNodeAction"
+                        "const": "runNodeAction",
+                        "description": "POSTs to a route on your Node half. The body says what was clicked, and its shape depends on where the action sits."
                       },
                       "path": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 256
+                        "maxLength": 256,
+                        "description": "The route to POST, one of your own."
                       }
                     },
                     "required": [
@@ -826,7 +937,8 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "createTask"
+                        "const": "createTask",
+                        "description": "Starts a new task from the selected rail row. Only a rail source's `onSelect` takes it."
                       }
                     },
                     "required": [
@@ -838,11 +950,13 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openUrl"
+                        "const": "openUrl",
+                        "description": "Opens an address in the person's browser, not inside acorn."
                       },
                       "url": {
                         "type": "string",
-                        "format": "uri"
+                        "format": "uri",
+                        "description": "The address to open. Only `https` opens."
                       }
                     },
                     "required": [
@@ -855,12 +969,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openOverlay"
+                        "const": "openOverlay",
+                        "description": "Opens one of your overlays over the window."
                       },
                       "overlay": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of an `overlay` this manifest declares under `frames`."
                       }
                     },
                     "required": [
@@ -873,12 +989,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "surfaceAction"
+                        "const": "surfaceAction",
+                        "description": "Sends the command's ID to a frame or tree region of one of your panes, for a shortcut pressed where your pane has no keyboard, such as in a document region's editor."
                       },
                       "surface": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of a pane this manifest declares."
                       }
                     },
                     "required": [
@@ -889,26 +1007,31 @@
                 ]
               },
               "emptyState": {
+                "description": "What the rail says when `items` answers with no rows. It isn't shown when the route fails.",
                 "type": "object",
                 "properties": {
                   "message": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 160
+                    "maxLength": 160,
+                    "description": "What the rail says when your route answers with no items. Plain text."
                   },
                   "action": {
+                    "description": "One action the empty rail offers, as a button.",
                     "oneOf": [
                       {
                         "type": "object",
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openPane"
+                            "const": "openPane",
+                            "description": "Opens one of your task panes in the open task. The clicked row's ID goes with it."
                           },
                           "pane": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of a `pane` this manifest declares under `frames`."
                           }
                         },
                         "required": [
@@ -921,7 +1044,8 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openTask"
+                            "const": "openTask",
+                            "description": "Goes to the task the clicked row names. Only a dashboard row names one, and a row that names no task gets a toast saying so."
                           }
                         },
                         "required": [
@@ -933,12 +1057,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "runNodeAction"
+                            "const": "runNodeAction",
+                            "description": "POSTs to a route on your Node half. The body says what was clicked, and its shape depends on where the action sits."
                           },
                           "path": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 256
+                            "maxLength": 256,
+                            "description": "The route to POST, one of your own."
                           }
                         },
                         "required": [
@@ -951,11 +1077,13 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openUrl"
+                            "const": "openUrl",
+                            "description": "Opens an address in the person's browser, not inside acorn."
                           },
                           "url": {
                             "type": "string",
-                            "format": "uri"
+                            "format": "uri",
+                            "description": "The address to open. Only `https` opens."
                           }
                         },
                         "required": [
@@ -968,12 +1096,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openOverlay"
+                            "const": "openOverlay",
+                            "description": "Opens one of your overlays over the window."
                           },
                           "overlay": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of an `overlay` this manifest declares under `frames`."
                           }
                         },
                         "required": [
@@ -986,12 +1116,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "surfaceAction"
+                            "const": "surfaceAction",
+                            "description": "Sends the command's ID to a frame or tree region of one of your panes, for a shortcut pressed where your pane has no keyboard, such as in a document region's editor."
                           },
                           "surface": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of a pane this manifest declares."
                           }
                         },
                         "required": [
@@ -1002,6 +1134,7 @@
                     ]
                   },
                   "actionLabel": {
+                    "description": "The button's label. Without it, the message shows alone.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 40
@@ -1012,9 +1145,11 @@
                 ]
               },
               "panels": {
+                "description": "A dashboard region beside the list, which the person fills with panels. Not with a `navigate` `onSelect`.",
                 "type": "object",
                 "properties": {
                   "sources": {
+                    "description": "The sources a panel here may be built from, as `<pluginId>:<sourceId>`. Leave it out for your own sources. Don't set it with `fieldRole`.",
                     "maxItems": 16,
                     "type": "array",
                     "items": {
@@ -1024,6 +1159,7 @@
                     }
                   },
                   "fieldRole": {
+                    "description": "Instead of `sources`: any source with a field in this role, including ones installed later.",
                     "type": "string",
                     "enum": [
                       "title",
@@ -1034,6 +1170,7 @@
                     ]
                   },
                   "views": {
+                    "description": "The views a person may pick for a panel here. Leave it out to allow every view.",
                     "minItems": 1,
                     "maxItems": 5,
                     "type": "array",
@@ -1050,6 +1187,7 @@
                   },
                   "max": {
                     "default": 4,
+                    "description": "How many panels fit in the region.",
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 12
@@ -1057,6 +1195,7 @@
                 }
               },
               "refresh": {
+                "description": "Seconds between rereads of the route, at least 30. A fallback: push changes with `ctx.events.status()` instead of polling.",
                 "type": "integer",
                 "minimum": 30,
                 "maximum": 86400
@@ -1071,6 +1210,7 @@
         },
         "slots": {
           "default": [],
+          "description": "Badges the host draws in the top bar or in a task's footer, from your route.",
           "maxItems": 8,
           "type": "array",
           "items": {
@@ -1079,16 +1219,19 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The badge's ID, unique in this manifest."
               },
               "slot": {
                 "type": "string",
                 "enum": [
                   "footer",
                   "topbar"
-                ]
+                ],
+                "description": "Where the badge goes: `topbar`, after the notification bell, or `footer`, in a task's footer."
               },
               "icon": {
+                "description": "A Lucide icon name, or a `brand:` mark.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
@@ -1096,21 +1239,25 @@
               "data": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A GET route that answers the badge, or `null` to hide it."
               },
               "onClick": {
+                "description": "What clicking the badge does.",
                 "oneOf": [
                   {
                     "type": "object",
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openPane"
+                        "const": "openPane",
+                        "description": "Opens one of your task panes in the open task. The clicked row's ID goes with it."
                       },
                       "pane": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of a `pane` this manifest declares under `frames`."
                       }
                     },
                     "required": [
@@ -1123,7 +1270,8 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openTask"
+                        "const": "openTask",
+                        "description": "Goes to the task the clicked row names. Only a dashboard row names one, and a row that names no task gets a toast saying so."
                       }
                     },
                     "required": [
@@ -1135,12 +1283,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "runNodeAction"
+                        "const": "runNodeAction",
+                        "description": "POSTs to a route on your Node half. The body says what was clicked, and its shape depends on where the action sits."
                       },
                       "path": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 256
+                        "maxLength": 256,
+                        "description": "The route to POST, one of your own."
                       }
                     },
                     "required": [
@@ -1153,11 +1303,13 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openUrl"
+                        "const": "openUrl",
+                        "description": "Opens an address in the person's browser, not inside acorn."
                       },
                       "url": {
                         "type": "string",
-                        "format": "uri"
+                        "format": "uri",
+                        "description": "The address to open. Only `https` opens."
                       }
                     },
                     "required": [
@@ -1170,12 +1322,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openOverlay"
+                        "const": "openOverlay",
+                        "description": "Opens one of your overlays over the window."
                       },
                       "overlay": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of an `overlay` this manifest declares under `frames`."
                       }
                     },
                     "required": [
@@ -1188,12 +1342,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "surfaceAction"
+                        "const": "surfaceAction",
+                        "description": "Sends the command's ID to a frame or tree region of one of your panes, for a shortcut pressed where your pane has no keyboard, such as in a document region's editor."
                       },
                       "surface": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of a pane this manifest declares."
                       }
                     },
                     "required": [
@@ -1204,6 +1360,7 @@
                 ]
               },
               "refresh": {
+                "description": "Seconds between rereads of the route, at least 30. A fallback: push changes with `ctx.events.status()` instead of polling.",
                 "type": "integer",
                 "minimum": 30,
                 "maximum": 86400
@@ -1218,6 +1375,7 @@
         },
         "commands": {
           "default": [],
+          "description": "Entries in the command palette: an action, a group, a search, a line of input, or a setting.",
           "maxItems": 32,
           "type": "array",
           "items": {
@@ -1228,12 +1386,14 @@
                   "id": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The command's ID, unique in this manifest. A keybinding names it, and the host makes it `plugin.<pluginId>.<id>`."
                   },
                   "title": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 120,
+                    "description": "The command's name in the palette."
                   },
                   "category": {
                     "default": "action",
@@ -1245,18 +1405,22 @@
                       "task",
                       "terminal",
                       "workspace"
-                    ]
+                    ],
+                    "description": "The palette group the command is listed under."
                   },
                   "palette": {
                     "default": true,
+                    "description": "Whether the palette lists it. Set `false` for a command only a keybinding runs.",
                     "type": "boolean"
                   },
                   "hint": {
+                    "description": "Secondary text on the palette row.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 160
                   },
                   "keywords": {
+                    "description": "Words the palette search matches besides the title.",
                     "maxItems": 16,
                     "type": "array",
                     "items": {
@@ -1266,18 +1430,21 @@
                     }
                   },
                   "order": {
+                    "description": "Order among its siblings, before search relevance. Lower comes first.",
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 100000
                   },
                   "parentId": {
+                    "description": "The ID of a `group` command in this manifest to list this one under. Another plugin's group is refused.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 64
                   },
                   "kind": {
                     "type": "string",
-                    "const": "action"
+                    "const": "action",
+                    "description": "A command that runs one action. Every command names its `kind`."
                   },
                   "action": {
                     "oneOf": [
@@ -1286,12 +1453,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openPane"
+                            "const": "openPane",
+                            "description": "Opens one of your task panes in the open task. The clicked row's ID goes with it."
                           },
                           "pane": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of a `pane` this manifest declares under `frames`."
                           }
                         },
                         "required": [
@@ -1304,7 +1473,8 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openTask"
+                            "const": "openTask",
+                            "description": "Goes to the task the clicked row names. Only a dashboard row names one, and a row that names no task gets a toast saying so."
                           }
                         },
                         "required": [
@@ -1316,12 +1486,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "runNodeAction"
+                            "const": "runNodeAction",
+                            "description": "POSTs to a route on your Node half. The body says what was clicked, and its shape depends on where the action sits."
                           },
                           "path": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 256
+                            "maxLength": 256,
+                            "description": "The route to POST, one of your own."
                           }
                         },
                         "required": [
@@ -1334,11 +1506,13 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openUrl"
+                            "const": "openUrl",
+                            "description": "Opens an address in the person's browser, not inside acorn."
                           },
                           "url": {
                             "type": "string",
-                            "format": "uri"
+                            "format": "uri",
+                            "description": "The address to open. Only `https` opens."
                           }
                         },
                         "required": [
@@ -1351,12 +1525,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openOverlay"
+                            "const": "openOverlay",
+                            "description": "Opens one of your overlays over the window."
                           },
                           "overlay": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of an `overlay` this manifest declares under `frames`."
                           }
                         },
                         "required": [
@@ -1369,12 +1545,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "surfaceAction"
+                            "const": "surfaceAction",
+                            "description": "Sends the command's ID to a frame or tree region of one of your panes, for a shortcut pressed where your pane has no keyboard, such as in a document region's editor."
                           },
                           "surface": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of a pane this manifest declares."
                           }
                         },
                         "required": [
@@ -1382,7 +1560,8 @@
                           "surface"
                         ]
                       }
-                    ]
+                    ],
+                    "description": "What the command does."
                   }
                 },
                 "required": [
@@ -1398,12 +1577,14 @@
                   "id": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The command's ID, unique in this manifest. A keybinding names it, and the host makes it `plugin.<pluginId>.<id>`."
                   },
                   "title": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 120,
+                    "description": "The command's name in the palette."
                   },
                   "category": {
                     "default": "action",
@@ -1415,18 +1596,22 @@
                       "task",
                       "terminal",
                       "workspace"
-                    ]
+                    ],
+                    "description": "The palette group the command is listed under."
                   },
                   "palette": {
                     "default": true,
+                    "description": "Whether the palette lists it. Set `false` for a command only a keybinding runs.",
                     "type": "boolean"
                   },
                   "hint": {
+                    "description": "Secondary text on the palette row.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 160
                   },
                   "keywords": {
+                    "description": "Words the palette search matches besides the title.",
                     "maxItems": 16,
                     "type": "array",
                     "items": {
@@ -1436,18 +1621,21 @@
                     }
                   },
                   "order": {
+                    "description": "Order among its siblings, before search relevance. Lower comes first.",
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 100000
                   },
                   "parentId": {
+                    "description": "The ID of a `group` command in this manifest to list this one under. Another plugin's group is refused.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 64
                   },
                   "kind": {
                     "type": "string",
-                    "const": "group"
+                    "const": "group",
+                    "description": "A command that holds the commands naming it as their `parentId`. It does nothing itself."
                   }
                 },
                 "required": [
@@ -1462,12 +1650,14 @@
                   "id": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The command's ID, unique in this manifest. A keybinding names it, and the host makes it `plugin.<pluginId>.<id>`."
                   },
                   "title": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 120,
+                    "description": "The command's name in the palette."
                   },
                   "category": {
                     "default": "action",
@@ -1479,18 +1669,22 @@
                       "task",
                       "terminal",
                       "workspace"
-                    ]
+                    ],
+                    "description": "The palette group the command is listed under."
                   },
                   "palette": {
                     "default": true,
+                    "description": "Whether the palette lists it. Set `false` for a command only a keybinding runs.",
                     "type": "boolean"
                   },
                   "hint": {
+                    "description": "Secondary text on the palette row.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 160
                   },
                   "keywords": {
+                    "description": "Words the palette search matches besides the title.",
                     "maxItems": 16,
                     "type": "array",
                     "items": {
@@ -1500,21 +1694,25 @@
                     }
                   },
                   "order": {
+                    "description": "Order among its siblings, before search relevance. Lower comes first.",
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 100000
                   },
                   "parentId": {
+                    "description": "The ID of a `group` command in this manifest to list this one under. Another plugin's group is refused.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 64
                   },
                   "kind": {
                     "type": "string",
-                    "const": "search"
+                    "const": "search",
+                    "description": "A live search: the palette sends what the person types to your route and lists the results."
                   },
                   "scope": {
                     "default": "node",
+                    "description": "Which identifier the host sends your route: `task`, `project`, and `workspace` send the open one's ID. A scope with nothing open offers no command.",
                     "type": "string",
                     "enum": [
                       "none",
@@ -1527,19 +1725,23 @@
                   "route": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 256
+                    "maxLength": 256,
+                    "description": "A GET route sent `q` that answers `{ items }`. Each item is display text only."
                   },
                   "placeholder": {
+                    "description": "Text in the empty search box.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 120
                   },
                   "minQueryLength": {
+                    "description": "How many characters the person types before the host asks your route.",
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 20
                   },
                   "debounceMs": {
+                    "description": "How long the host waits after a keystroke before it asks your route.",
                     "type": "integer",
                     "minimum": 150,
                     "maximum": 1000
@@ -1551,12 +1753,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openPane"
+                            "const": "openPane",
+                            "description": "Opens one of your task panes in the open task. The clicked row's ID goes with it."
                           },
                           "pane": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of a `pane` this manifest declares under `frames`."
                           }
                         },
                         "required": [
@@ -1569,7 +1773,8 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openTask"
+                            "const": "openTask",
+                            "description": "Goes to the task the clicked row names. Only a dashboard row names one, and a row that names no task gets a toast saying so."
                           }
                         },
                         "required": [
@@ -1581,12 +1786,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "runNodeAction"
+                            "const": "runNodeAction",
+                            "description": "POSTs to a route on your Node half. The body says what was clicked, and its shape depends on where the action sits."
                           },
                           "path": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 256
+                            "maxLength": 256,
+                            "description": "The route to POST, one of your own."
                           }
                         },
                         "required": [
@@ -1599,11 +1806,13 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openUrl"
+                            "const": "openUrl",
+                            "description": "Opens an address in the person's browser, not inside acorn."
                           },
                           "url": {
                             "type": "string",
-                            "format": "uri"
+                            "format": "uri",
+                            "description": "The address to open. Only `https` opens."
                           }
                         },
                         "required": [
@@ -1616,12 +1825,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openOverlay"
+                            "const": "openOverlay",
+                            "description": "Opens one of your overlays over the window."
                           },
                           "overlay": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of an `overlay` this manifest declares under `frames`."
                           }
                         },
                         "required": [
@@ -1634,12 +1845,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "surfaceAction"
+                            "const": "surfaceAction",
+                            "description": "Sends the command's ID to a frame or tree region of one of your panes, for a shortcut pressed where your pane has no keyboard, such as in a document region's editor."
                           },
                           "surface": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of a pane this manifest declares."
                           }
                         },
                         "required": [
@@ -1652,12 +1865,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "navigate"
+                            "const": "navigate",
+                            "description": "Goes to one of your project panes for the clicked row, at the address its `routes` entry declares. Needs a selected row and a project."
                           },
                           "surface": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of a `scope: 'project'` pane this manifest declares."
                           }
                         },
                         "required": [
@@ -1665,7 +1880,8 @@
                           "surface"
                         ]
                       }
-                    ]
+                    ],
+                    "description": "What picking a result does. A result can't choose its own action."
                   }
                 },
                 "required": [
@@ -1682,12 +1898,14 @@
                   "id": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The command's ID, unique in this manifest. A keybinding names it, and the host makes it `plugin.<pluginId>.<id>`."
                   },
                   "title": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 120,
+                    "description": "The command's name in the palette."
                   },
                   "category": {
                     "default": "action",
@@ -1699,18 +1917,22 @@
                       "task",
                       "terminal",
                       "workspace"
-                    ]
+                    ],
+                    "description": "The palette group the command is listed under."
                   },
                   "palette": {
                     "default": true,
+                    "description": "Whether the palette lists it. Set `false` for a command only a keybinding runs.",
                     "type": "boolean"
                   },
                   "hint": {
+                    "description": "Secondary text on the palette row.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 160
                   },
                   "keywords": {
+                    "description": "Words the palette search matches besides the title.",
                     "maxItems": 16,
                     "type": "array",
                     "items": {
@@ -1720,21 +1942,25 @@
                     }
                   },
                   "order": {
+                    "description": "Order among its siblings, before search relevance. Lower comes first.",
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 100000
                   },
                   "parentId": {
+                    "description": "The ID of a `group` command in this manifest to list this one under. Another plugin's group is refused.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 64
                   },
                   "kind": {
                     "type": "string",
-                    "const": "input"
+                    "const": "input",
+                    "description": "One line of text, sent to your route when the person presses Enter."
                   },
                   "scope": {
                     "default": "node",
+                    "description": "Which identifier the host sends your route: `task`, `project`, and `workspace` send the open one's ID. A scope with nothing open offers no command.",
                     "type": "string",
                     "enum": [
                       "none",
@@ -1747,9 +1973,11 @@
                   "route": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 256
+                    "maxLength": 256,
+                    "description": "A POST route sent `{ input }` that answers `{ ok: true }`. On an error the person's text stays where they typed it."
                   },
                   "placeholder": {
+                    "description": "Text in the empty input box.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 120
@@ -1761,12 +1989,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openPane"
+                            "const": "openPane",
+                            "description": "Opens one of your task panes in the open task. The clicked row's ID goes with it."
                           },
                           "pane": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of a `pane` this manifest declares under `frames`."
                           }
                         },
                         "required": [
@@ -1779,7 +2009,8 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openTask"
+                            "const": "openTask",
+                            "description": "Goes to the task the clicked row names. Only a dashboard row names one, and a row that names no task gets a toast saying so."
                           }
                         },
                         "required": [
@@ -1791,12 +2022,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "runNodeAction"
+                            "const": "runNodeAction",
+                            "description": "POSTs to a route on your Node half. The body says what was clicked, and its shape depends on where the action sits."
                           },
                           "path": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 256
+                            "maxLength": 256,
+                            "description": "The route to POST, one of your own."
                           }
                         },
                         "required": [
@@ -1809,11 +2042,13 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openUrl"
+                            "const": "openUrl",
+                            "description": "Opens an address in the person's browser, not inside acorn."
                           },
                           "url": {
                             "type": "string",
-                            "format": "uri"
+                            "format": "uri",
+                            "description": "The address to open. Only `https` opens."
                           }
                         },
                         "required": [
@@ -1826,12 +2061,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "openOverlay"
+                            "const": "openOverlay",
+                            "description": "Opens one of your overlays over the window."
                           },
                           "overlay": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of an `overlay` this manifest declares under `frames`."
                           }
                         },
                         "required": [
@@ -1844,12 +2081,14 @@
                         "properties": {
                           "verb": {
                             "type": "string",
-                            "const": "surfaceAction"
+                            "const": "surfaceAction",
+                            "description": "Sends the command's ID to a frame or tree region of one of your panes, for a shortcut pressed where your pane has no keyboard, such as in a document region's editor."
                           },
                           "surface": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64
+                            "maxLength": 64,
+                            "description": "The ID of a pane this manifest declares."
                           }
                         },
                         "required": [
@@ -1857,7 +2096,8 @@
                           "surface"
                         ]
                       }
-                    ]
+                    ],
+                    "description": "What runs after your route answers."
                   }
                 },
                 "required": [
@@ -1874,12 +2114,14 @@
                   "id": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The command's ID, unique in this manifest. A keybinding names it, and the host makes it `plugin.<pluginId>.<id>`."
                   },
                   "title": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 120,
+                    "description": "The command's name in the palette."
                   },
                   "category": {
                     "default": "action",
@@ -1891,18 +2133,22 @@
                       "task",
                       "terminal",
                       "workspace"
-                    ]
+                    ],
+                    "description": "The palette group the command is listed under."
                   },
                   "palette": {
                     "default": true,
+                    "description": "Whether the palette lists it. Set `false` for a command only a keybinding runs.",
                     "type": "boolean"
                   },
                   "hint": {
+                    "description": "Secondary text on the palette row.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 160
                   },
                   "keywords": {
+                    "description": "Words the palette search matches besides the title.",
                     "maxItems": 16,
                     "type": "array",
                     "items": {
@@ -1912,21 +2158,25 @@
                     }
                   },
                   "order": {
+                    "description": "Order among its siblings, before search relevance. Lower comes first.",
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 100000
                   },
                   "parentId": {
+                    "description": "The ID of a `group` command in this manifest to list this one under. Another plugin's group is refused.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 64
                   },
                   "kind": {
                     "type": "string",
-                    "const": "setting"
+                    "const": "setting",
+                    "description": "A choice from a fixed list, with its current value shown."
                   },
                   "scope": {
                     "default": "node",
+                    "description": "Which identifier the host sends your route: `task`, `project`, and `workspace` send the open one's ID. A scope with nothing open offers no command.",
                     "type": "string",
                     "enum": [
                       "none",
@@ -1939,12 +2189,14 @@
                   "readRoute": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 256
+                    "maxLength": 256,
+                    "description": "A GET route that answers the current `{ value }`."
                   },
                   "writeRoute": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 256
+                    "maxLength": 256,
+                    "description": "A PUT route sent the picked `{ value }` that answers `{ value }`."
                   },
                   "options": {
                     "minItems": 2,
@@ -1956,14 +2208,17 @@
                         "value": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 200
+                          "maxLength": 200,
+                          "description": "The value your routes read and write."
                         },
                         "label": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 200
+                          "maxLength": 200,
+                          "description": "The choice's text in the palette."
                         },
                         "keywords": {
+                          "description": "Words the palette search matches besides the label.",
                           "maxItems": 16,
                           "type": "array",
                           "items": {
@@ -1977,7 +2232,8 @@
                         "value",
                         "label"
                       ]
-                    }
+                    },
+                    "description": "The choices. A value your routes answer that isn't one of these is refused, not shown."
                   }
                 },
                 "required": [
@@ -1994,6 +2250,7 @@
         },
         "keybindings": {
           "default": [],
+          "description": "Default shortcuts for your commands.",
           "maxItems": 32,
           "type": "array",
           "items": {
@@ -2002,12 +2259,14 @@
               "command": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The ID of a command in this manifest."
               },
               "defaultChord": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The default chord, such as `meta+shift+k`, with modifiers in the order meta, ctrl, alt, shift. It needs meta, ctrl, or alt."
               },
               "when": {
                 "type": "string",
@@ -2015,9 +2274,11 @@
                   "global",
                   "task",
                   "surface"
-                ]
+                ],
+                "description": "Where the chord works: anywhere, in a task, or in one of your panes."
               },
               "surface": {
+                "description": "With `when: 'surface'`, the ID of the pane the chord works in.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
@@ -2032,6 +2293,7 @@
         },
         "attention": {
           "default": [],
+          "description": "Routes whose items appear in the notification inbox.",
           "maxItems": 4,
           "type": "array",
           "items": {
@@ -2040,10 +2302,12 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The source's ID, unique in this manifest."
               },
               "order": {
                 "default": 500,
+                "description": "Where these items sort among other sources' items. Lower comes first.",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100000
@@ -2051,9 +2315,11 @@
               "items": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A GET route that answers `{ items }`. The host asks each Node and sets each item's target itself."
               },
               "refresh": {
+                "description": "Seconds between rereads of the route, at least 30. A fallback: push changes with `ctx.events.status()` instead of polling.",
                 "type": "integer",
                 "minimum": 30,
                 "maximum": 86400
@@ -2067,6 +2333,7 @@
         },
         "nodeStats": {
           "default": [],
+          "description": "Numbers on a Node's card on Fleet home, read from your route.",
           "maxItems": 4,
           "type": "array",
           "items": {
@@ -2075,10 +2342,12 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The stat's ID, unique in this manifest."
               },
               "order": {
                 "default": 500,
+                "description": "Where the stat sits on the card. Lower comes first.",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100000
@@ -2096,14 +2365,17 @@
                     "minLength": 1,
                     "maxLength": 60
                   }
-                ]
+                ],
+                "description": "The label in singular and plural, such as `[\"card stuck\", \"cards stuck\"]`, so the card reads \"1 card stuck\"."
               },
               "data": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A GET route that answers the number."
               },
               "refresh": {
+                "description": "Seconds between rereads of the route, at least 30. A fallback: push changes with `ctx.events.status()` instead of polling.",
                 "type": "integer",
                 "minimum": 30,
                 "maximum": 86400
@@ -2118,6 +2390,7 @@
         },
         "contentLinks": {
           "default": [],
+          "description": "Links in acorn that open your pane, reference panel, or overlay, matched by URL.",
           "maxItems": 16,
           "type": "array",
           "items": {
@@ -2126,29 +2399,35 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The link's ID, unique in this manifest."
               },
               "match": {
+                "description": "The URLs this link claims, such as `https://linear.app/{team}/issue/{id}`: `https`, a literal host, and literal or `{capture}` path parts. Needs `item`.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 512
               },
               "openPane": {
+                "description": "A task pane in this manifest the link can open.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "openOverlay": {
+                "description": "An overlay in this manifest the link can open.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "item": {
+                "description": "The `{capture}` in `match` that names the item. Required with `match`.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 32
               },
               "presentations": {
+                "description": "The ways the link may open. The surface the link is clicked in picks one.",
                 "minItems": 1,
                 "maxItems": 5,
                 "type": "array",
@@ -2171,6 +2450,7 @@
         },
         "routes": {
           "default": [],
+          "description": "App URLs that open one of your project panes on an item.",
           "maxItems": 8,
           "type": "array",
           "items": {
@@ -2179,25 +2459,30 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The route's ID, unique in this manifest."
               },
               "path": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "The app address, inside `/p/:projectId/x/<id>/`, with a `:param` for the item, such as `/p/:projectId/x/acme/issue/:issueId`."
               },
               "surface": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The `scope: 'project'` pane in this manifest the address opens."
               },
               "item": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 32
+                "maxLength": 32,
+                "description": "The `:param` in `path` that holds the item. It can't be `projectId`, which the host binds itself."
               },
               "order": {
                 "default": 500,
+                "description": "The order the host matches routes in. Put a fixed path before a `:param` path that would also match it.",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100000
@@ -2213,6 +2498,7 @@
         },
         "agentContexts": {
           "default": [],
+          "description": "Entries in an agent composer's context list, each a snapshot your routes provide.",
           "maxItems": 4,
           "type": "array",
           "items": {
@@ -2221,14 +2507,17 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The entry's ID, unique in this manifest."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The entry's name in the composer's context list."
               },
               "description": {
+                "description": "One line under the label.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 240
@@ -2236,12 +2525,14 @@
               "options": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A GET route sent `taskId` that answers the options the person can pick."
               },
               "capture": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A POST route sent the picked `optionIds` that answers the text to attach. The host stamps the source and time itself."
               }
             },
             "required": [
@@ -2254,6 +2545,7 @@
         },
         "refResolvers": {
           "default": [],
+          "description": "Routes that turn your items' identifiers into labels, for surfaces that show them.",
           "maxItems": 4,
           "type": "array",
           "items": {
@@ -2262,17 +2554,20 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The resolver's ID, unique in this manifest."
               },
               "kind": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The kind of item it labels, such as `issue`."
               },
               "resolve": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A POST route sent `{ identifiers }` that answers a label for each. There's no single-item form: send an array of one."
               }
             },
             "required": [
@@ -2284,6 +2579,7 @@
         },
         "themes": {
           "default": [],
+          "description": "Color themes for Settings > Appearance, written as token values. You write no CSS.",
           "maxItems": 8,
           "type": "array",
           "items": {
@@ -2293,15 +2589,18 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64,
-                "pattern": "^[a-z0-9][a-z0-9-]*$"
+                "pattern": "^[a-z0-9][a-z0-9-]*$",
+                "description": "The theme's ID, in lowercase letters, digits, and dashes. The host makes it `plugin:<pluginId>:<id>`."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The theme's name in Settings > Appearance."
               },
               "dark": {
                 "default": false,
+                "description": "Whether the theme is dark. The host sets `--is-dark` and `--color-scheme` from it, so don't set those as tokens.",
                 "type": "boolean"
               },
               "tokens": {
@@ -2310,112 +2609,134 @@
                   "--bg": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--bg` color."
                   },
                   "--bg-subtle": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--bg-subtle` color."
                   },
                   "--bg-hover": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--bg-hover` color."
                   },
                   "--bg-selected": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--bg-selected` color."
                   },
                   "--border": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--border` color."
                   },
                   "--border-strong": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--border-strong` color."
                   },
                   "--text": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--text` color."
                   },
                   "--text-muted": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--text-muted` color."
                   },
                   "--text-faint": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--text-faint` color."
                   },
                   "--accent": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--accent` color."
                   },
                   "--focus": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--focus` color."
                   },
                   "--add-bg": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--add-bg` color."
                   },
                   "--add-marker": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--add-marker` color."
                   },
                   "--del-bg": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--del-bg` color."
                   },
                   "--del-marker": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--del-marker` color."
                   },
                   "--add-word-bg": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--add-word-bg` color."
                   },
                   "--del-word-bg": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--del-word-bg` color."
                   },
                   "--hunk-bg": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--hunk-bg` color."
                   },
                   "--hunk-text": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--hunk-text` color."
                   },
                   "--warn": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--warn` color."
                   },
                   "--badge-border": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--badge-border` color."
                   },
                   "--shadow-popover": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "The theme's `--shadow-popover` color."
                   }
                 },
                 "required": [
@@ -2442,7 +2763,8 @@
                   "--badge-border",
                   "--shadow-popover"
                 ],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "A color for every palette token, and no others. Each is a hex color or a flat color function, such as `#1e1e2e` or `oklch(0.7 0.15 250)`."
               }
             },
             "required": [
@@ -2454,6 +2776,7 @@
         },
         "styles": {
           "default": [],
+          "description": "Style packs for Settings > Appearance, written as token values the host checks.",
           "maxItems": 8,
           "type": "array",
           "items": {
@@ -2463,14 +2786,17 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64,
-                "pattern": "^[a-z0-9][a-z0-9-]*$"
+                "pattern": "^[a-z0-9][a-z0-9-]*$",
+                "description": "The style pack's ID, in lowercase letters, digits, and dashes."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The style pack's name in Settings > Appearance."
               },
               "description": {
+                "description": "One line about how the style pack looks.",
                 "type": "string",
                 "maxLength": 240
               },
@@ -2481,7 +2807,8 @@
                 },
                 "additionalProperties": {
                   "type": "string"
-                }
+                },
+                "description": "Style tokens and their values, such as radius and spacing. The host checks each one and refuses a value it can't use."
               }
             },
             "required": [
@@ -2493,6 +2820,7 @@
         },
         "contextMenus": {
           "default": [],
+          "description": "Rows on acorn's context menus, such as a task row, an Editor file, or selected text.",
           "maxItems": 32,
           "type": "array",
           "items": {
@@ -2501,7 +2829,8 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The row's ID, unique in this manifest."
               },
               "location": {
                 "type": "string",
@@ -2515,9 +2844,11 @@
                   "agent.message",
                   "agent.turn",
                   "content.selection"
-                ]
+                ],
+                "description": "Which menu the row goes on."
               },
               "surface": {
+                "description": "For a rail location, which of your own sources the menu belongs to. Required there, and not used elsewhere.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
@@ -2525,20 +2856,24 @@
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 60
+                "maxLength": 60,
+                "description": "The row's text."
               },
               "icon": {
+                "description": "A Lucide icon name, or a `brand:` mark.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "order": {
                 "default": 500,
+                "description": "Where the row sits. acorn's own rows come first unless yours is lower.",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100000
               },
               "when": {
+                "description": "Facts the target must match for the row to show, such as `{ \"extension\": \"md\" }`. Every value must equal the target's, with no patterns. A fact the location doesn't have is refused.",
                 "type": "object",
                 "propertyNames": {
                   "type": "string",
@@ -2564,12 +2899,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openPane"
+                        "const": "openPane",
+                        "description": "Opens one of your task panes in the open task. The clicked row's ID goes with it."
                       },
                       "pane": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of a `pane` this manifest declares under `frames`."
                       }
                     },
                     "required": [
@@ -2582,7 +2919,8 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openTask"
+                        "const": "openTask",
+                        "description": "Goes to the task the clicked row names. Only a dashboard row names one, and a row that names no task gets a toast saying so."
                       }
                     },
                     "required": [
@@ -2594,12 +2932,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "runNodeAction"
+                        "const": "runNodeAction",
+                        "description": "POSTs to a route on your Node half. The body says what was clicked, and its shape depends on where the action sits."
                       },
                       "path": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 256
+                        "maxLength": 256,
+                        "description": "The route to POST, one of your own."
                       }
                     },
                     "required": [
@@ -2612,11 +2952,13 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openUrl"
+                        "const": "openUrl",
+                        "description": "Opens an address in the person's browser, not inside acorn."
                       },
                       "url": {
                         "type": "string",
-                        "format": "uri"
+                        "format": "uri",
+                        "description": "The address to open. Only `https` opens."
                       }
                     },
                     "required": [
@@ -2629,12 +2971,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openOverlay"
+                        "const": "openOverlay",
+                        "description": "Opens one of your overlays over the window."
                       },
                       "overlay": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of an `overlay` this manifest declares under `frames`."
                       }
                     },
                     "required": [
@@ -2647,12 +2991,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "surfaceAction"
+                        "const": "surfaceAction",
+                        "description": "Sends the command's ID to a frame or tree region of one of your panes, for a shortcut pressed where your pane has no keyboard, such as in a document region's editor."
                       },
                       "surface": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of a pane this manifest declares."
                       }
                     },
                     "required": [
@@ -2660,7 +3006,8 @@
                       "surface"
                     ]
                   }
-                ]
+                ],
+                "description": "What the row does. It gets the ID of what was right-clicked."
               }
             },
             "required": [
@@ -2673,6 +3020,7 @@
         },
         "extensionPoints": {
           "default": [],
+          "description": "Places in your own views that other plugins may fill.",
           "maxItems": 16,
           "type": "array",
           "items": {
@@ -2682,15 +3030,18 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64,
-                "pattern": "^[a-z0-9][a-z0-9-]*$"
+                "pattern": "^[a-z0-9][a-z0-9-]*$",
+                "description": "The point's ID, in lowercase letters, digits, and dashes. Others name it as `<yourPluginId>:<id>`."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "What you're opening, in your words. Both plugins' trust prompts show it."
               },
               "kind": {
                 "default": "rows",
+                "description": "What a contributor brings: `rows` from a route, `annotation` marks, a `remote` tree, a `rectangle` frame, or a `hook` handler.",
                 "type": "string",
                 "enum": [
                   "rows",
@@ -2701,6 +3052,7 @@
                 ]
               },
               "location": {
+                "description": "Where on your surface the host draws the point. Required for `rows` and `rectangle`, refused for the other kinds.",
                 "type": "string",
                 "enum": [
                   "pane.footer",
@@ -2710,14 +3062,17 @@
                 ]
               },
               "surface": {
+                "description": "Which of your own panes the point sits on, for `rows` and `rectangle`.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "panels": {
+                "description": "For `pane.aside` only: what the person may put in the dashboard region. Leave it out for your own sources, every view, and four panels.",
                 "type": "object",
                 "properties": {
                   "sources": {
+                    "description": "The sources a panel here may be built from, as `<pluginId>:<sourceId>`. Leave it out for your own sources. Don't set it with `fieldRole`.",
                     "maxItems": 16,
                     "type": "array",
                     "items": {
@@ -2727,6 +3082,7 @@
                     }
                   },
                   "fieldRole": {
+                    "description": "Instead of `sources`: any source with a field in this role, including ones installed later.",
                     "type": "string",
                     "enum": [
                       "title",
@@ -2737,6 +3093,7 @@
                     ]
                   },
                   "views": {
+                    "description": "The views a person may pick for a panel here. Leave it out to allow every view.",
                     "minItems": 1,
                     "maxItems": 5,
                     "type": "array",
@@ -2753,6 +3110,7 @@
                   },
                   "max": {
                     "default": 4,
+                    "description": "How many panels fit in the region.",
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 12
@@ -2760,6 +3118,7 @@
                 }
               },
               "key": {
+                "description": "For `annotation`, and required there: the fields your items are keyed by, and each one's type.",
                 "type": "object",
                 "propertyNames": {
                   "type": "string",
@@ -2775,6 +3134,7 @@
                 }
               },
               "mode": {
+                "description": "For `remote` and `rectangle`: `replace` draws one contributor, and `stack` draws several, up to `max`.",
                 "type": "string",
                 "enum": [
                   "stack",
@@ -2782,17 +3142,20 @@
                 ]
               },
               "selector": {
+                "description": "For `replace`: what the key you pass names, such as `mime` or `path`, so Settings can say what the person picks between.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "max": {
                 "default": 4,
+                "description": "For `stack`: how many contributors draw before the host folds the rest away.",
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 12
               },
               "accepts": {
+                "description": "For `remote` and `rectangle`: the key values you'll pass, as a guide for contributors' `matches`. It's advisory.",
                 "maxItems": 32,
                 "type": "array",
                 "items": {
@@ -2802,6 +3165,7 @@
                 }
               },
               "actions": {
+                "description": "For `remote`: action names a contributor's tree may ask you to run with `mount.host.invoke`. You bind a handler for each in your own tree.",
                 "maxItems": 8,
                 "type": "array",
                 "items": {
@@ -2812,6 +3176,7 @@
                 }
               },
               "mounts": {
+                "description": "For `remote`: where the host draws the point outside your tree, above or below your views, so you write no `Slot`.",
                 "minItems": 1,
                 "maxItems": 8,
                 "type": "array",
@@ -2821,14 +3186,16 @@
                     "surface": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 64
+                      "maxLength": 64,
+                      "description": "One of your project panes or reference panels."
                     },
                     "region": {
                       "type": "string",
                       "enum": [
                         "header",
                         "footer"
-                      ]
+                      ],
+                      "description": "Above the view, `header`, or below it, `footer`."
                     }
                   },
                   "required": [
@@ -2838,6 +3205,7 @@
                 }
               },
               "payload": {
+                "description": "For `hook`, and required there: the fields a handler receives, and their types.",
                 "type": "object",
                 "propertyNames": {
                   "type": "string",
@@ -2858,6 +3226,7 @@
                 }
               },
               "allows": {
+                "description": "For `hook`: the modes a handler may ask for. A handler asking for another gets nothing.",
                 "minItems": 1,
                 "maxItems": 4,
                 "type": "array",
@@ -2873,12 +3242,14 @@
               },
               "timeoutMs": {
                 "default": 5000,
+                "description": "For `hook`: how long one handler may take, in milliseconds.",
                 "type": "integer",
                 "minimum": 100,
                 "maximum": 30000
               },
               "onTimeout": {
                 "default": "allow",
+                "description": "For `hook`: what a veto handler that runs out of time counts as.",
                 "type": "string",
                 "enum": [
                   "allow",
@@ -2887,6 +3258,7 @@
               },
               "order": {
                 "default": "priority",
+                "description": "For `hook`: run handlers by their `priority`, then install time, or by install time alone.",
                 "type": "string",
                 "enum": [
                   "priority",
@@ -2895,6 +3267,7 @@
               },
               "collect": {
                 "default": false,
+                "description": "For `hook`: run every veto handler instead of stopping at the first, so you can show every reason.",
                 "type": "boolean"
               }
             },
@@ -2906,6 +3279,7 @@
         },
         "extensions": {
           "default": [],
+          "description": "What you add to another plugin's extension point: rows, a tree, a rectangle, marks, or a hook handler.",
           "maxItems": 16,
           "type": "array",
           "items": {
@@ -2914,45 +3288,54 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The contribution's ID, unique in this manifest."
               },
               "point": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 130
+                "maxLength": 130,
+                "description": "The point you fill, as `<ownerPluginId>:<pointId>`. If the owner isn't installed, nothing shows, with no error."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The heading above your rows, and your contribution's name in Settings. The host shows your plugin's name beside it."
               },
               "order": {
                 "default": 500,
+                "description": "Where your rows sit among other contributors'. Lower comes first.",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100000
               },
               "items": {
+                "description": "For a `rows` or `annotation` point: a route on your Node half that answers the rows or marks. Name exactly one of `items`, `remote`, `frame`, and `route`.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
               },
               "remote": {
+                "description": "For a `remote` point: the `mountTree` entry in your client bundle that draws your tree.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "frame": {
+                "description": "For a `rectangle` point: an `inline` frame in this manifest.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "route": {
+                "description": "For a `hook` point: a route on your Node half the host calls with the payload. Needs `mode`.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
               },
               "matches": {
+                "description": "For `remote` and `frame`: the keys you draw for, exactly or as `prefix*` or `*suffix`. Leave it out to draw for every key.",
                 "minItems": 1,
                 "maxItems": 64,
                 "type": "array",
@@ -2963,11 +3346,13 @@
                 }
               },
               "overlay": {
+                "description": "For `remote`: one of your own overlays your tree may ask the host to open.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "mode": {
+                "description": "For `route`, and required there: what the handler asks to do: `observe`, `transform`, `veto`, or `ask`.",
                 "type": "string",
                 "enum": [
                   "observe",
@@ -2978,23 +3363,27 @@
               },
               "priority": {
                 "default": 500,
+                "description": "For a hook handler: where it runs in the chain, when the owner orders by priority. Lower runs first.",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100000
               },
               "onSelect": {
+                "description": "For `items` rows: what picking a row does. It gets the row's ID.",
                 "oneOf": [
                   {
                     "type": "object",
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openPane"
+                        "const": "openPane",
+                        "description": "Opens one of your task panes in the open task. The clicked row's ID goes with it."
                       },
                       "pane": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of a `pane` this manifest declares under `frames`."
                       }
                     },
                     "required": [
@@ -3007,7 +3396,8 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openTask"
+                        "const": "openTask",
+                        "description": "Goes to the task the clicked row names. Only a dashboard row names one, and a row that names no task gets a toast saying so."
                       }
                     },
                     "required": [
@@ -3019,12 +3409,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "runNodeAction"
+                        "const": "runNodeAction",
+                        "description": "POSTs to a route on your Node half. The body says what was clicked, and its shape depends on where the action sits."
                       },
                       "path": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 256
+                        "maxLength": 256,
+                        "description": "The route to POST, one of your own."
                       }
                     },
                     "required": [
@@ -3037,11 +3429,13 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openUrl"
+                        "const": "openUrl",
+                        "description": "Opens an address in the person's browser, not inside acorn."
                       },
                       "url": {
                         "type": "string",
-                        "format": "uri"
+                        "format": "uri",
+                        "description": "The address to open. Only `https` opens."
                       }
                     },
                     "required": [
@@ -3054,12 +3448,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "openOverlay"
+                        "const": "openOverlay",
+                        "description": "Opens one of your overlays over the window."
                       },
                       "overlay": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of an `overlay` this manifest declares under `frames`."
                       }
                     },
                     "required": [
@@ -3072,12 +3468,14 @@
                     "properties": {
                       "verb": {
                         "type": "string",
-                        "const": "surfaceAction"
+                        "const": "surfaceAction",
+                        "description": "Sends the command's ID to a frame or tree region of one of your panes, for a shortcut pressed where your pane has no keyboard, such as in a document region's editor."
                       },
                       "surface": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 64
+                        "maxLength": 64,
+                        "description": "The ID of a pane this manifest declares."
                       }
                     },
                     "required": [
@@ -3088,6 +3486,7 @@
                 ]
               },
               "refresh": {
+                "description": "Seconds between rereads of the route, at least 30. A fallback: push changes with `ctx.events.status()` instead of polling.",
                 "type": "integer",
                 "minimum": 30,
                 "maximum": 86400
@@ -3102,6 +3501,7 @@
         },
         "documentServices": {
           "default": [],
+          "description": "Hover and diagnostics for Editor's files in one language, from your routes.",
           "maxItems": 8,
           "type": "array",
           "items": {
@@ -3110,12 +3510,14 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The service's ID, unique in this manifest."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The service's name, shown when two plugins serve one language and the person picks."
               },
               "languageId": {
                 "type": "string",
@@ -3144,15 +3546,18 @@
                   "sql",
                   "ini",
                   "toml"
-                ]
+                ],
+                "description": "The language of the Editor files it serves, in LSP's spelling such as `python`."
               },
               "hover": {
+                "description": "Text shown when the person hovers in a file. Give `hover`, `diagnostics`, or both.",
                 "type": "object",
                 "properties": {
                   "route": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 256
+                    "maxLength": 256,
+                    "description": "A POST route on your Node half, sent the live text and its `revision`. Echo the revision in the answer."
                   }
                 },
                 "required": [
@@ -3160,12 +3565,14 @@
                 ]
               },
               "diagnostics": {
+                "description": "Errors and warnings drawn in a file. Read only: no fixes.",
                 "type": "object",
                 "properties": {
                   "route": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 256
+                    "maxLength": 256,
+                    "description": "A POST route on your Node half, sent the live text and its `revision`. Echo the revision in the answer."
                   }
                 },
                 "required": [
@@ -3181,6 +3588,7 @@
           }
         },
         "dataSources": {
+          "description": "Typed data sources your Node half serves, for dashboards and workflows.",
           "maxItems": 32,
           "type": "array",
           "items": {
@@ -3189,47 +3597,57 @@
               "sourceId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 200
+                "maxLength": 200,
+                "description": "The source's ID, unique in this manifest. Others name it as `<pluginId>:<sourceId>`."
               },
               "name": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The source's name, such as `Release readiness`."
               },
               "singular": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "What one record is called, such as `Issue`."
               },
               "plural": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "What several are called, such as `Issues`."
               },
               "identityScope": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 2048
+                "maxLength": 2048,
+                "description": "A sentence saying what a record's ID is and what keeps it stable, such as `GitHub GraphQL node ID; stable across renames`."
               },
               "icon": {
+                "description": "A Lucide icon name, or a `brand:` mark.",
                 "type": "string",
                 "maxLength": 80
               },
               "providerId": {
+                "description": "The integration whose connection each query picks. Not with `inputs`.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 200
               },
               "titlePointer": {
+                "description": "A pointer to the field that titles a record.",
                 "type": "string"
               },
               "urlPointer": {
+                "description": "A pointer to the field that holds a record's web address.",
                 "type": "string"
               },
               "handler": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 2048
+                "maxLength": 2048,
+                "description": "The route on your Node half that answers the source's operations."
               },
               "inputs": {
                 "type": "object",
@@ -3243,14 +3661,17 @@
                     "source": {
                       "type": "string",
                       "maxLength": 401,
-                      "pattern": "^[^:]+:.+$"
+                      "pattern": "^[^:]+:.+$",
+                      "description": "The source this input reads, as `<pluginId>:<sourceId>`. It must be registered statically, not discovered."
                     },
                     "label": {
                       "type": "string",
                       "minLength": 1,
-                      "maxLength": 80
+                      "maxLength": 80,
+                      "description": "The input's name where the person picks an account for it."
                     },
                     "optional": {
+                      "description": "Whether the person may skip it. A skipped input is `undefined` in your query.",
                       "type": "boolean"
                     }
                   },
@@ -3259,7 +3680,8 @@
                     "label"
                   ],
                   "additionalProperties": false
-                }
+                },
+                "description": "For a derived source: other sources the host reads for you, by input name, at most eight. The person approves them before your plugin reads anything."
               }
             },
             "required": [
@@ -3274,6 +3696,7 @@
           }
         },
         "dataSourceDiscoveries": {
+          "description": "Routes that list data sources your plugin can offer, found when someone asks.",
           "maxItems": 8,
           "type": "array",
           "items": {
@@ -3282,14 +3705,17 @@
               "discoveryId": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 200
+                "maxLength": 200,
+                "description": "The discovery's ID, unique in this manifest."
               },
               "handler": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 2048
+                "maxLength": 2048,
+                "description": "The route on your Node half that lists sources, at most 100 a page. A discovered source is available only in the scope that found it."
               },
               "providerId": {
+                "description": "The integration whose connection each discovery uses.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 200
@@ -3304,6 +3730,7 @@
         },
         "schedules": {
           "default": [],
+          "description": "Work the Node runs for your plugin on a cadence, with no client open.",
           "maxItems": 4,
           "type": "array",
           "items": {
@@ -3312,17 +3739,20 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The schedule's ID, unique in this manifest."
               },
               "name": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The schedule's name in Settings > Schedules and the trust prompt."
               },
               "run": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A POST route on your Node half the Node calls each time, sent `{ scheduleId }`. Only success or failure is read from the answer."
               },
               "cadence": {
                 "anyOf": [
@@ -3331,7 +3761,8 @@
                     "properties": {
                       "every": {
                         "type": "number",
-                        "exclusiveMinimum": 0
+                        "exclusiveMinimum": 0,
+                        "description": "Seconds between runs, at most a week."
                       }
                     },
                     "required": [
@@ -3343,7 +3774,8 @@
                     "properties": {
                       "daily": {
                         "type": "string",
-                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                        "description": "A time each day, as `HH:MM` in the Node's local time."
                       }
                     },
                     "required": [
@@ -3359,26 +3791,31 @@
                           "day": {
                             "type": "integer",
                             "minimum": 0,
-                            "maximum": 6
+                            "maximum": 6,
+                            "description": "The day of the week, 0 to 6, where 0 is Sunday."
                           },
                           "at": {
                             "type": "string",
-                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                            "description": "The time, as `HH:MM` in the Node's local time."
                           }
                         },
                         "required": [
                           "day",
                           "at"
-                        ]
+                        ],
+                        "description": "A day and time each week."
                       }
                     },
                     "required": [
                       "weekly"
                     ]
                   }
-                ]
+                ],
+                "description": "How often it runs: every so many seconds, daily, or weekly. A plugin's schedule runs at most every 300 seconds, whatever it asks."
               },
               "timeout": {
+                "description": "How long one run may take, in seconds, not milliseconds. Defaults to 60.",
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 300
@@ -3394,6 +3831,7 @@
         },
         "taskChecks": {
           "default": [],
+          "description": "Checks the host runs before it archives a task, each with an optional cleanup.",
           "maxItems": 4,
           "type": "array",
           "items": {
@@ -3402,19 +3840,23 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The check's ID, unique in this manifest."
               },
               "check": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A GET route sent `taskId` that answers `{ concern }`, or `{ concern: null }` when there's nothing to say. Keep that answer cheap."
               },
               "apply": {
+                "description": "A POST route that does the cleanup the concern offered, run only if the person leaves its box ticked. Leave it out for a warning with no cleanup.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
               },
               "timeout": {
+                "description": "Seconds. Parsed but not used: every check runs under the Node's own short limit, because the person is waiting.",
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 10
@@ -3428,6 +3870,7 @@
         },
         "auditActions": {
           "default": [],
+          "description": "Verbs your Node half may write to the audit log with `ctx.audit.record`. An undeclared verb is refused.",
           "maxItems": 8,
           "type": "array",
           "items": {
@@ -3437,12 +3880,14 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64,
-                "pattern": "^[a-z0-9][a-z0-9.-]*$"
+                "pattern": "^[a-z0-9][a-z0-9.-]*$",
+                "description": "The verb, in lowercase letters, digits, dots, and dashes, such as `run.finished`. No colon: the host makes it `<pluginId>:<id>`."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "What the audit log calls the action."
               }
             },
             "required": [
@@ -3453,6 +3898,7 @@
         },
         "harnesses": {
           "default": [],
+          "description": "Agent programs acorn can run as managed sessions. You declare the program, and acorn runs it.",
           "maxItems": 4,
           "type": "array",
           "items": {
@@ -3461,14 +3907,17 @@
               "id": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The harness's ID. The host makes it `<pluginId>:<id>` and stores it on every session, so renaming it breaks existing sessions."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The harness's name where a person picks an agent."
               },
               "glyph": {
+                "description": "A Lucide icon name, or a `brand:` mark. `brand:<pluginId>` is your manifest's `icon`.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
@@ -3477,17 +3926,20 @@
                 "type": "object",
                 "properties": {
                   "command": {
+                    "description": "A program found on the `PATH`, such as `opencode`. Name `command` or `entry`, not both.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 128
                   },
                   "entry": {
+                    "description": "A JavaScript file in your package that acorn runs with the Node's own runtime, for an adapter in front of an agent that doesn't speak ACP.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 256
                   },
                   "args": {
                     "default": [],
+                    "description": "Arguments passed to the program.",
                     "maxItems": 16,
                     "type": "array",
                     "items": {
@@ -3497,18 +3949,21 @@
                     }
                   },
                   "requires": {
+                    "description": "With `entry`: the agent program your adapter drives.",
                     "type": "object",
                     "properties": {
                       "command": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 128
+                        "maxLength": 128,
+                        "description": "The agent's program, looked up on the `PATH`."
                       },
                       "env": {
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 64,
-                        "pattern": "^[A-Z][A-Z0-9_]*$"
+                        "pattern": "^[A-Z][A-Z0-9_]*$",
+                        "description": "The variable that carries the program's full path to your adapter."
                       }
                     },
                     "required": [
@@ -3516,10 +3971,12 @@
                       "env"
                     ]
                   }
-                }
+                },
+                "description": "How acorn starts the agent for a managed session. It speaks ACP."
               },
               "envPassthrough": {
                 "default": [],
+                "description": "Environment variables passed from the Node to the agent, by name or as a `PREFIX_*` glob. A bare `*` is refused, and the trust prompt lists them.",
                 "maxItems": 32,
                 "type": "array",
                 "items": {
@@ -3530,28 +3987,34 @@
                 }
               },
               "quirks": {
+                "description": "What the agent supports that ACP doesn't say.",
                 "default": {},
                 "type": "object",
                 "properties": {
                   "manualCompaction": {
                     "default": false,
+                    "description": "The agent has a compact command, so the Agent pane offers Compact.",
                     "type": "boolean"
                   },
                   "sessionPersistence": {
                     "default": false,
+                    "description": "Sessions outlive the agent's process and can be loaded again, so resume works.",
                     "type": "boolean"
                   }
                 }
               },
               "probes": {
+                "description": "Routes on your Node half the Agent pane asks about the agent's account. Without them it shows less.",
                 "type": "object",
                 "properties": {
                   "usage": {
+                    "description": "A route that answers the account's plan usage, for the Agent pane.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 256
                   },
                   "auth": {
+                    "description": "A route that answers whether the agent's account is signed in.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 256
@@ -3559,15 +4022,18 @@
                 }
               },
               "terminal": {
+                "description": "The agent's interactive program, offered in a task terminal. Leave it out for an agent with no interactive mode.",
                 "type": "object",
                 "properties": {
                   "command": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 128
+                    "maxLength": 128,
+                    "description": "The agent's interactive program."
                   },
                   "backendPreference": {
                     "default": "tmux",
+                    "description": "How the terminal runs it.",
                     "type": "string",
                     "enum": [
                       "node-pty",
@@ -3576,6 +4042,7 @@
                   },
                   "launchArgs": {
                     "default": [],
+                    "description": "Arguments it starts with.",
                     "maxItems": 16,
                     "type": "array",
                     "items": {
@@ -3590,9 +4057,11 @@
                 ]
               },
               "oneShot": {
+                "description": "One prompt in, one answer out, with no session. It puts the harness in every Generate list.",
                 "type": "object",
                 "properties": {
                   "command": {
+                    "description": "The program, when the harness has no `terminal` to take it from. Refused beside a `terminal`.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 128
@@ -3604,9 +4073,11 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 256
-                    }
+                    },
+                    "description": "The arguments that make the program answer once and exit, such as `[\"run\"]`. The prompt goes last."
                   },
                   "modelFlag": {
+                    "description": "The flag that picks a model, such as `--model`. Leave it out and a model a caller names is dropped.",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 64
@@ -3616,7 +4087,8 @@
                     "enum": [
                       "text",
                       "json-lines"
-                    ]
+                    ],
+                    "description": "How to read the answer: `text` takes all of standard output, and `json-lines` looks for a `result` event in a stream of JSON lines."
                   }
                 },
                 "required": [
@@ -3634,6 +4106,7 @@
         },
         "customAgents": {
           "default": [],
+          "description": "Saved agents a person can start: a harness, its options, and instructions.",
           "maxItems": 8,
           "type": "array",
           "items": {
@@ -3643,19 +4116,23 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64,
-                "pattern": "^[a-z0-9][a-z0-9-]*$"
+                "pattern": "^[a-z0-9][a-z0-9-]*$",
+                "description": "The agent's ID, in lowercase letters, digits, and dashes. The host makes it `<pluginId>:<id>`."
               },
               "name": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 100
+                "maxLength": 100,
+                "description": "The name the person picks the agent by."
               },
               "glyph": {
+                "description": "A Lucide icon name, or a `brand:` mark.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64
               },
               "description": {
+                "description": "One line about what the agent is for.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 500
@@ -3663,10 +4140,12 @@
               "harness": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 130
+                "maxLength": 130,
+                "description": "The harness it runs on: `claude`, `codex`, another plugin's `<pluginId>:<harnessId>`, or the ID of a harness this manifest declares."
               },
               "options": {
                 "default": {},
+                "description": "Provider options to start with, by option ID. An option the harness doesn't offer is dropped when the session starts, with a line in the transcript.",
                 "type": "object",
                 "propertyNames": {
                   "type": "string",
@@ -3679,11 +4158,13 @@
                 }
               },
               "instructions": {
+                "description": "Text for the agent's system prompt. The trust prompt shows it in full, and a version that changes it asks the person again.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 16000
               },
               "maxToolRisk": {
+                "description": "The riskiest of acorn's own tools the agent may call: `read`, `write`, or `execute`.",
                 "type": "string",
                 "enum": [
                   "read",
@@ -3701,6 +4182,7 @@
         },
         "skills": {
           "default": [],
+          "description": "Folders holding a `SKILL.md` that every managed agent session can load by name.",
           "maxItems": 16,
           "type": "array",
           "items": {
@@ -3710,12 +4192,14 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64,
-                "pattern": "^[a-z0-9][a-z0-9-]*$"
+                "pattern": "^[a-z0-9][a-z0-9-]*$",
+                "description": "The skill's name, in lowercase letters, digits, and dashes. Agents see it as `<pluginId>:<id>`."
               },
               "path": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "The skill's folder in your package. It holds a `SKILL.md` and anything it uses."
               }
             },
             "required": [
@@ -3726,6 +4210,7 @@
         },
         "agentTools": {
           "default": [],
+          "description": "Tools agents can call, each answered by a route on your Node half.",
           "maxItems": 16,
           "type": "array",
           "items": {
@@ -3733,19 +4218,22 @@
             "properties": {
               "id": {
                 "type": "string",
-                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "description": "The tool's ID, in lowercase snake case starting with a letter. Agents see it as `<pluginId>_<id>`."
               },
               "description": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 500
+                "maxLength": 500,
+                "description": "What the tool does and when to call it. Agents read this to choose it, and the trust prompt shows it."
               },
               "inputSchema": {
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
-                "additionalProperties": {}
+                "additionalProperties": {},
+                "description": "A JSON Schema for the tool's arguments, of type `object`. Only a small set of keywords is accepted, within size and depth limits."
               },
               "risk": {
                 "type": "string",
@@ -3753,30 +4241,36 @@
                   "read",
                   "write",
                   "execute"
-                ]
+                ],
+                "description": "How much the tool can change. The person's tool tiers decide whether agents may call it."
               },
               "scope": {
                 "default": "task",
+                "description": "Always `task`: the tool runs for one task's agents.",
                 "type": "string",
                 "const": "task"
               },
               "handler": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A POST route on your Node half the host calls with the arguments. The host sends the verified task and session, and never retries."
               },
               "requiresSession": {
                 "default": false,
+                "description": "Hide the tool from a caller without a signed task and session, such as a terminal session.",
                 "type": "boolean"
               },
               "timeoutMs": {
                 "default": 10000,
+                "description": "How long a call may take, in milliseconds.",
                 "type": "integer",
                 "minimum": 100,
                 "maximum": 30000
               },
               "maxOutputBytes": {
                 "default": 65536,
+                "description": "The largest answer the host accepts, in bytes.",
                 "type": "integer",
                 "minimum": 1024,
                 "maximum": 262144
@@ -3793,6 +4287,7 @@
         },
         "contextSections": {
           "default": [],
+          "description": "Sections of a task's context, each read from a route on your Node half.",
           "maxItems": 8,
           "type": "array",
           "items": {
@@ -3800,34 +4295,41 @@
             "properties": {
               "id": {
                 "type": "string",
-                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "description": "The section's ID, in lowercase snake case starting with a letter."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The section's name in the task's context list."
               },
               "scope": {
                 "default": "task",
+                "description": "Always `task`: the section is part of one task's context.",
                 "type": "string",
                 "const": "task"
               },
               "order": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 100000
+                "maximum": 100000,
+                "description": "Where the section sits in the context. Lower comes first."
               },
               "read": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A route on your Node half that answers `{ items, compact, unavailable? }`: reference data and short text, never markup."
               },
               "defaultIncluded": {
                 "default": false,
+                "description": "Whether a task includes the section before the person chooses.",
                 "type": "boolean"
               },
               "timeoutMs": {
                 "default": 5000,
+                "description": "How long the read may take, in milliseconds.",
                 "type": "integer",
                 "minimum": 100,
                 "maximum": 15000
@@ -3835,12 +4337,14 @@
               "maxBytes": {
                 "type": "integer",
                 "minimum": 1024,
-                "maximum": 65536
+                "maximum": 65536,
+                "description": "The most bytes the section may add."
               },
               "maxTokens": {
                 "type": "integer",
                 "minimum": 256,
-                "maximum": 16384
+                "maximum": 16384,
+                "description": "The most tokens the section may add."
               }
             },
             "required": [
@@ -3855,6 +4359,7 @@
         },
         "cliCommands": {
           "default": [],
+          "description": "Commands under `acorn plugin`, each answered by a `/cli/<name>` route on your Node half.",
           "maxItems": 16,
           "type": "array",
           "items": {
@@ -3862,19 +4367,23 @@
             "properties": {
               "name": {
                 "type": "string",
-                "pattern": "^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){0,63}$"
+                "pattern": "^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){0,63}$",
+                "description": "The command's name after `acorn plugin <pluginId>`, in lowercase kebab case."
               },
               "title": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 80
+                "maxLength": 80,
+                "description": "The command's title in help."
               },
               "summary": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 300
+                "maxLength": 300,
+                "description": "One or two sentences of help."
               },
               "effects": {
+                "description": "What the command changes. Required when `risk` is `write`.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 500
@@ -3884,7 +4393,8 @@
                 "enum": [
                   "read",
                   "write"
-                ]
+                ],
+                "description": "Whether the command only reads, or changes something."
               },
               "scope": {
                 "type": "string",
@@ -3893,44 +4403,51 @@
                   "workspace",
                   "project",
                   "task"
-                ]
+                ],
+                "description": "What the command acts on. `inputSchema` must require `nodeId`, and the ID this scope names, as strings."
               },
               "capability": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 64
+                "maxLength": 64,
+                "description": "The core facet the command needs, such as `projects:read`. Declare it in `permissions.node.core` too: this field grants nothing."
               },
               "inputSchema": {
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
-                "additionalProperties": {}
+                "additionalProperties": {},
+                "description": "A JSON Schema for the command's input, of type `object`, in the same language as an agent tool's."
               },
               "outputSchema": {
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
-                "additionalProperties": {}
+                "additionalProperties": {},
+                "description": "A JSON Schema for your route's answer, of type `object`."
               },
               "route": {
                 "type": "object",
                 "properties": {
                   "method": {
                     "type": "string",
-                    "const": "POST"
+                    "const": "POST",
+                    "description": "Always `POST`."
                   },
                   "path": {
                     "type": "string",
-                    "pattern": "^\\/cli\\/[a-z][a-z0-9-]{0,63}$"
+                    "pattern": "^\\/cli\\/[a-z][a-z0-9-]{0,63}$",
+                    "description": "`/cli/<name>`, matching `name`."
                   }
                 },
                 "required": [
                   "method",
                   "path"
                 ],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "The route on your Node half that runs the command."
               }
             },
             "required": [
@@ -3949,6 +4466,7 @@
         },
         "browserHandoffs": {
           "default": [],
+          "description": "Buttons the browser extension draws on a website, which hand the page's item to a task.",
           "maxItems": 4,
           "type": "array",
           "items": {
@@ -3958,12 +4476,14 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 64,
-                "pattern": "^[a-z0-9][a-z0-9-]*$"
+                "pattern": "^[a-z0-9][a-z0-9-]*$",
+                "description": "The handoff's ID, in lowercase letters, digits, and dashes."
               },
               "label": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 40
+                "maxLength": 40,
+                "description": "The button's text, drawn as plain text."
               },
               "match": {
                 "minItems": 1,
@@ -3973,10 +4493,12 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 512
-                }
+                },
+                "description": "The pages the button appears on, such as `https://github.com/{owner}/{repo}/pull/{number}`: `https`, a literal host, and literal or `{capture}` path parts."
               },
               "anchors": {
                 "default": [],
+                "description": "CSS selectors tried in order. The button goes at the end of the first element found. When none match, the sidebar still offers the handoff.",
                 "maxItems": 4,
                 "type": "array",
                 "items": {
@@ -3988,7 +4510,8 @@
               "resolve": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 256
+                "maxLength": 256,
+                "description": "A POST route on your Node half, sent `{ url, captures }`, that answers the page's items."
               }
             },
             "required": [
@@ -4000,24 +4523,29 @@
           }
         },
         "taskAddresses": {
+          "description": "A GET route on your Node half listing the local origins your tasks' apps answer at, for the browser extension.",
           "type": "string",
           "minLength": 1,
           "maxLength": 256
         },
         "browserPanel": {
+          "description": "A read-only panel in the browser extension's sidebar for a task, served by a route on your Node half. One per plugin.",
           "type": "object",
           "properties": {
             "label": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 40
+              "maxLength": 40,
+              "description": "The panel's name in the sidebar's navigation."
             },
             "glyph": {
+              "description": "A Lucide icon name for the navigation item.",
               "type": "string",
               "minLength": 1,
               "maxLength": 64
             },
             "pane": {
+              "description": "A task pane in this manifest that **Open in Acorn** opens.",
               "type": "string",
               "minLength": 1,
               "maxLength": 64
@@ -4025,7 +4553,8 @@
             "route": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 256
+              "maxLength": 256,
+              "description": "A GET route sent `taskId` that answers the panel's blocks, or 404 for a task with no panel."
             }
           },
           "required": [
@@ -4034,12 +4563,14 @@
           ]
         },
         "codeHost": {
+          "description": "The Git hosts whose repositories your plugin names, and how acorn treats their change requests.",
           "type": "object",
           "properties": {
             "label": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 64
+              "maxLength": 64,
+              "description": "The host's name as a person reads it, such as `GitLab`."
             },
             "hosts": {
               "minItems": 1,
@@ -4049,27 +4580,33 @@
                 "type": "string",
                 "maxLength": 253,
                 "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$"
-              }
+              },
+              "description": "Bare lowercase host names, such as `gitlab.com`, with no scheme or port."
             },
             "changeRequest": {
+              "description": "How acorn treats this host's pull or merge requests. Every field is optional.",
               "type": "object",
               "properties": {
                 "ref": {
+                  "description": "The ref acorn fetches to check one out, holding `{number}` once, such as `merge-requests/{number}/head`. Without it, acorn fetches the source branch.",
                   "type": "string",
                   "maxLength": 200,
                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*\\{number\\}[A-Za-z0-9._/-]*$"
                 },
                 "label": {
+                  "description": "What a person calls one in an error, such as `merge request`. Defaults to `change request`.",
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 64
                 },
                 "prefix": {
+                  "description": "The mark before its number in a task title, such as `!`. Defaults to `#`.",
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 4
                 },
                 "pane": {
+                  "description": "The pane that shows one. A task whose main change request is on this host opens on it.",
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 64

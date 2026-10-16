@@ -41,10 +41,11 @@ your manifest at it and every contribution array is validated as you type:
   "id": "my-widget",
   "name": "My widget",
   "version": "1.0.0",
-  "baseline": "acorn-1",
-  "apiVersion": "5"
+  "baseline": "acorn-1"
 }
 ```
+
+A real manifest also needs `apiVersion`, described below.
 
 ## Commands are five shapes, not one
 
@@ -76,9 +77,10 @@ drizzle handle behind `ctx.storage.open()`. The manifest-carried `PluginAgentToo
 exported here without adding a runtime dependency. The rest of the surface is exact, and a test in
 the acorn repository fails if it drifts.
 
-`apiVersion` is a range over plugin API majors. This host speaks major `4`; write `"4"` for a plugin
-tested against it. A range such as `"3 || 4"` covers both majors, but declare one only after testing
-the plugin against each included host. Additive descriptor fields do not change the major; removing a
+`apiVersion` is a range over plugin API majors. Write the major the host speaks, which
+[Compatibility and versions](https://acorn.sh/docs/build-plugins/reference/compatibility-and-versions/)
+shows and the schema's hover text for `apiVersion` repeats. A range such as `"<previous> || <current>"`
+covers two majors, but declare one only after testing the plugin against each included host. Additive descriptor fields do not change the major; removing a
 published field does.
 
 ## Related

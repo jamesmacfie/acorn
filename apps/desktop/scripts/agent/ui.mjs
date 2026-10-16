@@ -16,7 +16,7 @@ function parseArgs(argv) {
     else rest.push(argv[index])
   }
   const [command, ...args] = rest
-  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|link|flow|replay|replay-ab|status|target|stop')
+  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|link|run|flow|replay|replay-ab|status|target|stop')
   return { session, command, args }
 }
 
@@ -138,6 +138,14 @@ async function main() {
     const place = await client.scroll(delta)
     if (!place) throw new Error('Nothing on this page scrolls.')
     process.stdout.write(`${renderPlace(place)}\n`)
+    return
+  }
+  // A script body from a file, or from stdin with no file, run in the window as a function. Its return
+  // value, awaited, prints as JSON. For a check the other verbs can't make, such as reading the DOM.
+  if (command === 'run') {
+    if (args.length > 1) throw new Error('Usage: run [SCRIPT_FILE], or the script on stdin')
+    const script = args[0] ? await readFile(args[0], 'utf8') : await new Response(process.stdin).text()
+    process.stdout.write(`${JSON.stringify(await client.execute(script))}\n`)
     return
   }
   if (command === 'screenshot') {

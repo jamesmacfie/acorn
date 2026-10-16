@@ -1,0 +1,9 @@
+{"columns":60,"rows":7,"lines":[
+[],
+[{"text":"Dev server","attrs":["bold"]}],
+[{"text":"How acorn starts this project.","fg":"muted"}],
+[{"text":"Command pnpm dev"}],
+[{"text":"Port 4000"}],
+[{"text":"Used for the preview pane.","fg":"muted"}],
+[]
+]}

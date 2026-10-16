@@ -1,0 +1,67 @@
+---
+title: Permissions
+description: Every permission a plugin can ask for, which ones acorn enforces, and what the trust prompt shows.
+sources:
+  - docs/plugin-authoring/permissions.md
+  - docs/security/plugin-node-realm.md
+  - docs/security/node-plugin-security.md
+checked: '498833615'
+---
+
+A plugin reaches nothing it doesn't ask for. `permissions` has three parts, and acorn enforces each at
+the boundary that owns it:
+
+- `permissions.api`: the acorn routes your frames and trees may call through the bridge.
+- `permissions.events`: the event channels your Node half and frames may hear.
+- `permissions.node`: what your Node half's `ctx` holds, and what its worker may do.
+
+Your own routes, `/v1/p/<id>/`, need no permission. Another plugin's routes are always refused, whatever
+your manifest says.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "permissions": {
+    "api": ["core.tasks:read"],
+    "events": ["tasks:changed"],
+    "node": {
+      "core": ["tasks", "git"],
+      "net": ["api.acme.example"],
+      "env": ["ACME_REGION"]
+    }
+  }
+}
+```
+
+## Asked at install, not at use
+
+The person installing your plugin reads its permissions once, in the trust prompt, and accepts them on
+each device. acorn doesn't ask again when your code first uses one. That's on purpose: a plugin that
+asks in the middle of someone's work gets a yes without a reading. What they accepted is recorded with
+your bundle's hash, so a version that asks for more is a new question, and the prompt shows only what
+changed.
+
+A plugin's **Permissions** tab in Settings lists the same lines as the trust prompt, in the same groups:
+
+<Snapshot id="permissions" />
+
+The trust prompt sorts its lines into groups, and the group is a claim about who holds the line:
+
+- **Enforced**: acorn blocks anything not listed. The bridge, the Node's worker, and the host hold these.
+- **Declared**: jobs and checks your plugin runs. acorn controls when they run, not what your code does
+  once it starts.
+- **Web pages**: pages from the internet in a webview. The shell enforces the host list, but the page has
+  live network access.
+- **Reads** and **Provides**: the data sources your plugin reads and the ones it offers.
+
+{/* facts */}
+
+## Mistakes
+
+- A facet you leave out of `permissions.node.core` isn't on `ctx.core`, so your first call to it throws a
+  `TypeError`. Add the facet rather than checking for it.
+- A `permissions.api` scope this acorn doesn't know parses, and the bridge denies every call that needs
+  it. Declare only the scopes listed above.
+- Hearing another plugin's `plugin:<id>:<verb>` needs that plugin to list the verb in `emits`. If it
+  isn't installed, you hear nothing and get no error.
+- Ask for `net` hosts rather than `sockets`. `sockets` is unrestricted, and the trust prompt says so.

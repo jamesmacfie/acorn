@@ -1,0 +1,108 @@
+{
+  "meta": {
+    "title": "Acme issue ACME-14",
+    "caption": "The reference panel's tree. The host draws the panel around it, with its title and close button.",
+    "terminal": {
+      "columns": 60,
+      "rows": 5
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Text",
+          "props": {
+            "emphasis": "muted"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "#text",
+              "props": {
+                "value": "Loading…"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "op": "remove",
+        "id": "n1"
+      },
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n3",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n4",
+              "type": "Badge",
+              "props": {
+                "tone": "warn"
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "In review"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Text",
+              "props": {
+                "emphasis": "strong"
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "#text",
+                  "props": {
+                    "value": "VAT missing on EU invoices"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n8",
+              "type": "Text",
+              "props": {
+                "wrap": true
+              },
+              "children": [
+                {
+                  "id": "n9",
+                  "type": "#text",
+                  "props": {
+                    "value": "Invoices to EU customers show no VAT line when the customer has no tax ID."
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

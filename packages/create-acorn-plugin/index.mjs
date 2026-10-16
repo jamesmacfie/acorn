@@ -341,13 +341,15 @@ package is installed. There is no build step either way: these files are still w
 
 ## Install it
 
-**Settings → Plugins → Install**, source kind *path*, with this directory's absolute path.
+**Settings → Plugins → Installed → Install…**, source **Local folder**, with this directory: click
+**Choose…**, or type its absolute path into **Package**. Then close Settings and click **Accept plugin**
+when acorn asks.
 
-A local path is **symlinked**, not copied, so you edit in place and the next boot runs what you
-edited. Installing reports \`installed-restart-required\`: a plugin's routes, tables and jobs wire at
-init, so restart the node (Settings → Plugins → Restart) before it is live. Then accept the bundle when the device asks —
-each device asks its own owner before running client bytes, keyed by \`(pluginId, hash)\`, so rewriting
-\`client.js\` re-prompts.
+A local folder is **linked**, not copied, so you edit in place. Installing starts the plugin in the
+running Node. Each device asks its own owner before running client bytes, keyed by
+\`(pluginId, hash)\`, so rewriting \`client.js\` asks again. To run an edit, turn the plugin's
+**Enabled** switch off and on, or turn on **Development mode** on its **Permissions** tab, which reloads
+it a moment after you save and runs each new version without asking.
 
 If an **agent** is writing this plugin, it never reaches the install route: it asks with the
 \`plugin_request\` tool and you approve in the shell. Approving with \`dev: true\` turns the loop into
@@ -377,7 +379,7 @@ the running host accepts:
 - **Settings → Advanced → Extension points** shows each point's contributors, their \`matches\`, the
   reason a tree last failed, and every extension whose point nobody declares.
 - \`docs/plugin-authoring/extension-example.md\` in the acorn repository is a tested plugin that fills
-  nine places in other plugins' UI, built with the SDK.
+  eleven places in other plugins' UI, built with the SDK.
 
 The full contract is \`docs/plugin-authoring.md\` in the acorn repository. An agent should call the
 \`plugin_authoring\` tool first — it answers with that guide plus the connected node's *current*
@@ -498,9 +500,11 @@ function onTreeMessage(message) {
   }
 }
 
-/** A node: the name of one of acorn's components, its props, and its children. */
+/** A node: the name of one of acorn's components, its props, and its children. A prop that's
+ *  \`undefined\` is left out, because the host refuses a whole batch that holds one. */
 function el(type, props, children) {
-  return { id: 'n' + ++nodeSeq, type: type, props: props || {}, children: children || [] }
+  const defined = Object.entries(props || {}).filter(([, value]) => value !== undefined)
+  return { id: 'n' + ++nodeSeq, type: type, props: Object.fromEntries(defined), children: children || [] }
 }
 
 /** A run of text. Text is a node, never a prop. */
@@ -542,7 +546,7 @@ function mount(slot, props, context, bridgePort) {
   const tree = el('Card', {}, [
     el('Stack', { gap: 'row' }, [
       el('Heading', {}, [text('${name}')]),
-      greeting,
+      el('Text', {}, [greeting]),
       el('Button', { variant: 'solid', onPress: on(() => {
         const query = mountedContext?.taskId ? \`?taskId=\${encodeURIComponent(mountedContext.taskId)}\` : ''
         void bridge.get(\`/v1/p/${id}/greeting\${query}\`)

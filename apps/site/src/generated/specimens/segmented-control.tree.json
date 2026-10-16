@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "title": "SegmentedControl",
+    "caption": "Three views of a diff, with Split chosen.",
+    "terminal": {
+      "columns": 40,
+      "rows": 1
+    },
+    "width": 320
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "SegmentedControl",
+          "props": {
+            "ariaLabel": "Diff view",
+            "value": "split",
+            "options": [
+              {
+                "value": "unified",
+                "label": "Unified"
+              },
+              {
+                "value": "split",
+                "label": "Split"
+              },
+              {
+                "value": "files",
+                "label": "Files"
+              }
+            ],
+            "onChange": {
+              "$handler": 1
+            }
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

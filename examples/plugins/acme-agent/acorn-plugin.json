@@ -1,0 +1,106 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-agent",
+  "name": "Acme agent kit",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "node": "./node.js",
+  "permissions": {
+    "api": [],
+    "events": [],
+    "node": { "core": ["models", "identity"], "capabilities": [], "secrets": false, "exec": false, "net": [] }
+  },
+  "contributions": {
+    "agentTools": [
+      {
+        "id": "list_notes",
+        "description": "List the Acme notes saved on this task, oldest first.",
+        "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+        "risk": "read",
+        "scope": "task",
+        "handler": "/v1/p/acme-agent/tools/list-notes",
+        "timeoutMs": 5000,
+        "maxOutputBytes": 65536
+      },
+      {
+        "id": "add_note",
+        "description": "Save a short note on this task for the person to read later, such as a decision or a follow-up.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string", "minLength": 1, "maxLength": 2000, "description": "The note, in plain text." }
+          },
+          "required": ["text"],
+          "additionalProperties": false
+        },
+        "risk": "write",
+        "scope": "task",
+        "requiresSession": true,
+        "handler": "/v1/p/acme-agent/tools/add-note",
+        "timeoutMs": 5000,
+        "maxOutputBytes": 4096
+      }
+    ],
+    "contextSections": [
+      {
+        "id": "notes",
+        "label": "Acme notes",
+        "scope": "task",
+        "order": 70,
+        "read": "/v1/p/acme-agent/context/notes",
+        "defaultIncluded": true,
+        "timeoutMs": 2000,
+        "maxBytes": 16384,
+        "maxTokens": 2048
+      }
+    ],
+    "customAgents": [
+      {
+        "id": "reviewer",
+        "name": "Acme reviewer",
+        "glyph": "search-check",
+        "description": "Reviews the change and saves each finding as an Acme note.",
+        "harness": "claude",
+        "instructions": "Review the change on this task for correctness. Save each bug you find with the acme-agent_add_note tool, naming its file and line. Don't edit files.",
+        "maxToolRisk": "write"
+      },
+      {
+        "id": "planner",
+        "name": "Acme planner",
+        "glyph": "list-checks",
+        "description": "Reads the task and its notes, then writes a plan without changing anything.",
+        "harness": "codex",
+        "options": { "reasoning": "high" },
+        "instructions": "Read the task, its Acme notes, and the code it touches. Write a numbered plan. Don't edit files.",
+        "maxToolRisk": "read"
+      }
+    ],
+    "skills": [{ "id": "release-note", "path": "skills/release-note" }],
+    "extensions": [
+      {
+        "id": "force-push-guard",
+        "point": "agents:before-tool",
+        "label": "Force-push guard",
+        "route": "/v1/p/acme-agent/hooks/before-tool",
+        "mode": "veto"
+      },
+      {
+        "id": "test-reminder",
+        "point": "agents:after-tool",
+        "label": "Test reminder",
+        "route": "/v1/p/acme-agent/hooks/after-tool",
+        "mode": "transform"
+      }
+    ],
+    "contextMenus": [
+      {
+        "id": "summarize",
+        "location": "task.row",
+        "label": "Summarize Acme notes",
+        "icon": "sparkles",
+        "action": { "verb": "runNodeAction", "path": "/v1/p/acme-agent/summary" }
+      }
+    ]
+  }
+}

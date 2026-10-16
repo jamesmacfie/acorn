@@ -1,0 +1,63 @@
+---
+title: Waiting requests and notifications
+description: How the browser extension tells you an agent is waiting on you, with the toolbar badge, the Waiting for you list, and notifications from your operating system.
+sources:
+  - docs/browser-extension/notifications.md
+  - apps/extension/src/background/requestBadge.ts
+  - apps/extension/src/sidebar/Waiting.tsx
+  - apps/extension/src/sidebar/Settings.tsx
+  - apps/extension/src/pageScope.ts
+checked: 07aa959a0
+---
+
+import SidebarPicture from '../../../../components/SidebarPicture.astro'
+
+When an agent stops to ask you something, such as permission to run a command, the browser extension
+can tell you while you're on another page. This page covers the toolbar badge, the **Waiting for you**
+list, and notifications from your operating system.
+
+## The toolbar badge
+
+The Acorn button in the toolbar shows a number: how many requests are waiting in the projects of the
+page you're on. A page's projects are the task it belongs to, and the projects its sites suggest
+([Project sites](/docs/browser-extension/project-sites/)).
+
+The badge works with the panel closed, and goes to zero at once when the Node stops answering. It needs
+no access to the site, only the tab's address.
+
+## The Waiting for you list
+
+**Waiting for you**, at the top of Home, lists every request waiting on the Node, across all its
+projects, not only this page's. It's there only while something waits.
+
+<SidebarPicture id="sidebar-home" />
+
+Requests are grouped by conversation, under the task's name. Answer each one in place, with the same
+buttons the conversation shows, or click **Open** to go to the conversation. A group goes once nothing
+in it waits.
+
+So the badge says what waits for this page, and the list says what waits anywhere.
+
+## Notifications from your operating system
+
+Notifications are off until you turn them on:
+
+1. In the panel, open **Settings** > **Notifications**.
+2. Tick **Notify me when an agent waits on the projects of the page I'm on**.
+3. Allow notifications when the browser asks.
+
+You then get one notification for each request that waits in the projects of a page you have open in
+front, in any window. It says only **An agent is asking for permission.** or **An agent has a question
+for you.**, then **Open Acorn to answer.** It never shows the request, a project or task name, or the
+page. Click it to open the panel on that conversation. If the browser won't open the panel from a
+notification, the conversation is there the next time you open the panel.
+
+Turning notifications off in the browser's own settings turns them off here too.
+
+## Limits
+
+- The badge and notifications cover requests in the projects of the page in front. The list covers the
+  whole Node.
+- A request from an archived task isn't counted, because it has no conversation to open.
+- The extension notifies only for requests from the Node it's using.
+- It reads at most the 100 oldest waiting requests on the Node.

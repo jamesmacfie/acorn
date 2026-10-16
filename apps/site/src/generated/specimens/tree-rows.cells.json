@@ -1,0 +1,6 @@
+{"columns":40,"rows":4,"lines":[
+[{"text":" ","fg":"accent"},{"text":" ▾ src"}],
+[{"text":"  ","bg":"hover"},{"text":" ","fg":"accent","bg":"hover"},{"text":"   ","bg":"hover"},{"text":"login.ts","bg":"hover","attrs":["inverse"]},{"text":"                         ","bg":"hover"}],
+[{"text":"  "},{"text":" ","fg":"accent"},{"text":"   session.ts"}],
+[{"text":" ","fg":"accent"},{"text":" ▸ test"}]
+]}

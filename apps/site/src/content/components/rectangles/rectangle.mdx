@@ -1,0 +1,27 @@
+---
+title: Rectangle
+description: "A box whose pixels another view draws: a terminal, a web page, a frame, or an editor."
+sources:
+  - packages/client-core/src/kit/components/content/Rectangle.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`Rectangle` is the box and the keyboard contract, and nothing else. It's one tab stop. Enter hands the keys to what's inside, and Escape takes them back. A tree can't fill it, because `mount` is a function. A plugin draws its own pixels in a frame the host places, and the terminal draws a `Fallback` child where it can't draw the kind.
+
+<Specimen id="rectangle" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="rectangle" />
+
+## Related
+
+- [`Fallback`](/docs/components/rectangles/fallback/), for what the terminal draws instead.
+- [`Only`](/docs/components/rectangles/only/), for content on one host.
+
+## Mistakes
+
+- Expecting a tree's rectangle to show a page. Contribute a frame or a web view, and the host places it. For more information, see [Draw your own pixels in a frame](/docs/build-plugins/ui/draw-your-own-pixels-in-a-frame/) and [Show a web page](/docs/build-plugins/ui/show-a-web-page/).

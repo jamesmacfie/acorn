@@ -1,0 +1,24 @@
+---
+// The picture a link to a page shows when someone shares it: 1200 by 630 pixels, in the current theme
+// and style pack. A screenshot of this component is the card.
+import Mark from './Mark.astro'
+
+interface Props {
+  /** Where the page sits, such as "Docs" or "Build plugins". */
+  section: string
+  title: string
+  description: string
+}
+
+const { section, title, description } = Astro.props
+---
+
+<div class="social-card">
+  <p class="eyebrow">{section}</p>
+  <p class="social-card-title">{title}</p>
+  <p>{description}</p>
+  <div class="social-card-foot">
+    <Mark />
+    <span>acorn.sh</span>
+  </div>
+</div>

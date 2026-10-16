@@ -1,0 +1,7 @@
+{"columns":80,"rows":5,"lines":[
+[{"text":"Issue                     ","attrs":["bold"]},{"text":" "},{"text":"Title                     ","attrs":["bold"]},{"text":" "},{"text":"State                     ","attrs":["bold"]}],
+[{"text":"ACME-12                    Webhooks give up after on… In progress"}],
+[{"text":"ACME-14                    VAT missing on EU invoices In review"}],
+[{"text":"ACME-15                    Overdue invoice query is … Todo"}],
+[]
+]}

@@ -1,0 +1,8 @@
+{"columns":50,"rows":6,"lines":[
+[{"text":"header region","fg":"muted"}],
+[{"text":"┌─Deploys────────────────────────────────────────┐"}],
+[{"text":"│"},{"text":"body region","fg":"muted"},{"text":"                                     │"}],
+[{"text":"│                                                │"}],
+[{"text":"└────────────────────────────────────────────────┘"}],
+[{"text":"footer region","fg":"muted"}]
+]}

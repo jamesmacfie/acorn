@@ -1,0 +1,151 @@
+---
+title: GitHub
+description: Connect GitHub, import repositories, review pull requests with their threads and checks, merge or create one, and start a task from one.
+sources:
+  - docs/github-integration.md
+  - docs/github-integration/surfaces.md
+  - docs/github-integration/reads-and-writes.md
+  - docs/github-integration/palette.md
+  - docs/github-integration/tasks-and-references.md
+  - docs/github-integration/mirror.md
+  - docs/agent-tools/tracker-tools.md
+  - plugins/github/src/client/index.ts
+  - plugins/github/src/client/CreatePullForm.tsx
+  - plugins/github/src/client/checks/ChecksPanel.tsx
+  - plugins/github/src/client/pullDetail/PrOverview.tsx
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+The GitHub plugin connects your GitHub account and brings your repositories' pull requests into acorn:
+the list, each pull request's diff, conversation, checks, and Actions logs, and the controls to review,
+merge, and create one.
+
+<Snapshot id="review" />
+
+<PluginFacts id="github">
+  <Fragment slot="adds">**GitHub** in the left rail, the **Pull request** pane on a task with a pull request, a panel for a pull request a link points to, **Import from GitHub** on **Settings** > **Overview**, palette commands, and tools agents use to read review comments and checks and to open a pull request.</Fragment>
+  <Fragment slot="needs">A GitHub account, connected with a sign-in code.</Fragment>
+  <Fragment slot="reach">GitHub's API, with your connection's token, and the repositories on the Node. The token is stored encrypted on the Node, and agents never see it.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. Open **Settings** > **Services**, click **Add connection**, and choose **GitHub**.
+
+2. Click **Connect GitHub**. acorn shows a code and opens GitHub's sign-in page in your browser. Enter
+   the code there and approve. Keep acorn's page open until it finishes. acorn never sees your
+   password.
+
+3. Add a repository as a project, if it isn't one already. In **Settings** > **Overview**, click
+   **Import from GitHub**, and choose **Clone** or **Link folder** for a repository.
+
+4. Click **GitHub** in the left rail, or press ⌘0.
+
+   <Checkpoint>The list shows the project's open pull requests.</Checkpoint>
+
+</Steps>
+
+The first-run wizard offers the same sign-in, as **Connect GitHub**
+([Install](/docs/start/install/#the-first-run-setup)). To use your own GitHub app instead of acorn's, set
+`GITHUB_CLIENT_ID` in the Node's environment, and turn on **Device Flow** in that app's settings.
+
+## Find a pull request
+
+The list has **Open** and **Closed** tabs. **Search** narrows the loaded list by number, title, author,
+or branch, then asks GitHub for more matches in the repository. Select a pull request to open it
+beside the list.
+
+## Review a pull request
+
+A pull request opens on its overview, with its changed files and its conversation below:
+
+- **Overview.** Its state, author, branch, review decision, checks, and age, then the description,
+  linked issues, labels, reviewers, and the merge controls. **Add label…** and **Request review…** change
+  them.
+- **Changed files.** Every file's diff in one column. Press `/` to find a file, and `[` and `]` to step
+  through them. Mark a file **Viewed** as you go.
+- **Conversation.** Comments, reviews, commits, and inline threads in order. Each thread quotes the lines
+  it's about. Reply in a thread, write a comment in **Leave a comment…**, or submit a review.
+
+Comment on a line of the diff to start a review thread on it. An outdated thread keeps its comments, and
+says **Outdated**.
+
+### Checks and Actions logs
+
+The overview lists the pull request's checks. Open a GitHub Actions job to read its log, split by step.
+
+## Merge, close, or mark ready
+
+The merge box offers one main button for the pull request's state: **Merge**, with **Merge method**
+beside it, or **Ready for review** on a draft. **Convert to draft** and **Close** sit below. A pull
+request with conflicts says **This branch has conflicts**, and **Merge** is off until they're resolved.
+Where the repository allows it, you can set the pull request to merge on its own when its checks pass.
+
+## Create a pull request
+
+Press `c`, or run **Create pull request** from the command palette. Choose the branch to merge **From**
+and **Into**, give it a **Title** and a **Description**, and tick **Create as draft** if you want. The form
+shows the commits and changed files beside it. ⌘Enter creates it.
+
+An agent can open one too, with `github_pull_create`. When an agent's turn ends and its task's branch has
+an open pull request, acorn links the pull request to the task, whoever opened it.
+
+## Start a task from a pull request
+
+Right-click a pull request in the list and choose **Create task**, or click **Create task** in the
+pull request's pane. The task checks out the pull request's branch, and is linked to the Linear issues its
+description names, when acorn can tell which Linear workspace they're in. If a task already has the pull request, you get **Open task** instead.
+[Tasks and worktrees](/docs/using/tasks-and-worktrees/#create-a-task-from-a-pull-request-or-an-issue)
+has the details.
+
+A task with a pull request has the **Pull request** pane, which opens on the same views. A
+`github.com/…/pull/…` link elsewhere in acorn opens the pull request in a panel, without leaving the page
+you're on.
+
+## From the command palette
+
+| Command | Chord | What it does |
+| --- | --- | --- |
+| **Open GitHub** | ⌘0 | Opens GitHub in the left rail. |
+| **Find pull request** | | Searches the project's pull requests. |
+| **Create pull request** | `c` | Opens the create form. |
+| **Find file in this pull request** | `/` | Finds a changed file in the open pull request. |
+
+`[` and `]` step through a pull request's changed files without the palette.
+
+## For agents
+
+The task's pull request is in its context, under **Pull request**. Agents have three GitHub tools:
+
+| Tool | What it does |
+| --- | --- |
+| `pr_review_comments` | Reads the reviews, inline threads, and comments on the task's pull request. |
+| `pr_checks` | Reads every check, and names the failing ones and the ones still running. |
+| `github_pull_create` | Opens a pull request from the task's branch. |
+
+The two that read use what acorn already holds, so they don't spend your GitHub token. Agents never get the
+token itself ([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)).
+
+## Settings
+
+The connection's page under **Settings** > **Services** holds its name and **Disconnect**. GitHub has no
+key to replace: disconnect and connect again instead ([Settings: Connections](/docs/settings/connections/)).
+
+## In the terminal
+
+The terminal client draws the same list, pull request views, and pane. A link to a pull request opens it
+in a pane or a panel, never a browser. Connect GitHub from the desktop app.
+
+## Limits
+
+- One GitHub account per Node.
+- The open list holds 100 pull requests per repository. Search finds the rest.
+- A comparison for a new pull request shows at most 300 changed files, GitHub's own limit.
+- A pull request opened by a fork's branch, or two open on one branch, isn't linked to a task on its own.

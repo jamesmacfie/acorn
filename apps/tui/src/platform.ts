@@ -1,6 +1,7 @@
 import { NodeBroker } from '@acorn/custody/broker'
 import { DeviceConfigStore } from '@acorn/custody/config'
 import { toNodeRecord } from '@acorn/custody/broker'
+import { listenForOauthCallback } from '@acorn/custody/oauthCallback'
 import { probeNode, pairWithNode } from '@acorn/custody/broker/nodePairing.ts'
 import type { NodePairRequest, NodeProbeResult, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import type { OpenedNode } from './node/open'
@@ -229,6 +230,10 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     // A typed local path is the terminal equivalent of the desktop's file dialog. The bridge
     // returns bytes, so the Node may be remote and never needs the host filesystem path.
     files: { pick: pickLocalFile, save: saveLocalFile },
+
+    // An MCP server's sign-in comes back to a port on this machine. Over SSH the browser is on another
+    // machine and cannot reach it, which is why the sign-in also offers to paste the address.
+    oauthCallback: { listen: () => listenForOauthCallback() },
 
     // A terminal has no file manager to reveal a path in, so "open the data folder" is the path
     // itself. It prints on the way out rather than now, because the renderer owns the screen until

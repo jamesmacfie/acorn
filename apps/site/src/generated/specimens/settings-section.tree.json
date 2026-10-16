@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "title": "SettingsSection with rows",
+    "caption": "A settings section: a label, a description, and a row per setting.",
+    "terminal": {
+      "columns": 60,
+      "rows": 7
+    },
+    "width": 560
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "SettingsSection",
+          "props": {
+            "id": "dev-server",
+            "label": "Dev server",
+            "description": "How acorn starts this project."
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "SettingRow",
+              "props": {
+                "label": "Command"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "pnpm dev"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n5",
+              "type": "SettingRow",
+              "props": {
+                "label": "Port",
+                "help": "Used for the preview pane."
+              },
+              "children": [
+                {
+                  "id": "n6",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n7",
+                      "type": "#text",
+                      "props": {
+                        "value": "4000"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

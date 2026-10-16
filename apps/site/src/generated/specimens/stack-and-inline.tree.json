@@ -1,0 +1,156 @@
+{
+  "meta": {
+    "title": "Stack and Inline",
+    "caption": "A stack of three lines, each an inline run spaced by the inline gap.",
+    "terminal": {
+      "columns": 50,
+      "rows": 3
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Text",
+                  "props": {
+                    "emphasis": "strong"
+                  },
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "build"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n5",
+                  "type": "Badge",
+                  "props": {
+                    "tone": "ok"
+                  },
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "passed"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n7",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n8",
+                  "type": "Text",
+                  "props": {
+                    "emphasis": "strong"
+                  },
+                  "children": [
+                    {
+                      "id": "n9",
+                      "type": "#text",
+                      "props": {
+                        "value": "test"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n10",
+                  "type": "Badge",
+                  "props": {
+                    "tone": "warn"
+                  },
+                  "children": [
+                    {
+                      "id": "n11",
+                      "type": "#text",
+                      "props": {
+                        "value": "flaky"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n12",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n13",
+                  "type": "Text",
+                  "props": {
+                    "emphasis": "strong"
+                  },
+                  "children": [
+                    {
+                      "id": "n14",
+                      "type": "#text",
+                      "props": {
+                        "value": "deploy"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n15",
+                  "type": "Badge",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n16",
+                      "type": "#text",
+                      "props": {
+                        "value": "waiting"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

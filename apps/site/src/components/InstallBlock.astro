@@ -1,0 +1,42 @@
+---
+// The install block: a tab per way to install, its commands after a prompt, and a Copy button that
+// copies the commands without the prompts.
+interface Props {
+  /** Unique on the page. Each tab's panel takes its id from it. */
+  id: string
+  methods: { label: string; commands: string[] }[]
+}
+
+const { id, methods } = Astro.props
+const panels = methods.map((method, index) => ({ ...method, panel: `${id}-${index}`, code: `${id}-${index}-code` }))
+---
+
+<div class="install frame">
+  <div class="frame-bar">
+    <div class="tabs" role="tablist" aria-label="Install method" data-tabs hidden>
+      {
+        panels.map((method) => (
+          <button type="button" role="tab" aria-controls={method.panel}>
+            {method.label}
+          </button>
+        ))
+      }
+    </div>
+  </div>
+  {
+    panels.map((method) => (
+      <div class="install-panel" id={method.panel} role="tabpanel" aria-label={method.label}>
+        {/* Focusable, so a keyboard can scroll a command wider than the block. */}
+        <pre tabindex="0"><code id={method.code}>{method.commands.map((command, line) => <Fragment>{line > 0 && '\n'}<span>{command}</span></Fragment>)}</code></pre>
+        <button type="button" class="button" data-copy={method.code} aria-live="polite" hidden>
+          Copy
+        </button>
+      </div>
+    ))
+  }
+</div>
+
+<script>
+  import '../scripts/tabs'
+  import '../scripts/copy'
+</script>

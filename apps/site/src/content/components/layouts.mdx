@@ -1,0 +1,104 @@
+---
+title: Layouts
+description: The eight named layouts a pane can take, the regions each one has, and how each draws on the desktop, on a narrow screen, and in the terminal.
+sources:
+  - docs/panes/layout.md
+  - packages/protocol/src/chrome/paneLayouts.ts
+checked: afced2661
+---
+
+This page covers the eight layouts a plugin's pane can name, and what each host draws for each one.
+Read it when you add a pane and choose how its regions are arranged.
+
+A pane names one layout in its manifest and fills that layout's regions, each with a tree or a frame.
+The host draws the split, the divider, and the drag handle, and keeps where the reader dragged them.
+[Add a pane](/docs/build-plugins/ui/add-a-pane/) shows the manifest.
+
+{/* facts */}
+
+## Why a layout is a name
+
+A layout is a name, never a setting. `document-over-frame` and `frame-beside-document` are the same
+two regions with the axis flipped, and that's two names rather than one layout with an `orientation`
+prop. A plugin that could set an orientation, a column count, or a width would be laying the pane out
+itself, and only the host knows how wide the window is, how narrow a phone is, and what fits in 80
+columns. A pane that needs an arrangement none of these give needs a new layout in acorn, written for
+every host first.
+
+Every region is a focus group. F6 and Shift+F6 move between a pane's regions on the desktop, and each
+region remembers where it was.
+
+## single
+
+<Specimen id="layout-single" both />
+
+One region, `body`, with the pane's padding. On a narrow screen it doesn't change. The terminal frames
+it, titled with the pane's name.
+
+## list-detail
+
+<Specimen id="layout-list-detail" both />
+
+A list beside the detail of what's selected, with the split and its handle drawn by the host.
+`list-header` and `list-footer` pin above and below the list's own scroll. On a narrow screen it shows
+one region at a time: selecting in the list shows the detail, and a back control returns. The terminal
+draws two frames, **List** and **Detail**, above 80 columns, and one at a time below.
+
+## header-body-footer
+
+<Specimen id="layout-header-body-footer" both />
+
+A header and a footer that stay put around a body that scrolls. All three regions are optional, so a
+pane with no footer is this layout with two regions. On a narrow screen it doesn't change. The
+terminal frames the body and leaves the one-line strips bare, because a frame around one line costs
+three rows.
+
+## tabs
+
+<Specimen id="layout-tabs" both />
+
+The host's tab bar, with one region per tab named `panel:<tab id>`. Only the open tab's region is
+drawn. On a narrow screen the bar scrolls sideways. The terminal draws the bar on one line and frames
+the panel, titled with the open tab.
+
+## document-over-frame
+
+<Specimen id="layout-document-over-frame" both />
+
+A document the host edits, over a region the plugin draws, with a handle between them. On a narrow
+screen the frame region becomes a sheet the document can open. The terminal draws both halves, each
+framed, and the document is a read-only text view there.
+
+## frame-beside-document
+
+<Specimen id="layout-frame-beside-document" both />
+
+The same two regions, side by side. On a narrow screen it works as `document-over-frame` does, and so
+it does in the terminal.
+
+## stack-split
+
+<Specimen id="layout-stack-split" both />
+
+Two stacked regions, `top` and `bottom`, with a handle between them. On a narrow screen `bottom`
+becomes a full-height sheet. The terminal frames each region.
+
+## wizard
+
+<Specimen id="layout-wizard" both />
+
+One step at a time. The host draws the step indicator and a footer with every action: skip, back,
+next, and finish on the last step. The step itself is the plugin's one region. On a narrow screen it
+doesn't change. The terminal frames the step, titled with the pane's name.
+
+## In the terminal
+
+Every region draws a frame with the region's name in its top border, and the frame lights up while
+the keys are inside it. There's no handle to drag, so a split moves by a key: Ctrl+Shift and an arrow.
+
+## Limits
+
+- The narrow projections are written down for a mobile client and not built. The desktop app and the
+  terminal client draw the two projections pictured above.
+- A layout's required regions must all be filled, and a region the layout doesn't have is refused when
+  the manifest is read.

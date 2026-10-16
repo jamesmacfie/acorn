@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stands in for uv while the shell snapshots are captured (docs/site/snapshots.md § The fixture): the
+# fixture's workflow runs the tests and the type check, and there is no Python project to run them on.
+case "$*" in
+  "run pytest") printf '14 passed in 0.62s\n' ;;
+  "run pyright") printf '0 errors, 0 warnings, 0 informations\n' ;;
+  *) printf 'Deployed billing-staging\n' ;;
+esac

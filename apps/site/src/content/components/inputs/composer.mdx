@@ -1,0 +1,27 @@
+---
+title: Composer
+description: A message field with a send button.
+sources:
+  - packages/client-core/src/kit/components/inputs/Composer.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Composer` for a message the reader sends, such as a question to an agent. `onSubmit` sends the text.
+
+<Specimen id="composer" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="composer" />
+
+## Related
+
+- [`Textarea`](/docs/components/inputs/textarea/), for text that isn't sent.
+- [`MentionTextarea`](/docs/components/inputs/mention-textarea/), for a field that completes mentions.
+
+## Mistakes
+
+- Reading `onInput` to track the text. It's dropped from a tree, so act on `onSubmit`.

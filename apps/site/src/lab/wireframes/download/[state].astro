@@ -1,0 +1,100 @@
+---
+// The download page in both states phase 10 defines: no release, and a release with an asset for every
+// platform. With no release, Build from source moves to the top.
+import Install from '../_Install.astro'
+import Page from '../_Page.astro'
+import { wireframe } from '../_nav'
+
+export function getStaticPaths() {
+  return [{ params: { state: 'no-release' } }, { params: { state: 'release' } }]
+}
+
+const release = Astro.params.state === 'release'
+const noRelease =
+  'acorn has no signed release. Build from source, or watch the repository for the first release.'
+
+const sections = [
+  {
+    heading: 'Desktop app',
+    text: 'For macOS and Windows. System requirements, the first run, and how to open an app macOS hasn’t notarized, with the reason.',
+    assets: ['macOS, Apple silicon · .dmg', 'macOS, Intel · .dmg', 'Windows · installer .exe'],
+  },
+  {
+    heading: 'Terminal client and command line',
+    text: 'Put acorn on your PATH, from the desktop app or from the standalone tarball.',
+    assets: ['From the desktop app: Settings > Command line', 'From the tarball: bin/acorn.mjs'],
+  },
+  {
+    heading: 'Standalone Node',
+    text: 'Run a Node on a server with no desktop app, and pair it from any client.',
+    assets: ['Standalone Node · .tgz', 'Checksums · SHA256SUMS'],
+  },
+]
+---
+
+<Page title={release ? 'Download, with a release' : 'Download, no release'} current="download">
+  <main class="wrap">
+    <section class="section" style="border-top: 0">
+      <p class="tag">State: {release ? 'a release with assets for every platform' : 'no release'}</p>
+      <h1>Download acorn</h1>
+      {
+        release ? (
+          <p>acorn 1.0.0 · released on the release's date · <a href={wireframe('changelog')}>What changed</a></p>
+        ) : (
+          <p>{noRelease} <a href="https://github.com/jamesmacfie/acorn/releases">Releases on GitHub</a></p>
+        )
+      }
+      <p class="tag">With script, the section for the visitor's platform moves first.</p>
+    </section>
+    {
+      !release && (
+        <section class="section">
+          <h2>Build from source</h2>
+          <p>You need Node, pnpm 11, and a Rust toolchain. The steps are the ones in the repository's README.</p>
+          <Install />
+        </section>
+      )
+    }
+    {
+      sections.map((section) => (
+        <section class="section">
+          <h2>{section.heading}</h2>
+          <p>{section.text}</p>
+          {release ? (
+            <div class="cols" style="--min: 220px">
+              {section.assets.map((asset) => (
+                <a class="card" href="#">
+                  {asset}
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p class="callout">{noRelease}</p>
+          )}
+        </section>
+      ))
+    }
+    <section class="section">
+      <h2>Browser extension</h2>
+      <p>
+        For Chrome and Firefox. The extension isn't in a browser store: load the build, then install its native bridge
+        so it can reach your Node.
+      </p>
+      <ol class="steps">
+        <li>Build the extension.</li>
+        <li>Load it in your browser.</li>
+        <li>Install the native bridge, and pair.</li>
+      </ol>
+      <a href="/docs/browser-extension/set-up-the-extension/">Set up the extension</a>
+    </section>
+    {
+      release && (
+        <section class="section">
+          <h2>Build from source</h2>
+          <p>You need Node, pnpm 11, and a Rust toolchain.</p>
+          <Install />
+        </section>
+      )
+    }
+  </main>
+</Page>

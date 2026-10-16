@@ -1,0 +1,91 @@
+{
+  "meta": {
+    "title": "A link preview",
+    "caption": "acme-review's preview of a docs.example.com link, read from its own route.",
+    "terminal": {
+      "columns": 50,
+      "rows": 2
+    },
+    "width": 360
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Text",
+          "props": {
+            "emphasis": "muted"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "#text",
+              "props": {
+                "value": "No summary for this page."
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n3",
+          "type": "Stack",
+          "props": {
+            "gap": "inline"
+          },
+          "children": [
+            {
+              "id": "n4",
+              "type": "Text",
+              "props": {
+                "emphasis": "strong"
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "Review guide"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Text",
+              "props": {
+                "wrap": true
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "#text",
+                  "props": {
+                    "value": "How Acme reviews a change."
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "op": "remove",
+        "id": "n1"
+      }
+    ]
+  ]
+}

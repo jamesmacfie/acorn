@@ -1,0 +1,6 @@
+{"columns":50,"rows":4,"lines":[
+[{"text":"▾ "},{"text":"Changed files","attrs":["bold"]},{"text":" "},{"text":"2","fg":"muted"}],
+[{"text":"  src/login.ts"}],
+[{"text":"  src/session.ts"}],
+[{"text":"▸ "},{"text":"Commits","attrs":["bold"]},{"text":" "},{"text":"4","fg":"muted"}]
+]}

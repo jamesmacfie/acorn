@@ -1,0 +1,67 @@
+---
+title: styles
+description: "Style packs for Settings > Appearance: shape, spacing, and density."
+sources:
+  - docs/ui-design/appearance.md
+  - docs/ui-design/tokens.md
+checked: '498833615'
+---
+
+A style pack changes acorn's shape rather than its colors: corner radius, borders, spacing, and
+density. It's a partial set of style tokens. Any token you leave out keeps the default, and acorn checks
+every value against what that token accepts.
+
+## A minimal example
+
+```json manifest
+{
+  "contributions": {
+    "styles": [
+      {
+        "id": "rounded",
+        "label": "Rounded",
+        "tokens": {
+          "--radius-surface": "var(--radius-lg)"
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "contributions": {
+    "styles": [
+      {
+        "id": "rounded",
+        "label": "Rounded",
+        "description": "Larger corners and softer cards.",
+        "tokens": {
+          "--radius-surface": "var(--radius-lg)",
+          "--elev-card": "var(--shadow-2)"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The terminal client draws no shapes, so a style pack changes nothing there.
+
+## Mistakes
+
+- One value acorn can't use refuses the whole pack.
+- A pack can't change icons.
+
+## Guide
+
+[Add a theme or a style pack](/docs/build-plugins/ui/add-a-theme-or-a-style-pack/) walks through it from start to finish.

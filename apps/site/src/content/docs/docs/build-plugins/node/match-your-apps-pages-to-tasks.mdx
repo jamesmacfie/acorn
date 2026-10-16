@@ -1,0 +1,108 @@
+---
+title: Match your app's pages to tasks
+description: Tell the browser extension which local address each task's running app answers at, so its pages show their task and a branch marker.
+sources:
+  - docs/plugin-authoring/browser-handoffs.md
+  - docs/browser-extension/task-pages.md
+  - packages/protocol/src/plugin/handoffs.ts
+  - examples/plugins/acme-browser/acorn-plugin.json
+  - examples/plugins/acme-browser/node.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll tell the browser extension where each task's app answers while it runs, such as a development
+server on `localhost`, so a tab on that app knows which task it belongs to.
+
+## The result
+
+With a task's app running at `https://acme-5b0d7c39.localhost:5173`, a tab on it:
+
+- Shows the task under **This page** in the extension's panel, with the state line **Acme app running**.
+- Gets a small marker in the page's bottom-right corner with the task's branch and **running**. Its
+  menu has **Show in side panel**, **Open in Acorn**, and **Ask about an element**.
+- Opens the task's [browser panel](/docs/build-plugins/node/show-a-panel-in-the-browser-sidebar/), if
+  your plugin has one.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-browser`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-browser),
+which treats a task's `web` run target as its app.
+
+## Steps
+
+<Steps>
+
+1. **Declare the route.** One `GET` route on your Node half.
+
+   <ExampleCode file="acme-browser/acorn-plugin.json" pick={['contributions.taskAddresses']} />
+
+2. **List each running app.** Answer `{ addresses }`, one per task whose app answers right now:
+
+   <ExampleCode file="acme-browser/node.js" region="addresses" />
+
+   - `origin` is exact, in the form a browser reports it: scheme, a loopback host, and the port, with no
+     path. `localhost`, a `*.localhost` name, `127.x.x.x`, and `[::1]` are loopback hosts.
+   - `label` names what answers, and `state` is read after it as one line, **Acme app running**. The
+     marker shows `state` alone, so write it in lower case.
+   - `severity` is `info` for healthy, `warn` for something to check, and `danger` for a failure.
+
+3. **Say when the list changes.** The extension never polls. It reads your route when a task changes
+   and when you call `ctx.events.status()`, so call it when an app comes up or goes down:
+
+   <ExampleCode file="acme-browser/node.js" region="run-target" />
+
+4. **Check it.** Start the task's `web` run target, and open its address in a browser with the
+   extension paired. The marker appears once the extension may read the site.
+
+</Steps>
+
+## Why the list stays on your side
+
+The extension matches tabs against your list in the browser. No tab's address goes to the Node for it,
+and the person still decides which sites the extension may read.
+
+## Mistakes
+
+- An address for an app that isn't answering. List an app only while it runs, and drop it as soon as it
+  stops.
+- A public address, such as `https://staging.acme.example`. Only loopback hosts are taken, so a list
+  can't claim someone else's site.
+- `https://app.localhost:443`, or a path such as `https://app.localhost/x`. Write the origin the way the
+  browser reports it: no default port, and no path.
+- Answering a task's own agent. The extension calls with the device's credential, so refuse a
+  credential bound to one task.
+
+`taskAddresses` is one route, not a list of addresses:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": { "taskAddresses": ["https://acme.localhost:5173"] }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": { "taskAddresses": "/v1/p/acme/task-addresses" }
+}
+```
+
+## In the terminal
+
+This is a browser extension feature.
+
+## Limits
+
+- One route per plugin, and up to 64 addresses in an answer, at most 64 KiB.
+- An address for a task that isn't active is dropped. One bad entry refuses your whole answer, and
+  the other plugins' addresses still show.
+
+## Reference
+
+[taskAddresses](/docs/build-plugins/reference/contributions/task-addresses/) has every field.
+[Task chips and handoffs](/docs/browser-extension/task-chips-and-handoffs/) is what the person sees.

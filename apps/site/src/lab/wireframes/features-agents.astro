@@ -1,0 +1,98 @@
+---
+// One feature page, in phase 9's shape, with copy written from docs/managed-agents.md and its topic
+// pages. Pictures alternate sides on wide screens only.
+import Page from './_Page.astro'
+import { href, wireframe } from './_nav'
+
+const sections = [
+  {
+    heading: 'Claude Code and Codex, with their own logins',
+    text: "acorn runs Claude Code and Codex as managed sessions inside a task, working in the task's worktree. Each harness signs in with its own login, so acorn never spends an API key on your agents, and you can keep a work account beside a personal one. Each turn records its tokens and cost.",
+    picture: 'Specimen: the new session menu, with Claude Code and Codex',
+    docs: 'Harnesses and defaults',
+  },
+  {
+    heading: 'Read every turn, and answer what it waits on',
+    text: 'The transcript shows each tool call, the files it read, and the diff it made. When an agent asks for a permission or asks you a question, the session waits for your answer and the inbox tells you.',
+    picture: 'Specimen: a transcript with a tool call and an approval',
+    docs: 'Agent sessions',
+  },
+  {
+    heading: 'Queue the next turn, or steer the one running',
+    text: 'Send a message while the agent works and it waits in the queue. Press Steer and the agent reads it after its current step, without waiting for the turn to end.',
+    picture: 'Specimen: the composer with Steer beside Send, and a queued row',
+    docs: 'Steering, queues, and follow-ups',
+  },
+  {
+    heading: 'Hand work to another session',
+    text: 'A session can start another managed session, in the same task or in a child task with its own worktree, give it work, and read what it found.',
+    picture: 'Specimen: a parent session with two delegated children',
+    docs: 'Delegation and subagents',
+  },
+  {
+    heading: 'Save a setup as a custom agent',
+    text: "A custom agent is a saved start: a harness, its options, a system prompt, and a ceiling on which of acorn's tools it may call. It shows under New in the Agent pane and in the command palette.",
+    picture: 'Specimen: the custom agent form',
+    docs: 'Custom agents',
+  },
+  {
+    heading: 'Memory you can read and undo',
+    text: 'Agents save what they learn as Markdown files for later sessions. The Memory page lists, searches, edits, and restores them, and shows each one’s history.',
+    picture: 'Specimen: the Memory page with one memory open',
+    docs: 'Memory',
+    base: 'using',
+  },
+]
+---
+
+<Page title="Agents">
+  <main>
+    <section class="wrap section" style="border-top: 0">
+      <p class="tag">1 · Title and one sentence</p>
+      <h1>Agents</h1>
+      <p>Run Claude Code and Codex inside your tasks, and answer them from the same window as the diff.</p>
+      <p class="tag">2 · The picture</p>
+      <div class="box" style="aspect-ratio: 16 / 9">Shell snapshot: an agent session in a task, beside the Changes pane</div>
+    </section>
+    {
+      sections.map((section, index) => (
+        <section class="wrap section">
+          {index === 0 && <p class="tag">3 · Sections: a question, a paragraph, a picture, and a docs link</p>}
+          <div class="cols" style="--min: 320px">
+            <div class="stack" style={index % 2 ? 'order: 1' : undefined}>
+              <h2>{section.heading}</h2>
+              <p>{section.text}</p>
+              <a href={href(section.base ?? 'agents', section.docs)}>Read {section.docs}</a>
+            </div>
+            <div class="box" style="block-size: 280px">
+              {section.picture}
+            </div>
+          </div>
+        </section>
+      ))
+    }
+    <section class="wrap section">
+      <p class="tag">4 · In the terminal</p>
+      <h2>In the terminal</h2>
+      <p>
+        The terminal client runs agent sessions too: open one, answer what it's waiting on, and send turns. Attaching
+        a file, exporting a transcript, Continue in terminal, and the agent settings pages need the desktop app.
+      </p>
+    </section>
+    <section class="wrap section">
+      <p class="tag">5 · Related features</p>
+      <div class="cols" style="--min: 240px">
+        <a class="card" href="/features/tasks/">Tasks</a>
+        <a class="card" href="/features/review/">Review</a>
+        <a class="card" href="/features/security/">Security</a>
+      </div>
+    </section>
+    <section class="wrap section">
+      <p class="tag">6 · Get started</p>
+      <div class="row">
+        <a class="button primary" href={wireframe('download/no-release')}>Get acorn</a>
+        <a class="button" href={href('agents', 'Agent sessions')}>Read the agents docs</a>
+      </div>
+    </section>
+  </main>
+</Page>

@@ -45,6 +45,9 @@ and its own `acorn-plugin.config.mjs`. It touches no composition list and no gol
 manifest is the record. Some loaded packages have an `apps/node` dependency entry only because that
 app's tests import them.
 
+Either kind of plugin that ships also needs an entry and a docs page on the public site, with a reason
+for each permission a loaded package asks for ([built-in plugin pages](../site/built-in-plugins.md)).
+
 ## The golden lists
 
 Four test files hold an exact, reviewed record of what each compiled plugin claims. They're

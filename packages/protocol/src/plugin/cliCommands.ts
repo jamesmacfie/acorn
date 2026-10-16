@@ -9,19 +9,44 @@ export const PLUGIN_CLI_OUTPUT_MAX_BYTES = PLUGIN_TOOL_OUTPUT_MAX_BYTES
 // guessing how a scalar should be projected into the CLI resource envelope.
 export const pluginCliCommandDescriptorSchema = z
   .strictObject({
-    name: z.string().regex(/^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){0,63}$/, 'command name must be lower-case kebab-case'),
-    title: z.string().min(1).max(80),
-    summary: z.string().min(1).max(300),
-    effects: z.string().min(1).max(500).optional(),
-    risk: z.enum(['read', 'write']),
-    scope: z.enum(['node', 'workspace', 'project', 'task']),
-    capability: z.string().min(1).max(64),
-    inputSchema: boundedPluginToolSchema,
-    outputSchema: boundedPluginToolSchema,
-    route: z.strictObject({
-      method: z.literal('POST'),
-      path: z.string().regex(/^\/cli\/[a-z][a-z0-9-]{0,63}$/, 'route must be a relative /cli/ command path'),
-    }),
+    name: z
+      .string()
+      .regex(/^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){0,63}$/, 'command name must be lower-case kebab-case')
+      .describe("The command's name after `acorn plugin <pluginId>`, in lowercase kebab case."),
+    title: z.string().min(1).max(80).describe("The command's title in help."),
+    summary: z.string().min(1).max(300).describe('One or two sentences of help.'),
+    effects: z
+      .string()
+      .min(1)
+      .max(500)
+      .optional()
+      .describe('What the command changes. Required when `risk` is `write`.'),
+    risk: z.enum(['read', 'write']).describe('Whether the command only reads, or changes something.'),
+    scope: z
+      .enum(['node', 'workspace', 'project', 'task'])
+      .describe(
+        'What the command acts on. `inputSchema` must require `nodeId`, and the ID this scope names, as strings.',
+      ),
+    capability: z
+      .string()
+      .min(1)
+      .max(64)
+      .describe(
+        'The core facet the command needs, such as `projects:read`. Declare it in `permissions.node.core` too: this field grants nothing.',
+      ),
+    inputSchema: boundedPluginToolSchema.describe(
+      "A JSON Schema for the command's input, of type `object`, in the same language as an agent tool's.",
+    ),
+    outputSchema: boundedPluginToolSchema.describe("A JSON Schema for your route's answer, of type `object`."),
+    route: z
+      .strictObject({
+        method: z.literal('POST').describe('Always `POST`.'),
+        path: z
+          .string()
+          .regex(/^\/cli\/[a-z][a-z0-9-]{0,63}$/, 'route must be a relative /cli/ command path')
+          .describe('`/cli/<name>`, matching `name`.'),
+      })
+      .describe('The route on your Node half that runs the command.'),
   })
   .superRefine((entry, ctx) => {
     if (entry.risk === 'write' && !entry.effects)

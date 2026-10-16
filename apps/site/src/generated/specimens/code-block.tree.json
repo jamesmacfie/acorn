@@ -1,0 +1,37 @@
+{
+  "meta": {
+    "title": "CodeBlock",
+    "caption": "A command in a code block, with its copy control.",
+    "terminal": {
+      "columns": 60,
+      "rows": 3
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "CodeBlock",
+          "props": {
+            "copy": true
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "#text",
+              "props": {
+                "value": "pnpm test --filter=@acme/billing"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

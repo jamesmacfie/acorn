@@ -1,0 +1,100 @@
+---
+title: Preview links and draw code fences
+description: Draw a preview of a link to your site, and draw a code fence in Markdown as your own view, with core:link-preview and core:markdown-fence.
+sources:
+  - docs/plugins/link-previews.md
+  - docs/plugins/markdown-fences.md
+  - examples/plugins/acme-review/acorn-plugin.json
+  - examples/plugins/acme-review/src/client.tsx
+  - examples/plugins/acme-review/node.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll fill two points acorn owns: a preview for links to a site you know about, and a view for code
+fences in Markdown with a language you know how to draw.
+
+## The result
+
+The Acme review example's preview of a `docs.example.com` link, and its view of a ` ```review ` fence:
+
+<Specimen id="acme-review-docs-preview" />
+
+<Specimen id="acme-review-checklist" />
+
+## Before you start
+
+Read [Add to another plugin's view](/docs/build-plugins/ui/add-to-another-plugins-view/). The code is
+from [`examples/plugins/acme-review`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-review).
+
+## Preview links
+
+<Steps>
+
+1. **Declare the sites.** `matches` lists the HTTPS addresses you preview, each exact, `prefix*`, or
+   `*suffix`.
+
+   <ExampleCode file="acme-review/acorn-plugin.json" pick={['contributions.extensions#docs']} />
+
+2. **Read on your Node half.** acorn fetches nothing for a preview. Your route gets the URL, and owns
+   which hosts it reads, redirects, size, and timeouts.
+
+   <ExampleCode file="acme-review/node.js" region="docs" />
+
+3. **Draw the preview.** The tree gets `{ url, label?, taskId?, projectId?, ref? }`. Moving to another
+   matching link is a props update, so read again for the new URL.
+
+   <ExampleCode file="acme-review/src/client.tsx" region="docs-preview" />
+
+4. **Check it.** Put `https://docs.example.com/guide/review` in an agent reply or a note, and rest the
+   pointer on it. The preview opens after a moment. Right-click the link, or press
+   <kbd>Shift</kbd>+<kbd>F10</kbd> on it, for **Preview** from the keyboard.
+
+</Steps>
+
+## Draw code fences
+
+<Steps>
+
+1. **Declare the languages.** `matches` lists fence hints, lowercase: ` ```review ` is `review`.
+
+   <ExampleCode file="acme-review/acorn-plugin.json" pick={['contributions.extensions#checklist']} />
+
+2. **Draw the fence.** The tree gets `{ blockId, language, text, revision, taskId?, projectId? }`.
+   `text` is the fence's source without its first and last lines. A changed fence is a new block, so
+   your tree never draws text it wasn't given.
+
+   <ExampleCode file="acme-review/src/client.tsx" region="checklist" />
+
+3. **Check it.** Ask an agent to answer with a ` ```review ` fence of file paths. The fence draws as a
+   checklist, with acorn's **Preview** toggle beside the copy button to see the source.
+
+</Steps>
+
+## Mistakes
+
+- A link preview reads from your own route. A frame can't load an outside website, and acorn adds no
+  network permission for a preview.
+- Hints aren't aliases: `yml` and `yaml` are two keys. List both.
+- Draw a fallback while the route answers, and when it fails.
+
+## In the terminal
+
+The terminal client has no hover. Pressing a link in a pane offers **Preview**, which opens your tree in
+a dialog. A fence view draws under a line with **Source** or **Preview**, **Copy**, and the hint, clipped
+at 20 rows.
+
+## Limits
+
+- No preview for a URL over 4,096 characters or one with a user name or password.
+- Each agent message or Markdown node opens at most four fence views at a time.
+- Only a closed fence with a hint, and at most 256 KiB of text, gets a view.
+- Links in overlays and reference panels get no preview.
+
+## Reference
+
+[Extension points](/docs/build-plugins/reference/extension-points/) has `core:link-preview` and
+`core:markdown-fence`.

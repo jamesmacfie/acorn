@@ -18,9 +18,16 @@ const timeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)
 // Cadence: a stored out-of-range value is clamped, never rejected, because rejecting would mean a row
 // the owner can see but the node refuses to load.
 export const cadenceSchema = z.union([
-  z.object({ every: z.number().finite().positive() }),
-  z.object({ daily: timeOfDay }),
-  z.object({ weekly: z.object({ day: z.number().int().min(0).max(6), at: timeOfDay }) }),
+  z.object({ every: z.number().finite().positive().describe('Seconds between runs, at most a week.') }),
+  z.object({ daily: timeOfDay.describe("A time each day, as `HH:MM` in the Node's local time.") }),
+  z.object({
+    weekly: z
+      .object({
+        day: z.number().int().min(0).max(6).describe('The day of the week, 0 to 6, where 0 is Sunday.'),
+        at: timeOfDay.describe("The time, as `HH:MM` in the Node's local time."),
+      })
+      .describe('A day and time each week.'),
+  }),
 ])
 
 export type Cadence = z.infer<typeof cadenceSchema>

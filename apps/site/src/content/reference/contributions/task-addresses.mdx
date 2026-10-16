@@ -1,0 +1,70 @@
+---
+title: taskAddresses
+description: "One route listing the local origins your tasks' apps answer at."
+sources:
+  - docs/plugin-authoring/browser-handoffs.md
+checked: '498833615'
+---
+
+`taskAddresses` names one GET route on your Node half that lists the exact local origins your tasks'
+apps answer at while they run, such as `https://app.localhost:5104`. The browser extension matches pages
+against the list in the browser, so it can show the right task on a page, and no page address goes to
+the Node.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "taskAddresses": "/v1/p/acme/task-addresses"
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "stack",
+        "label": "Stack",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "stack"
+          }
+        }
+      }
+    ],
+    "taskAddresses": "/v1/p/acme/task-addresses",
+    "browserPanel": {
+      "label": "Stack",
+      "pane": "stack",
+      "route": "/v1/p/acme/browser-panel"
+    }
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+This is a browser extension feature, not a client one.
+
+## Mistakes
+
+- An address is a loopback origin with no path: `localhost`, a `*.localhost` name, `127.x.x.x`, or `[::1]`.
+
+## Guide
+
+[Match your app's pages to tasks](/docs/build-plugins/node/match-your-apps-pages-to-tasks/) walks through it from start to finish.

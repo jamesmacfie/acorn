@@ -1,0 +1,27 @@
+---
+title: Markdown
+description: Formatted prose from a Markdown string.
+sources:
+  - packages/client-core/src/kit/components/content/Markdown.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Markdown` for text that arrives as Markdown, such as an issue's body or release notes. The host parses it, highlights its code, and opens its links.
+
+<Specimen id="markdown" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="markdown" />
+
+## Related
+
+- [`Text`](/docs/components/content/text/), for a plain run.
+- [`CodeBlock`](/docs/components/content/code-block/), for code on its own.
+
+## Mistakes
+
+- Relying on images in the terminal. The terminal draws no images, and writes a link's address beside its text.

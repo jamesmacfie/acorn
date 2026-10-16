@@ -1,0 +1,94 @@
+---
+title: Add icons and brand marks
+description: Name Lucide icons for your plugin's surfaces, and add your own brand marks with their colors.
+sources:
+  - docs/ui-design/icons.md
+  - examples/plugins/acme-theme/acorn-plugin.json
+  - examples/plugins/acme-tracker/acorn-plugin.json
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll give your plugin's surfaces icons: any of Lucide's by name, or your own brand mark, declared in
+the manifest.
+
+## The result
+
+The Acme tracker example's issue list at icon width, where each row is a Lucide icon its tree names:
+
+<Specimen id="acme-tracker-list-collapsed" />
+
+## Before you start
+
+You need a manifest. The code is from
+[`examples/plugins/acme-theme`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-theme)
+and [`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker).
+
+## Steps
+
+<Steps>
+
+1. **Name a Lucide icon.** A `glyph` or `icon` field takes any [Lucide](https://lucide.dev/icons/)
+   name, such as `list-todo`. Trees name icons the same way, in an `Icon` node or a `Row`'s
+   `collapsedIcon`.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.sources']} />
+
+2. **Add your brand mark.** `icon`, at the top of the manifest, is one SVG path's `d` attribute in a
+   24 by 24 box, and an optional six-digit hex `color`. acorn registers it as `brand:<your plugin ID>`.
+   `icons` adds up to 16 more, each as `brand:<your plugin ID>/<key>`.
+
+   <ExampleCode file="acme-theme/acorn-plugin.json" pick={['icon', 'icons']} />
+
+3. **Use it.** Name the mark anywhere a glyph goes:
+
+   <ExampleCode file="acme-theme/acorn-plugin.json" pick={['contributions.contextMenus']} />
+
+4. **Check it.** Install the plugin and right-click a task in the tab rail. **Open the Acme style
+   guide** has your mark beside it.
+
+</Steps>
+
+## Brand colors
+
+acorn fills a mark with the current text color, so it follows every theme. `color` is your brand's
+color, for places that draw a mark on its own color: acorn fills a shape with it and puts a readable
+color on top, rather than drawing your color on the background, where a dark brand color on a dark
+theme disappears.
+
+## Mistakes
+
+A mark is a path, not an SVG file. A whole `<svg>` is refused, and so is anything but path commands
+and numbers:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "icon": { "d": "<svg viewBox=\"0 0 24 24\"><path d=\"M12 2 L22 20 H2 Z\"/></svg>" }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "icon": { "d": "M12 2 L22 20 H2 Z", "color": "#c2410c" }
+}
+```
+
+- `color` is six-digit hex, such as `#c2410c`. A named color such as `orange`, or `rgb(…)`, is refused.
+- An unknown Lucide name draws as its text.
+
+## In the terminal
+
+The terminal client draws a small set of icons as one-cell marks, and an icon without one draws
+nothing. Don't let an icon be the only thing that carries meaning: give the row or button a label too.
+
+## Limits
+
+- One path per mark, up to 4,096 characters, drawn filled.
+- A frame is its own page and can't reach the registered marks. Draw your own copy there.
+
+## Reference
+
+The [manifest reference](/docs/build-plugins/reference/manifest-reference/) has `icon` and `icons`.

@@ -1,0 +1,6 @@
+{"columns":60,"rows":4,"lines":[
+[{"text":"[Run checks]","fg":"accent"},{"text":" [Open diff] [Skip] Details"}],
+[{"text":"[Delete branch]","fg":"danger"},{"text":" "},{"text":"[Merge]","fg":"muted"}],
+[],
+[]
+]}

@@ -1,0 +1,122 @@
+---
+title: Generate text with a model
+description: Have an AI write something for the person, with the model they picked for your plugin and a daily allowance, without ever seeing a key.
+sources:
+  - docs/integrations/model-providers.md
+  - docs/managed-agents/harnesses.md
+  - packages/plugin-types/src/contracts/coreMisc.ts
+  - packages/client-core/src/features/settings/plugins/ModelGrantSection.tsx
+  - examples/plugins/acme-agent/acorn-plugin.json
+  - examples/plugins/acme-agent/node.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll have your plugin write something with an AI model, such as a summary, using the model the
+person chose for your plugin. Your plugin never sees a key and never picks what to spend.
+
+## The result
+
+Right-click a task row and pick **Summarize Acme notes**. A moment later the bell has a row,
+**Acme notes summarized**, with two sentences the model wrote from the task's notes, and the summary is
+saved as a note an agent can read.
+
+On the plugin's page in **Settings** > **Plugins**, a **Model** section holds what it may spend:
+
+| Row | What it sets |
+| --- | --- |
+| **Generate with** | The backend and model your plugin's calls use: an API key the person connected, or an agent command line on the Node's computer |
+| **Daily allowance** | Output tokens per day, with **Save** and **Remove** |
+| **Today** | How much of the allowance today's calls used |
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-agent`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-agent).
+
+## Steps
+
+<Steps>
+
+1. **Ask for the grant.** `models` lets your Node half generate text, and `identity` tells it who owns
+   the Node. The plugin's **Permissions** tab, and the trust prompt when a device asks, mark spending the
+   person's model usage as wide reach.
+
+   <ExampleCode file="acme-agent/acorn-plugin.json" pick={['permissions.node']} />
+
+2. **Give the person a way to ask.** The example adds a row to the task row's menu, which posts the
+   task's id to a route:
+
+   <ExampleCode file="acme-agent/acorn-plugin.json" pick={['contributions.contextMenus']} />
+
+3. **Call `generateText` with no backend.** Leaving `backendId` out spends the grant: the backend,
+   model, and allowance the person set on your plugin's page. `userId` must be the Node's owner, from
+   `ctx.core.identity.active()`.
+
+   <ExampleCode file="acme-agent/node.js" region="generate" />
+
+   - `system` says what to do, and `prompt` is the material. Both are yours to write.
+   - `maxOutputTokens` caps the answer from a key. It's also what the call holds against the allowance
+     until the model says what it used.
+   - Pass the request's `AbortSignal` as `input.signal` when the person can cancel, and acorn stops the
+     call.
+
+4. **Turn a refusal into a sentence.** Two refusals spend nothing, and each has a fix the person can
+   make:
+
+   <ExampleCode file="acme-agent/node.js" region="errors" />
+
+5. **Check it.** Install the plugin, open its page in **Settings** > **Plugins**, and under **Model**
+   pick a backend and an allowance, then **Save**. Add a note with an agent, then right-click the task
+   and pick **Summarize Acme notes**. **Today** counts the call.
+
+</Steps>
+
+## Which model runs
+
+| What the person has | What your call spends |
+| --- | --- |
+| A grant on your plugin's page | That backend and model, within the allowance |
+| No grant | Nothing. The call fails with `provider_not_configured`, and acorn never picks one for you |
+| An API key | The key's provider, such as Anthropic or OpenAI, and the model they picked |
+| No key, but Claude Code or Codex installed | That command line, run once with its tools off, in an empty folder, with its own login |
+
+**Generate with** under **Agents** > **Harnesses and defaults** is the person's default for acorn's
+own Generate controls, such as the commit message. Your plugin has its own **Generate with**, on its
+page, so the two never get in each other's way.
+
+A command line can't be held to a token count, so each call to one counts as 4,000 output tokens
+against the allowance, whatever it reports.
+
+## Mistakes
+
+- Naming a `backendId` yourself, such as the first one `available()` lists. It runs, but outside the
+  allowance, and the person's page says your plugin did it.
+- Passing `input.modelId`. The person chose the model, so a different one is refused.
+- Retrying a failed call. A timeout or a cancelled call stays charged, because the provider may already
+  have spent it.
+- Generating on every request, such as every time a pane opens. Generate when the person asks, and save
+  the answer.
+- Misspelling a facet, such as `model` for `models`. acorn skips a facet it doesn't know rather than
+  refusing the manifest, so `ctx.core.models` is missing and your first call throws a `TypeError`.
+
+## In the terminal
+
+The grant lives on the Node, so a call from your plugin works the same whichever app the person uses.
+The plugin's page, where they set it, opens in the desktop app.
+
+## Limits
+
+- A system prompt is at most 100,000 characters, a prompt 1,000,000, and an answer 128,000 output
+  tokens. A call has at most three minutes.
+- The allowance resets at midnight on the Node's clock.
+- acorn stores no prompt and no answer, and sends neither to telemetry.
+
+## Reference
+
+[Permissions](/docs/build-plugins/reference/permissions/) has `models` and `identity`, and
+[The Node context](/docs/build-plugins/reference/the-node-context/) has `ctx.core.models`.
+[Model providers and generating text](/docs/agents/model-providers-and-generating-text/) is what the
+person reads.

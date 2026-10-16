@@ -1,0 +1,81 @@
+---
+title: dataSources
+description: "Typed data sources your Node half serves, for dashboards and workflows."
+sources:
+  - docs/data-sources.md
+  - docs/data-sources/derived-sources.md
+checked: '498833615'
+---
+
+A data source is a typed list of records your Node half serves, which dashboards, workflows, and agents
+can query. You declare its identity and labels, and one route answers every operation on it. A derived
+source declares `inputs` instead: other sources acorn reads for you, which the person approves first.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "dataSources": [
+      {
+        "sourceId": "deploys",
+        "name": "Deploys",
+        "singular": "Deploy",
+        "plural": "Deploys",
+        "identityScope": "Acme deploy ID; stable across retries",
+        "handler": "/v1/p/acme/sources/deploys"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "dataSources": [
+      {
+        "sourceId": "readiness",
+        "name": "Release readiness",
+        "singular": "Issue",
+        "plural": "Issues",
+        "identityScope": "Linear issue",
+        "handler": "/v1/p/acme/sources/readiness",
+        "icon": "rocket",
+        "inputs": {
+          "issues": {
+            "source": "linear:issues",
+            "label": "Issues"
+          },
+          "pulls": {
+            "source": "github:pull-requests",
+            "label": "Pull requests",
+            "optional": true
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+Data sources live on the Node, so the terminal client's dashboards and workflows read them too.
+
+## Mistakes
+
+- A source with `inputs` can't name a `providerId`.
+- An input names a statically registered source. A discovered one can't be an input.
+
+## Guide
+
+[Add a data source](/docs/build-plugins/node/add-a-data-source/) walks through it from start to finish.

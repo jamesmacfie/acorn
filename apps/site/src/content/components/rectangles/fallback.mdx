@@ -1,0 +1,27 @@
+---
+title: Fallback
+description: What to draw where a host can't draw the node it sits in.
+sources:
+  - packages/client-core/src/kit/components/content/Fallback.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Put a `Fallback` inside a node a host can't draw, such as a `Rectangle` in the terminal. `forNode` names that node, and the host draws the fallback where the support table says it can't draw the node.
+
+<Specimen id="rectangle" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="rectangle" />
+
+## Related
+
+- [`Rectangle`](/docs/components/rectangles/rectangle/), for the box it most often sits in.
+- [`Only`](/docs/components/rectangles/only/), for content on one host.
+
+## Mistakes
+
+- Using a fallback where the node draws. It draws only where the support table says the host can't draw the node it sits in.

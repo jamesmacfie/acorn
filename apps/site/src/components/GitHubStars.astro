@@ -1,0 +1,30 @@
+---
+// The Star on GitHub button: a plain link to the repository, with the star count once there are
+// enough stars to be worth showing, 100 or more. The count is
+// read when the site builds, so the button has no script and the visitor's browser asks GitHub for
+// nothing.
+import { Icon } from '@astrojs/starlight/components'
+import { readGithub } from '../lib/github'
+import { GITHUB } from '../nav'
+
+interface Props {
+  /** The design gallery passes a count. Every other page shows the build's. */
+  stars?: number
+}
+
+const SHOW_COUNT_FROM = 100
+
+const stars = Astro.props.stars ?? (await readGithub()).stars
+const count =
+  stars >= SHOW_COUNT_FROM
+    ? new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(stars).toLowerCase()
+    : undefined
+---
+
+<a class="button" href={GITHUB}>
+  <Icon name="github" />
+  {/* Two copies of the label, because the header hides the visible one on a narrow screen. */}
+  <span class="sr-only">Star on GitHub</span>
+  <span aria-hidden="true">Star on GitHub</span>
+  {count && <span>{count}<span class="sr-only"> stars</span></span>}
+</a>

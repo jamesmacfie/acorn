@@ -1,0 +1,27 @@
+---
+title: Table
+description: A table of rows and columns.
+sources:
+  - packages/client-core/src/kit/components/layout/Table.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Table` with `TableRow`, `TableHead`, and `TableCell` children for data with the same fields per row. The terminal drops the lowest-priority columns first when it runs out of width, and says which it dropped.
+
+<Specimen id="table" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="table" />
+
+## Related
+
+- [`Grid`](/docs/components/collections/grid/), for a long table from data.
+- [`Facts`](/docs/components/content/facts/), for one item's fields.
+
+## Mistakes
+
+- Leaving out `priority` on wide tables. Mark the columns a reader can lose as `low`, or the terminal guesses.

@@ -1,0 +1,165 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-tracker",
+  "name": "Acme tracker",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "permissions": {
+    "api": [],
+    "events": ["plugin:acme-data:deploys-changed"],
+    "node": { "core": [], "capabilities": ["acme-data.deploys"], "secrets": false, "exec": false, "net": [] }
+  },
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "acme-tracker",
+        "label": "Tracker",
+        "glyph": "list-todo",
+        "order": 820,
+        "layout": "header-body-footer",
+        "regions": {
+          "header": { "kind": "remote", "entry": "paneHeader" },
+          "body": { "kind": "remote", "entry": "pane" }
+        },
+        "statusAnnotations": true
+      },
+      {
+        "target": "settings",
+        "id": "settings",
+        "label": "Acme tracker",
+        "glyph": "list-todo",
+        "category": "connections",
+        "keywords": ["issues", "tickets"],
+        "sections": [
+          { "id": "account", "label": "Account" },
+          { "id": "display", "label": "Display", "keywords": ["sort"] }
+        ],
+        "railSourceVisibility": ["issues"],
+        "layout": "single",
+        "regions": { "body": { "kind": "remote", "entry": "settings" } }
+      },
+      {
+        "target": "refPanel",
+        "id": "issue-panel",
+        "label": "Acme issue",
+        "providerId": "acme-tracker",
+        "layout": "single",
+        "regions": { "body": { "kind": "remote", "entry": "panel" } }
+      }
+    ],
+    "sources": [
+      {
+        "id": "issues",
+        "label": "Acme issues",
+        "glyph": "list-todo",
+        "order": 400,
+        "tree": { "list": "list", "detail": "detail" },
+        "showInRailByDefault": true,
+        "statusAnnotations": true
+      }
+    ],
+    "contentLinks": [
+      {
+        "id": "issue-link",
+        "match": "https://tracker.acme.example/issue/{key}",
+        "item": "key",
+        "openPane": "acme-tracker",
+        "presentations": ["refPanel", "pane", "external"]
+      }
+    ],
+    "commands": [
+      { "id": "tracker", "kind": "group", "title": "Acme tracker", "category": "navigation" },
+      {
+        "id": "open",
+        "kind": "action",
+        "parentId": "tracker",
+        "title": "Open the Acme tracker",
+        "category": "pane",
+        "action": { "verb": "openPane", "pane": "acme-tracker" }
+      },
+      {
+        "id": "find",
+        "kind": "search",
+        "parentId": "tracker",
+        "title": "Find an Acme issue",
+        "scope": "none",
+        "route": "/v1/p/acme-tracker/issues/search",
+        "placeholder": "Search issues",
+        "onSelect": { "verb": "openPane", "pane": "acme-tracker" }
+      },
+      {
+        "id": "new",
+        "kind": "input",
+        "parentId": "tracker",
+        "title": "New Acme issue",
+        "scope": "task",
+        "route": "/v1/p/acme-tracker/issues",
+        "placeholder": "Issue title",
+        "onSuccess": { "verb": "openPane", "pane": "acme-tracker" }
+      },
+      {
+        "id": "sort",
+        "kind": "setting",
+        "parentId": "tracker",
+        "title": "Sort Acme issues by",
+        "scope": "none",
+        "readRoute": "/v1/p/acme-tracker/sort",
+        "writeRoute": "/v1/p/acme-tracker/sort",
+        "options": [
+          { "value": "state", "label": "State" },
+          { "value": "key", "label": "Key" }
+        ]
+      }
+    ],
+    "keybindings": [{ "command": "open", "defaultChord": "meta+alt+i", "when": "task" }],
+    "contextMenus": [
+      {
+        "id": "link",
+        "location": "task.row",
+        "label": "Link an Acme issue",
+        "icon": "link",
+        "action": { "verb": "runNodeAction", "path": "/v1/p/acme-tracker/link" }
+      },
+      {
+        "id": "refresh",
+        "location": "rail.source",
+        "surface": "issues",
+        "label": "Refresh Acme issues",
+        "action": { "verb": "runNodeAction", "path": "/v1/p/acme-tracker/refresh" }
+      },
+      {
+        "id": "file",
+        "location": "agent.message",
+        "label": "File as an Acme issue",
+        "when": { "role": "assistant" },
+        "action": { "verb": "runNodeAction", "path": "/v1/p/acme-tracker/file" }
+      }
+    ],
+    "slots": [
+      {
+        "id": "open-badge",
+        "slot": "topbar",
+        "icon": "list-todo",
+        "data": "/v1/p/acme-tracker/badge/open",
+        "onClick": { "verb": "openPane", "pane": "acme-tracker" },
+        "refresh": 300
+      },
+      {
+        "id": "review-badge",
+        "slot": "footer",
+        "data": "/v1/p/acme-tracker/badge/review",
+        "refresh": 300
+      }
+    ],
+    "extensions": [
+      { "id": "task-marks", "point": "core:task", "label": "Acme issues", "items": "/v1/p/acme-tracker/marks/tasks" },
+      { "id": "source-marks", "point": "core:source", "label": "Acme issues", "items": "/v1/p/acme-tracker/marks/sources" },
+      { "id": "pane-marks", "point": "core:pane", "label": "Acme issues", "items": "/v1/p/acme-tracker/marks/panes" }
+    ],
+    "attention": [{ "id": "reviews", "items": "/v1/p/acme-tracker/attention", "refresh": 300 }]
+  }
+}

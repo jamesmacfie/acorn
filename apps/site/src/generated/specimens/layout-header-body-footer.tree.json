@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "title": "header-body-footer",
+    "caption": "A pinned header and footer around a body that scrolls.",
+    "terminal": {
+      "columns": 50,
+      "rows": 6
+    },
+    "width": 400
+  },
+  "layout": {
+    "name": "header-body-footer",
+    "label": "Deploys",
+    "regions": [
+      "header",
+      "body",
+      "footer"
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{"columns":60,"rows":6,"lines":[
+[{"text":"Deploys","attrs":["bold"]},{"text":" "},{"text":"3","fg":"muted"}],
+[{"text":"staging · 12 minutes ago"}],
+[{"text":"production · yesterday"}],
+[{"text":"preview · failed","fg":"muted"}],
+[],
+[{"text":"                                                    "},{"text":"[Deploy]","fg":"accent"}]
+]}

@@ -1,0 +1,84 @@
+{
+  "meta": {
+    "title": "What a task owns",
+    "caption": "A task, and what it owns. Archiving it stops its agents and terminals and removes its worktree.",
+    "terminal": {
+      "columns": 60,
+      "rows": 4
+    },
+    "width": 680
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Graph",
+          "props": {
+            "id": "task-parts",
+            "ariaLabel": "What a task owns",
+            "nodes": [
+              {
+                "id": "task",
+                "label": "Task",
+                "detail": "One piece of work on one project",
+                "tone": "accent"
+              },
+              {
+                "id": "worktree",
+                "label": "Branch and worktree",
+                "detail": "Its own copy of the files"
+              },
+              {
+                "id": "agents",
+                "label": "Agents and terminals",
+                "detail": "Running in the worktree"
+              },
+              {
+                "id": "panes",
+                "label": "Panes",
+                "detail": "Changes, Notes, Editor…"
+              }
+            ],
+            "edges": [
+              {
+                "from": "task",
+                "to": "worktree"
+              },
+              {
+                "from": "task",
+                "to": "agents"
+              },
+              {
+                "from": "task",
+                "to": "panes"
+              }
+            ],
+            "positions": {
+              "task": {
+                "x": 210,
+                "y": 0
+              },
+              "worktree": {
+                "x": 0,
+                "y": 130
+              },
+              "agents": {
+                "x": 210,
+                "y": 130
+              },
+              "panes": {
+                "x": 420,
+                "y": 130
+              }
+            }
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

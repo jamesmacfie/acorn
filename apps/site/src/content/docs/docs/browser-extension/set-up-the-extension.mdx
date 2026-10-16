@@ -1,0 +1,148 @@
+---
+title: Set up the extension
+description: Install the bridge, load the extension in Chrome or Firefox, pair it with a Node, and know what each permission is for and what each message in the panel means.
+sources:
+  - docs/browser-extension.md
+  - docs/browser-extension/setup.md
+  - docs/cli/browser-host.md
+  - apps/extension/src/manifest.ts
+  - apps/extension/src/sidebar/Pairing.tsx
+  - apps/extension/src/sidebar/guidance.ts
+checked: 07aa959a0
+---
+
+import SidebarPicture from '../../../../components/SidebarPicture.astro'
+
+The browser extension puts acorn in a panel beside the page you're reading: your tasks, their agent
+conversations, and buttons on sites such as GitHub that bring an item into a task. This page covers
+installing it, pairing it with a Node, the permissions it asks for, and what the panel tells you when
+something's wrong.
+
+## What you need
+
+- macOS, with Chrome 116 or later, or Firefox 128 or later.
+- A running Node: the desktop app's, or a [standalone Node](/docs/nodes/run-a-standalone-node/). The
+  desktop app can stay closed when its Node runs.
+- The `acorn` command line, which holds the bridge the extension talks to the Node through.
+- A checkout of acorn, to build the extension. It isn't in a browser store.
+
+The extension never holds a token or a certificate. The bridge does, and it reaches the Node itself,
+with no part played by the desktop app.
+
+## Install the bridge
+
+1. In your own terminal, not an agent's, run:
+
+   ```sh
+   acorn browser install
+   ```
+
+   Run it from the copy of `acorn` you'll keep: the browser starts the bridge from that path.
+
+2. Run `acorn browser status`. Each browser should show `registered`, with no problem.
+
+If the panel is already open, it shows `acorn browser install` with **Copy** until the bridge answers,
+then carries on by itself.
+
+## Build and load the extension
+
+In the checkout, run `pnpm --filter @acorn/extension build`. Then:
+
+- **Chrome.** Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and choose
+  `apps/extension/dist/chrome`. It stays installed.
+- **Firefox.** Open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and choose
+  `apps/extension/dist/firefox/manifest.json`. Firefox removes it when it quits, so load it again after
+  each restart. Its pairing and settings stay.
+
+Click the Acorn button in the toolbar to open the panel.
+
+## Pair it with a Node
+
+The panel opens on pairing until it's paired with a Node.
+
+<SidebarPicture id="sidebar-pairing" />
+
+To pair with the Node on this Mac:
+
+1. Under **Choose a Node**, pick **This computer**, marked **On this Mac**, and click **Continue**. The
+   bridge found it in acorn's data folder and checked its certificate, so there are no identity words
+   to compare.
+2. Under **Allow in Acorn**, the panel shows three words. The desktop app opens **Allow a new client?**
+   with the same words. Click **Allow** there.
+
+   The panel moves on by itself.
+
+Or, with no desktop app open, paste a pairing code instead: from **Settings** > **Machines** >
+**Nodes** > **Pair a browser** in the desktop app, or from a standalone Node's terminal.
+
+To pair with a Node on another machine:
+
+1. Click **Use another address**, type the Node's address, and click **Check identity**.
+2. Compare the six words with the ones the Node shows ([Pair a device or a remote
+   Node](/docs/nodes/pair-a-device-or-a-remote-node/#get-a-pairing-code)). Tick **The words match** only if
+   they do, and click **Continue**.
+3. Paste the pairing code. **Pair a browser** on the Node's row in the desktop app gives one. Click
+   **Pair**.
+
+Once paired, the panel offers **Allow** for each site where the Node's plugins put buttons, such as
+`github.com`, and notifications. Both are optional, and both are in the panel's Settings later.
+
+Each browser pairs on its own, so pair Chrome and Firefox separately. To pair with another Node later,
+choose **Pair another** from the Node menu at the top of the panel.
+
+## What the browser asks for, and why
+
+| Permission | What it's for |
+| --- | --- |
+| Native messaging | Talking to the bridge, which talks to the Node. |
+| Storage | Your drafts, the Node you picked, and the panel's appearance, in the browser. |
+| Active tab | Reading the tab you clicked the Acorn button or a right-click entry on, and nothing else. |
+| Scripting | Putting the task chip, the branch marker, and the element picker into a page it may read. |
+| Context menus | **Add to Acorn chat** and **Ask Acorn about this element** on the right-click menu. |
+| Tabs | Every tab's address and title, never its content, to match pages to tasks and switch to a task's open tab. The browser calls this "Read your browsing history". |
+| Side panel | Chrome only: showing the panel. |
+
+Two more are optional, and the browser asks before granting either:
+
+- **Access to a site**, from **Allow** beside it in the panel's **Settings** > **Permissions**. It lets
+  the extension draw buttons on that site's pages and read them for its suggestions.
+- **Notifications**, from the tick in **Settings** > **Notifications**.
+
+The extension reads no site until you allow it, or click the toolbar button on it. It's off in private
+windows.
+
+## What the panel tells you
+
+When something's wrong, a line under the panel's header says what, and what to do:
+
+| The panel says | What to do |
+| --- | --- |
+| The bridge isn't installed | Run `acorn browser install`. The panel checks again every three seconds. |
+| The bridge stopped | Click **Retry**, or run `acorn browser status` to see why. |
+| The pairing code didn't work | Check the code and try again. A code works once, for 10 minutes. |
+| The Node on this Mac can't be read | Use **Use another address** instead. |
+| The Node and the extension can't talk to each other | Update whichever is older. |
+| The Node isn't answering | Check that it's running. |
+| The Node revoked this browser | Forget the Node and pair again. |
+| The Node's identity changed | Check with whoever runs it, then forget it and pair again. |
+| No agent can start | The harness's own message says why, such as Claude Code not being signed in. |
+| No page access | Click the Acorn toolbar button on the page, then try again. |
+
+## Repair, update, or remove it
+
+- **After moving or updating `acorn`**, the bridge points at a path that's gone. Run `acorn browser
+  install` from the new copy, then **Retry**. Pairings stay.
+- **After reinstalling the extension**, pick the Node again from the Node menu, or **Use** beside it in
+  Settings.
+- **To forget a Node**, choose **Forget** in the Node menu or Settings. This browser forgets it. The
+  Node still lists the browser as paired until you revoke it there.
+- **To remove the bridge**, run `acorn browser uninstall`. It keeps each browser's pairings in
+  `~/Library/Application Support/acorn/browser-bridge/<browser>/`. Delete that folder to remove them.
+
+## Limits
+
+- macOS only, and only as a build from a checkout. Firefox keeps it until it quits.
+- The bridge keeps each browser's tokens in its folder, readable only by you, and not encrypted.
+- In Firefox 151, the first time the extension starts the bridge after Firefox starts, the bridge can
+  fail to answer. The panel says so after 10 seconds, and **Retry** works at once.
+- A task another app adds appears in the panel the next time it reads that project.

@@ -1,0 +1,27 @@
+---
+title: ModalBody
+description: The content of a modal, between its title and its actions.
+sources:
+  - packages/client-core/src/kit/components/overlays/Modal.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Put a modal's text and fields in `ModalBody`.
+
+<Specimen id="modal" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="modal" />
+
+## Related
+
+- [`Modal`](/docs/components/overlays/modal/), for the dialog around it.
+- [`ModalActions`](/docs/components/overlays/modal-actions/), for the buttons under it.
+
+## Mistakes
+
+- Putting the buttons in the body. Put them in `ModalActions`, which the host aligns.

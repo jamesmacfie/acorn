@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "title": "Toolbar and ToolbarSpacer",
+    "caption": "A toolbar with a count at the start and its actions pushed to the end.",
+    "terminal": {
+      "columns": 60,
+      "rows": 2
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Toolbar",
+          "props": {
+            "ariaLabel": "Deploys"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Text",
+              "props": {
+                "emphasis": "muted"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "3 deploys"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "ToolbarSpacer",
+              "props": {},
+              "children": []
+            },
+            {
+              "id": "n5",
+              "type": "Button",
+              "props": {
+                "label": "Refresh",
+                "variant": "ghost"
+              },
+              "children": []
+            },
+            {
+              "id": "n6",
+              "type": "Button",
+              "props": {
+                "label": "Deploy",
+                "variant": "solid",
+                "tone": "accent"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

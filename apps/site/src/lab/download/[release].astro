@@ -1,0 +1,19 @@
+---
+// The download page with each fixture release in src/lib/releaseFixtures.ts, for checking the states
+// GitHub can't show today.
+import DownloadPage from '../../layouts/DownloadPage.astro'
+import { fixtureReleases } from '../../lib/releaseFixtures'
+import type { PageMeta } from '../../meta'
+
+export function getStaticPaths() {
+  return Object.keys(fixtureReleases).map((release) => ({ params: { release } }))
+}
+
+const meta: PageMeta = {
+  description: 'The download page with a fixture release.',
+  sources: ['apps/site/src/lib/releaseFixtures.ts'],
+  checked: 'fe19d3086',
+}
+---
+
+<DownloadPage meta={meta} release={fixtureReleases[Astro.params.release]} />

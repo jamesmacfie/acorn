@@ -1,0 +1,46 @@
+---
+// A docs sidebar: each group folds, and the group holding the current page starts open.
+import { href, type Group } from './_nav'
+
+interface Props {
+  groups: Group[]
+  current: string
+}
+
+const { groups, current } = Astro.props
+const holds = (group: Group): boolean =>
+  group.items?.some((item) => (typeof item === 'string' ? item === current : holds(item))) ?? false
+---
+
+<ul>
+  {
+    groups.map((group) => (
+      <li>
+        <details open={holds(group)}>
+          <summary>{group.label}</summary>
+          {group.items ? (
+            <ul>
+              {group.items.map((item) =>
+                typeof item === 'string' ? (
+                  <li>
+                    <a href={href(group.base, item)} aria-current={item === current ? 'page' : undefined}>
+                      {item}
+                    </a>
+                  </li>
+                ) : (
+                  <li>
+                    <Astro.self groups={[item]} current={current} />
+                  </li>
+                ),
+              )}
+            </ul>
+          ) : (
+            <ul>
+              <li>{group.count ? `${group.count} pages` : 'Generated pages'}</li>
+            </ul>
+          )}
+        </details>
+      </li>
+    ))
+  }
+</ul>

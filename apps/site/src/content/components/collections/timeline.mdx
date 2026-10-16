@@ -1,0 +1,27 @@
+---
+title: Timeline
+description: Cards in sequence, such as the turns of a conversation.
+sources:
+  - packages/client-core/src/kit/components/content/Timeline.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Timeline` for items in order, such as the turns of a review. `follow` holds it on the newest item as items arrive.
+
+<Specimen id="timeline" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="timeline" />
+
+## Related
+
+- [`Card`](/docs/components/grouping/card/), for each item in it.
+- [`Log`](/docs/components/content/log/), for lines of output.
+
+## Mistakes
+
+- Expecting the terminal to keep the reader's place. A redrawn timeline there opens at the newest turn.

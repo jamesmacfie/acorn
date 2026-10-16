@@ -24,7 +24,10 @@ consent. Package activation has its own confirmation for the staged graph and bi
 and HTTP rows remain editable but require consent before launch.
 
 **Review tool definition changes** is optional and off for existing servers. When enabled, Acorn
-places a session-owned loopback MCP proxy on the actual harness connection. It withholds tools until
+places a session-owned loopback MCP proxy on the actual harness connection. The same relay carries a
+signed-in server's token ([signing in to a server](./sign-in.md)). A server with
+both on uses one relay that does both, and a server with only sign-in on gets a relay with no review
+gate. It withholds tools until
 the device approves the full canonical catalogue on that connection, including descriptions,
 schemas, annotations, and forwarded fields. Approval binds the configuration and secret revision,
 managed installation identity when present, catalogue digest, and comparison version. A changed list
@@ -37,4 +40,5 @@ files remain outside Acorn's proxy.
 Installed Codex 0.159.2 keeps the initial empty tool list in an already-running thread after device
 approval. Start a new managed Codex session to use the approved catalogue. A later list change still
 refuses calls on the current connection until the device reviews it again. Event replay on a reviewed
-connection is unavailable; a reconnect starts a fresh reviewed connection.
+connection is unavailable; a reconnect starts a fresh reviewed connection. A reviewed server in a
+terminal handoff skips the relay, so review doesn't apply there.

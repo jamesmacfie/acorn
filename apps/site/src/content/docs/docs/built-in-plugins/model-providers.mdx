@@ -1,0 +1,77 @@
+---
+title: Model providers
+description: The plugin that lets acorn generate text with an OpenAI or Anthropic API key, and what uses it.
+sources:
+  - docs/integrations/model-providers.md
+  - plugins/model-providers/acorn-plugin.config.mjs
+  - plugins/model-providers/src/node/index.ts
+  - plugins/model-providers/src/server/openai.ts
+  - plugins/model-providers/src/server/anthropic.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Model providers plugin lets acorn generate text with an OpenAI or Anthropic API key, for features
+such as commit messages and SQL. You don't need it to run agents, which use each harness's own login.
+
+<PluginFacts id="model-providers">
+  <Fragment slot="adds">OpenAI and Anthropic as choices under **Settings** > **Connections** > **AI models**, and as backends in every Generate control.</Fragment>
+  <Fragment slot="needs">An OpenAI or Anthropic API key.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. Open **Settings** > **Connections** > **AI models**.
+
+2. Click **Add a key**, then **Connect Anthropic** or **Connect OpenAI**.
+
+3. Paste the key into **API key**, and click **Connect**. acorn checks the key with the provider before
+   it saves it.
+
+   <Checkpoint>**AI models** lists the key under **API keys**.</Checkpoint>
+
+</Steps>
+
+## What uses it
+
+Every feature that writes text for you can spend a key: a commit message in the Changes tab, **Explain
+commit**, SQL in the Database pane, a workflow draft, and the rest that
+[Model providers and generating text](/docs/agents/model-providers-and-generating-text/#what-generates-text)
+lists. Each sends only what it needs, such as the diff for a commit message. acorn stores neither the
+prompt nor the answer.
+
+When you have a key and an agent command line such as Claude Code, the key comes first, unless you pick
+a backend under **Generate with**
+([Model providers and generating text](/docs/agents/model-providers-and-generating-text/#choose-a-backend)).
+
+## What the plugin sees
+
+The plugin has no pane and no code on your device. acorn keeps the key encrypted on the Node and hands it
+to the plugin only for the length of one call. The plugin sends the call to the provider's API, and
+nothing else: it has no routes, no storage, and no other access. A failed call isn't retried, so a
+generate that times out is never charged twice.
+
+The Node's environment can point either provider somewhere else, with `OPENAI_BASE_URL` or
+`ANTHROPIC_BASE_URL`. The plugin's permissions name both, because the address a key goes to is worth
+knowing.
+
+## Settings
+
+Your keys are on **Settings** > **Connections** > **AI models**, and the default backend is **Generate
+with** under **Settings** > **Agents** > **Harnesses and defaults**
+([Settings: Connections](/docs/settings/connections/)).
+
+## In the terminal
+
+Generate controls in the terminal client offer the same backends. Add keys from the desktop app.
+
+## Limits
+
+- OpenAI and Anthropic only.
+- A generate call stops after three minutes.
+- Turning the plugin off leaves agent command lines as the only way to generate text.

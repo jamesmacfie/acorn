@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for the real agent CLI while the shell snapshots are captured (docs/site/snapshots.md §
+# The fixture), so the app's usage meter reads nobody's account.
+exit 1

@@ -1,0 +1,7 @@
+{"columns":50,"rows":5,"lines":[
+[{"text":"[Overview]","fg":"accent","attrs":["bold"]},{"text":"  Checks"}],
+[{"text":"┌─Overview───────────────────────────────────────┐","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"panel:overview region","fg":"muted"},{"text":"                           "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                "},{"text":"│","fg":"accent"}],
+[{"text":"└────────────────────────────────────────────────┘","fg":"accent"}]
+]}

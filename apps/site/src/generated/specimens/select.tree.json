@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "title": "Select",
+    "caption": "A select showing its current choice.",
+    "terminal": {
+      "columns": 40,
+      "rows": 1
+    },
+    "width": 320
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Select",
+          "props": {
+            "label": "Environment",
+            "value": "staging",
+            "options": [
+              {
+                "value": "preview",
+                "label": "Preview"
+              },
+              {
+                "value": "staging",
+                "label": "Staging"
+              },
+              {
+                "value": "production",
+                "label": "Production"
+              }
+            ]
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

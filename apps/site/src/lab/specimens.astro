@@ -1,0 +1,27 @@
+---
+// Every specimen, for review in any theme and style pack. A Starlight page, so the specimens sit in the
+// same header, sidebar, and text styles a docs page has.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro'
+import Specimen from '../components/Specimen.astro'
+
+const ids = Object.keys(import.meta.glob('../generated/specimens/*.tree.json'))
+  .map((path) => path.replace(/^.*\/(.+)\.tree\.json$/, '$1'))
+  .sort()
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Specimens',
+    description: 'Every specimen, on both hosts.',
+    sources: ['docs/site/specimens.md'],
+    checked: '284c614aa',
+    // Lab pages stay out of search.
+    pagefind: false,
+  }}
+>
+  <p>
+    Each specimen is plugin tree code, drawn by the desktop and by the terminal. Pick a theme and a style pack
+    under <strong>Appearance</strong> to see them all in it.
+  </p>
+  {ids.map((id) => <Specimen id={id} />)}
+</StarlightPage>

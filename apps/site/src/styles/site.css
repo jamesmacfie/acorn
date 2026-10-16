@@ -1,0 +1,1088 @@
+/* The site's stylesheet, written against acorn's own design tokens, which virtual:acorn-ui.css puts on
+   <html>. The theme and style pack a visitor picks set those tokens, so they restyle the site and every
+   specimen together. A color, font, or length the app has a token for comes from that token. The few
+   the app has no token for are the --site-* ones below. scripts/siteCss.test.mjs fails on a color
+   written here, and scripts/contrast.test.mjs checks the pairs of colors the site sets text in. */
+
+/* Inter, Literata, and Nunito, for the Modern, Cozy, and Cute packs. A browser fetches a face only when
+   a rule uses it, so a visitor who never picks those packs downloads none of them. */
+@import '@acorn/client-core/infra/styles/fonts.css';
+
+/* JetBrains Mono, served from public/fonts with its license (OFL.txt). */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* The app's mono stack, with the face the site serves first. No style pack moves it. */
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+
+  /* The widest a page's content runs: where a pane stops widening in the app. */
+  --site-width: var(--pane-measure);
+  --site-gutter: var(--space-11);
+  /* A line of prose. */
+  --site-measure: 70ch;
+  --site-lh-prose: 1.7;
+  /* The space between two sections of a marketing page. */
+  --site-section: calc(3 * var(--space-11));
+  /* Type above the app's largest size, --fs-xl, which no app surface needs. */
+  --site-fs-hero: clamp(2rem, 1.25rem + 3vw, 3.5rem);
+  --site-fs-h1: 2rem;
+  --site-fs-h2: 1.5rem;
+}
+
+@media (max-width: 49.99rem) {
+  :root {
+    --site-gutter: var(--space-8);
+  }
+}
+
+/* The app's motion tokens are the site's only motion, and reduced motion stops them. `[data-style]`
+   matches a pack's own block, which sets these too. */
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  :root[data-style] {
+    --dur-short: 0ms;
+    --dur-med: 0ms;
+    --dur-long: 0ms;
+    --hover-lift: none;
+    --press-scale: none;
+  }
+}
+
+/* ── Starlight ─────────────────────────────────────────────────────────────────────────────────
+   Starlight's palette, type, and layout values, pointed at acorn's tokens. Starlight declares its own
+   in cascade layers, so these win in every theme. Its greys that color text all map to --text, because
+   --text-muted is illegible in some themes. */
+:root {
+  --sl-color-white: var(--text);
+  --sl-color-gray-1: var(--text);
+  --sl-color-gray-2: var(--text);
+  --sl-color-gray-3: var(--text);
+  --sl-color-gray-4: var(--text);
+  --sl-color-gray-5: var(--border);
+  --sl-color-gray-6: var(--bg-subtle);
+  --sl-color-gray-7: var(--bg-subtle);
+  --sl-color-black: var(--bg);
+  --sl-color-accent-low: var(--bg-subtle);
+  --sl-color-accent: var(--accent);
+  --sl-color-accent-high: var(--text);
+  --sl-color-text: var(--text);
+  --sl-color-text-accent: var(--text);
+  --sl-color-text-invert: var(--bg);
+  --sl-color-bg: var(--bg);
+  --sl-color-bg-nav: var(--bg-subtle);
+  --sl-color-bg-sidebar: var(--bg);
+  --sl-color-bg-inline-code: var(--bg-subtle);
+  --sl-color-bg-accent: var(--text);
+  --sl-color-hairline-light: var(--border);
+  --sl-color-hairline: var(--border);
+  --sl-color-hairline-shade: var(--border);
+  --sl-color-backdrop-overlay: var(--scrim);
+  --sl-shadow-sm: var(--elev-card);
+  --sl-shadow-md: var(--elev-card);
+  --sl-shadow-lg: var(--elev-modal);
+
+  --sl-font: var(--font-ui);
+  --sl-font-mono: var(--font-mono);
+  --sl-text-body: var(--fs-lg);
+  --sl-text-body-sm: var(--fs);
+  --sl-text-code: var(--fs-md);
+  --sl-text-code-sm: var(--fs-sm);
+  --sl-text-h1: var(--site-fs-h1);
+  --sl-text-h2: var(--site-fs-h2);
+  --sl-text-h3: var(--fs-xl);
+  --sl-text-h4: var(--fs-lg);
+  --sl-text-h5: var(--fs-lg);
+  --sl-line-height: var(--site-lh-prose);
+  --sl-line-height-headings: var(--lh-tight);
+
+  --sl-nav-height: var(--topbar-h);
+  --sl-nav-pad-y: 0;
+  --sl-menu-button-size: var(--control-h);
+  /* Wide enough for a line of prose and a specimen or code block beside nothing. */
+  --sl-content-width: 52rem;
+}
+
+/* ── Page ──────────────────────────────────────────────────────────────────────────────────────
+   The document's defaults, in a cascade layer so Starlight's own component rules, which sit in its
+   layers, still beat them on a docs page. This sheet loads before Starlight's, so this layer comes
+   first and loses to every one of Starlight's. */
+@layer site-base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  html {
+    color-scheme: var(--color-scheme);
+    background: var(--bg);
+  }
+  body {
+    margin: 0;
+    color: var(--text);
+    background: var(--bg);
+    font-family: var(--font-ui);
+    font-size: var(--fs);
+    line-height: var(--lh);
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    font-size: var(--fs-lg);
+    line-height: var(--site-lh-prose);
+  }
+  /* Element rules leave the specimens alone: what's inside .acorn-ui is the app's markup, drawn as the
+     app draws it. */
+  :where(h1, h2, h3, h4):not(.acorn-ui *) {
+    font-family: var(--font-display);
+    font-weight: var(--heading-weight);
+    letter-spacing: var(--heading-tracking);
+    text-transform: var(--heading-transform);
+    line-height: var(--lh-tight);
+    color: var(--text);
+  }
+  :where(a):not(.acorn-ui *) {
+    color: var(--text);
+    text-decoration-color: var(--accent);
+    text-underline-offset: 0.2em;
+  }
+  :where(a, button, summary, select, input):not(.acorn-ui *):focus-visible {
+    outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus);
+    outline-offset: var(--focus-ring-offset);
+  }
+}
+[hidden] {
+  display: none !important;
+}
+.sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The label: the app's uppercase, tracked mono label in the Terminal pack, sentence case in Modern. */
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+  line-height: var(--lh-tight);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-block-size: var(--control-h);
+  padding: var(--pad-control-lg);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-tight);
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--bg);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: var(--transition-color);
+}
+.button:hover {
+  border-color: var(--accent);
+  transform: var(--hover-lift);
+}
+.button:active {
+  transform: var(--press-scale);
+}
+/* Inverse, not the accent: text on the accent fails contrast in some themes. */
+.button[data-variant='primary'] {
+  color: var(--bg);
+  background: var(--text);
+  border-color: var(--text);
+}
+.button[data-variant='primary']:hover {
+  opacity: 0.9;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+ul.actions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+select {
+  min-block-size: var(--control-h);
+  padding: var(--pad-control);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--input-bg);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+}
+
+/* ── Wordmark ──────────────────────────────────────────────────────────────────────────────────
+   The drawing is eight lines, sized so it fills a bar the height of the app's top bar. The name stays
+   mono in every pack. */
+.site-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--text);
+  text-decoration: none;
+}
+.site-mark pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: calc(var(--topbar-h) / 10);
+  line-height: 1;
+}
+.site-mark span {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────────────────────────
+   A chrome bar, as the app's top bar is. On a docs page Starlight's frame draws the bar itself. Below
+   Starlight's 50rem breakpoint the links fold into a menu, so the two kinds of page fold together. */
+.site-bar {
+  position: relative;
+  padding-inline: var(--site-gutter);
+  background: var(--bg-subtle);
+  border-block-end: var(--chrome-divider);
+}
+.site-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  block-size: var(--topbar-h);
+  font-size: var(--fs);
+}
+.site-header-links {
+  display: flex;
+  align-self: stretch;
+}
+.site-header-links a {
+  display: flex;
+  align-items: center;
+  padding-inline: var(--space-5);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.site-header-links a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+/* The current section, marked the way the app marks the selected tab. */
+.site-header-links a[aria-current] {
+  font-weight: var(--fw-semibold);
+  box-shadow: inset 0 calc(-1 * var(--tab-active-w)) var(--accent);
+}
+.site-header site-search {
+  margin-inline-start: auto;
+}
+.site-header-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.site-header-menu {
+  display: none;
+}
+.site-header-menu > summary {
+  list-style: none;
+}
+.site-header-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.site-header-menu > div {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 100%;
+  z-index: var(--sl-z-index-menu, 1);
+  display: grid;
+  gap: var(--space-8);
+  justify-items: start;
+  padding: var(--space-8) var(--site-gutter);
+  background: var(--popover-bg);
+  border-block-end: var(--surface-border);
+  box-shadow: var(--elev-menu);
+}
+.site-header-menu nav,
+.sidebar-menu nav {
+  display: grid;
+  gap: var(--space-5);
+}
+@media (max-width: 71.99rem) {
+  /* Search shrinks to its icon, and the star button to its icon and count. */
+  .site-header site-search button > span,
+  .site-header-tools .button > span[aria-hidden] {
+    display: none;
+  }
+}
+@media (max-width: 49.99rem) {
+  .site-header-links,
+  .site-header-tools {
+    display: none;
+  }
+  .site-header-menu {
+    display: block;
+  }
+  .sidebar-menu {
+    display: grid;
+  }
+}
+@media (min-width: 50rem) {
+  .sidebar-menu {
+    display: none;
+  }
+}
+
+/* The search button, as a control in the bar. */
+.search-open {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  cursor: pointer;
+  font-family: inherit;
+  min-block-size: var(--control-h);
+  padding: var(--pad-control);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+}
+.search-open:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.search-open > kbd {
+  padding-inline: var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+}
+
+/* The Appearance control: a popover under the bar's end, or two fields in place. */
+.appearance-fields:is(:not([popover]), :popover-open) {
+  display: grid;
+  gap: var(--space-6);
+}
+.appearance-fields[popover] {
+  inset: calc(var(--topbar-h) + var(--space-2)) var(--space-6) auto auto;
+  margin: 0;
+  padding: var(--pad-surface);
+  min-inline-size: 16rem;
+  color: var(--text);
+  background: var(--popover-bg);
+  border: var(--surface-border);
+  border-radius: var(--radius-popover);
+  box-shadow: var(--elev-popover);
+}
+.appearance-fields label {
+  display: grid;
+  gap: var(--space-2);
+}
+.appearance-fields label > span {
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────────────────────────── */
+.site-foot {
+  padding-inline: var(--site-gutter);
+  border-block-start: var(--chrome-divider);
+}
+.site-foot > .site-footer {
+  max-inline-size: var(--site-width);
+  margin-inline: auto;
+}
+.site-footer {
+  display: grid;
+  gap: var(--space-11);
+  padding-block: var(--space-11);
+  font-size: var(--fs);
+  line-height: var(--lh);
+}
+.site-footer-columns {
+  display: grid;
+  gap: var(--space-10);
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+.site-footer nav {
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+}
+.site-footer ul {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.site-footer a {
+  text-decoration: none;
+}
+.site-footer a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+.site-footer-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-10);
+  margin: 0;
+}
+
+/* ── Marketing pages ─────────────────────────────────────────────────────────────────────────── */
+.site-page {
+  max-inline-size: var(--site-width);
+  margin-inline: auto;
+  padding: var(--space-11) var(--site-gutter) var(--site-section);
+}
+.site-page > * + * {
+  margin-block-start: var(--space-8);
+}
+.site-page :where(p, h1, h2, h3, ul) {
+  max-inline-size: var(--site-measure);
+}
+.site-page h1 {
+  font-size: var(--site-fs-h1);
+}
+.site-page h2 {
+  font-size: var(--site-fs-h2);
+}
+.section {
+  display: grid;
+  gap: var(--space-10);
+  padding-block-start: var(--site-section);
+}
+.section > * {
+  min-inline-size: 0;
+}
+.section > :where(h2, p) {
+  margin: 0;
+}
+
+.hero {
+  display: grid;
+  gap: var(--space-8);
+  justify-items: start;
+}
+.hero > * {
+  margin: 0;
+  min-inline-size: 0;
+}
+.hero h1 {
+  max-inline-size: 24ch;
+  font-size: var(--site-fs-hero);
+}
+.hero-text {
+  max-inline-size: var(--site-measure);
+  font-size: var(--fs-xl);
+}
+.hero-text > * {
+  margin: 0;
+}
+.hero-picture {
+  justify-self: stretch;
+  margin-block-start: var(--space-10);
+}
+
+.features {
+  display: grid;
+  gap: var(--site-section);
+}
+.feature {
+  display: grid;
+  gap: var(--space-10);
+  align-items: center;
+}
+.feature > * {
+  min-inline-size: 0;
+}
+.feature-text {
+  display: grid;
+  gap: var(--space-6);
+  justify-items: start;
+}
+.feature-text > * {
+  margin: 0;
+}
+/* A grid inside a section's text takes the column's full width. */
+.feature-text > .cards {
+  justify-self: stretch;
+}
+.feature :is(h2, h3) {
+  font-size: var(--site-fs-h2);
+}
+@media (min-width: 64rem) {
+  .feature {
+    grid-template-columns: 2fr 3fr;
+  }
+  /* The picture changes sides down the list, on a wide screen only. */
+  .features > .feature:nth-child(even) {
+    grid-template-columns: 3fr 2fr;
+  }
+  .features > .feature:nth-child(even) .feature-picture {
+    order: -1;
+  }
+  /* A section with no picture keeps to the reading measure. */
+  .features > .feature:not(:has(> .feature-picture)) {
+    grid-template-columns: minmax(0, var(--site-measure));
+  }
+}
+
+.tour > .tabs {
+  overflow-x: auto;
+  border-block-end: var(--chrome-divider);
+}
+.tour-panel {
+  display: grid;
+  gap: var(--space-10);
+  padding-block-start: var(--space-10);
+}
+.tour-panel > * {
+  min-inline-size: 0;
+}
+.tour-text {
+  display: grid;
+  gap: var(--space-6);
+  align-content: start;
+  justify-items: start;
+}
+.tour-text > * {
+  margin: 0;
+}
+@media (min-width: 64rem) {
+  .tour-panel {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+
+.cards {
+  display: grid;
+  gap: var(--space-8);
+  grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+}
+/* The changelog's changes: a badge that names the kind, then the change. */
+.changelog-changes {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.callout {
+  max-inline-size: var(--site-measure);
+}
+.callout > * {
+  margin: 0;
+}
+.callout > * + * {
+  margin-block-start: var(--space-4);
+}
+/* A list of cards drops the list's own marks and measure. */
+ul.cards {
+  max-inline-size: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card {
+  position: relative;
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  padding: var(--pad-surface);
+  font-size: var(--fs);
+  line-height: var(--lh);
+  text-decoration: none;
+  background: var(--card-bg);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--elev-card);
+  transition: var(--transition-color);
+}
+.card:hover,
+.card:has(a:focus-visible) {
+  border-color: var(--accent);
+}
+.card > * {
+  margin: 0;
+}
+.card h3 {
+  font-size: var(--fs-lg);
+}
+.card h3 a {
+  text-decoration: none;
+}
+/* The whole card is the title's link. */
+.card h3 a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.card .badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* ── Frames ──────────────────────────────────────────────────────────────────────────────────
+   A picture of acorn sits in a frame drawn like a pane: a chrome bar, the divider under it, and the
+   picture. Specimens, snapshots, and the install block share it. */
+.frame {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--pane-bg);
+  border: var(--surface-border);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--elev-card);
+}
+.frame-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-block-size: var(--tab-h);
+  padding-inline: var(--space-6);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-tight);
+  background: var(--bg-subtle);
+  border-block-end: var(--chrome-divider);
+}
+.frame-bar .tabs {
+  align-self: stretch;
+}
+.frame-title {
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+}
+.frame-title + .tabs,
+.frame-title + .frame-size {
+  margin-inline-start: auto;
+}
+.frame-size {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+.frame-caption {
+  padding: var(--space-4) var(--space-6);
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  border-block-start: var(--chrome-divider);
+}
+.snapshot-body {
+  overflow: auto;
+}
+.sl-markdown-content .frame {
+  margin-block: var(--space-10);
+}
+
+.tabs {
+  display: flex;
+}
+.tabs [role='tab'] {
+  padding-inline: var(--space-5);
+  min-block-size: var(--tab-h);
+  font: inherit;
+  white-space: nowrap;
+  color: var(--text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.tabs [aria-selected='true'] {
+  font-weight: var(--fw-semibold);
+  box-shadow: inset 0 calc(-1 * var(--tab-active-w)) var(--accent);
+}
+
+.install {
+  max-inline-size: 40rem;
+}
+.install-panel {
+  display: flex;
+  align-items: start;
+  gap: var(--space-6);
+  padding: var(--space-6);
+}
+.install pre {
+  flex: 1;
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  line-height: var(--lh);
+}
+/* The prompt is drawn, not written, so Copy copies the commands alone. */
+.install code > span::before {
+  content: '$ ';
+  content: '$ ' / '';
+  user-select: none;
+}
+
+/* ── Docs ────────────────────────────────────────────────────────────────────────────────────── */
+/* Prose keeps a reading measure. Anything Starlight's prose styles leave alone, such as a specimen, a
+   code block, or a reference table, and a Markdown table, may take the content column's full width. */
+.sl-markdown-content > :not(.not-content, .expressive-code, table) {
+  max-inline-size: var(--site-measure);
+}
+.sl-markdown-content :is(h1, h2, h3, h4) {
+  font-family: var(--font-display);
+}
+
+.docs-title {
+  display: grid;
+  gap: var(--space-4);
+  margin-block-start: var(--space-8);
+}
+.docs-title h1 {
+  margin: 0;
+  font-size: var(--sl-text-h1);
+}
+
+/* Callouts: Starlight's asides in the shape of the kit's banner `Alert`. The tone is the border and the
+   icon, beside a title that names it, because tone colors fail contrast as text in some themes. A
+   marketing page's `.callout` takes the same shape. */
+.starlight-aside,
+.callout {
+  padding: var(--space-6);
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+}
+.starlight-aside--note {
+  --sl-color-asides-border: var(--border-strong);
+}
+.starlight-aside--tip {
+  --sl-color-asides-border: var(--success);
+}
+.starlight-aside--caution {
+  --sl-color-asides-border: var(--warn);
+}
+.starlight-aside--danger {
+  --sl-color-asides-border: var(--danger);
+}
+.starlight-aside[class*='--'] {
+  border-color: var(--sl-color-asides-border);
+}
+.starlight-aside__title {
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+  color: var(--text);
+}
+.starlight-aside__icon {
+  color: var(--sl-color-asides-border);
+}
+.starlight-aside__content a {
+  color: var(--text);
+}
+
+.sl-markdown-content table {
+  font-size: var(--fs);
+  line-height: var(--lh);
+}
+.sl-markdown-content th {
+  background: var(--bg-subtle);
+}
+/* A built-in plugin's facts box: the fact's name stays on one line beside its value. */
+.plugin-facts th {
+  white-space: nowrap;
+}
+.plugin-facts ul {
+  margin: 0;
+  padding-inline-start: 1.25em;
+}
+
+.reference {
+  font-size: var(--fs);
+  line-height: var(--lh);
+}
+.reference table {
+  inline-size: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.reference :is(th, td) {
+  padding: var(--space-4) var(--space-6);
+  text-align: start;
+  vertical-align: top;
+  border-block-end: var(--divider);
+}
+/* The header stays under the site's bar while its table scrolls past. */
+.reference thead th {
+  position: sticky;
+  inset-block-start: var(--sl-nav-height, 0);
+  z-index: 1;
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+  background: var(--bg-subtle);
+  border-block-end: var(--chrome-divider);
+}
+.reference tbody th {
+  font-weight: var(--fw-normal);
+  white-space: nowrap;
+}
+.reference tbody th a {
+  text-decoration: none;
+}
+.reference tbody th a:hover {
+  text-decoration: underline;
+}
+.reference tr:target {
+  box-shadow: inset var(--stripe-w) 0 var(--accent);
+}
+/* A narrow screen scrolls the table sideways, which sticky headers can't ride along with. */
+@media (max-width: 49.99rem) {
+  .reference {
+    overflow-x: auto;
+  }
+}
+
+/* Inline kit pieces, a badge or keys in a sentence, take the kit's look without the box the kit's
+   root rule draws round a whole specimen. */
+span.acorn-ui {
+  display: contents;
+}
+/* The kit sets a badge's word and a key cap in a tone or muted color, which fails contrast in some
+   themes, so the site keeps them in --text. A specimen's own badges stay as the app draws them. */
+span.acorn-ui > .ui-badge[data-tone],
+span.acorn-ui > .ui-kbd {
+  color: var(--text);
+}
+
+.sl-steps > li::before {
+  font-family: var(--font-mono);
+  border-radius: var(--radius-control);
+}
+.checkpoint {
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg-subtle);
+  border-inline-start: var(--stripe-w) solid var(--success);
+}
+.checkpoint .eyebrow {
+  margin-inline-end: var(--space-3);
+}
+
+/* The sidebar's group labels read as the app's labels, and the menu a narrow screen opens there carries
+   the header's links. */
+.sidebar-content {
+  font-size: var(--fs);
+}
+.sidebar-content .group-label .large {
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+}
+.sidebar-content a[aria-current='page'] {
+  border-radius: var(--radius-control);
+}
+.sidebar-menu {
+  gap: var(--space-8);
+  padding-block-end: var(--space-8);
+  border-block-end: var(--chrome-divider);
+}
+.sidebar-menu nav a {
+  text-decoration: none;
+}
+.sidebar-menu nav a[aria-current] {
+  font-weight: var(--fw-semibold);
+  box-shadow: inset var(--stripe-w) 0 var(--accent);
+  padding-inline-start: var(--space-5);
+}
+
+starlight-menu-button button {
+  color: var(--text);
+  background: var(--bg);
+  border: var(--control-border);
+  border-radius: var(--radius-control);
+  box-shadow: none;
+}
+
+/* The table of contents: the app's label over the list, and the current heading marked as the sidebar
+   marks the current page. */
+starlight-toc h2,
+mobile-starlight-toc .toggle {
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+}
+starlight-toc a[aria-current='true'] {
+  font-weight: var(--fw-semibold);
+  box-shadow: inset var(--stripe-w) 0 var(--accent);
+}
+
+.docs-footer {
+  display: grid;
+  gap: var(--space-10);
+  margin-block-start: var(--space-11);
+  font-size: var(--fs);
+  line-height: var(--lh);
+}
+.docs-footer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-10);
+}
+.docs-footer-meta > * {
+  margin: 0;
+}
+.docs-footer .site-footer {
+  border-block-start: var(--chrome-divider);
+}
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+.pagination .card {
+  flex: 1 1 16rem;
+}
+.pagination [rel='next'] {
+  text-align: end;
+}
+
+/* Search, drawn with acorn's command palette markup (Search.astro): the kit's overlay, bare field,
+   and rows, from the specimen stylesheet. The site marks the selected row with an accent rule, because
+   text on --bg-selected fails contrast in some themes, and labels each group of rows. */
+site-search dialog {
+  margin: 12vh auto auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+site-search dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: var(--scrim-filter);
+}
+site-search .overlay.palette {
+  width: min(40rem, 92vw);
+}
+site-search .palette-list {
+  max-height: 60vh;
+}
+site-search .palette-row {
+  text-decoration: none;
+}
+site-search .acorn-ui .palette-row.selected {
+  background: transparent;
+  box-shadow: inset var(--stripe-w) 0 var(--accent);
+}
+site-search .palette-label {
+  font-weight: var(--fw-semibold);
+}
+site-search .palette-row:hover .palette-label {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+site-search .palette-hint mark {
+  font-weight: var(--fw-semibold);
+  color: inherit;
+  background: none;
+}
+site-search .search-group {
+  padding: var(--space-4) var(--space-6) var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+}
+
+/* ── Social card ─────────────────────────────────────────────────────────────────────────────── */
+.social-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: var(--space-8);
+  inline-size: 1200px;
+  block-size: 630px;
+  padding: calc(2 * var(--space-11));
+  overflow: hidden;
+  color: var(--text);
+  background: var(--bg);
+  border-block-start: calc(2 * var(--space-4)) solid var(--accent);
+}
+.social-card > * {
+  margin: 0;
+}
+.social-card .eyebrow {
+  font-size: var(--fs-xl);
+}
+.social-card-title {
+  align-self: end;
+  font-family: var(--font-display);
+  font-size: 4rem;
+  font-weight: var(--heading-weight);
+  line-height: var(--lh-tight);
+}
+/* A long description stops at three lines, so the card's foot always shows. */
+.social-card > p:nth-child(3) {
+  display: -webkit-box;
+  max-inline-size: 52ch;
+  overflow: hidden;
+  font-size: 1.5rem;
+  line-height: var(--lh);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+.social-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block-start: var(--space-8);
+  font-size: var(--fs-xl);
+  border-block-start: var(--chrome-divider);
+}
+.social-card .site-mark pre {
+  font-size: 0.6rem;
+}
+.social-card .site-mark span {
+  font-size: 2rem;
+}

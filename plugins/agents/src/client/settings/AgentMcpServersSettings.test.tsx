@@ -21,6 +21,10 @@ const servers: AgentMcpServer[] = [
     consented: true,
     reviewTools: false,
     approvedCatalogueDigest: null,
+    auth: 'headers',
+    signIn: null,
+    clientId: null,
+    clientSecretStored: false,
   },
 ]
 const mocks = vi.hoisted(() => ({

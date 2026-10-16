@@ -1,0 +1,92 @@
+---
+title: Keyboard shortcuts
+description: The default shortcuts, how to change one, which binding wins a conflict, and what Escape does where.
+sources:
+  - docs/command-palette-and-shortcuts/shortcuts.md
+  - docs/command-palette-and-shortcuts/focus-and-typing.md
+  - docs/tui/navigation.md
+  - packages/client-core/src/features/settings/ShortcutsSettings.tsx
+  - apps/desktop/src/client/App.tsx
+  - apps/desktop/src/client/TaskView.tsx
+  - packages/client-core/src/host/palette/CommandPalette.tsx
+  - apps/site/scripts/keybindings.mjs
+checked: 90ded85ca
+---
+
+import Keys from '../../../../components/Keys.astro'
+
+This page lists the shortcuts acorn starts with, how to change them, what happens when two want the
+same keys, and how focus decides where a key goes. Press <Keys chord="meta+/" /> anywhere for a sheet of
+what the keyboard does right where you are.
+
+## The defaults
+
+[Keyboard shortcuts reference](/docs/reference/keyboard-shortcuts-reference/) lists every shortcut acorn
+starts with, read from the code, with where each works. The ones you'll use most:
+
+| Shortcut | What it does |
+| --- | --- |
+| <Keys chord="meta+k" /> | Open the command palette |
+| <Keys chord="meta+/" /> | Show what the keyboard does here |
+| <Keys chord="meta+shift+n" /> | New task |
+| <Keys chord="meta+1" /> to <Keys chord="meta+9" /> | Open the first nine tasks in the rail |
+| <Keys chord="meta+shift+t" /> | Show or hide the terminal drawer |
+
+On Windows, read Ctrl for ⌘. **Settings** > **General** > **Keyboard shortcuts** lists every shortcut,
+including the ones plugins add, with what each is set to now.
+
+## Change a shortcut
+
+1. Open **Settings** > **General** > **Keyboard shortcuts**.
+2. Click the shortcut you want to change, and press the new keys. Esc or Tab leaves it as it was.
+3. To remove a shortcut, click the unbind button beside it. To go back to the defaults for a group,
+   click **Reset section**.
+
+If the keys you press are already in use, acorn refuses them and says what uses them. Your changes are
+saved on this device. Removing a plugin keeps your changes to its shortcuts, so reinstalling it brings
+them back.
+
+## When two shortcuts want the same keys
+
+- A shortcut you set beats any default.
+- Among defaults, acorn's own win, then plugins' in the order they were installed.
+- The losing default gets no keys at all. Settings shows it beside the one that won, with **Also used
+  by**. acorn never picks other keys for it.
+
+One overlap is on purpose. A pane's shortcut and a task's shortcut can share keys, and the pane with
+focus wins. <Keys chord="meta+shift+t" /> reopens a closed file while the Editor has focus, and shows
+the terminal drawer anywhere else.
+
+A plugin can't take <Keys chord="meta+k" />, <Keys chord="meta+," />, <Keys chord="meta+1" /> to
+<Keys chord="meta+9" />, or Esc.
+
+## Where a key goes
+
+- **While you type in a field**, a key without ⌘, Ctrl, or Option goes to the field. Shortcuts with
+  one of those still work, so <Keys chord="meta+enter" /> commits from the message box.
+- **Inside a pane**, F6 and Shift+F6 move between its regions, such as a list and its detail. Ctrl+Option
+  with Left or Right moves between panes. Each region remembers where you were, so coming back lands in
+  the same place.
+- **In a list**, the arrow keys, Home, End, and Page Up and Page Down move, and typing jumps to a
+  matching row.
+- **Settings** covers the window, so no task or pane shortcut acts while it's open.
+
+### What Esc does
+
+Esc closes the thing on top, one at a time: a menu, then a dialog, then the palette. In the palette, it
+goes back one step first. With nothing open, Esc brings back the pane row after you've maximized a
+pane. A plugin can't claim Esc for itself.
+
+## In the terminal
+
+The terminal client uses the same shortcuts with Ctrl in place of ⌘, because a terminal never passes ⌘
+through. <Keys chord="ctrl+k" /> opens the palette. The footer line always lists what the keys do where
+you are, and `?` opens the full sheet. Tab and Shift+Tab move between regions, beside F6. Keys without
+a modifier also work outside a text field: `w`, `p`, `;`, `/`, `n`, `t`, and `q`. [Desktop and
+terminal](/docs/start/desktop-and-terminal/#keys-in-the-terminal-client) lists them. To change a
+shortcut, use the desktop app.
+
+## Limits
+
+- Some keys never reach acorn, because the operating system or the terminal keeps them.
+- A shortcut that lost a conflict has no keys until you give it some.

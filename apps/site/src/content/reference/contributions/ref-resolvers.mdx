@@ -1,0 +1,67 @@
+---
+title: refResolvers
+description: "Routes that turn your items' identifiers into labels."
+sources:
+  - docs/contribution-kinds.md
+  - docs/plugins/descriptors.md
+checked: '498833615'
+---
+
+A ref resolver labels your items wherever acorn shows their identifiers, such as a task's links,
+without that surface knowing your plugin. acorn POSTs a batch of identifiers to your route and draws the
+labels it answers.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "refResolvers": [
+      {
+        "id": "issues",
+        "kind": "issue",
+        "resolve": "/v1/p/acme/refs/resolve"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "refResolvers": [
+      {
+        "id": "issues",
+        "kind": "issue",
+        "resolve": "/v1/p/acme/refs/issues"
+      },
+      {
+        "id": "projects",
+        "kind": "project",
+        "resolve": "/v1/p/acme/refs/projects"
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+Labels resolve the same way in the terminal client.
+
+## Mistakes
+
+- There's no single-item form. Ask for an array of one.
+
+## Guide
+
+[Add a reference panel](/docs/build-plugins/ui/add-a-reference-panel/) walks through it from start to finish.

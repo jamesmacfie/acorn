@@ -1,0 +1,146 @@
+---
+title: Give agents tools
+description: Add a tool every agent in a task can call, with an input schema, a risk tier, and bounded output, that reaches Claude Code and Codex over MCP.
+sources:
+  - docs/agent-tools/loaded-tools.md
+  - docs/agent-tools/plugin-tools.md
+  - docs/agent-tools.md
+  - packages/protocol/src/plugin/runtimeContributions.ts
+  - examples/plugins/acme-agent/acorn-plugin.json
+  - examples/plugins/acme-agent/node.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll add a tool that every agent acorn runs in a task can call, Claude Code and Codex included,
+answered by a route on your Node half.
+
+## The result
+
+The Acme agent kit example adds `acme-agent_list_notes` and `acme-agent_add_note`. Ask an agent in a
+task to note something, and its transcript shows the call and your answer:
+
+```text
+mcp__acorn__acme-agent_add_note
+{ "saved": true, "count": 1 }
+```
+
+**Settings** > **Agents** > **Tools and permissions** lists both tools under the plugin, each with its
+tier and a switch.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-agent`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-agent).
+A tool needs no client bundle.
+
+## Steps
+
+<Steps>
+
+1. **Declare the tool.** Agents see it as `<pluginId>_<id>`, so `add_note` in `acme-agent` is
+   `acme-agent_add_note`. The `description` is what an agent reads to decide when to call it, so say
+   what it does and when.
+
+   <ExampleCode file="acme-agent/acorn-plugin.json" pick={['contributions.agentTools#add_note']} />
+
+   - `inputSchema` is a JSON Schema with an `object` at the root. acorn checks every call's arguments
+     against it before your route runs.
+   - `risk` is `read`, `write`, or `execute`. The person's tool tiers decide whether agents may call it:
+     read tools are on, write tools are on by default, and execute tools are off until the person turns
+     them on.
+   - `requiresSession: true` hides the tool from a caller that isn't a managed agent session, such as a
+     command typed in a terminal.
+   - `timeoutMs` and `maxOutputBytes` bound one call. A slow call fails with a timeout, and a bigger
+     answer is refused.
+
+2. **Answer it.** acorn posts `{ arguments, origin }` to the `handler` route. Read the task from the
+   request's credential, not from `origin`: the credential is signed, and `origin` is only a hint.
+
+   <ExampleCode file="acme-agent/node.js" region="tools" />
+
+   acorn never retries a call. If the reply is lost, the agent may call again, with the same
+   `x-acorn-tool-call-id` header. A tool that writes uses that id so a second call writes nothing new.
+
+3. **Install, and check it.** Install the plugin. Its page in **Settings** > **Plugins** lists each tool
+   with its tier on the **Permissions** tab. Start a Claude Code session in a task and ask it to save a
+   note. Claude Code finds the tool among acorn's, as `mcp__acorn__acme-agent_add_note`, or
+   `mcp__acorn-dev__acme-agent_add_note` in a development build.
+
+</Steps>
+
+## How a tool reaches an agent
+
+Your tool joins acorn's own tools, such as `task_context` and `pr_checks`, on acorn's MCP server. The
+server runs beside each agent, and every call goes to the Node with a token the Node signed for that one
+task and session:
+
+- **Claude Code and Codex** get the server registered before acorn starts them. Claude Code loads
+  acorn's tools by name when a task calls for one, which is another reason the description matters.
+- **A harness a plugin adds** gets it over the Agent Client Protocol, on every start and resume.
+
+The token decides which task a call reaches, and the person's tool tiers, any custom agent's limit, and
+any workflow step's limit decide whether it's allowed, all before your route runs. A tool turned off
+in Settings never reaches you. [Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)
+covers the rest.
+
+## Mistakes
+
+- Trusting `origin.taskId`. Use `context.principal.taskId` from the route's second argument.
+- A description that says what the tool is, not when to use it. "Notes" leaves an agent guessing.
+  "Save a short note on this task for the person to read later" doesn't.
+- Renaming a tool. The person's switch for it is stored by its name, so a renamed tool starts at its
+  tier's default.
+- A schema keyword outside the accepted set, such as `$ref`, `oneOf`, `pattern`, or `format`. The
+  manifest is refused, with the field's path.
+
+A tool id is snake case, because agents see it after an underscore:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "agentTools": [{
+      "id": "add-note", "description": "Save a note on this task.", "risk": "write",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "handler": "/v1/p/acme/tools/add-note"
+    }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "agentTools": [{
+      "id": "add_note", "description": "Save a note on this task.", "risk": "write",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+      "handler": "/v1/p/acme/tools/add-note"
+    }]
+  }
+}
+```
+
+## In the terminal
+
+The terminal client runs the same agent sessions, with the same tools. An agent you start in a
+terminal, in either app, isn't a managed session, so a tool with `requiresSession: true` is left out
+for it.
+
+## Limits
+
+- Up to 16 tools per plugin.
+- `inputSchema` takes `type`, `description`, `properties`, `required`, `additionalProperties`, `items`,
+  `enum`, and the length, count, and number bounds. It's at most 64 KiB, 8 levels deep, 64 properties,
+  and 64 enum values.
+- `timeoutMs` is 100 to 30,000. `maxOutputBytes` is 1,024 to 262,144, and the answer must be JSON.
+- A tool's route is one of your own. A tool can't search every provider the way acorn's `issue_detail`
+  does.
+
+## Reference
+
+[agentTools](/docs/build-plugins/reference/contributions/agent-tools/) has every field.
+[Permissions](/docs/build-plugins/reference/permissions/) shows the trust prompt's line for a tool.

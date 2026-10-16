@@ -1,0 +1,63 @@
+---
+// The facts box at the top of a built-in plugin's page. **Adds** and **Needs** are the page's own, in
+// slots. **Ships as** and **Works in** come from src/data/plugins.ts. **Can reach** is the page's own
+// for a plugin that's part of the app. For an installed package it's generated from the manifest, each
+// grant beside its reason, and the build fails on a grant with no reason.
+import { PLUGINS, SHIPS_AS, type PluginId } from '../data/plugins.ts'
+import { permissionKeys } from '../lib/pluginPermissions.ts'
+
+interface Props {
+  id: PluginId
+}
+
+const manifests = import.meta.glob<{ permissions?: Parameters<typeof permissionKeys>[0] }>(
+  '../../../../plugins/*/acorn-plugin.config.mjs',
+  { eager: true, import: 'default' },
+)
+
+const { id } = Astro.props
+const plugin = PLUGINS[id]
+const reasons: Record<string, string> = 'reasons' in plugin ? plugin.reasons : {}
+const grants =
+  plugin.ships === 'package'
+    ? permissionKeys(manifests[`../../../../plugins/${id}/acorn-plugin.config.mjs`]?.permissions).map((key) => {
+        if (!(key in reasons)) throw new Error(`${id} asks for ${key}, and src/data/plugins.ts gives no reason`)
+        return { key, reason: reasons[key] }
+      })
+    : null
+---
+
+<table class="plugin-facts">
+  <tbody>
+    <tr><th scope="row">Adds</th><td><slot name="adds" /></td></tr>
+    <tr>
+      <th scope="row">Ships as</th>
+      <td>{SHIPS_AS[plugin.ships]}, {'required' in plugin ? 'always on' : 'on by default'}.</td>
+    </tr>
+    <tr>
+      <th scope="row">Works in</th>
+      <td>{plugin.worksIn}.{'worksInNote' in plugin && ` ${plugin.worksInNote}`}</td>
+    </tr>
+    <tr><th scope="row">Needs</th><td><slot name="needs" /></td></tr>
+    <tr>
+      <th scope="row">Can reach</th>
+      <td>
+        {
+          !grants ? (
+            <slot name="reach" />
+          ) : grants.length ? (
+            <ul>
+              {grants.map((grant) => (
+                <li>
+                  <code>{grant.key}</code>: {grant.reason}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            'Nothing. Its manifest asks for no permissions.'
+          )
+        }
+      </td>
+    </tr>
+  </tbody>
+</table>

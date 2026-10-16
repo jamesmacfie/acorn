@@ -1,0 +1,99 @@
+---
+title: Add a reference panel
+description: Show an item from your service in a panel beside whatever the person is reading, opened from a link or by another plugin.
+sources:
+  - docs/plugins/frames.md
+  - docs/contribution-kinds.md
+  - docs/plugins/descriptors.md
+  - docs/panes.md
+  - examples/plugins/acme-tracker/acorn-plugin.json
+  - examples/plugins/acme-tracker/client.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll add a reference panel: a panel for one item from your service, such as an issue, that opens
+beside whatever the person is reading when they follow a link to it.
+
+## The result
+
+The Acme tracker example's panel for issue ACME-14. acorn draws the panel itself: its title, its close
+button, and **Create task** under the body, which starts a task linked to the item. Your tree draws
+the body.
+
+<Specimen id="acme-tracker-panel" />
+
+## Before you start
+
+Finish [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/). The code is from
+[`examples/plugins/acme-tracker`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-tracker).
+
+## Steps
+
+<Steps>
+
+1. **Declare the panel.** Add a `frames` entry with `target: "refPanel"`. `providerId` names whose
+   items it shows. Fill its `body` with a tree.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.frames#issue-panel']} />
+
+2. **Say which links open it.** A `contentLinks` entry recognizes your item's address and captures
+   its ID. `presentations` lists where the item may open, in your order of preference: the panel, a
+   pane, or the person's browser.
+
+   <ExampleCode file="acme-tracker/acorn-plugin.json" pick={['contributions.contentLinks']} />
+
+3. **Draw the body.** The panel's tree gets the item in its props as `item`: here, the issue key the
+   link captured.
+
+   <ExampleCode file="acme-tracker/client.js" region="panel" />
+
+4. **Check it.** Save. Put `https://tracker.acme.example/issue/ACME-14` in a task's note or an agent
+   reply, and click it. The panel opens beside what you were reading, and the link you followed is
+   unchanged underneath.
+
+</Steps>
+
+## Opened by another plugin
+
+A reference panel is the one surface no plugin mounts. acorn holds which item is open, one at a time,
+so any surface can ask for any provider's panel by its provider ID and the item's displayed ID. A
+plugin compiled into acorn calls `openRefPanel({ providerId, displayId })`, which is how a pull
+request in the GitHub pane opens Linear's panel for a linked issue without knowing anything about
+Linear. A plugin you install reaches your panel through a link it draws: the link resolves through
+your `contentLinks`.
+
+## Mistakes
+
+A content link has to land somewhere: a pane of yours, or your panel. One with neither is refused.
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "contributions": {
+    "contentLinks": [{ "id": "issue-link", "match": "https://tracker.acme.example/issue/{key}", "item": "key" }]
+  }
+}
+```
+
+- The pattern is `https` only, with a literal host, one capture per path segment, and no query.
+- A panel's props name the item `item`. Its owner can't pass anything else.
+
+## In the terminal
+
+The terminal client has no reference panels. A link resolves to your pane, if `presentations` lists
+one, and otherwise stops, because there's no browser tab to fall back to.
+
+## Limits
+
+- One panel is open at a time, across every plugin.
+- Links inside a panel get no hover previews.
+- Another plugin can add a region above or below your panel's body if you declare a point with
+  `mounts` ([Open your view to other plugins](/docs/build-plugins/ui/open-your-view-to-other-plugins/)).
+
+## Reference
+
+- [frames](/docs/build-plugins/reference/contributions/frames/) has the panel's fields.
+- [contentLinks](/docs/build-plugins/reference/contributions/content-links/) has the pattern grammar.

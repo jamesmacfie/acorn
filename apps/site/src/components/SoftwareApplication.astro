@@ -1,0 +1,26 @@
+---
+// acorn as a schema.org SoftwareApplication, for search engines, in the head of the landing and download
+// pages. It names the release's page as the download once there's a release.
+import type { Release } from '../lib/github'
+import { GITHUB } from '../nav'
+
+interface Props {
+  release: Release | null
+}
+
+const { release } = Astro.props
+const data = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'acorn',
+  description: 'A workspace for working with coding agents, one task at a time.',
+  url: new URL('/', Astro.site).href,
+  applicationCategory: 'DeveloperApplication',
+  // The desktop app runs on macOS and Windows, and the terminal client and the Node on Linux too.
+  operatingSystem: 'macOS, Windows, Linux',
+  license: `${GITHUB}/blob/main/LICENSE`,
+  ...(release && { softwareVersion: release.tag, downloadUrl: release.url }),
+}
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(data)} />

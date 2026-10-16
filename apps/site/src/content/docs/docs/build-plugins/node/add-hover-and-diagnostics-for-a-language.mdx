@@ -1,0 +1,109 @@
+---
+title: Add hover and diagnostics for a language
+description: Give Editor's files in one language a hover and underlined problems, answered by your Node half, and what happens when two plugins offer the same language.
+sources:
+  - docs/editor/document-surface.md
+  - packages/protocol/src/content/documentSurface.ts
+  - examples/plugins/acme-review/acorn-plugin.json
+  - examples/plugins/acme-review/node.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll make Editor understand a little of a language: a tooltip when the pointer rests on something,
+and underlines for problems, both answered by your Node half.
+
+## The result
+
+In a Markdown file open in Editor, every `TODO` is underlined as a warning, **Unresolved TODO**, and
+listed in the problems panel (⌘⇧M). Resting the pointer on one shows "Resolve before **merge**.",
+credited to the plugin.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-review`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-review).
+Language services need no client bundle.
+
+## Steps
+
+<Steps>
+
+1. **Declare the services.** `languageId` comes from Editor's language list, such as `markdown`,
+   `typescript`, or `sql`. Declare `hover`, `diagnostics`, or both, each a route on your Node half.
+
+   <ExampleCode file="acme-review/acorn-plugin.json" pick={['contributions.documentServices']} />
+
+2. **Answer a hover.** Editor posts the live buffer, saved or not, the caret's `position`, and a
+   `revision` that counts edits. Answer `null` when you have nothing to say, or the `contents` to show and
+   the `range` it's about:
+
+   <ExampleCode file="acme-review/node.js" region="hover" />
+
+3. **Answer diagnostics.** Editor posts the buffer and its `revision` 500 ms after the last edit. Answer
+   every problem you find, each with a `range`, a `severity`, and a `message`:
+
+   <ExampleCode file="acme-review/node.js" region="diagnostics" />
+
+   Positions are one-based lines and columns, counted in UTF-16 units, and a range's end is exclusive.
+   That's not the zero-based numbering of the Language Server Protocol.
+
+4. **Check it.** Install the plugin, open a Markdown file in Editor, and type `TODO`.
+
+</Steps>
+
+## When two plugins offer one language
+
+acorn picks one provider per language and service on each Node. With one, it runs. With two, neither
+runs until the person picks one under **Settings** > **Advanced** > **Extension points** > **Language
+services**. If the plugin they picked goes away, the language has no provider, never the other one.
+
+## Mistakes
+
+- Answering for an old revision. acorn drops an answer whose `revision` isn't the one it sent, or that
+  arrives after another edit. Echo the `revision` you were sent.
+- A range outside the text. acorn drops that item.
+- A slow answer. Diagnostics are asked again after every pause in typing, so a slow route shows stale
+  underlines. Keep it quick, and do the heavy work elsewhere.
+- Expecting fixes or commands. Diagnostics are read-only: no quick fixes, and no language server
+  process.
+
+A service names a route, not a function:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "documentServices": [{ "id": "todos", "label": "Review TODOs", "languageId": "markdown",
+      "hover": "/v1/p/acme/hover" }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node.js",
+  "contributions": {
+    "documentServices": [{ "id": "todos", "label": "Review TODOs", "languageId": "markdown",
+      "hover": { "route": "/v1/p/acme/hover" } }]
+  }
+}
+```
+
+## In the terminal
+
+The terminal has no pointer, so Editor there offers **Diagnostics** on the file as saved, because you
+edit in `$EDITOR`.
+
+## Limits
+
+- Up to 8 language services per plugin.
+- A hover's `contents` is plain text or Markdown, at most 64 KiB. Markdown is drawn sanitized, with
+  images as placeholders.
+- Editor keeps 200 diagnostics per answer, and doesn't send a buffer over 1 MiB.
+
+## Reference
+
+[documentServices](/docs/build-plugins/reference/contributions/document-services/) has every field.

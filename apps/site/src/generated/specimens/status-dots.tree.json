@@ -1,0 +1,161 @@
+{
+  "meta": {
+    "title": "StatusDot",
+    "caption": "A dot in each tone, each beside the word it stands for.",
+    "terminal": {
+      "columns": 60,
+      "rows": 1
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Inline",
+          "props": {
+            "gap": "stack"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "StatusDot",
+                  "props": {
+                    "tone": "ok",
+                    "label": "Running"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n4",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n5",
+                      "type": "#text",
+                      "props": {
+                        "value": "running"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "StatusDot",
+                  "props": {
+                    "tone": "warn",
+                    "label": "Starting"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n8",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n9",
+                      "type": "#text",
+                      "props": {
+                        "value": "starting"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n10",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n11",
+                  "type": "StatusDot",
+                  "props": {
+                    "tone": "danger",
+                    "label": "Exited"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n12",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n13",
+                      "type": "#text",
+                      "props": {
+                        "value": "exited"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n14",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n15",
+                  "type": "StatusDot",
+                  "props": {
+                    "tone": "muted",
+                    "label": "Stopped"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n16",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n17",
+                      "type": "#text",
+                      "props": {
+                        "value": "stopped"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

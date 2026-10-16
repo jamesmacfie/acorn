@@ -1,0 +1,27 @@
+---
+title: Spinner
+description: A turning mark for work with no known end.
+sources:
+  - packages/client-core/src/kit/components/content/Spinner.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Spinner` while something loads or runs. Give it a `label`, which names the work for a screen reader. The terminal draws a braille cycle, or `…` where motion is off.
+
+<Specimen id="spinner" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="spinner" />
+
+## Related
+
+- [`Meter`](/docs/components/content/meter/), for work with a known amount.
+- [`StatusDot`](/docs/components/content/status-dot/), for a running state.
+
+## Mistakes
+
+- Leaving a spinner as the only sign of a failure. Replace it with an `Alert` when the work fails.

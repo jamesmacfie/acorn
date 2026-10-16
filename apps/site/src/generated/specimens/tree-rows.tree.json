@@ -1,0 +1,105 @@
+{
+  "meta": {
+    "title": "TreeRow",
+    "caption": "An open folder with two files under it, and a closed folder.",
+    "terminal": {
+      "columns": 40,
+      "rows": 4
+    },
+    "width": 320
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "ListColumn",
+          "props": {
+            "label": "Files"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "TreeRow",
+              "props": {
+                "depth": 0,
+                "expandable": true,
+                "expanded": true,
+                "label": "src"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "src"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "TreeRow",
+              "props": {
+                "depth": 1,
+                "label": "login.ts",
+                "selected": true
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "login.ts"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "TreeRow",
+              "props": {
+                "depth": 1,
+                "label": "session.ts"
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "#text",
+                  "props": {
+                    "value": "session.ts"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n8",
+              "type": "TreeRow",
+              "props": {
+                "depth": 0,
+                "expandable": true,
+                "label": "test"
+              },
+              "children": [
+                {
+                  "id": "n9",
+                  "type": "#text",
+                  "props": {
+                    "value": "test"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

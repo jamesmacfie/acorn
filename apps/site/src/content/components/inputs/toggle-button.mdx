@@ -1,0 +1,26 @@
+---
+title: ToggleButton
+description: A button that stays pressed in or out.
+sources:
+  - packages/client-core/src/kit/components/inputs/ToggleButton.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `ToggleButton` for an on and off state that reads as a button, such as wrapping lines. `pressed` sets it, and `onPress` reports a press, so your tree flips `pressed` in its handler.
+
+<Specimen id="toggle-buttons" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="toggle-buttons" />
+
+## Related
+
+- [`Checkbox`](/docs/components/inputs/checkbox/), for an on and off setting with a label.
+
+## Mistakes
+
+- Waiting for `onPressedChange` in a tree. It isn't one of the twelve events, so it's dropped. Flip `pressed` on `onPress`.

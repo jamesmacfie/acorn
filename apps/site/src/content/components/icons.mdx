@@ -1,0 +1,51 @@
+---
+title: Icons
+description: The icon set a plugin can draw from, the icons that draw without waiting, brand marks, tones, and which icons the terminal draws.
+sources:
+  - docs/ui-design/icons.md
+  - packages/client-core/src/kit/tokens/iconNodes.ts
+  - packages/client-core/src/kit/tokens/brandMarks.ts
+  - apps/tui/src/kit/glyphs.ts
+checked: afced2661
+---
+
+This page covers the icons a plugin can name in an `Icon`, an `IconButton`, or anywhere a component
+takes a `glyph`. Read it when you pick an icon.
+
+An icon is a name. A name from [Lucide](https://lucide.dev/icons/) draws that Lucide icon, stroked, in
+the current text color. A name that starts with `brand:` draws a brand mark. Any other name draws as
+text. `tone` colors an icon with a tone role, as it colors text.
+
+<Specimen id="icons" />
+
+## Find an icon
+
+Every Lucide icon works. The list below is the set acorn draws on its first paint, because the app
+itself names them. Type in the filter to search it. An icon from the rest of Lucide's set draws its
+name as text for a frame while the full set loads, then draws as an icon. To browse every name, see
+[Lucide's icon list](https://lucide.dev/icons/).
+
+An icon the terminal draws as a one-cell mark shows that mark after its name.
+
+{/* facts */}
+
+## Brand marks
+
+A brand mark is one SVG path, named `brand:<id>`, filled with the text color, or with the brand's own
+color when `tone="brand"`. acorn's own list holds only GitHub, because a built-in view draws it. A
+plugin adds its own marks in its manifest, under `icon` or `icons`, and the host names them after the
+plugin, so one plugin can't claim another's mark. For more information, see
+[Add icons and brand marks](/docs/build-plugins/ui/add-icons-and-brand-marks/).
+
+## In the terminal
+
+The terminal draws a small set of icons as one-cell marks, such as `✓` for `circle-check`, and
+nothing for any other name. A brand mark draws nothing there. So an icon whose meaning matters needs a
+word beside it, or an `IconButton`, whose label the terminal draws.
+
+## Limits
+
+- A mark is one path, not an SVG document. A plugin's mark can't hold a gradient, an image, or a
+  second color.
+- `spin` turns an icon even when the person has turned motion off, because on a state icon the turn
+  is the signal.

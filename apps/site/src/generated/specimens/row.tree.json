@@ -1,0 +1,106 @@
+{
+  "meta": {
+    "title": "Row",
+    "caption": "Three rows in a list: a selected one, a plain one, and a stacked one with a second line.",
+    "terminal": {
+      "columns": 60,
+      "rows": 5
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "ListColumn",
+          "props": {
+            "label": "Issues"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Row",
+              "props": {
+                "meta": "ACO-12",
+                "selected": true
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Redirect loop after sign-in"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Row",
+              "props": {
+                "meta": "ACO-14"
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "Flaky upload test"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Row",
+              "props": {
+                "variant": "stacked",
+                "meta": "ACO-15"
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n8",
+                      "type": "#text",
+                      "props": {
+                        "value": "Slow first paint"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n9",
+                  "type": "Text",
+                  "props": {
+                    "emphasis": "muted"
+                  },
+                  "children": [
+                    {
+                      "id": "n10",
+                      "type": "#text",
+                      "props": {
+                        "value": "Opened by sam yesterday"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

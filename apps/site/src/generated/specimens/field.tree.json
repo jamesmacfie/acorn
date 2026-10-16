@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "title": "Field with an Input",
+    "caption": "A labelled text input with help under it.",
+    "terminal": {
+      "columns": 50,
+      "rows": 4
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Field",
+          "props": {
+            "label": "Branch name",
+            "help": "Letters, numbers, and dashes."
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Input",
+              "props": {
+                "value": "fix-login-redirect"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

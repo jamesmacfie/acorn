@@ -11,7 +11,7 @@ manual dispatch:
 
 | Job | Runner | Runs |
 | --- | --- | --- |
-| Check | Linux | `pnpm lint`, then `pnpm test --filter='!@acorn/desktop'` with `ACORN_TEST_CONCURRENCY=1` and `ACORN_TUI_WIDE=1` |
+| Check | Linux | `pnpm lint`, then `pnpm test --filter='!@acorn/desktop' --filter='!@acorn/site'` with `ACORN_TEST_CONCURRENCY=1` and `ACORN_TUI_WIDE=1` |
 | Desktop | macOS | `pnpm --filter @acorn/desktop test`, on pull requests and `main` pushes only |
 
 The check job runs on Linux for two reasons. A macOS runner has no Docker for the container probes to
@@ -25,6 +25,9 @@ Tags and manual dispatches skip the desktop job. Once the check job passes, they
 `.github/workflows/build-desktop.yml`, which builds the bundle inputs once, runs the desktop tests
 against them, and packages the same output into signed installers. A broken boot path fails there
 before packaging.
+
+`.github/workflows/site.yml` runs the public site's checks and deploys it, on pull requests and `main`
+pushes that touch the site or what it reads from. [The public site](../site.md) covers it.
 
 ## The Turborepo cache
 

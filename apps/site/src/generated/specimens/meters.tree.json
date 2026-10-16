@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "title": "Meter",
+    "caption": "A bar at 62 percent with a mark at 80, a warn bar, and a pie.",
+    "terminal": {
+      "columns": 40,
+      "rows": 3
+    },
+    "width": 360
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Meter",
+              "props": {
+                "label": "Context used",
+                "value": 0.62,
+                "mark": 0.8
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "Meter",
+              "props": {
+                "label": "Budget spent",
+                "value": 0.91,
+                "tone": "warn"
+              },
+              "children": []
+            },
+            {
+              "id": "n4",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "Meter",
+                  "props": {
+                    "label": "Checks done",
+                    "value": 0.5,
+                    "shape": "pie"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

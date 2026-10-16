@@ -1,0 +1,12 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "include": [".astro/types.d.ts", "**/*"],
+  "exclude": ["dist", "specimens", "snapshots"],
+  "compilerOptions": {
+    // The SDK's hand-written declarations, which its build copies to dist, so a check needs no build.
+    "paths": {
+      "acorn-plugin-sdk": ["../../packages/plugin-sdk/src/public.ts"],
+      "acorn-plugin-sdk/remote": ["../../packages/plugin-sdk/src/remote/public.ts"]
+    }
+  }
+}

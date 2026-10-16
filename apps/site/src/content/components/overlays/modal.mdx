@@ -1,0 +1,28 @@
+---
+title: Modal
+description: A dialog over the pane, with a title and a dismiss.
+sources:
+  - packages/client-core/src/kit/components/overlays/Modal.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Modal` for a short task the reader finishes or cancels, such as confirming a delete. Put its content in `ModalBody` and its buttons in `ModalActions`. Escape and the close button send `onDismiss`.
+
+<Specimen id="modal" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="modal" />
+
+## Related
+
+- [`ModalBody`](/docs/components/overlays/modal-body/), for its content.
+- [`ModalActions`](/docs/components/overlays/modal-actions/), for its buttons.
+- [`ConfirmButton`](/docs/components/inputs/confirm-button/), for a confirmation with no words.
+
+## Mistakes
+
+- Leaving out `onDismiss`. It's required, because a reader must always be able to leave.

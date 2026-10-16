@@ -1,0 +1,110 @@
+---
+title: Connect a service
+description: Add a service to Settings › Connections, borrow its key for one call at a time without storing it, and use it from a route or a schedule.
+sources:
+  - docs/integrations/contributions.md
+  - docs/plugins/node-providers.md
+  - docs/plugin-authoring/the-node-half.md
+  - examples/plugins/acme-data/acorn-plugin.json
+  - examples/plugins/acme-data/node/index.js
+  - examples/plugins/acme-data/server/cloud.js
+  - examples/plugins/acme-data/server/routes.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll let the person connect your plugin to a service with their own key, and use that key from your
+Node half without ever storing it yourself.
+
+## The result
+
+**Acme Cloud** appears under **Settings** > **Connections** > **Add connection**, with a form that asks
+for an API key. acorn draws the form, checks the key with your code, encrypts it on the Node, and lists
+the connection with **Test**, **Replace key**, **On**, and **Disconnect**. Every 15 minutes acme-data
+syncs deploys from Acme Cloud with that key.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-data`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-data).
+
+## Steps
+
+<Steps>
+
+1. **Ask for the host.** Your worker reaches only the hosts in `permissions.node.net`.
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['permissions.node']} />
+
+2. **Describe the connection.** `fields` is the form acorn draws. `validate` runs once when the person
+   saves it, `normalize` says what acorn stores, and `test` runs when acorn checks the key again.
+   `toPublic` is what every client may see, and acorn checks it holds exactly these fields, so a secret
+   can't leak through it.
+
+   <ExampleCode file="acme-data/server/cloud.js" region="provider" />
+
+   A failure acorn understands carries a `code`, such as `provider_needs_auth`, and an HTTP `status`.
+   acorn shows the person the fix: reconnect for a 401, wait for a 429.
+
+3. **Register it in `init`.**
+
+   <ExampleCode file="acme-data/node/index.js" region="connect" />
+
+   The id, `acme-cloud`, is the provider's name everywhere: in the database, in the connection's page,
+   and in your own calls. Keep it stable.
+
+4. **Borrow the key.** `withConnections` calls your function once for each of the person's connections
+   to the provider, with the key, and takes the key back when the function returns. There's no call
+   that reads a key and keeps it.
+
+   <ExampleCode file="acme-data/server/routes.js" region="schedule" />
+
+   `context.providers` is on every route's second argument. It answers for your own providers only, and
+   only for the person's device or the Node itself: an agent's task credential can't spend a key.
+
+5. **Check it.** Open **Settings** > **Connections** > **Add connection**, pick **Acme Cloud**, and paste
+   a key. A wrong key shows your `validate` error under the form. Then press **Run now** on the schedule in
+   **Settings** > **Automation** > **Schedules**, and the synced deploys appear on a dashboard.
+
+</Steps>
+
+## Add Nodes to the fleet
+
+A different kind of provider adds machines instead of a service. `ctx.providers.nodes` registers a
+provider whose `list` returns Nodes the person can adopt into the fleet, and which may `create`,
+`start`, `stop`, and `destroy` them. A provider that can create a Node must be able to destroy one, and
+acorn asks before `destroy`. It runs on a Node, never in a window, so the cloud account's credential
+stays there.
+
+## Mistakes
+
+- Storing the key in your own database or a preference. It stays readable after the person disconnects.
+  Borrow it with `withConnections` on every call.
+- A `toPublic` that returns more or less than the fields above. Registration fails, and the plugin with
+  it.
+- Answering 401 from a route the browser extension calls. The extension reads it as acorn refusing the
+  browser. Use 403 for a key the service refused.
+- Calling a host you didn't list in `permissions.node.net`, or listing an address such as
+  `https://api.acme.example/v1` where a host name, `api.acme.example`, belongs. The worker refuses the
+  request.
+
+## In the terminal
+
+The connection lives on the Node, so the terminal client's work uses it too. Adding one opens the
+desktop app's **Settings**.
+
+## Limits
+
+- A connection's credential is what the form's fields collect, stored as one string.
+- `budgets` caps how many requests run at once, across the provider and per connection.
+- A provider that also mirrors items, such as Linear's issues, so agents can read them with
+  `issue_detail`, is an integration provider. That needs more than a connection: an external id
+  contract, a codec, and mirrored resources.
+
+## Reference
+
+[Permissions](/docs/build-plugins/reference/permissions/) has `permissions.node.net`, and
+[The Node context](/docs/build-plugins/reference/the-node-context/) has `ctx.providers`.
+[Connections](/docs/settings/connections/) is what the person sees.

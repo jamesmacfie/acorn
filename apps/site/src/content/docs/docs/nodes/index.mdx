@@ -1,0 +1,75 @@
+---
+title: Nodes
+description: "The Node holds your projects and runs your agents. This page says what it keeps, what your device keeps, and why each Node keeps its own data."
+sources:
+  - docs/architecture-overview.md
+  - docs/architecture/fleet.md
+  - docs/state-ownership.md
+  - docs/node-distribution.md
+  - packages/client-core/src/features/fleet/FleetHome.tsx
+checked: 07aa959a0
+---
+
+import Specimen from '../../../../components/Specimen.astro'
+
+A Node is the process that holds your projects and does acorn's work: it keeps the database, makes
+worktrees, and runs terminals, agents, and workflows. This page is for anyone who wants to run acorn on
+more than one machine, or wants to know where things live.
+
+## What a Node keeps, and what your device keeps
+
+The desktop app, the terminal client, and the command line are clients. Each runs on your device and
+reaches one or more Nodes.
+
+<Specimen id="device-and-nodes" />
+
+| The Node keeps | Your device keeps |
+| --- | --- |
+| Workspaces, projects, and tasks | The Nodes it's paired with, and the token for each |
+| Branches, worktrees, and Git | Appearance, keyboard shortcuts, and the order of the left rail |
+| Terminals, agent sessions, and workflow runs | The window's size and place, and what was open last |
+| Notes, memory, saved queries, and dashboards | A cached copy of what it last read from each Node |
+| Connections such as GitHub, and their credentials | Drafts you haven't saved yet |
+| Which plugins are on, and project configuration you trusted | Which plugin bundles this device trusts |
+| A task's pane layout | |
+
+A task's pane layout is on the Node, so it looks the same from any client paired with that Node.
+**Settings** marks every setting with where it's stored: **This device** or the Node. [Where your data
+lives](/docs/nodes/where-your-data-lives/) has the folders.
+
+## The Node the desktop app runs for you
+
+The desktop app starts a Node on your computer when it opens, and restarts it if it stops. It's called
+**This computer** in the app, and it answers only on this computer. You don't have to set it up or pair
+with it.
+
+The terminal client and the command line use the same Node when the desktop app is installed. If no
+Node is running, `acorn` with no command starts one and stops it when you quit.
+
+## Each Node keeps its own data
+
+Pair another Node, such as a build machine or a server, and acorn shows both. A workspace and
+everything in it belongs to exactly one Node, so a task's worktree, terminals, and agents are on the
+machine that runs that Node.
+
+Nodes don't share a database, and nothing moves between them. That's on purpose:
+
+- A worktree and the agents working in it have to be on the same disk, and that disk belongs to one
+  machine.
+- When one Node is offline, the others keep working, and acorn shows what it last saw from the offline
+  one.
+- Nothing has to keep two copies of a task in step.
+
+[The fleet view](/docs/nodes/the-fleet-view/) shows every Node you're paired with in one place.
+
+## In the terminal
+
+The terminal client attaches to this machine's Node, or starts one. Run `acorn --node <address>` to use
+another. [Pair a device or a remote Node](/docs/nodes/pair-a-device-or-a-remote-node/) says how.
+
+## Limits
+
+- A task can't move from one Node to another. Push its branch and start a task on the other Node.
+- The desktop app manages only its own Node. A Node on another machine runs as a [standalone
+  Node](/docs/nodes/run-a-standalone-node/), and you start and stop it there.
+- A Node listens only on its own machine until you tell it otherwise.

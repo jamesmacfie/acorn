@@ -1,0 +1,72 @@
+---
+// The features index: a card per feature page, each with its sentence and a small picture. The cards
+// are links, so the pictures inside them are inert.
+import Card from '../../components/Card.astro'
+import Snapshot from '../../components/Snapshot.astro'
+import Specimen from '../../components/Specimen.astro'
+import { FEATURES, type FeatureId } from '../../features'
+import Marketing from '../../layouts/Marketing.astro'
+import type { PageMeta } from '../../meta'
+import type { SnapshotId } from '../../snapshots'
+
+export const meta = {
+  description: 'What acorn does, one part at a time, each with a picture and a way into the docs.',
+  sources: ['docs/features.md', 'apps/site/src/features.ts'],
+  checked: '663359ff7',
+} satisfies PageMeta
+
+// Each scene shows once on this page, so no snapshot needs an instance.
+const pictures: Record<FeatureId, { snapshot: SnapshotId } | { specimen: string }> = {
+  tasks: { snapshot: 'palette' },
+  agents: { snapshot: 'hero' },
+  review: { snapshot: 'review' },
+  'desktop-and-terminal': { snapshot: 'terminal-small' },
+  'task-tools': { snapshot: 'database' },
+  plugins: { specimen: 'starter-pane' },
+  nodes: { snapshot: 'fleet' },
+  browser: { snapshot: 'browser' },
+  automation: { snapshot: 'workflow' },
+  security: { snapshot: 'permissions' },
+}
+const ids = Object.keys(FEATURES) as FeatureId[]
+---
+
+<Marketing title="Features" meta={meta}>
+  <p class="lede">What acorn does, one part at a time. Each page shows the part and links to its docs.</p>
+  <section class="section">
+    <h2>Every part of acorn</h2>
+    <ul class="cards">
+      {
+        ids.map((id) => {
+          const picture = pictures[id]
+          return (
+            <li>
+              <Card title={FEATURES[id].title} href={`/features/${id}/`}>
+                <div class="picture" inert>
+                  {'snapshot' in picture ? <Snapshot id={picture.snapshot} /> : <Specimen id={picture.specimen} />}
+                </div>
+                <p>{FEATURES[id].sentence}</p>
+              </Card>
+            </li>
+          )
+        })
+      }
+    </ul>
+  </section>
+</Marketing>
+
+<style>
+  .lede {
+    max-inline-size: var(--site-measure);
+  }
+  .cards {
+    grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr));
+  }
+  .picture {
+    min-inline-size: 0;
+  }
+  /* A card's picture is a thumbnail: its caption is the card's own text. */
+  .picture :global(figcaption) {
+    display: none;
+  }
+</style>

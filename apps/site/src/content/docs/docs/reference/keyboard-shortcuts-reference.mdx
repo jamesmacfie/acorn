@@ -1,0 +1,42 @@
+---
+title: Keyboard shortcuts reference
+description: Every default keyboard shortcut in the desktop app and the terminal client, with what it does and where it works.
+sources:
+  - docs/command-palette-and-shortcuts/shortcuts.md
+  - docs/command-palette-and-shortcuts/focus-and-typing.md
+  - docs/tui/keys.md
+  - apps/site/scripts/keybindings.mjs
+checked: 07aa959a0
+---
+
+import KeyboardReference from '../../../../components/KeyboardReference.astro'
+
+This page lists every shortcut acorn starts with, read from the code that registers it when this site
+was built. [Keyboard shortcuts](/docs/using/keyboard-shortcuts/) explains how to change one, which
+shortcut wins when two want the same keys, and what Esc does where.
+
+Keys are shown as they are on macOS. On Windows, read Ctrl for ⌘. In a text field, a key without ⌘,
+Ctrl, or Option goes to the field, so a single-key shortcut such as `/` works only while you aren't
+typing.
+
+**Settings** > **General** > **Keyboard shortcuts** lists the same shortcuts with what each is set to
+now, including any you changed.
+
+## The desktop app
+
+<KeyboardReference />
+
+## The terminal client
+
+The terminal client uses the shortcuts above with Ctrl in place of ⌘, because a terminal never passes ⌘
+through. It adds these of its own:
+
+<KeyboardReference terminal />
+
+## Limits
+
+- A shortcut that loses a conflict has no keys until you give it some. This page shows the defaults
+  before any conflict.
+- A plugin you install can add shortcuts. They show in **Settings** > **General** > **Keyboard
+  shortcuts**, under the plugin's name, and not here.
+- Some keys never reach acorn, because the operating system or the terminal keeps them.

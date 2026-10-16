@@ -1,0 +1,27 @@
+---
+title: TableRow
+description: One row of a table, optionally pressable.
+sources:
+  - packages/client-core/src/kit/components/layout/Table.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `TableRow` for each row, and `head` for the header row. With `onPress` the row becomes a tab stop.
+
+<Specimen id="table" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="table" />
+
+## Related
+
+- [`TableCell`](/docs/components/collections/table-cell/), for its cells.
+- [`Table`](/docs/components/collections/table/), for the table around it.
+
+## Mistakes
+
+- Putting a button in every row to open it. Give the row `onPress`, and the whole row is the control.

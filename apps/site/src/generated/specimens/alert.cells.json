@@ -1,0 +1,8 @@
+{"columns":60,"rows":6,"lines":[
+[{"text":"✓","fg":"ok","attrs":["bold"]},{"text":" "},{"text":"The branch is up to date.","fg":"ok"}],
+[{"text":"!","fg":"warn","attrs":["bold"]},{"text":" "},{"text":"Two checks are still running.","fg":"warn"}],
+[{"text":"✕","fg":"danger","attrs":["bold"]},{"text":" "},{"text":"Push rejected","fg":"danger","attrs":["bold"]},{"text":" "},{"text":"The remote has commits you don't have.","fg":"danger"}],
+[],
+[],
+[]
+]}

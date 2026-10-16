@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "title": "list-detail",
+    "caption": "A list column with its header and footer, beside the detail. The host draws the split.",
+    "terminal": {
+      "columns": 90,
+      "rows": 6
+    },
+    "width": 640
+  },
+  "layout": {
+    "name": "list-detail",
+    "label": "Deploys",
+    "regions": [
+      "list-header",
+      "list",
+      "list-footer",
+      "detail"
+    ]
+  }
+}

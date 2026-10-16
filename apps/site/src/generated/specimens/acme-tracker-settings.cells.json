@@ -1,0 +1,12 @@
+{"columns":70,"rows":10,"lines":[
+[],
+[{"text":"Account","attrs":["bold"]}],
+[{"text":"The Acme workspace this plugin reads.","fg":"muted"}],
+[{"text":"Workspace acme-demo"}],
+[],
+[],
+[{"text":"Display","attrs":["bold"]}],
+[{"text":"Sort issues by [ State ▾ ]"}],
+[{"text":"The palette command changes the same setting.","fg":"muted"}],
+[]
+]}

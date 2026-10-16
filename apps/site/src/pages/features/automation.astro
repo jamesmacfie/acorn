@@ -1,0 +1,79 @@
+---
+import Feature from '../../components/Feature.astro'
+import Snapshot from '../../components/Snapshot.astro'
+import Specimen from '../../components/Specimen.astro'
+import { FEATURES } from '../../features'
+import FeaturePage from '../../layouts/FeaturePage.astro'
+import type { PageMeta } from '../../meta'
+
+export const meta = {
+  description: FEATURES.automation.sentence,
+  sources: [
+    'docs/workflows.md',
+    'docs/workflows/authoring.md',
+    'docs/workflows/step-kinds.md',
+    'docs/workflows/execution.md',
+    'docs/workflows/routes-and-ui.md',
+    'docs/schedules.md',
+    'docs/schedules/user-schedules.md',
+    'docs/dashboards.md',
+    'docs/cli.md',
+    'docs/tui/plugin-losses.md',
+    'docs/first-party-plugins/terminal.md',
+  ],
+  checked: '663359ff7',
+} satisfies PageMeta
+---
+
+<FeaturePage feature="automation" meta={meta} related={['agents', 'review', 'desktop-and-terminal']} docs={{ href: '/docs/automation/workflows/', label: 'Read about workflows' }}>
+  <Snapshot slot="picture" id="workflow" />
+
+  <Feature number={1} title="A graph of steps, in a file or in the app" href="/docs/automation/write-a-workflow/" link="Write a workflow">
+    <p>
+      A workflow is a graph of steps that runs on a task: agent turns, shell commands, HTTP requests, database
+      queries, and gates that wait for a person, for CI, or for a review. Commit it as a TOML file under{' '}
+      <code>.acorn/workflows/</code>, or build it in the editor under <strong>Workflows</strong> in the rail. acorn
+      reads both as one list.
+    </p>
+    <Specimen slot="picture" id="graph" />
+  </Feature>
+
+  <Feature number={2} title="Watch a run, and answer its gates" href="/docs/automation/steps-gates-and-budgets/" link="Steps, gates, and budgets">
+    <p>
+      A task that has run a workflow gets a Workflows pane: its runs, each run's steps as a list or as the graph
+      colored by status, and the selected step's work. An agent step's work is its whole conversation. A gate for a
+      person stops the run and rings the bell until you answer it.
+    </p>
+  </Feature>
+
+  <Feature number={3} title="Schedules that run with no client open" href="/docs/automation/schedules/" link="Schedules">
+    <p>
+      The Node keeps the only clock, so a schedule fires whether or not the desktop app or the terminal client is
+      open. Schedule a published workflow, or an action a plugin offers. <strong>Settings → Schedules</strong> lists
+      each one with its last and next run, and lets you pause it, run it now, or delete one you made.
+    </p>
+  </Feature>
+
+  <Feature number={4} title="Dashboards over your data" href="/docs/automation/dashboards/" link="Dashboards">
+    <p>
+      A dashboard panel reads one or more data sources, such as your GitHub pull requests, or a saved query, and
+      draws it as a list, a table, a board, a number, or a chart. The Node runs the query, and Home is a dashboard.
+    </p>
+  </Feature>
+
+  <Feature number={5} title="Script it from the command line" href="/docs/automation/the-command-line/" link="The command line">
+    <p>
+      <code>acorn workflow start</code> starts a run with typed JSON inputs, and <code>acorn workflow run wait</code>{' '}
+      waits until it finishes or needs you. Every command can print JSON, and its exit code says whether the wait
+      succeeded, so a script can tell a failed run from a timeout.
+    </p>
+  </Feature>
+
+  <Fragment slot="terminal">
+    <p>
+      The Workflows source, its editor, and the run pane draw whole in the terminal client, and an agent step's
+      conversation works as it does in the Agent pane. A dashboard set beside another pane draws as one line there.{' '}
+      <a href="/docs/start/desktop-and-terminal/">Desktop and terminal</a>
+    </p>
+  </Fragment>
+</FeaturePage>

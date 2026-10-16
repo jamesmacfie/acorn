@@ -1,0 +1,26 @@
+---
+title: PickerRow
+description: One row in an open picker's list.
+sources:
+  - packages/client-core/src/kit/components/inputs/PickerRow.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`PickerRow` is the row a picker draws for each item: a label and a grey hint. A tree draws one standalone only to list choices the same way.
+
+<Specimen id="picker-row" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="picker-row" />
+
+## Related
+
+- [`Picker`](/docs/components/inputs/picker/), for the control that opens the list.
+
+## Mistakes
+
+- Building a picker out of rows. Use `Picker` with `items`.

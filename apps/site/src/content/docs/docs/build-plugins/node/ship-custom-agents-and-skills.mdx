@@ -1,0 +1,139 @@
+---
+title: Ship custom agents and skills
+description: Add custom agents to New, with their own harness, options, instructions, and tool limit, and skills an agent loads when a task calls for one.
+sources:
+  - docs/plugin-authoring/custom-agents.md
+  - docs/managed-agents/custom-agents.md
+  - docs/managed-agents/skills.md
+  - packages/client-core/src/host/trust/permissions.ts
+  - examples/plugins/acme-agent/acorn-plugin.json
+  - examples/plugins/acme-agent/skills/release-note/SKILL.md
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll ship two kinds of words for agents: custom agents, which are ready-made starts for a session,
+and skills, which are procedures an agent finds and reads when a task needs one.
+
+## The result
+
+**Acme reviewer** and **Acme planner** are listed under **New** in the Agent pane, on the empty pane's
+cards, and in the command palette. A session started from one shows a chip with its name in the
+header. The **release-note** skill is offered to every agent, and Claude Code and Codex list it among
+their own skills:
+
+```text
+Skills the agent can load: acme-agent:release-note (native).
+```
+
+## Before you start
+
+Neither needs a Node half or a client. The code is from
+[`examples/plugins/acme-agent`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-agent).
+
+## Steps
+
+<Steps>
+
+1. **Declare the custom agents.**
+
+   <ExampleCode file="acme-agent/acorn-plugin.json" pick={['contributions.customAgents']} />
+
+   - `harness` is `claude`, `codex`, another plugin's harness as `<pluginId>:<harnessId>`, or one your
+     own manifest declares, by its bare id.
+   - `options` are the harness's own session options, such as Codex's `reasoning`. One the harness
+     doesn't offer is dropped when the session starts, with a line in the transcript.
+   - `instructions` go in the system prompt of every session started from the agent on Claude Code and
+     Codex, and in front of the first message on any other harness.
+   - `maxToolRisk` is the highest tier of acorn's tools the session may call. It narrows, never widens:
+     the reviewer may save notes with a `write` tool, and the planner only reads.
+
+2. **Write a skill.** A skill is a folder with a `SKILL.md`: frontmatter with `name` and `description`,
+   then the steps. It's the same shape Claude Code reads from `.claude/skills/`, so one you already have
+   drops in unchanged.
+
+   <ExampleCode file="acme-agent/skills/release-note/SKILL.md" />
+
+   The description is what an agent reads to decide whether to load the skill, so say when to use it.
+   The body is read only when it's needed, so ten skills cost ten lines of context.
+
+3. **Declare the skill.**
+
+   <ExampleCode file="acme-agent/acorn-plugin.json" pick={['contributions.skills']} />
+
+4. **Install, and read the prompt.** The trust prompt lists both kinds under **Declared**, in full,
+   because they're text your agents will follow:
+
+   ```text
+   Add the “Acme reviewer” agent to New, running on claude, and tell every session started from it: “Review the change …”
+   Adds 1 procedure your agents can load: release-note
+   ```
+
+   A version that changes one word of an agent's instructions, or one byte of a skill's folder, asks
+   again.
+
+5. **Check it.** Open a task and click **New** in the Agent pane: both agents are there. Start the
+   reviewer and ask it to review the change. Then ask any agent for a release note. On the plugin's
+   page in **Settings** > **Plugins**, **Skills** says which harnesses received the skill and how.
+
+</Steps>
+
+## How a skill reaches each harness
+
+| Harness | How it gets the skill |
+| --- | --- |
+| Claude Code | Its own skill support. The person can call it from the message box |
+| Codex | Its own skill support |
+| Any other | A short list of names, descriptions, and where each file is, sent before the first turn |
+
+Either way the agent reads the body only when a task matches. A skill switched off on the plugin's
+page, or removed, is named as gone at the next start, so an agent doesn't follow an old list.
+
+## Mistakes
+
+- Instructions that ask for more than the tool limit allows. An agent with `maxToolRisk: "read"` can't
+  call a `write` tool, whatever it's told.
+- A skill folder with a symlink, more than 64 files, or more than 1 MiB. The package fails to load, with
+  the reason.
+- A `name` in `SKILL.md` with capitals or spaces. It's up to 64 lower-case letters, digits, and dashes.
+- Expecting a custom agent to bring a tool server. A server is a program to run. Add
+  [agent tools](/docs/build-plugins/node/give-agents-tools/) instead.
+
+A custom agent's tool limit is a tier name:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "contributions": {
+    "customAgents": [{ "id": "planner", "name": "Acme planner", "harness": "codex", "maxToolRisk": "none" }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "contributions": {
+    "customAgents": [{ "id": "planner", "name": "Acme planner", "harness": "codex", "maxToolRisk": "read" }]
+  }
+}
+```
+
+## In the terminal
+
+Custom agents and skills live on the Node, so agent sessions in the terminal client get them too. The
+terminal client asks about a plugin's skills in its own trust prompt.
+
+## Limits
+
+- Up to 8 custom agents and 16 skills per plugin.
+- The person can't edit a plugin's agent. **Duplicate** in **Settings** makes one of their own.
+- A skill's body is at most 64 KiB, and its `description` at most 1,024 characters with no XML tags.
+- Changes apply at a session's next start or resume, never in the middle of a turn.
+
+## Reference
+
+[customAgents](/docs/build-plugins/reference/contributions/custom-agents/) and
+[skills](/docs/build-plugins/reference/contributions/skills/) have every field.
+[Custom agents](/docs/agents/custom-agents/) and [Skills](/docs/agents/skills/) are what the person
+sees.

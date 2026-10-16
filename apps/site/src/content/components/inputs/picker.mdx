@@ -1,0 +1,27 @@
+---
+title: Picker
+description: A button that opens a list the reader filters by typing.
+sources:
+  - packages/client-core/src/kit/components/inputs/Picker.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Picker` for a choice from a long list. Pass `items`, and the picker filters them as the reader types and sends `onPick` with the chosen id.
+
+<Specimen id="picker" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="picker" />
+
+## Related
+
+- [`PickerRow`](/docs/components/inputs/picker-row/), for the rows in its list.
+- [`Select`](/docs/components/inputs/select/), for a short list.
+
+## Mistakes
+
+- Passing `results` to filter. It's a function, so a tree passes `items` and the picker filters them itself.

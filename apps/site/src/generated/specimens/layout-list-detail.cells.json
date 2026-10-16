@@ -1,0 +1,8 @@
+{"columns":90,"rows":6,"lines":[
+[{"text":"┌─List─────────────────────────┐","fg":"accent"},{"text":"┌─Detail─────────────────────────────────────────────────┐"}],
+[{"text":"│","fg":"accent"},{"text":"list-header region","fg":"muted"},{"text":"            "},{"text":"│","fg":"accent"},{"text":"│"},{"text":"detail region","fg":"muted"},{"text":"                                           │"}],
+[{"text":"│","fg":"accent"},{"text":"list region","fg":"muted"},{"text":"                   "},{"text":"│","fg":"accent"},{"text":"│                                                        │"}],
+[{"text":"│","fg":"accent"},{"text":"                              "},{"text":"│","fg":"accent"},{"text":"│                                                        │"}],
+[{"text":"│","fg":"accent"},{"text":"list-footer region","fg":"muted"},{"text":"            "},{"text":"│","fg":"accent"},{"text":"│                                                        │"}],
+[{"text":"└──────────────────────────────┘","fg":"accent"},{"text":"└────────────────────────────────────────────────────────┘"}]
+]}

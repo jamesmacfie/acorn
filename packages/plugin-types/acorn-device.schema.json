@@ -5,29 +5,35 @@
   "type": "object",
   "properties": {
     "theme": {
+      "description": "The theme, by ID, when the theme doesn't follow the system.",
       "type": "string",
       "minLength": 1,
       "maxLength": 128
     },
     "themeLight": {
+      "description": "The theme, by ID, while the system is in light mode.",
       "type": "string",
       "minLength": 1,
       "maxLength": 128
     },
     "themeDark": {
+      "description": "The theme, by ID, while the system is in dark mode.",
       "type": "string",
       "minLength": 1,
       "maxLength": 128
     },
     "themeFollowSystem": {
+      "description": "Whether the theme follows the system, switching between `themeLight` and `themeDark`.",
       "type": "boolean"
     },
     "style": {
+      "description": "The style pack, by ID.",
       "type": "string",
       "minLength": 1,
       "maxLength": 128
     },
     "keybindings": {
+      "description": "Shortcuts you changed: a command ID to its chord, such as `meta+shift+k`, or `null` to remove it.",
       "type": "object",
       "propertyNames": {
         "type": "string",
@@ -47,6 +53,7 @@
       }
     },
     "railOrder": {
+      "description": "The order of the left rail.",
       "type": "object",
       "properties": {
         "pinned": {
@@ -55,7 +62,8 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 160
-          }
+          },
+          "description": "Task IDs pinned to the top of the left rail, in order."
         },
         "order": {
           "type": "array",
@@ -63,9 +71,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 160
-          }
+          },
+          "description": "Task IDs in the order you dragged them. Other tasks follow."
         },
         "sources": {
+          "description": "Source IDs, in the order you dragged them.",
           "type": "array",
           "items": {
             "type": "string",
@@ -81,12 +91,15 @@
       "additionalProperties": false
     },
     "leftCollapsed": {
+      "description": "Whether the left rail is collapsed.",
       "type": "boolean"
     },
     "workspaceRail": {
+      "description": "Whether the workspace rail shows.",
       "type": "boolean"
     },
     "railVisibility": {
+      "description": "Whether each source shows in the left rail, keyed `<pluginId>:<sourceId>`. A missing entry uses the source's default.",
       "type": "object",
       "propertyNames": {
         "type": "string",
@@ -98,6 +111,7 @@
       }
     },
     "exclusiveSlots": {
+      "description": "Which plugin draws each part of the window a plugin can replace, by plugin ID. `core` is acorn's own.",
       "type": "object",
       "propertyNames": {
         "type": "string",
@@ -115,6 +129,7 @@
       }
     },
     "plugins": {
+      "description": "Plugins to offer for installing. Each shows in the Plugins palette, and nothing installs or is trusted until you say so.",
       "maxItems": 128,
       "type": "array",
       "items": {
@@ -123,7 +138,8 @@
           "id": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 160
+            "maxLength": 160,
+            "description": "The plugin's ID."
           },
           "source": {
             "anyOf": [
@@ -188,7 +204,8 @@
                 ],
                 "additionalProperties": false
               }
-            ]
+            ],
+            "description": "Where to install it from: `{ github, tag? }`, `{ npm, version? }`, `{ url }` on https, or `{ path }`."
           }
         },
         "required": [

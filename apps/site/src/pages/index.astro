@@ -1,0 +1,404 @@
+---
+// The landing page. Every claim links
+// to the docs page that owns it, and every picture is a specimen or a shell snapshot.
+import { Code } from '@astrojs/starlight/components'
+import Card from '../components/Card.astro'
+import Feature from '../components/Feature.astro'
+import Hero from '../components/Hero.astro'
+import InstallBlock from '../components/InstallBlock.astro'
+import Snapshot from '../components/Snapshot.astro'
+import SoftwareApplication from '../components/SoftwareApplication.astro'
+import Specimen from '../components/Specimen.astro'
+import Tour from '../components/Tour.astro'
+import Marketing from '../layouts/Marketing.astro'
+import { installMethods } from '../install'
+import { readGithub } from '../lib/github'
+import type { PageMeta } from '../meta'
+import { GITHUB } from '../nav'
+import type { SnapshotId } from '../snapshots'
+
+export const meta = {
+  description:
+    'A workspace for working with coding agents, one task at a time. Each task gets a branch, a Git worktree, terminals, and Claude Code and Codex sessions, in the desktop app or the terminal.',
+  sources: [
+    'docs/features.md',
+    'docs/workspaces-and-tasks.md',
+    'docs/workspaces-and-tasks/archive.md',
+    'docs/managed-agents.md',
+    'docs/tui.md',
+    'docs/command-palette-and-shortcuts.md',
+    'docs/security/credentials.md',
+    'docs/security/audit.md',
+    'docs/security/plugin-bundles.md',
+    'docs/telemetry.md',
+    'docs/node-distribution.md',
+    'docs/local-development.md',
+    'docs/agent-tools/plugin-tools.md',
+    'packages/create-acorn-plugin/index.mjs',
+  ],
+  checked: 'b8c018a90',
+} satisfies PageMeta
+
+const steps = [
+  {
+    title: 'Open a task',
+    text: 'A task is one piece of work on one project, on its own branch. acorn creates its Git worktree the first time something needs the files.',
+    specimen: 'task-rows',
+    href: '/docs/using/tasks-and-worktrees/',
+    link: 'Tasks and worktrees',
+  },
+  {
+    title: 'Run agents in it',
+    text: 'Start Claude Code and Codex sessions in the task and answer their permission requests as they come. Queue the next turn while one runs, or delegate work to a session of its own.',
+    specimen: 'agent-turn',
+    href: '/docs/agents/agent-sessions/',
+    link: 'Agent sessions',
+  },
+  {
+    title: 'Review and ship',
+    text: 'Read the diff, open the pull request, and merge it without leaving the task. Archive the task and acorn stops its agents and terminals and removes its worktree.',
+    specimen: 'ship',
+    href: '/docs/using/archive-and-restore/',
+    link: 'Archive and restore',
+  },
+]
+
+// One tab per feature group, in phase 1's ranking. The page shows `hero` and `fleet` twice, so the tour's
+// copies take an instance.
+const tour: { id: string; label: string; snapshot: SnapshotId; text: string; href: string; link: string }[] = [
+  {
+    id: 'tasks',
+    label: 'Tasks',
+    snapshot: 'palette',
+    text: 'A task holds a branch, a worktree, terminals, agent sessions, and a linked pull request or issue. Start one from GitHub, Linear, Rollbar, or the New task dialog, and press ⌘K for the command palette over it.',
+    href: '/features/tasks/',
+    link: 'More about tasks',
+  },
+  {
+    id: 'agents',
+    label: 'Agents',
+    snapshot: 'hero',
+    text: "Claude Code and Codex run as managed sessions in the task's worktree. Each session keeps its transcript, usage, and requests, and a delegated session can share the task or start a child task with its own worktree.",
+    href: '/features/agents/',
+    link: 'More about agents',
+  },
+  {
+    id: 'review',
+    label: 'Review',
+    snapshot: 'review',
+    text: "The pull request pane has the checks, comments, review threads, and a diff in unified or split view with inline threads. Merge from the same pane, and the task's Changes tab commits and pushes.",
+    href: '/features/review/',
+    link: 'More about review',
+  },
+  {
+    id: 'desktop-and-terminal',
+    label: 'Desktop and terminal',
+    snapshot: 'terminal-small',
+    text: 'The terminal client is a second window onto the same Node, drawing the same panes in character cells. One command palette and one set of keyboard commands serve both clients.',
+    href: '/features/desktop-and-terminal/',
+    link: 'More about the two clients',
+  },
+  {
+    id: 'task-tools',
+    label: 'Task tools',
+    snapshot: 'database',
+    text: "Each task has panes for the tools you'd otherwise open beside it: an editor with ripgrep search, a PostgreSQL client, an HTTP client, Docker containers, and a browser preview. Connect Linear and Rollbar to bring their issues in too.",
+    href: '/features/task-tools/',
+    link: 'More about task tools',
+  },
+  {
+    id: 'plugins',
+    label: 'Plugins',
+    snapshot: 'permissions',
+    text: 'Every pane in acorn comes from a plugin, and a plugin you install works the same way. Its permissions are listed in Settings, and each device decides whether to run it.',
+    href: '/features/plugins/',
+    link: 'More about plugins',
+  },
+  {
+    id: 'nodes',
+    label: 'Nodes',
+    snapshot: 'fleet',
+    text: 'A Node holds your workspaces and runs your agents. The desktop app starts one on your computer, and Fleet home shows every Node you pair with it.',
+    href: '/features/nodes/',
+    link: 'More about Nodes',
+  },
+  {
+    id: 'browser-automation-security',
+    label: 'Browser, automation, and security',
+    snapshot: 'browser',
+    text: 'The Chrome and Firefox extension shows the task behind the page you’re on and sends pages, selections, and screenshots to an agent. Workflows run agent, terminal, and check steps, with gates where a person decides.',
+    href: '/features/browser/',
+    link: 'More about the browser extension',
+  },
+]
+
+// The pane entry `npm create acorn-plugin` writes, for a plugin named Hello
+// (packages/create-acorn-plugin/index.mjs). The specimen beside it is the pane it draws.
+const paneEntry = `"frames": [{
+  "target": "pane",
+  "id": "hello",
+  "label": "Hello",
+  "glyph": "puzzle",
+  "order": 800,
+  "layout": "single",
+  "regions": {
+    "body": { "kind": "remote", "entry": "pane" }
+  }
+}]`
+
+const guides = [
+  ['/docs/build-plugins/ui/add-a-pane/', 'Add a pane', 'A view in the task’s row of panes.'],
+  ['/docs/build-plugins/ui/add-a-source-to-the-left-rail/', 'Add a source to the left rail', 'A list to browse, with items you can open.'],
+  ['/docs/build-plugins/ui/add-commands-and-keybindings/', 'Add commands and keybindings', 'Rows in the command palette, and keys for them.'],
+  ['/docs/build-plugins/node/give-agents-tools/', 'Give agents tools', 'Tools your agent sessions can call.'],
+  ['/docs/build-plugins/node/add-a-harness/', 'Add a harness', 'Another agent program for acorn to run.'],
+  ['/docs/build-plugins/ui/add-a-theme-or-a-style-pack/', 'Add a theme or a style pack', 'Colors, or a whole look.'],
+]
+
+const security = [
+  ['/docs/security/the-trust-model/', 'Agents get a scoped token', 'An agent gets a token that reaches only its own task. acorn never puts your GitHub token or API keys in its environment.'],
+  ['/docs/security/credentials-and-secrets/', 'Credentials are encrypted', 'Stored credentials are encrypted at rest and never returned by the Node. Backups leave them out.'],
+  ['/docs/security/plugin-trust-and-permissions/', 'Plugins are sandboxed', 'An installed plugin draws from a sandbox and gets only the permissions you accept, on each device.'],
+  ['/docs/security/telemetry-and-privacy/', 'Telemetry is off', 'Telemetry is off by default. Nothing leaves the machine unless you turn it on and add a destination.'],
+]
+
+const faq = [
+  {
+    question: 'What does it cost?',
+    answer: 'Nothing. acorn is open source under the MIT license.',
+    href: `${GITHUB}/blob/main/LICENSE`,
+    link: 'Read the license',
+  },
+  {
+    question: 'Do I need an API key?',
+    answer: 'Not for agents. acorn runs Claude Code and Codex, and each signs in with its own login. An API key is optional, for features such as SQL generation.',
+    href: '/docs/agents/model-providers-and-generating-text/',
+    link: 'Model providers and generating text',
+  },
+  {
+    question: 'Does my code leave my machine?',
+    answer: 'Your code stays on the machine that runs the Node. acorn talks to the services you connect, such as GitHub, and your agents talk to their own providers. Telemetry is off by default.',
+    href: '/docs/security/telemetry-and-privacy/',
+    link: 'Telemetry and privacy',
+  },
+  {
+    question: 'Which platforms?',
+    answer: 'The desktop app runs on macOS and Windows. The terminal client and the standalone Node run wherever Node.js runs, Linux included.',
+    href: '/docs/start/install/',
+    link: 'Install',
+  },
+  {
+    question: 'How is it different from a terminal multiplexer or an IDE?',
+    answer: 'A task owns its branch, worktree, terminals, agent sessions, and pull request, and they all sit in one window. Archiving the task stops what runs in it and removes its worktree.',
+    href: '/docs/start/concepts/',
+    link: 'Concepts',
+  },
+  {
+    question: 'Can a plugin break the app or read my keys?',
+    answer: "An installed plugin runs in a sandbox, draws only with acorn's components, and gets only the permissions its manifest declares and you accept on each device.",
+    href: '/docs/security/plugin-trust-and-permissions/',
+    link: 'Plugin trust and permissions',
+  },
+  {
+    question: 'Can I run it on another machine?',
+    answer: 'Yes. Run a standalone Node there, pair it, and use it from the desktop app, the terminal client, or the command line.',
+    href: '/docs/nodes/pair-a-device-or-a-remote-node/',
+    link: 'Pair a device or a remote Node',
+  },
+]
+
+// Until there's a release to download, the download page offers ways to build acorn.
+const { release } = await readGithub()
+const getAcorn = release ? 'Download' : 'Get acorn'
+---
+
+<Marketing title="A workspace for working with coding agents" meta={meta}>
+  <SoftwareApplication slot="head" release={release} />
+  <Hero slot="hero" eyebrow="Claude Code and Codex" title="A workspace for working with coding agents, one task at a time.">
+    <p>
+      Open a task and acorn gives it a branch, a Git worktree, terminals, and agent sessions, with the diff and the pull
+      request in the panes beside them. Use it from the desktop app or from your terminal. It's the same workspace either
+      way.
+    </p>
+    <Fragment slot="actions">
+      <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
+      <a class="button" href="/docs/">Read the docs</a>
+    </Fragment>
+    <div slot="picture" class="hero-stack">
+      <p class="clients">
+        <a href="/docs/start/install/">The desktop app</a> for macOS and Windows,{' '}
+        <a href="/docs/start/desktop-and-terminal/">the terminal client</a>,{' '}
+        <a href="/docs/automation/the-command-line/">the command line</a>, and{' '}
+        <a href="/docs/browser-extension/set-up-the-extension/">the browser extension</a>.
+      </p>
+      <InstallBlock id="hero-install" methods={installMethods} />
+      <div class="hero-shot">
+        <div class="tabs" role="tablist" aria-label="Client" data-tabs hidden>
+          <button type="button" role="tab" aria-controls="hero-shot-desktop">Desktop</button>
+          <button type="button" role="tab" aria-controls="hero-shot-terminal">Terminal</button>
+        </div>
+        <div id="hero-shot-desktop" role="tabpanel" aria-label="Desktop"><Snapshot id="hero" /></div>
+        <div id="hero-shot-terminal" role="tabpanel" aria-label="Terminal"><Snapshot id="hero-terminal" /></div>
+        <p class="hero-shot-caption">The same task in both clients.</p>
+      </div>
+    </div>
+  </Hero>
+
+  <section class="section">
+    <h2>How it works</h2>
+    <div class="features">
+      {
+        steps.map((step, index) => (
+          <Feature number={index + 1} level={3} title={step.title} href={step.href} link={step.link}>
+            <p>{step.text}</p>
+            <Specimen slot="picture" id={step.specimen} />
+          </Feature>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>What acorn does</h2>
+    <Tour tabs={tour}>
+      {tour.map((tab) => <Snapshot slot={tab.id} id={tab.snapshot} instance={tab.snapshot === 'hero' || tab.snapshot === 'fleet' ? 'tour' : undefined} />)}
+    </Tour>
+  </section>
+
+  <section class="section">
+    <h2>Two clients, one workspace</h2>
+    <p>
+      The desktop app and the terminal client draw the same components, so a plugin written once works in both. Here's
+      one plugin's pane, drawn by each. <a href="/docs/start/desktop-and-terminal/">Desktop and terminal</a>
+    </p>
+    <Specimen id="issues-pane" both />
+  </section>
+
+  <section class="section">
+    <h2>Add what's missing</h2>
+    <p>
+      A plugin adds a pane with one entry in its manifest. This is the entry <code>npm create acorn-plugin</code> writes,
+      beside the pane it draws.
+    </p>
+    <div class="split">
+      <Code code={paneEntry} lang="json" title="acorn-plugin.json" />
+      <Specimen id="starter-pane" />
+    </div>
+    <ul class="cards">
+      {
+        guides.map(([href, title, text]) => (
+          <li>
+            <Card title={title} href={href}>
+              <p>{text}</p>
+            </Card>
+          </li>
+        ))
+      }
+    </ul>
+    <p>
+      Or ask your agent to write it. acorn's agents read the plugin vocabulary from your Node with the{' '}
+      <code>plugin_authoring</code> tool. <a href="/docs/build-plugins/start/have-your-agent-build-it/">Have your agent build it</a>
+    </p>
+  </section>
+
+  <section class="section">
+    <h2>Your machine, your keys</h2>
+    <div class="cards">
+      {
+        security.map(([href, title, text]) => (
+          <Card title={title} href={href}>
+            <p>{text}</p>
+          </Card>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Run it anywhere</h2>
+    <p>
+      The desktop app runs a Node on your machine. Pair others, including a{' '}
+      <a href="/docs/nodes/run-a-standalone-node/">standalone Node on a server</a>, and use any of them from the desktop
+      app, the terminal client, or the command line. <a href="/docs/nodes/">Nodes</a>
+    </p>
+    <div class="fleet"><Snapshot id="fleet" /></div>
+  </section>
+
+  <section class="section">
+    <h2>Questions</h2>
+    <div class="faq">
+      {
+        faq.map((item) => (
+          <details>
+            <summary>{item.question}</summary>
+            <p>
+              {item.answer} <a href={item.href}>{item.link}</a>
+            </p>
+          </details>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Get acorn</h2>
+    <InstallBlock id="footer-install" methods={installMethods} />
+    <div class="actions">
+      <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
+      <a class="button" href="/docs/">Read the docs</a>
+    </div>
+  </section>
+</Marketing>
+
+<script>
+  import '../scripts/tabs'
+</script>
+
+<style>
+  .hero-stack {
+    display: grid;
+    gap: var(--space-8);
+  }
+  .hero-stack > * {
+    margin: 0;
+    min-inline-size: 0;
+  }
+  .hero-shot {
+    display: grid;
+    gap: var(--space-5);
+  }
+  .hero-shot > * {
+    margin: 0;
+    min-inline-size: 0;
+  }
+  .hero-shot-caption {
+    font-size: var(--fs-sm);
+  }
+  .split {
+    display: grid;
+    gap: var(--space-10);
+    align-items: start;
+  }
+  .split > * {
+    min-inline-size: 0;
+  }
+  @media (min-width: 64rem) {
+    .split {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .fleet {
+    max-inline-size: 48rem;
+  }
+  .faq details {
+    padding-block: var(--space-6);
+    border-block-end: var(--divider);
+  }
+  .faq summary {
+    font-weight: var(--fw-semibold);
+    cursor: pointer;
+  }
+  .faq p {
+    margin-block-end: 0;
+  }
+</style>

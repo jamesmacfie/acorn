@@ -1,0 +1,61 @@
+---
+// Every built-in theme as a row of its own colors, read from the app's `tokens-theme.css` by the
+// generator (docs/ui-design/tokens.md). The swatches are literal colors, so they show each theme
+// whatever theme the page itself is in.
+interface Props {
+  themes: { id: string; label: string; dark: boolean; colors: { token: string; name: string; value: string }[] }[]
+}
+
+const { themes } = Astro.props
+---
+
+<ul class="themes not-content">
+  {
+    themes.map(({ id, label, dark, colors }) => (
+      <li id={`theme-${id}`}>
+        <p>
+          <strong>{label}</strong> <code>{id}</code> <span>{dark ? 'Dark' : 'Light'}</span>
+        </p>
+        <ul class="swatches" aria-label={`${label} colors`}>
+          {colors.map(({ token, name, value }) => (
+            <li>
+              <span class="swatch" style={`background: ${value}`} />
+              <span>{name}</span>
+              <code>{token}</code>
+            </li>
+          ))}
+        </ul>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .themes,
+  .swatches {
+    padding: 0;
+    list-style: none;
+  }
+  .themes {
+    display: grid;
+    gap: var(--space-6);
+  }
+  .themes p {
+    margin: 0 0 var(--space-2);
+  }
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    gap: var(--space-2);
+  }
+  .swatches li {
+    display: grid;
+    gap: var(--space-1);
+    font-size: var(--fs-sm);
+  }
+  .swatch {
+    block-size: 2rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+  }
+</style>

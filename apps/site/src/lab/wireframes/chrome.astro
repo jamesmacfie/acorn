@@ -1,0 +1,38 @@
+---
+// The header, the footer, and the narrow-screen menu, which this page starts open. Every wireframe
+// shares them through _Page.astro.
+import Page from './_Page.astro'
+---
+
+<Page title="Header, footer, and mobile navigation" menuOpen>
+  <main class="wrap section" style="border-top: 0">
+    <h1>Header, footer, and mobile navigation</h1>
+    <div class="cols" style="--min: 300px">
+      <section class="stack">
+        <h2>Header, 768 pixels and wider</h2>
+        <p>
+          The mark and acorn, then Docs, Build plugins, Download, and Changelog. On the right: search, Appearance, and
+          Star on GitHub. The star count shows from 100 stars.
+        </p>
+      </section>
+      <section class="stack">
+        <h2>Header, below 768 pixels</h2>
+        <p>
+          The mark, search, and Menu. Menu opens a panel under the header with the same links, Appearance, and Star on
+          GitHub, in the same order. It's a details element, so it works with no script.
+        </p>
+      </section>
+      <section class="stack">
+        <h2>Docs navigation, below 1280 and 1024 pixels</h2>
+        <p>
+          Below 1280 pixels, On this page folds into a menu at the top of the content. Below 1024, the sidebar folds
+          beside it. Open any docs wireframe at those widths to see both.
+        </p>
+      </section>
+      <section class="stack">
+        <h2>Footer</h2>
+        <p>The sitemap in four columns, which stack on a phone. Then the license and the newest release's version.</p>
+      </section>
+    </div>
+  </main>
+</Page>

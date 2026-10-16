@@ -1,5 +1,6 @@
 // The settings form's working copy of one server, and the two conversions it needs.
 import type {
+  AgentMcpAuth,
   AgentMcpManagedPackage,
   AgentMcpServer,
   AgentMcpServerInput,
@@ -23,6 +24,12 @@ export type AgentMcpServerDraft = {
   enabled: boolean
   reviewTools: boolean
   managed: AgentMcpManagedPackage | null
+  /** HTTP only. */
+  auth: AgentMcpAuth
+  clientId: string
+  /** What was typed. Empty keeps a stored secret while a client ID is set. */
+  clientSecret: string
+  clientSecretStored: boolean
 }
 
 export const blankAgentMcpServerDraft = (): AgentMcpServerDraft => ({
@@ -36,6 +43,10 @@ export const blankAgentMcpServerDraft = (): AgentMcpServerDraft => ({
   enabled: true,
   reviewTools: false,
   managed: null,
+  auth: 'headers',
+  clientId: '',
+  clientSecret: '',
+  clientSecretStored: false,
 })
 
 export const agentMcpServerDraft = (server: AgentMcpServer): AgentMcpServerDraft => ({
@@ -54,6 +65,10 @@ export const agentMcpServerDraft = (server: AgentMcpServer): AgentMcpServerDraft
   enabled: server.enabled,
   reviewTools: server.reviewTools,
   managed: server.managed ?? null,
+  auth: server.auth,
+  clientId: server.clientId ?? '',
+  clientSecret: '',
+  clientSecretStored: server.clientSecretStored,
 })
 
 export function agentMcpServerInput(draft: AgentMcpServerDraft): AgentMcpServerInput {
@@ -76,5 +91,19 @@ export function agentMcpServerInput(draft: AgentMcpServerDraft): AgentMcpServerI
         enabled: draft.enabled,
         reviewTools: draft.reviewTools,
       }
-    : { transport: 'http', url: draft.url.trim(), values, enabled: draft.enabled, reviewTools: draft.reviewTools }
+    : {
+        transport: 'http',
+        url: draft.url.trim(),
+        values,
+        enabled: draft.enabled,
+        reviewTools: draft.reviewTools,
+        ...(draft.auth === 'oauth' ? { auth: 'oauth', ...signInClient(draft) } : {}),
+      }
+}
+
+function signInClient(draft: AgentMcpServerDraft): Pick<AgentMcpServerInput, 'clientId' | 'clientSecret'> {
+  const clientId = draft.clientId.trim()
+  if (!clientId) return { clientSecret: null }
+  if (draft.clientSecret) return { clientId, clientSecret: draft.clientSecret }
+  return draft.clientSecretStored ? { clientId } : { clientId, clientSecret: null }
 }

@@ -1,0 +1,48 @@
+---
+title: The client bridge
+description: Everything your plugin's client half can call, from the SDK's four entries.
+sources:
+  - docs/plugin-authoring/the-bridge.md
+  - docs/plugins/publishing.md
+  - docs/security/plugin-client-sandbox.md
+checked: '498833615'
+---
+
+Your client half draws in acorn's window without being part of it. A frame is a sandboxed page, and a
+tree runs in a worker with no DOM. Either way, the only line back to acorn is the bridge: one message
+port, carrying requests to your routes, the closed set of effects acorn performs for you, and pushes
+from the host.
+
+The `acorn-plugin-sdk` package wraps the bridge. It has four entries:
+
+- `acorn-plugin-sdk`: `connect` for a frame, `mountTree` for trees, and the `AcornBridge` type.
+- `acorn-plugin-sdk/remote`: the kit's nodes and the Solid adapter a tree is written with.
+- `acorn-plugin-sdk/data` and `acorn-plugin-sdk/testing`: helpers for a derived data source on your Node
+  half, and for testing one.
+
+## The handshake
+
+1. acorn posts `{ acornBridge: 1 }` into your frame or worker, with a `MessagePort` beside it.
+2. You take the port and start it.
+3. acorn sends `{ kind: 'ready', context }`: which surface you're drawing, and the task, project, or
+   item it was opened for. The context is a snapshot, so when it changes, acorn opens a new frame.
+4. You post anything back, usually `{ kind: 'connected' }`. If nothing arrives within 10 seconds, acorn
+   replaces your frame with a "failed to start" message.
+
+`connect()` does all four steps and resolves the bridge. It also applies acorn's appearance push, which
+sets the theme and every token as a CSS custom property, so your frame matches the window.
+
+## What isolates a frame
+
+- **Its origin is its bundle's hash.** New bytes are a new origin and a new page, so an update never
+  shares storage with the version before it.
+- **It has no network.** `connect-src` is `'none'`. Every call goes over the bridge, to your own routes or
+  to a core route your `permissions.api` grants.
+- **It has one message port.** There's no `window.parent` API to call and no second channel to open.
+- **Two budgets guard the port.** 100 requests in flight and 1,000 messages in 10 seconds, telemetry
+  included. Tripping either closes the port and shows a "plugin misbehaving" message.
+
+`window.confirm` and `alert` don't work in a frame, and `navigator.clipboard` can't write. Draw your own
+confirmation, and copy with `bridge.ui.copy`.
+
+{/* facts */}

@@ -27,7 +27,7 @@ const EXTS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.css']
 type Pkg = { name: string; dir: string; src: string; kind: 'app' | 'plugin' | 'lib' }
 
 // Derived from the filesystem, never hardcoded: a new package is covered the day it is added.
-const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
+const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools', 'examples']
   .flatMap((base) => {
     const dir = join(ROOT, base)
     if (!existsSync(dir)) return []
@@ -712,10 +712,10 @@ describe('architecture boundaries', () => {
     // ends up shipped. Any package's testkit/, not just node-core's.
     // One exception: the agent-automation seeder, which writes fixtures into a throwaway data root
     // before the window starts and is test scaffolding by purpose (docs/testing/desktop.md § The large-surface
-    // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling.
-    const offenders = EDGES.filter(
-      (e) => !isTestCode(e.fromFile) && rel(e.fromFile) !== 'apps/desktop/scripts/agent/seed.ts',
-    )
+    // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling. The site's fixture is
+    // one of its fixtures, in a module of its own.
+    const seeders = new Set(['apps/desktop/scripts/agent/seed.ts', 'apps/desktop/scripts/agent/siteSnapshots.ts'])
+    const offenders = EDGES.filter((e) => !isTestCode(e.fromFile) && !seeders.has(rel(e.fromFile)))
       .filter((e) => e.target.file?.includes('/src/testkit/') || e.target.file?.endsWith('/src/testkit.ts'))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     expect([...new Set(offenders)].sort()).toEqual([])
@@ -778,8 +778,9 @@ describe('architecture boundaries', () => {
       // point list, the browser handoff contract, which the extension and its native host read
       // without the whole manifest contract, and the project site association rules, which the Node,
       // the native host, and the extension share without the `api.ts` facade, and the list of client apps
-      // a plugin can name, which custody reads without the manifest contract.
-      '@acorn/protocol': 87,
+      // a plugin can name, which custody reads without the manifest contract, and the manifest vocabulary
+      // the plugin_authoring tool and the public site's plugin reference share.
+      '@acorn/protocol': 88,
       // client-core publishes narrow entrypoints where a consumer can't take a barrel that pulls in
       // renderer-only modules. Pure leaves the terminal, logic tests or remote trees need: model-provider
       // error guidance, `kit/lib/savedSignal`, `kit/lib/formatChord`, `kit/lib/ansi`, and the address
@@ -789,10 +790,11 @@ describe('architecture boundaries', () => {
       // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
       // `LinkPreviewHost` (docs/frontend/startup-budget.md). The token and style pack stylesheets, which
       // the browser extension loads without the app's own stylesheet.
-      '@acorn/client-core': 193, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, and the four stylesheets the extension sidebar loads.
+      '@acorn/client-core': 194, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, and TreeHost for the site's component pages.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
-      // (docs/managed-agents/read-block.md).
-      '@acorn/node-core': 66,
+      // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
+      // public site's plugin reference reads to check its examples and list the grants.
+      '@acorn/node-core': 67,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.
       '@acorn/diff-document': 2,
@@ -1552,7 +1554,7 @@ describe('architecture boundaries', () => {
     // inside the one surface that owns global focus, the reserved keys and every loading and error
     // state — and it would have no terminal half at all.
     const surfaces = readFileSync(join(ROOT, 'packages/protocol/src/plugin/manifest/surfaces.ts'), 'utf8')
-    const targets = /target: z\.enum\(\[([^\]]*)\]\)/.exec(surfaces)
+    const targets = /target: z\s*\.enum\(\[([^\]]*)\]\)/.exec(surfaces)
     expect(targets).not.toBeNull()
     expect(targets![1]).not.toMatch(/palette/)
 

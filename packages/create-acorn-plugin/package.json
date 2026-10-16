@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@acorn/node-core": "workspace:*",
+    "@acorn/plugin-examples": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "vitest": "^4.1.11"
   }

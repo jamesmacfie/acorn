@@ -1,0 +1,27 @@
+---
+title: KeyValueEditor
+description: A grid of names and values, with a blank row to add one.
+sources:
+  - packages/client-core/src/kit/components/inputs/KeyValueEditor.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `KeyValueEditor` for headers, variables, or any list of pairs. `onChange` sends the whole list each time it changes, and the blank row at the end grows a new pair as you type.
+
+<Specimen id="key-value-editor" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="key-value-editor" />
+
+## Related
+
+- [`Input`](/docs/components/inputs/input/), for one value.
+- [`Table`](/docs/components/collections/table/), for pairs the reader doesn't edit.
+
+## Mistakes
+
+- Adding a blank row to `rows`. The editor adds its own, so yours draws as a second.

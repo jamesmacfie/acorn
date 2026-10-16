@@ -1,0 +1,108 @@
+---
+title: Log and measure
+description: Write log lines and telemetry from your Node half with your plugin's id on them, time slow work, record unattended work on the audit log, and know what reaches a sink.
+sources:
+  - docs/plugin-authoring/telemetry.md
+  - docs/plugin-authoring/testing.md
+  - docs/telemetry/plugins-and-sinks.md
+  - docs/plugin-authoring/the-node-half.md
+  - examples/plugins/acme-data/acorn-plugin.json
+  - examples/plugins/acme-data/server/routes.js
+  - examples/plugins/hello-pane/node/index.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll make your Node half say what it's doing: log lines you can read while you work, and counts and
+timings that reach the person's telemetry when they've turned it on.
+
+## The result
+
+Each log line reaches the Node's output with your plugin's id in front:
+
+```text
+[acme-data] synced deploys count=1
+[acme-data] sync failed reason=Error: Acme Cloud answered 503
+```
+
+While your plugin is in **Development mode**, its page in **Settings** > **Plugins** has a **Logs** tab
+with its last 500 lines, their time, and their level.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-data`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-data).
+Neither member needs a permission: measuring your own work reads nobody else's.
+
+## Steps
+
+<Steps>
+
+1. **Log with `ctx.log`.** It has `debug`, `info`, `warn`, and `error`, with your plugin's id already on
+   each line. Attributes are flat values, such as numbers and short strings, never objects.
+
+   <ExampleCode file="hello-pane/node/index.js" />
+
+2. **Measure with `ctx.telemetry`.** `count`, `gauge`, `event`, and `error` record one thing each.
+   `startSpan` times work and ends with `ok` or `error`:
+
+   <ExampleCode file="acme-data/server/routes.js" region="schedule" />
+
+   `measure(name, fn)` times a function that returns at once. For work that awaits, use a span.
+
+3. **Put unattended work on the audit log.** **Settings** > **Machines** > **Audit log** is what someone
+   reviewing the machine reads. Declare each verb in the manifest, then record it with `ctx.audit`:
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['contributions.auditActions']} />
+
+   <ExampleCode file="acme-data/server/routes.js" region="audit" />
+
+   Record work done with nobody watching, money spent, or something leaving the Node, not every call.
+   `details` holds a few flat values you choose, never a request body or a credential.
+
+4. **Check it.** Turn on **Development mode** on the plugin's page, run the schedule, and open the
+   **Logs** tab.
+
+</Steps>
+
+## What reaches a sink
+
+- **Stderr** gets every log line, always.
+- **Telemetry** gets your log lines, counts, gauges, events, errors, and spans only when the person has
+  telemetry on. Every verb does nothing when it's off, and can't throw into your code.
+- acorn sets `owner` to your plugin's id on every record, and drops an `owner` you set yourself.
+- Messages pass a scrubber before they go anywhere.
+- acorn already times your routes, schedules, hook handlers, and every call it makes to you. Measure
+  what's inside them.
+
+Reading other plugins' telemetry is a separate grant, `telemetry` in `permissions.node.core`, for a
+plugin that's a sink itself.
+
+## Mistakes
+
+- `console.log`. It has no id, skips the scrubber, and no sink sees it.
+- Recording a verb you didn't declare in `auditActions`. acorn refuses it, because an action nobody can
+  list is one nobody reviews.
+- A secret or a person's text in a message or an attribute. Log ids and counts.
+- Measuring something costly when nobody's listening. `ctx.telemetry.enabled()` says whether
+  telemetry is on, so you can skip the work.
+
+## In the terminal
+
+Your Node half runs on the Node, so its lines and records are the same whichever app the person uses.
+The **Logs** tab is on the desktop app's plugin page.
+
+## Limits
+
+- The **Logs** tab keeps 500 lines, only in memory, only while **Development mode** is on.
+- In a test, `ctx.recorded` holds every record your plugin made, without a sink
+  ([Test your plugin](/docs/build-plugins/node/test-your-plugin/)).
+
+## Reference
+
+[The Node context](/docs/build-plugins/reference/the-node-context/) has `ctx.log`, `ctx.telemetry`, and
+`ctx.audit`, and [auditActions](/docs/build-plugins/reference/contributions/audit-actions/) has every
+field.
+[Telemetry and privacy](/docs/security/telemetry-and-privacy/) is what the person controls.

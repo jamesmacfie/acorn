@@ -1,0 +1,74 @@
+---
+title: Keyboard and accessibility
+description: How components take focus, what the keys do on each, which keys a plugin can claim, and what the kit does for a screen reader.
+sources:
+  - docs/ui-design/interaction.md
+  - docs/ui-design/states.md
+  - docs/tui/keys.md
+  - packages/client-core/src/kit/tokens/focusRoles.ts
+  - packages/protocol/src/chrome/keybindings.ts
+checked: afced2661
+---
+
+This page covers how a reader reaches a plugin's components from the keyboard, and what the kit gives
+a screen reader. Read it before you choose components for a view that has to work without a pointer,
+which is every view.
+
+A plugin sets none of this. Each component's focus is fixed by the kit, and the keys belong to the
+host. Your tree says what a component is, and the host makes it reachable the same way everywhere.
+
+## Focus
+
+Every component has one of six focus roles. A component's page names its role.
+
+{/* facts */}
+
+A collection keeps its place across a refetch, because the host keys the active and selected item by
+the item's own key, not its position.
+
+## What the keys do
+
+- Tab and Shift+Tab move between stops.
+- The arrow keys move inside a collection, and Home, End, and the page keys jump in it. `j` and `k`
+  move too, where nobody is typing.
+- Enter or Space presses a stop: a button's `onPress`, a checkbox's toggle, a select's list, or the
+  inside of a `Rectangle`.
+- Escape closes a modal or a menu and gives focus back to whatever opened it. Inside a `Rectangle` it
+  takes the keys back.
+- `Input`, `Textarea`, `Composer`, and `MentionTextarea` take every key typed while they have focus,
+  except the few shortcuts that work while typing.
+
+## Keys a plugin can claim
+
+A tree never sees a key. `onKeyDown` and every other key handler are dropped before they reach your
+tree, so a component answers to what a key means, such as next or dismiss, and the host maps keys to
+that. A plugin claims a chord by binding it to a command in its manifest. For more information, see
+[Add commands and keybindings](/docs/build-plugins/ui/add-commands-and-keybindings/).
+
+- A chord needs Cmd, Ctrl, or Option. A letter alone, or with Shift alone, would change what someone
+  types.
+- A loaded plugin can't bind a chord that works while someone is typing.
+- A frame can claim chords to receive while it has focus, in its `claimsKeys`. It can't claim Escape,
+  Cmd+K, Cmd+comma, or Cmd+1 to Cmd+9, because those always reach acorn.
+
+## What the kit gives you
+
+- The ARIA each component needs follows from its role: a tab strip is a `tablist`, a dialog is a
+  `dialog` that holds focus, and a label names its control.
+- Focus rings, reduced motion, and readable line heights come from the kit, in every style pack.
+- Nothing is reachable by hover alone. Anything a pointer reveals, focus reveals too, so a row's
+  actions show when the row has focus.
+
+## In the terminal
+
+The same roles work in cells. Tab moves between regions on screen, the arrow keys and `h`, `j`, `k`,
+and `l` move inside them, Enter presses, and Escape goes back up. A hover tip draws nothing, so the
+kit draws `help` text as a line under its label instead. For more information, see
+[Keyboard shortcuts](/docs/using/keyboard-shortcuts/).
+
+## Limits
+
+- A tree can't read a key, a pointer, or the window size. A view that needs raw keys, such as a game
+  or a canvas, belongs in a frame, whose keys the host hands over on Enter.
+- A tip is for extra words. The terminal never shows one, so nothing a reader needs can live in a tip
+  alone.

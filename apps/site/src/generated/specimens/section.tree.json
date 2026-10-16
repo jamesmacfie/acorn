@@ -1,0 +1,96 @@
+{
+  "meta": {
+    "title": "Section and SectionHeader",
+    "caption": "A section with a count and help, and a section header over a run of text.",
+    "terminal": {
+      "columns": 60,
+      "rows": 7
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "section"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Section",
+              "props": {
+                "label": "Reviewers",
+                "count": 2,
+                "help": "People asked to review this pull request."
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "alex, sam"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n5",
+              "type": "Stack",
+              "props": {
+                "gap": "row"
+              },
+              "children": [
+                {
+                  "id": "n6",
+                  "type": "SectionHeader",
+                  "props": {
+                    "level": "group"
+                  },
+                  "children": [
+                    {
+                      "id": "n7",
+                      "type": "#text",
+                      "props": {
+                        "value": "Description"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n8",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n9",
+                      "type": "#text",
+                      "props": {
+                        "value": "Signing in from a deep link now returns to that link."
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

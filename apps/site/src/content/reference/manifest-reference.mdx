@@ -1,0 +1,116 @@
+---
+title: Manifest reference
+description: Every field in acorn-plugin.json, with its type, bounds, and what it does.
+sources:
+  - docs/plugin-authoring/the-manifest.md
+  - docs/plugins/forward-compatibility.md
+checked: '498833615'
+---
+
+`acorn-plugin.json` is the one file acorn trusts about your plugin. It says who the plugin is, which
+files hold its code, what it may reach, and what it adds to acorn. The Node reads it before any of your
+code runs, and the person installing your plugin reads it too, as the trust prompt.
+
+## How the pieces fit
+
+A plugin is a folder with up to three kinds of code beside the manifest:
+
+- **The Node half**, the file `node` names. It runs on the Node, in a worker that has only what
+  `permissions.node` grants. It answers your routes under `/v1/p/<id>/` and registers anything your
+  manifest can't declare.
+- **The client half**, the file `client` names. It draws your trees and frames in the desktop app and
+  the terminal client, and talks to acorn only through the bridge.
+- **Migrations**, the folder `migrations` names, if you keep tables in your own SQLite file.
+
+The manifest declares everything else. A badge, a palette command, a context menu row, or a schedule is
+data you write here, and acorn draws or runs it. Most contributions point at a route on your Node half
+for their data, and acorn checks that every such route is inside your own namespace.
+
+## A complete minimal manifest
+
+This plugin adds one pane, drawn by a tree from its client bundle, and a palette command that opens it:
+
+```json manifest
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme",
+  "name": "Acme",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "@API_MAJOR@",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "acme",
+        "label": "Acme",
+        "layout": "single",
+        "regions": { "body": { "kind": "remote", "entry": "pane" } }
+      }
+    ],
+    "commands": [
+      { "id": "open", "kind": "action", "title": "Open Acme", "action": { "verb": "openPane", "pane": "acme" } }
+    ]
+  }
+}
+```
+
+## A manifest that uses every top-level key
+
+```json manifest
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme",
+  "name": "Acme",
+  "version": "2.1.0",
+  "baseline": "acorn-1",
+  "apiVersion": "@API_MAJOR@",
+  "icon": { "d": "M12 2L2 22h20L12 2z", "color": "#c2410c" },
+  "icons": { "status": { "d": "M4 12h16" } },
+  "clients": ["desktop", "terminal"],
+  "emits": [{ "verb": "synced", "description": "Acme finished syncing a project." }],
+  "requires": { "plugins": [{ "id": "agents" }] },
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "migrations": "./migrations",
+  "permissions": {
+    "api": ["core.tasks:read"],
+    "events": ["plugin:acme:synced"],
+    "node": { "core": ["tasks"], "net": ["api.acme.example"] }
+  },
+  "contributions": {}
+}
+```
+
+## Fields
+
+{/* facts */}
+
+`permissions` has its own page, [Permissions](/docs/build-plugins/reference/permissions/), and each key
+of `contributions` has one under [Contributions](/docs/build-plugins/reference/contributions/).
+
+## Mistakes the parse catches
+
+The fields above are checked one at a time. These rules check one field against another, and a manifest
+that breaks one doesn't load:
+
+- Every route in every descriptor must be inside `/v1/p/<id>/`, your own namespace.
+- An `openPane` must name a task pane your manifest declares, and a `navigate` must name a project pane.
+- A project pane needs a `routes` entry, its only address, and a rail source whose `onSelect` navigates
+  to it.
+- A webview and a `coreSlot` surface need a `client` bundle.
+
+The ID in a route has to match `id`, which is why the example below fails:
+
+```json manifest-invalid
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "slots": [{ "id": "count", "slot": "topbar", "data": "/v1/p/someone-else/count" }]
+  }
+}
+```
+
+A key this acorn doesn't know is reported and skipped, not refused, so a manifest written for a newer
+acorn still loads. A value a known key doesn't accept is refused.

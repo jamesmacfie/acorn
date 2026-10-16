@@ -1,0 +1,127 @@
+{
+  "meta": {
+    "title": "Acme issues at icon width",
+    "caption": "The same list tree with the column collapsed: each row is its collapsedIcon, a Lucide icon, named in a tooltip. The terminal client has no icon width, so it keeps the titles.",
+    "terminal": {
+      "columns": 20,
+      "rows": 4
+    },
+    "width": 64
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Text",
+          "props": {
+            "emphasis": "muted"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "#text",
+              "props": {
+                "value": "Loading issues…"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ],
+    [
+      {
+        "op": "remove",
+        "id": "n1"
+      },
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n3",
+          "type": "ListColumn",
+          "props": {},
+          "children": [
+            {
+              "id": "n4",
+              "type": "Row",
+              "props": {
+                "density": "compact",
+                "meta": "ACME-12",
+                "selected": true,
+                "collapsedIcon": "circle-dot",
+                "label": "Webhooks give up after one retry",
+                "onPress": {
+                  "$handler": 1
+                }
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "Webhooks give up after one retry"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Row",
+              "props": {
+                "density": "compact",
+                "meta": "ACME-14",
+                "selected": false,
+                "collapsedIcon": "eye",
+                "label": "VAT missing on EU invoices",
+                "onPress": {
+                  "$handler": 2
+                }
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "#text",
+                  "props": {
+                    "value": "VAT missing on EU invoices"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n8",
+              "type": "Row",
+              "props": {
+                "density": "compact",
+                "meta": "ACME-15",
+                "selected": false,
+                "collapsedIcon": "circle",
+                "label": "Overdue invoice query is slow",
+                "onPress": {
+                  "$handler": 3
+                }
+              },
+              "children": [
+                {
+                  "id": "n9",
+                  "type": "#text",
+                  "props": {
+                    "value": "Overdue invoice query is slow"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

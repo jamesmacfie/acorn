@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "title": "A replacement pane switcher",
+    "caption": "acme-switcher's tree in the right rail's pane switcher slot, drawn from the host's pane data.",
+    "terminal": {
+      "columns": 40,
+      "rows": 6
+    },
+    "width": 280
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "ListColumn",
+          "props": {
+            "label": "Retry webhooks"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Row",
+              "props": {
+                "density": "compact",
+                "selected": true,
+                "meta": "⌘1",
+                "onPress": {
+                  "$handler": 1
+                }
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Agent"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Row",
+              "props": {
+                "density": "compact",
+                "selected": true,
+                "meta": "⌘2",
+                "onPress": {
+                  "$handler": 2
+                }
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "Changes"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Row",
+              "props": {
+                "density": "compact",
+                "selected": false,
+                "meta": "⌘3",
+                "onPress": {
+                  "$handler": 3
+                }
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "#text",
+                  "props": {
+                    "value": "Editor"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n8",
+              "type": "Row",
+              "props": {
+                "density": "compact",
+                "selected": false,
+                "onPress": {
+                  "$handler": 4
+                }
+              },
+              "children": [
+                {
+                  "id": "n9",
+                  "type": "#text",
+                  "props": {
+                    "value": "Tracker"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n10",
+                  "type": "StatusDot",
+                  "props": {
+                    "tone": "accent",
+                    "label": "Linked to an Acme issue"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n11",
+              "type": "Button",
+              "props": {
+                "size": "sm",
+                "onPress": {
+                  "$handler": 5
+                }
+              },
+              "children": [
+                {
+                  "id": "n12",
+                  "type": "#text",
+                  "props": {
+                    "value": "Equal widths"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

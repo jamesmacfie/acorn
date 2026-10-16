@@ -1,0 +1,16 @@
+---
+// The download page's Build from source section. It sits first when there's no release, and last when
+// there is one.
+import { installMethods } from '../install'
+import InstallBlock from './InstallBlock.astro'
+---
+
+<section class="section" data-platforms="macos windows linux">
+  <h2>Build from source</h2>
+  <p>
+    You need Git, Node 22.23.2, 24.18.1, or 26.5.1 or later in its branch, pnpm 11, and a Rust toolchain. These commands
+    build acorn and start the desktop app from your checkout.
+  </p>
+  <InstallBlock id="source" methods={[installMethods[0]]} />
+  <p><code>pnpm dist</code> packages the desktop app, and <code>pnpm pack:node</code> builds the standalone Node.</p>
+</section>

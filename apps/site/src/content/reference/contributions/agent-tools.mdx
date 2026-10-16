@@ -1,0 +1,96 @@
+---
+title: agentTools
+description: "Tools agents can call, each answered by a route on your Node half."
+sources:
+  - docs/agent-tools/loaded-tools.md
+  - docs/plugin-authoring/the-node-half.md
+checked: '498833615'
+---
+
+An agent tool is a function agents can call, answered by a route on your Node half. You declare its
+name, what it's for, a JSON Schema for its arguments, and how risky it is. acorn checks the arguments,
+applies the person's tool tiers, sends your route the verified task and session, and never retries a
+call.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "agentTools": [
+      {
+        "id": "find_issue",
+        "description": "Find an Acme issue by its key.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "key"
+          ]
+        },
+        "risk": "read",
+        "handler": "/v1/p/acme/tools/find-issue"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "agentTools": [
+      {
+        "id": "close_issue",
+        "description": "Close an Acme issue. Use it after the task's pull request merges.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "maxLength": 32
+            },
+            "comment": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "key"
+          ],
+          "additionalProperties": false
+        },
+        "risk": "write",
+        "handler": "/v1/p/acme/tools/close-issue",
+        "requiresSession": true,
+        "timeoutMs": 5000,
+        "maxOutputBytes": 4096
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+Agents call tools on the Node, the same for every client.
+
+## Mistakes
+
+- `inputSchema` takes only a small set of JSON Schema keywords. Others are refused.
+- Agents see the tool as `<pluginId>_<id>`, so keep `id` short.
+
+## Guide
+
+[Give agents tools](/docs/build-plugins/node/give-agents-tools/) walks through it from start to finish.

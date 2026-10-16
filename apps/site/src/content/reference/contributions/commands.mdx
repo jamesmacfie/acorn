@@ -1,0 +1,159 @@
+---
+title: commands
+description: "Entries in the command palette: an action, a group, a search, a line of input, or a setting."
+sources:
+  - docs/plugins/commands.md
+  - docs/plugin-authoring/contributions.md
+  - docs/tui/chrome.md
+checked: '498833615'
+---
+
+A command is an entry in acorn's command palette. Every command names its `kind`:
+
+- `action` runs one action verb.
+- `group` holds the commands that name it as their `parentId`.
+- `search` sends what the person types to your route and lists what comes back.
+- `input` sends one line of text to your route when the person presses Enter.
+- `setting` shows a value from your route and lets the person pick another from a fixed list.
+
+A route's answer never chooses what happens. The verb that runs is the one your manifest names.
+
+## A minimal example
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "acme",
+        "label": "Acme",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "acme"
+          }
+        }
+      }
+    ],
+    "commands": [
+      {
+        "id": "open",
+        "kind": "action",
+        "title": "Open Acme",
+        "category": "pane",
+        "action": {
+          "verb": "openPane",
+          "pane": "acme"
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "scope": "project",
+        "id": "issue",
+        "label": "Issue",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "issue"
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "id": "issue-route",
+        "path": "/p/:projectId/x/acme/issue/:issueId",
+        "surface": "issue",
+        "item": "issueId"
+      }
+    ],
+    "commands": [
+      {
+        "id": "acme",
+        "kind": "group",
+        "title": "Acme",
+        "category": "navigation"
+      },
+      {
+        "id": "find",
+        "kind": "search",
+        "parentId": "acme",
+        "title": "Find an issue",
+        "scope": "project",
+        "route": "/v1/p/acme/issues/search",
+        "placeholder": "Search issues",
+        "onSelect": {
+          "verb": "navigate",
+          "surface": "issue"
+        }
+      },
+      {
+        "id": "note",
+        "kind": "input",
+        "parentId": "acme",
+        "title": "Add a note to the task",
+        "scope": "task",
+        "route": "/v1/p/acme/notes",
+        "onSuccess": {
+          "verb": "openUrl",
+          "url": "https://acme.example/notes"
+        }
+      },
+      {
+        "id": "region",
+        "kind": "setting",
+        "parentId": "acme",
+        "title": "Acme region",
+        "scope": "none",
+        "readRoute": "/v1/p/acme/region",
+        "writeRoute": "/v1/p/acme/region",
+        "options": [
+          {
+            "value": "eu",
+            "label": "Europe"
+          },
+          {
+            "value": "us",
+            "label": "United States"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The terminal client's palette, `Ctrl+K`, is the same palette session, so your commands are there too.
+
+## Mistakes
+
+- Every command names its `kind`. A command without one is refused.
+- A `search`, `input`, or `setting` needs a `node` entry, because its routes are on your Node half.
+- A `setting` value your route answers that isn't one of `options` is refused, not shown.
+
+## Guide
+
+[Add commands and keybindings](/docs/build-plugins/ui/add-commands-and-keybindings/) walks through it from start to finish.

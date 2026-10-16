@@ -1,0 +1,69 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-theme",
+  "name": "Acme theme",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "icon": {
+    "d": "M12 2 L22 20 H2 Z M12 8 L7 17 H17 Z",
+    "color": "#c2410c"
+  },
+  "icons": {
+    "outline": { "d": "M12 2 L22 20 H2 Z M12 5 L4.5 18.5 H19.5 Z" }
+  },
+  "contributions": {
+    "themes": [
+      {
+        "id": "dusk",
+        "label": "Acme dusk",
+        "dark": true,
+        "tokens": {
+          "--bg": "#1c1a24",
+          "--bg-subtle": "#24212f",
+          "--bg-hover": "#2d2939",
+          "--bg-selected": "#3a3449",
+          "--border": "#3b3648",
+          "--border-strong": "#4f4860",
+          "--text": "#ece8f4",
+          "--text-muted": "#aaa3bb",
+          "--text-faint": "#7e778f",
+          "--accent": "#f97316",
+          "--focus": "#fb923c",
+          "--add-bg": "rgba(74, 222, 128, 0.14)",
+          "--add-marker": "#4ade80",
+          "--del-bg": "rgba(248, 113, 113, 0.14)",
+          "--del-marker": "#f87171",
+          "--add-word-bg": "rgba(74, 222, 128, 0.32)",
+          "--del-word-bg": "rgba(248, 113, 113, 0.32)",
+          "--hunk-bg": "#24212f",
+          "--hunk-text": "#aaa3bb",
+          "--warn": "#facc15",
+          "--badge-border": "#4f4860",
+          "--shadow-popover": "rgba(0, 0, 0, 0.55)"
+        }
+      }
+    ],
+    "styles": [
+      {
+        "id": "roomy",
+        "label": "Acme roomy",
+        "description": "Taller rows and rounder cards.",
+        "tokens": {
+          "--row-h": "32px",
+          "--radius-surface": "var(--radius-lg)",
+          "--elev-card": "var(--shadow-2)"
+        }
+      }
+    ],
+    "contextMenus": [
+      {
+        "id": "style-guide",
+        "location": "task.row",
+        "label": "Open the Acme style guide",
+        "icon": "brand:acme-theme",
+        "action": { "verb": "openUrl", "url": "https://acme.example/style" }
+      }
+    ]
+  }
+}

@@ -1,0 +1,119 @@
+---
+title: Check a task before it's archived
+description: Warn the person about your plugin's work when they archive a task, and offer to clean it up, in acorn's archive dialog.
+sources:
+  - docs/plugins/task-checks.md
+  - docs/plugin-authoring/contributions.md
+  - packages/protocol/src/plugin/manifest/runtimeDescriptors.ts
+  - examples/plugins/acme-data/acorn-plugin.json
+  - examples/plugins/acme-data/server/routes.js
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+
+You'll put a line in the dialog acorn shows before it archives a task, to say what your plugin still
+has going on there, and offer to clean it up.
+
+## The result
+
+Archiving a task with a deploy still running shows, in acorn's dialog, beside a warning icon:
+
+```text
+1 Acme deploy is still running for this task
+  staging f00dfee
+☐ Mark them cancelled
+```
+
+The person archives either way. If they tick the box, acorn calls your cleanup while the task's
+worktree still exists.
+
+## Before you start
+
+Read [Write the Node half](/docs/build-plugins/node/write-the-node-half/). The code is from
+[`examples/plugins/acme-data`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-data).
+
+## Steps
+
+<Steps>
+
+1. **Declare the check.** `check` is a GET route. `apply` is the cleanup, and leaving it out makes the
+   check a warning with no box.
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['contributions.taskChecks']} />
+
+2. **Answer the check, and run the cleanup.** acorn calls `check` with `?taskId=`. Answer
+   `{ concern: null }` when there's nothing to say, which should be most of the time and cheap.
+   Otherwise answer a concern:
+
+   <ExampleCode file="acme-data/server/routes.js" region="check" />
+
+   - `message` is drawn without your plugin's name, so say what it's about: "2 deploys are still
+     running", not "2 running".
+   - `severity` is `warn` or `danger`.
+   - `details` lists up to five lines under it, and `detailsMore` counts the rest as "+7 more".
+   - `action` draws the box. `checked` is whether it starts ticked.
+
+3. **Install it.** When a device asks about the plugin, its trust prompt lists the check under
+   **Declared**:
+
+   ```text
+   Check a task before you archive it, and offer to clean up after it
+   ```
+
+4. **Check it.** Start a deploy that runs, then archive the task. Your line is in the dialog.
+
+</Steps>
+
+## With or without a cleanup
+
+| You declare | The dialog | When the person confirms |
+| --- | --- | --- |
+| `check` only | Your message and details | Nothing more from you |
+| `check` and `apply` | The same, with your box | acorn posts `{ taskId }` to `apply` if the box is ticked, after the teardown script and before the worktree goes |
+
+Leave `apply` out for anything you shouldn't do on the person's behalf, such as discarding their work.
+A version that adds a cleanup asks again at install.
+
+## Mistakes
+
+- A slow check. acorn waits two seconds, then draws the dialog without you. The person is watching.
+- A check that throws or answers something acorn can't draw. It adds no line, the same as having
+  nothing to say. A broken check never blocks an archive.
+- Starting the cleanup in `check`. The person hasn't decided yet.
+
+A check is answered by your Node half, so the manifest needs one:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "contributions": {
+    "taskChecks": [{ "id": "running-deploys", "check": "/v1/p/acme/archive/check" }]
+  }
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "taskChecks": [{ "id": "running-deploys", "check": "/v1/p/acme/archive/check" }]
+  }
+}
+```
+
+## In the terminal
+
+The terminal client can't archive a task, so your line appears in the desktop app's archive dialog.
+
+## Limits
+
+- Up to 4 checks per plugin.
+- A check has two seconds. A cleanup has sixty, and a cleanup that fails is named in the archive's
+  result while the task is still archived.
+- A check is the only way into the archive dialog. There's no veto: the person always decides.
+
+## Reference
+
+[taskChecks](/docs/build-plugins/reference/contributions/task-checks/) has every field.
+[Archive and restore](/docs/using/archive-and-restore/) is what the person sees.

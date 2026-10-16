@@ -1,0 +1,96 @@
+---
+title: Preview
+description: Show a task's running web app in a pane beside its code, where its address comes from, what the pane can load, and why a remote Node's preview is refused.
+sources:
+  - docs/shell/webviews.md
+  - docs/security/webviews.md
+  - plugins/preview/src/client/index.ts
+  - plugins/preview/src/client/PreviewPane.tsx
+  - plugins/preview/src/client/paneContribution.ts
+  - plugins/preview/src/client/configuredStore.ts
+  - packages/client-core/src/features/settings/ProjectConfigTabs.tsx
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Preview plugin adds the Preview pane: your app, such as a dev server, in a small browser beside the
+task, so you can see a change without leaving acorn.
+
+<PluginFacts id="preview">
+  <Fragment slot="adds">The **Preview** pane on a task with a preview address, and the **Open Preview** command.</Fragment>
+  <Fragment slot="needs">A preview address for the project, or a run target with one. A Node on this computer.</Fragment>
+  <Fragment slot="reach">`http` and `https` pages, in a webview apart from acorn's own window, with its own temporary storage.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+<Steps>
+
+1. Open **Settings**, choose the project, and open its **Preview** tab.
+
+2. In **Browser preview URL**, choose where the preview opens: **A fixed URL**, **localhost with a
+   port**, or **A script that prints the URL**, and fill in its value.
+
+3. Start your app, open a task in the project, and click **Preview** in the pane switcher, or press ⌘⇧B.
+
+   <Checkpoint>The pane shows your app, with its address in **Preview address**.</Checkpoint>
+
+</Steps>
+
+A run target with a URL in `.acorn/config.toml` works too. acorn picks the address in this order: the
+run target a layout chose, the running default run target, then the project's **Browser preview URL**
+([Project configuration](/docs/using/project-configuration/)). A script runs in the task's worktree on
+the Node, with ten seconds to answer.
+
+## Use it
+
+The bar above the page has **Back**, **Forward**, **Reload the page**, the address, **Copy page address**,
+and a button that goes back to the app's home address. Type an address to go somewhere else. In a
+development build, **Show developer tools** opens the page's inspector.
+
+Each task keeps its own preview. Switching tasks hides one and shows another, and each keeps its page and
+history while acorn is open. Stopping your dev server doesn't close the pane: reload when it's back.
+Other plugins can add up to four buttons beside the address bar.
+
+## What the pane can load
+
+- `http` and `https` addresses only, without a username or password in them.
+- It has its own temporary storage, so its cookies and logins aren't acorn's, and go when acorn quits.
+- It can't call acorn, open new windows, or get permission for the camera or similar.
+
+[The preview and webviews](/docs/security/the-preview-and-webviews/) covers these in more depth.
+
+## Why a remote Node's preview is refused
+
+When the task is on a Node on another machine, the pane says **Preview works on this computer only**.
+The page would come from that Node's address, and the webview can check where a page navigates, but not
+where its scripts send requests. A page from a remote Node could reach your router, a NAS, or a database
+on your network. Open the app's address in your own browser instead.
+
+## From the command palette
+
+**Open Preview** opens the pane on the current task.
+
+## For agents
+
+Agents don't see or drive the Preview pane. To have an agent look at your app, give it the same address,
+and it opens the page in [its own browser](/docs/built-in-plugins/agent-browser/).
+
+## Settings
+
+**Browser preview URL** is on each project's **Preview** tab
+([Settings: Workspaces and projects](/docs/settings/workspaces-and-projects/#preview)). The plugin has no
+Settings page of its own.
+
+## In the terminal
+
+The terminal client can't show a web page, so it has no Preview pane.
+
+## Limits
+
+- Desktop only, and only for a Node on this computer.
+- Each task's page lasts while acorn is open. Quitting clears its history and storage.
+- A page can still do anything a web page can do on your network, from your computer.

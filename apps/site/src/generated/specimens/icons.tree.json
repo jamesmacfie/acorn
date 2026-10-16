@@ -1,0 +1,161 @@
+{
+  "meta": {
+    "title": "Icon",
+    "caption": "Four state icons in their tones, each with the word it stands for.",
+    "terminal": {
+      "columns": 60,
+      "rows": 1
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Inline",
+          "props": {
+            "gap": "stack"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Icon",
+                  "props": {
+                    "name": "circle-check",
+                    "tone": "ok"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n4",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n5",
+                      "type": "#text",
+                      "props": {
+                        "value": "passed"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "Icon",
+                  "props": {
+                    "name": "triangle-alert",
+                    "tone": "warn"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n8",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n9",
+                      "type": "#text",
+                      "props": {
+                        "value": "flaky"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n10",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n11",
+                  "type": "Icon",
+                  "props": {
+                    "name": "circle-alert",
+                    "tone": "danger"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n12",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n13",
+                      "type": "#text",
+                      "props": {
+                        "value": "failed"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n14",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n15",
+                  "type": "Icon",
+                  "props": {
+                    "name": "clock",
+                    "tone": "muted"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n16",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n17",
+                      "type": "#text",
+                      "props": {
+                        "value": "queued"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

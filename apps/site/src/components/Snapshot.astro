@@ -1,0 +1,101 @@
+---
+// One shell snapshot, a whole acorn window captured from a running app on the site's fixture
+// (docs/site/snapshots.md). The desktop's HTML draws at the window's own size and scales to the
+// column, styled by the specimen stylesheet, so it follows the visitor's theme. It's a picture, so
+// nothing in it can be focused or clicked.
+import 'virtual:acorn-ui.css'
+import { SNAPSHOTS, type SnapshotId } from '../snapshots'
+import Cells, { type CellFrame } from './Cells.astro'
+import SnapshotFrame from './SnapshotFrame.astro'
+
+interface Props {
+  id: SnapshotId
+  /** Set when the page shows this scene more than once, so each copy's ids stay unique on the page. */
+  instance?: string
+}
+
+const pages = import.meta.glob<string>('../generated/snapshots/*.html', { eager: true, query: '?raw', import: 'default' })
+const frames = import.meta.glob<CellFrame>('../generated/snapshots/*.cells.json', { eager: true, import: 'default' })
+
+const { id, instance } = Astro.props
+const scene = SNAPSHOTS[id]
+const captured = pages[`../generated/snapshots/${id}.html`]
+// The capture prefixes every id with the scene (docs/site/snapshots.md), so a second copy renames
+// `<scene>-` in the attributes that hold or point at an id.
+const html = instance
+  ? captured?.replace(/(\s(?:id|for|aria-[a-z]+)=")([^"]*)"/g, (_, attribute: string, value: string) =>
+      `${attribute}${value.replace(new RegExp(`(^|\\s)${id}-`, 'g'), `$1${id}-${instance}-`)}"`,
+    )
+  : captured
+const cells = frames[`../generated/snapshots/${id}.cells.json`]
+if (scene.host === 'terminal' ? !cells : html === undefined) {
+  throw new Error(`There's no shell snapshot "${id}". Run pnpm --filter @acorn/site snapshots ${id}.`)
+}
+---
+
+<SnapshotFrame
+  host={scene.host}
+  title={scene.title}
+  caption={scene.caption}
+  size={cells && `${cells.columns}×${cells.rows}`}
+>
+  {
+    scene.host !== 'terminal' ? (
+      <div class="window" style={`--width: ${scene.width}; --height: ${scene.height}`}>
+        <div class="acorn-ui" inert set:html={html} />
+      </div>
+    ) : (
+      <div class="terminal" inert>
+        <Cells cells={cells!} />
+      </div>
+    )
+  }
+</SnapshotFrame>
+
+<style>
+  /* The window keeps its proportions at any column width. `tan(atan2(a, b))` is a / b as a plain
+     number, which `scale` takes and a division of two lengths doesn't give. */
+  .window {
+    container-type: inline-size;
+    aspect-ratio: var(--width) / var(--height);
+    overflow: hidden;
+  }
+  .window > .acorn-ui {
+    inline-size: calc(var(--width) * 1px);
+    block-size: calc(var(--height) * 1px);
+    overflow: hidden;
+    transform-origin: 0 0;
+    scale: tan(atan2(100cqi, calc(var(--width) * 1px)));
+  }
+  /* What a capture draws in place of what it can't copy: a web page is a labeled box, and the browser
+     extension's panel sits beside its page (scripts/shellPage.js, scripts/capture-shell.mjs). */
+  .window :global(.snapshot-webview) {
+    display: grid;
+    place-items: center;
+    block-size: 100%;
+    font-family: var(--font-mono);
+    color: var(--text);
+    background: var(--bg-subtle);
+  }
+  .window :global(.snapshot-browser) {
+    display: flex;
+    block-size: 100%;
+  }
+  .window :global(.snapshot-browser > .snapshot-webview) {
+    flex: 1;
+  }
+  /* The panel's own fixed parts stay inside it, as they do in the browser. */
+  .window :global(.snapshot-sidebar) {
+    contain: layout;
+    inline-size: 360px;
+    border-inline-start: var(--surface-border);
+  }
+  /* A cell is 0.6em wide in a monospace face, so the terminal sizes its text to fit every column. */
+  .terminal {
+    container-type: inline-size;
+    padding: var(--pane-pad);
+  }
+  .terminal :global(.cells) {
+    font-size: min(var(--term-fs), calc(100cqi / var(--columns) / 0.6));
+  }
+</style>

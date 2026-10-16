@@ -1,0 +1,100 @@
+---
+title: Replace the top bar, rail, or pane switcher
+description: Offer your own version of one of acorn's surfaces, drawn from the data the host passes, with acorn as the fallback.
+sources:
+  - docs/plugins/replacing-core-surfaces.md
+  - docs/plugin-authoring/ui-contributions.md
+  - packages/protocol/src/chrome/paneSwitcher.ts
+  - examples/plugins/acme-switcher/acorn-plugin.json
+  - examples/plugins/acme-switcher/client.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll offer a replacement for one of acorn's own surfaces: the top bar, the left rail, the rail's task
+list, or the pane switcher. Offering takes nothing away. The person chooses your version in Settings,
+and acorn draws its own again whenever yours can't.
+
+## The result
+
+The Acme switcher example draws the pane switcher as a list of labeled rows, from the pane data acorn
+passes it:
+
+<Specimen id="acme-switcher" />
+
+## Before you start
+
+Finish [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/). A replacement
+needs a client bundle and no Node half. The code is from
+[`examples/plugins/acme-switcher`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-switcher).
+
+## Steps
+
+<Steps>
+
+1. **Declare the surface.** A `frames` entry with `target: "coreSlot"` names which surface it draws
+   in `coreSlot`: `pane.switcher`, `rail`, `topbar`, or `rail.taskList`. The first three need a
+   `single` layout with one tree in `body`.
+
+   <ExampleCode file="acme-switcher/acorn-plugin.json" pick={['client', 'contributions.frames']} />
+
+2. **Draw from the host's data.** The tree's props are acorn's data for the surface. The pane switcher
+   gets `panes`, each with `id`, `label`, `icon`, `shown`, `pinned`, `shortcut`, and `markers`, plus
+   `task` and `maximized`.
+
+   <ExampleCode file="acme-switcher/client.js" region="switcher" />
+
+3. **Change things through named actions.** Your tree never moves a pane itself. It asks acorn to,
+   by name: the switcher's actions are `show`, `add`, `close`, `pin`, `toggleMaximize`, `equalize`,
+   and `openContextMenu`. A hand-written client sends them as a `tree:host-request`, which the
+   plumbing's `invoke` does. With the SDK, call `host.invoke('show', paneId)`.
+
+4. **Choose it.** Save. Open **Settings** > **Plugins** > **Rail and surfaces**, and under
+   **Replaced surfaces**, pick **Pane list with labels** for the pane switcher. The right rail draws
+   your tree. Pick acorn's own to switch back.
+
+</Steps>
+
+## acorn is the fallback
+
+acorn draws its own surface again at once when nobody is chosen, your plugin is off or removed, its
+bundle isn't accepted, or your tree fails. A replacement that fails three times in a session is skipped
+until the plugin list changes, and the notice names your plugin.
+
+## Mistakes
+
+A `pane.switcher`, `rail`, or `topbar` replacement is one tree, because it gets changing data and
+actions an iframe can't take:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [{ "target": "coreSlot", "id": "switcher", "label": "Switcher", "coreSlot": "pane.switcher",
+      "layout": "single", "regions": { "body": "frame" } }]
+  }
+}
+```
+
+- A `rail` or `topbar` replacement that hides the task list or the status items should place them: the
+  host passes `slots.taskList` or `slots.right`, which your tree draws with a `Slot` node, and
+  `placesSlots` declares it. Without it, Settings warns the person.
+- A replacement isn't a pane. No pane verb can name it.
+
+## In the terminal
+
+The terminal client keeps its own chrome. A replacement draws in the desktop app.
+
+## Limits
+
+- One provider per surface, chosen per device.
+- A replacement draws in the surface's own box. The pane switcher keeps the rail's narrow width, so
+  long labels are clipped.
+- The tree gets data and named actions, never the shell's functions.
+
+## Reference
+
+[frames](/docs/build-plugins/reference/contributions/frames/) has `coreSlot` and `placesSlots`.

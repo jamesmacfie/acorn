@@ -1,0 +1,89 @@
+---
+title: View files and agent attachments
+description: Draw your own view of a file type in Editor, and of an attachment or artifact in an agent session.
+sources:
+  - docs/plugins/document-surfaces.md
+  - docs/plugins/remote-points.md
+  - docs/editor/file-renderers.md
+  - docs/managed-agents/attachments.md
+  - examples/plugins/acme-review/acorn-plugin.json
+  - examples/plugins/acme-review/src/client.tsx
+  - examples/plugins/acme-review/node.js
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll draw your own view of a kind of file: in Editor, when someone opens it, and in an agent session,
+when an agent attaches it or writes it as an artifact.
+
+## The result
+
+The Acme review example's view of `rates.csv` in Editor. Editor keeps the tab and the **Source**
+toggle. The table is Acme review's tree:
+
+<Specimen id="acme-review-csv-file" />
+
+## Before you start
+
+Read [Add to another plugin's view](/docs/build-plugins/ui/add-to-another-plugins-view/). The code is
+from [`examples/plugins/acme-review`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-review).
+
+## Steps
+
+<Steps>
+
+1. **Declare the viewers.** Three points take a viewer, each `replace`, so one contributor draws in
+   place of the owner's default:
+
+   | Point | Keyed by | Props |
+   | --- | --- | --- |
+   | `editor:document` | The file's name, lowercase: `*.csv` | `{ taskId, path, text?, revision }` |
+   | `agents:artifact` | The media type: `text/csv` | `{ taskId, sessionId, media }` |
+   | `agents:transcript-attachment` | The media type | `{ taskId, sessionId, media }` |
+
+   <ExampleCode file="acme-review/acorn-plugin.json" pick={['requires', 'permissions', 'contributions.extensions#csv-file', 'contributions.extensions#csv-artifact', 'contributions.extensions#csv-attachment']} />
+
+2. **Draw a file.** Editor passes the file's `text`, so the viewer needs nothing more.
+
+   <ExampleCode file="acme-review/src/client.tsx" region="csv" />
+
+   The attachment and artifact view reads the bytes through your own route, which asks Agents.
+
+3. **Read the bytes on your Node half.** `agents.transcriptMedia` is a capability Agents provides. It
+   checks that the media belongs to the session and the session to the task, and answers `null`
+   otherwise. Ask for it in `permissions.node.capabilities`, and name Agents in `requires`.
+
+   <ExampleCode file="acme-review/node.js" region="artifact" />
+
+4. **Check it.** Save. Open a `.csv` file in Editor: it draws as a table, with **Source** one toggle
+   away. Ask an agent to write a CSV artifact, and its card draws the table above the download row.
+
+</Steps>
+
+## Mistakes
+
+- The bytes are capped at 12 MiB through the bridge. A larger file stays downloadable from the card.
+- Keys are lowercase, without parameters: `text/plain; charset=utf-8` matches `text/plain`.
+- Two contributors for the same key tie, and the owner draws its own default.
+
+## In the terminal
+
+The terminal client mounts the same trees in cells, in Editor and in transcripts.
+
+## Show a web page instead
+
+To show a whole website, declare a webview ([Show a web page](/docs/build-plugins/ui/show-a-web-page/)).
+
+## Limits
+
+- A viewer draws only the body. Editor keeps its tab, toolbar, and **Source**. Agents keeps the
+  filename, the size, and **Download**.
+- Bodies mount only for cards in the transcript's drawn window, so a long session doesn't start a worker
+  per card.
+
+## Reference
+
+[Extension points](/docs/build-plugins/reference/extension-points/) has each point's props.

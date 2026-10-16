@@ -1,0 +1,27 @@
+---
+title: Log
+description: Lines of output that scroll, with find.
+sources:
+  - packages/client-core/src/kit/components/content/Log.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Log` for build or process output. It scrolls itself, and `follow` keeps it on the last line as lines arrive.
+
+<Specimen id="log" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="log" />
+
+## Related
+
+- [`CodeBlock`](/docs/components/content/code-block/), for a short block to copy.
+- [`FindBar`](/docs/components/inputs/find-bar/), for the find control a log draws.
+
+## Mistakes
+
+- Putting a `Log` in a panel that also scrolls. Set `TabPanel scroll={false}` around it.

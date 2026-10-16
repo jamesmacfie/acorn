@@ -1,0 +1,123 @@
+{
+  "meta": {
+    "title": "HistoryMark",
+    "caption": "Two commits on one lane, each mark beside its message.",
+    "terminal": {
+      "columns": 50,
+      "rows": 2
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "none"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "HistoryMark",
+                  "props": {
+                    "slot": {
+                      "id": "b2c4e6f",
+                      "lane": 0,
+                      "lanes": 1,
+                      "edges": [
+                        {
+                          "from": 0,
+                          "to": 0,
+                          "start": "center",
+                          "end": "bottom",
+                          "continuation": false
+                        }
+                      ],
+                      "continuation": false,
+                      "disconnected": false
+                    }
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n4",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n5",
+                      "type": "#text",
+                      "props": {
+                        "value": "Fix the redirect after sign-in"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "HistoryMark",
+                  "props": {
+                    "slot": {
+                      "id": "3f9a2c1",
+                      "lane": 0,
+                      "lanes": 1,
+                      "edges": [
+                        {
+                          "from": 0,
+                          "to": 0,
+                          "start": "top",
+                          "end": "center",
+                          "continuation": false
+                        }
+                      ],
+                      "continuation": false,
+                      "disconnected": false
+                    }
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n8",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n9",
+                      "type": "#text",
+                      "props": {
+                        "value": "Add the sign-in page"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

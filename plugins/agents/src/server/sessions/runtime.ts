@@ -848,6 +848,7 @@ export class ManagedAgentRuntime {
       name: server.name,
       transport: server.transport,
       enabled: selected.has(server.name),
+      signIn: server.signIn,
     }))
     const reported = await this.engine.sessionHandleIfPresent(sessionId, async (handle) =>
       handle.mcpStatus ? handle.mcpStatus().catch(() => null) : null,

@@ -1,0 +1,690 @@
+---
+title: Extension points
+description: "Every place one plugin can add to another's view, and what each takes."
+sources:
+  - docs/plugins/cooperative-extension-points.md
+  - docs/plugins/remote-points.md
+  - docs/plugins/rows-and-annotations.md
+  - docs/tui/plugin-losses.md
+checked: '498833615'
+---
+
+An extension point is a place in one plugin's view that another plugin may fill. The owner opens it,
+and you fill it with an `extensions` entry naming the point as `<owner>:<point>`. Nothing reaches into a
+view that didn't open a point, and nothing runs your code inside another plugin: you bring a tree from
+your own client bundle, or rows and marks from your own routes, and acorn draws them where the owner
+said.
+
+Each point takes one of two things:
+
+- **A tree.** Name a `remote` entry your client bundle passes to `mountTree`. A `replace` point draws one
+  contributor: the person picks when two match, and until then the owner's own view draws. A `stack`
+  point draws several, up to its cap. `matches` narrows your tree to the keys it can draw, exactly or as
+  `prefix*` or `*suffix`.
+- **Marks.** Name an `items` route on your Node half. acorn POSTs `{ keys }` for what it's drawing, and
+  your route answers `{ items: [{ key, severity, text, icon? }] }`, with `severity` one of `info`,
+  `warn`, and `danger`. Text is cut at 200 characters.
+
+If the owner isn't installed, or is turned off, your contribution draws nothing and reports no error.
+
+{/* facts */}
+
+## An example for each point
+
+### Points `core` opens
+
+#### `core:link-preview`
+
+A preview of an HTTPS link, drawn where acorn shows the link.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "core-link-preview",
+        "point": "core:link-preview",
+        "label": "Acme link preview",
+        "remote": "linkPreview",
+        "matches": [
+          "https://acme.example/*"
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### `core:markdown-fence`
+
+A view of a closed code fence in rendered Markdown, keyed by its language.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "core-markdown-fence",
+        "point": "core:markdown-fence",
+        "label": "Acme diagram",
+        "remote": "fence",
+        "matches": [
+          "acme"
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### `core:task`
+
+Status marks on task rows. Every task takes them, with no consent needed.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "core-task",
+        "point": "core:task",
+        "label": "Acme status",
+        "items": "/v1/p/acme/marks/tasks"
+      }
+    ]
+  }
+}
+```
+
+#### `core:source`
+
+Status marks on a rail source's icon, for a source whose owner sets `statusAnnotations: true`.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "core-source",
+        "point": "core:source",
+        "label": "Acme sync state",
+        "items": "/v1/p/acme/marks/sources"
+      }
+    ]
+  }
+}
+```
+
+#### `core:pane`
+
+Status marks on a task pane's switcher button, for a pane whose owner sets `statusAnnotations: true`.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "core-pane",
+        "point": "core:pane",
+        "label": "Acme pane state",
+        "items": "/v1/p/acme/marks/panes"
+      }
+    ]
+  }
+}
+```
+
+#### `core:storage`
+
+A section on a Node's storage page in Settings.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "core-storage",
+        "point": "core:storage",
+        "label": "Acme cache",
+        "remote": "storage"
+      }
+    ]
+  }
+}
+```
+
+#### `core:security`
+
+A section on a Node's security page in Settings.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "core-security",
+        "point": "core:security",
+        "label": "Acme audit",
+        "remote": "security"
+      }
+    ]
+  }
+}
+```
+
+#### `core:plugin-page`
+
+A section on a plugin's own page in Settings.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "core-plugin-page",
+        "point": "core:plugin-page",
+        "label": "Acme notes",
+        "remote": "pluginPage"
+      }
+    ]
+  }
+}
+```
+
+### Points `agents` opens
+
+#### `agents:tool-card`
+
+The card an agent transcript draws for one tool call, keyed by the tool's name.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "agents-tool-card",
+        "point": "agents:tool-card",
+        "label": "Acme tool card",
+        "remote": "toolCard",
+        "matches": [
+          "acme_*"
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### `agents:attachment`
+
+A view of a draft attachment in the composer, keyed by media type. Its owner accepts a `replace` action.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "agents-attachment",
+        "point": "agents:attachment",
+        "label": "Acme attachment",
+        "remote": "attachment",
+        "matches": [
+          "application/vnd.acme+json"
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### `agents:transcript-attachment`
+
+A view of an attachment in a transcript, keyed by media type.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "agents-transcript-attachment",
+        "point": "agents:transcript-attachment",
+        "label": "Acme file",
+        "remote": "transcriptAttachment",
+        "matches": [
+          "application/vnd.acme+json"
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### `agents:artifact`
+
+A view of an artifact an agent made, keyed by media type.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "agents-artifact",
+        "point": "agents:artifact",
+        "label": "Acme artifact",
+        "remote": "artifact",
+        "matches": [
+          "application/vnd.acme+json"
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### `agents:composer-actions`
+
+Controls beside an agent composer.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "agents-composer-actions",
+        "point": "agents:composer-actions",
+        "label": "Acme snippets",
+        "remote": "composerActions"
+      }
+    ]
+  }
+}
+```
+
+#### `agents:session-header`
+
+A section in an agent session's header.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "agents-session-header",
+        "point": "agents:session-header",
+        "label": "Acme budget",
+        "remote": "sessionHeader"
+      }
+    ]
+  }
+}
+```
+
+#### `agents:request-card`
+
+A section on the card for a request an agent is blocked on.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "agents-request-card",
+        "point": "agents:request-card",
+        "label": "Acme policy",
+        "remote": "requestCard"
+      }
+    ]
+  }
+}
+```
+
+### Points `git` opens
+
+#### `git:diff-line`
+
+Marks on lines of a task's diff.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "git-diff-line",
+        "point": "git:diff-line",
+        "label": "Acme coverage",
+        "items": "/v1/p/acme/marks/diff"
+      }
+    ]
+  }
+}
+```
+
+#### `git:push-actions`
+
+Controls beside the Git pane's push.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "git-push-actions",
+        "point": "git:push-actions",
+        "label": "Acme deploy",
+        "remote": "pushActions"
+      }
+    ]
+  }
+}
+```
+
+### Points `context` opens
+
+#### `context:section`
+
+A section in the task context view, keyed by section ID. Its props carry callbacks a loaded tree can't receive, so only a compiled plugin can fill it. The entry below is the shape, and a loaded plugin's tree gets no callbacks from it.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "context-section",
+        "point": "context:section",
+        "label": "Acme context",
+        "remote": "contextSection",
+        "matches": [
+          "acme"
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Points `docker` opens
+
+#### `docker:stats-beside`
+
+A section beside a container's stats.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "docker-stats-beside",
+        "point": "docker:stats-beside",
+        "label": "Acme health",
+        "remote": "containerHealth"
+      }
+    ]
+  }
+}
+```
+
+#### `docker:container`
+
+Marks on a container row.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "docker-container",
+        "point": "docker:container",
+        "label": "Acme container state",
+        "items": "/v1/p/acme/marks/containers"
+      }
+    ]
+  }
+}
+```
+
+### Points `editor` opens
+
+#### `editor:document`
+
+A view of a file in Editor, keyed by the file's lowercased name.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "editor-document",
+        "point": "editor:document",
+        "label": "Acme file view",
+        "remote": "documentView",
+        "matches": [
+          "*.acme"
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### `editor:file`
+
+Marks on a file in Editor's file tree.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "editor-file",
+        "point": "editor:file",
+        "label": "Acme file state",
+        "items": "/v1/p/acme/marks/files"
+      }
+    ]
+  }
+}
+```
+
+#### `editor:line`
+
+Text after a line in Editor, with a tooltip.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "editor-line",
+        "point": "editor:line",
+        "label": "Acme blame",
+        "items": "/v1/p/acme/marks/lines"
+      }
+    ]
+  }
+}
+```
+
+### Points `github` opens
+
+#### `github:diff-line`
+
+Marks on lines of a pull request's diff.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "github-diff-line",
+        "point": "github:diff-line",
+        "label": "Acme review marks",
+        "items": "/v1/p/acme/marks/pull-diff"
+      }
+    ]
+  }
+}
+```
+
+#### `github:summary-badges`
+
+Badges beside a pull request's state.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "github-summary-badges",
+        "point": "github:summary-badges",
+        "label": "Acme checks",
+        "remote": "summaryBadges"
+      }
+    ]
+  }
+}
+```
+
+### Points `preview` opens
+
+#### `preview:toolbar-actions`
+
+Controls in the Preview pane's toolbar. A tree may ask the owner to `reload`.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "preview-toolbar-actions",
+        "point": "preview:toolbar-actions",
+        "label": "Acme reload",
+        "remote": "previewTools"
+      }
+    ]
+  }
+}
+```
+
+### Points `terminal` opens
+
+#### `terminal:toolbar-actions`
+
+Controls in the Terminal pane's toolbar. A tree may ask the owner to `interrupt`.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "terminal-toolbar-actions",
+        "point": "terminal:toolbar-actions",
+        "label": "Acme interrupt",
+        "remote": "terminalTools"
+      }
+    ]
+  }
+}
+```
+
+### Points `workflows` opens
+
+#### `workflows:step-body`
+
+The body of a workflow step's result, keyed by the step's kind.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "workflows-step-body",
+        "point": "workflows:step-body",
+        "label": "Acme step result",
+        "remote": "stepBody",
+        "matches": [
+          "acme:report"
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Points `linear` opens
+
+#### `linear:issue-summary`
+
+A section above a Linear issue's detail.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "linear-issue-summary",
+        "point": "linear:issue-summary",
+        "label": "Acme issue links",
+        "remote": "issueSummary"
+      }
+    ]
+  }
+}
+```
+
+### Points `rollbar` opens
+
+#### `rollbar:item-summary`
+
+A section above a Rollbar item's detail.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "rollbar-item-summary",
+        "point": "rollbar:item-summary",
+        "label": "Acme item links",
+        "remote": "itemSummary"
+      }
+    ]
+  }
+}
+```
+
+## Mistakes
+
+- A `point` that isn't `<owner>:<point>` is refused when the manifest loads.
+- Name exactly one of `items`, `remote`, `frame`, and `route`. Which one fits depends on the point.
+- A tree reads its own data through your own routes, and only gets the props listed above. It can't read
+  the owner's data.

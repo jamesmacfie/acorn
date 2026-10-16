@@ -1,0 +1,100 @@
+{
+  "meta": {
+    "title": "Ready to merge",
+    "caption": "A reviewed pull request, its merge, and the archive that follows.",
+    "terminal": {
+      "columns": 60,
+      "rows": 3
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Badge",
+                  "props": {
+                    "tone": "ok"
+                  },
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "checks passed"
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "n5",
+                  "type": "Badge",
+                  "props": {
+                    "tone": "accent"
+                  },
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "approved"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n7",
+              "type": "Inline",
+              "props": {
+                "gap": "inline"
+              },
+              "children": [
+                {
+                  "id": "n8",
+                  "type": "Button",
+                  "props": {
+                    "variant": "solid",
+                    "tone": "accent",
+                    "label": "Squash and merge"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n9",
+                  "type": "Button",
+                  "props": {
+                    "variant": "outline",
+                    "label": "Archive task"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

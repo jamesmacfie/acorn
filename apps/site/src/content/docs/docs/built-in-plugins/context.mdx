@@ -1,0 +1,76 @@
+---
+title: Context
+description: The Context pane, where you choose what a task tells its agents, see how big it is, and send it to a session.
+sources:
+  - docs/agent-tools/context-sections.md
+  - plugins/context/src/client/index.ts
+  - plugins/context/src/client/ContextPane.tsx
+  - plugins/context/src/client/agentContextContribution.ts
+  - plugins/context/src/client/selectionStore.ts
+checked: 68d4f3b5a
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+import Snapshot from '../../../../components/Snapshot.astro'
+
+The Context plugin adds the Context pane: the task's pull request, linked issues, notes, and task script
+results, gathered into what an agent gets about its task. You choose the sections, see the size, and send
+it to a running session.
+
+<Snapshot id="context" />
+
+<PluginFacts id="context">
+  <Fragment slot="adds">The **Context** pane, the **Open the Context pane** command, and **Task context** in the agent's **Context** picker.</Fragment>
+  <Fragment slot="needs">Nothing.</Fragment>
+  <Fragment slot="reach">What the Node already holds for the task. It runs in your client and adds nothing on the Node.</Fragment>
+</PluginFacts>
+
+## Set it up
+
+There's nothing to set up.
+
+<Steps>
+
+1. Open a task, and click **Context** in the pane switcher, or press ⇧⌘X.
+
+   <Checkpoint>The pane lists the task's sections, each with its size, and **What the agent gets** at the bottom.</Checkpoint>
+
+</Steps>
+
+## Use it
+
+[Task context](/docs/using/task-context/) covers the pane in full:
+
+- [Choose and preview](/docs/using/task-context/#choose-and-preview) the sections, and read the exact
+  text an agent gets.
+- [Send it to a session](/docs/using/task-context/#send-it-to-a-session) that's already running.
+
+Your section choices are saved on this device, per task.
+
+## From the command palette
+
+**Open the Context pane** opens it on the current task.
+
+## For agents
+
+A new managed session gets the task's context with its first message. To add it to a message yourself,
+open **Context** below the agent's message box and choose **Task context**. Plugins can add their own
+sections, and other plugins can add a summary under a section.
+
+## Settings
+
+The Context plugin has no settings.
+
+## In the terminal
+
+The terminal client draws the same pane, with the same boxes, sizes, preview, and **Send context**.
+
+## Limits
+
+- The whole bundle is capped at 512 KiB, and each section has its own share of that.
+- An agent sees the context as it was when it was sent, until the next send.
+- Section choices are per device, and an agent that another agent starts doesn't use them.
+- It runs in your client, so it doesn't appear under **Settings** > **Plugins** > **Installed**, and it
+  can't be turned off.

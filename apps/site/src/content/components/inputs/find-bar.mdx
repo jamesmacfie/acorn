@@ -1,0 +1,27 @@
+---
+title: FindBar
+description: A find field with a match count and next and previous controls.
+sources:
+  - packages/client-core/src/kit/components/inputs/FindBar.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `FindBar` to step through matches in what a pane shows. It draws the query and the count, such as `3/12`.
+
+<Specimen id="find-bar" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="find-bar" />
+
+## Related
+
+- [`FilterBar`](/docs/components/grouping/filter-bar/), for a filter that hides what doesn't match.
+- [`Log`](/docs/components/content/log/), which draws its own find.
+
+## Mistakes
+
+- Expecting a tree's find bar to search. Its query and next and previous handlers aren't among the twelve events, so a tree can draw it and can't hear it.

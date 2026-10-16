@@ -1,0 +1,7 @@
+{"columns":60,"rows":5,"lines":[
+[{"text":"┌─Delete fix-login-redirect?───────────────────────────────┐"}],
+[{"text":"│ The branch has two commits that aren't on main.          │"}],
+[{"text":"│                                                          │"}],
+[{"text":"│                                        "},{"text":"[Cancel]","fg":"accent","attrs":["bold"]},{"text":" "},{"text":"[Delete]","fg":"danger"},{"text":" │"}],
+[{"text":"└──────────────────────────────────────────────────────────┘"}]
+]}

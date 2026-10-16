@@ -1,0 +1,113 @@
+---
+title: contentLinks
+description: "Links in acorn that open your pane, reference panel, or overlay."
+sources:
+  - docs/contribution-kinds.md
+  - docs/plugins/client-half.md
+  - docs/first-party-plugins/terminal.md
+checked: '498833615'
+---
+
+A content link claims URLs. When one appears in acorn, such as in a transcript or a task's notes, a
+click opens your pane, your reference panel, or your overlay on the item instead of a browser tab. `match`
+is a pattern over the address, and `item` is the part of it that names the item.
+
+## A minimal example
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "issue",
+        "label": "Issue",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "issue"
+          }
+        }
+      }
+    ],
+    "contentLinks": [
+      {
+        "id": "issue-link",
+        "match": "https://acme.example/{team}/issue/{id}",
+        "item": "id",
+        "openPane": "issue"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "issue",
+        "label": "Issue",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "issue"
+          }
+        }
+      },
+      {
+        "target": "refPanel",
+        "id": "issue-panel",
+        "label": "Issue",
+        "providerId": "acme",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "issuePanel"
+          }
+        }
+      }
+    ],
+    "contentLinks": [
+      {
+        "id": "issue-link",
+        "match": "https://acme.example/{team}/issue/{id}",
+        "item": "id",
+        "openPane": "issue",
+        "presentations": [
+          "refPanel",
+          "pane",
+          "external"
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+In the terminal client, a content link resolves to your pane or reference panel and stops there.
+There's no browser tab to fall back to.
+
+## Mistakes
+
+- A `match` needs an `item` capture.
+- Patterns are `https` only, with a literal host and no query or fragment.
+
+## Guide
+
+[Add a reference panel](/docs/build-plugins/ui/add-a-reference-panel/) walks through it from start to finish.

@@ -1,0 +1,18 @@
+{
+  "meta": {
+    "title": "single",
+    "caption": "One region, body, with the pane's padding.",
+    "terminal": {
+      "columns": 50,
+      "rows": 4
+    },
+    "width": 400
+  },
+  "layout": {
+    "name": "single",
+    "label": "Deploys",
+    "regions": [
+      "body"
+    ]
+  }
+}

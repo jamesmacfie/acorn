@@ -1,0 +1,28 @@
+---
+title: Section
+description: A labeled group of content, with an optional count, help, and actions.
+sources:
+  - packages/client-core/src/kit/components/layout/Section.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Section` to group content under a label, such as the reviewers on a pull request. The label draws as an eyebrow, and `help` adds a line that explains the group.
+
+<Specimen id="section" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="section" />
+
+## Related
+
+- [`SectionHeader`](/docs/components/grouping/section-header/), for a heading line without a group around it.
+- [`Fold`](/docs/components/grouping/fold/), for a group the reader can close.
+- [`SettingsSection`](/docs/components/grouping/settings-section/), for a group on a settings page.
+
+## Mistakes
+
+- Putting the explanation in a hover tip. The terminal has no hover, so use `help`, which both hosts draw.

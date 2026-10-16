@@ -1,0 +1,29 @@
+---
+title: Tabs
+description: A tab strip that switches between panels.
+sources:
+  - packages/client-core/src/kit/components/layout/Tabs.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Tabs` for the strip and one `TabPanel` per tab. The strip sends `onChange` with the tab id, and your tree sets `active` to it.
+
+<Specimen id="tabs" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="tabs" />
+
+## Related
+
+- [`TabPanel`](/docs/components/grouping/tab-panel/), for the content under each tab.
+- [`DocumentTabs`](/docs/components/grouping/document-tabs/), for open files you can close.
+- [`SegmentedControl`](/docs/components/inputs/segmented-control/), for a choice that changes a view rather than the panel.
+
+## Mistakes
+
+- Giving `Tabs` and its `TabPanel`s different `idPrefix` values. The host links each tab to its panel by the prefix and the tab id.
+- Using an icon as the only label. The terminal draws the text label and drops the icon.

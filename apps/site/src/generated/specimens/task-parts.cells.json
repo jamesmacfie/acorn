@@ -1,0 +1,6 @@
+{"columns":60,"rows":4,"lines":[
+[{"text":" ","fg":"accent"},{"text":"  Task                     "},{"text":"One piece of work on one project","fg":"muted"}],
+[{"text":"  "},{"text":" ","fg":"accent"},{"text":"  Branch and worktree           "},{"text":"Its own copy of the files","fg":"muted"}],
+[{"text":"  "},{"text":" ","fg":"accent"},{"text":"  Agents and terminals            "},{"text":"Running in the worktree","fg":"muted"}],
+[{"text":"  "},{"text":" ","fg":"accent"},{"text":"  Panes                           "},{"text":"Changes, Notes, Editor…","fg":"muted"}]
+]}

@@ -1,0 +1,157 @@
+---
+title: routes
+description: "App addresses that open one of your project panes on an item."
+sources:
+  - docs/contribution-kinds.md
+  - docs/panes.md
+  - docs/tui/sources-and-settings.md
+checked: '498833615'
+---
+
+A route gives one of your project panes an address in acorn, such as
+`/p/:projectId/x/acme/issue/:issueId`. A project pane has no other address, so every project pane needs
+one. Your rail source's `navigate` and your palette searches go there.
+
+## A minimal example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "scope": "project",
+        "id": "issue",
+        "label": "Issue",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "issue"
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "id": "issue-route",
+        "path": "/p/:projectId/x/acme/issue/:issueId",
+        "surface": "issue",
+        "item": "issueId"
+      }
+    ],
+    "sources": [
+      {
+        "id": "issues",
+        "label": "Issues",
+        "order": 300,
+        "items": "/v1/p/acme/issues",
+        "onSelect": {
+          "verb": "navigate",
+          "surface": "issue"
+        }
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "scope": "project",
+        "id": "issue",
+        "label": "Issue",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "issue"
+          }
+        }
+      },
+      {
+        "target": "pane",
+        "scope": "project",
+        "id": "issue-new",
+        "label": "New issue",
+        "layout": "single",
+        "regions": {
+          "body": {
+            "kind": "remote",
+            "entry": "newIssue"
+          }
+        }
+      }
+    ],
+    "routes": [
+      {
+        "id": "issue-new-route",
+        "path": "/p/:projectId/x/acme/issue/new/:draft",
+        "surface": "issue-new",
+        "item": "draft",
+        "order": 100
+      },
+      {
+        "id": "issue-route",
+        "path": "/p/:projectId/x/acme/issue/:issueId",
+        "surface": "issue",
+        "item": "issueId",
+        "order": 200
+      }
+    ],
+    "sources": [
+      {
+        "id": "issues",
+        "label": "Issues",
+        "order": 300,
+        "items": "/v1/p/acme/issues",
+        "onSelect": {
+          "verb": "navigate",
+          "surface": "issue"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "id": "draft",
+        "kind": "search",
+        "title": "Draft an issue",
+        "scope": "project",
+        "route": "/v1/p/acme/drafts",
+        "onSelect": {
+          "verb": "navigate",
+          "surface": "issue-new"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+The terminal client opens a project pane in its main area, beside the source's list in Browse.
+
+## Mistakes
+
+- `path` must be inside `/p/:projectId/x/<id>/`.
+- `item` must be a `:param` in `path`, and never `projectId`.
+- Put a fixed path before a `:param` path that would also match it, with `order`.
+
+## Guide
+
+[Add a source to the left rail](/docs/build-plugins/ui/add-a-source-to-the-left-rail/) walks through it from start to finish.

@@ -1,0 +1,18 @@
+---
+// The 404 page: what happened, the search box, and the ways back.
+import Page from './_Page.astro'
+import { wireframe } from './_nav'
+---
+
+<Page title="Page not found">
+  <main class="wrap section" style="border-top: 0">
+    <h1>Page not found</h1>
+    <p>There's no page at this address. Search the docs, or start from one of these.</p>
+    <a class="box search" style="inline-size: min(480px, 100%)" href={wireframe('search')}>Search the docs ⌘K</a>
+    <div class="row">
+      <a class="button primary" href={wireframe('docs-home')}>Docs home</a>
+      <a class="button" href={wireframe('tutorial')}>Build plugins</a>
+      <a class="button" href={wireframe('landing')}>acorn home</a>
+    </div>
+  </main>
+</Page>

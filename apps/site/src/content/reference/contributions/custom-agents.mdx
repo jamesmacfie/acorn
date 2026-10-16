@@ -1,0 +1,67 @@
+---
+title: customAgents
+description: "Saved agents a person can start: a harness, its options, and instructions."
+sources:
+  - docs/plugin-authoring/custom-agents.md
+  - docs/managed-agents/custom-agents.md
+checked: '498833615'
+---
+
+A custom agent is a saved way to start a session: a harness, the options it starts with, instructions
+for its system prompt, and the most it may do with acorn's own tools. It's data, so it needs no
+permission. The trust prompt shows the instructions in full, and a version that changes them asks again.
+
+## A minimal example
+
+```json manifest
+{
+  "contributions": {
+    "customAgents": [
+      {
+        "id": "reviewer",
+        "name": "Reviewer",
+        "harness": "claude"
+      }
+    ]
+  }
+}
+```
+
+## A fuller example
+
+```json manifest
+{
+  "contributions": {
+    "customAgents": [
+      {
+        "id": "reviewer",
+        "name": "Reviewer",
+        "glyph": "eye",
+        "description": "Reviews a diff and doesn't change files.",
+        "harness": "claude",
+        "options": {
+          "model": "opus"
+        },
+        "instructions": "Review the task's diff. Report problems. Don't edit files.",
+        "maxToolRisk": "read"
+      }
+    ]
+  }
+}
+```
+
+## Fields
+
+{/* facts */}
+
+## In the terminal
+
+Custom agents start the same way in the terminal client.
+
+## Mistakes
+
+- An option the harness doesn't offer is dropped when the session starts, with a line in the transcript.
+
+## Guide
+
+[Ship custom agents and skills](/docs/build-plugins/node/ship-custom-agents-and-skills/) walks through it from start to finish.

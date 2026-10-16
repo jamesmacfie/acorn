@@ -1,0 +1,106 @@
+{
+  "meta": {
+    "title": "DiffLine and NonCodeRow",
+    "caption": "A hunk header, then an unchanged line, a removed one, and an added one.",
+    "terminal": {
+      "columns": 60,
+      "rows": 4
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "none"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "NonCodeRow",
+              "props": {
+                "row": {
+                  "kind": "hunk",
+                  "text": "@@ -1,3 +1,3 @@"
+                }
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "DiffLine",
+              "props": {
+                "r": {
+                  "kind": "normal",
+                  "path": "src/login.ts",
+                  "oldNo": 1,
+                  "newNo": 1,
+                  "raw": "import { session } from \"./session\"",
+                  "toks": [
+                    {
+                      "content": "import { session } from \"./session\"",
+                      "light": "",
+                      "dark": ""
+                    }
+                  ]
+                },
+                "canAdd": false
+              },
+              "children": []
+            },
+            {
+              "id": "n4",
+              "type": "DiffLine",
+              "props": {
+                "r": {
+                  "kind": "delete",
+                  "path": "src/login.ts",
+                  "oldNo": 2,
+                  "newNo": null,
+                  "raw": "const next = \"/\"",
+                  "toks": [
+                    {
+                      "content": "const next = \"/\"",
+                      "light": "",
+                      "dark": ""
+                    }
+                  ]
+                },
+                "canAdd": false
+              },
+              "children": []
+            },
+            {
+              "id": "n5",
+              "type": "DiffLine",
+              "props": {
+                "r": {
+                  "kind": "insert",
+                  "path": "src/login.ts",
+                  "oldNo": null,
+                  "newNo": 2,
+                  "raw": "const next = params.get(\"next\") ?? \"/\"",
+                  "toks": [
+                    {
+                      "content": "const next = params.get(\"next\") ?? \"/\"",
+                      "light": "",
+                      "dark": ""
+                    }
+                  ]
+                },
+                "canAdd": false
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

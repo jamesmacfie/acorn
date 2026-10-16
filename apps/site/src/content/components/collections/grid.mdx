@@ -1,0 +1,26 @@
+---
+title: Grid
+description: A table from data, for many rows, with one row selected.
+sources:
+  - packages/client-core/src/kit/components/layout/Grid.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Grid` for many rows of strings, such as query results. Pass `columns` and `rows`, and it scrolls only what shows. The arrow keys move `selected`, and it sends `onSelect` with the row's index.
+
+<Specimen id="grid" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="grid" />
+
+## Related
+
+- [`Table`](/docs/components/collections/table/), for a short table you build row by row.
+
+## Mistakes
+
+- Building a `Table` for thousands of rows. A `Grid` draws only the rows on screen.

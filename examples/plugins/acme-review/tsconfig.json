@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2023", "module": "ESNext", "moduleResolution": "bundler", "lib": ["ES2023", "DOM"],
+    "jsx": "preserve", "jsxImportSource": "solid-js", "types": ["node"],
+    "allowJs": true, "checkJs": true, "strict": true, "noEmit": true
+  },
+  "include": ["src", "node.js"]
+}

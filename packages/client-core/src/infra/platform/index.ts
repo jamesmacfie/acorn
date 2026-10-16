@@ -165,6 +165,20 @@ export type Notify = {
 // schedules). A page answers from its own `document`, so only a host without one installs this.
 type HostVisibility = { hidden(): boolean; onChange(cb: () => void): () => void }
 
+// The browser's return trip from an MCP server's sign-in page (docs/mcp/sign-in.md).
+// The browser runs on this machine and the node may not, so the client listens for it here. Only a
+// host that can open a loopback port has the group: both shells can, a page cannot. Without it, the
+// person pastes the address the browser landed on.
+export type OauthCallback = {
+  /** Opens a one-request listener on 127.0.0.1 and an unguessable path. */
+  listen(): Promise<{
+    redirectUri: string
+    /** The query string the browser arrived with. Rejects on timeout or close. */
+    result: Promise<URLSearchParams>
+    close(): void
+  }>
+}
+
 // The two actions the node recovery screen offers. Neither is expressible in the renderer: one reveals
 // a path in the file manager, the other bypasses the will-quit prompt, whose handler lives in a shell
 // that is not mounted behind the gate.
@@ -333,6 +347,7 @@ type AcornPreload = {
   plugins?: PluginCustody
   config?: DeviceConfigBridge
   recovery?: RecoveryActions
+  oauthCallback?: OauthCallback
   folderPath?: FolderPicker
   files?: FileDialogs
   notify?: Notify
@@ -439,6 +454,7 @@ export const desktopExtras = (): DesktopExtras | null => {
   return { onClosePane, onCommandPalette, onWillQuit, openConfigFile }
 }
 export const recoveryActions = (): RecoveryActions | null => acornGlobal()?.recovery ?? null
+export const oauthCallback = (): OauthCallback | null => acornGlobal()?.oauthCallback ?? null
 export const previewViews = (): PreviewViews | null => acornGlobal()?.preview ?? null
 export const pluginWebviews = (): PluginWebviews | null => acornGlobal()?.webview ?? null
 

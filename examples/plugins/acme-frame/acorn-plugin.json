@@ -1,0 +1,53 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acme-frame",
+  "name": "Acme frame",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "5",
+  "node": "./node/index.js",
+  "client": "./client.js",
+  "permissions": {
+    "api": [],
+    "events": [],
+    "node": { "core": [], "capabilities": [], "secrets": false, "exec": false, "net": [] }
+  },
+  "contributions": {
+    "frames": [
+      {
+        "target": "pane",
+        "id": "acme-frame",
+        "label": "Deploy chart",
+        "glyph": "chart-line",
+        "order": 830,
+        "layout": "single",
+        "regions": { "body": "frame" },
+        "claimsKeys": ["meta+shift+r"]
+      },
+      {
+        "target": "webview",
+        "id": "acme-frame-docs",
+        "label": "Acme docs",
+        "glyph": "book-open",
+        "url": "https://docs.acme.example/",
+        "hosts": ["docs.acme.example"]
+      }
+    ],
+    "commands": [
+      {
+        "id": "open",
+        "kind": "action",
+        "title": "Open the deploy chart",
+        "category": "pane",
+        "action": { "verb": "openPane", "pane": "acme-frame" }
+      },
+      {
+        "id": "docs",
+        "kind": "action",
+        "title": "Open the Acme docs",
+        "category": "pane",
+        "action": { "verb": "openPane", "pane": "acme-frame-docs" }
+      }
+    ]
+  }
+}

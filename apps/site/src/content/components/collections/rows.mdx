@@ -1,0 +1,28 @@
+---
+title: Rows
+description: A list the host keeps selection and scroll for. A tree can't draw one.
+sources:
+  - packages/client-core/src/kit/components/layout/Rows.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`Rows` takes its items and a render function that draws each one. A function can't cross from a tree, so a tree draws its list as `Row` nodes in a `ListColumn`, as the picture shows.
+
+<Specimen id="row" caption="A tree draws a list as Row nodes in a ListColumn." />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="row" />
+
+## Related
+
+- [`Row`](/docs/components/collections/row/), for each item a tree draws.
+- [`ListColumn`](/docs/components/grouping/list-column/), for the column around them.
+- [`Grid`](/docs/components/collections/grid/), for a long table of rows.
+
+## Mistakes
+
+- Sending `Rows` with `Row` children. The host draws the first child for every item.

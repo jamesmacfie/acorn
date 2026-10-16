@@ -1,0 +1,26 @@
+---
+title: IconButton
+description: A button whose face is an icon, named by a required label.
+sources:
+  - packages/client-core/src/kit/components/inputs/IconButton.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `IconButton` for a small action marked by an icon, such as refresh. `label` names it, and the terminal draws the label because it has no icons.
+
+<Specimen id="icon-buttons" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="icon-buttons" />
+
+## Related
+
+- [`Button`](/docs/components/inputs/button/), for a button with words.
+
+## Mistakes
+
+- Writing a vague label such as "Icon". The terminal draws the label as the button, so write the action.

@@ -17,6 +17,8 @@ import { processIsAlive, readJson, runningManifest } from './state.mjs'
 //   check NAME           toggle the checkbox named NAME
 //   eval EXPRESSION      evaluate EXPRESSION in the sidebar and print the result
 //   pairing-code         ask the session's own Node for a fresh pairing code
+//   panel URL            open URL in a tab and the panel beside it, as a toolbar click does (Chrome);
+//                        the other verbs then act on the panel
 //   stop                 stop the session
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--')
@@ -158,6 +160,50 @@ async function pairingCode(manifest) {
   throw new Error('The Node printed no pairing code. See logs/node.log.')
 }
 
+// The toolbar click, through CDP's browser-level `Extensions.triggerAction`
+// (docs/local-development/extension-dev-loop.md § Check page capture). A sidebar tab would take the
+// other verbs from the panel, so any is closed first.
+async function openPanel(manifest, url) {
+  if (manifest.browser !== 'chrome') throw new Error('panel needs a Chrome session.')
+  const endpoint = manifest.automation.endpoint
+  for (const target of await (await fetch(`${endpoint}/json/list`)).json()) {
+    if (target.url.startsWith(manifest.extension.sidebarUrl)) await fetch(`${endpoint}/json/close/${target.id}`)
+  }
+  await fetch(`${endpoint}/json/new?${encodeURI(url)}`, { method: 'PUT' })
+  const socket = new WebSocket((await (await fetch(`${endpoint}/json/version`)).json()).webSocketDebuggerUrl)
+  await new Promise((resolve, reject) => {
+    socket.onopen = resolve
+    socket.onerror = () => reject(new Error('Could not reach Chrome.'))
+  })
+  let next = 0
+  const send = (method, params) =>
+    new Promise((resolve, reject) => {
+      const id = ++next
+      socket.onmessage = (event) => {
+        const reply = JSON.parse(event.data)
+        if (reply.id !== id) return
+        if (reply.error) reject(new Error(`${method}: ${reply.error.message}`))
+        else resolve(reply.result)
+      }
+      socket.send(JSON.stringify({ id, method, params }))
+    })
+  try {
+    const deadline = Date.now() + 10_000
+    let tab
+    while (!tab && Date.now() < deadline) {
+      const { targetInfos } = await send('Target.getTargets', { filter: [{}] })
+      tab = targetInfos.find((target) => target.type === 'tab' && target.url === url)
+      if (!tab) await new Promise((resolve) => setTimeout(resolve, 200))
+    }
+    if (!tab) throw new Error(`The tab never opened ${url}.`)
+    const id = new URL(manifest.extension.origin).host
+    await send('Extensions.triggerAction', { id, targetId: tab.targetId })
+    return 'opened'
+  } finally {
+    socket.close()
+  }
+}
+
 async function stopSession(manifest) {
   process.kill(manifest.launcherPid, 'SIGTERM')
   const deadline = Date.now() + 60_000
@@ -168,10 +214,11 @@ async function stopSession(manifest) {
 }
 
 async function main() {
-  if (!verb) throw new Error('Pass a verb: open, text, click, fill, check, eval, pairing-code, or stop.')
+  if (!verb) throw new Error('Pass a verb: open, text, click, fill, check, eval, pairing-code, panel, or stop.')
   const manifest = await runningManifest(sessionName)
   if (verb === 'stop') return stopSession(manifest)
   if (verb === 'pairing-code') return pairingCode(manifest)
+  if (verb === 'panel') return openPanel(manifest, rest[0])
   if (verb !== 'open' && !actions[verb]) throw new Error(`Unknown verb ${verb}.`)
   const sidebar = await (manifest.browser === 'chrome' ? chromeSidebar : firefoxSidebar)(manifest, verb === 'open')
   try {

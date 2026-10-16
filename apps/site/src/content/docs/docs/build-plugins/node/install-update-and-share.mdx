@@ -1,0 +1,123 @@
+---
+title: Install, update, and share
+description: Install your plugin from a folder, a GitHub release, npm, or a tarball, on a Node or on one device, ship updates the person approves, and say which acorn it works with.
+sources:
+  - docs/plugin-authoring/installing-a-hand-written-package.md
+  - docs/plugins/publishing.md
+  - docs/plugins/distribution.md
+  - docs/security/plugin-install.md
+  - docs/security/plugin-bundles.md
+  - packages/protocol/src/plugin/source.ts
+  - packages/client-core/src/features/settings/plugins/InstallPlugin.tsx
+  - examples/plugins/acme-data/acorn-plugin.json
+checked: f7af12472
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Snapshot from '../../../../../components/Snapshot.astro'
+
+You'll get your plugin onto someone else's acorn: package it, pick where it's installed from, and ship
+new versions they approve before they run.
+
+## The result
+
+The person opens **Settings** > **Plugins** > **Installed** > **Install…**, picks a **Source**, types
+where it is into **Package**, and clicks **Install**. A plugin with a client bundle, skills, or a derived
+source's inputs then waits for the trust prompt, which lists what it asks for. One with none of those
+runs at once. Either way, its page lists its grants:
+
+<Snapshot id="permissions" />
+
+## Before you start
+
+Have a plugin that works installed from its folder on your own Node
+([Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/)).
+
+## Where a plugin installs from
+
+| Source | **Package** takes | The Node fetches |
+| --- | --- | --- |
+| **Local folder** | `/absolute/path/to/the/plugin` | Nothing. It links the folder, so edits take effect on the next load |
+| **GitHub release** | `owner/repo`, or `owner/repo@v1.2.0` | The release's `acorn-plugin.tgz` asset, from the latest release or the tag |
+| **npm package** | `package-name`, or `package-name@1.2.0` | The version's tarball from the npm registry, checked against its published integrity |
+| **Tarball URL** | `https://example.com/acorn-plugin.tgz` | That file, over `https` |
+
+**Install on** picks the Node or **This device**. A plugin on one device has no Node half: it draws on
+that device only, from a client bundle, and its manifest may not ask for anything a Node does.
+
+A folder is the one source acorn can't pin, because its files keep changing. Point acorn at a folder only
+you can write.
+
+## Steps
+
+<Steps>
+
+1. **Say which acorn it works with.** `apiVersion` is the plugin API's major version, or a range of
+   them: `"5"`, `"4 || 5"`, or `"4-5"`. A Node that speaks none of them refuses the install.
+
+   <ExampleCode file="acme-data/acorn-plugin.json" pick={['version', 'apiVersion']} />
+
+2. **Package it.** Put `acorn-plugin.json` at the top of a gzipped tar, or inside one folder in it, as
+   `tar -czf` of the plugin's folder or `npm pack` writes. Include everything the manifest names, built:
+   a Node half that imports a package needs it bundled into your own files first.
+
+3. **Publish it.** Attach the tarball to a GitHub release as `acorn-plugin.tgz`, or `npm publish` it,
+   or host it anywhere on `https`. There's no registry and no review: each person decides.
+
+4. **Ship an update.** Raise `version`, and append a migration rather than editing one. The person
+   clicks **Update** on the plugin's **Versions** tab, which gets the newest version from where it was
+   installed, and approves it before it runs. A new version is new bytes, so each device asks again,
+   leading with what it gained. acorn never updates a plugin on its own.
+
+</Steps>
+
+## What the person approves
+
+- **Installing** puts the plugin on the Node, after the person reads what it asks for. It's audited.
+- **Each device** asks before it runs the plugin's client code the first time, and again for every new
+  version. It hashes the bytes it received, and its answer is for those bytes only.
+- **An agent** can ask for an install with `plugin_request`, but never install. The person approves the
+  request, then the manifest the Node read back, before anything runs.
+- **Development mode**, on the plugin's page, trusts new versions from that one Node without asking,
+  for the plugin you're working on.
+
+## Mistakes
+
+- Changing `id` between versions. It's a different plugin to acorn, with an empty database.
+- A lower `version` in an update. The Node refuses a downgrade unless the person asks for one, and a
+  downgrade never undoes a migration.
+- A bare import in the Node half, such as `drizzle-orm`, that resolved from a parent `node_modules`
+  on your machine. It fails on everyone else's.
+- Claiming an `apiVersion` you haven't tested. A range doesn't make an older major compatible.
+
+`apiVersion` is a major version or a range, not a semver range:
+
+```json manifest-invalid title="Wrong: acorn-plugin.json"
+{
+  "apiVersion": "^5.0.0"
+}
+```
+
+```json manifest title="Right: acorn-plugin.json"
+{
+  "apiVersion": "4 || 5"
+}
+```
+
+## In the terminal
+
+The terminal client runs a plugin installed on its Node, and asks about its client code in its own
+prompt. Installing opens the desktop app's **Settings**.
+
+## Limits
+
+- A package is at most 32 MiB.
+- Uninstalling keeps the plugin's data unless the person picks **Uninstall and delete its data**.
+- A plugin compiled into acorn isn't installed this way. It ships with the app.
+
+## Reference
+
+[Compatibility and versions](/docs/build-plugins/reference/compatibility-and-versions/) has
+`apiVersion` and `requires`. [Plugin trust and permissions](/docs/security/plugin-trust-and-permissions/)
+is what the person reads before they install.

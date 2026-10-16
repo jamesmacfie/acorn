@@ -1,0 +1,98 @@
+---
+title: Use the SDK and JSX
+description: Write your client in JSX with acorn-plugin-sdk, and bundle it into the one file acorn runs.
+sources:
+  - docs/plugin-authoring/the-bridge.md
+  - docs/plugin-authoring/the-client-half.md
+  - docs/plugin-authoring/extension-example.md
+  - docs/plugin-authoring/installing-a-hand-written-package.md
+  - packages/plugin-sdk/README.md
+  - examples/plugins/acme-review/package.json
+  - examples/plugins/acme-review/vite.config.ts
+  - examples/plugins/acme-review/src/client.tsx
+checked: dfb0bd69b
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import ExampleCode from '../../../../../components/ExampleCode.astro'
+import Specimen from '../../../../../components/Specimen.astro'
+
+You'll write your client in JSX with `acorn-plugin-sdk`, and bundle it into one `client.js`. The
+scaffold's hand-written `client.js` is fine for a pane or two. The SDK is for when the plumbing gets in
+the way: reactive state, many trees, abort signals, and types.
+
+## The result
+
+The Acme review example's pane, written as a Solid component:
+
+<Specimen id="acme-review-pane" />
+
+## Before you start
+
+Finish [Build your first plugin](/docs/build-plugins/start/build-your-first-plugin/). You need npm and
+a bundler; the example uses Vite. The code is from
+[`examples/plugins/acme-review`](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-review).
+
+## Steps
+
+<Steps>
+
+1. **Install the packages.** `acorn-plugin-sdk` is the bridge and the components. `acorn-plugin-types`
+   types your Node half. `solid-js`, `vite`, and `vite-plugin-solid` build the client.
+
+   <ExampleCode file="acme-review/package.json" />
+
+   Neither acorn package is on npm yet, so the example installs them from tarballs packed from an
+   acorn checkout: `pnpm --filter acorn-plugin-sdk pack` and `pnpm --filter acorn-plugin-types pack`.
+
+2. **Compile JSX into acorn's tree.** Solid's universal renderer, pointed at
+   `acorn-plugin-sdk/remote`, turns components into the tree acorn draws instead of DOM. Build one file
+   with everything inlined.
+
+   <ExampleCode file="acme-review/vite.config.ts" />
+
+3. **Write the trees.** Import the components from `acorn-plugin-sdk/remote`. `solidTree` gives each
+   component the props the host passes, plus `bridge`, to reach your routes, and `host`, to ask an
+   owner for an action. `mountTree` offers each tree under the entry name your manifest uses.
+
+   <ExampleCode file="acme-review/src/client.tsx" region="pane" />
+
+   <ExampleCode file="acme-review/src/client.tsx" region="entries" />
+
+4. **Point the manifest at the bundle.** `client` is the built file:
+   `"client": "./dist/client.js"`.
+
+5. **Build and check it.** Run `npm run build`, then reload the plugin. `npm run check` type-checks the
+   trees and the Node half.
+
+</Steps>
+
+## Why the client must be one file
+
+acorn serves your client from an origin named by the hash of its bytes, and that origin serves exactly
+one script. A second module, a stylesheet, or an image can't be fetched, and the worker has no network
+to fetch it from. So the hash covers everything your client runs, and the trust prompt covers the hash.
+Bundle Solid and the SDK into `client.js`, and inline anything else.
+
+## Mistakes
+
+- Leaving `import` or `export` in the bundle. A worker evaluates `client.js` as one script, so bundle
+  as a library with nothing external.
+- Compiling JSX for the DOM. Without `generate: 'universal'` and `moduleName`, the components try to
+  touch a document the worker doesn't have.
+- Calling `connect()` in a tree. A tree uses the `bridge` it's mounted with, which carries its task.
+
+## In the terminal
+
+The terminal client runs the same bundle in a worker and draws the same trees.
+
+## Limits
+
+- The SDK's frame helpers, such as `mountFrame`, are for a frame. A tree uses `mountTree`.
+- No bundler runs inside acorn. Build before you install, and install the built folder.
+
+## Reference
+
+- [The client bridge](/docs/build-plugins/reference/the-client-bridge/) lists every SDK export.
+- [An extension example](https://github.com/jamesmacfie/acorn/blob/main/docs/plugin-authoring/extension-example.md)
+  describes every tree in `acme-review`.

@@ -1,0 +1,146 @@
+{
+  "meta": {
+    "title": "Text",
+    "caption": "Text in each emphasis, and in the ok and danger tones.",
+    "terminal": {
+      "columns": 60,
+      "rows": 7
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Text",
+              "props": {
+                "emphasis": "eyebrow"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Pull request"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Text",
+              "props": {
+                "emphasis": "heading"
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "Fix the redirect after sign-in"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Text",
+              "props": {},
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "#text",
+                  "props": {
+                    "value": "Signing in from a deep link now returns to that link."
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n8",
+              "type": "Text",
+              "props": {
+                "emphasis": "muted"
+              },
+              "children": [
+                {
+                  "id": "n9",
+                  "type": "#text",
+                  "props": {
+                    "value": "Opened by alex 2 hours ago"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n10",
+              "type": "Text",
+              "props": {
+                "emphasis": "mono"
+              },
+              "children": [
+                {
+                  "id": "n11",
+                  "type": "#text",
+                  "props": {
+                    "value": "src/login.ts"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n12",
+              "type": "Text",
+              "props": {
+                "tone": "ok"
+              },
+              "children": [
+                {
+                  "id": "n13",
+                  "type": "#text",
+                  "props": {
+                    "value": "All checks passed"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n14",
+              "type": "Text",
+              "props": {
+                "tone": "danger"
+              },
+              "children": [
+                {
+                  "id": "n15",
+                  "type": "#text",
+                  "props": {
+                    "value": "Merge blocked"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

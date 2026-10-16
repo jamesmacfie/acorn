@@ -1,0 +1,302 @@
+/* The one wireframe stylesheet: grey boxes, one font at one size, black text. Structure only, so
+   nothing here is a design choice for phase 6 to keep. */
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font: 16px/1.5 system-ui, sans-serif;
+  color: #000;
+  background: #fff;
+}
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+dl,
+dd,
+figure,
+pre {
+  margin: 0;
+  font-size: inherit;
+}
+h1,
+h2,
+h3 {
+  font-weight: bold;
+}
+a {
+  color: inherit;
+}
+pre,
+code {
+  font: inherit;
+}
+summary {
+  cursor: pointer;
+}
+[hidden] {
+  display: none !important;
+}
+
+/* Page width and vertical rhythm. */
+.wrap {
+  max-inline-size: 1440px;
+  margin-inline: auto;
+  padding-inline: 48px;
+}
+.stack {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+.section {
+  display: grid;
+  gap: 24px;
+  padding-block: 64px;
+  border-top: 1px solid #ccc;
+}
+.cols {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(var(--min, 240px), 1fr));
+}
+/* Grid children may shrink below their content, so a wide picture can't push the page sideways. */
+.stack > *,
+.section > *,
+.cols > * {
+  min-inline-size: 0;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.spacer {
+  flex: 1;
+}
+@media (max-width: 767px) {
+  .wrap {
+    padding-inline: 16px;
+  }
+  .section {
+    padding-block: 40px;
+  }
+}
+
+/* A grey box stands in for a picture, a specimen, or a control, and says what it will be. */
+.box {
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: #e6e6e6;
+  border: 1px solid #b3b3b3;
+  text-align: center;
+}
+/* A tag names a section or marks copy as a draft. */
+.tag {
+  justify-self: start;
+  inline-size: fit-content;
+  padding-inline: 6px;
+  border: 1px dashed #000;
+}
+.card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid #000;
+  text-decoration: none;
+}
+.button {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid #000;
+  background: #fff;
+  font: inherit;
+  text-decoration: none;
+}
+.button.primary {
+  background: #000;
+  color: #fff;
+}
+.code {
+  display: grid;
+  border: 1px solid #000;
+}
+.code > :first-child {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 4px 12px;
+  border-bottom: 1px solid #000;
+}
+.code pre {
+  padding: 12px;
+  overflow-x: auto;
+  background: #f2f2f2;
+}
+.callout {
+  padding: 12px 16px;
+  border: 1px solid #000;
+  border-inline-start-width: 6px;
+}
+table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  padding: 6px 8px;
+  border: 1px solid #b3b3b3;
+  text-align: start;
+  vertical-align: top;
+}
+th {
+  background: #f2f2f2;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+ol.steps {
+  display: grid;
+  gap: 24px;
+  padding-inline-start: 24px;
+}
+
+/* The site header. Below 768 pixels the links fold into a menu. */
+.site-header {
+  border-bottom: 1px solid #000;
+}
+.site-header .wrap {
+  display: flex;
+  gap: 16px 24px;
+  white-space: nowrap;
+  align-items: center;
+  min-block-size: 56px;
+}
+.site-header nav {
+  display: flex;
+  gap: 24px;
+}
+.site-header [aria-current] {
+  font-weight: bold;
+}
+.search {
+  padding: 4px 12px;
+  inline-size: 220px;
+}
+.menu {
+  display: none;
+}
+@media (max-width: 767px) {
+  .wide-only {
+    display: none !important;
+  }
+  .menu {
+    display: block;
+  }
+  .search {
+    inline-size: auto;
+    padding-inline: 8px;
+  }
+  .site-header .wrap {
+    gap: 12px;
+  }
+  .menu[open] > div {
+    position: absolute;
+    inset-inline: 0;
+    display: grid;
+    gap: 16px;
+    padding: 16px;
+    background: #fff;
+    border-bottom: 1px solid #000;
+  }
+  .menu nav {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+/* The site footer. */
+.site-footer {
+  border-top: 1px solid #000;
+  padding-block: 48px;
+}
+.site-footer ul {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+/* Docs: sidebar, content, and table of contents above 1280 pixels. Below that the table of contents
+   folds into a menu at the top of the page, and below 1024 pixels the sidebar folds beside it. */
+.docs {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 220px;
+  gap: 40px;
+  padding-block: 32px;
+}
+.docs > nav {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.docs > nav ul,
+.fold ul {
+  display: grid;
+  gap: 4px;
+  padding-inline-start: 16px;
+  list-style: none;
+}
+.docs [aria-current] {
+  font-weight: bold;
+}
+.docs-content {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+}
+/* Text keeps a reading measure. A specimen or a table may take the content column's full width. */
+.docs-content > * {
+  max-inline-size: 70ch;
+}
+.docs-content > .breakout {
+  max-inline-size: none;
+}
+.fold {
+  display: none;
+  gap: 12px;
+  padding-block: 8px;
+  border-block: 1px solid #000;
+}
+.fold-sidebar {
+  display: none;
+}
+@media (max-width: 1279px) {
+  .docs {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+  .docs > .toc {
+    display: none;
+  }
+  .fold {
+    display: grid;
+  }
+}
+@media (max-width: 1023px) {
+  .docs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .docs > .sidebar {
+    display: none;
+  }
+  .fold-sidebar {
+    display: block;
+  }
+}
