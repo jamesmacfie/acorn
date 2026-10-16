@@ -439,6 +439,7 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/server/profiles.ts', // probes whether an agent CLI is installed
       'packages/node-core/src/server/core/loginShellPath.ts', // the login-shell PATH probe, once at boot
       'packages/node-core/src/server/transport/listener.ts', // lsof and ps, only when the wanted port is taken
+      'packages/node-core/src/server/telemetry/runtimePressure.ts', // sysctl swap read, once a minute; the broker imports the collector this feeds
       // The supervised node's own child.
       'packages/custody/src/supervision/serviceHost.ts',
       'apps/tui/src/node/supervise.ts', // `acorn` supervising the node it started, when it started one

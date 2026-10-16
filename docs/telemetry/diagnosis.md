@@ -43,6 +43,8 @@ file path. Workload sizes are histogram values, never labels.
 | Is a plugin flooding the UI? | `tree.apply`, `tree.queue.wait`, `tree.batch.operations`, `tree.batch.merged`, `tree.nodes`, and `tree.batch.refused`, by owning plugin. |
 | Is terminal output flooding its parser? | `terminal.output.size`, `terminal.pending.size`, `terminal.write`, and `terminal.fit`. |
 | Is the Node or helper under pressure? | `runtime.event_loop.p95`, `.max`, and `.utilization`, `runtime.cpu`, `runtime.memory.rss`, `runtime.memory.heap`, and `runtime.suspended`. |
+| Is it Acorn or the Mac? | `host.load.1m`, `host.memory.free`, and `host.swap.used` ([is it Acorn or the Mac?](#is-it-acorn-or-the-mac)). |
+| What held a slow Node request? | Its child spans: slow `git.*`, `proc.spawn`, and `sql.*` samples, `checkout.admission.wait`, `tool.availability`, `task.archive.phase`, and the plugins' `*.api` spans. |
 | Where is the memory going? | [Memory over a day](#memory-over-a-day). |
 
 A measured client operation of at least 100 ms can also produce a detailed span under its original
@@ -89,6 +91,28 @@ however late it lands, so a stall that runs past the window's end is still measu
 A frame gap is a paint-opportunity measurement, not proof the compositor presented pixels. Collection
 that's off during startup doesn't measure cache hydration after the fact. The boot account is the
 exception: its marks are kept and sent once collection turns on.
+
+### Sleep and hidden windows
+
+A sleeping Mac or a hidden window stretches any span that's open across it. Filter `suspended:false`
+before you quote a latency. Every Node and renderer span carries the flag.
+
+The Node learns of a suspend from the runtime pressure sampler, which reads it at the end of each
+five-second window. A span that ends inside the window where the suspend happened misses it. The
+renderer learns from its one-second timer and the visibility listener, so a span shorter than a tick
+can miss one too. The distorted spans are minutes long, so that's acceptable. A deadline span that
+timed out late is capped at its deadline and carries `late: true`.
+
+### Is it Acorn or the Mac?
+
+Every five seconds the sampler also reports the whole machine: `host.load.1m`, the one-minute load
+average with `host.cpus` beside it, and `host.memory.free` in bytes. On macOS it reads
+`host.swap.used` at most once a minute, because reading swap starts a process. A load well past
+`host.cpus`, or swap close to full, beside a slow request or a `ui.stall` points at the machine
+rather than at Acorn.
+
+A request whose `http.request` span carries `client.gone: true` kept working after the caller gave
+up. Group those by `route` to find work that should be cancelled.
 
 ### Find slow connections in Sentry
 

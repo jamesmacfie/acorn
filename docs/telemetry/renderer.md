@@ -45,7 +45,8 @@ there's no router event to hang a span on. `nav.change` starts where the signal 
 the second `requestAnimationFrame`: the first frame is the one the browser was going to paint anyway,
 and the second is the first with the new content. Two writes inside one change collapse into one span,
 because opening a task writes both signals. A region still fetching at that frame isn't covered.
-`pane.region` measures that.
+`pane.region` measures that. A hidden window runs no frames, so the span also ends when the window goes
+hidden, or at 30 seconds. Otherwise every background request would join the interaction for hours.
 
 ## An owner on a contribution that never declared one
 
@@ -69,7 +70,7 @@ Paths are under `packages/client-core/src` unless they start with `apps/`.
 | Every failed query and mutation | `infra/node/fleet.ts` `clientFor` | A handled error with the first two key segments |
 | Every inbound WebSocket frame | `infra/node/wsClient.ts` `dispatch` | Histogram `ws.inbound.<channel prefix>` |
 | Every command | `host/registries/commands/commands.ts` `executeCommand` | Span `command`, owner from `ownerId`. Opens an interaction |
-| Every page change | `features/tasks/pageChange.ts` | Span `nav.change`. Opens an interaction |
+| Every page change | `features/tasks/pageChange.ts` | Span `nav.change`. Opens an interaction. Ends with `outcome: 'hidden'` when the window goes hidden, or `'timeout'` after 30 seconds without a frame |
 | Consequential view lifecycle | `infra/telemetry/emitter.ts` `startOperation` | A child span under an open interaction, or an interaction root |
 | Opted-in state transitions | `infra/telemetry/emitter.ts` `startRenderTransition` | One `ui.render` child span with turn, first-frame, and paint-frame durations |
 | Opted-in initial list construction | `infra/telemetry/emitter.ts` `measureRenderBatch` | One `ui.render.batch` span per operation and turn |
@@ -91,6 +92,13 @@ Paths are under `packages/client-core/src` unless they start with `apps/`.
 | Every pane, source, and Settings opening | `infra/telemetry/featureOpening.ts` | Span `ui.feature.open` ([feature openings](#feature-openings)) |
 | Uncaught error or rejection | `apps/desktop/src/client/index.tsx` | A fatal error with its stack |
 | Console lines | Everywhere under client-core and the desktop client and shell | Log records through `createLogger(tag)` |
+
+Every renderer span carries `suspended`, true when the window went hidden or its one-second timer ran
+more than five seconds late between the span's start and its end. The responsiveness monitor notices
+both and calls `noteSuspension()` in the emitter. A 30-second deadline that fires more than five seconds
+late, which `ui.feature.open`, `agents.*.open`, `nav.change`, and `ui.render` all have, ends its span at
+the deadline with `late: true` instead of recording the whole gap
+([sleep and hidden windows](./diagnosis.md#sleep-and-hidden-windows)).
 
 `@acorn/protocol/telemetry` owns `apiRouteNamespace`. The request seam and the desktop bridge both use
 it to group `/v1/p/<plugin>` requests by plugin without recording full paths.
@@ -149,7 +157,8 @@ closes it. The span is `ui.feature.open`, with these attributes:
 - `state`: `content`, `empty`, `offline`, or `error`. Each is a usable state. A spinner isn't.
 - `proxy: 'mount'`: the feature doesn't report for itself, so the host closed the record when the
   feature's first content mounted. Don't read a proxy as usable time.
-- `outcome: 'timeout'`, with status `error`, when nothing closed the record within 30 seconds.
+- `outcome: 'timeout'`, with status `error`, when nothing closed the record within 30 seconds. A
+  timeout that fired more than five seconds late is capped at 30 seconds and carries `late: true`.
 
 An opening that's closed before it reports, by a task switch or a closed pane, emits nothing. The
 module holds one pending record per feature ID and at most 16 in all, never one per task.

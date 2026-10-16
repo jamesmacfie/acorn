@@ -1,3 +1,5 @@
+import type { AddressInfo } from 'node:net'
+import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -171,6 +173,30 @@ describe('the request span', () => {
     expect(fresh.parentSpanId).toBeUndefined()
     // The raw header is never echoed anywhere.
     expect(JSON.stringify(fresh)).not.toContain('not-a-traceparent')
+  })
+
+  it('says the client gave up when the connection closed before the handler finished', async () => {
+    let finish!: () => void
+    const handled = new Promise<void>((resolve) => (finish = resolve))
+    const slow = new Hono<AppEnv>().use('*', requestIdMiddleware).get('/v1/core/slow', async (c) => {
+      await new Promise<void>((resolve) => c.req.raw.signal.addEventListener('abort', () => resolve()))
+      setTimeout(finish, 0)
+      return c.json({ late: true })
+    })
+    const server = serve({ fetch: slow.fetch, port: 0, hostname: '127.0.0.1' })
+    await new Promise<void>((resolve) => server.once('listening', () => resolve()))
+    try {
+      const { port } = server.address() as AddressInfo
+      const controller = new AbortController()
+      const request = fetch(`http://127.0.0.1:${port}/v1/core/slow`, { signal: controller.signal })
+      setTimeout(() => controller.abort(), 50)
+      await expect(request).rejects.toThrow()
+      await handled
+      const [span] = spans()
+      expect(span?.attrs).toMatchObject({ route: '/v1/core/slow', 'client.gone': true })
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
   })
 
   it('marks a 500 as an error', async () => {

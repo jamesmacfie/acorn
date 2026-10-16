@@ -15,6 +15,8 @@ import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { agentTools, agentToolsCatalog } from './agentTools'
 import { makeTestDb, type TestDb } from '../../../testkit/db'
+import { flushTelemetry, onTelemetryBatch, resetTelemetryForTest, startTelemetry } from '../../telemetry/collector'
+import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import type { Env } from '../../bindings'
 
 vi.mock('../../db', async (importOriginal) => {
@@ -226,6 +228,27 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     const ready = (await (await get('/api/tasks/ready/tools')).json()) as { tools: { name: string }[] }
     expect(ready.tools.map((t) => t.name)).toEqual(expect.arrayContaining(['exec_tool', 'exec_tool_2']))
     expect(availabilityCalls).toBe(1)
+  })
+
+  it('times each shared availability check once, owned by the plugin that contributed the tool', async () => {
+    const records: TelemetryRecord[] = []
+    startTelemetry({ node: 'n', version: '1', readPref: async () => '1' })
+    onTelemetryBatch((batch) => void records.push(...batch.records))
+    for (let index = 0; index < 5; index += 1) await Promise.resolve()
+    try {
+      await setPerms({ tiers: { execute: true } })
+      await get('/api/tasks/ready/tools')
+      flushTelemetry()
+      const spans = records.filter((record) => record.kind === 'span' && record.name === 'tool.availability')
+      expect(spans).toEqual([
+        expect.objectContaining({
+          status: 'ok',
+          attrs: expect.objectContaining({ owner: OWNER, tool: 'exec_tool', available: true }),
+        }),
+      ])
+    } finally {
+      resetTelemetryForTest()
+    }
   })
 
   // An installation that has never opened Settings → Tools and permissions has no preference row at all, which is

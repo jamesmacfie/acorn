@@ -3,10 +3,12 @@ import { rollbarProvider } from '../server/provider'
 import { createRollbarFetch } from '../server/routes/rollbar'
 import { errorSource } from '../shared/errorSource'
 import { createErrorSourceHandler } from '../server/data/errorSourceHandler'
+import { setRollbarApiTelemetry } from '../server/index'
 
 export const rollbarPlugin = (): NodePlugin => ({
   name: 'rollbar',
   init: (ctx) => {
+    setRollbarApiTelemetry(ctx.telemetry)
     ctx.routes.fetch(createErrorSourceHandler(), { prefix: '/data/errors' })
     ctx.dataSources.register(errorSource)
     // Portable fetch carrier: docs/integrations.md § Connection lifecycle covers why a loaded

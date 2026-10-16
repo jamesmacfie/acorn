@@ -6,6 +6,10 @@ export const agentTelemetry = telemetryFor('agents')
 const pageVisibility = (): DocumentVisibilityState | undefined =>
   typeof document === 'undefined' ? undefined : document.visibilityState
 
+const OPEN_TIMEOUT_MS = 30_000
+/** A timeout that fires this late was held by a sleep or a hidden window, the emitter's own rule. */
+const LATE_TIMER_MS = 5_000
+
 /** One opening, ending after loaded content has had a paint opportunity, including cached views.
  *  `claimed` says whether a conversation has taken the open on, and is recorded on a timeout. */
 export function startAgentView(name: string, claimed?: () => boolean) {
@@ -18,21 +22,30 @@ export function startAgentView(name: string, claimed?: () => boolean) {
   const finish = (
     outcome: 'ready' | 'error' | 'cancelled' | 'timeout',
     attrs: Record<string, string | boolean> = {},
+    at?: number,
   ) => {
     if (done) return
     done = true
     clearTimeout(timer)
     clearTimeout(hiddenCheck)
     if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame)
-    span.end(outcome === 'error' || outcome === 'timeout' ? 'error' : 'ok', { ...attrs, outcome })
+    span.end(outcome === 'error' || outcome === 'timeout' ? 'error' : 'ok', { ...attrs, outcome }, at)
   }
+  const due = performance.now() + OPEN_TIMEOUT_MS
   const timer = setTimeout(() => {
     const visibility = pageVisibility()
-    finish('timeout', {
-      ...(claimed ? { claimed: claimed() } : {}),
-      ...(visibility ? { visibility } : {}),
-    })
-  }, 30_000)
+    // Capped at the deadline, so a sleep reads as a timeout and not as minutes of waiting.
+    const late = performance.now() - due > LATE_TIMER_MS
+    finish(
+      'timeout',
+      {
+        ...(claimed ? { claimed: claimed() } : {}),
+        ...(visibility ? { visibility } : {}),
+        ...(late ? { late } : {}),
+      },
+      late ? due : undefined,
+    )
+  }, OPEN_TIMEOUT_MS)
   return {
     ready: () => {
       if (done || scheduled) return

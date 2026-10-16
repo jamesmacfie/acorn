@@ -74,6 +74,19 @@ it('drops a cancelled opening and reports a timed-out one as an error', async ()
   expect(spans[0]).toMatchObject({ status: 'error', attrs: { 'feature.id': 'settings', outcome: 'timeout' } })
 })
 
+it('caps a timeout that fired late at the deadline and says it was late', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  let now = 1_000
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+  openFeature('settings', 'core', { kind: 'settings', reportsUsable: true })
+  // The Mac slept, so the timer fires a minute after it was due.
+  now += OPENING_TIMEOUT_MS + 60_000
+  vi.advanceTimersByTime(OPENING_TIMEOUT_MS)
+  clock.mockRestore()
+  const [span] = await openings()
+  expect(span).toMatchObject({ durationMs: OPENING_TIMEOUT_MS, attrs: { outcome: 'timeout', late: true } })
+})
+
 it('holds at most a bounded number of pending records', async () => {
   const settled = whenOpenFeaturesSettle()
   for (let index = 0; index <= MAX_PENDING_OPENINGS; index += 1)

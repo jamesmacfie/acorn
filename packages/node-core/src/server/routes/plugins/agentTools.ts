@@ -61,7 +61,21 @@ async function available(tool: AgentToolContribution, ctx: ToolContext, cache: A
   if (!tool.when) return true
   let result = cache.get(tool.when)
   if (!result) {
-    result = Promise.resolve(tool.when(ctx)).catch(() => false)
+    // Owned by the plugin that contributed the tool, so a slow `/tools` call names whose check held it.
+    const span = startSpan(agentToolOwner(tool.name), {
+      name: 'tool.availability',
+      attrs: { seam: 'tool.availability', tool: tool.name },
+    })
+    result = Promise.resolve(tool.when(ctx)).then(
+      (ok) => {
+        span.end('ok', { available: ok })
+        return ok
+      },
+      () => {
+        span.end('error', { available: false })
+        return false
+      },
+    )
     cache.set(tool.when, result)
   }
   return result

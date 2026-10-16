@@ -54,7 +54,7 @@ nanoseconds, measured on September 11, 2026.
 
 | Seam | Where | What it emits |
 | --- | --- | --- |
-| Every HTTP request | `server/respond.ts` `requestIdMiddleware` | Span `http.request` with method, route pattern, status, bytes, and request id. Reads `traceparent` |
+| Every HTTP request | `server/respond.ts` `requestIdMiddleware` | Span `http.request` with method, route pattern, status, bytes, and request id. Reads `traceparent`. Adds `client.gone: true` when the caller closed the connection before the handler finished |
 | Every uncaught route error | `server/respond.ts` `onServerError` | An error with a name and a code, no message or stack |
 | Every scheduled run | `server/schedules/scheduler.ts` | Span `schedule.run`, owner from the key prefix, with the period and timeout in milliseconds |
 | Every hook handler | `server/pluginHost/hooks.ts` | Span `hook.run`, owner from the handler's registration |
@@ -63,18 +63,34 @@ nanoseconds, measured on September 11, 2026.
 | Every Git spawn | `server/core/git.ts` | Histogram `git.<subcommand>` |
 | Every SQL statement | `server/storage/sqlite.ts` | Histogram `sql.<verb>` |
 | Every process spawn | `server/core/proc.ts` | Histogram `proc.spawn` with the binary's base name. Events `proc.timeout` and `proc.truncated` |
+| Every measured call of 100 ms or more | `server/telemetry/collector.ts` `measure()` | A span named for the seam with `slow: true`, under the ambient trace, up to 20 per flush window ([hot seams](./model.md#hot-seams-are-metrics)) |
+| Every wait of 10 ms or more for a repository | `server/core/checkoutAdmission.ts` | Span `checkout.admission.wait` under the waiting request, owner from the ambient store |
 | Every serve-then-revalidate decision | `server/sync/engine.ts` | Count `sync.fresh`, `sync.stale`, or `sync.cold` with the resource |
 | Every outbound WebSocket frame | `server/transport/wsHub.ts` | Histogram `ws.frame` with the channel prefix. Event `ws.shed` when a socket falls behind |
 | Every agent tool call | `server/routes/plugins/agentTools.ts` | Span `tool.call`, owner from the plugin that contributed the tool |
+| Every tool availability check | `server/routes/plugins/agentTools.ts` `available()` | Span `tool.availability` with `tool` and `available`, owner from the contributing plugin, once per check per request |
+| Every archive dialog check | `server/pluginHost/taskChecks.ts` | Span `task.check` with `check` and `outcome`, owned by the plugin |
+| Task archiving | `server/storage/archive.ts` | Span `task.archive` with `task.id`, and `task.archive.phase` children ([task archiving](#task-archiving)) |
 | Task worktree preparation | `server/worktrees/taskWorktree.ts`, `worktrees.ts` | Spans `task.prepare`, `task.prepare.wait`, and `task.prepare.phase` ([task preparation](#task-preparation)) |
 | Every audit row | `server/audit.ts` | Event `audit.<action>` with the actor and none of the row's details |
 | Uncaught exception or rejection | `apps/node/src/composition/crash.ts` | A fatal error with its stack, then exit 1 |
-| Runtime pressure | `server/telemetry/runtimePressure.ts` | Event loop, CPU, and memory gauges every five seconds ([diagnosis](./diagnosis.md)) |
+| Runtime pressure | `server/telemetry/runtimePressure.ts` | Event loop, CPU, and memory gauges every five seconds, with the host's `host.load.1m`, `host.memory.free`, and, on macOS once a minute, `host.swap.used` ([diagnosis](./diagnosis.md#is-it-acorn-or-the-mac)) |
 | The app's shipped bytes, once per launch | `server/telemetry/installedBytes.ts` | Gauges `app.startup.bytes` and `app.bundle.bytes` ([shipped bytes](#shipped-bytes)) |
 | Console lines | Everywhere under `packages/node-core/src` and `apps/node/src` | Log records ([logging](./logging.md)) |
 
 Git and SQL histograms take their owner from the ambient store. A loaded plugin's HTTP routes need
 nothing extra, because the request span already names the plugin from `/v1/p/<id>/`.
+
+Every Node span carries `suspended`, true when the runtime pressure sampler saw the process suspended
+between the span's start and its end ([sleep and hidden windows](./diagnosis.md#sleep-and-hidden-windows)).
+
+Plugins add their own spans through `ctx.telemetry`:
+
+| Span | Plugin | What it carries |
+| --- | --- | --- |
+| `agents.usage.collect` | agents | One harness account's plan usage read, with `provider`, the account's folder name as `account`, and `outcome` |
+| `agents.usage.wait` | agents | A usage read waiting on another read's refresh |
+| `github.api`, `linear.api`, `rollbar.api` | github, linear, rollbar | One API call, with `method`, `status`, and an `operation` from a fixed list. Never the URL or the query. A GitHub call adds `ratelimit.low: true` when under 10% of its rate limit is left |
 
 ### Task preparation
 
@@ -99,6 +115,22 @@ Node stops printing the stack and stops exiting, so `installCrashHandlers` does 
 flush in between and a one-second window for asynchronous sinks. A crash must not become a hang
 because an exporter waits on a socket. It's installed from the two process entries, not from
 `startServiceRuntime`, which a test boots three times in one process.
+
+### Task archiving
+
+`task.archive` covers one archive request, including its subtasks, and ends `error` when the archive
+refused or failed. Each step that ran is a `task.archive.phase` child labelled by `phase`:
+
+| Phase | What it waits for |
+| --- | --- |
+| `admit.wait` | The repository's admission queue |
+| `worktree.wait` | A worktree creation still in progress for the task |
+| `teardown` | The project's teardown script. Ends `error` on a non-zero exit |
+| `hooks` | The `core:task-archiving` hook chain |
+| `checks` | The plugin cleanups the owner ticked. Ends `error` when one failed |
+| `worktree.aside` | Moving the worktree out of the way. Ends `error` when Git refused |
+| `sessions.drop` | Stopping the task's terminal sessions |
+| `worktree.discard` | Deleting the set-aside worktree |
 
 ## Shipped bytes
 

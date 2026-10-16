@@ -225,6 +225,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         },
         pricingForUser: (userId) => readAgentPricingPreferences(core.prefs, userId),
         onRefreshed: () => ctx.events.send({ channel: pluginChannel('agents', 'usage-refreshed') }),
+        telemetry: ctx.telemetry,
       })
 
       // The first decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks). A prompt policy,

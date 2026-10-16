@@ -4,11 +4,16 @@ import {
   linearData,
   linearError,
   linearFetch,
+  linearOperation,
   linearTeamScopeId,
   linearUploadTarget,
   parseIdentifier,
   projectIssueSearchFilter,
   projectIssuesFilter,
+  COMMENT_CREATE,
+  ISSUE_DETAIL_QUERY,
+  setLinearApiTelemetry,
+  VIEWER_QUERY,
 } from './index'
 
 describe('linear server helpers', () => {
@@ -125,5 +130,31 @@ describe('linearUploadTarget', () => {
     expect(linearUploadTarget('file:///etc/passwd')).toBeNull()
     expect(linearUploadTarget('/relative')).toBeNull()
     expect(linearUploadTarget(undefined)).toBeNull()
+  })
+})
+
+describe('the linear.api span', () => {
+  afterEach(() => {
+    setLinearApiTelemetry(undefined)
+    vi.unstubAllGlobals()
+  })
+
+  it('names a call by the first field its document asks for', () => {
+    expect(linearOperation(VIEWER_QUERY)).toBe('viewer')
+    expect(linearOperation(ISSUE_DETAIL_QUERY)).toBe('issues')
+    expect(linearOperation(COMMENT_CREATE)).toBe('commentCreate')
+  })
+
+  it('carries the operation and status and nothing from the query', async () => {
+    const ends: unknown[] = []
+    const startSpan = vi.fn(() => ({ traceId: 't', spanId: 's', end: (...args: unknown[]) => void ends.push(args) }))
+    setLinearApiTelemetry({ enabled: () => true, startSpan })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 200 })),
+    )
+    await linearFetch('key', VIEWER_QUERY, {})
+    expect(startSpan).toHaveBeenCalledWith('linear.api', { attrs: { operation: 'viewer', method: 'POST' } })
+    expect(ends).toEqual([['ok', { status: 200 }]])
   })
 })

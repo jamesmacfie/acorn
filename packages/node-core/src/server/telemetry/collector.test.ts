@@ -8,6 +8,7 @@ import {
   onTelemetryBatch,
   recordDuration,
   resetTelemetryForTest,
+  runWithTelemetry,
   startSpan,
   startTelemetry,
   stopTelemetry,
@@ -16,6 +17,19 @@ import {
   telemetryEnabled,
   telemetryFor,
 } from './collector'
+
+// The real sampler, with a handle on the suspend callback the collector gives it, because a test
+// can't put the process to sleep.
+const pressure = vi.hoisted(() => ({ suspended: (_ms: number): void => {} }))
+vi.mock('./runtimePressure', async (original) => {
+  const actual = await original<typeof import('./runtimePressure')>()
+  return {
+    startRuntimePressure: (options: Parameters<typeof actual.startRuntimePressure>[0]) => {
+      pressure.suspended = options.suspended
+      return actual.startRuntimePressure(options)
+    },
+  }
+})
 
 // One collected sink and the records it saw, which is how every assertion below reads what the
 // collector produced. A sink is the only way in: there is no "read the ring" verb, on purpose.
@@ -415,5 +429,91 @@ describe('preference read ownership', () => {
     expect(telemetrySummary().enabled).toBe(true)
     expect(sink.records()).toHaveLength(count)
     expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+describe('slow measured calls', () => {
+  // The collector times calls on the monotonic clock, which fake timers leave alone.
+  let hr = 0n
+  beforeEach(() => {
+    hr = 0n
+    vi.spyOn(process.hrtime, 'bigint').mockImplementation(() => hr)
+  })
+  afterEach(() => vi.restoreAllMocks())
+  const takes = (ms: number) => () => {
+    hr += BigInt(ms * 1e6)
+  }
+  const request = { traceId: 'a'.repeat(32), spanId: 'b'.repeat(16), owner: 'git' }
+  const spans = (sink: ReturnType<typeof collect>) => sink.records().filter((record) => record.kind === 'span')
+
+  it('become a child span of the ambient request and still count in the histogram', async () => {
+    const sink = await enable()
+    runWithTelemetry(request, () => measure('core', 'git.rev_parse', takes(150), { op: 'head' }))
+    flushTelemetry()
+    expect(spans(sink)).toEqual([
+      expect.objectContaining({
+        name: 'git.rev_parse',
+        traceId: request.traceId,
+        parentSpanId: request.spanId,
+        durationMs: 150,
+        status: 'ok',
+        attrs: expect.objectContaining({ owner: 'git', op: 'head', slow: true }),
+      }),
+    ])
+    const histogram = sink.records().find((record) => record.kind === 'metric' && record.name === 'git.rev_parse')
+    expect(histogram).toMatchObject({ value: { count: 1 } })
+  })
+
+  it('stay histogram-only when fast or outside a trace', async () => {
+    const sink = await enable()
+    runWithTelemetry(request, () => measure('core', 'git.status', takes(50)))
+    measure('core', 'git.status', takes(150))
+    flushTelemetry()
+    expect(spans(sink)).toEqual([])
+  })
+
+  it('stop at twenty a window and start again after the flush', async () => {
+    const sink = await enable()
+    runWithTelemetry(request, () => {
+      for (let index = 0; index < 21; index += 1) measure('core', 'git.status', takes(150))
+    })
+    flushTelemetry()
+    expect(spans(sink)).toHaveLength(20)
+    runWithTelemetry(request, () => measure('core', 'git.status', takes(150)))
+    flushTelemetry()
+    expect(spans(sink)).toHaveLength(21)
+  })
+
+  it('mark a rejection as failed', async () => {
+    const sink = await enable()
+    await expect(
+      runWithTelemetry(request, () =>
+        measure('core', 'git.fetch', async () => {
+          takes(150)()
+          throw new Error('boom')
+        }),
+      ),
+    ).rejects.toThrow('boom')
+    flushTelemetry()
+    expect(spans(sink)[0]).toMatchObject({ name: 'git.fetch', status: 'error' })
+  })
+})
+
+describe('a span that crossed a suspend', () => {
+  it('says so, and a span that started after it does not', async () => {
+    const sink = await enable()
+    const crossed = startSpan('core', { name: 'http.request' })
+    vi.advanceTimersByTime(1_000)
+    pressure.suspended(60_000)
+    vi.advanceTimersByTime(1_000)
+    const after = startSpan('core', { name: 'http.request' })
+    crossed.end()
+    after.end()
+    flushTelemetry()
+    const flags = sink
+      .records()
+      .filter((record) => record.kind === 'span')
+      .map((record) => record.attrs.suspended)
+    expect(flags).toEqual([true, false])
   })
 })

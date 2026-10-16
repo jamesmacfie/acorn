@@ -4,6 +4,7 @@
 import type { TaskArchiveConcern } from '@acorn/protocol/task.ts'
 import type { TaskRef } from '../core'
 import type { Disposable } from './capabilities'
+import { startSpan } from '../telemetry/collector'
 import { createLogger, describeError } from '../telemetry/logger'
 
 const log = createLogger('task-check')
@@ -151,29 +152,31 @@ export function sanitizeConcern(
 function runOne(check: RegisteredTaskCheck, task: TaskRef): Promise<WireTaskConcern | null> {
   return new Promise<WireTaskConcern | null>((resolve) => {
     const controller = new AbortController()
+    const span = startSpan(check.pluginId, { name: 'task.check', attrs: { seam: 'task.check', check: check.id } })
     let settled = false
-    const finish = (concern: WireTaskConcern | null): void => {
+    const finish = (concern: WireTaskConcern | null, outcome: 'concern' | 'none' | 'timeout' | 'failed'): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      span.end(outcome === 'timeout' || outcome === 'failed' ? 'error' : 'ok', { outcome })
       resolve(concern)
     }
     const timer = setTimeout(() => {
       if (settled) return
       controller.abort()
       log.warn(`${check.pluginId}:${check.id} did not answer within ${CHECK_TIMEOUT_MS}ms`)
-      finish(null)
+      finish(null, 'timeout')
     }, CHECK_TIMEOUT_MS)
     Promise.resolve(check.check(task, controller.signal))
       .then((answer) => {
-        if (answer === null || answer === undefined) return finish(null)
+        if (answer === null || answer === undefined) return finish(null, 'none')
         const concern = sanitizeConcern(check.pluginId, check.id, answer, check.apply !== undefined)
         if (!concern) log.warn(`${check.pluginId}:${check.id} returned an unusable concern`)
-        finish(concern)
+        finish(concern, concern ? 'concern' : 'failed')
       })
       .catch((error) => {
         log.warn(`${check.pluginId}:${check.id} failed: ${describeError(error).message}`)
-        finish(null)
+        finish(null, 'failed')
       })
   })
 }

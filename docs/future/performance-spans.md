@@ -1,6 +1,24 @@
 # Measure where slow requests spend their time
 
-Date: October 16, 2026. Status: proposed. Starting point: `main` at afda2b53f.
+Date: October 16, 2026. Status: implemented October 16, 2026, on branch `perf-3`. The day of Sentry
+acceptance queries in [accept the work](#accept-the-work) remains open. Starting point: `main` at
+afda2b53f.
+
+What shipped differs from the plan in five places:
+
+- The renderer keeps one suspend timestamp in the emitter rather than two counters in
+  `responsiveness.ts`, because the emitter can't import that module without a cycle. The Node does the
+  same with the sampler's last suspend time, so every span, including `http.request` and `hook.run`,
+  is checked without a snapshot at its start.
+- A usage read that joins another read's refresh raises its own `agents.usage.wait` span. A plugin
+  can't add an attribute to the core request span.
+- Archiving also has a `hooks` phase for `core:task-archiving`. Hook chains start their own trace, so
+  `hook.run` spans don't nest under the phase as the plan expected.
+- `ui.render`'s 30-second deadline gets the same late-timer cap as `ui.feature.open` and the agent
+  view opens.
+- GitHub, Linear, and Rollbar get their telemetry handle at init through a setter in each plugin's API
+  module, because those modules have no `ctx` in reach. GraphQL operations are named by the
+  document's first field.
 
 This plan adds the measurements that would answer the performance questions Sentry can't answer
 today. Read it before you add a span, a histogram, or an attribute to the Node or the renderer. It

@@ -2,6 +2,8 @@
 // with no "Bearer" prefix, since that one is for OAuth tokens. Returns parsed GraphQL data or throws;
 // callers map errors via linearError on the fetch Response. Linear has one endpoint: POST /graphql.
 
+import type { PluginTelemetry } from '@acorn/plugin-api/node'
+
 // Every call out to a provider needs a deadline shorter than the client's. The fan-out gives a node 5s
 // (client-core's node fan-out) and then draws "unavailable" over the whole node, so a fetch that
 // outlasts it reads to the user as "your machine is down" rather than "this API is slow", and the
@@ -15,16 +17,46 @@ const LINEAR_GRAPHQL = 'https://api.linear.app/graphql'
 
 type GraphQLResponse<T> = { data?: T; errors?: { message: string }[] }
 
+// One `linear.api` span per call (docs/telemetry/runtimes.md § Node seams). The operation is the
+// GraphQL document's first field, a schema name. The query text and its variables never ride along.
+type ApiTelemetry = Pick<PluginTelemetry, 'enabled' | 'startSpan'>
+let telemetry: ApiTelemetry | undefined
+/** `ctx.telemetry`, handed over at init, because the modules that call Linear have no `ctx` in reach. */
+export const setLinearApiTelemetry = (next: ApiTelemetry | undefined): void => {
+  telemetry = next
+}
+
+/** `issues`, `viewer`, `commentCreate`: the first field a GraphQL document asks for, past an alias. */
+export const linearOperation = (query: string): string => /\{\s*(?:\w+\s*:\s*)?(\w{1,64})/.exec(query)?.[1] ?? 'graphql'
+
+function timed<T extends Response | null>(operation: string, method: string, call: () => Promise<T>): Promise<T> {
+  if (!telemetry?.enabled()) return call()
+  const span = telemetry.startSpan('linear.api', { attrs: { operation, method } })
+  return call().then(
+    (res) => {
+      const status = res?.status ?? 0
+      span.end(status === 0 || status >= 500 ? 'error' : 'ok', { status })
+      return res
+    },
+    (error: unknown) => {
+      span.end('error', { status: 0 })
+      throw error
+    },
+  )
+}
+
 // Low-level: returns the raw Response so the route can normalize status (e.g. 401 bad key).
 export const linearFetch = (apiKey: string, query: string, variables: Record<string, unknown>, signal?: AbortSignal) =>
-  fetch(LINEAR_GRAPHQL, {
-    method: 'POST',
-    headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-    signal: signal
-      ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
-      : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
+  timed(linearOperation(query), 'POST', () =>
+    fetch(LINEAR_GRAPHQL, {
+      method: 'POST',
+      headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables }),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
+        : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    }),
+  )
 
 export const linearError = (res: Response): { error: string; status: 401 | 502 } | null =>
   res.ok
@@ -295,8 +327,10 @@ const UPLOAD_TIMEOUT_MS = 30_000
 
 /** One private upload, fetched with the key that can read it. Null when the fetch fails outright. */
 export const fetchLinearUpload = (apiKey: string, target: URL): Promise<Response | null> =>
-  fetch(target, { headers: { Authorization: apiKey }, signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS) }).catch(
-    () => null,
+  timed('upload', 'GET', () =>
+    fetch(target, { headers: { Authorization: apiKey }, signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS) }).catch(
+      () => null,
+    ),
   )
 
 // "ENG-123" → { key: 'ENG', number: 123 }; null if it isn't a valid identifier.

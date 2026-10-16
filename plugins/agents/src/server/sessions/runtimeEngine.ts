@@ -116,6 +116,16 @@ export function acornMcpServers(
 }
 
 // The tag is what the reader greps for and the owner is what a sink files it under.
+
+/** A dispatched turn's span and the waits inside it. Times are `performance.now()`. */
+type TurnSpan = {
+  span: SpanHandle
+  startedAt: number
+  firstOutputMs?: number
+  approvalWaitMs: number
+  /** Permission asks still waiting on a person, by request id, with when each was asked. */
+  waiting: Map<string, number>
+}
 const log = createLogger('agents', 'agents')
 
 export type AgentRuntimeOptions = {
@@ -249,7 +259,7 @@ export class ManagedAgentEngine {
   // The span of every turn this process dispatched and has not seen settle, by turn id. In memory
   // for the reason `live` is: a turn only runs inside the node that started it, and a turn the
   // process died in the middle of reports nothing, which is the honest answer.
-  private readonly turnSpans = new Map<string, SpanHandle>()
+  private readonly turnSpans = new Map<string, TurnSpan>()
   private readonly queue: QueueCoordinator
   private readonly subagentQuietMs: number
   // The background pass over rows stored before the ledger fold, started by the runtime's reconcile().
@@ -1248,6 +1258,7 @@ export class ManagedAgentEngine {
 
   async record(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<AgentEventRecord> {
     const record = await this.store.recordEvent(sessionId, turnId, event)
+    if (record.turnId) this.timeTurnEvent(record.turnId, event)
     const session = await this.store.requireSession(sessionId)
     let clientRecord = record
     if (
@@ -1336,18 +1347,48 @@ export class ManagedAgentEngine {
    *  a turn can sit in the queue behind the concurrency limit for minutes, and "how long did the
    *  agent take" is not "how long was the node busy". */
   private beginTurnSpan(turnId: string, sessionId: string, providerId: string, source: string): void {
-    const span = this.telemetry?.startSpan('agent.turn', {
+    if (!this.telemetry?.enabled()) return
+    const span = this.telemetry.startSpan('agent.turn', {
       attrs: { seam: 'agent.turn', 'turn.id': turnId, 'session.id': sessionId, provider: providerId, source },
     })
-    if (span) this.turnSpans.set(turnId, span)
+    this.turnSpans.set(turnId, { span, startedAt: performance.now(), approvalWaitMs: 0, waiting: new Map() })
+  }
+
+  /** The two waits inside a turn, so a slow provider reads apart from a person who hadn't yet
+   *  clicked Allow: the time to the provider's first output, and the time spent on permission asks. */
+  private timeTurnEvent(turnId: string, event: AgentNormalizedEvent): void {
+    const turn = this.turnSpans.get(turnId)
+    if (!turn) return
+    const now = performance.now()
+    if (
+      turn.firstOutputMs === undefined &&
+      (event.type === 'assistant_message' || event.type === 'reasoning' || event.type === 'tool')
+    )
+      turn.firstOutputMs = now - turn.startedAt
+    if (event.type === 'request' && event.kind === 'permission' && !event.blocked)
+      turn.waiting.set(event.requestId, now)
+    if (event.type === 'request_resolved') {
+      const asked = turn.waiting.get(event.requestId)
+      turn.waiting.delete(event.requestId)
+      if (asked !== undefined) turn.approvalWaitMs += now - asked
+    }
   }
 
   /** Close it, from whichever of the four ways a turn stops being active got there first. `end` is
    *  idempotent, so a race between a provider closing and its last event arriving costs nothing. */
   private endTurnSpan(turnId: string, outcome: 'completed' | 'error' | 'interrupted' | 'requeued'): void {
-    const span = this.turnSpans.get(turnId)
+    const turn = this.turnSpans.get(turnId)
     this.turnSpans.delete(turnId)
-    span?.end(outcome === 'completed' ? 'ok' : 'error', { outcome })
+    if (!turn) return
+    const now = performance.now()
+    // An ask still open when the turn ended was waited on until now.
+    let approvalWaitMs = turn.approvalWaitMs
+    for (const asked of turn.waiting.values()) approvalWaitMs += now - asked
+    turn.span.end(outcome === 'completed' ? 'ok' : 'error', {
+      outcome,
+      'approval.wait.ms': approvalWaitMs,
+      ...(turn.firstOutputMs === undefined ? {} : { 'first_output.ms': turn.firstOutputMs }),
+    })
   }
 
   forkContext(source: AgentSession): ReturnType<typeof buildForkContext> {
