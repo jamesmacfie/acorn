@@ -11,17 +11,23 @@ manual dispatch:
 
 | Job | Runner | Runs |
 | --- | --- | --- |
-| Check | Linux | `pnpm lint`, then `pnpm test --filter='!@acorn/desktop' --filter='!@acorn/site'` with `ACORN_TEST_CONCURRENCY=1` and `ACORN_TUI_WIDE=1` |
+| Lint | Linux | `pnpm lint` |
+| Test | Linux, three shards | `pnpm test` over a third of the packages each, with `ACORN_TEST_CONCURRENCY=1` and `ACORN_TUI_WIDE=1` |
 | Desktop | macOS | `pnpm --filter @acorn/desktop test`, on pull requests and `main` pushes only |
 
-The check job runs on Linux for two reasons. A macOS runner has no Docker for the container probes to
+The lint job and the three test shards run side by side. Shards 1 and 2 each name four of the slowest
+packages in the workflow's `SHARD_1` and `SHARD_2`. Shard 3 runs every other package except the
+desktop and the site, so a new package needs no edit. If a shard grows much slower than the others,
+move a package between the lists.
+
+The test shards run on Linux for two reasons. A macOS runner has no Docker for the container probes to
 find. Its `/var` is also a symlink to `/private/var`, and one HTTP test compares paths against it.
 
 The desktop job installs Rust and caches the pinned Node runtime. The package's `test` script stages
 the bundle inputs, builds the renderer, runs Vitest including the boot test, and runs `cargo test`. It
 needs no signing secrets and builds no installer.
 
-Tags and manual dispatches skip the desktop job. Once the check job passes, they call
+Tags and manual dispatches skip the desktop job. Once lint and every test shard pass, they call
 `.github/workflows/build-desktop.yml`, which builds the bundle inputs once, runs the desktop tests
 against them, and packages the same output into signed installers. A broken boot path fails there
 before packaging.
@@ -31,9 +37,13 @@ pushes that touch the site or what it reads from. [The public site](../site.md) 
 
 ## The Turborepo cache
 
-The workflows cache dependencies and the pinned Node runtime. The check job also carries Turborepo's
-local cache between runs, so a lint or test task whose inputs haven't changed is replayed instead of
-run. The same happens on your machine.
+The workflows cache dependencies and the pinned Node runtime. The lint job and each test shard also
+carry their own slice of Turborepo's local cache between runs, so a lint or test task whose inputs
+haven't changed is replayed instead of run. The same happens on your machine.
+
+Each job saves its slice even when a task fails, because Turborepo stores only the tasks that passed.
+When the cache saved only on green runs, a red streak on `main` meant every run restored a cache weeks
+old and replayed nothing.
 
 That makes `turbo.json` part of the test contract. A test that reads a file outside its package must
 declare that file as an input. Otherwise a change to the file serves a stale pass. The architecture

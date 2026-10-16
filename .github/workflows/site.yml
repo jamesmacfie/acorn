@@ -49,10 +49,20 @@ env:
   # The Wrangler release the deploy steps run, kept out of the lockfile so a normal install doesn't
   # download the Workers runtime.
   WRANGLER: wrangler@4.149.0
+  # `pnpm dlx` ignores the workspace's allowBuilds list and fails on any dependency build script it
+  # was not told to allow. Wrangler needs these two.
+  WRANGLER_BUILDS: --allow-build=esbuild --allow-build=workerd
 
 jobs:
   site:
+    # The production and preview builds check side by side. Production also runs the once-only steps:
+    # the review report, lint, the specimens, and the production deploy. Preview uploads the preview.
+    name: site (${{ matrix.build }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [production, preview]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -72,6 +82,7 @@ jobs:
       # the pages that cite a file it changes. Both go to the job summary for review and never fail the
       # job.
       - name: Report pages to review
+        if: matrix.build == 'production'
         continue-on-error: true
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -91,30 +102,30 @@ jobs:
 
       # `astro check` for the .astro pages, the content config, and the tests, then the specimens with
       # Solid's JSX.
-      - run: pnpm --filter @acorn/site lint
+      - if: matrix.build == 'production'
+        run: pnpm --filter @acorn/site lint
 
       # Regenerates every specimen on both hosts and fails when a committed picture is stale. Run
       # `UPDATE_SPECIMENS=1 pnpm --filter @acorn/site specimens`, then review and commit the change.
-      - run: pnpm --filter @acorn/site specimens
+      - if: matrix.build == 'production'
+        run: pnpm --filter @acorn/site specimens
 
       # Each build runs the link validator. `test` runs the budget check's own tests, the budget, and the
       # Playwright tests in the runner's installed Chrome. The production build must leave out every
       # draft and /lab/ page, and the preview build must keep them.
       # A build reads the star count and the newest release from GitHub. The token lifts the anonymous
       # rate limit.
-      - name: Check the production build
+      - name: Check the ${{ matrix.build }} build
         run: pnpm --filter @acorn/site build && pnpm --filter @acorn/site test
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: Check the preview build
-        run: pnpm --filter @acorn/site build && pnpm --filter @acorn/site test
-        env:
-          ACORN_SITE_PREVIEW: '1'
+          ACORN_SITE_PREVIEW: ${{ matrix.build == 'preview' && '1' || '' }}
           GITHUB_TOKEN: ${{ github.token }}
 
       # A fork's pull request gets no secrets, so it gets no preview.
       - name: Upload the preview
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        if: >-
+          matrix.build == 'preview' && github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
         working-directory: apps/site
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -124,20 +135,18 @@ jobs:
         run: |
           # Keep search engines off preview URLs.
           printf '\n/*\n  X-Robots-Tag: noindex\n' >> dist/_headers
-          pnpm dlx "$WRANGLER" versions upload --preview-alias "pr-$PR_NUMBER"
+          pnpm dlx $WRANGLER_BUILDS "$WRANGLER" versions upload --preview-alias "pr-$PR_NUMBER"
           url=$(jq -r 'select(.type == "version-upload") | .preview_alias_url // .preview_url' "$WRANGLER_OUTPUT_FILE_PATH")
           echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deploy production
         if: >-
+          matrix.build == 'production' && (
           (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-          github.event_name == 'schedule' || github.event_name == 'release'
+          github.event_name == 'schedule' || github.event_name == 'release')
         working-directory: apps/site
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          # The last build was the preview, so build production again before it ships.
-          pnpm build
-          pnpm dlx "$WRANGLER" deploy
+        # dist/ holds the production build this job just checked.
+        run: pnpm dlx $WRANGLER_BUILDS "$WRANGLER" deploy
