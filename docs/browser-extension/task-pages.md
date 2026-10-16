@@ -77,7 +77,7 @@ states:
 
 A page that matches none of these has no **This page** section, and Home shows only its task list.
 The sidebar reads the page again when the tab finishes loading, so the section follows the tab.
-Sites to allow are under Settings → **Permissions**.
+Sites to allow are under Settings → **Sites**.
 
 ## Moving between pages
 
@@ -152,7 +152,7 @@ only, the extension's own look, and the page's light or dark theme, read from th
 A page with no plugin address gets no marker.
 
 The marker needs page access like any chip. A local app's origin is a site like any other, so the
-person allows it under Settings → **Permissions**, where it's listed as **Branch marker on its pages**, or clicks
+person turns on its switch under Settings → **Sites**, where it reads **Branch marker for** the app, or clicks
 the toolbar button on the tab. The extension asks for nothing by itself. Browsers grant access by host
 and not by port, so `https://runn-05ea41.runn.localhost:5104` asks for all of
 `https://runn-05ea41.runn.localhost`.

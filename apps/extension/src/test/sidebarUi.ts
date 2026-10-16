@@ -8,16 +8,6 @@ export const button = (root: ParentNode, name: string) =>
     (element) => element.textContent?.trim() === name || element.getAttribute('aria-label') === name,
   )
 
-export const selected = (root: ParentNode, name: string) =>
-  root.querySelector<HTMLSelectElement>(`select[name="${name}"]`)?.value
-
-export async function pick(root: ParentNode, name: string, value: string) {
-  const select = root.querySelector<HTMLSelectElement>(`select[name="${name}"]`)!
-  select.value = value
-  select.dispatchEvent(new Event('change', { bubbles: true }))
-  await settle(20)
-}
-
 const header = (root: ParentNode) => root.querySelector('header')!
 
 async function click(element: HTMLElement | undefined, what: string) {
@@ -48,15 +38,37 @@ export const tab = (root: ParentNode, label: string) =>
 export const taskTabs = (root: ParentNode) =>
   [...root.querySelectorAll('[role="tablist"][aria-label="Task"] [role="tab"]')].map((tab) => tab.textContent)
 
+// Settings' row for a paired Node, by its name.
+export const nodeRow = (root: ParentNode, label: string) =>
+  [...root.querySelectorAll<HTMLElement>('[data-settings-section="nodes"] .ui-row')].find(
+    (row) => row.querySelector('.ui-text')?.textContent === label,
+  )
+
 // Switches Nodes from Settings, then goes back Home.
 export async function useNode(root: ParentNode, label: string) {
   await openSettings(root)
-  const row = [...root.querySelectorAll('[aria-label="Nodes"] li')].find(
-    (item) => item.querySelector('strong')?.textContent === label,
-  )
+  const row = nodeRow(root, label)
   await click(row && button(row, 'Use'), `Use button for ${label}`)
   await back(root)
 }
+
+// Settings' sites, each its host and what the extension does there, then whether its access switch
+// is on. A regex association has no switch.
+export const siteList = (root: ParentNode) =>
+  [...root.querySelectorAll('[data-settings-section="sites"] .ui-row')].map((row) => {
+    const [host, uses] = [...row.querySelectorAll('.ui-text')].map((text) => text.textContent)
+    const access = row.querySelector<HTMLInputElement>('[role="switch"]')
+    return `${host}: ${uses}${access ? (access.checked ? ' · on' : ' · off') : ''}`
+  })
+
+// Flips a site's access switch, as a click does.
+export const siteSwitch = (root: ParentNode, host: string) =>
+  click(
+    root.querySelector<HTMLElement>(
+      `[data-settings-section="sites"] [role="switch"][aria-label="Access to ${host}"]`,
+    ) ?? undefined,
+    `access switch for ${host}`,
+  )
 
 // Picks a row in the kit picker whose trigger is named `name`. Its list draws in a portal on the body.
 export async function pickFrom(root: ParentNode, name: string, label: string) {

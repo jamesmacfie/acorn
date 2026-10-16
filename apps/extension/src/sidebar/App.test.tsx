@@ -3,7 +3,7 @@ import { render } from 'solid-js/web'
 import { fingerprintWords } from '@acorn/protocol/fingerprintWords.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
-import { back, button, goHome, openSettings, pick, useNode } from '../test/sidebarUi'
+import { back, button, goHome, nodeRow, openSettings, pickFrom, useNode } from '../test/sidebarUi'
 import { App } from './App'
 
 const FINGERPRINT = 'ab'.repeat(32)
@@ -28,10 +28,12 @@ function mount(
   const fake = fakeBrowser()
   const held: { nodeId: string; release(): void }[] = []
   let active: string | null = null
+  // Names given in Settings, which the host keeps.
+  const names: Record<string, string> = {}
   const nodes = () => ({
     nodes: known.map((nodeId) => ({
       nodeId,
-      label: `Node ${nodeId}`,
+      label: names[nodeId] ?? `Node ${nodeId}`,
       endpoint: `https://${nodeId}.test`,
       local: false,
     })),
@@ -49,6 +51,10 @@ function mount(
     if (request.op === 'node.forget') {
       known.splice(known.indexOf(request.nodeId!), 1)
       if (active === request.nodeId) active = null
+      return reply(nodes())
+    }
+    if (request.op === 'node.rename') {
+      names[request.nodeId!] = request.label!
       return reply(nodes())
     }
     if (request.op === 'node.local')
@@ -112,6 +118,19 @@ function mount(
   return { fake, held, root }
 }
 
+// Opens a Node's ⋯ menu in Settings. The menu draws in a portal on the body.
+async function nodeMenu(root: HTMLElement, label: string) {
+  button(nodeRow(root, label)!, 'Node actions')!.click()
+  await settle()
+}
+const menuItems = () => [...document.querySelectorAll('[role="menu"] .ui-menu-item')].map((item) => item.textContent)
+async function chooseItem(label: string) {
+  ;[...document.querySelectorAll<HTMLButtonElement>('[role="menu"] .ui-menu-item')]
+    .find((item) => item.textContent?.startsWith(label))!
+    .click()
+  await settle()
+}
+
 // The selected Node, as the acorn on Home names it.
 const shownNode = (root: HTMLElement) => root.querySelector('header .mark')!.getAttribute('aria-label')
 const input = (root: HTMLElement, name: string) => root.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
@@ -148,12 +167,15 @@ describe('sidebar', () => {
     await settle()
     await useNode(root, 'Node a')
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
-    expect(root.querySelector('[aria-label="Nodes"]')).toBeNull()
+    expect(root.querySelector('[data-settings-section="nodes"]')).toBeNull()
     await openSettings(root)
     expect(root.querySelector('.view[aria-label="Home"]')).toBeNull()
-    expect(root.querySelector('[aria-label="Nodes"]')!.textContent).toContain('Node a')
-    await pick(root, 'theme', 'nord')
+    expect(nodeRow(root, 'Node a')!.textContent).toContain('In use')
+    await pickFrom(root, 'Theme', 'Nord')
     expect(fake.storage.get('appearance')).toEqual({ theme: 'nord', style: 'terminal' })
+    button(root, 'Cozy')!.click()
+    await settle()
+    expect(fake.storage.get('appearance')).toEqual({ theme: 'nord', style: 'cozy' })
     await back(root)
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
 
@@ -201,7 +223,7 @@ describe('sidebar', () => {
     await settle()
     expect(root.querySelector('[aria-label="Paired"]')!.textContent).toContain('Paired with This computer')
     expect(shownNode(root)).toContain('Node new')
-    expect(root.querySelector('[aria-label="Notifications"]')).not.toBeNull()
+    expect(root.querySelector('[data-settings-section="notifications"]')).not.toBeNull()
     button(root, 'Done')!.click()
     await settle()
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
@@ -257,7 +279,7 @@ describe('sidebar', () => {
     await settle()
     await useNode(root, 'Node a')
     await openSettings(root)
-    button(root.querySelector('[aria-label="Nodes"]')!, 'Pair a Node')!.click()
+    button(root.querySelector('[data-settings-section="nodes"]')!, 'Pair')!.click()
     await settle()
     // The Node on this Mac is already paired, so it shows as a Use row with its tag.
     const choose = root.querySelector('[aria-label="Choose a Node"]')!
@@ -268,10 +290,47 @@ describe('sidebar', () => {
     // Pairing closes back to Settings, where it was asked for.
     expect(root.querySelector('[aria-label="Settings"]')).not.toBeNull()
 
-    button(root.querySelector('[aria-label="Nodes"]')!, 'Forget')!.click()
-    await settle()
+    // Forget asks first, in the Node's menu.
+    await nodeMenu(root, 'Node a')
+    expect(menuItems()).toEqual(['Rename', 'Copy addresshttps://a.test', 'Forget Node a'])
+    await chooseItem('Forget Node a')
+    expect(menuItems()).toContain('Forget Node a?')
+    expect(nodeRow(root, 'Node a')).toBeDefined()
+    await chooseItem('Forget Node a?')
+    expect(nodeRow(root, 'Node a')).toBeUndefined()
     await goHome(root)
     expect(shownNode(root)).toBe('No Node')
+  })
+
+  it('renames a Node in place, where Enter saves and Escape cancels', async () => {
+    const { fake, root } = mount(['a', 'b'])
+    await settle()
+    await useNode(root, 'Node a')
+    await openSettings(root)
+    const field = () => root.querySelector<HTMLInputElement>('input[name="node-name"]')
+    const rename = async (from: string, to: string, key: string) => {
+      await nodeMenu(root, from)
+      await chooseItem('Rename')
+      expect(document.activeElement).toBe(field())
+      field()!.value = to
+      field()!.dispatchEvent(new Event('input', { bubbles: true }))
+      field()!.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+      await settle()
+    }
+    await rename('Node b', 'Studio', 'Escape')
+    expect(field()).toBeNull()
+    expect(nodeRow(root, 'Node b')).toBeDefined()
+
+    await rename('Node b', '  Studio Mac ', 'Enter')
+    expect(field()).toBeNull()
+    expect(nodeRow(root, 'Studio Mac')).toBeDefined()
+    const renames = fake.hosts[0]!.received.filter((message) => (message as Request).op === 'node.rename')
+    expect(renames).toMatchObject([{ nodeId: 'b', label: 'Studio Mac' }])
+
+    // The top bar's footer in Go to task and Home's acorn name the Node in use by its new name.
+    await rename('Node a', 'Laptop', 'Enter')
+    await goHome(root)
+    expect(shownNode(root)).toContain('Laptop')
   })
 
   it('shows the install command with Copy, and carries on once the bridge answers', async () => {

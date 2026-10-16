@@ -17,6 +17,8 @@ import {
   idle,
   openChat,
   openSettings,
+  siteList,
+  siteSwitch,
   openTask,
   pickFrom,
   runRows,
@@ -209,10 +211,6 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
   return { fake, state, root }
 }
 
-const siteAccess = (root: HTMLElement) =>
-  [...root.querySelectorAll('[aria-label="Site access"] li')].map(
-    (row) => `${row.querySelector('strong')!.textContent}: ${row.querySelector('.quiet')!.textContent}`,
-  )
 const openTab = (root: HTMLElement) =>
   root.querySelector('[role="tablist"][aria-label="Task"] [aria-selected="true"]')?.textContent ?? null
 const captures = (root: HTMLElement) =>
@@ -617,11 +615,10 @@ describe('a handoff in the sidebar', () => {
     const { fake, root } = mount({ items: [item({ projects: [] })] })
     await settle(30)
     await openSettings(root)
-    expect(siteAccess(root)).toEqual(['tracker.example: Buttons on its pages · Not allowed'])
-    button(root, 'Allow')!.click()
-    await settle(20)
+    expect(siteList(root)).toEqual(['tracker.example: Task chips on its pages · off'])
+    await siteSwitch(root, 'tracker.example')
     expect(fake.granted.has('https://tracker.example/*')).toBe(true)
-    expect(siteAccess(root)).toEqual(['tracker.example: Buttons on its pages · Allowed'])
+    expect(siteList(root)).toEqual(['tracker.example: Task chips on its pages · on'])
     // Removing it, here or in the browser's settings, takes back This page's offer too.
     fake.activeTab = { ...fake.activeTab, url: PAGE }
     fake.activate()
@@ -630,9 +627,8 @@ describe('a handoff in the sidebar', () => {
     expect(card(root)).not.toBeNull()
     fake.activeTab = { ...fake.activeTab, url: undefined }
     await openSettings(root)
-    button(root, 'Remove')!.click()
-    await settle(20)
-    expect(siteAccess(root)).toEqual(['tracker.example: Buttons on its pages · Not allowed'])
+    await siteSwitch(root, 'tracker.example')
+    expect(siteList(root)).toEqual(['tracker.example: Task chips on its pages · off'])
     await back(root)
     expect(button(root, 'Look up in Acorn')).toBeUndefined()
     await clickSiteButton(fake)

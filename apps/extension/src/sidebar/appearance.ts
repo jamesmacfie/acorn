@@ -6,19 +6,21 @@ import type { BrowserApi } from '../browser'
 // docs/browser-extension/setup.md#appearance.
 
 // The app's built-in themes and style packs, the blocks in tokens-theme.css and the style-*.css packs.
-export const THEMES: readonly (readonly [id: string, label: string])[] = [
-  ['light', 'Light'],
-  ['dark', 'Dark'],
-  ['solarized-light', 'Solarized Light'],
-  ['solarized-dark', 'Solarized Dark'],
-  ['monokai', 'Monokai'],
-  ['nord', 'Nord'],
-  ['catppuccin-latte', 'Catppuccin Latte'],
-  ['catppuccin-frappe', 'Catppuccin Frappé'],
-  ['catppuccin-macchiato', 'Catppuccin Macchiato'],
-  ['catppuccin-mocha', 'Catppuccin Mocha'],
-  ['one-dark', 'One Dark'],
-  ['dracula', 'Dracula'],
+// Each theme's background colour is its swatch: the sheet scopes it to `:root`, so the panel can't
+// read another theme's colour from CSS. appearance.test.ts keeps the two in step.
+export const THEMES: readonly (readonly [id: string, label: string, background: string])[] = [
+  ['light', 'Light', '#ffffff'],
+  ['dark', 'Dark', '#121212'],
+  ['solarized-light', 'Solarized Light', '#fdf6e3'],
+  ['solarized-dark', 'Solarized Dark', '#002b36'],
+  ['monokai', 'Monokai', '#272822'],
+  ['nord', 'Nord', '#2e3440'],
+  ['catppuccin-latte', 'Catppuccin Latte', '#eff1f5'],
+  ['catppuccin-frappe', 'Catppuccin Frappé', '#303446'],
+  ['catppuccin-macchiato', 'Catppuccin Macchiato', '#24273a'],
+  ['catppuccin-mocha', 'Catppuccin Mocha', '#1e1e2e'],
+  ['one-dark', 'One Dark', '#282c34'],
+  ['dracula', 'Dracula', '#282a36'],
 ]
 export const STYLES: readonly (readonly [id: string, label: string])[] = [
   ['terminal', 'Terminal'],
@@ -34,7 +36,7 @@ const APPEARANCE_KEY = 'appearance'
 
 export async function loadAppearance(storage: BrowserApi['storage']['local']): Promise<Appearance> {
   const stored = (await storage.get([APPEARANCE_KEY]))[APPEARANCE_KEY] as Partial<Appearance> | undefined
-  const known = (list: typeof THEMES, id: unknown) => list.some(([known]) => known === id)
+  const known = (list: readonly (readonly [string, ...string[]])[], id: unknown) => list.some(([known]) => known === id)
   return {
     theme: known(THEMES, stored?.theme) ? stored!.theme! : null,
     style: known(STYLES, stored?.style) ? stored!.style! : 'terminal',

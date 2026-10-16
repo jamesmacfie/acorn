@@ -704,6 +704,18 @@ describe('browser bridge selection', () => {
     await call({ op: 'node.select', nodeId: 'node-a' })
     expect(await call({ op: 'node.forget', nodeId: 'node-a' })).toEqual({ nodes: [], activeNodeId: null, status: null })
   })
+
+  it('renames a Node for this browser and keeps its pairing and selection', async () => {
+    const { call } = await paired()
+    await call({ op: 'node.select', nodeId: 'node-a' })
+    const renamed = await call({ op: 'node.rename', nodeId: 'node-a', label: 'Studio Mac' })
+    expect(renamed).toMatchObject({ activeNodeId: 'node-a', nodes: [{ nodeId: 'node-a', label: 'Studio Mac' }] })
+    expect((await call({ op: 'nodes.list' })).nodes[0]).toMatchObject({ label: 'Studio Mac' })
+    expect(await call({ op: 'projects.list', nodeId: 'node-a' })).toMatchObject({ nodeId: 'node-a' })
+    await expect(call({ op: 'node.rename', nodeId: 'missing', label: 'Gone' })).rejects.toMatchObject({
+      code: 'unknown_node',
+    })
+  })
 })
 
 describe('browser bridge agent operations', () => {

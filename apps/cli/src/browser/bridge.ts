@@ -621,6 +621,10 @@ export function createBridge(options: {
         if (activeNodeId === request.nodeId) select(null)
         fleet.forget(request.nodeId)
         return nodes()
+      case 'node.rename':
+        if (!fleet.rename(request.nodeId, request.label))
+          throw new BridgeFailure('unknown_node', 'This browser has not paired that Node.')
+        return nodes()
       case 'projects.list':
         return listProjects(request.nodeId)
       case 'tasks.list':

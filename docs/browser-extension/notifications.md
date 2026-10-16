@@ -96,9 +96,9 @@ pending list drops it. When another client answered first, the row shows that an
 
 ## OS notifications
 
-OS notifications are off until the person ticks, in the sidebar's Settings, **Notify me when an agent waits on the projects of the
-page I'm on**. The tick asks the browser for the optional `notifications` permission, and unticking it
-removes the permission. The permission is the only setting, so turning it off in the browser's
+OS notifications are off until the person turns on **When an agent needs you**, under
+**Notifications** in the sidebar's Settings. The switch asks the browser for the optional
+`notifications` permission, and turning it off removes the permission. The permission is the only setting, so turning it off in the browser's
 settings turns it off here too. It's local to the browser profile and separate from the Node's
 associations.
 

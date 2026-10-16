@@ -213,6 +213,8 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const select = (nodeId: string | null) =>
     attempt(async () => showFleet(await client.call({ op: 'node.select', nodeId })))
   const forget = (nodeId: string) => attempt(async () => showFleet(await client.call({ op: 'node.forget', nodeId })))
+  const rename = (nodeId: string, label: string) =>
+    attempt(async () => showFleet(await client.call({ op: 'node.rename', nodeId, label })))
 
   onMount(() => void refresh())
   // ⌘K, or Ctrl+K, opens Go to task from anywhere in the panel once it has focus.
@@ -410,6 +412,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
             online={online()}
             pair={() => setPairing(true)}
             select={(nodeId) => void select(nodeId)}
+            rename={(nodeId, label) => void rename(nodeId, label)}
             forget={(nodeId) => void forget(nodeId)}
             handoffs={handoffs()}
             sites={sites()}

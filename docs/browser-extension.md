@@ -39,7 +39,7 @@ Three pieces carry a request from the sidebar to a Node:
 
 1. The extension, `apps/extension/`. Its sidebar page (`src/sidebar/`) is at one of three levels: Home,
    about the page beside it and the Node's tasks, one task with its panes as tabs, or one conversation
-   inside a task. Settings, behind the gear, holds Nodes, pairing, and site access
+   inside a task. Settings, behind the gear, is one page of Nodes, sites, notifications, and appearance
    ([sidebar navigation](./browser-extension/navigation.md)).
    Its background (`src/background/`) owns the one native port. Chrome runs the
    background as a module service worker and shows the page in its side panel. Firefox runs it as a

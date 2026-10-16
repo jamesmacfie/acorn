@@ -167,6 +167,8 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   }),
   z.strictObject({ ...envelope, op: z.literal('node.select'), nodeId: nodeId.nullable() }),
   z.strictObject({ ...envelope, op: z.literal('node.forget'), nodeId }),
+  // This browser's name for the Node. Nothing on the Node or in other clients changes.
+  z.strictObject({ ...envelope, op: z.literal('node.rename'), nodeId, label: z.string().trim().min(1).max(120) }),
   // Bound to the node it was asked of. The host refuses it once that node is no longer selected.
   z.strictObject({ ...envelope, op: z.literal('projects.list'), nodeId }),
   z.strictObject({ ...envelope, op: z.literal('tasks.list'), nodeId, projectId: rowId }),
@@ -510,6 +512,7 @@ export type BridgeResults = {
   'node.collect': NodeRecord | null
   'node.select': BridgeNodes
   'node.forget': BridgeNodes
+  'node.rename': BridgeNodes
   'projects.list': { nodeId: string; projects: BridgeProject[]; workspaces: BridgeWorkspace[] }
   'tasks.list': { nodeId: string; projectId: string; tasks: BridgeTask[] }
   'tasks.pages': { nodeId: string; tasks: BridgePageTask[] }

@@ -16,10 +16,10 @@ import {
   openSiteTask,
   chosen,
   openTask,
-  pick,
   pickFrom,
-  selected,
   shownTask,
+  siteList,
+  siteSwitch,
   taskRow,
   taskRows,
   useNode,
@@ -172,10 +172,6 @@ async function projectGroups(root: HTMLElement): Promise<Record<string, string[]
 }
 const suggestedOptions = async (root: HTMLElement) =>
   ((await projectGroups(root))['Suggested for this page'] ?? []).map((row) => row.split(' · ')[0])
-const siteAccess = (root: HTMLElement) =>
-  [...root.querySelectorAll('[aria-label="Site access"] li')].map(
-    (row) => `${row.querySelector('strong')!.textContent}: ${row.querySelector('.quiet')!.textContent}`,
-  )
 
 const site = (projectId: string, origin: string, pathPrefix = '/'): ProjectSite => ({ projectId, origin, pathPrefix })
 
@@ -298,92 +294,128 @@ describe('project suggestions for a site', () => {
     expect(root.querySelector('[aria-label="This page"]')).toBeNull()
     expect(idle(root)).toBe(true)
     await openSettings(root)
-    expect(siteAccess(root)).toEqual([])
+    expect(siteList(root)).toEqual([])
   })
 })
 
-describe('the project site editor', () => {
-  it('adds each kind of site from a dialog that starts on the page, and removes them', async () => {
+describe('Settings › Sites', () => {
+  const sitesSection = (root: HTMLElement) => root.querySelector<HTMLElement>('[data-settings-section="sites"]')!
+  const siteMenu = async (root: HTMLElement, host: string) => {
+    const row = [...sitesSection(root).querySelectorAll<HTMLElement>('.ui-row')].find(
+      (candidate) => candidate.querySelector('.ui-text')?.textContent === host,
+    )
+    button(row!, 'Site actions')!.click()
+    await settle(20)
+  }
+
+  it('adds each kind of site from a dialog that starts on the page, and edits and removes them', async () => {
     const { state, root } = mount({ url: 'https://example.com/app/login' })
     await settle(30)
     await openSettings(root)
-    button(root, 'Projects')!.click()
-    await settle(20)
-    expect(root.querySelectorAll('[data-testid="project-site"]')).toHaveLength(0)
+    expect(siteList(root)).toEqual([])
     const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')
+    const field = () => dialog()!.querySelector<HTMLInputElement>('input[name="site"]')!
     const open = async () => {
-      button(root, 'Add site')!.click()
+      button(sitesSection(root), 'Add site')!.click()
       await settle(20)
     }
-    const submit = async () => {
-      button(dialog()!, 'Add site')!.click()
+    const submit = async (label = 'Add site') => {
+      button(dialog()!, label)!.click()
       await settle(20)
     }
-    const added = () => state.requests.filter((request) => request.op === 'site.add')
+    const calls = () => state.requests.filter((request) => request.op === 'site.add' || request.op === 'site.remove')
 
-    // The page's domain, on the first project, by default.
+    // The page's domain, on the first project, by default, with a check that it covers the page.
     await open()
-    expect(dialog()!.querySelector<HTMLInputElement>('input[name="site"]')!.value).toBe('example.com')
-    expect(selected(dialog()!, 'site-project')).toBe('p1')
+    expect(field().value).toBe('example.com')
+    expect(chosen(dialog()!, 'Project')).toBe('Web')
+    expect(dialog()!.textContent).toContain('Covers this page')
     await submit()
     expect(dialog()).toBeNull()
-    expect(added().at(-1)).toMatchObject({ nodeId: 'n1', projectId: 'p1', site: { domain: 'example.com' } })
+    expect(calls().at(-1)).toMatchObject({
+      op: 'site.add',
+      nodeId: 'n1',
+      projectId: 'p1',
+      site: { domain: 'example.com' },
+    })
 
-    // A pattern starts empty, says whether it covers the page, and is checked before it is sent.
+    // A pattern starts empty, says nothing about the page, and is checked before it is sent.
     await open()
     button(dialog()!, 'Regex')!.click()
     await settle(20)
-    expect(dialog()!.querySelector<HTMLInputElement>('input[name="site"]')!.value).toBe('')
+    expect(field().value).toBe('')
     fill(dialog()!, 'input[name="site"]', '(')
     await submit()
     expect(dialog()!.textContent).toContain("That pattern isn't a valid regular expression.")
-    expect(added()).toHaveLength(1)
+    expect(calls()).toHaveLength(1)
     fill(dialog()!, 'input[name="site"]', '/app/')
     await settle(20)
-    expect(dialog()!.textContent).toContain('Covers this page.')
+    expect(dialog()!.textContent).not.toContain('Covers this page')
     await submit()
-    expect(added().at(-1)).toMatchObject({ projectId: 'p1', site: { regex: '/app/' } })
+    expect(calls().at(-1)).toMatchObject({ projectId: 'p1', site: { regex: '/app/' } })
 
-    // Another project, and the page's address as a prefix.
+    // Another project, picked by name with its workspace beside it, and the page's address as a prefix.
     await open()
-    await pick(dialog()!, 'site-project', 'p2')
+    await pickFrom(dialog()!, 'Project', 'Docs')
     button(dialog()!, 'Starts with')!.click()
     await settle(20)
     await submit()
-    expect(added().at(-1)).toMatchObject({
+    expect(calls().at(-1)).toMatchObject({
       projectId: 'p2',
       site: { origin: 'https://example.com', pathPrefix: '/app/login' },
     })
-
-    const listed = (project: string) =>
-      [...root.querySelectorAll(`[aria-label="${project}"] [data-testid="project-site"]`)].map((row) => row.textContent)
-    expect(listed('Web')).toEqual(['example.com', '/app/'])
-    expect(listed('Docs')).toEqual(['https://example.com/app/login'])
-    // Where a project is suggested and what the extension may read are listed apart. A pattern asks
-    // for no access.
-    expect(siteAccess(root)).toEqual([
-      '*.example.com: Project suggestions · Not allowed',
-      'example.com: Project suggestions · Not allowed',
+    // One row per site, by the access the browser grants. A regex names no host, so it has no switch.
+    expect(siteList(root)).toEqual([
+      '*.example.com: Suggests Web · off',
+      '/app/: Suggests Web',
+      'example.com: Suggests Docs · off',
     ])
 
-    button(root.querySelector('[aria-label="Web"]')!, 'Remove')!.click()
-    await settle(20)
-    expect(listed('Web')).toEqual(['/app/'])
+    // Edit moves the pattern to Docs: the new association first, then the old one goes.
+    await siteMenu(root, '/app/')
+    expect(menuItems()).toEqual(['/app/ · Web', 'Edit', 'Remove'])
+    await choose('Edit')
+    expect(dialog()!.textContent).toContain('Edit site')
+    expect(field().value).toBe('/app/')
+    await pickFrom(dialog()!, 'Project', 'Docs')
+    await submit('Save')
+    expect(calls().slice(-2)).toMatchObject([
+      { op: 'site.add', projectId: 'p2', site: { regex: '/app/' } },
+      { op: 'site.remove', projectId: 'p1', site: { regex: '/app/' } },
+    ])
+    expect(siteList(root)).toEqual([
+      'example.com: Suggests Docs · off',
+      '/app/: Suggests Docs',
+      '*.example.com: Suggests Web · off',
+    ])
+
+    await siteMenu(root, '*.example.com')
+    await choose('Remove')
     expect(state.sites.n1).toEqual([
-      { projectId: 'p1', regex: '/app/' },
       { projectId: 'p2', origin: 'https://example.com', pathPrefix: '/app/login' },
+      { projectId: 'p2', regex: '/app/' },
     ])
   })
 
-  it('asks for access to a localhost association by host, as browsers grant it', async () => {
-    const { fake, root } = mount({ sites: [site('p1', 'http://localhost:5173', '/admin')] })
+  it('switches access by host, as browsers grant it, and leaves the association alone', async () => {
+    const { fake, state, root } = mount({ sites: [site('p1', 'http://localhost:5173', '/admin')] })
     await settle(30)
     await openSettings(root)
-    expect(siteAccess(root)).toEqual(['http://localhost: Project suggestions · Not allowed'])
-    button(root, 'Allow')!.click()
-    await settle(20)
+    expect(siteList(root)).toEqual(['http://localhost: Suggests Web · off'])
+    await siteSwitch(root, 'http://localhost')
     expect(fake.granted.has('http://localhost/*')).toBe(true)
-    expect(siteAccess(root)).toEqual(['http://localhost: Project suggestions · Allowed'])
+    expect(siteList(root)).toEqual(['http://localhost: Suggests Web · on'])
+
+    // Off asks nothing, and the project is still suggested there.
+    await siteSwitch(root, 'http://localhost')
+    expect(fake.granted.has('http://localhost/*')).toBe(false)
+    expect(siteList(root)).toEqual(['http://localhost: Suggests Web · off'])
+    expect(state.sites.n1).toHaveLength(1)
+
+    // A declined prompt puts the switch back.
+    fake.answerRequest = false
+    await siteSwitch(root, 'http://localhost')
+    expect(siteList(root)).toEqual(['http://localhost: Suggests Web · off'])
   })
 })
 
@@ -694,7 +726,7 @@ describe('This page', () => {
     expect(button(thisPage(root), 'Show the branch marker on this site')).toBeUndefined()
 
     await openSettings(root)
-    expect(siteAccess(root)).toEqual(['runn-05ea41.runn.localhost: Branch marker on its pages · Not allowed'])
+    expect(siteList(root)).toEqual(['runn-05ea41.runn.localhost: Branch marker for Runn stack · off'])
   })
 })
 

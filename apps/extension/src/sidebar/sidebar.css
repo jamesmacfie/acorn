@@ -121,12 +121,18 @@ main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-st
 /* Home on a page that matches nothing: the Acorn mark alone, in the middle of the panel. */
 /* A lone button in a section or form keeps its own width rather than the column's. */
 :is(.view > section, .view > section > section, form) > button { justify-self: start; }
-/* Settings: the desktop's tab strip, narrow enough for five tabs, over one padded column per tab. */
-.settings .ui-tab { min-width: 0; padding: 0 var(--space-4); }
-.settings .ui-tab-panel > section, .sites > section { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-row); }
-.sites { gap: var(--gap-section); }
-.sites .section-head { align-items: center; }
-.sites .section-head > button { flex: none; white-space: nowrap; }
+/* Settings: a setting's control takes its own width. The kit's fixed control column is sized for the
+ * desktop's page and squeezes the label in a panel this narrow. */
+.settings { --setting-control-w: max-content; }
+/* Add a site's Match: the four kinds share the dialog's width, so the last isn't cut off in the
+ * Terminal pack's wider letters. A long label wraps instead. */
+[role='dialog'] .ui-segments { display: flex; }
+[role='dialog'] .ui-segment { flex: 1 1 auto; min-width: 0; padding-inline: var(--space-2); }
+/* A menu item's note, such as a Node's address beside Copy address, gives way before its label does. */
+.ui-menu-label { flex: 1 0 auto; }
+.ui-menu-trailing { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A theme's colour, in Settings' theme picker. */
+.swatch { display: inline-block; flex: none; width: 12px; height: 12px; border: var(--control-border); border-radius: var(--radius-chip); vertical-align: -1px; }
 h2, h3 {
   margin: 0;
   font-size: var(--label-size);
@@ -253,7 +259,6 @@ fieldset { border: var(--surface-border); border-radius: var(--radius-surface); 
 /* A short label beside a name, such as the Node on this Mac. */
 .tag { padding: 0 var(--space-2); border: var(--control-border); border-radius: var(--radius-chip); font-size: var(--fs-xs); color: var(--text-muted); }
 ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
-.sites { display: grid; gap: var(--gap-row); }
 
 /* ── This page ──────────────────────────────────────────────────────────────────────────────── */
 /* A field's caption beside its picker, small and muted, as one column of labels. Runs' workflow form

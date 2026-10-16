@@ -6,8 +6,10 @@ import type { BrowserApi } from '../browser'
 import { CallFailure } from '../messages'
 import type { BridgeClient } from './bridgeClient'
 import { errorGuidance } from './guidance'
+import { SettingsSection } from '@acorn/client-core/kit/components/layout'
 import { Notifications } from './Settings'
-import { SiteAccess } from './SiteAccess'
+import { SiteList } from './Sites'
+import { siteRows } from './siteRows'
 import { State } from './state'
 
 // A Node has no name of its own. Every Acorn client calls the one on this computer this.
@@ -87,12 +89,17 @@ export function Pairing(props: {
                 <p class="quiet">Switch Nodes in Settings.</p>
               </section>
               {/* Both optional: the same controls Settings has, so either can wait until later. */}
-              <SiteAccess
-                api={props.api}
-                handoffs={props.handoffs.filter((handoff) => handoff.anchors.length)}
-                sites={[]}
-                apps={[]}
-              />
+              <SettingsSection id="sites" label="Sites">
+                <SiteList
+                  api={props.api}
+                  rows={siteRows({
+                    handoffs: props.handoffs.filter((handoff) => handoff.anchors.length),
+                    sites: [],
+                    apps: [],
+                    projects: [],
+                  })}
+                />
+              </SettingsSection>
               <Notifications permissions={props.api.permissions} />
               <section>
                 <button type="button" class="quiet" onClick={() => props.close()}>

@@ -106,6 +106,8 @@ A problem with the bridge itself shows as a line under the top bar, with the nex
 
 ## Settings
 
-Settings holds the Node list, where **Use** switches Nodes and **Forget** forgets one, pairing, site
-access, each project's sites, notifications, and appearance ([set up](./setup.md)). Settings stays
-open when you switch Nodes there.
+Settings is one page of four sections: **Nodes**, where **Use** switches Nodes, **Pair** starts
+pairing, and each Node's ⋯ menu renames, copies, or forgets it; **Sites**, the websites the extension
+works on with an access switch each ([project sites](./project-sites.md#settings--sites));
+**Notifications**; and **Appearance** ([set up](./setup.md)). Settings stays open when you switch
+Nodes there.

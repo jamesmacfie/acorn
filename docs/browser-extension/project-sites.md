@@ -69,7 +69,7 @@ workspace:
   rest under **Other projects**. A project they leave out is cleared, and the picker reads **Choose a
   project**.
 - **No candidate** shows no picker, and Home shows only its task list. To tie the page's site to a
-  project, add it under Settings → **Projects**.
+  project, click **Add site** under **Sites** in Settings.
 
 Under the picker, **This page** lists the chosen project's open tasks as
 [Home's task rows](./task-pages.md#homes-task-list), from the Node's task list, and clicking one opens
@@ -88,27 +88,40 @@ suggested. A later page on the same origin that suggests the same projects gets 
 again. A page on that origin that suggests other projects gets its own suggestion. Choosing the
 suggestion again forgets the override.
 
-## The editor
+## Settings › Sites
 
-Settings uses the desktop's tab strip: **Nodes**, **Projects**, **Permissions**, **Notifications**,
-and **Appearance**.
+Settings is one page: **Nodes**, **Sites**, **Notifications**, and **Appearance**, each the kit's
+`SettingsSection`. **Sites** lists every website the extension does something on, one row per access
+pattern the browser grants, built by `siteRows` in `apps/extension/src/sidebar/siteRows.ts` from the
+selected Node's handoffs, its project associations, and the apps its tasks' plugins publish. Each row
+shows:
 
-**Projects** lists every visible project on the selected Node with its associations, each with its
-kind and **Remove**. **Add site** opens a dialog with a project picker, which starts on the current
-task's project and offers a filter once the list is long, a choice of kind, and the address or
-pattern. Until the person types, the field holds the page beside the sidebar in the chosen kind's
-form, so the dialog starts on the page's domain. A pattern starts empty. Under the field the dialog
-says whether the entry covers that page, and it says what was typed wrong before anything goes to the
-Node.
+- The plugin's logo for a site a plugin uses, when the kit has its mark, such as GitHub's, and a muted
+  globe otherwise.
+- The host, then what the extension does there, joined with commas: "Task chips on its pages" for a
+  handoff with buttons, "Look up items" for a handoff the sidebar offers, "Suggests *project*" for an
+  association, and "Branch marker for *app*" for a task's
+  [branch marker](./task-pages.md#the-branch-marker).
+- For a site that suggests a project, a ⋯ menu with each association, its project, **Edit**, and
+  **Remove**.
+- A switch for the browser's access to the site.
 
-Site access is listed apart, under **Permissions**. Each site there says what access is for:
-buttons on its pages, handoffs in the sidebar, project suggestions, or the
-[branch marker](./task-pages.md#the-branch-marker) on a task's app. Browsers grant access by host
-and not by port, so a `http://localhost:5173` association asks for all of `http://localhost`. A domain
-asks for `https://*.<domain>/*`, so a domain served only over plain `http` gets no access row of its
-own. A pattern names no host, so it asks for nothing: its pages match only where other access lets the
-sidebar read the address. Removing access stops the sidebar reading the page, so its suggestions go at
-once.
+The switch is browser access and nothing else. Turning it on asks the browser. Turning it off asks
+nothing and removes the access, and leaves every association in place, so the panel just can't read
+that site's pages. Removing access stops the sidebar reading the page, so its suggestions go at once.
+Browsers grant access by host and not by port, so a `http://localhost:5173` association asks for all of
+`http://localhost`. A domain asks for `https://*.<domain>/*`, so a domain served only over plain
+`http` gets no access of its own. A pattern names no host, so it has a row with no switch: its pages
+match only where other access lets the sidebar read the address.
+
+**Add site** in the section's header opens a dialog with the kit's project `Picker`, each project with
+its workspace, which starts on the current task's project. Then **Match**: **Domain**, **Starts with**,
+**Exact page**, or **Regex**, then the address or pattern. Until the person types, the field holds the
+page beside the sidebar in the chosen kind's form, so the dialog starts on the page's domain. A pattern
+starts empty. Under the field a green check says "Covers this page" when the entry matches that page,
+and nothing shows for a pattern. The dialog says what was typed wrong before anything goes to the Node.
+**Edit** opens the same dialog on the association. Saving adds the new association before it removes
+the old one, so a refusal loses nothing.
 
 ## Handoffs
 

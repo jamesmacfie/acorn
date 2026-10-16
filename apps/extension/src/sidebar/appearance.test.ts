@@ -20,6 +20,21 @@ describe('appearance', () => {
     ]).toEqual(STYLES.map(([id]) => id))
   })
 
+  it("gives each theme's swatch the background colour its stylesheet block sets", () => {
+    const themes = sheet('tokens-theme.css')
+    // Every `--name: value` in the plain :root blocks, for the `var()` a theme block points at.
+    const rootBlocks = [...themes.matchAll(/^:root \{([^}]*)\}/gm)].map((match) => match[1]).join('')
+    const rootValue = (name: string) => new RegExp(`(?<![\\w-])--${name}:\\s*([^;]+);`).exec(rootBlocks)?.[1]
+    const background = (id: string) => {
+      // Light is the plain :root default, with no block of its own.
+      const block =
+        id === 'light' ? rootBlocks : new RegExp(`:root\\[data-theme="${id}"\\] \\{([^}]*)\\}`).exec(themes)?.[1]
+      const value = /(?<![\w-])--bg:\s*([^;]+);/.exec(block ?? '')?.[1]
+      return value?.replace(/^var\(--([\w-]+)\)$/, (_, name: string) => rootValue(name)!)
+    }
+    for (const [id, , swatch] of THEMES) expect(background(id), id).toBe(swatch)
+  })
+
   it('follows the system until a theme is chosen, and follows a choice made in another panel', async () => {
     const fake = fakeBrowser()
     const root = { dataset: {} as DOMStringMap }

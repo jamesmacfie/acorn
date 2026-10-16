@@ -54,7 +54,7 @@ user-level folder that `acorn browser install` writes. A Chrome started with `--
 
 ## Pair a Node
 
-The panel opens on pairing while no Node is paired. Later, choose **Pair a Node** under **Nodes** in
+The panel opens on pairing while no Node is paired. Later, click **Pair** in the **Nodes** header in
 Settings.
 
 1. **Choose a Node.** The Node running on this Mac is listed first, as **This computer** with an **On
@@ -70,9 +70,9 @@ Settings.
    Nodes → Pair a browser**. A standalone Node prints one at start, and `kill -USR1 <pid>` prints
    another. The name fills in as **This computer** for the Node on this Mac, or the address for
    another. Click **Pair**.
-4. **Done.** The panel names the Node it paired with. It offers **Allow** for each site where the Node's
-   plugins put buttons, such as `github.com`, and a box for notifications. Both are optional, and both
-   stay in Settings.
+4. **Done.** The panel names the Node it paired with. It offers an access switch for each site where
+   the Node's plugins put buttons, such as `github.com`, and the notifications switch. Both are
+   optional, and both stay in Settings.
 
 Each browser pairs on its own, so pair Chrome and Firefox separately. A Node on another computer must
 advertise its address, or be reached through an SSH tunnel, as
@@ -80,11 +80,13 @@ advertise its address, or be reached through an SSH tunnel, as
 
 ## Turn on site features
 
-- In Settings, click **Allow** beside a site under **Permissions** for its buttons, sidebar handoffs,
-  and project suggestions. The browser asks you first.
+- In Settings, turn on a site's switch under **Sites** for its buttons, sidebar handoffs, and project
+  suggestions. The browser asks you first. Turning it off asks nothing
+  ([project sites](./project-sites.md#settings--sites)).
 - To capture from a site you haven't allowed, click the Acorn toolbar button on that page, then
   capture.
-- In Settings, tick **Notify me when an agent waits** for OS notifications. The browser asks you first.
+- In Settings, turn on **When an agent needs you** under **Notifications** for OS notifications. The
+  browser asks you first.
 - A handoff works only for a plugin running on the selected Node. The desktop's Node has GitHub, Linear,
   and Rollbar. A standalone Node has GitHub, and needs Linear and Rollbar installed as plugins.
 
@@ -95,10 +97,14 @@ advertise its address, or be reached through an SSH tunnel, as
   `acorn browser install` from the new copy, then click **Retry**. Pairings stay.
 - **After reinstalling the extension**, its pairings are still in the bridge. Click **Use** beside the
   Node in Settings.
+- **Rename** in a Node's ⋯ menu in Settings turns its name into a field: Enter or leaving the field
+  saves, and Escape cancels. It calls `node.rename`, so the bridge keeps the name. The name is this
+  browser's own, so nothing on the Node or in other clients changes.
 - **To remove the bridge**, run `acorn browser uninstall`. It removes the registrations and launchers,
   and names each browser's bridge folder, which still holds its pairings and tokens. Delete
   `~/Library/Application Support/acorn/browser-bridge/<browser>/` to remove them.
-- **Forget** in Settings deletes one Node's pairing from this browser. Neither
+- **Forget** in a Node's ⋯ menu in Settings deletes its pairing from this browser, after a second
+  click on **Forget *name*?**. Neither
   forgetting nor deleting the folder revokes the browser's device on the Node. Another paired client
   can revoke it with `DELETE /v1/core/devices/:id` ([authentication](../authentication.md)).
 
@@ -120,7 +126,10 @@ the app does, with `data-theme` and `data-style` on the page's root element
 
 The desktop keeps its appearance as a device preference the extension can't read, so the panel has
 its own. By default it follows the system's light or dark setting with the Terminal style. Settings →
-**Appearance** offers the app's 12 themes and 4 style packs. The choice is kept in `storage.local`
+**Appearance** offers the app's 12 themes in the kit's `Picker`, with **System** first, and the 4 style
+packs as a segmented control. Each theme's row shows a swatch of its background. The sheet scopes
+those colours to `:root`, so `THEMES` in `appearance.ts` carries each one, and
+`appearance.test.ts` checks it against `tokens-theme.css`. The choice is kept in `storage.local`
 under `appearance` ([browser storage](./conversations.md#browser-storage)), and every open panel
 follows a change made in any of them.
 

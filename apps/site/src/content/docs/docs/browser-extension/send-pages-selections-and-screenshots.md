@@ -71,7 +71,7 @@ It can read a page when:
 
 - You clicked the Acorn toolbar button on that tab, until it goes to another page.
 - You used **Add to Acorn chat** or **Ask Acorn about this element** on it.
-- You allowed its site in the panel's **Settings** > **Permissions**. That covers text and links, but
+- You turned on its site's switch in the panel's **Settings** > **Sites**. That covers text and links, but
   not screenshots, which need the toolbar button or a right-click entry.
 
 Clicking inside the panel grants nothing. With no access, the panel asks you to click the toolbar

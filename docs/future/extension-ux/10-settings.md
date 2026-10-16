@@ -1,7 +1,72 @@
 # Phase 10: one Settings page
 
-Date: October 16, 2026. Status: proposed. Independent of the other phases, apart from Settings opening
+Date: October 16, 2026. Status: done on October 17, 2026. Independent of the other phases, apart from Settings opening
 from [phase 1](./01-navigation.md)'s top bar. [Phase 11](./11-connect.md) needs this phase's rename.
+
+## Completion note
+
+Landed on October 17, 2026. Settings is one scrolling page of four kit `SettingsSection`s: **Nodes**,
+**Sites**, **Notifications**, and **Appearance**, the parts the desktop's Settings pages use. A Node
+is the kit's stacked `Row` with a `StatusDot`, **In use** as a `Badge` or **Use**, and a ⋯ `Menu` with
+**Rename**, **Copy address**, and **Forget *name***. Rename is a field in place, and calls the new
+`node.rename` bridge operation. **Sites** merges Permissions and Projects: `siteRows` in
+`apps/extension/src/sidebar/siteRows.ts` builds one row per access pattern, each with its uses, a ⋯ menu
+for its associations, and an access switch. `AddSite.tsx` holds the dialog, now with the kit's project
+`Picker`, the "Covers this page" check, and an edit mode. The theme is a `Picker` with swatches, and the
+style a `SegmentedControl`. [Set up](../../browser-extension/setup.md),
+[project sites](../../browser-extension/project-sites.md#settings--sites),
+[native messaging](../../browser-extension/native-messaging.md), [navigation](../../browser-extension/navigation.md),
+[handoffs](../../browser-extension/handoffs.md), [notifications](../../browser-extension/notifications.md),
+[task pages](../../browser-extension/task-pages.md), and five site pages are updated.
+
+Decisions and deviations:
+
+- **Forget** uses `Menu.Item`'s `confirm`, the kit's arm-to-confirm inside a menu, not a
+  `ConfirmButton`. The first press turns the item into **Forget *name*?**, and the second forgets. The
+  kit's `Menu` says a `ConfirmButton` in a menu breaks its roving focus.
+- Rename saves on Enter or when the field loses focus, as the desktop's Node rename does, and Escape
+  cancels. A failed rename shows in the panel's error banner, and the field closes. `node.rename` takes
+  the label limits `node.collect` and `node.pair` use, and refuses an unknown Node with `unknown_node`.
+- The Node in use has a green dot while the panel is online and a red one otherwise; other Nodes have
+  the kit's muted dot.
+- A row's uses are generic, because the data has no per-site wording: "Task chips on its pages" for a
+  handoff with buttons, "Look up items" for one without, "Suggests *project*", and "Branch marker for
+  *app label*". A project the Node hasn't listed yet reads "Suggests a project".
+- A regex association names no host, so it gets its own row, keyed by its text, with a menu and no
+  switch.
+- A site's ⋯ menu lists each of its associations as a label, with **Edit** and **Remove** under each.
+  **Edit** opens the dialog on the association, titled **Edit site** with **Save**. Saving adds the new
+  association, then removes the old one, so a refusal loses nothing. The bridge has no update operation.
+- A switch's change returns the browser's answer, so a declined prompt puts it back, through the kit
+  `Checkbox`'s own rollback. Notifications works the same way.
+- "Covers this page" shows only for a match. A miss shows nothing, as a pattern does.
+- **System** heads the theme picker, with a half Light, half Dark swatch.
+- The site list part is `SiteList`, so pairing's done screen draws the same rows from its handoffs.
+  Phase 11's paired screen can take it as it is.
+- Sidebar CSS: `.settings` sets `--setting-control-w` to `max-content`, because the kit's fixed control
+  column is sized for the desktop and squeezed the labels into a third of the panel. Add site's
+  **Match** segments share the dialog's width, so **Regex** isn't cut off in the Terminal pack, which
+  was so before this phase too. A menu item's trailing note truncates before its label, for **Copy
+  address**. The old tab, `.sites`, and list rules are gone.
+- The test helpers `pick` and `selected` for native selects are gone; nothing in Settings is a native
+  select now.
+
+Sidebar-only, so a plugin can't reach it: `Settings`, `Sites`, `SiteList`, `AddSite`, and `siteRows`
+live in the extension, and so do `.swatch` and the three CSS rules above. The sections, rows, switches,
+pickers, segmented controls, menus, and dialog are all kit parts, and the terminal host has them. The
+desktop's own Node rows (`NodesSettings`) and theme select read the desktop's fleet and preference
+stores, which the extension doesn't have, so the sidebar draws the same parts from bridge data. A kit
+`Swatch` would let the desktop's theme select show colours too.
+
+For later phases:
+
+- Phase 11: `node.rename` exists, so pairing can drop its name field. `SiteList` with
+  `siteRows({ handoffs, sites: [], apps: [], projects: [] })` draws "Allow on these sites", and
+  `Notifications` from `Settings.tsx` is a `SettingsSection` with the switch.
+- Tests: `apps/extension/src/test/sidebarUi.ts` has `nodeRow`, `siteList`, and `siteSwitch`. Settings'
+  sections are found by `[data-settings-section="…"]`, since `SettingsSection` names itself through
+  `aria-labelledby`. `App.test.tsx` has `nodeMenu`, `menuItems`, and `chooseItem`, and its fake Node
+  answers `node.rename`.
 
 ## Goal
 
@@ -26,10 +91,10 @@ which lets pairing drop its name field.
 - `apps/extension/src/sidebar/Settings.tsx` draws five kit `Tabs`: **Nodes**, **Projects**,
   **Permissions**, **Notifications**, and **Appearance**. Nodes lists each paired Node with **Use** and
   **Forget**, then **Pair a Node**.
-- `apps/extension/src/sidebar/SiteAccess.tsx` lists the sites the extension may read, each a switch
+- `SiteAccess.tsx`, since folded into `apps/extension/src/sidebar/Sites.tsx`, listed the sites the extension may read, each a switch
   that asks the browser for optional host access.
-- `apps/extension/src/sidebar/ProjectSites.tsx` lists every project's site associations, and `AddSite`
-  is its dialog, with a native project select.
+- `ProjectSites.tsx`, since split into `Sites.tsx` and `apps/extension/src/sidebar/AddSite.tsx`, listed
+  every project's site associations, and `AddSite` was its dialog, with a native project select.
 - `apps/extension/src/sidebar/appearance.ts` lists `THEMES` and `STYLES`. A theme of null follows the
   system.
 - The host has no rename operation. `FleetStore.rename` in `packages/custody/src/broker/fleetStore.ts`

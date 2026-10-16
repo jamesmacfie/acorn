@@ -84,11 +84,12 @@ To pair with a Node on another machine:
 3. Paste the pairing code. **Pair a browser** on the Node's row in the desktop app gives one. Click
    **Pair**.
 
-Once paired, the panel offers **Allow** for each site where the Node's plugins put buttons, such as
-`github.com`, and notifications. Both are optional, and both are in the panel's Settings later.
+Once paired, the panel offers a switch for each site where the Node's plugins put buttons, such as
+`github.com`, and one for notifications. Both are optional, and both are in the panel's Settings later.
 
 Each browser pairs on its own, so pair Chrome and Firefox separately. To pair with another Node later,
-choose **Pair a Node** under **Nodes** in the panel's Settings. **Use** there switches Nodes.
+click **Pair** beside **Nodes** in the panel's Settings. **Use** there switches Nodes, and a Node's
+**⋯** menu renames it for this browser.
 
 ## What the browser asks for, and why
 
@@ -104,9 +105,9 @@ choose **Pair a Node** under **Nodes** in the panel's Settings. **Use** there sw
 
 Two more are optional, and the browser asks before granting either:
 
-- **Access to a site**, from **Allow** beside it in the panel's **Settings** > **Permissions**. It lets
-  the extension draw buttons on that site's pages and read them for its suggestions.
-- **Notifications**, from the tick in **Settings** > **Notifications**.
+- **Access to a site**, from its switch in the panel's **Settings** > **Sites**. It lets the extension
+  draw buttons on that site's pages and read them for its suggestions.
+- **Notifications**, from the switch in **Settings** > **Notifications**.
 
 The extension reads no site until you allow it, or click the toolbar button on it. It's off in private
 windows.
@@ -134,7 +135,8 @@ When something's wrong, a line under the panel's header says what, and what to d
   install` from the new copy, then **Retry**. Pairings stay.
 - **After reinstalling the extension**, pick the Node again from the Node menu, or **Use** beside it in
   Settings.
-- **To forget a Node**, choose **Forget** in the Node menu or Settings. This browser forgets it. The
+- **To forget a Node**, open its **⋯** menu in Settings, choose **Forget**, and click again to confirm.
+  This browser forgets it. The
   Node still lists the browser as paired until you revoke it there.
 - **To remove the bridge**, run `acorn browser uninstall`. It keeps each browser's pairings in
   `~/Library/Application Support/acorn/browser-bridge/<browser>/`. Delete that folder to remove them.
