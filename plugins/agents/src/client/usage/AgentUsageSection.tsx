@@ -1,6 +1,7 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import {
   Alert,
+  Card,
   DescriptionList,
   Fold,
   IconButton,
@@ -28,10 +29,10 @@ import { usageMeterTone, usageTone } from '../sessions/stateTone'
 
 // What each harness's own plan has left, read off the provider's CLI rather than any acorn record
 // (docs/managed-agents/providers.md § Plan usage). One block per harness, headed by its name and
-// refresh. A harness with one reading shows it straight under the header. A harness with extra
-// accounts gets a row per account, with a dot and the session and week bars, so the accounts can be
-// compared without opening anything. It is drawn inside a popover, which is why it carries no pane
-// chrome.
+// refresh. Each account sits on its own card, so one account's numbers can't run into the next. A
+// harness with one reading shows it on the card as is. A harness with extra accounts gets a row per
+// account, with a dot and the session and week bars, so the accounts can be compared without
+// opening anything. It is drawn inside a popover, which is why it carries no pane chrome.
 export default function AgentUsageSection(props: {
   showHeader?: boolean
   defaultAccounts?: Readonly<Record<string, string | undefined>>
@@ -75,38 +76,47 @@ export default function AgentUsageSection(props: {
                 />
               </Inline>
               {/* One reading needs no row: a row labelled "Usual sign-in" would say nothing. */}
-              <Show when={group.readings.length > 1} fallback={<AccountBody reading={group.readings[0]!} showDot />}>
+              <Show
+                when={group.readings.length > 1}
+                fallback={
+                  <Card pad="sm">
+                    <AccountBody reading={group.readings[0]!} showDot />
+                  </Card>
+                }
+              >
                 <For each={group.readings}>
                   {(reading) => {
                     const key = `${group.provider}:${usageAccountKey(reading)}`
                     return (
-                      <Fold
-                        level="sub"
-                        label={usageAccountLabel(reading)}
-                        leading={<StatusDot tone={usageTone(reading.health)} label={reading.health} />}
-                        meta={
-                          // No pace mark: a bar this short cannot show one legibly.
-                          <Inline gap="row">
-                            <For each={compactQuotas(reading)}>
-                              {(quota) => (
-                                <Inline>
-                                  <Text emphasis="muted">{quota.label}</Text>
-                                  <Meter
-                                    value={quota.fill}
-                                    tone={usageMeterTone(quota.health)}
-                                    label={`${usageAccountLabel(reading)} ${quota.label}: ${quota.value} remaining`}
-                                  />
-                                  <Text emphasis="muted">{quota.value}</Text>
-                                </Inline>
-                              )}
-                            </For>
-                          </Inline>
-                        }
-                        open={toggled()[key] ?? usageAccountKey(reading) === defaultKey()}
-                        onOpenChange={(open) => setToggled({ ...toggled(), [key]: open })}
-                      >
-                        <AccountBody reading={reading} />
-                      </Fold>
+                      <Card pad="sm">
+                        <Fold
+                          level="sub"
+                          label={usageAccountLabel(reading)}
+                          leading={<StatusDot tone={usageTone(reading.health)} label={reading.health} />}
+                          meta={
+                            // No pace mark: a bar this short cannot show one legibly.
+                            <Inline gap="row">
+                              <For each={compactQuotas(reading)}>
+                                {(quota) => (
+                                  <Inline>
+                                    <Text emphasis="muted">{quota.label}</Text>
+                                    <Meter
+                                      value={quota.fill}
+                                      tone={usageMeterTone(quota.health)}
+                                      label={`${usageAccountLabel(reading)} ${quota.label}: ${quota.value} remaining`}
+                                    />
+                                    <Text emphasis="muted">{quota.value}</Text>
+                                  </Inline>
+                                )}
+                              </For>
+                            </Inline>
+                          }
+                          open={toggled()[key] ?? usageAccountKey(reading) === defaultKey()}
+                          onOpenChange={(open) => setToggled({ ...toggled(), [key]: open })}
+                        >
+                          <AccountBody reading={reading} />
+                        </Fold>
+                      </Card>
                     )
                   }}
                 </For>
