@@ -156,11 +156,92 @@ export const codeHostDescriptor = z.object({
         .max(64)
         .optional()
         .describe('The pane that shows one. A task whose main change request is on this host opens on it.'),
+      // Where core asks about a task's change request for its agent tools and the `pr` context section.
+      // The routes under it answer the shapes below.
+      api: pluginRoute
+        .optional()
+        .describe(
+          "A route on your Node half. Acorn's agent tools read a task's change request from the routes under it.",
+        ),
     })
     .optional()
     .describe("How acorn treats this host's pull or merge requests. Every field is optional."),
 })
 export type CodeHostDescriptor = z.infer<typeof codeHostDescriptor>
+
+// What a code host's `changeRequest.api` routes answer (docs/plugins/code-hosts.md § Agent context).
+// Core parses each answer with these, so a compiled and a loaded plugin hand an agent the same fields.
+// Each GET carries `taskId` as a query parameter. The POST carries it in the body.
+
+// GET {api}/{number}
+export const changeRequestDetail = z.object({
+  number: z.number().int(),
+  title: z.string(),
+  body: z.string().nullable(),
+  changedFiles: z.array(z.string()),
+})
+
+// GET {api}/{number}/checks. A check that is still running is pending, not failing.
+export const changeRequestChecks = z.object({
+  number: z.number().int(),
+  checks: z.array(
+    z.object({
+      name: z.string(),
+      status: z.string().nullable(),
+      url: z.string().nullable(),
+      // The host's id for the CI run behind the check, when it has one.
+      runId: z.number().int().nullable().optional(),
+    }),
+  ),
+  failing: z.array(z.string()),
+  pending: z.array(z.string()),
+})
+
+const feedbackComment = z.object({
+  author: z.string().nullable(),
+  body: z.string().nullable(),
+  createdAt: z.number().nullable(),
+})
+
+// GET {api}/{number}/feedback, with `includeResolved=true` to add resolved threads.
+export const changeRequestFeedback = z.object({
+  number: z.number().int(),
+  reviews: z.array(
+    z.object({
+      author: z.string().nullable(),
+      state: z.string().nullable(),
+      body: z.string().nullable(),
+      submittedAt: z.number().nullable(),
+    }),
+  ),
+  threads: z.array(
+    z.object({
+      threadId: z.string(),
+      path: z.string().nullable(),
+      line: z.number().int().nullable(),
+      originalLine: z.number().int().nullable(),
+      outdated: z.boolean().nullable(),
+      side: z.string().nullable(),
+      resolved: z.boolean(),
+      comments: z.array(feedbackComment),
+    }),
+  ),
+  comments: z.array(feedbackComment),
+  // How many reviews, threads, and comments the host left out.
+  omitted: z.number().int().min(0),
+})
+export type ChangeRequestFeedback = z.infer<typeof changeRequestFeedback>
+
+// POST {api} sends this and answers `{ number }`. `head` is the task's branch.
+export const changeRequestCreateInput = z.object({
+  taskId: z.string().min(1),
+  title: z.string(),
+  body: z.string().optional(),
+  base: z.string().min(1),
+  head: z.string().min(1),
+  draft: z.boolean().optional(),
+})
+export const changeRequestCreated = z.object({ number: z.number().int().positive() })
 
 // `api` and `events` are enforced by client-core's frame broker. `contributions` stays loose: a manifest
 // written for a newer acorn should contribute less on an older one rather than fail to parse.

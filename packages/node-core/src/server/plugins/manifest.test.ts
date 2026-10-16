@@ -273,6 +273,22 @@ describe('runtime contribution descriptors', () => {
     expect(messages(declared)).toEqual([])
   })
 
+  it("keeps a code host's change request api inside its own routes", () => {
+    const declare = (api: string) =>
+      pluginManifestSchema.safeParse({
+        id: 'board',
+        name: 'Board',
+        version: '1.0.0',
+        baseline: 'acorn-1',
+        apiVersion: '1',
+        node: './dist/node.js',
+        permissions: { node: { core: ['projects:read'] } },
+        contributions: { codeHost: { label: 'GitLab', hosts: ['gitlab.com'], changeRequest: { api } } },
+      })
+    expect(messages(declare('/v1/p/board/change-requests'))).toEqual([])
+    expect(messages(declare('/v1/p/github/change-requests'))).toEqual(['route must be inside /v1/p/board/'])
+  })
+
   it('requires a node half and rejects duplicate local ids across carriers', () => {
     expect(
       messages(

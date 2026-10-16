@@ -6,15 +6,20 @@ import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import {
   asContextSection,
+  changeRequestSection,
   linkedIssuesSection,
   registerContextSection,
   removeContextSections,
 } from '@acorn/node-core/server/agentTools'
+import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
+import { createProjectService, createTaskService } from '@acorn/node-core/server/core'
+import { declareCodeHost } from '@acorn/node-core/server/pluginHost'
 import { taskContext } from '@acorn/node-core/server/routes'
+import { registerRoute, removePluginRoutes } from '@acorn/node-core/server/routes/registry.ts'
 import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@acorn/node-core/testkit'
-// Each plugin-owned section is shaped by the plugin that owns its rows, and reaches a test through
-// that plugin's testkit. Core keeps only `issues`.
-import { mirroredPullRequest, prFiles, pullRequests, pullRequestSection, repos } from '@acorn/plugin-github/testkit'
+// Core owns `issues` and `pr`. The `pr` section asks GitHub's change request routes, which reach this
+// test through the plugin's testkit, and notes is shaped by the plugin that owns its rows.
+import { changeRequestRoutes, checks, prFiles, pullRequests, repos } from '@acorn/plugin-github/testkit'
 import { notesSection, type ContextNotesSource } from '@acorn/plugin-notes/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 import { buildAgentTools } from '@acorn/node-core/server/agentTools'
@@ -28,13 +33,14 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
   let t: TestDb
   // The github mirror is a second database (docs/data-layer/plugin-databases.md § Plugin databases), so the `pr`
   // section's fixture is seeded into the plugin's own migrated file and reaches the section through
-  // the same injected source production uses. Two handles in one test is the honest shape: the
-  // assertions below still exercise `mirroredPullRequest` for real rather than a hand-written
-  // stand-in, which is what keeps them able to catch a drift between the section's contract and the
-  // mirror's columns.
+  // GitHub's real change request routes. Two handles in one test is the honest shape: the assertions
+  // below exercise the mirror reads for real rather than a hand-written stand-in, which is what keeps
+  // them able to catch a drift between the routes' contract and the mirror's columns.
   let gh: TestPluginDb
   let app: Hono<AppEnv>
   let notesSource: ContextNotesSource
+  let undeclare: () => void
+  const env = { ACTIVE_IDENTITY: { get: () => 'james' } } as unknown as Env
 
   beforeEach(async () => {
     t = makeTestDb()
@@ -47,12 +53,24 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
     removeContextSections('core')
     for (const owner of ['github', 'notes', 'memory']) removeContextSections(owner)
     registerContextSection('core', linkedIssuesSection)
-    registerContextSection(
+    registerContextSection('core', changeRequestSection(env))
+    undeclare = declareCodeHost(
       'github',
-      asContextSection(
-        pullRequestSection((userId, owner, name, number) => mirroredPullRequest(gh.db, userId, owner, name, number)),
-      ),
+      {
+        label: 'GitHub',
+        hosts: ['github.com'],
+        changeRequest: { label: 'pull request', prefix: '#', api: '/v1/p/github/change-requests' },
+      },
+      true,
     )
+    registerRoute({
+      plugin: 'github',
+      prefix: '/change-requests',
+      router: changeRequestRoutes(gh.db, {
+        tasks: createTaskService(t.db),
+        projects: createProjectService(t.db, memoryIdentityStore('james')),
+      }),
+    })
     registerContextSection('notes', asContextSection(notesSection((...args) => notesSource(...args))))
     vi.mocked(getDb).mockReturnValue(t.db)
     const now = Date.now()
@@ -98,6 +116,16 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
       createdAt: now,
       updatedAt: now,
       archivedAt: null,
+    })
+    await t.db.insert(schema.taskChangeRequests).values({
+      taskId: 'task1',
+      provider: 'github',
+      repoHost: 'github.com',
+      repoPath: 'acme/api',
+      number: 813,
+      role: 'primary',
+      provenance: 'task',
+      createdAt: now,
     })
     await gh.db.insert(repos).values({
       userId: 'james',
@@ -178,6 +206,8 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
 
   afterEach(() => {
     for (const owner of ['core', 'github', 'notes', 'memory']) removeContextSections(owner)
+    removePluginRoutes('github')
+    undeclare()
     gh.cleanup()
     t.cleanup()
   })
@@ -200,6 +230,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
       branch: 'fix/null-token',
       worktreePath: '/wt/acme-api-fix-null-token',
       pullNumber: 813,
+      changeRequest: { provider: 'github', number: 813 },
     })
     expect(Object.keys(ctx).sort()).toEqual(['sections', 'task'])
     expect(ctx.sections.find((section) => section.id === 'pr')?.items).toEqual([
@@ -240,7 +271,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
   })
 
   it('projects the same bounded items to agent tools', async () => {
-    const tools = buildAgentTools({ db: t.db, secrets: t.secrets })
+    const tools = buildAgentTools({ db: t.db, secrets: t.secrets, env })
     const call = async (name: string, input: unknown = {}) =>
       tools.find((tool) => tool.name === name)!.handler(input, { userLogin: 'james', taskId: 'task1' } as never)
     const context = await fetchCtx()
@@ -249,6 +280,27 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
     expect(await call('task_current')).toMatchObject({ links: issues })
     expect(await call('pr_current')).toEqual(pr)
     expect(await call('pr_changed_files')).toEqual(pr.details)
+    // The two tools GitHub used to own, through core and GitHub's own routes.
+    await gh.db.insert(checks).values([
+      { userId: 'james', repoId: 99, number: 813, name: 'test', status: 'failure', url: null, runId: 7, position: 0 },
+      { userId: 'james', repoId: 99, number: 813, name: 'lint', status: null, url: null, runId: null, position: 1 },
+    ])
+    expect(await call('pr_checks')).toEqual({
+      number: 813,
+      checks: [
+        { name: 'lint', status: null, url: null, runId: null },
+        { name: 'test', status: 'failure', url: null, runId: 7 },
+      ],
+      failing: ['test'],
+      pending: ['lint'],
+    })
+    expect(await call('pr_review_comments')).toEqual({
+      number: 813,
+      reviews: [],
+      threads: [],
+      comments: [],
+      omitted: 0,
+    })
     expect(await call('linked_issues')).toEqual(issues)
     expect(await call('linked_issues', { provider: 'linear' })).toEqual(
       issues.filter((item) => item.providerId === 'linear'),

@@ -11,9 +11,10 @@ the registry sorts by it, so core keeps no list of plugin IDs. Core applies byte
 records each section's status and freshness, and returns a deterministic snapshot. GitHub, notes,
 Linear, Rollbar, and task sections are optional, and one failing section keeps its siblings.
 
-The plugin that owns a section's rows also shapes it: `pr` is in
-`plugins/github/src/server/contextSection.ts`, and `notes` is in the same file in its own package.
-`@acorn/plugin-api/node` offers `truncateBytes` and `formatOmitted`, so a section's `format` applies
+The plugin that owns a section's rows also shapes it: `notes` is in `contextSection.ts` in its own
+package. Core owns `pr`, which asks the code host that holds the task's primary change request for it
+([code hosts](../plugins/code-hosts.md#agent-context)), so a GitLab task's merge request reads the same
+way as a GitHub pull request. `@acorn/plugin-api/node` offers `truncateBytes` and `formatOmitted`, so a section's `format` applies
 core's arithmetic, and core keeps the assembly, the order, and the 512 KiB budget. It also offers
 `pastedContent`, which wraps text you didn't write in `<pasted_content>` tags that Claude Code's
 system prompt explains. `pr` wraps the pull request body with it. The tag ID is a hash of the text,
@@ -24,11 +25,11 @@ through this registry. It applies the `notes` budget once across several tasks, 
 `core:before-snapshot` hook by assembling only the `notes` section. See
 [notes in delegated agents](../notes-and-memory.md#notes-in-delegated-agents).
 
-Core's own `issues` section registers at module scope, not through `wireAgentTools`, because the
-standalone Node (`pnpm dev:node`, and any Node paired over the LAN) doesn't call `wireAgentTools`.
+Core's own `issues` section registers at module scope. `pr` registers in `wireAgentTools`, with the
+core tools, because it needs the Node's bindings to call a code host's routes.
 `issues` and `task_links` are core tables ([external items](../data-layer.md)). GitHub and Rollbar
-write them through the `ExternalItemStore` seam. `issues` is the only section that reads the database
-handle, so the shared `PluginContextSection` contract withholds it from every other section.
+write them through the `ExternalItemStore` seam. Only core's sections read the database handle, so the
+shared `PluginContextSection` contract withholds it from every plugin's section.
 
 ## Rules for a section
 

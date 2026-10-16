@@ -38,12 +38,12 @@ rather than the patches, so the preview reads its segments through the same two 
 a pull's diff (§ Diff documents).
 
 Creating a pull request sends `plugin:github:pulls-changed` after the plugin invalidates the owning
-repository's open-pull list. The interactive route and `github_pull_create` agent tool share this
-write path.
+repository's open-pull list. The interactive route, the `POST /v1/p/github/change-requests` route
+behind core's `pr_create` tool, and the `github_pull_create` agent tool share this write path.
 
-The task-scoped `github_pull_create` agent tool shares the same create service as the interactive
-route. It infers the head from the task branch, uses the requested base, and atomically attaches the
-created PR through `CoreServices.tasks.attachChangeRequest`: the first attachment becomes the task's
+Core's `pr_create` and the `github_pull_create` agent tool, its older name, share the same create
+service as the interactive route. Each takes the head from the task branch, uses the requested base,
+and attaches the created PR through `attachChangeRequest`: the first attachment becomes the task's
 primary change request, while later attachments become durable related rows with the managed session
 id.
 After a managed agent turn completes, the GitHub plugin checks the task branch for an open PR using
@@ -60,12 +60,12 @@ after a turn does not prove who created it. A missing connection leaves the task
 failures are logged and another completed turn can retry; the check runs without a connected client
 and does not delay the agent's completion event. There is no startup replay of completed turns.
 
-Two read-tier tools sit beside it. `pr_review_comments` returns the submitted reviews, the inline
+Core's read-tier `pr_review_comments` and `pr_checks` tools ask this plugin's change request routes,
+under `/v1/p/github/change-requests`. `pr_review_comments` returns the submitted reviews, the inline
 threads and the conversation comments for the task's PR, and `pr_checks` returns every mirrored check
-with the failing ones named. Both read this plugin's mirror, so neither spends the credential or
-touches the network, and both distinguish an unmirrored PR from an empty one. Before they existed, an
-agent asked to address review feedback had to shell out to `gh` against data acorn already had
-([agent tools](../agent-tools.md) § GitHub).
+with the failing ones named. Both routes read this plugin's mirror, so neither spends the credential or
+touches the network, and a 404 tells core the PR is unmirrored rather than empty
+([code hosts](../plugins/code-hosts.md#agent-context)).
 
 The "my pull requests" collection filters by involvement (review-requested, assigned, authored) as a
 live GitHub search rather than a mirror query. Assignees are never mirrored, and review requests only

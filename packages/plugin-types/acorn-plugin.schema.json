@@ -4610,6 +4610,12 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 64
+                },
+                "api": {
+                  "description": "A route on your Node half. Acorn's agent tools read a task's change request from the routes under it.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
                 }
               }
             }

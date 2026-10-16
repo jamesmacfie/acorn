@@ -3,13 +3,14 @@ title: codeHost
 description: 'The Git hosts whose repositories your plugin understands, such as gitlab.com.'
 sources:
   - docs/plugins/code-hosts.md
-checked: '80943fbc5'
+checked: '1e5d6a032'
 ---
 
 `codeHost` claims Git hosts, such as `gitlab.com`. acorn stamps your plugin's ID on every project whose
 origin remote is on one of them, and your data sources get the paths of those projects. The optional
 `changeRequest` block tells acorn how to check out, name, and show your host's pull or merge requests.
-One per plugin.
+Its `api` names the routes acorn's pull request tools, such as `pr_checks`, read a task's change
+request from. One per plugin.
 
 ## A minimal example
 

@@ -1,5 +1,4 @@
 import { lazyFetch, lazyRouter, type NodePlugin } from '@acorn/plugin-api/node'
-import { pullRequestSection } from '../server/contextSection'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/repos/import'
@@ -11,6 +10,7 @@ import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
 import { githubClientId } from '../server/config'
 import { githubAgentTools } from '../server/agentTools'
 import { taskPulls } from '../server/routes/pulls/taskPulls'
+import { changeRequestRoutes } from '../server/routes/changeRequests'
 import { githubEmitter } from '../server/events'
 import { readCachedRepos, toPublicRepo } from '../server/routes/mirror/repoMirror'
 import { pullSource } from '../shared/pullSource'
@@ -40,11 +40,18 @@ export const githubPlugin = (): NodePlugin => {
     // (docs/plugins/data-ownership.md § Data ownership).
     migrationsModule: import.meta.url,
     // Projects whose remote is on github.com are GitHub's (docs/plugins/code-hosts.md). GitHub serves
-    // every pull request's head at `pull/<n>/head`, a fork's included, and the PR pane shows one.
+    // every pull request's head at `pull/<n>/head`, a fork's included, and the PR pane shows one. Core's
+    // agent tools read a task's pull request from the routes under `api`.
     codeHost: {
       label: 'GitHub',
       hosts: ['github.com'],
-      changeRequest: { ref: 'pull/{number}/head', label: 'pull request', prefix: '#', pane: 'pr' },
+      changeRequest: {
+        ref: 'pull/{number}/head',
+        label: 'pull request',
+        prefix: '#',
+        pane: 'pr',
+        api: '/v1/p/github/change-requests',
+      },
     },
     // The pull request button on github.com
     // (docs/github-integration/tasks-and-references.md § Browser handoff). Its route below loads on
@@ -120,6 +127,10 @@ export const githubPlugin = (): NodePlugin => {
         { prefix: '/repos', note: 'repository and pull request mirror' },
       )
       ctx.routes.register(taskPulls(ctx.core), { prefix: '/tasks', note: '/:taskId/pulls — durable task PR relations' })
+      ctx.routes.register(changeRequestRoutes(store, ctx.core, emit), {
+        prefix: '/change-requests',
+        note: "a task's pull request for core's agent tools and `pr` context section",
+      })
       // The device-flow connect writes core's own `integrations` row through connectProvider
       // (docs/github-integration.md § Connecting). It touches none of this plugin's tables, so it
       // takes no handle.
@@ -167,17 +178,6 @@ export const githubPlugin = (): NodePlugin => {
           mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
         footprint: () => mirrorFootprint(store),
       })
-
-      // The `pr` context section. Its rows are this plugin's (`repos ⋈ pull_requests ⋈ pr_files` in
-      // github.sqlite), so github registers it directly rather than through GITHUB_MIRROR: resolving
-      // its own capability out of the registry would be a plugin asking the graph about itself.
-      // Contribution semantics, including what an absent section renders as, are core's
-      // (docs/agent-tools/context-sections.md § Context sections).
-      ctx.contextSections.register(
-        pullRequestSection((userId, repoOwner, repoName, pullNumber) =>
-          mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
-        ),
-      )
     },
     dispose: async () => {
       await discovery?.dispose()

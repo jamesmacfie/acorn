@@ -2,11 +2,18 @@
 // The reads core needs, the one write that moves a task's primary, and what the code host that claims
 // a change request's host declared about it.
 import { and, eq, inArray } from 'drizzle-orm'
+import type { z } from 'zod'
 import type { TaskChangeRequest as WireChangeRequest } from '@acorn/protocol/api.ts'
+import type { Env } from '../bindings'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
+import type { Principal } from '../middleware/auth'
 import { changeRequestDeclaration, codeHostFor } from '../pluginHost/codeHosts'
+import { dispatchPluginRoute, type PluginDispatchInit } from '../pluginHost/dispatch'
 import { githubFacet, projectRepository, type ProjectRow } from '../projects/projects'
+import { createLogger, describeError } from '../telemetry/logger'
+
+const log = createLogger('change-requests')
 
 export type ChangeRequestRow = typeof schema.taskChangeRequests.$inferSelect
 type Transaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0]
@@ -108,4 +115,81 @@ export function setPrimaryChangeRequest(tx: Transaction, taskId: string, link: C
     .set({ pullNumber: github ? link.number : null, updatedAt: Date.now() })
     .where(eq(schema.tasks.id, taskId))
     .run()
+}
+
+// ─── Asking the code host ───────────────────────────────────────────────────────────────────────
+//
+// Core's `pr` context section and `pr_*` agent tools ask the plugin that owns a change request's host,
+// through the routes under its declared `changeRequest.api` (docs/plugins/code-hosts.md § Agent context).
+
+// The read routes answer from the plugin's local mirror, so a slow one is a stuck plugin, and the
+// context assembly waiting on it matters more than its answer.
+const READ_DEADLINE_MS = 5_000
+
+export type ChangeRequestHost = { provider: string; api: string; number: number; label: string; prefix: string }
+
+/** The task's primary change request and the route its code host answers on. Null when the task has no
+ *  primary, or the running plugin that holds its host declared no `api`. */
+export async function primaryChangeRequestHost(db: AppDatabase, taskId: string): Promise<ChangeRequestHost | null> {
+  const row = await primaryChangeRequest(db, taskId)
+  const provider = row ? changeRequestProvider(row) : null
+  const declared = provider ? changeRequestDeclaration(provider) : undefined
+  if (!row || !provider || !declared?.api) return null
+  return {
+    provider,
+    api: declared.api,
+    number: row.number,
+    label: declared.label ?? 'change request',
+    prefix: changeRequestPrefix(provider),
+  }
+}
+
+/** Call one of `provider`'s change request routes. Null when it doesn't answer within `deadlineMs`. The
+ *  race matters as well as the abort, because a compiled handler can ignore its signal. */
+export async function askChangeRequestHost(
+  env: Env,
+  provider: string,
+  path: string,
+  init: PluginDispatchInit,
+  principal: Principal,
+  deadlineMs: number,
+): Promise<Response | null> {
+  const signal = AbortSignal.timeout(deadlineMs)
+  const timedOut = new Promise<null>((resolve) => signal.addEventListener('abort', () => resolve(null), { once: true }))
+  return Promise.race([dispatchPluginRoute(env, provider, path, init, signal, principal), timedOut])
+}
+
+/** Read `{api}/{number}{view}` as the task, and parse it with `shape`. Null for any answer an agent can't
+ *  use: a non-2xx, a timeout, a missing route, or a body that doesn't match. */
+export async function readChangeRequest<T>(
+  env: Env,
+  host: ChangeRequestHost,
+  view: '' | '/checks' | '/feedback',
+  shape: z.ZodType<T>,
+  caller: { userId: string; taskId: string; query?: Record<string, string> },
+): Promise<T | null> {
+  const query = new URLSearchParams({ ...caller.query, taskId: caller.taskId })
+  const path = `${host.api}/${host.number}${view}?${query}`
+  const principal: Principal = { kind: 'internal', scope: 'task', userId: caller.userId, taskId: caller.taskId }
+  try {
+    const response = await askChangeRequestHost(
+      env,
+      host.provider,
+      path,
+      { method: 'GET' },
+      principal,
+      READ_DEADLINE_MS,
+    )
+    if (!response?.ok) {
+      if (response) log.warn(`${host.provider} answered ${response.status} from ${host.api}`)
+      else log.warn(`${host.provider} did not answer ${host.api} in ${READ_DEADLINE_MS}ms`)
+      return null
+    }
+    const parsed = shape.safeParse(await response.json())
+    if (!parsed.success) log.warn(`${host.provider} answered ${host.api}${view} with an unexpected shape`)
+    return parsed.success ? parsed.data : null
+  } catch (error) {
+    log.warn(`${host.provider} failed ${host.api}${view}: ${describeError(error).message}`)
+    return null
+  }
 }

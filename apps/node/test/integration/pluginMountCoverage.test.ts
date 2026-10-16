@@ -50,6 +50,11 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
 
   // The task is in the body or query, so no mount can see it. The handler checks it.
   'POST /v1/p/agents/attachments': 'checks the taskId query with mayActOnTask',
+  'GET /v1/p/github/change-requests/:number': 'checks the taskId query with mayActOnTask',
+  'GET /v1/p/github/change-requests/:number/checks': 'checks the taskId query with mayActOnTask',
+  'GET /v1/p/github/change-requests/:number/feedback': 'checks the taskId query with mayActOnTask',
+  // A task token can't spend the GitHub connection, so only core's pr_create, as the Node, opens one.
+  'POST /v1/p/github/change-requests': 'checks the body taskId with mayActOnTask',
 
   // Refused to a task's agent in the handler.
   'GET /v1/p/agents/runs': 'answers 403 to a task-confined caller',

@@ -18,13 +18,22 @@ import { integrationProviderRegistry } from '../integrations/registry'
 import type { IntegrationProviderContribution } from '../integrations/types'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
+import { changeRequestDetail } from '@acorn/protocol/plugin/contract.ts'
+import type { Env } from '../bindings'
+import {
+  changeRequestProvider,
+  primaryChangeRequest,
+  primaryChangeRequestHost,
+  readChangeRequest,
+} from '../core/changeRequests'
 import { projectRepository } from '../projects/projects'
 
 type TaskRow = typeof schema.tasks.$inferSelect
 type AssembleArgs = {
   db: AppDatabase
   userLogin: string
-  task: TaskRow
+  // `changeRequest` is the task's primary, on any code host. `pullNumber` is the same on github.com only.
+  task: TaskRow & { changeRequest: TaskContext['task']['changeRequest'] }
   repo: string
   // The task's project remote (docs/plugins/code-hosts.md). A code host's section checks `provider`.
   repository: ProjectRepository | null
@@ -32,6 +41,8 @@ type AssembleArgs = {
 }
 type ContextDraft = {
   items: ContextItem[]
+  // Replaces the contribution's label for this task, such as `Merge request` on a GitLab task.
+  label?: string
   // A descriptor may carry already-formatted reference text. Compiled contributions normally leave
   // this absent and use their pure `format` function below.
   compact?: string
@@ -118,10 +129,56 @@ export const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted}
 // Invariant: a section's `compact` must be computed independently of which other sections are
 // included (docs/agent-tools/context-sections.md § Context sections).
 
-// ─── The one section core owns ──────────────────────────────────────────────────────────────────
+// ─── The sections core owns ─────────────────────────────────────────────────────────────────────
 //
-// Every other section is registered by the plugin that owns its rows: `pr` by github, `notes` by
-// notes, `memory` by memory (docs/agent-tools/context-sections.md § Context sections).
+// Every other section is registered by the plugin that owns its rows: `notes` by notes, `memory` by
+// memory (docs/agent-tools/context-sections.md § Context sections).
+
+// The task's primary change request, asked of the code host that owns it, so a task on any host reads
+// the same section (docs/plugins/code-hosts.md § Agent context). It needs `env` to reach the host's
+// routes, which is why `wireAgentTools` registers it rather than this module.
+export const changeRequestSection = (env: Env): ContextSectionContribution => ({
+  id: 'pr',
+  order: 10,
+  label: 'Pull request',
+  defaultIncluded: false,
+  budget: { maxItems: 1, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
+  async assemble({ db, userLogin, task }) {
+    const host = await primaryChangeRequestHost(db, task.id)
+    if (!host) return { items: [] }
+    const label = host.label.charAt(0).toUpperCase() + host.label.slice(1)
+    const pr = await readChangeRequest(env, host, '', changeRequestDetail, { userId: userLogin, taskId: task.id })
+    if (!pr) return { label, items: [] }
+    return {
+      label,
+      items: [
+        {
+          id: `pr:${pr.number}`,
+          kind: 'PR',
+          label: `${host.prefix}${pr.number} ${pr.title}`,
+          body: pr.body ?? undefined,
+          details: pr.changedFiles,
+        },
+      ],
+    }
+  },
+  format(items) {
+    const item = items[0]
+    if (!item) return ''
+    const lines = [`## PR ${item.label}`]
+    // The body is the author's, not the reader's, so it is marked as text the model should not take
+    // instructions from. Tags are stripped first, which also keeps a forged closing tag out.
+    const body = item.body?.replace(/<[^>]+>/g, '').trim()
+    if (body) lines.push(pastedContent(truncateBytes(body, 600)))
+    const files = item.details ?? []
+    if (files.length) {
+      const shown = files.slice(0, 30)
+      const more = files.length - shown.length
+      lines.push(`Changed files (${files.length}): ${shown.join(', ')}${more > 0 ? `, +${more} more` : ''}`)
+    }
+    return lines.join('\n')
+  },
+})
 
 // `task_links` and `issues` are core tables (docs/data-layer/core-database.md § External-item read model);
 // GitHub and Rollbar write them through the ExternalItemStore seam. This is also the only section
@@ -338,6 +395,8 @@ export async function assembleContext(
   const projectId = project.id
   const repository = projectRepository(project)
   const repo = repository?.path ?? ''
+  const primary = await primaryChangeRequest(db, task.id)
+  const changeRequest = primary ? { provider: changeRequestProvider(primary), number: primary.number } : null
   const ctx: TaskContext = {
     task: {
       id: task.id,
@@ -347,6 +406,7 @@ export async function assembleContext(
       branch: task.branch,
       worktreePath: task.worktreePath,
       pullNumber: task.pullNumber,
+      changeRequest,
     },
     sections: [],
   }
@@ -366,7 +426,14 @@ export async function assembleContext(
     if (!included.has(contribution.id)) continue
     let draft: ContextDraft
     try {
-      draft = await contribution.assemble({ db, userLogin, task, repo, repository, workflowRunId: opts.workflowRunId })
+      draft = await contribution.assemble({
+        db,
+        userLogin,
+        task: { ...task, changeRequest },
+        repo,
+        repository,
+        workflowRunId: opts.workflowRunId,
+      })
     } catch (error) {
       draft = {
         items: [],
@@ -394,7 +461,7 @@ export async function assembleContext(
     remainingTokens = Math.max(0, remainingTokens - compactTokens)
     ctx.sections.push({
       id: contribution.id,
-      label: contribution.label,
+      label: draft.label ?? contribution.label,
       defaultIncluded: contribution.defaultIncluded,
       budget: contribution.budget,
       items,

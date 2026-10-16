@@ -80,7 +80,7 @@ export function githubWorkflowPolicies(
       if ('verdict' in read) return read.verdict
       if (read.headSha && read.checksSha && read.headSha !== read.checksSha)
         return { verdict: 'wait', detail: 'The checks are still for an older commit.' }
-      const mirrored = await taskChecks(db, core, read.pull.userId, ctx.taskId)
+      const mirrored = await taskChecks(db, read.pull)
       if (!mirrored) {
         return ctx.with.missing === 'wait'
           ? { verdict: 'wait', detail: 'The pull request has no checks yet.' }

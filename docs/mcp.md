@@ -44,6 +44,9 @@ register for the addressed task. [Agent tools](./agent-tools.md) owns each tool'
 
 - Task and pull request context, from core: `task_current`, `task_context`, `pr_current`,
   `pr_changed_files`, `linked_issues`, and `repo_info`.
+- The pull request, from core over the task's code host: `pr_review_comments` and `pr_checks` from its
+  local mirror, and the write `pr_create`. The GitHub plugin keeps `github_pull_create` as a second
+  name for `pr_create`.
 - Issues and errors, from core over whichever provider owns them: `issue_detail` reads one in full,
   `issue_comment` posts on a linked one, and `issue_image` returns an image from a linked one. They're
   core's tools, so one name covers every tracker and the provider's key stays in core's secret scope.
@@ -56,8 +59,6 @@ register for the addressed task. [Agent tools](./agent-tools.md) owns each tool'
 - A repository's run targets, from `terminal`: `run_targets`, `run_start`, `run_stop`, `run_restart`,
   and `run_status`.
 - Browser automation, from `browser`.
-- The pull request, from `github`: `pr_review_comments` and `pr_checks` over the local mirror, and the
-  write `github_pull_create`.
 - Managed-session orchestration, from `agents`: `agent_spawn`, `agent_prompt`, `agent_wait`,
   `agent_read`, and `agent_cancel`.
 - Workflows, from `workflows`: discovery, agent drafts, and starting, reading, waiting on, and

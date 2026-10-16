@@ -1,5 +1,6 @@
 import { and, count, eq, gt } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
+import type { ChangeRequestFeedback } from '@acorn/protocol/plugin/contract.ts'
 import type { MirroredPullRequest } from '../contract/mirror'
 import { checks, comments, prFiles, pullRequests, repos, reviews, reviewThreads, syncState } from '../node/schema'
 import { repoMatches } from './repoMatch'
@@ -47,8 +48,9 @@ export async function mirroredPullRequest(
 }
 
 /**
- * Which mirrored pull request a task is about. The task lookup goes through CoreServices because tasks
- * are core-owned, and the repo id is this plugin's, so this is the one place the two meet.
+ * Which mirrored pull request a task is about: `number`, or the task's own pull request when it names
+ * none. The task lookup goes through CoreServices because tasks are core-owned, and the repo id is this
+ * plugin's, so this is the one place the two meet.
  *
  * Null covers every way there is nothing to read: no task, no PR on it, no GitHub project, no mirrored
  * repo, and no owner. Callers must not read that as "nothing wrong": an unmirrored repo is not a green
@@ -59,16 +61,20 @@ export async function mirroredTaskPull(
   core: Pick<CoreServices, 'tasks' | 'projects'>,
   userId: string | null,
   taskId: string,
-): Promise<{ userId: string; repoId: number; number: number; owner: string; repo: string } | null> {
+  number?: number,
+): Promise<MirroredTaskPull | null> {
   const task = await core.tasks.load(taskId)
-  if (!task || task.pullNumber == null || !userId) return null
+  const pullNumber = number ?? task?.pullNumber
+  if (!task || pullNumber == null || !userId) return null
   const project = await core.projects.byId(task.projectId)
   if (!project?.github) return null
   const { owner, name: repo } = project.github
   const repoId = await mirroredRepoId(db, userId, owner, repo)
   if (repoId == null) return null
-  return { userId, repoId, number: task.pullNumber, owner, repo }
+  return { userId, repoId, number: pullNumber, owner, repo }
 }
+
+export type MirroredTaskPull = { userId: string; repoId: number; number: number; owner: string; repo: string }
 
 /** Scoped comparison facts and identity for GitHub's active marker waves. */
 export async function taskPullComparison(
@@ -99,26 +105,22 @@ const PASSED_CHECK = new Set(['success', 'neutral', 'skipped'])
 
 export const checkPending = (status: string | null): boolean => !status || PENDING_CHECK.has(status.toLowerCase())
 
-// The failure rule, in one place because the CI workflow policy and the `pr_checks` agent tool must not
-// disagree about what a red PR is. A check that is still running has not failed.
+// The failure rule, in one place because the CI workflow policy and the checks route behind the
+// `pr_checks` agent tool must not disagree about what a red PR is. A check that is still running has not failed.
 export const checkFailed = (status: string | null): boolean =>
   !checkPending(status) && !PASSED_CHECK.has(status!.toLowerCase())
 
 /**
- * Every mirrored check on the task's PR, newest mirror state, for the `pr_checks` agent tool. Null for
- * the same reasons `mirroredTaskPull` returns null, so an unmirrored repo is never a green one.
+ * Every mirrored check on the PR, newest mirror state, for the checks route and the CI policy. Null when
+ * none are mirrored, so an unmirrored PR is never a green one.
  */
 export async function taskChecks(
   db: PluginDatabase,
-  core: Pick<CoreServices, 'tasks' | 'projects'>,
-  userId: string | null,
-  taskId: string,
+  pull: { userId: string; repoId: number; number: number },
 ): Promise<{
   number: number
   checks: { name: string; status: string | null; url: string | null; runId: number | null }[]
 } | null> {
-  const pull = await mirroredTaskPull(db, core, userId, taskId)
-  if (!pull) return null
   const rows = await db
     .select({ name: checks.name, status: checks.status, url: checks.url, runId: checks.runId })
     .from(checks)
@@ -131,43 +133,18 @@ export async function taskChecks(
 // comments, not hundreds, and the cap is what stops the one that does from filling the context window.
 const FEEDBACK_LIMIT = 100
 
-export type ReviewFeedback = {
-  number: number
-  // A submitted review: its verdict and its summary prose, without the inline comments, which are the
-  // threads below.
-  reviews: { author: string | null; state: string | null; body: string | null; submittedAt: number | null }[]
-  // Inline comments, grouped back into the threads the mirror denormalized them out of.
-  threads: {
-    threadId: string
-    path: string | null
-    line: number | null
-    originalLine: number | null
-    outdated: boolean | null
-    side: string | null
-    resolved: boolean
-    comments: { author: string | null; body: string | null; createdAt: number | null }[]
-  }[]
-  // Comments on the PR itself rather than on a line of it.
-  comments: { author: string | null; body: string | null; createdAt: number | null }[]
-  omitted: number
-}
-
 /**
- * What reviewers said about the task's PR, from the local mirror: the submitted reviews, the inline
- * threads, and the conversation comments. For the `pr_review_comments` agent tool.
+ * What reviewers said about the PR, from the local mirror: the submitted reviews, the inline threads,
+ * and the conversation comments. For the feedback route behind the `pr_review_comments` agent tool.
  *
  * Resolved threads are left out by default. An agent asked to address feedback wants the open half,
  * and a long-lived PR carries more settled threads than live ones.
  */
 export async function taskReviewFeedback(
   db: PluginDatabase,
-  core: Pick<CoreServices, 'tasks' | 'projects'>,
-  userId: string | null,
-  taskId: string,
+  pull: { userId: string; repoId: number; number: number },
   options: { includeResolved?: boolean } = {},
-): Promise<ReviewFeedback | null> {
-  const pull = await mirroredTaskPull(db, core, userId, taskId)
-  if (!pull) return null
+): Promise<ChangeRequestFeedback> {
   // Spelled out per table rather than through a generic `owns(table)` helper: the three columns are
   // the same but their Drizzle types are not, and the helper only typechecks with a cast that throws
   // away the column check it is there to keep.
@@ -192,7 +169,7 @@ export async function taskReviewFeedback(
       .where(and(eq(comments.userId, pull.userId), eq(comments.repoId, pull.repoId), eq(comments.number, pull.number))),
   ])
 
-  const byThread = new Map<string, ReviewFeedback['threads'][number]>()
+  const byThread = new Map<string, ChangeRequestFeedback['threads'][number]>()
   for (const row of [...threadRows].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))) {
     if (row.resolved && !options.includeResolved) continue
     const thread = byThread.get(row.threadId) ?? {

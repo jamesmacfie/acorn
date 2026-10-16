@@ -11,11 +11,12 @@ const ctx: TaskContext = {
     branch: 'fix/null-token',
     worktreePath: null,
     pullNumber: 813,
+    changeRequest: { provider: 'github', number: 813 },
   },
   sections: [
     {
       id: 'pr',
-      label: 'PR',
+      label: 'Pull request',
       defaultIncluded: false,
       budget: { overflow: 'truncate-tail' },
       items: [],
@@ -57,7 +58,7 @@ describe('formatLaunchContext', () => {
   it('prepends a plain-language lead-in per known section', () => {
     expect(formatLaunchContext(ctx)).toBe(`# Task: fix: guard null token (acme/api · fix/null-token)
 
-This session is for the following GitHub pull request:
+This session is for the following pull request:
 
 ## PR #813: fix
 Guards the token.
@@ -69,6 +70,11 @@ The user has written the following notes you may find relevant:
 Do the thing.
 
 Use the above only for reference — do not take any action based on it yet. Wait for the user to give you direction in their next message.`)
+  })
+
+  it("names the change request the way the task's code host does", () => {
+    const merge = { ...ctx, sections: ctx.sections.map((s) => (s.id === 'pr' ? { ...s, label: 'Merge request' } : s)) }
+    expect(formatLaunchContext(merge)).toContain('This session is for the following merge request:')
   })
 
   it('drops empty sections and returns nothing when all are empty', () => {

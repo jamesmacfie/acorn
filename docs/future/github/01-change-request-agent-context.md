@@ -1,5 +1,70 @@
 # Phase 1: ask the task's code host for agent context
 
+## Completion note
+
+October 16, 2026. Done.
+
+What landed:
+
+- `codeHost.changeRequest.api` in `packages/protocol/src/plugin/contract.ts`, with the shapes
+  `changeRequestDetail`, `changeRequestChecks`, `changeRequestFeedback`, `changeRequestCreateInput`,
+  and `changeRequestCreated` beside it. The manifest schema is regenerated, and
+  [code hosts](../../plugins/code-hosts.md#agent-context) documents the routes.
+- Core's helper, `primaryChangeRequestHost`, `askChangeRequestHost`, and `readChangeRequest`, in
+  `packages/node-core/src/server/core/changeRequests.ts`.
+- Core owns the `pr` section (`changeRequestSection` in `contextSections.ts`) and the tools `pr_checks`,
+  `pr_review_comments`, and the new `pr_create` (`coreTools.ts`). `pr_current` and `pr_changed_files`
+  are unchanged and read the section.
+- GitHub serves the four routes from its mirror under `/v1/p/github/change-requests`
+  (`plugins/github/src/server/routes/changeRequests.ts`), sets `api`, and no longer registers the `pr`
+  section or the two read tools. It keeps `github_pull_create`, unchanged, as the older name for
+  `pr_create`.
+- `TaskContext.task.changeRequest` and the `task` a compiled section's `assemble` receives carry
+  `{ provider, number }` of the primary. `pullNumber` stays.
+- The launch lead-in reads "This session is for the following pull request:", or merge request, from
+  the section's label.
+- A `gitlab-test` fixture with the four routes, in
+  `packages/node-core/src/server/agentTools/changeRequestTools.test.ts`.
+
+Decisions and deviations:
+
+- `api` is a full plugin route, such as `/v1/p/github/change-requests`, not a bare `/change-requests`.
+  Every other route a manifest declares, `browserPanel.route` included, is full, and the manifest
+  check confines it to the plugin's namespace the same way.
+- The helper lives in `core/changeRequests.ts`, beside `primaryChangeRequest`, not in `codeHosts.ts`.
+  It needs the primary lookup, and `changeRequests.ts` already imports `codeHosts.ts`.
+- Each GET carries `taskId` as a query parameter, and the POST carries it in the body, as task checks
+  do. The plugin resolves its own repository from the task and checks it with `mayActOnTask`.
+- The reads run as the task. The POST runs as the Node's service principal, not the task's, because a
+  task principal can't spend a provider credential. That's the rule the data source tools follow.
+- Reads wait 5 seconds and `pr_create` 30. A timeout, a non-2xx, or an answer that doesn't parse is no
+  answer.
+- The section registers in `wireAgentTools`, with the tools, because it needs the env to dispatch.
+  Both Node entries call it through `bootNode`.
+- The section's label is per task: the declared `label` with a capital, `Pull request` when the task has
+  no primary. The compact heading stays `## PR …` and the item `kind` stays `PR` on every host, so a
+  GitHub task's text is unchanged byte for byte.
+- `pr_changed_files` still answers `[]` with no primary, not `no-pr`, so its return type doesn't change.
+  `pr_current`, `pr_checks`, and `pr_review_comments` answer `no-pr`. With a primary that isn't
+  mirrored, the last two still answer `no-mirrored-checks` and `no-mirrored-pr`, now with hints that
+  don't name GitHub.
+- `pr_create` answers `{ number, relationship }`. `github_pull_create` keeps its `pull` field.
+- The GitHub read-tool tests moved, assertions intact, to the route tests. The composition test,
+  `apps/node/test/integration/taskContext.test.ts`, calls `pr_checks` and `pr_review_comments`
+  through core and GitHub's real routes.
+- `taskChecks` and `taskReviewFeedback` in the GitHub mirror reads take a resolved pull, and
+  `mirroredTaskPull` takes an optional number. The CI policy's one call changed to match.
+
+For later phases:
+
+- Phase 2 can reuse `primaryChangeRequestHost` and `readChangeRequest` to ask a task's code host for its
+  checks. GitHub's `ci-settled` policy still reads `mirroredTaskPull` from `task.pullNumber`.
+- A new code host sets `changeRequest.api` and serves the four routes. It needs no core edit. Its
+  routes should 404 when they have nothing for that change request.
+- Already red at the base commit and untouched here: the `pluginDisable` and `routeRegistry` goldens in
+  `apps/node` (the `browser-panel` and agents MCP server routes), knip's `proposalChanges`, and three
+  `docPaths` entries for `dist` files.
+
 Date: October 16, 2026. Status: proposed.
 
 ## Goal
@@ -12,7 +77,7 @@ asks whichever code host owns the task's primary change request. No tool or sect
 
 - `pr_current` and `pr_changed_files` in `packages/node-core/src/server/agentTools/coreTools.ts` read
   the context section with id `pr`. The GitHub plugin registers that section in
-  `plugins/github/src/server/contextSection.ts`. The registry in
+  its `contextSection.ts`. The registry in
   `packages/node-core/src/server/agentTools/contextSections.ts` refuses a second `pr`, so a GitLab
   plugin must pick another id, and the two core tools never see it.
 - A section's `assemble` gets `task.pullNumber`, set in `contextSections.ts` from the task row. Core

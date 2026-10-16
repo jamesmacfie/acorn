@@ -29,6 +29,7 @@
       "github",
       "github",
       "github/browser",
+      "github/change-requests",
       "github/data/actions",
       "github/data/branches",
       "github/data/pulls",
@@ -71,8 +72,6 @@
       "notes_list",
       "notes_read",
       "notes_write",
-      "pr_checks",
-      "pr_review_comments",
       "run_restart",
       "run_start",
       "run_status",
@@ -92,7 +91,6 @@
     ],
     "sections": [
       "task-scripts",
-      "pr",
       "issues",
       "notes",
       "plugin-authoring"
@@ -211,6 +209,7 @@
         "github",
         "github",
         "github/browser",
+        "github/change-requests",
         "github/data/actions",
         "github/data/branches",
         "github/data/pulls",
@@ -218,12 +217,7 @@
         "github/tasks"
       ],
       "tools": [
-        "github_pull_create",
-        "pr_checks",
-        "pr_review_comments"
-      ],
-      "sections": [
-        "pr"
+        "github_pull_create"
       ],
       "connectionProviders": [
         "github"

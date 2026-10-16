@@ -43,7 +43,10 @@ export type TaskContext = {
     repo?: string
     branch: string | null
     worktreePath: string | null
+    // The same as `changeRequest.number` for a github.com primary, and null on every other host.
     pullNumber: number | null
+    // The task's primary change request. `provider` is null while no running plugin claims its host.
+    changeRequest: { provider: string | null; number: number } | null
   }
   sections: ContextSectionResult[]
 }

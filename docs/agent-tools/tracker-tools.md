@@ -2,24 +2,30 @@
 
 These tools let an agent read and comment on the issues and errors linked to its task, and work with
 its pull request. Core owns the tracker tools, and each provider owns the reads and writes behind them.
-The GitHub plugin owns its three tools.
+Core owns the pull request tools too, and the task's code host answers them.
 
-## GitHub
+## Pull requests
 
-`github_pull_create` is write-tier. It's available only to a managed session on a task with a GitHub
-project and a branch. It creates the pull request from that branch, records the session in core's
-task pull request relation, and returns whether the pull request became primary or related.
+Core's `pr_current`, `pr_changed_files`, `pr_checks`, `pr_review_comments`, and `pr_create` ask the
+code host plugin that holds the task's repository, through the routes it declares
+([code hosts](../plugins/code-hosts.md#agent-context)). They work the same on a GitHub task and on a
+GitLab or Bitbucket one.
 
-`pr_review_comments` and `pr_checks` are read-tier. Both read the mirror the GitHub plugin keeps fresh,
-so neither spends a credential or touches the network. `pr_review_comments` includes outdated unresolved
-threads with separate current line, original line, and nullable outdated status. It groups the mirror's
-`review_threads` rows into threads and leaves resolved ones out unless asked. `pr_checks` returns every
-check with its raw status, the failing names, and the names still running, by the rules the
-`github:ci-settled` workflow policy uses (`checkFailed` and `checkPending` in
-`plugins/github/src/server/mirrorQueries.ts`). A check that is still running isn't failed. Both say in a `status` field whether the pull request
-is unmirrored, because an unmirrored pull request isn't one with no feedback or a green one.
+`pr_create` is write-tier. It's available only to a managed session on a task with a branch, whose code
+host can open one. It opens the pull request from that branch, attaches it to the task with the session,
+and returns whether it became primary or related. The GitHub plugin keeps `github_pull_create` as a
+second name for it until the next plugin API major, because saved prompts name it.
 
-Core's `pr_current` and `pr_changed_files` read the task's primary pull request.
+`pr_current`, `pr_changed_files`, `pr_review_comments`, and `pr_checks` are read-tier. A code host
+answers them from its local mirror, so none spends a credential or touches the network. On GitHub,
+`pr_review_comments` includes outdated unresolved threads with separate current line, original line,
+and nullable outdated status. It groups the mirror's `review_threads` rows into threads and leaves
+resolved ones out unless asked. `pr_checks` returns every check with its raw status, the failing names,
+and the names still running, by the rules the `github:ci-settled` workflow policy uses (`checkFailed`
+and `checkPending` in `plugins/github/src/server/mirrorQueries.ts`). A check that is still running
+isn't failed. Both say in a `status` field whether the pull request is unmirrored, because an
+unmirrored pull request isn't one with no feedback or a green one. A task with no pull request gets
+`no-pr`.
 
 ## issue_detail
 

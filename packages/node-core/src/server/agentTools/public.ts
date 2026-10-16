@@ -1,5 +1,6 @@
 export {
   asContextSection,
+  changeRequestSection,
   formatOmitted,
   getContextSections,
   linkedIssuesSection,

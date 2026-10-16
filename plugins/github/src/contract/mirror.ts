@@ -1,6 +1,6 @@
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 
-/** A PR as core's context assembler needs it: the mirrored head of the task's pull request. */
+/** The mirrored head of a task's pull request, as core's `pr` context section shows it. */
 export type MirroredPullRequest = {
   number: number
   title: string
@@ -25,9 +25,9 @@ export type GithubMirrorCapability = {
 
   /**
    * The mirrored PR for a task's (owner, repo, pullNumber), or null when there is no PR, no mirrored
-   * repo, or nothing cached. Never fetches: this backs the `pr` context section, assembled while a
-   * prompt is being built, and a cold mirror must render as an absent section rather than block on
-   * GitHub.
+   * repo, or nothing cached. Never fetches: the same read backs the `pr` context section, assembled
+   * while a prompt is being built, and a cold mirror must render as an absent section rather than block
+   * on GitHub.
    */
   pullRequest(
     userId: string,

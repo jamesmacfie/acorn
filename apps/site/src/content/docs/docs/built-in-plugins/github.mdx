@@ -13,7 +13,7 @@ sources:
   - plugins/github/src/client/CreatePullForm.tsx
   - plugins/github/src/client/checks/ChecksPanel.tsx
   - plugins/github/src/client/pullDetail/PrOverview.tsx
-checked: 68d4f3b5a
+checked: 1e5d6a032
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -94,7 +94,7 @@ Press `c`, or run **Create pull request** from the command palette. Choose the b
 and **Into**, give it a **Title** and a **Description**, and tick **Create as draft** if you want. The form
 shows the commits and changed files beside it. ⌘Enter creates it.
 
-An agent can open one too, with `github_pull_create`. When an agent's turn ends and its task's branch has
+An agent can open one too, with `pr_create`, or `github_pull_create`, its older name. When an agent's turn ends and its task's branch has
 an open pull request, acorn links the pull request to the task, whoever opened it.
 
 ## Start a task from a pull request
@@ -122,13 +122,14 @@ you're on.
 
 ## For agents
 
-The task's pull request is in its context, under **Pull request**. Agents have three GitHub tools:
+The task's pull request is in its context, under **Pull request**. acorn's pull request tools read it
+from GitHub on a GitHub task:
 
 | Tool | What it does |
 | --- | --- |
 | `pr_review_comments` | Reads the reviews, inline threads, and comments on the task's pull request. |
 | `pr_checks` | Reads every check, and names the failing ones and the ones still running. |
-| `github_pull_create` | Opens a pull request from the task's branch. |
+| `pr_create` | Opens a pull request from the task's branch. `github_pull_create` is its older name. |
 
 The two that read use what acorn already holds, so they don't spend your GitHub token. Agents never get the
 token itself ([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)).

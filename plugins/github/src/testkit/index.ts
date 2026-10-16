@@ -2,17 +2,16 @@
 // Client-side test exports live in ./client.ts, split for the reason @acorn/plugin-api splits its
 // own testkit: one barrel carrying both halves puts DOM types into a node-only program.
 //
-//   apps/node/test/integration/taskContext.test.ts             mirroredPullRequest, mirror tables, pullRequestSection
+//   apps/node/test/integration/taskContext.test.ts             mirror tables, changeRequestRoutes
 //   apps/node/test/integration/auth/internalPrincipal.test.ts  githubToken
 //   apps/node/test/helpers/registerProviders.ts                githubProvider
 //
 // `seedGithubIntegration` keeps its own file; this package's own route tests import it relatively.
 export { githubProvider } from '../server/provider'
 export { githubToken } from '../server/githubToken'
-export { mirroredPullRequest } from '../server/mirrorQueries'
-export { prFiles, pullRequests, repos } from '../node/schema'
+export { checks, prFiles, pullRequests, repos } from '../node/schema'
 export { seedGithubIntegration } from './githubToken'
-export { pullRequestSection } from '../server/contextSection'
+export { changeRequestRoutes } from '../server/routes/changeRequests'
 // Node source composition test in apps/node/test/integration/githubDataSource.test.ts.
 export { createPullSourceHandler } from '../server/data/pullSourceHandler'
 export { pullSource } from '../shared/pullSource'

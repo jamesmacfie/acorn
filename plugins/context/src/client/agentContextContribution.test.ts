@@ -12,6 +12,7 @@ const context: TaskContext = {
     branch: 'fix/issue',
     worktreePath: '/worktree',
     pullNumber: null,
+    changeRequest: null,
   },
   sections: [
     {

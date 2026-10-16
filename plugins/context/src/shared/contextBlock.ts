@@ -9,9 +9,9 @@ export function formatContextBlock(ctx: TaskContext): string {
 
 // Launch-time variant (docs/notes-and-memory.md): the block auto-injected as an agent's first
 // prompt. Same section compacts, but each is introduced by a plain-language lead-in so the agent
-// knows why it's being handed the material. Sections with no content are dropped.
+// knows why it's being handed the material. Sections with no content are dropped. The `pr` section's
+// label names what its code host calls one, such as a merge request.
 const LAUNCH_LEADINS: Record<string, string> = {
-  pr: 'This session is for the following GitHub pull request:',
   issues: 'You may find these linked issues relevant:',
   notes: 'The user has written the following notes you may find relevant:',
 }
@@ -26,7 +26,10 @@ export function formatLaunchContext(ctx: TaskContext): string {
     .map((section) => {
       const compact = section.compact.trim()
       if (!compact) return ''
-      const leadIn = LAUNCH_LEADINS[section.id]
+      const leadIn =
+        section.id === 'pr'
+          ? `This session is for the following ${section.label.toLowerCase()}:`
+          : LAUNCH_LEADINS[section.id]
       return leadIn ? `${leadIn}\n\n${compact}` : compact
     })
     .filter(Boolean)

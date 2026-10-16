@@ -75,7 +75,13 @@ A code host tells core how to treat its change requests with an optional `change
 "codeHost": {
   "label": "GitLab",
   "hosts": ["gitlab.com"],
-  "changeRequest": { "ref": "merge-requests/{number}/head", "label": "merge request", "prefix": "!", "pane": "mr" }
+  "changeRequest": {
+    "ref": "merge-requests/{number}/head",
+    "label": "merge request",
+    "prefix": "!",
+    "pane": "mr",
+    "api": "/v1/p/gitlab/change-requests"
+  }
 }
 ```
 
@@ -85,6 +91,7 @@ A code host tells core how to treat its change requests with an optional `change
 | `label` | Names a change request in an error, such as "Could not fetch merge request !12". Defaults to `change request`. |
 | `prefix` | Goes before the number in a task title, as in `!12 api`. Defaults to `#`. |
 | `pane` | Opens when a task with a primary change request on the host is first shown. A task without one opens on the first pane it offers. |
+| `api` | A route on the plugin's own Node half. Core's agent tools and `pr` context section ask it about a task's change request, as described in [agent context](#agent-context). |
 
 A plugin links one in one of three ways. A task created with `changeRequest: { number, sourceBranch? }`
 on `POST /v1/core/tasks` takes it as its primary, and `PATCH` sets or clears the primary the same
@@ -93,6 +100,37 @@ takes an empty primary slot and later ones are related. `adoptChangeRequests(pro
 branchToNumber)` gives a primary to every active task on that branch that has none. The provider and
 path must name the task project's repository. `changeRequests(taskId)` lists them all. The wire task
 carries the primary as `changeRequest`, with the provider and the declared pane.
+
+## Agent context
+
+Core owns the `pr` context section and the agent tools `pr_current`, `pr_changed_files`, `pr_checks`,
+`pr_review_comments`, and `pr_create`. Each finds the task's primary change request and asks the
+running plugin that holds its host, through the routes under its declared `api`:
+
+| Route | Answers |
+| --- | --- |
+| `GET {api}/{number}?taskId=` | The number, title, body, and changed file paths |
+| `GET {api}/{number}/checks?taskId=` | Each check's name, status, and URL, with the failing and pending names |
+| `GET {api}/{number}/feedback?taskId=` | Reviews, inline threads, and conversation comments. `includeResolved=true` adds resolved threads |
+| `POST {api}` | Opens a change request from `head`, the task's branch, and answers `{ number }` |
+
+The shapes are `changeRequestDetail`, `changeRequestChecks`, `changeRequestFeedback`,
+`changeRequestCreateInput`, and `changeRequestCreated` in `packages/protocol/src/plugin/contract.ts`.
+Core parses every answer with them, so a compiled and a loaded plugin give an agent the same fields.
+
+Core calls the three reads as the task, so a route should check the task with `mayActOnTask` and
+read only its own local data. A read waits at most 5 seconds. A 404, a timeout, or an answer that
+doesn't parse means there's nothing to show: the section stays empty, and `pr_checks` and
+`pr_review_comments` say nothing is mirrored. A task with no primary change request, or one whose host
+declares no `api`, gets `no-pr` from `pr_current`, `pr_checks`, and `pr_review_comments`.
+
+Core calls the `POST` as the Node, because opening one spends the person's connection and a task can't.
+The task id rides in the body. Core attaches the number the route answers to the task with the agent's
+session, as `attachChangeRequest` does. An error answer's `error.message` reaches the agent.
+
+The section's label is the declared `label`, so a GitLab task reads `Merge request`, and its item label
+starts with the declared `prefix`, as in `!12 Fix the importer`. The task a section's `assemble` receives,
+and `TaskContext.task`, carry the primary as `changeRequest: { provider, number }`.
 
 ## The GitHub-named fields
 

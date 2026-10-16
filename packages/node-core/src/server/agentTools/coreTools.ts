@@ -1,7 +1,8 @@
 import { taskScriptWaitInputSchema, taskScriptLogsInputSchema } from '@acorn/protocol/taskScripts.ts'
 import { taskScripts } from '../taskScripts/service'
 import { z } from 'zod'
-import { assembleContext, parseInclude } from './contextSections.ts'
+import { changeRequestChecks, changeRequestCreated, changeRequestFeedback } from '@acorn/protocol/plugin/contract.ts'
+import { assembleContext, changeRequestSection, parseInclude, registerContextSection } from './contextSections.ts'
 import { pluginAuthoringTool } from './pluginAuthoringContribution.ts'
 import { pluginRequestTool } from './pluginRequests.ts'
 import {
@@ -14,10 +15,14 @@ import {
 import { issueDetailTool } from './issueDetail.ts'
 import { issueCommentTool, issueImageTool } from './issueTools.ts'
 import type { AppDatabase } from '../db/index.ts'
+import { askChangeRequestHost, primaryChangeRequestHost, readChangeRequest } from '../core/changeRequests.ts'
+import { createTaskService } from '../core/tasks.ts'
+import { changeRequestDeclaration } from '../pluginHost/codeHosts.ts'
+import type { Disposable } from '../pluginHost/capabilities.ts'
 import type { SecretService } from '../core/secrets.ts'
 import type { Env } from '../bindings.ts'
 import { discoverDataSources, invokeDataSource, listDataSources } from '../dataSources/runtime.ts'
-import { broadcastPluginApprovalNotice } from '../notify.ts'
+import { broadcastPluginApprovalNotice, broadcastStatus } from '../notify.ts'
 import { githubFacet, projectRepository } from '../projects/projects.ts'
 import { loadTask, projectForTask } from '../worktrees/taskWorktree.ts'
 import { datasetWriteSchema } from '@acorn/protocol/datasets.ts'
@@ -212,6 +217,146 @@ async function assemble(deps: AgentToolsDeps, ctx: ToolContext, include: Set<str
   return result
 }
 
+const NO_PR = { status: 'no-pr', hint: 'This task has no linked pull request yet.' }
+
+// Opening one calls the code host's API over the network, unlike the mirror reads.
+const CREATE_DEADLINE_MS = 30_000
+
+// Where `pr_create` opens a change request: the code host that holds the task project's repository,
+// when it declared an `api`.
+async function createTarget(db: AppDatabase, taskId: string) {
+  const task = await loadTask(db, taskId)
+  const project = task && (await projectForTask(db, task))
+  const repository = project ? projectRepository(project) : null
+  const api = repository?.provider ? changeRequestDeclaration(repository.provider)?.api : undefined
+  return { task, repository, api }
+}
+
+// The change request tools ask the code host that owns the task's primary
+// (docs/plugins/code-hosts.md § Agent context). `pr_current` and `pr_changed_files` read the `pr`
+// section, which asks the same host.
+const changeRequestTools = (deps: AgentToolsDeps): AgentToolContribution[] => {
+  const { db, env } = deps
+  return [
+    {
+      name: 'pr_review_comments',
+      description:
+        "What reviewers said about the current task's pull request: submitted reviews, inline comment threads, and conversation comments, from acorn's local mirror. Open threads only unless you ask for resolved ones.",
+      input: z.object({
+        includeResolved: z
+          .boolean()
+          .optional()
+          .describe('include threads a reviewer has marked resolved (default: false)'),
+      }),
+      scope: 'task',
+      risk: 'read',
+      handler: async (raw, ctx) => {
+        const host = await primaryChangeRequestHost(db, ctx.taskId)
+        if (!host) return NO_PR
+        const query = (raw as { includeResolved?: boolean }).includeResolved ? { includeResolved: 'true' } : undefined
+        const feedback =
+          env &&
+          (await readChangeRequest(env, host, '/feedback', changeRequestFeedback, {
+            userId: ctx.userLogin,
+            taskId: ctx.taskId,
+            query,
+          }))
+        // Absent is not empty. "Nothing mirrored" and "nobody has commented" are different answers,
+        // and an agent that cannot tell them apart reports the wrong thing.
+        return (
+          feedback ?? {
+            status: 'no-mirrored-pr',
+            hint: "This task's pull request isn't mirrored yet. Open it in acorn once.",
+          }
+        )
+      },
+    },
+    {
+      name: 'pr_checks',
+      description:
+        "The CI checks on the current task's pull request from acorn's local mirror, with the failing and still-running ones called out. A running check has not failed.",
+      input: z.object({}),
+      scope: 'task',
+      risk: 'read',
+      handler: async (_raw, ctx) => {
+        const host = await primaryChangeRequestHost(db, ctx.taskId)
+        if (!host) return NO_PR
+        const checks =
+          env &&
+          (await readChangeRequest(env, host, '/checks', changeRequestChecks, {
+            userId: ctx.userLogin,
+            taskId: ctx.taskId,
+          }))
+        return (
+          checks ?? {
+            status: 'no-mirrored-checks',
+            hint: "No checks are mirrored for this task's pull request. This is not the same as a green PR.",
+          }
+        )
+      },
+    },
+    {
+      name: 'pr_create',
+      description:
+        "Open a pull request for this task's branch on its code host and attach it to the task. The first attached one becomes primary; later ones become related.",
+      input: z.object({
+        title: z.string().min(1).describe('Pull request title'),
+        body: z.string().optional().describe('Pull request description'),
+        base: z.string().min(1).describe('Base branch, for example main'),
+        draft: z.boolean().optional().describe('Create as a draft pull request'),
+      }),
+      scope: 'task',
+      risk: 'write',
+      whenDescription:
+        'Available when the task has a branch, a managed agent session, and a code host that can open a pull request.',
+      when: async (ctx) => {
+        if (!ctx.sessionId || !env) return false
+        const { task, api } = await createTarget(db, ctx.taskId)
+        return !!task?.branch && !!api
+      },
+      handler: async (raw, ctx) => {
+        const input = raw as { title: string; body?: string; base: string; draft?: boolean }
+        if (!ctx.sessionId)
+          throw new ToolError('bad_request', 'A managed agent session is required to open a task pull request.')
+        const { task, repository, api } = await createTarget(db, ctx.taskId)
+        if (!task) throw new ToolError('not_found', 'Task not found.')
+        if (!task.branch) throw new ToolError('bad_request', 'This task has no branch to open a pull request from.')
+        if (!env || !repository?.provider || !api)
+          throw new ToolError('bad_request', "This task's code host can't open a pull request from acorn.")
+        // As the node, not the task: opening one spends the person's connection, which a task principal
+        // can't (docs/security/credentials.md § Credential handling). The task rides in the body.
+        const response = await askChangeRequestHost(
+          env,
+          repository.provider,
+          api,
+          { method: 'POST', body: JSON.stringify({ ...input, taskId: task.id, head: task.branch }) },
+          { kind: 'internal', scope: 'service', userId: ctx.userLogin },
+          CREATE_DEADLINE_MS,
+        )
+        if (!response) throw new ToolError('timeout', 'The code host did not answer in time.')
+        const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
+        if (!response.ok)
+          throw new ToolError(
+            response.status === 400 || response.status === 422 ? 'bad_request' : 'failed',
+            body?.error?.message ?? `The code host answered HTTP ${response.status}.`,
+          )
+        const created = changeRequestCreated.safeParse(body)
+        if (!created.success) throw new ToolError('failed', 'The code host answered without a change request number.')
+        const relation = await createTaskService(db).attachChangeRequest(task.id, {
+          provider: repository.provider,
+          path: repository.path,
+          number: created.data.number,
+          sourceBranch: task.branch,
+          sessionId: ctx.sessionId,
+        })
+        // The code host's rail and badges show the task's change request, so it re-reads them.
+        broadcastStatus(repository.provider)
+        return { number: relation.number, relationship: relation.role }
+      },
+    },
+  ]
+}
+
 export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
   const { db } = deps
   const empty = z.object({})
@@ -349,11 +494,18 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
     issueDetailTool(deps),
     issueCommentTool(deps),
     issueImageTool(deps),
+    ...changeRequestTools(deps),
     ...sourceTools(deps),
   ]
 }
 
+let wiredSection: Disposable | undefined
+
 export function wireAgentTools(deps: AgentToolsDeps): void {
   removeAgentTools(OWNER)
   for (const tool of buildAgentTools(deps)) registerAgentTool(OWNER, tool)
+  // The `pr` section reaches code host routes through the env, so it registers here with the tools
+  // that read it.
+  wiredSection?.dispose()
+  wiredSection = deps.env ? registerContextSection(OWNER, changeRequestSection(deps.env)) : undefined
 }

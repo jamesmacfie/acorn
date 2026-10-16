@@ -42,6 +42,8 @@ export function validateNodeDeclarations(refs: ManifestReferences): void {
       })
   }
   contextSections.forEach((entry, i) => route(entry.read, ['contributions', 'contextSections', i, 'read']))
+  const changeRequestApi = manifest.contributions.codeHost?.changeRequest?.api
+  if (changeRequestApi !== undefined) route(changeRequestApi, ['contributions', 'codeHost', 'changeRequest', 'api'])
   const cliNames = new Set<string>()
   cliCommands.forEach((entry, i) => {
     const at = ['contributions', 'cliCommands', i] as (string | number)[]

@@ -68,6 +68,10 @@ describe('the full agent-tool manifest', () => {
     'task_context',
     'pr_current',
     'pr_changed_files',
+    // Asked of the code host that owns the task's primary change request (docs/plugins/code-hosts.md § Agent context).
+    'pr_checks',
+    'pr_review_comments',
+    'pr_create',
     'linked_issues',
     'repo_info',
     // How to write a plugin against this node, read off its own schemas so the agent never answers a

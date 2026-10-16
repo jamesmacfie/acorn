@@ -8,7 +8,7 @@ sources:
   - docs/agent-tools/orchestration.md
   - packages/protocol/src/agents/toolPermissions.ts
   - plugins/agents/src/client/settings/AgentMcpServersSettings.tsx
-checked: 52225e24f
+checked: 1e5d6a032
 ---
 
 This page covers acorn's own tools for agents, the MCP server that carries them, the token that scopes
@@ -21,9 +21,9 @@ Every agent acorn starts in a task, managed or in the terminal drawer, can call 
 
 | From | Tools |
 | --- | --- |
-| The task and pull request | `task_current`, `task_context`, `repo_info`, `linked_issues`, `pr_current`, `pr_changed_files` |
+| The task and pull request | `task_current`, `task_context`, `repo_info`, `linked_issues`, `pr_current`, `pr_changed_files`, `pr_review_comments`, `pr_checks`, `pr_create`, from whichever code host holds the task's repository |
 | Issues and errors | `issue_detail`, `issue_comment`, `issue_image`, for whichever tracker is linked |
-| GitHub | `pr_review_comments`, `pr_checks`, and `github_pull_create` |
+| GitHub | `github_pull_create`, an older name for `pr_create` |
 | Git | `local_changes`, `local_diff`, `git_log` |
 | Notes and memory | `notes_list`, `notes_read`, `notes_write`, `notes_append`, and five `memory_` tools |
 | Task scripts | `task_scripts_status`, `task_scripts_wait`, `task_scripts_logs` |

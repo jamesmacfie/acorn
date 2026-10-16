@@ -4,7 +4,16 @@ import { assembleBlockFrom, sectionCap, selectionFromContext, traySummary } from
 import { bytesOf, formatSize } from '@acorn/plugin-api/client'
 
 const ctx: TaskContext = {
-  task: { id: 't', title: 'x', projectId: 'project-1', repo: 'a/b', branch: 'm', worktreePath: null, pullNumber: null },
+  task: {
+    id: 't',
+    title: 'x',
+    projectId: 'project-1',
+    repo: 'a/b',
+    branch: 'm',
+    worktreePath: null,
+    pullNumber: null,
+    changeRequest: null,
+  },
   sections: [
     {
       id: 'notes',
