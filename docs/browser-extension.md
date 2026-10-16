@@ -109,13 +109,16 @@ person just chose. A probe comes from one of two operations:
   it, so the sidebar shows no identity words. With no Node holding the root, it answers `null`. A
   held root with no `node.json`, or a certificate that doesn't read, is `node_error`.
 - **`node.probe`** probes an address the person typed. The sidebar shows the fingerprint as six words,
-  and asks for the code only after the person ticks **The words match**.
+  and asks for the code only after the person clicks **They match**.
 
 The local probe can also pair by approval
 ([pairing by approval](./api-reference/transport.md#pairing-by-approval)). `node.ask` asks the Node
 over the kept probe and keeps the secret in the host, so the extension never holds it. The sidebar
-shows the phrase and calls `node.collect` once a second until the owner allows it in the desktop. A
-typed address can't ask, because the Node answers an ask only from its own computer.
+shows the phrase and calls `node.collect` once a second until the owner allows it in the desktop, with
+**Use a pairing code instead** one click away for a Node no desktop is watching. A typed address can't
+ask, because the Node answers an ask only from its own computer. The sidebar names the Node in
+`node.collect` and `node.pair` itself, "This computer" or the address's host, and Settings renames it
+with `node.rename`.
 
 Each browser keeps its own custody, apart from the CLI's and the desktop's: a `FleetStore` and token
 files under `~/Library/Application Support/acorn/browser-bridge/<browser>/`. The folder is mode 0700

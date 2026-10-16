@@ -102,7 +102,10 @@ At most one strip shows under the bars, chosen in this order:
 3. The page carries an item a handoff matches and no task holds: "This page has no task", with **Start
    task**, which goes Home, where **This page** looks the item up.
 
-A problem with the bridge itself shows as a line under the top bar, with the next step.
+No strip shows while the panel gets connected. Without the bridge, or while pairing, the top bar is
+bare: the acorn and "Acorn", and **Cancel** on a pairing step with somewhere to go back to
+([pair a Node](./setup.md#pair-a-node)). A bridge that stopped shows as a line under the top bar, with
+**Retry**.
 
 ## Settings
 

@@ -28,9 +28,10 @@ launcher script, so install it from the copy of the CLI you keep:
 
 [The browser host](../cli/browser-host.md) covers the files these commands write.
 
-If the panel is already open, it shows `acorn browser install` with a **Copy** button while the bridge
-is missing. It checks again every three seconds and carries on by itself once the bridge answers.
-**Retry** checks at once.
+If the panel is already open, it shows only **Install the browser bridge**, with the command as one
+button that copies it, and a spinner. A bridge that refuses this extension shows the same screen as
+**Repair the browser bridge**. The panel checks again every three seconds and carries on by itself
+once the bridge answers.
 
 ## Build and load the extension
 
@@ -57,22 +58,26 @@ user-level folder that `acorn browser install` writes. A Chrome started with `--
 The panel opens on pairing while no Node is paired. Later, click **Pair** in the **Nodes** header in
 Settings.
 
-1. **Choose a Node.** The Node running on this Mac is listed first, as **This computer** with an **On
-   this Mac** tag. The bridge found it in the same data folder `acorn` reads. Nodes this browser already
-   paired show as rows with **Use**. For a Node elsewhere, click **Use another address**.
-2. **Identity.** The Node on this Mac needs no check by eye: the bridge pinned the certificate from the
-   Node's own files. For another address, enter its HTTPS address and click **Check identity**. Compare
-   the six words with the ones the Node shows: the code panel in the desktop's **Settings → Nodes**, or
-   a standalone Node's banner. Tick **The words match** only if they do, then click **Continue**.
-3. **Allow or code.** For the Node on this Mac, the panel asks the Node and shows three words under
-   **Allow in Acorn**. The desktop opens a dialog with the same words. Click **Allow** there, and the
-   panel moves on by itself. Otherwise, paste a pairing code. The desktop shows one in **Settings →
-   Nodes → Pair a browser**. A standalone Node prints one at start, and `kill -USR1 <pid>` prints
-   another. The name fills in as **This computer** for the Node on this Mac, or the address for
-   another. Click **Pair**.
-4. **Done.** The panel names the Node it paired with. It offers an access switch for each site where
-   the Node's plugins put buttons, such as `github.com`, and the notifications switch. Both are
-   optional, and both stay in Settings.
+Each step is one screen under a bare top bar: the acorn and "Acorn", with **Cancel** on a middle step
+to go back to the first. The first step has **Cancel** too when a Node is already paired, and it
+closes pairing.
+
+1. **Connect to Acorn.** The Node running on this Mac shows as a card, **This computer** with its
+   address and **Connect**. The bridge found it in the same data folder `acorn` reads. With no Node on
+   this Mac, or one already paired, the card is left out. **Connect to another Node** is under it.
+2. **Approve in Acorn.** **Connect** asks the Node and shows three words. The desktop opens a dialog
+   with the same words. Click **Allow** there, and the panel moves on by itself. **Use a pairing code
+   instead** shows the code field. A Node that can't take an ask goes straight to the code.
+3. **Another Node.** Enter its HTTPS address and click **Check**. **Check its identity** shows six
+   words. Compare them with the ones the Node shows: the code panel in the desktop's **Settings →
+   Nodes**, or a standalone Node's banner. Click **They match** only if they do. The Node on this Mac
+   needs no check by eye: the bridge pinned the certificate from the Node's own files.
+4. **Enter the pairing code.** The desktop shows one in **Settings → Nodes → Pair a browser**. A
+   standalone Node prints one at start, and `kill -USR1 <pid>` prints another. Click **Pair**.
+5. **Connected.** The panel names the Node it paired with: **This computer** for the Node on this Mac,
+   or the address's host for another. Rename it in Settings. **Allow on these sites** has an access
+   switch for each site where the Node's plugins put buttons, such as `github.com`, and
+   **Notifications** has its switch. Both are optional, and both stay in Settings. **Done** goes Home.
 
 Each browser pairs on its own, so pair Chrome and Firefox separately. A Node on another computer must
 advertise its address, or be reached through an SSH tunnel, as
@@ -142,10 +147,10 @@ Each failure has a next step, written in `apps/extension/src/sidebar/guidance.ts
 
 | State | How it is detected | Next step shown |
 | --- | --- | --- |
-| Host missing | The port closes with "not found" (Chrome) or "No such native application" (Firefox) | Run `acorn browser install`, with **Copy**; the panel checks again every three seconds |
+| Host missing or refusing | The port closes with "not found" (Chrome) or "No such native application" (Firefox), or "forbidden" or "not allowed" when the registration doesn't list this extension | **Install the browser bridge** or **Repair the browser bridge**, with the command to copy; the panel checks again every three seconds |
 | Host stopped | Any other close, or no reply within 10 seconds. A launcher whose runtime or entry moved exits at once | Retry, or run `acorn browser status` |
 | Bad code | The Node refuses the pairing | Check the code and try again |
-| Node on this Mac unreadable | `node.local` fails: the data folder is held but its `node.json` or certificate doesn't read, or the Node presents another certificate | The reason, under the Node list; **Use another address** still works |
+| Node on this Mac unreadable | `node.local` fails: the data folder is held but its `node.json` or certificate doesn't read, or the Node presents another certificate | The reason, in place of the card; **Connect to another Node** still works |
 | Incompatible | The probe reports another protocol, or the broker marks the Node `incompatible` | Update whichever side is older |
 | Offline | The broker reports `offline`, or a read fails | Check that the Node is running |
 | Revoked | The Node answers 401 `unauthenticated` | Forget the Node and pair again |

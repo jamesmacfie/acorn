@@ -83,7 +83,7 @@ main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-st
 .strip .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .strip[data-tone='bad'] { background: color-mix(in srgb, var(--danger) 8%, var(--bg)); }
 
-/* A capture or an identity word, as a small rounded label. */
+/* A capture, as a small rounded label. */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -99,19 +99,20 @@ main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-st
 
 /* One line under the bars for anything wrong, with the next step. */
 .banner { padding: var(--space-4) var(--space-6); border-bottom: var(--chrome-divider); }
-.banner > :is(.command, p) { flex-basis: 100%; }
-.command code { font-family: var(--font-mono); color: var(--text); }
+
+/* ── Getting connected ──────────────────────────────────────────────────────────────────────── */
+/* Each screen is the kit's empty state, its action as wide as the panel with its parts centred. */
+.connect .ui-empty { padding-block: var(--space-10) var(--space-6); }
+.connect .ui-empty-action { align-self: stretch; flex-direction: column; text-align: start; }
+.connect .ui-empty-action > .ui-stack { align-items: center; }
+.connect .ui-empty-action > .ui-stack > :is(.ui-card, form, .ui-btn:has(.install-command)) { align-self: stretch; }
+.connect .ui-empty-action :is(.ui-inline, .ui-chiprow) { justify-content: center; }
+.connect form .ui-inline > :first-child { flex: 1; }
+/* The install command: a `$`, the command, and the copy mark, the whole block one button. */
+.install-command { display: flex; align-items: center; gap: var(--space-4); width: 100%; }
+.install-command > .ui-text:nth-child(2) { flex: 1; text-align: start; }
 
 /* ── Views and sections ─────────────────────────────────────────────────────────────────────── */
-.view-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--row-h);
-  padding: 0 var(--space-4);
-  border-bottom: var(--chrome-divider);
-}
-.view-head .title { font-weight: var(--heading-weight); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Agents with no task to list. */
 .empty { padding: var(--space-6); }
 /* One column no wider than the panel: an auto column grows to its longest unbroken word, so a long
@@ -122,8 +123,8 @@ main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-st
 /* A lone button in a section or form keeps its own width rather than the column's. */
 :is(.view > section, .view > section > section, form) > button { justify-self: start; }
 /* Settings: a setting's control takes its own width. The kit's fixed control column is sized for the
- * desktop's page and squeezes the label in a panel this narrow. */
-.settings { --setting-control-w: max-content; }
+ * desktop's page and squeezes the label in a panel this narrow. Pairing's done screen has the same rows. */
+:is(.settings, .connect) { --setting-control-w: max-content; }
 /* Add a site's Match: the four kinds share the dialog's width, so the last isn't cut off in the
  * Terminal pack's wider letters. A long label wraps instead. */
 [role='dialog'] .ui-segments { display: flex; }
@@ -143,34 +144,8 @@ h2, h3 {
 }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-inline); }
 
-/* Rows: 36 px, with dividers between them. */
-.rows > li {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-inline);
-  min-height: var(--row-h);
-  border-bottom: var(--divider);
-}
-.rows > li:last-child { border-bottom: 0; }
-.rows > li > div, .row-button { display: grid; min-width: 0; }
-.rows span, .rows strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row-button {
-  flex: 1;
-  width: 100%;
-  min-height: var(--row-h);
-  padding: var(--space-2) 0;
-  justify-content: stretch;
-  text-align: left;
-  font-weight: var(--fw-normal);
-  background: transparent;
-  color: var(--text);
-  border: 0;
-  border-radius: 0;
-}
-.row-button:hover:not(:disabled) { background: var(--bg-hover); }
 /* A New picker row's harness mark and, for a login shown as an icon, the account's icon. */
 .agent-marks { display: inline-flex; align-items: center; gap: var(--space-2); }
-.row-button[aria-current='true'] { box-shadow: inset var(--marker-w) 0 0 var(--accent); padding-left: var(--space-4); }
 /* Home's task rows, This page's task, and a task's conversations, the kit's stacked row: a state mark
  * beside the title, and a line of detail under it. A section's own padding takes the place of the
  * row's, except on the Agents tab, whose rows sit under the kit's section headers. */
@@ -256,8 +231,6 @@ fieldset { border: var(--surface-border); border-radius: var(--radius-surface); 
 .quiet { color: var(--text-muted); }
 .problem { color: var(--danger); }
 .notice { color: var(--text-muted); }
-/* A short label beside a name, such as the Node on this Mac. */
-.tag { padding: 0 var(--space-2); border: var(--control-border); border-radius: var(--radius-chip); font-size: var(--fs-xs); color: var(--text-muted); }
 ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 
 /* ── This page ──────────────────────────────────────────────────────────────────────────────── */

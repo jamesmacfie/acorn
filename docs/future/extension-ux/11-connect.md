@@ -1,7 +1,68 @@
 # Phase 11: install the bridge, pair, and finish
 
-Date: October 16, 2026. Status: proposed. Depends on [phase 10](./10-settings.md) for the Node
-rename, because this phase drops the name field from pairing.
+Date: October 16, 2026. Status: done on October 17, 2026. Depends on [phase 10](./10-settings.md) for
+the Node rename, because this phase drops the name field from pairing.
+
+## Completion note
+
+Landed on October 17, 2026. Getting connected is one screen per job, each the kit's `EmptyState`
+under a bare top bar. A missing or refused bridge shows the text acorn, **Install the browser bridge**
+or **Repair the browser bridge**, the command as one button that copies it, and a spinner. Pairing
+opens on **Connect to Acorn**, with the Node on this computer as a card with **Connect**. **Connect**
+asks Acorn and waits under **Approve in Acorn**, with **Use a pairing code instead** one click away.
+Another Node goes **Connect to another Node**, **Check its identity** with **They match**, then
+**Enter the pairing code**. The name field is gone. The paired screen says **Connected to *name***,
+then **Allow on these sites**, **Notifications**, and **Done**, which goes Home.
+[Set up](../../browser-extension/setup.md#pair-a-node),
+[pairing and custody](../../browser-extension.md#pairing-and-custody),
+[navigation](../../browser-extension/navigation.md), the site's setup page, its pairing picture, and
+the site's capture script are updated.
+
+Decisions and deviations:
+
+- No Node or desktop change. `node.ask` and `node.collect` existed, and the desktop already shows the
+  approval dialog. The trust checks are unchanged: the bridge still pins the local Node from its
+  files, a typed address still can't reach the code field without a press on **They match** after
+  its words show, and the extension still never sees the ask's secret.
+- The kit's `Acorn.tsx` gained `AcornArt`, the acorn alone, for an empty state's icon. The `.acorn-*`
+  rules moved from `shell.css` to `primitives.css`, so the kit's `Acorn` draws wherever the kit's
+  sheet loads, the sidebar included. The desktop loads both sheets, so it looks the same.
+- The top bar's `bare` mode is a `Match` in `TopBar.tsx`. `Pairing` reports what **Cancel** does on
+  each step through `showCancel`, as `Workspace` reports its heading. A middle step's **Cancel** goes
+  back to the first. The first step has **Cancel** only when a Node is already paired, where it
+  closes pairing, so pairing opened from Settings still has a way back.
+- Pairing no longer lists the paired Nodes with **Use**. Settings switches Nodes.
+- With the bridge missing, the panel shows only the install screen, and the Workspace unmounts. A
+  bridge that stopped keeps its line under the top bar with **Retry**. `installFixes` became
+  `installTitle` in `guidance.ts`.
+- The card's Node is the kit's stacked `Row` in a `Card`: a `laptop` icon, the name over the address
+  in monospace, and a solid **Connect**. `laptop` joined the kit's eager icon set. While `node.local`
+  answers, the step shows only the acorn and its title. A local Node that can't be read shows its
+  reason as an `Alert` where the card would be.
+- A failed ask, and a denied or expired one, both show the code field. A denial keeps the words, with
+  "The request was denied or has expired. Pair with a code instead."
+- Errors from **Check** and **Pair** use the kit `Field`'s `error`. The identity words are the kit's
+  `ChipRow` of `Chip`s, named by the phrase.
+- The paired screen leaves out **Allow on these sites** when no handoff has anchors.
+- The capture script names the Node by its host now, since there's no name field to fill.
+- `sidebar.css` lost the `.view-head`, `.rows`, `.row-button`, `.tag`, and `.command` rules, which
+  only the old screens used.
+
+Sidebar-only, so a plugin can't reach it: `InstallBridge`, `Pairing`, and their steps live in the
+extension, and so do the `.connect` and `.install-command` rules in `sidebar.css`, which widen the
+empty state's action to the panel and lay out the command button. Every part they draw with is a
+kit part the terminal host has: `EmptyState`, `Card`, `Row`, `ChipRow`, `Chip`, `Field`, `Input`,
+`Button`, `Spinner`, `Alert`, `Text`, `Stack`, `Inline`, and `SettingsSection`. The desktop's pairing
+lives in `NodePairingCode.tsx` and the onboarding wizard, which pair the other way round: they show a
+code, where the sidebar takes one.
+
+For later phases:
+
+- Tests: `App.test.tsx` has `header`, `screenTitles`, `localCard`, `words`, and `sent`. A screen's
+  title is the empty state's `.ui-empty-title`. The fake Node takes an ask with
+  `approval: { allowed }`.
+- `pnpm dev:extension:ui` drives pairing with `click "Connect to another Node"`, `fill address`,
+  `click Check`, `click "They match"`, `fill pairing-code`, and `click Pair`.
 
 ## Goal
 

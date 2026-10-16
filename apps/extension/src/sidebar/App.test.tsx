@@ -137,6 +137,18 @@ const input = (root: HTMLElement, name: string) => root.querySelector<HTMLInputE
 // Submits the form on screen: each pairing step shows one.
 const submit = (root: HTMLElement) =>
   root.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+const header = (root: HTMLElement) => root.querySelector('header')!
+// The one title each screen has, then any settings section's.
+const screenTitles = (root: HTMLElement) =>
+  [...root.querySelectorAll('.ui-empty-title, .ui-settings-section-label')].map((title) => title.textContent)
+const localCard = (root: HTMLElement) => root.querySelector<HTMLElement>('.connect .ui-card')!
+// The words on screen to compare, and the phrase they read as.
+const words = (root: HTMLElement, phrase?: string) =>
+  [...root.querySelectorAll(`.ui-chiprow${phrase ? `[aria-label="${phrase}"]` : ''} .ui-chip-label`)].map(
+    (word) => word.textContent,
+  )
+const sent = (fake: ReturnType<typeof fakeBrowser>, op: string) =>
+  fake.hosts.flatMap((host) => host.received as Request[]).filter((request) => request.op === op)
 const type = (element: HTMLInputElement, value: string) => {
   element.value = value
   element.dispatchEvent(new Event('input', { bubbles: true }))
@@ -200,19 +212,21 @@ describe('sidebar', () => {
     expect(root.querySelector('header .dot')!.getAttribute('data-tone')).toBe('ok')
   })
 
-  it('pairs the Node on this Mac with a code alone, then offers what comes next', async () => {
-    const { root } = mount([], { local: { nodeId: 'new', endpoint: 'https://127.0.0.1:4317' } })
+  it("pairs the Node on this Mac with a code when it can't take an ask, then offers what comes next", async () => {
+    const { fake, root } = mount([], { local: { nodeId: 'new', endpoint: 'https://127.0.0.1:4317' } })
     await settle()
-    // With nothing paired, the panel opens on pairing, the Node on this Mac first.
-    const choose = root.querySelector('[aria-label="Choose a Node"]')!
-    expect(choose.textContent).toContain('This computerOn this Machttps://127.0.0.1:4317')
-    expect(choose.textContent).toContain("Found in this Mac's Acorn data folder.")
-    button(choose, 'Continue')!.click()
+    // With nothing paired, the panel opens on pairing, under a bare top bar with nowhere else to go.
+    expect(screenTitles(root)).toEqual(['Connect to Acorn'])
+    expect(header(root).textContent).toBe('Acorn')
+    expect(button(header(root), 'Settings')).toBeUndefined()
+    expect(localCard(root).textContent).toContain('This computerhttps://127.0.0.1:4317')
+    button(localCard(root), 'Connect')!.click()
     await settle()
 
-    expect(root.textContent).toContain("Checked against this Mac's own certificate")
-    expect(root.querySelector('[data-testid="identity-words"]')).toBeNull()
-    expect(input(root, 'label').value).toBe('This computer')
+    // The Node took no ask, so the code is the only way, with no name to fill in.
+    expect(screenTitles(root)).toEqual(['Enter the pairing code'])
+    expect(root.textContent).toContain('In Acorn: Settings › Nodes › Pair a browser')
+    expect(input(root, 'label')).toBeNull()
     type(input(root, 'pairing-code'), 'WRONG')
     submit(root)
     await settle()
@@ -221,71 +235,103 @@ describe('sidebar', () => {
     type(input(root, 'pairing-code'), ' GOOD ')
     submit(root)
     await settle()
-    expect(root.querySelector('[aria-label="Paired"]')!.textContent).toContain('Paired with This computer')
-    expect(shownNode(root)).toContain('Node new')
-    expect(root.querySelector('[data-settings-section="notifications"]')).not.toBeNull()
+    expect(sent(fake, 'node.pair').at(-1)).toMatchObject({ code: 'GOOD', label: 'This computer' })
+    expect(screenTitles(root)).toEqual(['Connected to This computer', 'Notifications'])
     button(root, 'Done')!.click()
     await settle()
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
+    expect(shownNode(root)).toContain('Node new')
   })
 
-  it('pairs the Node on this Mac once Acorn allows it, with no code', async () => {
+  it('Connect asks Acorn to allow this browser, and pairs once it does', async () => {
     const approval = { allowed: false }
-    const { root } = mount([], { local: { nodeId: 'new', endpoint: 'https://127.0.0.1:4317' }, approval })
+    const { fake, root } = mount([], { local: { nodeId: 'new', endpoint: 'https://127.0.0.1:4317' }, approval })
     await settle()
-    button(root.querySelector('[aria-label="Choose a Node"]')!, 'Continue')!.click()
+    button(localCard(root), 'Connect')!.click()
     await settle()
-    // The words the owner's dialog shows, with the code form still there.
-    expect(root.querySelector('[data-testid="request-words"]')!.getAttribute('aria-label')).toBe('maple river stone')
-    expect(input(root, 'pairing-code')).not.toBeNull()
+    // The words Acorn's dialog shows, with the code a click away.
+    expect(screenTitles(root)).toEqual(['Approve in Acorn'])
+    expect(words(root, 'maple river stone')).toEqual(['maple', 'river', 'stone'])
+    expect(root.textContent).toContain('Waiting for approval')
+    expect(input(root, 'pairing-code')).toBeNull()
+    expect(button(root, 'Use a pairing code instead')).toBeDefined()
 
     approval.allowed = true
     await new Promise((resolve) => setTimeout(resolve, 1_100))
     await settle()
-    expect(root.querySelector('[aria-label="Paired"]')!.textContent).toContain('Paired with This computer')
+    expect(sent(fake, 'node.collect').at(-1)).toMatchObject({ label: 'This computer' })
+    expect(screenTitles(root)[0]).toBe('Connected to This computer')
+  })
+
+  it('Use a pairing code instead pairs with a code while Acorn waits', async () => {
+    const { fake, root } = mount([], {
+      local: { nodeId: 'new', endpoint: 'https://127.0.0.1:4317' },
+      approval: { allowed: false },
+    })
+    await settle()
+    button(localCard(root), 'Connect')!.click()
+    await settle()
+    button(root, 'Use a pairing code instead')!.click()
+    await settle()
+    type(input(root, 'pairing-code'), 'GOOD')
+    submit(root)
+    await settle()
+    expect(sent(fake, 'node.pair').at(-1)).toMatchObject({ code: 'GOOD', label: 'This computer' })
+    expect(screenTitles(root)[0]).toBe('Connected to This computer')
+    // Pairing stopped asking whether Acorn allowed it.
+    const collects = sent(fake, 'node.collect').length
+    await new Promise((resolve) => setTimeout(resolve, 1_100))
+    expect(sent(fake, 'node.collect').length).toBe(collects)
   })
 
   it('shows another address its identity words, and asks for the code only once they match', async () => {
-    const { root } = mount([], { refuseLateReads: true })
+    const { fake, root } = mount([], { refuseLateReads: true })
     await settle()
-    expect(root.querySelector('[data-testid="local-node-note"]')!.textContent).toBe(
-      'No Acorn Node is running on this Mac.',
-    )
-    button(root, 'Use another address ›')!.click()
+    // No Node on this Mac: no card, and the other way in is a plain button.
+    expect(root.querySelector('.connect .ui-card')).toBeNull()
+    button(root, 'Connect to another Node')!.click()
     await settle()
+    expect(screenTitles(root)).toEqual(['Connect to another Node'])
+    // A middle step's Cancel goes back to the first.
+    button(header(root), 'Cancel')!.click()
+    await settle()
+    expect(screenTitles(root)).toEqual(['Connect to Acorn'])
+    expect(button(header(root), 'Cancel')).toBeUndefined()
+    button(root, 'Connect to another Node')!.click()
+    await settle()
+
     type(input(root, 'address'), 'https://new.test:7443')
     submit(root)
     await settle()
-    const words = [...root.querySelectorAll('[data-testid="identity-words"] li')].map((word) => word.textContent)
-    expect(words).toEqual(fingerprintWords(FINGERPRINT))
-    expect(root.textContent).toContain('Find them in Settings › Nodes in the Acorn app')
-    expect(button(root, 'Continue')!.disabled).toBe(true)
+    expect(screenTitles(root)).toEqual(['Check its identity'])
+    expect(root.textContent).toContain('new.test:7443 shows these words in Settings › Nodes')
+    expect(words(root)).toEqual(fingerprintWords(FINGERPRINT))
     expect(input(root, 'pairing-code')).toBeNull()
 
-    input(root, 'confirm').click()
+    button(root, 'They match')!.click()
     await settle()
-    button(root, 'Continue')!.click()
-    await settle()
-    expect(root.textContent).toContain('You confirmed the identity words')
-    expect(input(root, 'label').value).toBe('new.test:7443')
+    expect(screenTitles(root)).toEqual(['Enter the pairing code'])
+    expect(root.textContent).toContain('On new.test:7443: Settings › Nodes › Pair a browser')
     type(input(root, 'pairing-code'), 'GOOD')
     submit(root)
+    await settle()
+    expect(sent(fake, 'node.pair').at(-1)).toMatchObject({ label: 'new.test:7443' })
+    button(root, 'Done')!.click()
     await settle()
     expect(shownNode(root)).toContain('Node new')
   })
 
-  it('lists paired Nodes to use while pairing, and pairs another or forgets one from Settings', async () => {
+  it('pairs another Node from Settings, where Cancel goes back, and forgets one there', async () => {
     const { root } = mount(['a'], { local: { nodeId: 'a', endpoint: 'https://127.0.0.1:4317' } })
     await settle()
     await useNode(root, 'Node a')
     await openSettings(root)
     button(root.querySelector('[data-settings-section="nodes"]')!, 'Pair')!.click()
     await settle()
-    // The Node on this Mac is already paired, so it shows as a Use row with its tag.
-    const choose = root.querySelector('[aria-label="Choose a Node"]')!
-    expect(choose.textContent).not.toContain('This computer')
-    expect(choose.querySelector('li')!.textContent).toContain('Node aOn this Mac')
-    button(choose, 'Use')!.click()
+    // The Node on this Mac is already paired, so it has no card.
+    expect(screenTitles(root)).toEqual(['Connect to Acorn'])
+    expect(root.querySelector('.connect .ui-card')).toBeNull()
+    button(header(root), 'Cancel')!.click()
     await settle()
     // Pairing closes back to Settings, where it was asked for.
     expect(root.querySelector('[aria-label="Settings"]')).not.toBeNull()
@@ -333,7 +379,7 @@ describe('sidebar', () => {
     expect(shownNode(root)).toContain('Laptop')
   })
 
-  it('shows the install command with Copy, and carries on once the bridge answers', async () => {
+  it('shows the install command and a spinner, and carries on once the bridge answers', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     const writeText = vi.fn(async () => {})
     Object.assign(navigator, { clipboard: { writeText } })
@@ -344,15 +390,15 @@ describe('sidebar', () => {
     document.body.append(root)
     dispose = render(() => <App api={fake.api} />, root)
     await settle()
-    const banner = root.querySelector('[role="alert"]')!
-    expect(banner.textContent).toContain('The Acorn browser bridge is not installed.')
-    expect(banner.querySelector('code')!.textContent).toBe('acorn browser install')
-    button(banner, 'Copy')!.click()
+    // One screen, under a bare top bar: the command as one button that copies it, and a spinner.
+    expect(screenTitles(root)).toEqual(['Install the browser bridge'])
+    expect(button(header(root), 'Settings')).toBeUndefined()
+    expect(root.textContent).toContain('Waiting for the bridge')
+    expect(root.textContent).not.toContain('Retry')
+    const copy = button(root, 'Copy acorn browser install')!
+    expect(copy.textContent).toBe('$acorn browser install')
+    copy.click()
     expect(writeText).toHaveBeenCalledWith('acorn browser install')
-    // The pairings are in the bridge, so Settings doesn't claim there are none.
-    await openSettings(root)
-    expect(root.textContent).not.toContain('No Node is paired')
-    expect(root.textContent).toContain('The paired Nodes show once the bridge answers.')
 
     // The person installs the bridge; the next check finds it without a click.
     fake.onNativeConnect = () => {}
@@ -364,7 +410,6 @@ describe('sidebar', () => {
     vi.advanceTimersByTime(3_000)
     vi.useRealTimers()
     await settle()
-    expect(root.querySelector('[role="alert"]')).toBeNull()
-    expect(root.querySelector('[aria-label="Choose a Node"]')).not.toBeNull()
+    expect(screenTitles(root)).toEqual(['Connect to Acorn'])
   })
 })

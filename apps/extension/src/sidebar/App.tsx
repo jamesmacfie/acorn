@@ -19,10 +19,10 @@ import { pageTasks } from '../taskPages'
 import { activePageUrl } from './activePage'
 import { bridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
-import { INSTALL_COMMAND, errorGuidance, hostGuidance, installFixes, statusGuidance } from './guidance'
+import { errorGuidance, hostGuidance, installTitle, statusGuidance } from './guidance'
 import { createLocation, type Location } from './location'
 import { NeedsYouButton } from './NeedsYou'
-import { Pairing } from './Pairing'
+import { InstallBridge, Pairing } from './Pairing'
 import { Settings } from './Settings'
 import { TopBar, type Heading } from './TopBar'
 import { ConversationMenu, TaskMenu } from './TopBarMenus'
@@ -40,8 +40,10 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [fleet, setFleet] = createSignal<BridgeNodes | null>(null)
   const [status, setStatus] = createSignal<NodeStatus | null>(null)
   const [problem, setProblem] = createSignal<CallError | null>(null)
-  // Pairing replaces whatever the panel showed, which returns when it closes.
+  // Pairing replaces whatever the panel showed, which returns when it closes. Its step says what the
+  // top bar's Cancel does.
   const [pairing, setPairing] = createSignal(false)
+  const [pairingCancel, setPairingCancel] = createSignal<(() => void) | null>(null)
   const [hint, setHint] = createSignal<BridgeAgentHint | null>(null)
   // Counts each return of the selected Node's connection. What the sidebar shows may have changed
   // while it was away, and frames missed in a gap are never replayed, so a return means read again.
@@ -250,10 +252,12 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const tasksKnown = createMemo(() => nodeTasks() !== null)
   createEffect(on([pageUrl, tasksKnown], () => !pairing() && nav.followPage(pageTaskId()), { defer: true }))
   // `acorn browser install` runs in a terminal, so the panel can't see it finish. It asks again until
-  // the bridge answers; Retry stays for the impatient.
-  const awaitingInstall = createMemo(() => installFixes(host()))
+  // the bridge answers.
+  const installing = createMemo(() => installTitle(host()))
+  // Getting connected shows a bare top bar: nothing else works without a bridge and a Node.
+  const connecting = () => !!installing() || pairing()
   createEffect(() => {
-    if (!awaitingInstall()) return
+    if (!installing()) return
     const timer = setInterval(() => void refresh(), BRIDGE_RECHECK_MS)
     onCleanup(() => clearInterval(timer))
   })
@@ -261,7 +265,9 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   return (
     <main>
       <TopBar
-        location={pairing() ? { level: 'home' } : nav.location()}
+        location={nav.location()}
+        bare={connecting()}
+        cancel={pairing() ? (pairingCancel() ?? undefined) : undefined}
         heading={heading()}
         nodeLabel={selected()?.label ?? null}
         status={status()}
@@ -273,7 +279,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
         }}
         goToTask={() => setGoToTask(true)}
         needsYou={
-          <Show when={!pairing() && fleet()?.activeNodeId} keyed>
+          <Show when={fleet()?.activeNodeId} keyed>
             {(nodeId) => (
               <NeedsYouButton
                 client={client}
@@ -323,19 +329,6 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
             <button type="button" class="quiet" onClick={() => void refresh()}>
               Retry
             </button>
-            <Show when={awaitingInstall()}>
-              <div class="command row">
-                <code class="grow">{INSTALL_COMMAND}</code>
-                <button
-                  type="button"
-                  class="quiet"
-                  onClick={() => void navigator.clipboard.writeText(INSTALL_COMMAND).catch(() => {})}
-                >
-                  Copy
-                </button>
-              </div>
-              <p class="quiet">The panel checks again every few seconds and carries on once the bridge answers.</p>
-            </Show>
           </div>
         )}
       </Show>
@@ -358,7 +351,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
         )}
       </Show>
       {/* The selected Node can't be worked with. What the panel shows stays readable under the strip. */}
-      <Show when={selected() && statusGuidance(status()).detail}>
+      <Show when={!connecting() && selected() && statusGuidance(status()).detail}>
         {(detail) => (
           <div class="strip" data-tone="bad" role="status" data-testid="node-status">
             <Icon name="circle-x" tone="danger" />
@@ -375,7 +368,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
           </div>
         )}
       </Show>
-      <Show when={fleet() && !fleet()!.activeNodeId && nav.location().level !== 'settings' && !pairing()}>
+      <Show when={fleet() && !fleet()!.activeNodeId && nav.location().level !== 'settings' && !connecting()}>
         <div class="banner notice row">
           <span class="grow">
             {fleet()!.nodes.length ? 'Choose a Node to work with.' : 'No Node is paired with this browser yet.'}
@@ -387,20 +380,28 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
       </Show>
 
       <Show
-        when={!pairing()}
+        when={!connecting()}
         fallback={
-          <Pairing
-            api={props.api}
-            client={client}
-            fleet={fleet()}
-            handoffs={handoffs()}
-            use={(nodeId) => {
-              setPairing(false)
-              void select(nodeId)
-            }}
-            paired={(node) => void select(node.nodeId)}
-            close={() => setPairing(false)}
-          />
+          <Show
+            when={installing()}
+            fallback={
+              <Pairing
+                api={props.api}
+                client={client}
+                fleet={fleet()}
+                handoffs={handoffs()}
+                paired={(node) => void select(node.nodeId)}
+                showCancel={(cancel) => setPairingCancel(() => cancel)}
+                close={() => setPairing(false)}
+                done={() => {
+                  setPairing(false)
+                  nav.goHome()
+                }}
+              />
+            }
+          >
+            {(title) => <InstallBridge title={title()} />}
+          </Show>
         }
       >
         {/* Settings shows over the Workspace, which stays mounted so the task it showed is there on Back. */}

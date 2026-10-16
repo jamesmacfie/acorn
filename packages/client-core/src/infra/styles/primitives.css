@@ -491,6 +491,30 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-empty[data-align='start'] .ui-empty-text { max-width: none; }
 .ui-empty-action { display: inline-flex; gap: var(--gap-row); margin-top: var(--space-2); }
 
+/* ── Acorn ──────────────────────────────────────────────────────────────────────────────────
+   The acorn drawn in text, alone in a pane with nothing to show, or above an empty state's title. */
+.acorn-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  min-height: 0;
+}
+.acorn-art {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  line-height: 1.1;
+  white-space: pre;
+}
+.acorn-word {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.2em;
+}
+
 /* ── StatusDot ──────────────────────────────────────────────────────────────────────────────
    See docs/ui-design/kit-internals.md § How the kit is built for the two colour vocabularies this
    replaces. 8px is the majority size (.check-dot, .checks-dot, .docker-dot); terminal's 7px and

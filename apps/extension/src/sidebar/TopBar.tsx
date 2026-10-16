@@ -21,11 +21,15 @@ const Acorn = () => (
 // The key that opens Go to task, as the panel writes it: ⌘K on a Mac, Ctrl+K elsewhere.
 const GO_TO_TASK_KEYS = formatChord(/Mac/.test(navigator.userAgent) ? 'meta+k' : 'ctrl+k')
 
-// The bar above every level, drawn from where the sidebar is. Home shows the acorn with the selected
+// The bar above every level, drawn from where the sidebar is. While the panel gets connected it's bare:
+// the acorn and "Acorn", and Cancel on a pairing step that has somewhere to go back to. Home shows the acorn with the selected
 // Node's state as a dot, Go to task, Needs you, and the Settings gear. A task, a conversation, and Settings show
 // Back and what they are, and a task's title opens Go to task too.
 export function TopBar(props: {
   location: Location
+  // Installing the bridge or pairing, when nothing else works yet.
+  bare: boolean
+  cancel?: () => void
   heading: Heading | null
   // The selected Node, if any, and its state, which the acorn's dot shows.
   nodeLabel: string | null
@@ -47,6 +51,19 @@ export function TopBar(props: {
   return (
     <header class="top" ref={props.ref}>
       <Switch>
+        <Match when={props.bare}>
+          <span class="mark">
+            <Acorn />
+          </span>
+          <strong class="grow">Acorn</strong>
+          <Show when={props.cancel}>
+            {(cancel) => (
+              <button type="button" class="icon" aria-label="Cancel" onClick={() => cancel()()}>
+                <Icon name="x" />
+              </button>
+            )}
+          </Show>
+        </Match>
         <Match when={props.location.level === 'home'}>
           <span
             class="mark"

@@ -1,72 +1,133 @@
-import { For, Match, Show, Switch, createSignal, onCleanup, onMount } from 'solid-js'
+import { For, Match, Show, Switch, createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import type { NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import type { BridgeHandoff, BridgeNodes, BridgeResults } from '@acorn/protocol/extensionBridge.ts'
 import { fingerprintPhrase, fingerprintWords } from '@acorn/protocol/fingerprintWords.ts'
+import { AcornArt } from '@acorn/client-core/kit/components/content/Acorn.tsx'
+import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { Text } from '@acorn/client-core/kit/components/content'
+import { ChipRow, Inline, SettingsSection, Stack } from '@acorn/client-core/kit/components/layout'
+import {
+  Alert,
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  Field,
+  Input,
+  Row,
+  Spinner,
+} from '@acorn/client-core/kit/components/primitives.tsx'
 import type { BrowserApi } from '../browser'
 import { CallFailure } from '../messages'
 import type { BridgeClient } from './bridgeClient'
-import { errorGuidance } from './guidance'
-import { SettingsSection } from '@acorn/client-core/kit/components/layout'
+import { INSTALL_COMMAND, errorGuidance } from './guidance'
 import { Notifications } from './Settings'
 import { SiteList } from './Sites'
 import { siteRows } from './siteRows'
-import { State } from './state'
+
+// Getting connected: the bridge, then a Node. Each screen does one job, in the kit's empty state.
 
 // A Node has no name of its own. Every Acorn client calls the one on this computer this.
 const LOCAL_NAME = 'This computer'
 
+// The command that installs the bridge, as one button that copies it, over a spinner while the panel
+// waits for the bridge to answer. `title` says whether it's missing or refuses this extension.
+export function InstallBridge(props: { title: string }) {
+  const [copied, setCopied] = createSignal(false)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(timer))
+  const copy = () =>
+    navigator.clipboard.writeText(INSTALL_COMMAND).then(
+      () => {
+        setCopied(true)
+        clearTimeout(timer)
+        timer = setTimeout(() => setCopied(false), 1_500)
+      },
+      () => {},
+    )
+  return (
+    <div class="connect">
+      <EmptyState
+        icon={<AcornArt />}
+        title={props.title}
+        action={
+          <Stack>
+            <Button label={`Copy ${INSTALL_COMMAND}`} onPress={() => void copy()}>
+              <span class="install-command">
+                <Text tone="muted">$</Text>
+                <Text emphasis="mono">{INSTALL_COMMAND}</Text>
+                <Icon name={copied() ? 'check' : 'copy'} tone="muted" />
+              </span>
+            </Button>
+            <Waiting>Waiting for the bridge</Waiting>
+          </Stack>
+        }
+      >
+        Run this in a terminal. The extension reaches Acorn through it.
+      </EmptyState>
+    </div>
+  )
+}
+
 type Step =
   | { kind: 'choose' }
   | { kind: 'address' }
+  | { kind: 'identity'; probe: NodeProbeResult }
   // `local` is a Node whose certificate the bridge read from its own files.
   | { kind: 'code'; probe: NodeProbeResult; local: boolean }
   | { kind: 'done'; node: NodeRecord }
 
-// Choose a Node, check its identity, enter the code, and offer what comes next. The Node on this
-// computer needs no comparison: the bridge pins the certificate from the Node's own files. Another
-// address shows identity words the person compares with what the Node shows, before the code field
-// appears. That comparison is what makes pairing it safe, so it is a step rather than a field to skip.
+// Choose a Node, check its identity, pair, and offer what comes next. The Node on this computer needs
+// no comparison: the bridge pins the certificate from the Node's own files. Another address shows
+// identity words the person compares with what the Node shows before the code field appears. That
+// comparison is what makes pairing it safe, so it is a step rather than a field to skip.
 export function Pairing(props: {
   api: BrowserApi
   client: BridgeClient
   fleet: BridgeNodes | null
   // The selected Node's handoffs, which name the sites worth allowing once it is paired.
   handoffs: readonly BridgeHandoff[]
-  use(nodeId: string): void
   paired(node: NodeRecord): void
+  // What the top bar's Cancel does on this step, or null for none.
+  showCancel(cancel: (() => void) | null): void
   close(): void
+  done(): void
 }) {
   const [step, setStep] = createSignal<Step>({ kind: 'choose' })
   const stepOf = <Kind extends Step['kind']>(kind: Kind) => {
     const current = step()
     return current.kind === kind ? (current as Extract<Step, { kind: Kind }>) : null
   }
-  const back = () => {
-    const current = step()
-    if (current.kind === 'address') setStep({ kind: 'choose' })
-    else if (current.kind === 'code') setStep({ kind: current.local ? 'choose' : 'address' })
-    else props.close()
-  }
+  const restart = () => setStep({ kind: 'choose' })
+  // A middle step goes back to the first. The first closes pairing when there's a Node to go back to.
+  createEffect(() => {
+    const kind = step().kind
+    if (kind === 'done') props.showCancel(null)
+    else if (kind !== 'choose') props.showCancel(restart)
+    else props.showCancel(props.fleet?.nodes.length ? props.close : null)
+  })
   return (
-    <div class="view" aria-label="Pair a Node">
-      <div class="view-head">
-        <button type="button" class="icon" aria-label="Back" onClick={back}>
-          ‹
-        </button>
-        <span class="title">Pair this browser</span>
-      </div>
+    <div class="view connect" aria-label="Pair a Node">
       <Switch>
         <Match when={step().kind === 'choose'}>
           <Choose
             client={props.client}
             fleet={props.fleet}
-            use={props.use}
-            chose={(probe) => setStep({ kind: 'code', probe, local: true })}
+            connect={(probe) => setStep({ kind: 'code', probe, local: true })}
             another={() => setStep({ kind: 'address' })}
           />
         </Match>
         <Match when={step().kind === 'address'}>
-          <Address client={props.client} confirmed={(probe) => setStep({ kind: 'code', probe, local: false })} />
+          <Address client={props.client} found={(probe) => setStep({ kind: 'identity', probe })} />
+        </Match>
+        <Match when={stepOf('identity')} keyed>
+          {(current) => (
+            <Identity
+              probe={current.probe}
+              matched={() => setStep({ kind: 'code', probe: current.probe, local: false })}
+              cancel={restart}
+            />
+          )}
         </Match>
         <Match when={stepOf('code')} keyed>
           {(current) => (
@@ -82,44 +143,19 @@ export function Pairing(props: {
           )}
         </Match>
         <Match when={stepOf('done')} keyed>
-          {(current) => (
-            <>
-              <section aria-label="Paired">
-                <strong>Paired with {current.node.label}</strong>
-                <p class="quiet">Switch Nodes in Settings.</p>
-              </section>
-              {/* Both optional: the same controls Settings has, so either can wait until later. */}
-              <SettingsSection id="sites" label="Sites">
-                <SiteList
-                  api={props.api}
-                  rows={siteRows({
-                    handoffs: props.handoffs.filter((handoff) => handoff.anchors.length),
-                    sites: [],
-                    apps: [],
-                    projects: [],
-                  })}
-                />
-              </SettingsSection>
-              <Notifications permissions={props.api.permissions} />
-              <section>
-                <button type="button" class="quiet" onClick={() => props.close()}>
-                  Done
-                </button>
-              </section>
-            </>
-          )}
+          {(current) => <Paired api={props.api} node={current.node} handoffs={props.handoffs} done={props.done} />}
         </Match>
       </Switch>
     </div>
   )
 }
 
-// The Node on this computer, then the Nodes this browser already paired, then another address.
+// The Node on this computer as the obvious choice, unless it's missing or already paired, then
+// another address.
 function Choose(props: {
   client: BridgeClient
   fleet: BridgeNodes | null
-  use(nodeId: string): void
-  chose(probe: NodeProbeResult): void
+  connect(probe: NodeProbeResult): void
   another(): void
 }) {
   const [local, setLocal] = createSignal<{ node: BridgeResults['node.local']; problem: string | null } | null>(null)
@@ -132,168 +168,137 @@ function Choose(props: {
       setLocal({ node: null, problem: failure instanceof Error ? failure.message : String(failure) })
     }
   })
-  const localNode = () => local()?.node ?? null
   const unpaired = () => {
-    const node = localNode()
+    const node = local()?.node
     return node?.compatible && !props.fleet?.nodes.some((paired) => paired.nodeId === node.nodeId) ? node : null
   }
-  const note = () => {
-    const found = local()
-    if (!found) return 'Looking for a Node on this Mac…'
-    if (found.problem) return found.problem
-    return found.node ? "Found in this Mac's Acorn data folder." : 'No Acorn Node is running on this Mac.'
-  }
-  const onThisMac = (nodeId: string) => localNode()?.nodeId === nodeId
 
   return (
-    <section aria-label="Choose a Node">
-      <h2>Pair this browser</h2>
-      <ul class="rows">
-        <Show when={unpaired()}>
-          {(node) => (
-            <NodeRow
-              name={LOCAL_NAME}
-              endpoint={node().endpoint}
-              onThisMac
-              action="Continue"
-              act={() => props.chose(node())}
-            />
+    <EmptyState
+      icon={<AcornArt />}
+      title="Connect to Acorn"
+      action={
+        <Show when={local()}>
+          {(found) => (
+            <Stack>
+              <Show when={unpaired()}>
+                {(node) => (
+                  <Card pad="sm">
+                    <Row
+                      variant="stacked"
+                      leading={<Icon name="laptop" size="1.5em" tone="muted" />}
+                      trailing={
+                        <Button variant="solid" size="sm" onPress={() => props.connect(node())}>
+                          Connect
+                        </Button>
+                      }
+                    >
+                      <Text emphasis="strong">{LOCAL_NAME}</Text>
+                      <Text emphasis="mono" tone="muted">
+                        {node().endpoint}
+                      </Text>
+                    </Row>
+                  </Card>
+                )}
+              </Show>
+              <Show when={found().problem}>{(problem) => <Alert>{problem()}</Alert>}</Show>
+              <Button variant={unpaired() ? 'bare' : 'outline'} onPress={() => props.another()}>
+                Connect to another Node
+              </Button>
+            </Stack>
           )}
         </Show>
-        <For each={props.fleet?.nodes}>
-          {(node) => (
-            <NodeRow
-              name={node.label}
-              endpoint={node.endpoint}
-              onThisMac={onThisMac(node.nodeId)}
-              action="Use"
-              act={() => props.use(node.nodeId)}
-            />
-          )}
-        </For>
-        <li>
-          <button type="button" class="row-button" onClick={() => props.another()}>
-            Use another address ›
-          </button>
-        </li>
-      </ul>
-      <p class="quiet" data-testid="local-node-note">
-        {note()}
-      </p>
-    </section>
+      }
+    />
   )
 }
 
-function NodeRow(props: { name: string; endpoint: string; onThisMac: boolean; action: string; act(): void }) {
-  return (
-    <li>
-      <div class="grow">
-        <span class="row">
-          <strong>{props.name}</strong>
-          <Show when={props.onThisMac}>
-            <span class="tag">On this Mac</span>
-          </Show>
-        </span>
-        <span class="quiet">{props.endpoint}</span>
-      </div>
-      <button type="button" class="quiet" onClick={() => props.act()}>
-        {props.action}
-      </button>
-    </li>
-  )
-}
-
-// Another address: probe it, then show the certificate it presented as words for the person to compare.
-function Address(props: { client: BridgeClient; confirmed(probe: NodeProbeResult): void }) {
+// Another address: probe it, then show the certificate it presented as words.
+function Address(props: { client: BridgeClient; found(probe: NodeProbeResult): void }) {
   const [address, setAddress] = createSignal('https://')
-  const [probe, setProbe] = createSignal<NodeProbeResult | null>(null)
-  const [matched, setMatched] = createSignal(false)
+  const [problem, setProblem] = createSignal<string | null>(null)
   const work = action()
 
   const check = (event: SubmitEvent) => {
     event.preventDefault()
-    setProbe(null)
-    setMatched(false)
+    setProblem(null)
     void work.run(async () => {
-      setProbe(await props.client.call({ op: 'node.probe', endpoint: address().trim() }))
+      const probe = await props.client.call({ op: 'node.probe', endpoint: address().trim() })
+      if (probe.compatible) props.found(probe)
+      else setProblem(incompatible(probe))
     })
   }
 
   return (
-    <section aria-label="Identity">
-      <form onSubmit={check}>
-        <label>
-          Node address
-          <input
-            name="address"
-            type="url"
-            required
-            value={address()}
-            onInput={(event) => setAddress(event.currentTarget.value)}
-          />
-        </label>
-        <button type="submit" class="quiet" disabled={work.busy()}>
-          Check identity
-        </button>
-      </form>
-      <Show when={probe()}>
-        {(result) => (
-          <Show
-            when={result().compatible}
-            fallback={
-              <p class="problem" role="alert">
-                {incompatible(result())}
-              </p>
-            }
-          >
-            <h2>Identity</h2>
-            <p>Compare these words with the ones the Node shows:</p>
-            <ul class="chips" data-testid="identity-words" aria-label={fingerprintPhrase(result().fingerprint) ?? ''}>
-              <For each={fingerprintWords(result().fingerprint) ?? [result().fingerprint]}>
-                {(word) => <li class="chip">{word}</li>}
-              </For>
-            </ul>
-            <p class="quiet">
-              Find them in Settings › Nodes in the Acorn app, or in the banner a standalone Node prints when it starts.
-            </p>
-            <label class="check">
-              <input
-                name="confirm"
-                type="checkbox"
-                checked={matched()}
-                onChange={(event) => setMatched(event.currentTarget.checked)}
+    <EmptyState
+      title="Connect to another Node"
+      action={
+        <form onSubmit={check}>
+          <Field label="Address" error={problem() ?? work.error() ?? undefined}>
+            <Inline>
+              <Input
+                name="address"
+                type="url"
+                required
+                autofocus
+                value={address()}
+                onInput={(value) => setAddress(value)}
               />
-              The words match
-            </label>
-            <button type="button" disabled={!matched()} onClick={() => props.confirmed(result())}>
-              Continue
-            </button>
-          </Show>
-        )}
-      </Show>
-      <Show when={work.error()}>
-        <p class="problem" role="alert">
-          {work.error()}
-        </p>
-      </Show>
-    </section>
+              <Button variant="solid" submit busy={work.busy()}>
+                Check
+              </Button>
+            </Inline>
+          </Field>
+        </form>
+      }
+    />
+  )
+}
+
+// The words for the certificate the address presented, to compare with what the Node shows.
+function Identity(props: { probe: NodeProbeResult; matched(): void; cancel(): void }) {
+  return (
+    <EmptyState
+      title="Check its identity"
+      action={
+        <Stack>
+          <Words
+            phrase={fingerprintPhrase(props.probe.fingerprint) ?? props.probe.fingerprint}
+            words={fingerprintWords(props.probe.fingerprint) ?? [props.probe.fingerprint]}
+          />
+          <Inline>
+            <Button variant="solid" onPress={() => props.matched()}>
+              They match
+            </Button>
+            <Button variant="ghost" onPress={() => props.cancel()}>
+              Cancel
+            </Button>
+          </Inline>
+        </Stack>
+      }
+    >
+      {new URL(props.probe.endpoint).host} shows these words in Settings › Nodes. Continue only if they match.
+    </EmptyState>
   )
 }
 
 // How often the sidebar asks whether the owner has allowed this browser.
 const COLLECT_EVERY_MS = 1_000
 
-// The code, and the name this browser shows for the Node. `node.pair` completes the probe the bridge
-// kept, so nothing here names the Node again.
-//
-// The Node on this computer also gets an ask (docs/api-reference/transport.md § Pairing by approval):
-// Acorn shows a dialog, and this waits for the owner to allow it. The code form stays beside it, for a
-// Node no paired app is watching.
+// The Node on this computer gets an ask (docs/api-reference/transport.md § Pairing by approval): Acorn
+// shows a dialog, and this waits for the owner to allow it, with the code one click away for a Node no
+// paired app is watching. Another Node, or one that can't take an ask, goes straight to the code.
+// `node.pair` completes the probe the bridge kept, so nothing here names the Node again.
 function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: boolean; paired(node: NodeRecord): void }) {
+  const host = new URL(props.probe.endpoint).host
+  // The name this browser shows for the Node. Settings renames it.
+  const label = props.local ? LOCAL_NAME : host
   const [code, setCode] = createSignal('')
-  const [label, setLabel] = createSignal(props.local ? LOCAL_NAME : new URL(props.probe.endpoint).host)
+  // Whether the ask has answered, and the words Acorn's dialog shows if it took it.
+  const [asked, setAsked] = createSignal(!props.local)
   const [phrase, setPhrase] = createSignal<string | null>(null)
   const [refused, setRefused] = createSignal(false)
+  const [usingCode, setUsingCode] = createSignal(false)
   const work = action()
 
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -305,7 +310,7 @@ function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: bool
   const collect = async () => {
     if (stopped) return
     try {
-      const node = await props.client.call({ op: 'node.collect', label: label().trim() || LOCAL_NAME })
+      const node = await props.client.call({ op: 'node.collect', label })
       if (stopped) return
       if (node) return props.paired(node)
       timer = setTimeout(() => void collect(), COLLECT_EVERY_MS)
@@ -317,75 +322,122 @@ function Code(props: { client: BridgeClient; probe: NodeProbeResult; local: bool
     if (!props.local) return
     try {
       setPhrase((await props.client.call({ op: 'node.ask' })).phrase)
+      void collect()
     } catch {
-      return // A Node that can't take an ask still takes a code.
+      // A Node that can't take an ask still takes a code.
+    } finally {
+      setAsked(true)
     }
-    void collect()
   })
 
   const pair = (event: SubmitEvent) => {
     event.preventDefault()
-    void work.run(async () =>
-      props.paired(await props.client.call({ op: 'node.pair', code: code().trim(), label: label().trim() })),
-    )
+    void work.run(async () => props.paired(await props.client.call({ op: 'node.pair', code: code().trim(), label })))
   }
-
-  return (
-    <section aria-label="Pairing code">
-      <h2>Identity</h2>
-      <State tone="ok">
-        {props.local ? "Checked against this Mac's own certificate" : 'You confirmed the identity words'}
-      </State>
-      <Show when={phrase()}>
-        {(words) => (
-          <section aria-label="Allow in Acorn">
-            <h2>Allow in Acorn</h2>
-            <Show
-              when={!refused()}
-              fallback={
-                <p class="problem" role="alert">
-                  The request was denied or has expired. Pair with a code instead.
-                </p>
-              }
-            >
-              <p>Acorn on this Mac asks whether to allow this browser. Allow it if it shows these words:</p>
-              <ul class="chips" data-testid="request-words" aria-label={words()}>
-                <For each={words().split(' ')}>{(word) => <li class="chip">{word}</li>}</For>
-              </ul>
-              <p class="quiet">Or pair with a code.</p>
-            </Show>
-          </section>
-        )}
-      </Show>
-      <form onSubmit={pair}>
-        <label>
-          Pairing code
-          <input
+  const codeForm = () => (
+    <form onSubmit={pair}>
+      <Field
+        label="Pairing code"
+        hint={
+          props.local ? 'In Acorn: Settings › Nodes › Pair a browser' : `On ${host}: Settings › Nodes › Pair a browser`
+        }
+        error={work.error() ?? undefined}
+      >
+        <Inline>
+          <Input
             name="pairing-code"
             required
-            autocomplete="off"
+            autofocus
             placeholder="Paste the code"
             value={code()}
-            onInput={(event) => setCode(event.currentTarget.value)}
+            onInput={(value) => setCode(value)}
           />
-        </label>
-        <p class="quiet">
-          In the Acorn app: Settings › Nodes › Pair a browser. A standalone Node prints one when it starts.
-        </p>
-        <label>
-          Name in this browser
-          <input name="label" required value={label()} onInput={(event) => setLabel(event.currentTarget.value)} />
-        </label>
-        <button type="submit" disabled={work.busy()}>
-          Pair
-        </button>
-      </form>
-      <Show when={work.error()}>
-        <p class="problem" role="alert">
-          {work.error()}
-        </p>
+          <Button variant="solid" submit busy={work.busy()}>
+            Pair
+          </Button>
+        </Inline>
+      </Field>
+    </form>
+  )
+
+  return (
+    <Show when={asked()}>
+      <Show when={phrase()} fallback={<EmptyState title="Enter the pairing code" action={codeForm()} />}>
+        {(words) => (
+          <EmptyState
+            title="Approve in Acorn"
+            action={
+              <Stack>
+                <Words phrase={words()} words={words().split(' ')} />
+                <Show
+                  when={!refused()}
+                  fallback={<Alert>The request was denied or has expired. Pair with a code instead.</Alert>}
+                >
+                  <Waiting>Waiting for approval</Waiting>
+                </Show>
+                <Show
+                  when={usingCode() || refused()}
+                  fallback={
+                    <Button variant="bare" onPress={() => setUsingCode(true)}>
+                      Use a pairing code instead
+                    </Button>
+                  }
+                >
+                  {codeForm()}
+                </Show>
+              </Stack>
+            }
+          >
+            Acorn on this Mac asks to allow this browser. Allow it if it shows these words.
+          </EmptyState>
+        )}
       </Show>
-    </section>
+    </Show>
+  )
+}
+
+// Paired: the sites worth allowing and notifications, both optional and both in Settings later.
+function Paired(props: { api: BrowserApi; node: NodeRecord; handoffs: readonly BridgeHandoff[]; done(): void }) {
+  const rows = () =>
+    siteRows({
+      handoffs: props.handoffs.filter((handoff) => handoff.anchors.length),
+      sites: [],
+      apps: [],
+      projects: [],
+    })
+  return (
+    <>
+      <EmptyState icon={<Icon name="circle-check" tone="ok" size="2em" />} title={`Connected to ${props.node.label}`} />
+      <Show when={rows().length}>
+        <SettingsSection id="sites" label="Allow on these sites">
+          <SiteList api={props.api} rows={rows()} />
+        </SettingsSection>
+      </Show>
+      <Notifications permissions={props.api.permissions} />
+      <section>
+        <Button variant="solid" onPress={() => props.done()}>
+          Done
+        </Button>
+      </section>
+    </>
+  )
+}
+
+// Words the person compares with what another screen shows.
+function Words(props: { phrase: string; words: readonly string[] }) {
+  return (
+    <ChipRow ariaLabel={props.phrase}>
+      <For each={props.words}>{(word) => <Chip>{word}</Chip>}</For>
+    </ChipRow>
+  )
+}
+
+function Waiting(props: { children: string }) {
+  return (
+    <Inline>
+      <Spinner label={props.children} />
+      <Text tone="muted">{props.children}</Text>
+    </Inline>
   )
 }
 
