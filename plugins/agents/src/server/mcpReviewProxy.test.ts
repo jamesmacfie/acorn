@@ -164,6 +164,7 @@ it('does not forward a cancelled tool call after its held catalogue is released'
       closed: () => undefined,
     },
   )
+  const catalogueReads = vi.spyOn(proxy, 'catalogue')
   const declared = await proxy.listen()
   if (declared.transport !== 'http') throw new Error('The proxy did not offer HTTP.')
   const client = new Client({ name: 'harness', version: '1' })
@@ -173,7 +174,9 @@ it('does not forward a cancelled tool call after its held catalogue is released'
       new StreamableHTTPClientTransport(new URL(declared.url), { requestInit: { headers: declared.headers } }),
     )
     const call = client.callTool({ name: 'read', arguments: {} }, undefined, { signal: controller.signal })
-    await vi.waitFor(() => expect(access(started)).resolves.toBeUndefined())
+    // The proxy reads the catalogue once on its own after connect, so the list starting doesn't mean it has
+    // the call yet. The call's own read is the second. Aborting before it lets the cancel overtake the call.
+    await vi.waitFor(() => expect(catalogueReads).toHaveBeenCalledTimes(2))
     controller.abort()
     await expect(call).rejects.toThrow()
     await new Promise((resolve) => setTimeout(resolve, 50))

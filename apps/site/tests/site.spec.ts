@@ -51,7 +51,7 @@ for (const route of ['/', '/download/', ...featureRoutes]) {
       .evaluateAll((links) => links.map((link) => link.getAttribute('href')!))
     const built = new Set(routes)
     expect(hrefs.length).toBeGreaterThan(0)
-    for (const href of new Set(hrefs)) expect(built.has(href), href).toBe(true)
+    for (const href of new Set(hrefs)) expect(built.has(href.replace(/#.*$/, '')), href).toBe(true)
   })
 }
 
@@ -102,21 +102,28 @@ test('with a release for every platform, the download page links every file', as
 
 test("the download page puts the visitor's platform first", async ({ page }) => {
   test.skip(!previewBuild, 'The fixture releases are lab pages, which only a preview build has.')
-  const headings = page.locator('main h2')
-  await page.goto('/lab/download/every-platform/')
-  const defaultOrder = await headings.allTextContents()
-  await page.addInitScript(() =>
-    Object.defineProperty(Navigator.prototype, 'userAgentData', { get: () => ({ platform: 'Linux' }) }),
-  )
-  await page.goto('/lab/download/every-platform/')
-  expect(await headings.allTextContents()).toEqual([
+  // Every visit names its platform, or names none, because the browser running the test reports its own.
+  const headingsOn = async (platform: string | undefined) => {
+    const tab = await page.context().newPage()
+    await tab.addInitScript(
+      (platform) =>
+        Object.defineProperty(Navigator.prototype, 'userAgentData', {
+          get: () => (platform ? { platform } : undefined),
+        }),
+      platform,
+    )
+    await tab.goto('/lab/download/every-platform/')
+    return tab.locator('main h2').allTextContents()
+  }
+  const linuxOrder = await headingsOn('Linux')
+  expect(linuxOrder).toEqual([
     'Terminal client and command line',
     'Standalone Node',
     'Build from source',
     'Desktop app',
     'Browser extension',
   ])
-  expect(defaultOrder).not.toEqual(await headings.allTextContents())
+  expect(await headingsOn(undefined)).not.toEqual(linuxOrder)
 })
 
 test('the changelog feed has an item for every entry on the page', async ({ page, request }) => {
