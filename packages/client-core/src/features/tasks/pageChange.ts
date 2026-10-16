@@ -1,10 +1,10 @@
 import type { TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
 import {
+  startDeadline,
   startInteraction,
   startRenderTransition,
   telemetryEnabled,
   type RenderTransitionHandle,
-  type SpanHandle,
 } from '../../infra/telemetry/emitter'
 
 // The `nav.change` span: how long it takes between asking for a different page and seeing one
@@ -19,9 +19,14 @@ import {
 //
 // Regions that suspend are not covered by this. A pane that is still fetching draws nothing at that
 // second frame, and `pane.region` is what measures it to content.
+//
+// A hidden window runs no frames, so the span also ends when the window goes hidden, or after 30
+// seconds. Without that the interaction stays open for hours and every background request joins it.
+
+const PAGE_CHANGE_TIMEOUT_MS = 30_000
 
 /** The change in flight, or null between them. */
-let open: { span: SpanHandle; render: RenderTransitionHandle; attrs: TelemetryAttrs } | null = null
+let open: { render: RenderTransitionHandle; attrs: TelemetryAttrs; dispose: () => void } | null = null
 
 const nextFrame = (run: () => void): void => {
   // A bare-Node suite has no frames. Nothing reaches here with telemetry off, and the fallback is
@@ -47,18 +52,32 @@ export function markPageChange(owner: string, attrs: TelemetryAttrs): void {
   }
   const span = startInteraction(owner, { name: 'nav.change', attrs: { seam: 'nav.change' } })
   const render = startRenderTransition(owner, 'navigation', attrs)
-  const change = { span, render, attrs: { seam: 'nav.change', ...attrs } }
-  open = change
-  nextFrame(() =>
-    nextFrame(() => {
-      open = null
-      change.span.end('ok', change.attrs)
-    }),
+  let ended = false
+  const end = (status: 'ok' | 'error', outcome?: TelemetryAttrs, at?: number) => {
+    if (ended) return
+    ended = true
+    open = null
+    clearTimeout(deadline)
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', hidden)
+    span.end(status, { ...change.attrs, ...outcome }, at)
+  }
+  const hidden = () => {
+    if (document.visibilityState !== 'hidden') return
+    render.cancel()
+    end('ok', { outcome: 'hidden' })
+  }
+  const deadline = startDeadline(PAGE_CHANGE_TIMEOUT_MS, (late, at) =>
+    end('error', { outcome: 'timeout', ...(late ? { late } : {}) }, at),
   )
+  const change = { render, attrs: { seam: 'nav.change', ...attrs }, dispose: () => end('ok') }
+  open = change
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', hidden)
+  nextFrame(() => nextFrame(() => end('ok')))
 }
 
 /** Test seam: forget a change that is still waiting for its second frame. */
 export const _resetPageChange = (): void => {
   open?.render.cancel()
+  open?.dispose()
   open = null
 }

@@ -55,6 +55,9 @@ const MAX_SAMPLES = 20_000
  *  the vocabulary rule exists to prevent (docs/telemetry/model.md § The attribute vocabulary). */
 const MAX_SERIES = 200
 let slowSamples = 0
+/** A deadline timer that fires this much later than it was due was held by a sleep or a hidden
+ *  window, not by the work it was timing. */
+const LATE_TIMER_MS = 5_000
 
 export type TelemetryPoster = (records: readonly TelemetryRecord[]) => Promise<void>
 
@@ -62,7 +65,8 @@ export type SpanInput = { name: string; attrs?: TelemetryAttrs; traceId?: string
 export type SpanHandle = {
   readonly traceId: string
   readonly spanId: string
-  end(status?: 'ok' | 'error', attrs?: TelemetryAttrs): void
+  /** `at` is a `performance.now()` time to end at instead of now, for a deadline that fired late. */
+  end(status?: 'ok' | 'error', attrs?: TelemetryAttrs, at?: number): void
 }
 export type RenderTransitionHandle = {
   /** Add bounded context learned after the transition began. Later values win. */
@@ -281,11 +285,11 @@ export function startInteraction(owner: string, input: SpanInput): SpanHandle {
   return {
     traceId: span.traceId,
     spanId: span.spanId,
-    end: (status, attrs) => {
+    end: (status, attrs, at) => {
       for (const [operation, calls] of takeInteractionWork(span.spanId)) {
         emitEvent(owner, 'ui.interaction.work', { traceId: span.traceId, spanId: span.spanId, operation, calls })
       }
-      span.end(status, attrs)
+      span.end(status, attrs, at)
       // Only if it is still ours. A second interaction that opened over this one owns the trace now,
       // and clearing it here would orphan every request the newer one is about to make.
       if (state.trace?.spanId === span.spanId) {
@@ -327,6 +331,19 @@ function notifyActivity(): void {
 
 let spansOnTimeline = false
 
+/** Wall-clock time the window last went hidden or its timers last stalled past a sleep, or 0. */
+let suspendedAt = 0
+
+/**
+ * Say the page just went hidden or woke from a sleep. A span that started before this and ends after
+ * it measured the gap rather than work, and says `suspended: true` so it can be left out of latency
+ * numbers. The responsiveness monitor calls it, because it already owns the visibility listener and
+ * the one-second timer.
+ */
+export function noteSuspension(): void {
+  suspendedAt = Date.now()
+}
+
 /**
  * Also write every span to this page's performance timeline, as a `performance.measure` named
  * `acorn:<span name>` with the attributes as its `detail`.
@@ -348,6 +365,8 @@ export function emitSpan(
   if (!telemetryEnabled()) return
   safely(() => {
     const attrs = cleanAttrs(span.attrs, owner)
+    // Stamped after the caps, like the owner, so every span can be filtered on it.
+    attrs.suspended = suspendedAt > span.start
     push({ ...span, kind: 'span', attrs })
     if (spansOnTimeline) {
       // `start` is wall-clock milliseconds, so the entry's start is to the millisecond; its duration is exact.
@@ -416,7 +435,7 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
   return {
     traceId,
     spanId,
-    end: (status = 'ok', attrs) => {
+    end: (status = 'ok', attrs, at = performance.now()) => {
       if (ended) return
       ended = true
       if (collection.aborted) return
@@ -426,12 +445,26 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
         ...(parentSpanId ? { parentSpanId } : {}),
         name: input.name,
         start: started,
-        durationMs: performance.now() - from,
+        durationMs: Math.max(0, at - from),
         status,
         attrs: { ...input.attrs, ...attrs },
       })
     },
   }
+}
+
+/**
+ * A span's time limit. `expire` gets the time to end the span at, which is the deadline itself when
+ * the timer fired more than five seconds late, so a sleep reads as a timeout and not as minutes of
+ * waiting. `late` says that happened.
+ */
+export function startDeadline(ms: number, expire: (late: boolean, at: number) => void): ReturnType<typeof setTimeout> {
+  const due = performance.now() + ms
+  return setTimeout(() => {
+    const now = performance.now()
+    const late = now - due > LATE_TIMER_MS
+    expire(late, late ? due : now)
+  }, ms)
 }
 
 // ── Render transitions ───────────────────────────────────────────────────────────────────────────
@@ -468,21 +501,26 @@ export function startRenderTransition(
   let paintWaitMs = 0
   let phaseStarted = started
 
-  const finish = (outcome: 'ready' | 'cancelled' | 'timeout') => {
+  const finish = (outcome: 'ready' | 'cancelled' | 'timeout', late = false, at?: number) => {
     if (ended) return
     ended = true
     clearTimeout(deadline)
-    span.end(outcome === 'timeout' ? 'error' : 'ok', {
-      ...attrs,
-      operation,
-      outcome,
-      'phase.turn_ms': turnMs,
-      'phase.frame_wait_ms': frameWaitMs,
-      'phase.paint_wait_ms': paintWaitMs,
-      ...(outcome === 'timeout' ? { phase } : {}),
-    })
+    span.end(
+      outcome === 'timeout' ? 'error' : 'ok',
+      {
+        ...attrs,
+        operation,
+        outcome,
+        'phase.turn_ms': turnMs,
+        'phase.frame_wait_ms': frameWaitMs,
+        'phase.paint_wait_ms': paintWaitMs,
+        ...(outcome === 'timeout' ? { phase } : {}),
+        ...(late ? { late } : {}),
+      },
+      at,
+    )
   }
-  const deadline = setTimeout(() => finish('timeout'), 30_000)
+  const deadline = startDeadline(30_000, (late, at) => finish('timeout', late, at))
 
   // Scheduled before the caller performs its write. The callback therefore cannot run until the
   // write and Solid's synchronous reactive propagation have returned to the microtask checkpoint.
@@ -841,6 +879,7 @@ export function _resetClientTelemetry(): void {
   state.refused = 0
   state.runtime = 'renderer'
   spansOnTimeline = false
+  suspendedAt = 0
 }
 
 // ── The owner-bound projection ────────────────────────────────────────────────────────────────────

@@ -53,6 +53,10 @@ const MAX_SAMPLES = 20_000
  *  would otherwise mint one series per call, which is the cardinality failure the vocabulary rule
  *  exists to prevent (docs/telemetry/model.md § The attribute vocabulary). */
 const MAX_SERIES = 200
+/** A measured call this slow also becomes a span, up to this many per flush window. The renderer's
+ *  `measure()` uses the same two numbers (docs/telemetry/model.md § Hot seams are metrics). */
+const SLOW_SAMPLE_MS = 100
+const SLOW_SAMPLES_MAX = 20
 /** The separator inside a summary counter key. A control
  *  character because an owner, a seam and an attribute value are all free-ish text and none of them
  *  can contain one. */
@@ -96,6 +100,10 @@ type CollectorState = {
   dropped: number
   truncated: number
   refused: number
+  slowSamples: number
+  /** Wall-clock time the runtime sampler last saw the process suspended, or 0. A span that started
+   *  before it and ended after it measured a sleep, not work. */
+  suspendedAt: number
   // Counters for the summary, all since the last `startTelemetry`. `dropped` and `truncated` above
   // are the pending ones: each flush turns them into a record and zeroes them, so a page reading
   // those two would show whatever happened in the last five seconds.
@@ -118,6 +126,8 @@ const state: CollectorState = {
   dropped: 0,
   truncated: 0,
   refused: 0,
+  slowSamples: 0,
+  suspendedAt: 0,
   counts: new Map(),
   droppedTotal: 0,
   truncatedTotal: 0,
@@ -235,7 +245,14 @@ export function emitSpan(
   span: Omit<TelemetrySpan, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs },
 ): void {
   if (!telemetryEnabled()) return
-  safely(() => push({ ...span, kind: 'span', attrs: cleanAttrs(span.attrs, resolveOwner(owner)) }))
+  safely(() => {
+    const attrs = cleanAttrs(span.attrs, resolveOwner(owner))
+    // Stamped after the caps, like the owner, so every span can be filtered on it. The sampler only
+    // notices a suspend at the end of its five-second window, so a span that ends inside that window
+    // misses it (docs/telemetry/diagnosis.md § Sleep and hidden windows).
+    attrs.suspended = state.suspendedAt > span.start
+    push({ ...span, kind: 'span', attrs })
+  })
 }
 
 // The logger sanitizes attributes before either sink and passes the truncation count separately.
@@ -345,6 +362,32 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
 }
 
 /**
+ * Run `run` inside a span of its own, entered as the ambient context, so the Git, SQL, slow samples
+ * and spans under it nest there. `failed` marks a span whose result reports a failure without
+ * throwing, such as a teardown script that exited non-zero.
+ */
+export async function runInSpan<T>(
+  owner: string,
+  input: SpanInput,
+  run: () => Promise<T>,
+  failed?: (result: T) => boolean,
+): Promise<T> {
+  const span = startSpan(owner, input)
+  if (!span.traceId) return run()
+  try {
+    const result = await runWithTelemetryContext(
+      { traceId: span.traceId, spanId: span.spanId, owner: resolveOwner(owner) },
+      run,
+    )
+    span.end(failed?.(result) ? 'error' : 'ok')
+    return result
+  } catch (error) {
+    span.end('error')
+    throw error
+  }
+}
+
+/**
  * One sample into a histogram, aggregated over the flush window.
  *
  * A seam firing thousands of times a second is a metric and never a span
@@ -394,20 +437,50 @@ export function recordDuration(owner: string, seam: string, ms: number, attrs?: 
 export function measure<T>(owner: string, seam: string, run: () => T, attrs?: TelemetryAttrs): T {
   if (!telemetryEnabled()) return run()
   const started = process.hrtime.bigint()
-  // Resolved here, where the ambient context is certainly the caller's, rather than in `finish`,
-  // which runs when the promise settles.
+  const startedAt = Date.now()
+  // Read here, where the ambient context is certainly the caller's, rather than in `finish`, which
+  // runs when the promise settles.
+  const ambient = currentTelemetryContext()
   const resolved = resolveOwner(owner)
-  const finish = () => recordDuration(resolved, seam, Number(process.hrtime.bigint() - started) / 1e6, attrs)
+  const finish = (status: 'ok' | 'error') => {
+    const ms = Number(process.hrtime.bigint() - started) / 1e6
+    recordDuration(resolved, seam, ms, attrs)
+    // A slow call also becomes a span under the request that waited for it, so the request names
+    // the git command or statement that held it. Bounded per window, and only inside a trace,
+    // because a sample with no parent explains nothing the histogram doesn't.
+    if (ms < SLOW_SAMPLE_MS || !ambient || state.slowSamples >= SLOW_SAMPLES_MAX) return
+    state.slowSamples += 1
+    emitSpan(resolved, {
+      traceId: ambient.traceId,
+      spanId: newSpanId(),
+      parentSpanId: ambient.spanId,
+      name: seam,
+      start: startedAt,
+      durationMs: ms,
+      status,
+      attrs: { ...attrs, slow: true },
+    })
+  }
   let result: T
   try {
     result = run()
   } catch (error) {
-    finish()
+    finish('error')
     throw error
   }
-  // `finally` rather than `then`, so a rejection is still counted.
-  if (result instanceof Promise) return result.finally(finish) as T
-  finish()
+  // Both outcomes are counted, and a rejection marks a slow sample as failed.
+  if (result instanceof Promise)
+    return result.then(
+      (value) => {
+        finish('ok')
+        return value
+      },
+      (error: unknown) => {
+        finish('error')
+        throw error
+      },
+    ) as T
+  finish('ok')
   return result
 }
 
@@ -545,9 +618,11 @@ export function flushTelemetry(): void {
       state.ring = []
       state.histograms.clear()
       state.refused = 0
+      state.slowSamples = 0
       return
     }
     foldHistograms()
+    state.slowSamples = 0
     if (state.refused > 0) {
       const refused = state.refused
       state.refused = 0
@@ -640,7 +715,12 @@ function arm(): void {
   stopPressure = startRuntimePressure({
     enabled: telemetryEnabled,
     duration: (name, value) => recordDuration('core', name, value),
-    gauge: (name, value, unit) => emitMetric('core', { name, value, unit, type: 'gauge' }),
+    suspended: (ms) => {
+      state.suspendedAt = Date.now()
+      recordDuration('core', 'runtime.suspended', ms)
+    },
+    gauge: (name, value, unit, attrs) =>
+      emitMetric('core', { name, value, unit, type: 'gauge', ...(attrs ? { attrs } : {}) }),
   })
   state.timer = setInterval(tick, FLUSH_EVERY_MS)
   // Unref'd like the scheduler's timers: a node with nothing left to do must be allowed to exit.
@@ -690,6 +770,7 @@ function applyPreference(on: boolean): void {
     state.ring = []
     state.histograms.clear()
     state.refused = 0
+    state.slowSamples = 0
     state.truncated = 0
     state.dropped = 0
   }
@@ -711,6 +792,7 @@ export function startTelemetry(options: StartTelemetryOptions): Disposable {
   state.dropped = 0
   state.truncated = 0
   state.refused = 0
+  state.slowSamples = 0
   // The summary counts from here, which is what "since this node started" means on the page. A
   // second boot in one process is a second start, and the page says so through `since`.
   state.counts.clear()
@@ -751,11 +833,13 @@ export function resetTelemetryForTest(): void {
   state.dropped = 0
   state.truncated = 0
   state.refused = 0
+  state.slowSamples = 0
   state.counts.clear()
   state.droppedTotal = 0
   state.truncatedTotal = 0
   state.startedAt = Date.now()
   state.lastFlushAt = null
+  state.suspendedAt = 0
   disarm()
 }
 

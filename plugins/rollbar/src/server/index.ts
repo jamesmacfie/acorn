@@ -3,6 +3,8 @@
 // `counter` (#142) rather than their internal id. Exported fetch is mocked in route tests, never
 // called live there.
 
+import type { PluginTelemetry } from '@acorn/plugin-api/node'
+
 // Every call out to a provider needs a deadline shorter than the client's. The fan-out gives a node 5s
 // (client-core's node fan-out) and then draws "unavailable" over the whole node, so a fetch that
 // outlasts it reads to the user as "your machine is down" rather than "this API is slow", and the
@@ -14,13 +16,50 @@ const REQUEST_TIMEOUT_MS = 4_000
 
 const BASE = 'https://api.rollbar.com/api/1'
 
+// One `rollbar.api` span per call (docs/telemetry/runtimes.md § Node seams). The path never rides
+// along, because it holds item numbers and search text. The operation comes from the fixed list below.
+type ApiTelemetry = Pick<PluginTelemetry, 'enabled' | 'startSpan'>
+let telemetry: ApiTelemetry | undefined
+/** `ctx.telemetry`, handed over at init, because the modules that call Rollbar have no `ctx` in reach. */
+export const setRollbarApiTelemetry = (next: ApiTelemetry | undefined): void => {
+  telemetry = next
+}
+
+const OPERATIONS: [RegExp, string][] = [
+  [/^\/project$/, 'project'],
+  [/^\/item_by_counter\/[^/]+$/, 'item_by_counter'],
+  [/^\/item\/[^/]+\/instances$/, 'item.instances'],
+  [/^\/item\/[^/]+$/, 'item'],
+  [/^\/instance\/[^/]+$/, 'instance'],
+]
+
+/** The operation a path names, or `other`. Never any part of the path itself. */
+export const rollbarOperation = (path: string): string => {
+  const [bare, search = ''] = path.split('?')
+  if (bare === '/items') return new URLSearchParams(search).has('query') ? 'items.search' : 'items'
+  return OPERATIONS.find(([pattern]) => pattern.test(bare!))?.[1] ?? 'other'
+}
+
 export function rollbarFetch(token: string, path: string, signal?: AbortSignal): Promise<Response> {
-  return fetch(`${BASE}${path}`, {
-    headers: { 'X-Rollbar-Access-Token': token, accept: 'application/json' },
-    signal: signal
-      ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
-      : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
+  const call = () =>
+    fetch(`${BASE}${path}`, {
+      headers: { 'X-Rollbar-Access-Token': token, accept: 'application/json' },
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
+        : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    })
+  if (!telemetry?.enabled()) return call()
+  const span = telemetry.startSpan('rollbar.api', { attrs: { operation: rollbarOperation(path), method: 'GET' } })
+  return call().then(
+    (res) => {
+      span.end(res.status >= 500 ? 'error' : 'ok', { status: res.status })
+      return res
+    },
+    (error: unknown) => {
+      span.end('error', { status: 0 })
+      throw error
+    },
+  )
 }
 
 // Rollbar wraps every response as { err: 0, result }. A nonzero err or an HTTP failure counts as an

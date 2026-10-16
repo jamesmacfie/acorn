@@ -24,6 +24,14 @@ import { registerCheckoutAdmission, type CheckoutAdmission } from '../core/check
 import { worktreeBranchDirName } from '../worktrees/pathGuards'
 import { archiveTask, restoreTask, runTeardownProcess, type ArchiveDeps } from './archive'
 import { computeTaskStatuses, reconcileWorktrees, setWorktreesRoot, taskRoot } from '../worktrees/taskWorktree'
+import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
+import {
+  flushTelemetry,
+  onTelemetryBatch,
+  resetTelemetryForTest,
+  startTelemetry,
+  telemetryEnabled,
+} from '../telemetry/collector'
 
 // Real git subprocesses plus a teardown script per test: the 5s default is too tight under a fully
 // parallel run. Matches the other git-backed suites.
@@ -363,6 +371,53 @@ describe('archiveTask teardown ordering', () => {
     expect(row.status).toBe('active')
     // A refusal releases the transient gate so the active task remains usable and retryable.
     await expect(taskRoot(t.db, 'task1')).resolves.toBe(worktree)
+  })
+
+  describe('telemetry', () => {
+    const records: TelemetryRecord[] = []
+    beforeEach(async () => {
+      records.length = 0
+      onTelemetryBatch((batch) => void records.push(...batch.records))
+      startTelemetry({ node: 'test', version: 'test', readPref: async () => '1' })
+      await vi.waitFor(() => expect(telemetryEnabled()).toBe(true))
+    })
+    afterEach(() => resetTelemetryForTest())
+    const spans = (name: string): TelemetrySpan[] => {
+      flushTelemetry()
+      return records.filter((record): record is TelemetrySpan => record.kind === 'span' && record.name === name)
+    }
+
+    it('records one task.archive span with a phase child for each step that ran', async () => {
+      await setTeardown('true')
+      await archiveTask(t.db, 'task1', {}, { ...deps(), taskArchiving: async () => {} })
+      const [archive, ...more] = spans('task.archive')
+      expect(more).toEqual([])
+      expect(archive).toMatchObject({ status: 'ok', attrs: { 'task.id': 'task1' } })
+      const phases = records.filter(
+        (record): record is TelemetrySpan => record.kind === 'span' && record.name === 'task.archive.phase',
+      )
+      expect(phases.map((phase) => phase.attrs.phase)).toEqual([
+        'admit.wait',
+        'worktree.wait',
+        'teardown',
+        'hooks',
+        'worktree.aside',
+        'sessions.drop',
+        'worktree.discard',
+      ])
+      for (const phase of phases) expect(phase.parentSpanId).toBe(archive!.spanId)
+    })
+
+    it('marks a failed teardown phase, and the archive, as an error', async () => {
+      await setTeardown('exit 3')
+      await archiveTask(t.db, 'task1', {}, deps())
+      expect(spans('task.archive')[0]?.status).toBe('error')
+      const teardown = records.find(
+        (record): record is TelemetrySpan =>
+          record.kind === 'span' && record.name === 'task.archive.phase' && record.attrs.phase === 'teardown',
+      )
+      expect(teardown?.status).toBe('error')
+    })
   })
 
   it('skipTeardown archives past a failing script', async () => {

@@ -162,7 +162,7 @@ it('opens the session the list will select, so a first visit reads one snapshot'
   expect(opened).toEqual(['older'])
   // Restoring the already-mounted fallback must not leave a second span waiting for a remount.
   expect(opening).toHaveBeenCalledOnce()
-  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'ready' })
+  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'ready' }, undefined)
   vi.advanceTimersByTime(30_000)
   expect(end).toHaveBeenCalledOnce()
   dispose()

@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
 import type { TaskRef } from '../core'
+import {
+  flushTelemetry,
+  onTelemetryBatch,
+  resetTelemetryForTest,
+  startTelemetry,
+  telemetryEnabled,
+} from '../telemetry/collector'
 import { applyTaskChecks, clearTaskChecks, collectTaskConcerns, registerTaskCheck, sanitizeConcern } from './taskChecks'
 
 const task: TaskRef = {
@@ -78,6 +86,37 @@ describe('collectTaskConcerns', () => {
       check: async () => ({ id: 'files', message: 'still here', severity: 'warn' }),
     })
     await expect(collectTaskConcerns(task)).resolves.toHaveLength(1)
+  })
+
+  it('times each check under the plugin that owns it', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const records: TelemetryRecord[] = []
+    onTelemetryBatch((batch) => void records.push(...batch.records))
+    startTelemetry({ node: 'test', version: 'test', readPref: async () => '1' })
+    try {
+      await vi.waitFor(() => expect(telemetryEnabled()).toBe(true))
+      registerTaskCheck({ pluginId: 'docker', id: 'containers', check: async () => null })
+      registerTaskCheck({
+        pluginId: 'bad',
+        id: 'throws',
+        check: async () => {
+          throw new Error('boom')
+        },
+      })
+      await collectTaskConcerns(task)
+      flushTelemetry()
+      const spans = records.filter(
+        (record): record is TelemetrySpan => record.kind === 'span' && record.name === 'task.check',
+      )
+      expect(spans.map((span) => [span.attrs.owner, span.attrs.check, span.attrs.outcome, span.status]).sort()).toEqual(
+        [
+          ['bad', 'throws', 'failed', 'error'],
+          ['docker', 'containers', 'none', 'ok'],
+        ],
+      )
+    } finally {
+      resetTelemetryForTest()
+    }
   })
 
   it('refuses a second check under one id', () => {

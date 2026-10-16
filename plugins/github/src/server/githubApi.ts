@@ -1,3 +1,5 @@
+import type { PluginTelemetry } from '@acorn/plugin-api/node'
+
 // Every call out to a provider needs a deadline shorter than the client's. The client's fan-out gives a
 // node 5s and then draws "unavailable" over the whole node, so a fetch that outlasts it reads to the
 // user as "your machine is down" rather than "this API is slow", and the "this provider is
@@ -23,28 +25,103 @@ const notConnected = (): Response =>
     headers: { 'content-type': 'application/json' },
   })
 
+// ─── Telemetry ───────────────────────────────────────────────────────────────
+//
+// One `github.api` span per call (docs/telemetry/runtimes.md § Node seams). The URL never rides along,
+// because it holds repository, branch and label names. The operation comes from the fixed list below.
+
+type ApiTelemetry = Pick<PluginTelemetry, 'enabled' | 'startSpan'>
+let telemetry: ApiTelemetry | undefined
+/** `ctx.telemetry`, handed over at init, because the modules that call GitHub have no `ctx` in reach. */
+export const setGithubApiTelemetry = (next: ApiTelemetry | undefined): void => {
+  telemetry = next
+}
+
+const REPO = String.raw`^/repos/[^/]+/[^/]+`
+const REST_OPERATIONS: [RegExp, string][] = [
+  [/^\/user$/, 'user'],
+  [/^\/user\/repos$/, 'user.repos'],
+  [/^\/repositories$/, 'repositories'],
+  [/^\/search\/issues$/, 'search.issues'],
+  [new RegExp(`${REPO}$`), 'repo'],
+  [new RegExp(`${REPO}/pulls$`), 'pulls'],
+  [new RegExp(`${REPO}/pulls/\\d+$`), 'pull'],
+  [new RegExp(`${REPO}/pulls/\\d+/files$`), 'pull.files'],
+  [new RegExp(`${REPO}/pulls/\\d+/merge$`), 'pull.merge'],
+  [new RegExp(`${REPO}/pulls/\\d+/reviews$`), 'pull.reviews'],
+  [new RegExp(`${REPO}/pulls/\\d+/requested_reviewers$`), 'pull.reviewers'],
+  [new RegExp(`${REPO}/pulls/\\d+/comments$`), 'pull.comments'],
+  [new RegExp(`${REPO}/pulls/\\d+/comments/\\d+/replies$`), 'pull.comment.replies'],
+  [new RegExp(`${REPO}/issues/\\d+/comments$`), 'issue.comments'],
+  [new RegExp(`${REPO}/issues/\\d+/labels(/[^/]+)?$`), 'issue.labels'],
+  [new RegExp(`${REPO}/labels$`), 'labels'],
+  [new RegExp(`${REPO}/compare/.+$`), 'compare'],
+  [new RegExp(`${REPO}/git/blobs/[^/]+$`), 'git.blob'],
+  [new RegExp(`${REPO}/actions/runs$`), 'actions.runs'],
+  [new RegExp(`${REPO}/actions/runs/\\d+/(attempts/\\d+/)?jobs$`), 'actions.jobs'],
+  [new RegExp(`${REPO}/actions/runs/\\d+/rerun-failed-jobs$`), 'actions.rerun'],
+  [new RegExp(`${REPO}/actions/jobs/\\d+$`), 'actions.job'],
+  [new RegExp(`${REPO}/actions/jobs/\\d+/rerun$`), 'actions.rerun'],
+  [new RegExp(`${REPO}/actions/jobs/\\d+/logs$`), 'actions.job.logs'],
+]
+
+/** The operation a REST path names, or `other`. Never any part of the path itself. */
+export const restOperation = (path: string): string => {
+  const bare = path.split('?')[0]!
+  return REST_OPERATIONS.find(([pattern]) => pattern.test(bare))?.[1] ?? 'other'
+}
+
+/** The first field a GraphQL document asks for, such as `repository` or `mergePullRequest`. A
+ *  schema name, never a value: variables carry those. */
+export const graphQLOperation = (query: string): string => {
+  const field = /\{\s*(?:\w+\s*:\s*)?(\w{1,64})/.exec(query)?.[1]
+  return field ? `graphql.${field}` : 'graphql'
+}
+
+function timed(operation: string, method: string, call: () => Promise<Response>): Promise<Response> {
+  if (!telemetry?.enabled()) return call()
+  const span = telemetry.startSpan('github.api', { attrs: { operation, method } })
+  return call().then(
+    (res) => {
+      const limit = Number(res.headers.get('x-ratelimit-limit'))
+      const remaining = Number(res.headers.get('x-ratelimit-remaining'))
+      const low = limit > 0 && res.headers.has('x-ratelimit-remaining') && remaining < limit * 0.1
+      span.end(res.status >= 500 ? 'error' : 'ok', { status: res.status, ...(low ? { 'ratelimit.low': true } : {}) })
+      return res
+    },
+    (error: unknown) => {
+      span.end('error', { status: 0 })
+      throw error
+    },
+  )
+}
+
 // REST.
 export const gh = (token: string, path: string, init?: RequestInit) =>
   token
-    ? fetch(`https://api.github.com${path}`, {
-        ...init,
-        headers: { ...ghHeaders(token), ...init?.headers },
-        // A caller that brought its own signal keeps it, deadline included.
-        signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      })
+    ? timed(restOperation(path), init?.method ?? 'GET', () =>
+        fetch(`https://api.github.com${path}`, {
+          ...init,
+          headers: { ...ghHeaders(token), ...init?.headers },
+          // A caller that brought its own signal keeps it, deadline included.
+          signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        }),
+      )
     : Promise.resolve(notConnected())
 
 // GraphQL, POST to /graphql. No ETag support (docs/caching.md); callers self-cache by TTL.
 export const ghGraphQL = (token: string, query: string, variables: Record<string, unknown>, signal?: AbortSignal) =>
   token
-    ? fetch('https://api.github.com/graphql', {
-        method: 'POST',
-        headers: { ...ghHeaders(token), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables }),
-        // As with REST, a caller's own signal wins. A data source read brings its run's budget,
-        // and one search page can take longer than four seconds.
-        signal: signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      })
+    ? timed(graphQLOperation(query), 'POST', () =>
+        fetch('https://api.github.com/graphql', {
+          method: 'POST',
+          headers: { ...ghHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, variables }),
+          // As with REST, a caller's own signal wins. A data source read brings its run's budget,
+          // and one search page can take longer than four seconds.
+          signal: signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        }),
+      )
     : Promise.resolve(notConnected())
 
 // Normalize a non-OK GitHub REST/GraphQL Response to a client error code + HTTP status, or null

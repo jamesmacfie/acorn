@@ -146,7 +146,9 @@ session admission has resolved its initial task root. Worktree preparation durin
 
 Dispatching a turn raises an `agent.turn` span. The turn span
 carries the turn ID, session ID, provider, and source. Neither carries a prompt, a result, or a
-transcript.
+transcript. When the turn ends, it also carries `first_output.ms`, the time to the provider's first
+message, reasoning, or tool call, and `approval.wait.ms`, the time the turn waited on permission asks.
+The second tells a slow provider apart from a person who hasn't clicked **Allow** yet.
 
 The startup spans cover connecting the provider, because a session
 outlives its process and a span over its life couldn't close. The turn span opens at dispatch, not at

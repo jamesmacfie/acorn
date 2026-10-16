@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { startRuntimePressure } from './runtimePressure'
+import { parseSwapUsage, startRuntimePressure } from './runtimePressure'
 
 afterEach(() => vi.useRealTimers())
 it('samples only while collecting and releases its timer on disposal', () => {
@@ -7,7 +7,7 @@ it('samples only while collecting and releases its timer on disposal', () => {
   let enabled = false
   const duration = vi.fn()
   const gauge = vi.fn()
-  const stop = startRuntimePressure({ enabled: () => enabled, duration, gauge })
+  const stop = startRuntimePressure({ enabled: () => enabled, duration, suspended: duration, gauge })
   try {
     vi.advanceTimersByTime(10_000)
     expect(gauge).not.toHaveBeenCalled()
@@ -37,6 +37,7 @@ describe('a window the process spent suspended', () => {
     const stop = startRuntimePressure({
       enabled: () => true,
       duration: (name, value) => durations.set(name, [...(durations.get(name) ?? []), value]),
+      suspended: (value) => durations.set('runtime.suspended', [...(durations.get('runtime.suspended') ?? []), value]),
       gauge: () => {},
       sources: {
         now: () => clock,
@@ -104,5 +105,46 @@ describe('a window the process spent suspended', () => {
     stop()
     expect(durations.get('runtime.suspended')).toEqual([3_599_980])
     expect(durations.get('runtime.event_loop.max')).toEqual([21])
+  })
+})
+
+describe('the host beside the process', () => {
+  it('reports load and free memory every window, and swap at most once a minute', async () => {
+    vi.useFakeTimers()
+    let clock = 0
+    const gauges: Array<[string, number, Record<string, unknown> | undefined]> = []
+    const swapUsed = vi.fn(async () => 2 ** 30)
+    const stop = startRuntimePressure({
+      enabled: () => true,
+      duration: () => {},
+      suspended: () => {},
+      gauge: (name, value, _unit, attrs) => void gauges.push([name, value, attrs]),
+      sources: {
+        now: () => clock,
+        loop: () => ({ idle: clock, active: 0 }),
+        delay: { enable: () => true, disable: () => true, reset() {}, percentile: () => 0, max: 0 },
+        host: { load: () => 3.5, cpus: () => 10, freeMemory: () => 512, swapUsed },
+      },
+    })
+    try {
+      for (let index = 0; index < 14; index += 1) {
+        clock += 5_000
+        await vi.advanceTimersByTimeAsync(5_000)
+      }
+    } finally {
+      stop()
+    }
+    expect(gauges).toContainEqual(['host.load.1m', 3.5, { 'host.cpus': 10 }])
+    expect(gauges).toContainEqual(['host.memory.free', 512, undefined])
+    expect(gauges).toContainEqual(['host.swap.used', 2 ** 30, undefined])
+    // Thirteen observed windows, a minute apart at the first and the thirteenth.
+    expect(swapUsed).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads swap in use from sysctl', () => {
+    expect(parseSwapUsage('total = 11264.00M  used = 10159.12M  free = 1104.88M  (encrypted)')).toBe(
+      Math.round(10159.12 * 2 ** 20),
+    )
+    expect(parseSwapUsage('nonsense')).toBeNull()
   })
 })

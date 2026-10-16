@@ -6,6 +6,7 @@ import {
   setTelemetryEnabled,
   startClientTelemetry,
   startInteraction,
+  startSpan,
 } from './emitter'
 import { noteScreenWork, startResponsivenessMonitor } from './responsiveness'
 
@@ -167,4 +168,33 @@ it('requests no frames while telemetry is off', () => {
   noteScreenWork()
   clock.run(10_000)
   expect(clock.requests()).toBe(0)
+})
+
+it('marks a span that crossed a hidden window or a sleep as suspended', async () => {
+  const { posted } = armedMonitor()
+  const visibility = vi.spyOn(document, 'visibilityState', 'get')
+  const hidden = startSpan('core', { name: 'hidden' })
+  vi.advanceTimersByTime(500)
+  visibility.mockReturnValue('hidden')
+  document.dispatchEvent(new Event('visibilitychange'))
+  hidden.end()
+  visibility.mockReturnValue('visible')
+  document.dispatchEvent(new Event('visibilitychange'))
+  vi.advanceTimersByTime(500)
+  const slept = startSpan('core', { name: 'slept' })
+  // The Mac sleeps for a minute, so the next one-second tick runs a minute late.
+  vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 60_000)
+  vi.advanceTimersByTime(1_000)
+  slept.end()
+  vi.advanceTimersByTime(1)
+  startSpan('core', { name: 'awake' }).end()
+  await vi.advanceTimersByTimeAsync(0)
+  await flushTelemetry()
+  const flags = Object.fromEntries(
+    posted
+      .flat()
+      .filter((record) => record.kind === 'span')
+      .map((record) => [record.name, record.attrs.suspended]),
+  )
+  expect(flags).toEqual({ hidden: true, slept: true, awake: false })
 })

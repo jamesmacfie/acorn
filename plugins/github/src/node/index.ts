@@ -19,6 +19,7 @@ import { branchSource } from '../shared/branchSource'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
 import { pullRequestEditorLineMarkers } from '../server/editorLineMarkers'
 import { startPullDiscovery } from '../server/pullDiscovery'
+import { setGithubApiTelemetry } from '../server/githubApi'
 
 export const githubPlugin = (): NodePlugin => {
   let discovery: ReturnType<typeof startPullDiscovery> | null = null
@@ -70,6 +71,7 @@ export const githubPlugin = (): NodePlugin => {
       // Opens and migrates before init returns; every router below closes over this handle rather
       // than reading one off the request environment (docs/data-layer/plugin-databases.md § Plugin databases).
       const store = ctx.storage.open()
+      setGithubApiTelemetry(ctx.telemetry)
       ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
         id: 'pull-request',
         value: pullRequestEditorLineMarkers(store, ctx.core),

@@ -152,6 +152,69 @@ describe('what a session reports', () => {
     expect(turn.status).toBe('ok')
   })
 
+  it('splits a turn into the wait for first output and the wait for a permission answer', async () => {
+    const taskId = await seedTask(ctx)
+    const registry = new AgentDriverRegistry()
+    const fake = new FakeAgentDriver()
+    registry.registerNative('fake', () => ({
+      providerId: 'fake',
+      profileId: 'fake',
+      probe: () => fake.probe(),
+      start: async (options) => {
+        await options.onEvent({ type: 'session_metadata', providerSessionRef: randomUUID() })
+        await options.onEvent({ type: 'session_state', state: 'ready' })
+        let ready = true
+        return {
+          providerSessionRef: randomUUID(),
+          get ready() {
+            return ready
+          },
+          async sendTurn() {
+            ready = false
+            await options.onEvent({ type: 'assistant_message', text: 'Checking first.' })
+            await options.onEvent({
+              type: 'request',
+              requestId: 'permission-1',
+              kind: 'permission',
+              title: 'Run the tests?',
+              options: [{ id: 'allow-once', label: 'Allow once', kind: 'allow_once' }],
+            })
+            return {}
+          },
+          async cancel() {},
+          async resolveRequest() {
+            ready = true
+            await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+          },
+          async stop() {},
+        }
+      },
+    }))
+    runtime = build(registry, ctx.telemetry)
+    const session = await runtime.createSession({
+      taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Ask first.' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
+    await runtime.wait(session.id, 0, 'attention', 2_000)
+    // The person takes a moment before clicking Allow.
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    await runtime.resolveRequest(session.id, 'permission-1', { optionId: 'allow-once' }, randomUUID())
+    await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+
+    const turn = spanNamed(ctx, 'agent.turn')!
+    expect(turn.attrs['approval.wait.ms']).toBeGreaterThanOrEqual(50)
+    expect(turn.attrs['first_output.ms']).toBeLessThan(turn.attrs['approval.wait.ms'] as number)
+  })
+
   it('marks a provider that will not start as an error', async () => {
     const taskId = await seedTask(ctx)
     const registry = new AgentDriverRegistry()

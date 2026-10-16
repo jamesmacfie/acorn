@@ -29,10 +29,27 @@ import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 import { broadcastTasksChanged } from '../notify'
 import { admitCheckout, checkoutAdmissionFor } from '../core/checkoutAdmission'
 import { primaryChangeRequest } from '../core/changeRequests'
+import { runInSpan } from '../telemetry/collector'
 
 const exec = promisify(execFile)
 
 export const TEARDOWN_TIMEOUT_MS = 2 * 60 * 1000
+
+// One `task.archive` span per archive, with a child per step, the task preparation pattern
+// (docs/telemetry/runtimes.md § Node seams). A step that reports failure without throwing marks its
+// span `error`.
+type ArchivePhase =
+  | 'admit.wait'
+  | 'worktree.wait'
+  | 'teardown'
+  | 'hooks'
+  | 'checks'
+  | 'worktree.aside'
+  | 'sessions.drop'
+  | 'worktree.discard'
+
+const archivePhase = <T>(phase: ArchivePhase, run: () => Promise<T>, failed?: (result: T) => boolean): Promise<T> =>
+  runInSpan('core', { name: 'task.archive.phase', attrs: { seam: 'task.archive.phase', phase } }, run, failed)
 
 // Another lifecycle change holds the task: an archive tearing it down, a delete, or a restore that
 // got there first. The routes answer 409 (routes/projects/worktree.ts).
@@ -96,7 +113,20 @@ async function teardownScriptFor(db: AppDatabase, projectId: string): Promise<st
   return config?.config.teardownScript?.trim() || null
 }
 
-export async function archiveTask(
+export const archiveTask = (
+  db: AppDatabase,
+  id: string,
+  opts: ArchiveOpts,
+  deps: ArchiveDeps,
+): Promise<ArchiveResult> =>
+  runInSpan(
+    'core',
+    { name: 'task.archive', attrs: { seam: 'task.archive', 'task.id': id } },
+    () => archiveTaskTree(db, id, opts, deps),
+    (result) => !result.ok,
+  )
+
+async function archiveTaskTree(
   db: AppDatabase,
   id: string,
   opts: ArchiveOpts,
@@ -116,11 +146,12 @@ export async function archiveTask(
       }
       return true
     }
-    const admitted = checkoutAdmissionFor(db) ? await checkoutAdmissionFor(db)!.admitWork(id, claim) : await claim()
+    const admission = checkoutAdmissionFor(db)
+    const admitted = admission ? await archivePhase('admit.wait', () => admission.admitWork(id, claim)) : await claim()
     if (!admitted) return { ok: false, reason: 'Task archive is already in progress.' }
     for (const task of tree) {
       if (task.status === 'archived') continue
-      await waitForTaskWorktreeCreation(task.id)
+      await archivePhase('worktree.wait', () => waitForTaskWorktreeCreation(task.id))
       const result = await archiveClaimedTask(
         db,
         task.id,
@@ -218,7 +249,12 @@ async function archiveClaimedTask(
       const identity = { attemptId: attempt.attemptId!, generation: attempt.generation }
       let res: TeardownResult
       try {
-        res = await deps.runTeardown(script, t.worktreePath, env, t.id, identity)
+        const cwd = t.worktreePath
+        res = await archivePhase(
+          'teardown',
+          () => deps.runTeardown(script, cwd, env, t.id, identity),
+          (result) => result.exitCode !== 0,
+        )
       } catch {
         res = { exitCode: null, output: '', reason: 'spawn_failed' }
       }
@@ -243,25 +279,39 @@ async function archiveClaimedTask(
   // Plugin sessions stop at the same point as the terminal's, before removal. An agent in the middle
   // of a turn is still writing into the worktree, and removing the folder under it can leave files
   // behind or make git refuse.
-  await deps.taskArchiving?.(id)
+  const taskArchiving = deps.taskArchiving
+  if (taskArchiving) await archivePhase('hooks', () => taskArchiving(id))
 
   // Plugin cleanups, at the same point and for the same reason as the teardown script above: the
   // worktree still exists, so a check that needs it has it. This is a step with a known position and
   // a result, rather than a client-side call racing the archive request.
-  const checkFailures = opts.applyChecks?.length
-    ? ((await deps.applyTaskChecks?.({ id: t.id, worktreePath: t.worktreePath }, opts.applyChecks)) ?? [])
-    : []
+  const applyChecks = opts.applyChecks?.length ? opts.applyChecks : null
+  const applyTaskChecks = deps.applyTaskChecks
+  const checkFailures =
+    applyChecks && applyTaskChecks
+      ? await archivePhase(
+          'checks',
+          () => applyTaskChecks({ id: t.id, worktreePath: t.worktreePath }, applyChecks),
+          (failures) => failures.length > 0,
+        )
+      : []
 
   // With no mapped checkout there is nothing to git-remove, so archive anyway and drop the orphaned
   // reference.
   let setAside: { checkout: string; aside: string | null } | null = null
   if (deleteWorktree && ownsWorktree && t.worktreePath && project?.path && project.vcs === 'git') {
-    const res = await setWorktreeAside(t.worktreePath, force, getWorktreesRoot()) // force discards a dirty tree
+    const checkout = t.worktreePath
+    // `force` discards a dirty tree.
+    const res = await archivePhase(
+      'worktree.aside',
+      () => setWorktreeAside(checkout, force, getWorktreesRoot()),
+      (result) => !result.ok,
+    )
     if (!res.ok) return res
     setAside = { checkout: project.path, aside: res.aside }
   }
   try {
-    await deps.dropTaskSessions(id)
+    await archivePhase('sessions.drop', () => deps.dropTaskSessions(id))
     await db
       .update(schema.tasks)
       .set({ status: 'archived', archivedAt: Date.now(), worktreePath: null, updatedAt: Date.now() })
@@ -271,7 +321,8 @@ async function archiveClaimedTask(
     if (setAside?.aside) await rename(setAside.aside, t.worktreePath!)
     throw error
   }
-  if (setAside) await discardWorktree(setAside.checkout, setAside.aside)
+  const discard = setAside
+  if (discard) await archivePhase('worktree.discard', () => discardWorktree(discard.checkout, discard.aside))
   broadcastTasksChanged({ taskId: id })
   // Archived, but say what did not happen. `ok` stays true, because the task is archived, and
   // reporting a failure would have the caller offer a retry for work already done.

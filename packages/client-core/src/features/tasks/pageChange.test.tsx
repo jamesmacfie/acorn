@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import {
   _resetClientTelemetry,
@@ -33,6 +33,9 @@ beforeEach(() => {
 afterEach(() => {
   _resetClientTelemetry()
   _resetPageChange()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('a page change', () => {
@@ -66,6 +69,27 @@ describe('a page change', () => {
     markPageChange('core', { to: 'task', 'task.id': 't2' })
     await settle()
     expect(spans().map((span) => span.attrs['task.id'])).toEqual(['t1', 't2'])
+  })
+
+  it('ends when the window goes hidden, because a hidden window draws no frames', async () => {
+    markPageChange('core', { to: 'task', 'task.id': 't1' })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushTelemetry()
+    expect(spans()).toEqual([
+      expect.objectContaining({ status: 'ok', attrs: expect.objectContaining({ outcome: 'hidden' }) }),
+    ])
+  })
+
+  it('ends at thirty seconds when no frame arrives', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    vi.stubGlobal('requestAnimationFrame', () => 0)
+    markPageChange('core', { to: 'task', 'task.id': 't1' })
+    vi.advanceTimersByTime(30_000)
+    await flushTelemetry()
+    expect(spans()).toEqual([
+      expect.objectContaining({ status: 'error', attrs: expect.objectContaining({ outcome: 'timeout' }) }),
+    ])
   })
 
   it('builds nothing while the switch is off', async () => {

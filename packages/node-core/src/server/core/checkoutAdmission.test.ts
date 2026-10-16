@@ -6,6 +6,15 @@ import type { CoreGitService } from './index'
 import { makeTestDb } from '../../testkit/db'
 import { schema } from '../db'
 import { setupCheckoutActivity, taskScriptEvidence, taskScripts } from '../taskScripts/service'
+import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
+import {
+  flushTelemetry,
+  onTelemetryBatch,
+  resetTelemetryForTest,
+  runWithTelemetry,
+  startTelemetry,
+  telemetryEnabled,
+} from '../telemetry/collector'
 
 const deferred = () => {
   let resolve!: () => void
@@ -46,6 +55,34 @@ it('excludes writes after an admitted turn, including project aliases', async ()
   await expect(service.write('first', async () => 'written')).rejects.toThrow(/alias queued turn/)
   busy.clear()
   expect(await service.write('first', async () => 'written')).toBe('written')
+})
+
+it('times a wait behind another operation on the repository, and not an uncontended one', async () => {
+  const records: TelemetryRecord[] = []
+  onTelemetryBatch((batch) => void records.push(...batch.records))
+  startTelemetry({ node: 'test', version: 'test', readPref: async () => '1' })
+  try {
+    await vi.waitFor(() => expect(telemetryEnabled()).toBe(true))
+    const { service } = fixture()
+    const request = { traceId: 'a'.repeat(32), spanId: 'b'.repeat(16), owner: 'git' }
+    await runWithTelemetry(request, () => service.admitWork('first', async () => {}))
+    const held = deferred()
+    const first = service.admitWork('first', () => held.promise)
+    const queued = runWithTelemetry(request, () => service.admitWork('alias', async () => {}))
+    setTimeout(held.resolve, 30)
+    await Promise.all([first, queued])
+    flushTelemetry()
+    const waits = records.filter((record) => record.kind === 'span' && record.name === 'checkout.admission.wait')
+    expect(waits).toEqual([
+      expect.objectContaining({
+        traceId: request.traceId,
+        parentSpanId: request.spanId,
+        attrs: expect.objectContaining({ owner: 'git' }),
+      }),
+    ])
+  } finally {
+    resetTelemetryForTest()
+  }
 })
 
 it('reports activity on every task sharing the checkout without admitting anything', async () => {

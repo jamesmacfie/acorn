@@ -59,6 +59,12 @@ aggregate into one histogram per flush window: SQL statements, Git spawns, proce
 frames, terminal frames, bridge messages, and key dispatch. A histogram carries `count`, `sum`, `min`,
 `max`, `p50`, and `p95`, and costs one record every five seconds however hot the seam is.
 
+There's one bounded exception, in both runtimes. A call through `measure()` that takes 100 ms or more
+also becomes a span named for the seam, such as `git.rev_parse`, with the histogram's labels and
+`slow: true`. Each emitter sends at most 20 of these per flush window, and the histogram still counts
+every call. The Node sends one only inside an ambient trace and hangs it under the request, so a slow
+request names the Git command, process, or statement that held it.
+
 Each emitter admits at most 200 histogram series per flush window, across all names, owners, label
 sets, and units. Node durations are milliseconds, and client workload samples keep their own units.
 Samples share a series only when those dimensions and the typed label values match. Label order
@@ -108,6 +114,8 @@ what the audit trail refuses:
   drivers embed bound values in `err.message`, and its record carries the same.
 - The owner's account. The serve-then-revalidate dedupe key is `<userId>:<resource>`, and only the
   resource reaches a sink.
+  A harness account's folder name, such as `work`, does reach a sink on `agents.usage.collect`. It's a
+  label the owner chose, not the login inside the folder. James approved this on October 16, 2026.
 
 The scrubber doesn't shorten every path-shaped string. Route patterns, channel names, and plugin
 namespaces are slash-shaped, and collapsing them would make every record unreadable. The two paths

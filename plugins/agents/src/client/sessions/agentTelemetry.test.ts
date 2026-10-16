@@ -32,7 +32,7 @@ it('waits for content and two frames, then ends once', () => {
   vi.advanceTimersByTime(1_000)
   expect(end).not.toHaveBeenCalled()
   frames.shift()!(16)
-  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'ready' })
+  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'ready' }, undefined)
   view.dispose()
   vi.advanceTimersByTime(30_000)
   expect(end).toHaveBeenCalledOnce()
@@ -44,7 +44,7 @@ it.each(['error', 'cancelled', 'timeout'])('records %s instead of readiness', (o
   if (outcome === 'cancelled') view.dispose()
   if (outcome === 'timeout') vi.advanceTimersByTime(30_000)
   view.ready()
-  expect(end).toHaveBeenCalledExactlyOnceWith(outcome === 'cancelled' ? 'ok' : 'error', { outcome })
+  expect(end).toHaveBeenCalledExactlyOnceWith(outcome === 'cancelled' ? 'ok' : 'error', { outcome }, undefined)
 })
 it('ends as ready, tagged hidden, when the content arrives in a hidden window', () => {
   vi.useFakeTimers()
@@ -53,7 +53,7 @@ it('ends as ready, tagged hidden, when the content arrives in a hidden window', 
   const view = startAgentView('agents.session.open')
   view.ready()
   vi.advanceTimersByTime(100)
-  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'ready', hidden: true })
+  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'ready', hidden: true }, undefined)
 })
 it('records the window visibility and whether the open was claimed on a timeout', () => {
   vi.useFakeTimers()
@@ -61,25 +61,33 @@ it('records the window visibility and whether the open was claimed on a timeout'
   markAgentSelection('shown', 's1')
   claimAgentSelection('s1')
   vi.advanceTimersByTime(30_000)
-  expect(end).toHaveBeenCalledExactlyOnceWith('error', { outcome: 'timeout', claimed: true, visibility: 'visible' })
+  expect(end).toHaveBeenCalledExactlyOnceWith(
+    'error',
+    { outcome: 'timeout', claimed: true, visibility: 'visible' },
+    undefined,
+  )
 })
 it('records an unclaimed mark on a timeout', () => {
   vi.useFakeTimers()
   vi.stubGlobal('document', { visibilityState: 'hidden' })
   markAgentSelection('shown', 's1')
   vi.advanceTimersByTime(30_000)
-  expect(end).toHaveBeenCalledExactlyOnceWith('error', { outcome: 'timeout', claimed: false, visibility: 'hidden' })
+  expect(end).toHaveBeenCalledExactlyOnceWith(
+    'error',
+    { outcome: 'timeout', claimed: false, visibility: 'hidden' },
+    undefined,
+  )
 })
 it('cancels at once a mark for a task that is not on screen', async () => {
   vi.useFakeTimers()
   markAgentSelection('elsewhere', 's1')
   expect(end).not.toHaveBeenCalled()
   await Promise.resolve()
-  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'cancelled' })
+  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'cancelled' }, undefined)
   // That task's conversation, mounting later, measures its own open instead of the cancelled one.
   const view = claimAgentSelection('s1')
   view.ready()
-  expect(end).toHaveBeenLastCalledWith('ok', { outcome: 'ready' })
+  expect(end).toHaveBeenLastCalledWith('ok', { outcome: 'ready' }, undefined)
   expect(end).toHaveBeenCalledTimes(2)
 })
 it('keeps a mark for the task on screen for its conversation to claim', async () => {
@@ -88,5 +96,16 @@ it('keeps a mark for the task on screen for its conversation to claim', async ()
   await Promise.resolve()
   expect(end).not.toHaveBeenCalled()
   claimAgentSelection('s1').ready()
-  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'ready' })
+  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'ready' }, undefined)
+})
+it('caps a timeout that fired late at the deadline and says it was late', () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  let now = 1_000
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+  startAgentView('agents.session.open')
+  // The Mac slept, so the timer fires a minute after it was due.
+  now += 90_000
+  vi.advanceTimersByTime(30_000)
+  clock.mockRestore()
+  expect(end).toHaveBeenCalledExactlyOnceWith('error', { outcome: 'timeout', late: true }, 31_000)
 })

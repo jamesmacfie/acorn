@@ -1,4 +1,4 @@
-import { startSpan, type SpanHandle } from './emitter'
+import { startDeadline, startSpan, type SpanHandle } from './emitter'
 
 // How long a feature takes to become usable after the host opens it
 // (docs/telemetry/renderer.md § Feature openings).
@@ -51,6 +51,7 @@ function settle(
   record: Pending,
   outcome: OpeningOutcome,
   attrs: Record<string, string | boolean>,
+  at?: number,
 ): void {
   if (pending.get(featureId) !== record) return
   pending.delete(featureId)
@@ -58,7 +59,7 @@ function settle(
   const proxy = outcome === 'usable' && attrs.proxy === 'mount'
   // A cancelled opening is not a measurement. The span is dropped, but the startup account still
   // hears that the feature went away.
-  if (outcome !== 'cancelled') record.span.end(outcome === 'usable' ? 'ok' : 'error', { outcome, ...attrs })
+  if (outcome !== 'cancelled') record.span.end(outcome === 'usable' ? 'ok' : 'error', { outcome, ...attrs }, at)
   for (const listener of settledListeners) listener(featureId, outcome, proxy)
 }
 
@@ -85,7 +86,9 @@ export function openFeature(
       name: 'ui.feature.open',
       attrs: { seam: 'ui.feature.open', 'feature.id': featureId, 'feature.kind': options.kind, first },
     }),
-    timer: setTimeout(() => settle(featureId, record, 'timeout', {}), OPENING_TIMEOUT_MS),
+    timer: startDeadline(OPENING_TIMEOUT_MS, (late, at) =>
+      settle(featureId, record, 'timeout', late ? { late } : {}, at),
+    ),
   }
   pending.set(featureId, record)
   return () => settle(featureId, record, 'cancelled', {})

@@ -1,4 +1,5 @@
 import { mkdir } from 'node:fs/promises'
+import type { PluginTelemetry } from '@acorn/plugin-api/node'
 import type {
   AgentProviderUsage,
   AgentProviderUsageReading,
@@ -30,6 +31,8 @@ export type AgentUsageServiceOptions = {
   onRefreshed?: () => void
   /** A harness's extra logins, read per refresh like the collectors (docs/managed-agents/accounts.md). */
   accounts?: (providerId: string) => Promise<UsageAccount[]>
+  /** `ctx.telemetry`, so each collector run and each wait on another read's refresh is a span. */
+  telemetry?: Pick<PluginTelemetry, 'startSpan'>
 }
 
 type UsageAccount = { name: string; home: string; label?: string }
@@ -105,6 +108,35 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
         }),
       )
     ).flat()
+  // One span per collector run. The account is the folder name the person chose, such as `work`,
+  // never the login inside it (docs/telemetry/model.md § What never leaves the machine).
+  const collect = (
+    entry: AgentUsageCollectorEntry,
+    pricing: AgentPricingPreferences,
+    account: UsageAccount | null | undefined,
+  ): Promise<AgentProviderUsageReading> => {
+    const span = options.telemetry?.startSpan('agents.usage.collect', {
+      attrs: { provider: entry.provider, ...(account ? { account: account.name } : {}) },
+    })
+    const reading = entry.collect(pricing, account?.home)
+    if (!span) return reading
+    return reading.then(
+      (usage) => {
+        span.end('ok', { outcome: 'ok' })
+        return usage
+      },
+      (error: unknown) => {
+        span.end('error', { outcome: normalizeError(error).code })
+        throw error
+      },
+    )
+  }
+  // A read that waits on another read's refresh. Its own span, so a chain of waits shows as one
+  // under the request that sat in it.
+  const joined = (wait: Promise<AgentUsageSnapshot>): Promise<AgentUsageSnapshot> => {
+    const span = options.telemetry?.startSpan('agents.usage.wait')
+    return span ? wait.finally(() => span.end()) : wait
+  }
   const lastSuccess = new Map<string, AgentProviderUsage>()
   let activeKey: string | null = null
   let cached: { key: string; snapshot: AgentUsageSnapshot } | null = null
@@ -131,9 +163,7 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
       providerId !== null && previous?.has(providerId) && targets.every((target) => previous.has(targetKey(target)))
     // A harness's refresh reads all of its accounts, so its rows stay comparable.
     const selected = partial ? targets.filter((target) => target.entry.provider === providerId) : targets
-    const settled = await Promise.allSettled(
-      selected.map((target) => target.entry.collect(pricing, target.account?.home)),
-    )
+    const settled = await Promise.allSettled(selected.map((target) => collect(target.entry, pricing, target.account)))
     const updated = new Map(
       selected.map((target, index) => {
         const result = settled[index]
@@ -162,8 +192,8 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     const pricing = await pricingForUser(userId)
     const key = `${userId}\u0000${agentPricingFingerprint(pricing)}`
     if (inFlight) {
-      if (inFlight.key === key && (!force || inFlight.providerId === null)) return inFlight.promise
-      await inFlight.promise
+      if (inFlight.key === key && (!force || inFlight.providerId === null)) return joined(inFlight.promise)
+      await joined(inFlight.promise)
       return read({ userId, force })
     }
     if (!force && cached?.key === key && now() - cached.snapshot.refreshedAt < ttlMs) {
@@ -182,9 +212,9 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     const key = `${userId}\u0000${agentPricingFingerprint(pricing)}`
     if (inFlight) {
       if (inFlight.key === key && (inFlight.providerId === null || inFlight.providerId === providerId)) {
-        return inFlight.promise
+        return joined(inFlight.promise)
       }
-      await inFlight.promise
+      await joined(inFlight.promise)
       return refreshProvider({ userId, providerId })
     }
     const promise = refresh(pricing, key, providerId).finally(() => {
@@ -198,13 +228,13 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     const entry = collectors.get(providerId)
     if (!entry) return null
     // The quota of the login that ran out. An account the collector can't read has no known reset.
-    const home = account ? (await accountsOf(entry)).find((candidate) => candidate.name === account)?.home : undefined
-    if (account && !home) return null
+    const found = account ? (await accountsOf(entry)).find((candidate) => candidate.name === account) : undefined
+    if (account && !found) return null
     const pricing = await pricingForUser(userId)
     let usage: AgentProviderUsageReading
     try {
       await mkdir(options.probeDir, { recursive: true })
-      usage = await entry.collect(pricing, home)
+      usage = await collect(entry, pricing, found)
     } catch {
       return null
     }

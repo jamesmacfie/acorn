@@ -39,6 +39,9 @@ import type { AppEnv } from './middleware/auth'
 // a plugin route that 404s before it matches still be attributed, and a header would be attacker
 // input.
 //
+// `client.gone` says the caller closed the connection before the handler finished, so the work
+// that followed went nowhere. The listener aborts the request's signal when the socket closes early.
+//
 // The response size rides along because the desktop's helper wire base64-encodes every body, and
 // `apps/desktop/src/shell/wire.ts` puts the ceiling on that at tens of megabytes, and this is what
 // shows whether a real body gets near it. `-1` means the response is a
@@ -84,6 +87,7 @@ export const requestIdMiddleware = createMiddleware<AppEnv>(async (c, next) => {
         status: c.res.status,
         bytes: Number(bytes),
         'request.id': requestId,
+        ...(c.req.raw.signal.aborted ? { 'client.gone': true } : {}),
       },
     })
   }

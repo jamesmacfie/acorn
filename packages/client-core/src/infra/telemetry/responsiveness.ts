@@ -1,6 +1,7 @@
 import {
   currentActivity,
   emitEvent,
+  noteSuspension,
   onTelemetryActivity,
   recordDuration,
   telemetryEnabled,
@@ -8,6 +9,9 @@ import {
 } from './emitter'
 
 export type ResponsivenessPulse = { active: boolean; activity: TelemetryActivity | null }
+
+/** A one-second tick this late means the window slept or was throttled while hidden. */
+const SUSPEND_GAP_MS = 5_000
 
 /** How long frame gaps are sampled after the last sign of activity. */
 const FRAME_SAMPLE_MS = 2_000
@@ -70,6 +74,7 @@ export function startResponsivenessMonitor(send: (pulse: ResponsivenessPulse) =>
     if (frame === null && isActive()) frame = requestAnimationFrame(paint)
   }
   const changed = () => {
+    if (document.visibilityState === 'hidden') noteSuspension()
     last = performance.now()
     pulse()
     if (isActive()) return sampleFrames()
@@ -85,6 +90,7 @@ export function startResponsivenessMonitor(send: (pulse: ResponsivenessPulse) =>
   const timer = setInterval(() => {
     const now = performance.now()
     const delay = Math.max(0, now - last - 1000)
+    if (delay > SUSPEND_GAP_MS) noteSuspension()
     // Very large gaps may be suspend/resume. The independent helper applies the same exclusion.
     if (active && isActive() && delay < 30_000) {
       recordDuration('core', 'ui.event_loop.delay', delay)

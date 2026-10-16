@@ -6,6 +6,8 @@ import type { CoreGitService } from './index'
 import type { AppDatabase } from '../db'
 import { isTaskArchiving } from '../worktrees/archiveGate'
 import { BridgeError } from '../bridge'
+import { emitSpan, newSpanId, telemetryEnabled } from '../telemetry/collector'
+import { currentTelemetryContext } from '../telemetry/context'
 
 export type CheckoutActivity = { taskId: string; description: string }
 export type CheckoutActivityReader = (taskIds: readonly string[]) => Promise<CheckoutActivity[]>
@@ -26,6 +28,28 @@ export const admitCheckout = <T>(db: AppDatabase, taskId: string, action: () => 
 // folder with another repository, which admission doesn't cover. The limit bounds how long one
 // repository can have two keys after that.
 const REPOSITORY_KEY_TTL_MS = 60_000
+
+// A wait this long behind another operation on the same repository becomes a span under the waiting
+// request, so a request queued behind another task's `git worktree add` doesn't read as slow Git.
+// Shorter waits, which are nearly all of them, record nothing.
+const ADMISSION_WAIT_SPAN_MS = 10
+
+function noteAdmissionWait(start: number, hrStart: bigint): void {
+  const ambient = currentTelemetryContext()
+  if (!ambient) return
+  const durationMs = Number(process.hrtime.bigint() - hrStart) / 1e6
+  if (durationMs < ADMISSION_WAIT_SPAN_MS) return
+  emitSpan('core', {
+    traceId: ambient.traceId,
+    spanId: newSpanId(),
+    parentSpanId: ambient.spanId,
+    name: 'checkout.admission.wait',
+    start,
+    durationMs,
+    status: 'ok',
+    attrs: { seam: 'checkout.admission.wait' },
+  })
+}
 
 /** Serializes Acorn's admission decisions for one canonical checkout. Owner state stays with its owner. */
 export function createCheckoutAdmission(
@@ -84,7 +108,12 @@ export function createCheckoutAdmission(
     })
     const tail = before.then(() => settled)
     tails.set(key, tail)
-    await before
+    if (telemetryEnabled()) {
+      const start = Date.now()
+      const hrStart = process.hrtime.bigint()
+      await before
+      noteAdmissionWait(start, hrStart)
+    } else await before
     try {
       return await operation()
     } finally {

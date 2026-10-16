@@ -327,3 +327,54 @@ describe('agent usage service with extra accounts', () => {
     expect(await service.depletedUntil({ userId: 'james', providerId: 'claude', account: 'gone' })).toBeNull()
   })
 })
+
+describe('agent usage service telemetry', () => {
+  it('times each collector run by provider and account, and each wait on another read', async () => {
+    const spans: Array<{ name: string; attrs?: Record<string, unknown>; status?: string; end?: unknown }> = []
+    const telemetry = {
+      startSpan: (name: string, options?: { attrs?: Record<string, unknown> }) => {
+        const span: (typeof spans)[number] = { name, attrs: options?.attrs }
+        spans.push(span)
+        return {
+          traceId: 't',
+          spanId: 's',
+          end: (status = 'ok', attrs?: Record<string, unknown>) => {
+            span.status = status
+            span.end = attrs ?? {}
+          },
+        }
+      },
+    }
+    const registry = new AgentUsageCollectorRegistry()
+    registry.register({
+      provider: 'claude',
+      label: 'Claude Code',
+      accounts: true,
+      collect: async () => provider('claude'),
+    })
+    registry.register({
+      provider: 'codex',
+      label: 'Codex',
+      collect: async () => {
+        throw new UsageProcessError('cli_missing', 'codex is not installed')
+      },
+    })
+    const service = createAgentUsageService({
+      probeDir: await probeDir(),
+      collectors: registry,
+      accounts: async () => [{ name: 'work', home: '/accounts/claude/work' }],
+      telemetry,
+    })
+    await Promise.all([service.read({ userId: 'james' }), service.read({ userId: 'james' })])
+    expect(spans).toEqual([
+      { name: 'agents.usage.wait', attrs: undefined, status: 'ok', end: {} },
+      {
+        name: 'agents.usage.collect',
+        attrs: { provider: 'claude', account: 'work' },
+        status: 'ok',
+        end: { outcome: 'ok' },
+      },
+      { name: 'agents.usage.collect', attrs: { provider: 'codex' }, status: 'error', end: { outcome: 'cli_missing' } },
+    ])
+  })
+})

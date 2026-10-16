@@ -3,6 +3,7 @@ import { linearProvider } from '../server/provider'
 import { createLinearFetch } from '../server/routes/linear'
 import { issueSource } from '../shared/issueSource'
 import { createIssueSourceHandler } from '../server/data/issueSourceHandler'
+import { setLinearApiTelemetry } from '../server/index'
 
 export const linearPlugin = (): NodePlugin => ({
   name: 'linear',
@@ -14,6 +15,7 @@ export const linearPlugin = (): NodePlugin => ({
   // Always the portable fetch carrier (docs/plugins/loaded-plugins.md § Loaded plugins): linear ships loaded, and a
   // bundled Hono instance cannot cross the contract.
   init: (ctx) => {
+    setLinearApiTelemetry(ctx.telemetry)
     ctx.routes.fetch(createIssueSourceHandler(), { prefix: '/data/issues' })
     ctx.dataSources.register(issueSource)
     ctx.providers.integration(linearProvider, createLinearFetch(ctx.core.projects, ctx.events.send))
