@@ -4,6 +4,7 @@ import { integrationsRoute, projectsRoute, tasksRoute, workspaceExternalProjects
 import { contentLinkRegistry } from '@acorn/plugin-api/testkit/client'
 import { projectsKey, tasksKey, workspaceExternalProjectsKey, type Task } from '@acorn/plugin-api/client'
 import type { Integration } from '@acorn/protocol/api.ts'
+import type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
 import { pullRoute, type PullDetail } from '../shared/api'
 import { activeTaskForPull, githubPullPromotion, linearConnectionForProject, promotePullToTask } from './pullTasks'
 
@@ -11,6 +12,7 @@ const requests = vi.hoisted(() => ({
   routes: [] as string[],
   responses: new Map<string, unknown>(),
   creates: 0,
+  resolve: vi.fn<(identifiers: readonly string[]) => Promise<PluginRefResolution[]>>(async () => []),
 }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@acorn/plugin-api/client')>()),
@@ -19,6 +21,10 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
     if (!requests.responses.has(route)) throw new Error(`No test response for ${route}`)
     return requests.responses.get(route)
   },
+  // Linear itself is stubbed; which identifiers get asked about is what these tests check.
+  refResolutionsOptions: (_providerId: string, identifiers: readonly string[]) => ({
+    queryFn: () => requests.resolve(identifiers),
+  }),
   createTask: async () => {
     requests.creates++
     throw new Error('Unexpected task creation')
@@ -29,6 +35,7 @@ afterEach(() => {
   requests.routes = []
   requests.responses.clear()
   requests.creates = 0
+  requests.resolve.mockReset().mockResolvedValue([])
 })
 
 const task = (overrides: Partial<Task> = {}): Task => ({
@@ -243,5 +250,44 @@ describe('the GitHub source promotion for an Acorn link', () => {
     } finally {
       recogniser.dispose()
     }
+  })
+
+  describe('with the ticket named only by the branch', () => {
+    const branchPull = {
+      ...detail.pull!,
+      headRef: 'jordan/sec-354-first-time-google-sign-in',
+      body: 'Closes SEC-354.',
+    }
+    const prepare = () => {
+      requests.responses.set(integrationsRoute, { integrations: [linear('work')] })
+      return githubPullPromotion.prepare(branchPull, { projectId: 'project-1', branch: '' })
+    }
+
+    it('links the ticket once Linear confirms it', async () => {
+      requests.resolve.mockResolvedValue([
+        {
+          providerId: 'linear',
+          identifier: 'SEC-354',
+          label: 'Google sign-in joins the wrong account',
+          url: 'https://linear.app/runn/issue/SEC-354',
+        },
+      ])
+      await expect(prepare()).resolves.toMatchObject({
+        links: [
+          {
+            connectionId: 'work',
+            identifier: 'SEC-354',
+            ref: { displayId: 'SEC-354', url: 'https://linear.app/runn/issue/SEC-354' },
+          },
+        ],
+      })
+      expect(requests.resolve).toHaveBeenCalledWith(['SEC-354'])
+    })
+
+    it('leaves an unconfirmed fragment out, and still creates the task when Linear fails', async () => {
+      await expect(prepare()).resolves.toMatchObject({ links: [] })
+      requests.resolve.mockRejectedValue(new Error('provider_not_connected'))
+      await expect(prepare()).resolves.toMatchObject({ links: [] })
+    })
   })
 })
