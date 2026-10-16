@@ -107,7 +107,7 @@ jobs:
       - name: Test the desktop
         run: pnpm --filter @acorn/desktop test
 
-  # Installers wait for the Linux suite, so a red commit never spends the macOS and Windows minutes.
+  # Installers wait for the Linux suite, so a red commit never spends the installer runners' minutes.
   package:
     needs: check
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
