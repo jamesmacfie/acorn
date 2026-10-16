@@ -8,7 +8,6 @@ import { CopyAcornLink, OpenInAcorn } from './OpenInAcorn'
 import { attachmentPreviews } from './attachmentPreviews'
 import type { BridgeClient } from './bridgeClient'
 import { Composer } from './Composer'
-import type { Heading } from './Header'
 import { conversationItems, conversationReader, type ConversationWindow } from './conversationWindow'
 import { errorGuidance } from './guidance'
 import type { DraftTarget } from '../localState'
@@ -48,10 +47,6 @@ export function Conversation(props: {
   target: DraftTarget
   // The conversation's row as its task's list read it, until the conversation's own read arrives.
   session: BridgeAgentSession
-  taskTitle: string
-  back(): void
-  // Names this conversation, under its task, in the top bar.
-  heading(heading: Heading): void
   online: boolean
   // Whether Open in Acorn may open the desktop app, or copies its link.
   opensLinks: boolean
@@ -116,9 +111,6 @@ export function Conversation(props: {
       session(),
       (view()?.requests ?? []).some((request) => request.status === 'pending'),
     )
-
-  // Where a message goes: the conversation, under its task.
-  createEffect(() => props.heading({ eyebrow: props.taskTitle, title: session().title, back: props.back }))
 
   return (
     <div class="view conversation" aria-label="Conversation" ref={followNewest}>

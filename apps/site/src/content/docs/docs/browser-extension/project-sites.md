@@ -19,7 +19,7 @@ click away. This page covers adding sites and choosing another project for a sit
 
    Each visible project on the Node is listed with its sites.
 
-2. Click **Add site**, and pick the project. It starts on the current task's project.
+2. Click **Add site**, and pick the project. It starts on the project of the task you last had open.
 3. Choose a kind, and type the address or pattern. Until you type, the box holds the page beside the
    panel, so the domain you're on is one click away. The dialog says whether what you typed covers that
    page, and what's wrong with it, before anything is saved.
@@ -38,7 +38,7 @@ project on the Node, so every browser paired with that Node sees them. A reposit
 ## What a site does
 
 On a page a project's site covers, Home's **This page** suggests the project under **Suggested for this
-page**, and lists its open tasks. Click one to make it the current task. **New task in Acorn** opens the
+page**, and lists its open tasks. Click one to open it. **New task in Acorn** opens the
 project in the desktop app.
 
 - Several projects' sites can cover one page. Then the panel lists them first and asks you to choose.
@@ -46,8 +46,8 @@ project in the desktop app.
 - A site is only a suggestion. It grants the extension no access, and any task can still be chosen on
   any page.
 
-The suggestion moves nothing by itself: the current task, its conversation, and its draft stay put when
-the page changes. The [toolbar badge](/docs/browser-extension/waiting-requests-and-notifications/#the-toolbar-badge)
+The suggestion moves nothing by itself: the task or conversation the panel shows, and its draft, stay put
+when the page changes. The [toolbar badge](/docs/browser-extension/waiting-requests-and-notifications/#the-toolbar-badge)
 counts requests waiting in the projects a page suggests.
 
 ## Choose another project for a site

@@ -27,7 +27,7 @@ covers both.
    description, and `link` or `url` with its address.
 4. Click **Start workflow**.
 
-   acorn makes a task linked to the item, starts the run on it, and opens the **Workflows** tab on the
+   acorn makes a task linked to the item, starts the run on it, and opens the task's **Runs** tab on the
    run.
 
 A workflow file acorn hasn't been told to trust yet is refused here. Start it once in the desktop app,
@@ -36,13 +36,14 @@ Pressing the button again after a slow answer doesn't start a second run.
 
 ## Follow a task's runs
 
-The bar at the bottom of the panel shows **Workflows** while the page's task has a run. It lists:
+Each task in the panel has a **Runs** tab while your Node runs workflows. A spinner marks it while a run
+is going. It lists:
 
 1. **Runs**, newest first, each with its status and when it started. The newest is chosen until you
    pick another.
 2. **Steps** of the chosen run, each with its status and how long it took.
 
-Click a step that ran an agent to open its conversation, with **Back** to the steps. A gate, or a step
+Click a step that ran an agent to open its conversation. **Back** returns to **Runs**. A gate, or a step
 that hasn't started, has nothing to open. To approve a gate or retry a step, open the run in the
 desktop app.
 
@@ -51,7 +52,7 @@ While a run is going or waiting on you, the panel reads it again every three sec
 ## Plugin panels
 
 A plugin can show a read-only panel about the task, such as the state of the app it's running for it.
-When the page's task has one, its name and icon join the bar at the bottom, after **Workflows**.
+When the task has one, its name and icon join the task's tabs, after **Runs**.
 
 A panel can show:
 

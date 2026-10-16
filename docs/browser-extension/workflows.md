@@ -30,24 +30,25 @@ schema.
 `workflow.start`. Both writes keep their keys, so pressing it again after one went unconfirmed makes
 no second task or run. A workflow from the repository's own config that Acorn doesn't trust yet is
 refused, with a message to start it once in the desktop app, where the trust prompt is. Once the run
-starts, the card closes, the task becomes current, and the panel opens the Workflows tab on the run.
+starts, the card closes, and the panel opens the new task on its **Runs** tab, with the run chosen.
 
-## The Workflows tab
+## The Runs tab
 
-The bottom bar shows **Workflows** while the task the Agents tab shows has at least one run. That
-task is the page's own, or the current task on its project's site. The tab lists:
+A task shows **Runs** in its tab strip while the Node runs the workflows plugin, so a task with no run
+yet still has one. A turning loader marks the tab while a run runs. The tab lists:
 
 1. **Runs**, newest first, each with its status icon, its name, and when it started. A click chooses
    the run, and the newest is chosen until the person picks one.
 2. **Steps** of the chosen run, each with its status icon, its name, and how long it took.
 
-A step that ran an agent opens that conversation. The top bar names the step, with the run above it
-and **Back** to the run's steps. A step with no conversation, such as a gate or one not started,
+A step that ran an agent opens that conversation. The top bar names the step, with the run above it,
+and **Back** returns to **Runs**. A step with no conversation, such as a gate or one not started,
 can't be opened.
 
 While the chosen run is running, waiting on a person, or cancelling, the sidebar reads the runs and
 its steps again every 3 seconds. A change hint for the task, or a reconnect, reads the runs again.
-A Node without the workflows plugin answers the runs read with a failure, and the tab stays hidden.
+A Node without the workflows plugin answers the runs read with a failure, and no task shows the tab.
+A task open on **Runs** then gives way to **Agents**.
 
 ## Native operations
 

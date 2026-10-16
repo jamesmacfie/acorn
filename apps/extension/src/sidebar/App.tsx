@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
+import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type {
   BridgeAgentHint,
@@ -9,8 +9,7 @@ import type {
   BridgePendingRequest,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
-import { RailTab } from '@acorn/client-core/features/tabs/RailTab.tsx'
-import { agentRailMarkers, type AgentRailState } from '@acorn/plugin-agents/contract/runtimeState.ts'
+import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import type { BrowserApi } from '../browser'
 import { HIDDEN_MARKERS_KEY, type PageHandoff } from '../handoffs'
 import { CallFailure, type CallError, type HostState, type RequestTarget } from '../messages'
@@ -19,9 +18,10 @@ import { activePageUrl } from './activePage'
 import { bridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { INSTALL_COMMAND, errorGuidance, hostGuidance, installFixes, statusGuidance } from './guidance'
-import { Header, type Heading } from './Header'
+import { createLocation } from './location'
 import { Pairing } from './Pairing'
 import { Settings } from './Settings'
+import { TopBar, type Heading } from './TopBar'
 import { Workspace } from './Workspace'
 
 // How often the panel asks again for a bridge the person is installing.
@@ -29,18 +29,6 @@ const BRIDGE_RECHECK_MS = 3_000
 
 // Online, or online with live updates paused: either way the Node answers requests.
 const connected = (status: NodeStatus | null) => status?.state === 'online' || status?.state === 'degraded'
-
-// A plugin's sidebar panel is `panel:<pluginId>`.
-type View = 'home' | 'agents' | 'workflows' | 'settings' | `panel:${string}`
-type Tab = { id: View; label: string; glyph: string }
-const TABS: Tab[] = [
-  { id: 'home', label: 'Home', glyph: 'house' },
-  { id: 'agents', label: 'Agents', glyph: 'bot' },
-  { id: 'workflows', label: 'Workflows', glyph: 'workflow' },
-]
-const SETTINGS_TAB: Tab = { id: 'settings', label: 'Settings', glyph: 'settings' }
-// The nav glyph of a panel that names none.
-const PANEL_GLYPH = 'puzzle'
 
 // `opensLinks` says whether this build runs beside a desktop that opens `acorn://` links.
 export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
@@ -58,11 +46,8 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [projectChanges, setProjectChanges] = createSignal(0)
   // The selected Node's handoffs, and the one the person asked for, if any.
   const [handoffs, setHandoffs] = createSignal<BridgeHandoff[]>([])
-  // The selected Node's plugin panels, and the plugins with one for the sidebar's task.
-  const [panels, setPanels] = createSignal<BridgePanel[]>([])
-  const [panelsShown, setPanelsShown] = createSignal<string[]>([])
-  // The agents of the task Agents shows, for the marker on its tab, as the desktop marks its Agent button.
-  const [agentState, setAgentState] = createSignal<AgentRailState>({ working: 0, attention: 0 })
+  // The selected Node's plugin panels, null until it answers.
+  const [panels, setPanels] = createSignal<BridgePanel[] | null>(null)
   const [handoff, setHandoff] = createSignal<PageHandoff | null>(null)
   // Counts toolbar clicks, after which the active page may be readable where it wasn't.
   const [pageChecks, setPageChecks] = createSignal(0)
@@ -78,56 +63,27 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [openRequest, setOpenRequest] = createSignal<RequestTarget | null>(null)
   // Why the page's right-click entry added nothing, until the person dismisses it or it works.
   const [notice, setNotice] = createSignal<string | null>(null)
-  // The selected Node's tasks and their page addresses, as the background keeps them, and a task chip's
-  // click asking Home to show the page's task.
+  // The selected Node's tasks and their page addresses, as the background keeps them: null until the
+  // background has sent the selected Node's list.
   const [taskPages, setTaskPages] = createSignal<{ nodeId: string | null; tasks: BridgePageTask[] }>({
     nodeId: null,
     tasks: [],
   })
+  const nodeTasks = () => (taskPages().nodeId === fleet()?.activeNodeId ? taskPages().tasks : null)
   // The apps plugins published for the selected Node's tasks, for site access.
-  const apps = () =>
-    taskPages().nodeId === fleet()?.activeNodeId
-      ? taskPages().tasks.flatMap((task) => task.pages.filter((page) => page.status))
-      : []
-  const [showTask, setShowTask] = createSignal<{ chat: { url: string; title: string } | null } | null>(null)
+  const apps = () => (nodeTasks() ?? []).flatMap((task) => task.pages.filter((page) => page.status))
+  // The tasks the page beside the panel belongs to, and the first of them, which the panel follows.
+  const pageTaskList = createMemo(() => pageTasks(nodeTasks() ?? [], pageUrl()))
+  const pageTaskId = createMemo(() => pageTaskList()[0]?.task.id ?? null)
   // A handed-off item's context, waiting for the conversation the person opens next.
   const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
-  // The bottom bar's choice. Home, Agents, and Workflows share one Workspace; Settings replaces it, and
-  // the Workspace restores from storage when Settings closes. Workflows shows only for a task with runs,
-  // and a plugin's panel only for a task it has one for. Either stays while open, so neither vanishes
-  // while its view loads.
-  const [view, setView] = createSignal<View>('home')
-  const [hasWorkflows, setHasWorkflows] = createSignal(false)
-  const tabs = (): Tab[] => [
-    ...TABS.filter((tab) => tab.id !== 'workflows' || hasWorkflows() || view() === 'workflows'),
-    ...panels()
-      .filter((panel) => panelsShown().includes(panel.pluginId) || view() === `panel:${panel.pluginId}`)
-      .map((panel): Tab => ({ id: `panel:${panel.pluginId}`, label: panel.label, glyph: panel.glyph ?? PANEL_GLYPH })),
-    SETTINGS_TAB,
-  ]
-  const workspaceTab = () => {
-    const shown = view()
-    return shown === 'settings' ? 'home' : shown
-  }
-  // A panel whose plugin stopped, or that another Node doesn't have, closes to Home.
-  createEffect(() => {
-    const shown = view()
-    if (shown.startsWith('panel:') && !panels().some((panel) => shown === `panel:${panel.pluginId}`)) setView('home')
+  // Where the sidebar is, and what the top bar names under a task or in a conversation.
+  const nav = createLocation({
+    storage: props.api.storage.local,
+    pageTaskId,
+    projectOf: (taskId) => nodeTasks()?.find((task) => task.id === taskId)?.projectId ?? null,
   })
-  // Whether the person has picked a tab since the panel opened. Until then, a remembered conversation
-  // reopens on Agents; after, it waits there without moving them. Each pick is counted for the
-  // Workspace too, which shows the page's task when the pick is Agents.
-  let picked = false
-  const [tabPicks, setTabPicks] = createSignal(0)
-  // What Agents or Workflows names in the top bar: the list and its count, or the open conversation.
-  const [agentsHeading, setAgentsHeading] = createSignal<Heading | null>(null)
-  const heading = (): Heading => {
-    if (view() === 'settings') return { title: 'Settings' }
-    if (view() === 'home') return { title: 'Home' }
-    const panel = panels().find((each) => view() === `panel:${each.pluginId}`)
-    if (panel) return { title: panel.label }
-    return agentsHeading() ?? { title: view() === 'workflows' ? 'Workflows' : 'Agents' }
-  }
+  const [heading, setHeading] = createSignal<Heading | null>(null)
   // The origins the branch marker is hidden on. Its own menu hides it, and This page shows it again.
   const [hiddenMarkers, setHiddenMarkers] = createSignal<string[]>([])
   const readHiddenMarkers = (value: unknown) =>
@@ -155,7 +111,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     agents: (next) => next.nodeId === fleet()?.activeNodeId && setHint(next),
     handoff: (next) => {
       setHandoff(next)
-      setView('home')
+      nav.goHome()
     },
     handoffsChanged: (nodeId) => nodeId === fleet()?.activeNodeId && void loadHandoffs(nodeId),
     projectsChanged: (nodeId) => {
@@ -167,16 +123,26 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     requests: (nodeId, list) => setRequests({ nodeId, requests: list }),
     open: (target) => {
       setNotice(null)
+      setPairing(false)
       setOpenRequest(target)
-      setView('agents')
     },
     notice: setNotice,
     taskPages: (nodeId, tasks) => setTaskPages({ nodeId, tasks }),
+    // A task chip was clicked: its task opens, on Agents with the page's link waiting for the
+    // conversation the person starts or opens next when they asked for a new chat about the page.
     showTask: (chat) => {
-      setShowTask({ chat })
-      // A new chat about the page starts in Agents; the page's task alone shows on Home.
-      setView(chat ? 'agents' : 'home')
       setPairing(false)
+      const taskId = pageTaskId()
+      if (taskId) nav.openTask(taskId, chat ? 'agents' : undefined)
+      else nav.goHome()
+      if (chat)
+        setWaitingContext({
+          kind: 'link',
+          id: crypto.randomUUID(),
+          url: chat.url,
+          title: chat.title,
+          capturedAt: Date.now(),
+        })
     },
   })
   const selected = () => fleet()?.nodes.find((node) => node.nodeId === fleet()?.activeNodeId) ?? null
@@ -223,12 +189,14 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     const switched = next.activeNodeId !== fleet()?.activeNodeId
     // The first answer from a bridge with nothing paired opens pairing, which is all there is to do.
     if (!fleet() && !next.nodes.length) setPairing(true)
+    // Before the Node shows, so a conversation a notification asked for opens over the fresh start.
+    if (switched) void nav.selectNode(next.activeNodeId)
     setFleet(next)
     showStatus(next.status)
     if (!switched) return
     // A handoff belongs to the Node it was asked of, as the page buttons do.
     setHandoffs([])
-    setPanels([])
+    setPanels(null)
     setHandoff(null)
     setWaitingContext(null)
     setSites([])
@@ -243,6 +211,19 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const forget = (nodeId: string) => attempt(async () => showFleet(await client.call({ op: 'node.forget', nodeId })))
 
   onMount(() => void refresh())
+  // A conversation an OS notification or a right-click asked to open, once its Node is the selected one.
+  createEffect(
+    on([openRequest, () => fleet()?.activeNodeId], ([target, nodeId]) => {
+      if (!target || !nodeId) return
+      setOpenRequest(null)
+      if (target.nodeId === nodeId) nav.openConversation(target.taskId, target.sessionId)
+    }),
+  )
+  // The panel follows the page as the browser tab moves, and once the Node's task list first arrives.
+  // A later list, such as one with a task just made for the page, moves nothing, so Home's card stays.
+  // Pairing never moves.
+  const tasksKnown = createMemo(() => nodeTasks() !== null)
+  createEffect(on([pageUrl, tasksKnown], () => !pairing() && nav.followPage(pageTaskId()), { defer: true }))
   // `acorn browser install` runs in a terminal, so the panel can't see it finish. It asks again until
   // the bridge answers; Retry stays for the impatient.
   const awaitingInstall = createMemo(() => installFixes(host()))
@@ -251,15 +232,19 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     const timer = setInterval(() => void refresh(), BRIDGE_RECHECK_MS)
     onCleanup(() => clearInterval(timer))
   })
+  const offline = () => status()?.state === 'offline'
   return (
     <main>
-      <Header
+      <TopBar
+        location={pairing() ? { level: 'home' } : nav.location()}
         heading={heading()}
-        fleet={fleet()}
+        nodeLabel={selected()?.label ?? null}
         status={status()}
-        select={(nodeId) => void select(nodeId)}
-        pair={() => setPairing(true)}
-        forget={(nodeId) => void forget(nodeId)}
+        back={nav.back}
+        openSettings={() => {
+          setPairing(false)
+          nav.openSettings()
+        }}
       />
       {/* One line for anything wrong with the bridge or the Node, with the next step. */}
       <Show when={hostGuidance(host())}>
@@ -303,19 +288,30 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
           </p>
         )}
       </Show>
+      {/* The selected Node can't be worked with. What the panel shows stays readable under the strip. */}
       <Show when={selected() && statusGuidance(status()).detail}>
         {(detail) => (
-          <p class="banner problem" data-testid="node-status">
-            {detail()}
-          </p>
+          <div class="strip" data-tone="bad" role="status" data-testid="node-status">
+            <Icon name="circle-x" tone="danger" />
+            <span class="grow">
+              <Show when={offline()} fallback={detail()}>
+                <b>{selected()!.label}</b> is offline
+              </Show>
+            </span>
+            <Show when={offline()}>
+              <button type="button" class="quiet" onClick={() => void refresh()}>
+                Retry
+              </button>
+            </Show>
+          </div>
         )}
       </Show>
-      <Show when={fleet() && !fleet()!.activeNodeId && view() !== 'settings' && !pairing()}>
+      <Show when={fleet() && !fleet()!.activeNodeId && nav.location().level !== 'settings' && !pairing()}>
         <div class="banner notice row">
           <span class="grow">
             {fleet()!.nodes.length ? 'Choose a Node to work with.' : 'No Node is paired with this browser yet.'}
           </span>
-          <button type="button" onClick={() => (fleet()!.nodes.length ? setView('settings') : setPairing(true))}>
+          <button type="button" onClick={() => (fleet()!.nodes.length ? nav.openSettings() : setPairing(true))}>
             {fleet()!.nodes.length ? 'Choose a Node' : 'Pair a Node'}
           </button>
         </div>
@@ -338,57 +334,8 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
           />
         }
       >
-        <Show
-          when={view() === 'settings'}
-          fallback={
-            <Show when={fleet()?.activeNodeId} keyed>
-              {(nodeId) => (
-                <Workspace
-                  client={client}
-                  api={props.api}
-                  nodeId={nodeId}
-                  online={online()}
-                  opensLinks={props.opensLinks ?? false}
-                  hint={hint()}
-                  reconnects={reconnects()}
-                  projectChanges={projectChanges()}
-                  tab={workspaceTab()}
-                  showAgents={() => setView('agents')}
-                  showWorkflows={() => setView('workflows')}
-                  showTab={setView}
-                  tabPicks={tabPicks()}
-                  hasWorkflows={setHasWorkflows}
-                  panels={panels()}
-                  panelsShown={setPanelsShown}
-                  agentState={setAgentState}
-                  resumed={() => !picked && setView('agents')}
-                  heading={setAgentsHeading}
-                  pageUrl={pageUrl()}
-                  handoffs={handoffs()}
-                  sites={sites()}
-                  tasks={taskPages().nodeId === nodeId ? taskPages().tasks : []}
-                  pageTasks={pageTasks(taskPages().nodeId === nodeId ? taskPages().tasks : [], pageUrl())}
-                  markerHidden={(origin) => hiddenMarkers().includes(origin)}
-                  showMarker={(origin) =>
-                    void props.api.storage.local.set({
-                      [HIDDEN_MARKERS_KEY]: hiddenMarkers().filter((hidden) => hidden !== origin),
-                    })
-                  }
-                  showTask={showTask()}
-                  shownTask={() => setShowTask(null)}
-                  handoff={handoff()}
-                  startHandoff={setHandoff}
-                  dismissHandoff={() => setHandoff(null)}
-                  waitingContext={waitingContext()}
-                  setWaitingContext={setWaitingContext}
-                  requests={requests().nodeId === nodeId ? requests().requests : []}
-                  openRequest={openRequest()}
-                  openedRequest={() => setOpenRequest(null)}
-                />
-              )}
-            </Show>
-          }
-        >
+        {/* Settings shows over the Workspace, which stays mounted so the task it showed is there on Back. */}
+        <Show when={nav.location().level === 'settings'}>
           <Settings
             api={props.api}
             client={client}
@@ -407,27 +354,41 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
             }}
           />
         </Show>
-      </Show>
-      {/* The desktop rail's controls, laid along the bottom edge, Settings apart at the far end. */}
-      <nav class="rail" aria-label="Navigation">
-        <For each={tabs()}>
-          {(tab) => (
-            <RailTab
-              glyph={tab.glyph}
-              label={tab.label}
-              active={view() === tab.id}
-              markers={tab.id === 'agents' ? agentRailMarkers(agentState()) : undefined}
-              aria-current={view() === tab.id ? 'page' : undefined}
-              onClick={() => {
-                picked = true
-                setPairing(false)
-                setView(tab.id)
-                setTabPicks((count) => count + 1)
-              }}
+        <Show when={fleet()?.activeNodeId} keyed>
+          {(nodeId) => (
+            <Workspace
+              client={client}
+              api={props.api}
+              nodeId={nodeId}
+              online={online()}
+              opensLinks={props.opensLinks ?? false}
+              hint={hint()}
+              reconnects={reconnects()}
+              projectChanges={projectChanges()}
+              nav={nav}
+              heading={setHeading}
+              panels={panels()}
+              pageUrl={pageUrl()}
+              handoffs={handoffs()}
+              sites={sites()}
+              tasks={nodeTasks()}
+              pageTasks={pageTaskList()}
+              markerHidden={(origin) => hiddenMarkers().includes(origin)}
+              showMarker={(origin) =>
+                void props.api.storage.local.set({
+                  [HIDDEN_MARKERS_KEY]: hiddenMarkers().filter((hidden) => hidden !== origin),
+                })
+              }
+              handoff={handoff()}
+              startHandoff={setHandoff}
+              dismissHandoff={() => setHandoff(null)}
+              waitingContext={waitingContext()}
+              setWaitingContext={setWaitingContext}
+              requests={requests().nodeId === nodeId ? requests().requests : []}
             />
           )}
-        </For>
-      </nav>
+        </Show>
+      </Show>
     </main>
   )
 }

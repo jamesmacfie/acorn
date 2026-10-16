@@ -8,7 +8,7 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import { SELECTED_NODE_KEY, startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
-import { back, button, conversationTitle, openChat, rememberTask, tab } from '../test/sidebarUi'
+import { back, button, conversationTitle, openChat, openTask, shownTask, tab, taskTabs } from '../test/sidebarUi'
 import { reportResize } from '../test/sidebarSetup'
 import { App } from './App'
 
@@ -78,7 +78,17 @@ function node() {
       case 'node.select':
         return { result: nodes }
       case 'projects.list':
-        return { result: { nodeId: 'n1', projects: [{ id: 'p1', name: 'Acorn', path: null, hidden: false }] } }
+        return {
+          result: {
+            nodeId: 'n1',
+            projects: [{ id: 'p1', name: 'Acorn', path: null, hidden: false, workspaceId: 'w1' }],
+            workspaces: [{ id: 'w1', name: 'Main' }],
+          },
+        }
+      case 'tasks.pages':
+        return {
+          result: { nodeId: 'n1', tasks: [{ id: 't1', title: 'Fix it', branch: null, projectId: 'p1', pages: [] }] },
+        }
       // The test page is on the project's site, so Home lists the current task's conversations.
       case 'sites.list':
         return {
@@ -272,7 +282,7 @@ const draft = (root: HTMLElement) => root.querySelector<HTMLTextAreaElement>('te
 
 async function openSession(subject: ReturnType<typeof mount>, sessionId = 's1') {
   await settle()
-  await rememberTask(subject.root, subject.fake.storage, 'p1', 't1')
+  await openTask(subject.root, 'Fix it')
   await openChat(subject.root, `Chat ${sessionId}`)
 }
 // The conversation's own reads, apart from the short ones Home makes for each row's last line.
@@ -544,20 +554,17 @@ describe('home', () => {
       row.querySelector('.agent-meta')!.textContent,
       row.querySelector('.ui-icon[data-spin]') !== null,
     ])
-  const heading = (root: HTMLElement) => root.querySelector('header h1')!.textContent
-
-  it("lists the current task's conversations as the desktop does, and goes back from one", async () => {
+  it("lists the task's conversations as the desktop does, and goes back from one", async () => {
     const subject = mount()
     subject.state.sessions[0]!.model = 'Opus · High'
     subject.state.sessions[1]!.runtimeState = 'working'
     await settle()
-    await rememberTask(subject.root, subject.fake.storage, 'p1', 't1')
-    expect(subject.root.querySelector('[aria-label="Current task"]')!.textContent).toContain('Fix it')
-    expect(heading(subject.root)).toBe('Home')
-    // The list is Agents', not Home's.
+    // The list is the task's, not Home's.
     expect(subject.root.querySelector('.view[aria-label="Agents"]')).toBeNull()
-    await tab(subject.root, 'Agents')
-    expect(heading(subject.root)).toBe('Agents2')
+    await openTask(subject.root, 'Fix it')
+    expect(shownTask(subject.root)).toBe('Fix it')
+    // A Node without workflows has no Runs tab.
+    expect(taskTabs(subject.root)).toEqual(['Agents'])
     expect(rows(subject.root)).toEqual([
       ['Chat s1', 'claude · Opus · High · ready', false],
       ['Chat s2', 'claude · working', true],
@@ -565,27 +572,33 @@ describe('home', () => {
 
     await openChat(subject.root, 'Chat s1')
     expect(subject.root.querySelector('.view[aria-label="Agents"]')).toBeNull()
-    expect(heading(subject.root)).toBe('Chat s1')
+    expect(conversationTitle(subject.root)).toBe('Chat s1')
+    expect(subject.root.querySelector('header .eyebrow')!.textContent).toBe('Fix it')
     await back(subject.root)
     expect(subject.root.querySelector('[aria-label="Conversation"]')).toBeNull()
-    expect(heading(subject.root)).toBe('Agents2')
+    expect(shownTask(subject.root)).toBe('Fix it')
+    expect(subject.root.querySelector('.view[aria-label="Agents"]')).not.toBeNull()
     expect(subject.fake.storage.get('destination:n1')).toEqual({ projectId: 'p1', taskId: 't1', sessionId: null })
   })
 
-  it("marks the Agents tab with the task's working agents, or the ones waiting, under an open conversation too", async () => {
+  it("marks the Agents tab with the task's working agents, or the ones waiting, counted under an open conversation too", async () => {
     const subject = mount()
     const marker = () =>
-      subject.root.querySelector('nav.rail button[aria-label="Agents"] .sr-only')?.textContent ?? null
+      subject.root
+        .querySelector('[role="tablist"][aria-label="Task"] [role="tab"] [role="img"]')
+        ?.getAttribute('aria-label') ?? null
     subject.state.sessions[1]!.runtimeState = 'working'
     await settle()
-    await rememberTask(subject.root, subject.fake.storage, 'p1', 't1')
+    await openTask(subject.root, 'Fix it')
     expect(marker()).toBe('1 agent working')
 
     await openChat(subject.root, 'Chat s1')
     subject.state.sessions[1]!.runtimeState = 'ready'
     subject.state.host!.send({ v: 1, event: 'agent', nodeId: 'n1', sessions: ['s2'], tasks: [], missed: false })
     await settle(20)
+    await back(subject.root)
     expect(marker()).toBeNull()
+    await openChat(subject.root, 'Chat s1')
 
     subject.state.agentRequests.push(permission())
     subject.state.host!.send({
@@ -598,6 +611,7 @@ describe('home', () => {
       requests: true,
     })
     await settle(20)
+    await back(subject.root)
     expect(marker()).toBe('1 agent needs you')
   })
 
@@ -606,7 +620,7 @@ describe('home', () => {
     subject.state.sessions.push(session('s3', { kind: 'workflow' }), session('s4', { inline: true }))
     subject.state.events.set('s3', []).set('s4', [])
     await settle()
-    await rememberTask(subject.root, subject.fake.storage, 'p1', 't1')
+    await openTask(subject.root, 'Fix it')
     await tab(subject.root, 'Agents')
     const groups = [...subject.root.querySelectorAll('[aria-label="Agents"] ul.rows')].map((list) => [
       list.getAttribute('aria-label'),

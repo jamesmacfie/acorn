@@ -1,6 +1,6 @@
 # Rework the browser extension's sidebar
 
-Date: October 16, 2026. Status: proposed. Implementation not started.
+Date: October 16, 2026. Status: in progress. Phase 1 is done.
 
 This folder turns the clickable prototype at `references/extension-ux/acorn-extension-ux.html` into
 thirteen phases a developer can pick up one at a time. The last is optional. Read this page first. It says how to read the

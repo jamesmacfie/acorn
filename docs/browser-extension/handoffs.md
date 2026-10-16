@@ -43,9 +43,9 @@ plugin's `label` stays in the chip's accessible name.
   **1 waiting** in the warning colour when an agent waits on the person. The background reads the
   conversations of each task an open page shows, and again when a hint names that task or one of its
   conversations. A conversation is waiting while the Node holds a request from it. A click opens the
-  panel on Home with the task. The arrow beside it opens a menu: **Show in side panel**, **Open in
+  panel on the task. The arrow beside it opens a menu: **Show in side panel**, **Open in
   Acorn** (a plain `acorn://` link to the task, on its item's pane), **New chat about this page**
-  (Home's new-chat picker for the task, with the page's link waiting for the draft), **Ask about an
+  (the task's **Agents** tab, with the page's link waiting for the draft), **Ask about an
   element** (the [element picker](./element-picker.md)), and **Copy Acorn link**. A development
   build leaves out Open in Acorn, as the panel does.
 - **A page no task holds** reads **Start task**. A click opens a menu with the desktop row menu's two

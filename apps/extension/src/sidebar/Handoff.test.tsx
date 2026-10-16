@@ -8,7 +8,20 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
-import { back, button, conversationTitle, idle, openChat, openSettings, pick, selected, tab } from '../test/sidebarUi'
+import {
+  back,
+  button,
+  conversationTitle,
+  goHome,
+  idle,
+  openChat,
+  openSettings,
+  pick,
+  selected,
+  shownTask,
+  tab,
+  taskTabs,
+} from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -67,8 +80,8 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
     tasks: { p1: [{ id: 't1', title: 'Existing work', branch: null }], p2: [] } as Record<string, unknown[]>,
     sessions: { t1: [session('s1', 't1')] } as Record<string, BridgeAgentSession[]>,
     requests: [] as Request[],
-    // The tasks the page belongs to. A new task holds the item, so the page becomes its page.
-    pageTasks: [] as BridgePageTask[],
+    // The Node's tasks and their pages. A new task holds the item, so the page becomes its page.
+    pageTasks: [{ id: 't1', title: 'Existing work', branch: null, projectId: 'p1', pages: [] }] as BridgePageTask[],
     steps: [] as BridgeWorkflowStep[],
   }
   const answer = (request: Request): unknown => {
@@ -88,6 +101,7 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
         const task = { id: 't-new', title: 'Fix the flaky test', branch: 'fix', projectId: request.projectId as string }
         state.tasks[request.projectId as string] = [...state.tasks[request.projectId as string]!, task]
         state.pageTasks = [
+          ...state.pageTasks,
           { ...task, pages: [{ origin: 'https://tracker.example', pathPrefix: '/items/42', source: 'tracker' }] },
         ]
         return { nodeId: 'n1', task, created: true }
@@ -185,6 +199,8 @@ const siteAccess = (root: HTMLElement) =>
   [...root.querySelectorAll('[aria-label="Site access"] li')].map(
     (row) => `${row.querySelector('strong')!.textContent}: ${row.querySelector('.quiet')!.textContent}`,
   )
+const openTab = (root: HTMLElement) =>
+  root.querySelector('[role="tablist"][aria-label="Task"] [aria-selected="true"]')?.textContent ?? null
 const captures = (root: HTMLElement) =>
   [...root.querySelectorAll('[data-testid="capture"]')].map((row) => row.textContent)
 
@@ -235,7 +251,7 @@ describe('a handoff in the sidebar', () => {
       url: PAGE,
     })
     expect(root.querySelector('[aria-label="Handoff"]')).toBeNull()
-    expect(root.querySelector('header h1')!.textContent).toBe('Home')
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
     expect(root.querySelector('[aria-label="Page tasks"]')!.textContent).toContain('Fix the flaky test')
     expect(root.querySelector('[aria-label="Waiting context"]')!.textContent).toContain('Fix the flaky test')
     // No conversation was started, and nothing went to an agent.
@@ -275,8 +291,9 @@ describe('a handoff in the sidebar', () => {
       defId: 'review',
       inputs: { issue: 'Fix the flaky test\n\nThe test waits on a timer.' },
     })
-    expect(root.querySelector('header h1')!.textContent).toBe('Workflows')
-    expect(button(root.querySelector('nav')!, 'Workflows')).toBeDefined()
+    expect(shownTask(root)).toBe('Fix the flaky test')
+    expect(taskTabs(root)).toEqual(['Agents', 'Runs'])
+    expect(openTab(root)).toBe('Runs')
     // The kit's own header and rows, as the desktop draws them.
     expect(root.querySelector('.section-header')!.textContent).toBe('Runs1')
     expect(root.querySelector('[aria-label="Runs"] .ui-row[data-selected]')!.textContent).toContain('PR review')
@@ -288,7 +305,9 @@ describe('a handoff in the sidebar', () => {
     await settle(30)
     expect(conversationTitle(root)).toBe('Explain the PR')
     expect(root.querySelector('header .eyebrow')!.textContent).toBe('PR review')
+    // Back from a step's conversation opens Runs.
     await back(root)
+    expect(openTab(root)).toBe('Runs')
     expect(root.querySelector('[aria-label="Steps"]')).not.toBeNull()
   })
 
@@ -315,7 +334,7 @@ describe('a handoff in the sidebar', () => {
     expect(new Set(keys('handoff.create')).size).toBe(1)
     expect(keys('workflow.start')).toHaveLength(2)
     expect(new Set(keys('workflow.start')).size).toBe(1)
-    expect(root.querySelector('header h1')!.textContent).toBe('Workflows')
+    expect(openTab(root)).toBe('Runs')
   })
 
   it('opens the item and its task in Acorn through acorn:// links in a release build', async () => {
@@ -402,7 +421,7 @@ describe('a handoff in the sidebar', () => {
     expect(root.querySelector<HTMLTextAreaElement>('textarea[name="input-focus"]')!.value).toBe('The retry loop')
   })
 
-  it('goes back to Home when the tab moves to a page no task holds, with a conversation waiting under Agents', async () => {
+  it('stays on the task, tab, or conversation it shows when the tab moves to a page no task holds', async () => {
     const { fake, root, state } = mount({ url: PAGE })
     state.pageTasks = [
       {
@@ -415,29 +434,23 @@ describe('a handoff in the sidebar', () => {
     ]
     state.sessions['t-new'] = [session('s2', 't-new')]
     await settle(30)
-    const heading = () => root.querySelector('header h1')!.textContent
-    for (const label of ['Agents', 'Workflows'] as const) {
-      fake.navigate(PAGE)
-      await settle(30)
+    expect(shownTask(root)).toBe('Fix the flaky test')
+    for (const label of ['Agents', 'Runs']) {
       await tab(root, label)
-      // Agents adds its count.
-      expect(heading()).toMatch(new RegExp(`^${label}`))
       fake.navigate('https://elsewhere.example/')
       await settle(30)
-      expect(heading()).toBe('Home')
+      expect(shownTask(root)).toBe('Fix the flaky test')
+      expect(openTab(root)).toBe(label)
+      fake.navigate(PAGE)
+      await settle(30)
     }
-    fake.navigate(PAGE)
-    await settle(30)
     await openChat(root, 'Chat s2')
     fake.navigate('https://elsewhere.example/')
     await settle(30)
-    expect(heading()).toBe('Home')
-    // One click back, to capture the page into it.
-    await tab(root, 'Agents')
     expect(conversationTitle(root)).toBe('Chat s2')
   })
 
-  it('leaves the conversation under Agents open when Home looks up a page', async () => {
+  it('keeps a conversation open on an item no task holds, and Start task goes Home to look it up', async () => {
     const { fake, root, state } = mount({ url: PAGE })
     state.pageTasks = [
       {
@@ -453,9 +466,11 @@ describe('a handoff in the sidebar', () => {
     await openChat(root, 'Chat s2')
     fake.navigate('https://tracker.example/items/43')
     await settle(30)
-    expect(root.querySelector('[aria-label="Handoff"]')).not.toBeNull()
-    await tab(root, 'Agents')
     expect(conversationTitle(root)).toBe('Chat s2')
+    expect(state.requests.filter((request) => request.op === 'handoff.resolve')).toHaveLength(0)
+    button(root.querySelector('.strip')!, 'Start task')!.click()
+    await settle(30)
+    expect(root.querySelector('[aria-label="Handoff"]')!.textContent).toContain('https://tracker.example/items/43')
   })
 
   it('closes the card when the tab moves to a page it may not read', async () => {
@@ -567,97 +582,91 @@ describe('moving between task pages', () => {
     await settle(40)
   }
 
-  it('shows the conversation the person last read in each task as they switch tabs', async () => {
+  it("keeps an open conversation when the tab switches to another task's page, and Switch opens that task", async () => {
     const { fake, root } = twoTasks()
     await settle(30)
-    // The older of t1's conversations, not its newest.
+    expect(shownTask(root)).toBe('Existing work')
     await openChat(root, 'Chat s0')
-    expect(conversationTitle(root)).toBe('Chat s0')
-    // t-new has nothing remembered yet, so the open conversation moves to its newest.
     await switchTo(fake, PAGE)
-    expect(conversationTitle(root)).toBe('Chat s2')
+    expect(conversationTitle(root)).toBe('Chat s0')
+    expect(root.querySelector('.strip')!.textContent).toBe('This page is in Fix the flaky testSwitch')
+    button(root.querySelector('.strip')!, 'Switch')!.click()
+    await settle(30)
+    expect(shownTask(root)).toBe('Fix the flaky test')
+    expect(openTab(root)).toBe('Agents')
+  })
+
+  it('opens the task of the page the tab switches to, on the tab last picked there, from Home too', async () => {
+    const { fake, root } = twoTasks()
+    await settle(30)
+    await switchTo(fake, PAGE)
+    expect(shownTask(root)).toBe('Fix the flaky test')
+    expect(openTab(root)).toBe('Agents')
+    await tab(root, 'Runs')
     await switchTo(fake, ITEM_1)
-    expect(conversationTitle(root)).toBe('Chat s0')
-    // Back to t-new's list, then away and back again: the list comes back, not a conversation.
+    expect(shownTask(root)).toBe('Existing work')
+    expect(openTab(root)).toBe('Agents')
+    await goHome(root)
     await switchTo(fake, PAGE)
+    expect(shownTask(root)).toBe('Fix the flaky test')
+    expect(openTab(root)).toBe('Runs')
+    expect(fake.storage.get('taskViews:n1')).toEqual({ 't-new': { tab: 'runs' } })
+  })
+
+  it('leaves Settings open as the tab switches', async () => {
+    const { fake, root } = twoTasks()
+    await settle(30)
+    await openSettings(root)
+    await switchTo(fake, PAGE)
+    expect(root.querySelector('.view[aria-label="Settings"]')).not.toBeNull()
     await back(root)
-    await switchTo(fake, ITEM_1)
-    expect(conversationTitle(root)).toBe('Chat s0')
-    await switchTo(fake, PAGE)
-    expect(conversationTitle(root)).toBeNull()
-    expect(root.querySelector('.view[aria-label="Agents"]')).not.toBeNull()
-    // Home is the person's choice, and stays put.
-    await tab(root, 'Home')
-    await switchTo(fake, ITEM_1)
-    expect(root.querySelector('header h1')!.textContent).toBe('Home')
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 
-  it("shows the page's task on Agents, not a conversation left open in another task", async () => {
-    const { fake, root } = twoTasks()
-    await settle(30)
-    await openChat(root, 'Chat s0')
-    // Home is the person's choice, so switching tabs leaves t1's conversation open behind it.
-    await tab(root, 'Home')
-    await switchTo(fake, PAGE)
-    expect(root.querySelector('header h1')!.textContent).toBe('Home')
-    await tab(root, 'Agents')
-    expect(conversationTitle(root)).toBe('Chat s2')
-    // The page's own row on Home asks for the same thing.
-    await openChat(root, 'Chat w1')
-    await switchTo(fake, ITEM_1)
-    expect(conversationTitle(root)).toBe('Chat s0')
-    await tab(root, 'Home')
-    await switchTo(fake, PAGE)
-    root.querySelector<HTMLButtonElement>('[aria-label="Page tasks"] .row-button')!.click()
-    await settle(40)
-    expect(conversationTitle(root)).toBe('Chat w1')
-  })
-
-  it.each([
-    ['its own task', ITEM_1, 'Chat s0'],
-    ["another task's", PAGE, null],
-  ])("reopens the last conversation when the panel opens on %s page, or doesn't", async (_name, url, shown) => {
-    const { fake, root } = twoTasks(url)
-    fake.storage.set('destination:n1', { projectId: 'p1', taskId: 't1', sessionId: 's0' })
-    await settle(40)
-    expect(conversationTitle(root)).toBe(shown)
-  })
-
-  it('closes Workflows on moving to a task with no runs, as its tab goes', async () => {
-    const { fake, root } = twoTasks(PAGE)
-    await settle(30)
-    // A conversation left open under Agents doesn't pull the sidebar there.
-    await openChat(root, 'Chat s2')
-    await tab(root, 'Workflows')
-    await switchTo(fake, ITEM_1)
-    expect(root.querySelector('header h1')!.textContent).toBe('Home')
-    expect(button(root.querySelector('nav')!, 'Workflows')).toBeUndefined()
-  })
-
-  it("reopens a workflow step's conversation on coming back to its task", async () => {
+  it("goes up one level with Back: a step's conversation to Runs, any other to Agents, and a task to Home", async () => {
     const { fake, root } = twoTasks()
     await switchTo(fake, PAGE)
-    await tab(root, 'Workflows')
+    await tab(root, 'Runs')
     ;[...root.querySelectorAll<HTMLElement>('[aria-label="Steps"] .ui-row')][0]!.click()
     await settle(30)
     expect(conversationTitle(root)).toBe('Explain the PR')
-    await switchTo(fake, ITEM_1)
-    expect(conversationTitle(root)).toBeNull()
-    await switchTo(fake, PAGE)
-    expect(conversationTitle(root)).toBe('Explain the PR')
+    await back(root)
+    expect(openTab(root)).toBe('Runs')
+    await openChat(root, 'Chat s2')
+    await back(root)
+    expect(shownTask(root)).toBe('Fix the flaky test')
+    expect(openTab(root)).toBe('Agents')
+    await back(root)
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 
-  it('shows where the person was after a page no task holds sent the sidebar Home', async () => {
-    const { fake, root } = twoTasks()
-    await settle(30)
-    await openChat(root, 'Chat s0')
-    fake.navigate('https://elsewhere.example/')
-    await settle(30)
-    expect(root.querySelector('header h1')!.textContent).toBe('Home')
-    expect(fake.storage.get('taskViews:n1')).toMatchObject({ t1: { tab: 'agents', sessionId: 's0' } })
-    // Home was the sidebar's doing, so coming back shows where the person was.
-    fake.navigate(ITEM_1)
+  it.each([
+    ['its own task', ITEM_1, null],
+    ["another task's", PAGE, 'This page is in Fix the flaky testSwitch'],
+  ])('reopens the last conversation when the panel opens on %s page', async (_name, url, strip) => {
+    const { fake, root } = twoTasks(url)
+    fake.storage.set('destination:n1', { projectId: 'p1', taskId: 't1', sessionId: 's0' })
     await settle(40)
     expect(conversationTitle(root)).toBe('Chat s0')
+    expect(root.querySelector('.strip')?.textContent ?? null).toBe(strip)
+  })
+
+  it('gives way to Agents on a task with no Runs tab', async () => {
+    const { fake, root, state } = twoTasks(PAGE)
+    await settle(30)
+    await tab(root, 'Runs')
+    // The Node stops answering for workflows, so no task has a Runs tab.
+    const answer = fake.onNativeMessage
+    fake.onNativeMessage = (raw, host) => {
+      const request = raw as Request
+      if (request.op !== 'workflow.runs') return answer(raw, host)
+      state.requests.push(request)
+      host.send({ v: 1, id: request.id, ok: false, error: { code: 'not_found', message: 'No workflows.' } })
+    }
+    await switchTo(fake, ITEM_1)
+    expect(shownTask(root)).toBe('Existing work')
+    expect(taskTabs(root)).toEqual(['Agents'])
+    await switchTo(fake, PAGE)
+    expect(openTab(root)).toBe('Agents')
   })
 })

@@ -22,13 +22,14 @@ headers where they crowd today.
 ## Starting point
 
 - No palette exists in the sidebar.
-- `apps/extension/src/sidebar/Header.tsx` has the Node chip and its menu: switch, pair, and forget.
+- Phase 1 took the Node chip out of the top bar, `apps/extension/src/sidebar/TopBar.tsx`. Settings →
+  **Nodes** switches with **Use**, pairs, and forgets.
 - Home's task rows in `apps/extension/src/sidebar/Home.tsx` expand to show **Switch to tab**, **Open
   in Acorn**, and **Chat**. `apps/extension/src/sidebar/OpenInAcorn.tsx` draws **Open in Acorn ↗**
   and **Copy Acorn link**. `apps/extension/src/acornLinks.ts` builds the links.
 - `apps/extension/src/sidebar/openTabs.ts` switches to a task's open tab or opens a new one.
-- The bridge reads tasks one project at a time with `tasks.list`. `tasks.pages` reads every task but
-  returns only those with a page address.
+- The bridge reads tasks one project at a time with `tasks.list`. `tasks.pages` returns every active
+  task with its page addresses, which may be none. The sidebar keeps it as the Node's task list.
 - No bridge operation archives a conversation. The agents plugin archives one with
   `PATCH /v1/p/agents/sessions/:id` and `{ archived: true }`.
 

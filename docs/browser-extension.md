@@ -9,8 +9,9 @@ Topic pages:
 - [Native messaging](./browser-extension/native-messaging.md): the frames, every operation and event
   between the background and the native host, and the frame limits.
 - [Set up and troubleshoot](./browser-extension/setup.md): install the bridge and the development
-  builds, pair, repair or remove them, the panel's views and appearance, and what each sidebar state
-  means.
+  builds, pair, repair or remove them, appearance, and what each sidebar state means.
+- [Sidebar navigation](./browser-extension/navigation.md): Home, a task with its tabs, and a
+  conversation, with the top bar, **Back**, and the strip under the bars at each.
 - [Agent conversations](./browser-extension/conversations.md): the agent operations, change hints,
   the conversation window, send retries, and browser storage.
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
@@ -19,9 +20,9 @@ Topic pages:
 - [Handoffs](./browser-extension/handoffs.md): the task chip on websites, the handoff card, the
   panel's verbs and its `acorn://` links, and the operations that resolve a page and create a linked
   task.
-- [Workflows](./browser-extension/workflows.md): starting a workflow, and the Workflows tab.
+- [Workflows](./browser-extension/workflows.md): starting a workflow, and a task's Runs tab.
 - [Plugin panels](./browser-extension/plugin-panels.md): a plugin's read-only view of the sidebar's
-  task, its nav item, and the operation that reads it.
+  task, its tab, and the operation that reads it.
 - [Pages matched to tasks](./browser-extension/task-pages.md): the `tasks.pages` read, the app
   addresses plugins publish, matching the page to its task in the browser, Home's **This page**
   section, and the branch marker on a local app.
@@ -34,9 +35,10 @@ Topic pages:
 
 Three pieces carry a request from the sidebar to a Node:
 
-1. The extension, `apps/extension/`. Its sidebar page (`src/sidebar/`) has three views: Home, about
-   the page beside it and the current task, a conversation that opens over Home, and Settings, behind
-   the gear, for Nodes, pairing, and site access ([the panel's views](./browser-extension/setup.md#the-panels-views)).
+1. The extension, `apps/extension/`. Its sidebar page (`src/sidebar/`) is at one of three levels: Home,
+   about the page beside it and the Node's tasks, one task with its panes as tabs, or one conversation
+   inside a task. Settings, behind the gear, holds Nodes, pairing, and site access
+   ([sidebar navigation](./browser-extension/navigation.md)).
    Its background (`src/background/`) owns the one native port. Chrome runs the
    background as a module service worker and shows the page in its side panel. Firefox runs it as a
    background script and shows the page in its sidebar. `src/browser.ts` types the slice of the

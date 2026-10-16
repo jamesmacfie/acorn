@@ -1,6 +1,59 @@
 # Phase 1: three levels and a top bar that names the task
 
-Date: October 16, 2026. Status: proposed. Depends on nothing. Every later phase depends on it.
+Date: October 16, 2026. Status: done on October 16, 2026. Depends on nothing. Every later phase
+depends on it.
+
+## Completion note
+
+Landed on October 16, 2026. The sidebar is always on Home, one task, or one conversation, with
+Settings beside them. `apps/extension/src/sidebar/location.ts` holds the location, the moves, the tab
+last picked in each task, and the stored destination. `TopBar.tsx` replaces `Header.tsx`. The task's
+tabs are the kit's `Tabs`, the bottom bar and **Current task** are gone, and `agentsTask()` is deleted.
+[Sidebar navigation](../../browser-extension/navigation.md) is a new reference page, because
+`setup.md` went over 200 lines.
+
+Decisions and deviations:
+
+- `App.tsx` creates the location and draws the top bar and the offline strip. `Workspace.tsx` draws
+  the tab strip, the page strips, and each level's body, and reports the top bar's title through
+  `heading`. The Workspace stays mounted under Settings, so Settings no longer reloads it.
+- The panel follows the page when the browser tab moves, and once when the Node's task list first
+  arrives. A later task list moves nothing. Following every list change threw away Home's handoff card
+  while a run was being retried, because the new task made the page its own. So **Create task** leaves
+  the panel on Home, which shows the new task under **This page**.
+- Following waits while a Node's stored location loads, then runs once.
+- `TaskView` is `{ tab }`. The remembered conversation and run per task went, because an open
+  conversation no longer moves with the page. A stored `workflows` tab reads as `runs`.
+- `Destination` keeps its shape, because the right-click menu, the ask box, and Settings read its
+  project. Home and Settings don't overwrite it. A step's conversation is stored as its task.
+- **Runs** shows on every task once `workflow.runs` answers, and hides after it fails. A tab the task
+  turns out not to have gives way to **Agents**.
+- The kit's `TabDef` gained `marker`, an icon with a tone, a spin, and its meaning in words, and
+  `TabDef` is exported from the layout entry.
+- The acorn is the prototype's SVG, inline in `TopBar.tsx`. The kit's `Acorn` is ASCII art.
+- **Go to task**, **Needs you**, and the ⋯ menus are left out. The task's title is plain text.
+- The item strip reads "This page has no task", because the item's key isn't known until a lookup.
+- Home's task row opens the task. A chevron beside it folds out the links that phase 3 removes.
+- The panel goes Home when the Node's task list had the shown task and the next list doesn't. The
+  background sends an empty list before its first read, so a missing task alone proves nothing. A
+  task archived while the panel was closed comes back with an empty title until you press **Back**.
+- Switching Nodes in Settings keeps Settings open. Pairing started there returns there.
+- `pnpm dev:extension:ui click` also matches a button's accessible name, so it can press **Back** and
+  **Settings**.
+- Pairing's done screen says "Switch Nodes in Settings." Phase 11 removes that line.
+
+For later phases:
+
+- Phase 2: make the title in `TopBar.tsx` the **Go to task** button, and add the ⋯ menus there.
+  Switching Nodes lives in Settings under **Use**.
+- Phase 3: remove the links toggle, the button named "<title> links" in `Tasks` in `Home.tsx`.
+- Phase 4: add **Needs you** to `TopBar.tsx` for Home, a task, and a conversation.
+- Phase 5: the item strip and its **Start task** are in `pageStrip` in `Workspace.tsx`.
+- Phase 6: the waiting context shows only under Home's **This page**, not on the **Agents** tab.
+- Phase 8: `runsLive` in `Workflows.tsx` marks the tab. The view's label is `Runs`.
+- Phase 9: draw the pull request's red dot with `TabDef.marker`.
+- Tests: `apps/extension/src/test/sidebarUi.ts` has `goHome`, `openTask`, `tab`, `taskTabs`, and
+  `shownTask`. A fixture's `tasks.pages` must list every task a test opens.
 
 ## Goal
 
@@ -25,7 +78,7 @@ the browser tab only to a page that belongs to a task, and never throws away wha
   `settings`, or `panel:<pluginId>`, and draws the bottom bar from `TABS` with the client's
   `RailTab`. Workflows shows only for a task with runs, and a plugin panel only for a task it has one
   for, so tabs come and go as you browse.
-- `apps/extension/src/sidebar/Header.tsx` draws the top bar: a heading, with an eyebrow and Back for
+- `Header.tsx`, since replaced by `apps/extension/src/sidebar/TopBar.tsx`, drew the top bar: a heading, with an eyebrow and Back for
   an open conversation, and a chip with the selected Node and a menu to switch, pair, and forget.
 - `apps/extension/src/sidebar/Workspace.tsx` owns the state. `agentsTask()` at about line 181 picks
   the subject: the page's task, or the current task when the page is on its project's site. That rule

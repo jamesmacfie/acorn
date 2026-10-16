@@ -5,7 +5,7 @@ import type { BrowserPanelView } from '@acorn/protocol/plugin/handoffs.ts'
 import { taskPaneLink } from '../acornLinks'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
-import { button, pick } from '../test/sidebarUi'
+import { button, goHome, pick, shownTask, tab, taskTabs } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -62,8 +62,7 @@ const view = (source = 'web'): BrowserPanelView => ({
 
 // One Node with a Runn panel. The page belongs to whichever task `state.pageTask` names, and the
 // panel's answer for each task is in `state.views`: a view, null for none, or a failure.
-function mount() {
-  const fake = fakeBrowser()
+function mount(fake = fakeBrowser()) {
   fake.activeTab = { id: 7, windowId: 1, url: PAGE, title: 'App' }
   const state = {
     pageTask: 't1',
@@ -127,15 +126,12 @@ function mount() {
   return { fake, state, root }
 }
 
-const nav = (root: HTMLElement) =>
-  [...root.querySelectorAll('nav button')].map((tab) => tab.getAttribute('aria-label') ?? tab.textContent)
 const panel = (root: HTMLElement) => root.querySelector<HTMLElement>('.view[aria-label="Runn"]')
+const openTab = (root: HTMLElement) =>
+  root.querySelector('[role="tablist"][aria-label="Task"] [aria-selected="true"]')?.textContent ?? null
 const panelReads = (state: ReturnType<typeof mount>['state']) =>
   state.requests.filter((request) => request.op === 'plugin.panel')
-async function openPanel(root: HTMLElement) {
-  button(root.querySelector('nav')!, 'Runn')!.click()
-  await settle(20)
-}
+const openPanel = (root: HTMLElement) => tab(root, 'Runn')
 // The Node says its tasks changed, as it does when a plugin with a panel reports a new state.
 async function tasksChanged(fake: ReturnType<typeof fakeBrowser>) {
   fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'n1' })
@@ -146,18 +142,23 @@ describe('plugin panels', () => {
   it("shows the plugin's tab only for a task it has a panel for", async () => {
     const { fake, state, root } = mount()
     await settle(30)
-    expect(nav(root)).toEqual(['Home', 'Agents', 'Runn', 'Settings'])
+    // The panel opens on the page's task.
+    expect(shownTask(root)).toBe('Task t1')
+    expect(taskTabs(root)).toEqual(['Agents', 'Runs', 'Runn'])
     expect(panelReads(state)).toMatchObject([{ pluginId: 'runn', taskId: 't1' }])
-    state.pageTask = 't2'
-    await tasksChanged(fake)
-    expect(nav(root)).toEqual(['Home', 'Agents', 'Settings'])
+    // t3's page opens t3, which has no Runn panel.
+    fake.navigate('https://other.example/')
+    await settle(30)
+    expect(shownTask(root)).toBe('Task t3')
+    expect(taskTabs(root)).toEqual(['Agents', 'Runs'])
   })
 
   it('draws every block as text, under the plugin name', async () => {
     const { root } = mount()
     await settle(30)
     await openPanel(root)
-    expect(root.querySelector('header h1')!.textContent).toBe('Runn')
+    expect(shownTask(root)).toBe('Task t1')
+    expect(openTab(root)).toBe('Runn')
     const shown = panel(root)!
     expect(shown.querySelector('.state')!.textContent).toBe('Stack running')
     // The detail is the plugin's text, never markup.
@@ -213,47 +214,58 @@ describe('plugin panels', () => {
     expect(panel(root)!.querySelector('[role="alert"]')!.textContent).toContain("can't use")
     expect(panel(root)!.querySelector('.state')!.textContent).toBe('Stack running')
     // The sidebar still works around it.
-    button(root.querySelector('nav')!, 'Home')!.click()
-    await settle(20)
+    await goHome(root)
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 
-  it('goes back to Home when the tab moves to a page no task holds, or to a task with no panel', async () => {
-    const { fake, root } = mount()
-    await settle(30)
-    for (const elsewhere of ['https://elsewhere.example/', 'https://other.example/']) {
-      fake.navigate(PAGE)
-      await settle(30)
-      await openPanel(root)
-      expect(panel(root)).not.toBeNull()
-      fake.navigate(elsewhere)
-      await settle(30)
-      expect(root.querySelector('header h1')!.textContent).toBe('Home')
-      expect(nav(root)).toEqual(['Home', 'Agents', 'Settings'])
-    }
-  })
-
-  it('opens the panel again on coming back to its task', async () => {
-    const { fake, root } = mount()
+  it('stays on the task and tab it shows when the page moves to one no task holds', async () => {
+    const { fake, state, root } = mount()
     await settle(30)
     await openPanel(root)
+    const reads = panelReads(state).length
     fake.navigate('https://elsewhere.example/')
     await settle(30)
-    expect(root.querySelector('header h1')!.textContent).toBe('Home')
-    fake.navigate(PAGE)
-    await settle(30)
-    expect(root.querySelector('header h1')!.textContent).toBe('Runn')
+    expect(shownTask(root)).toBe('Task t1')
+    expect(openTab(root)).toBe('Runn')
     expect(panel(root)!.querySelector('.state')!.textContent).toBe('Stack running')
+    expect(panelReads(state).length).toBe(reads)
   })
 
-  it('stays open on a page of another task that has a panel', async () => {
-    const { fake, state, root } = mount()
+  it('opens a task on the tab last picked there, after the panel closes and opens again too', async () => {
+    const fake = fakeBrowser()
+    const { state, root } = mount(fake)
     state.views.t3 = view('worker')
     await settle(30)
     await openPanel(root)
+    // Another task's page opens that task on Agents, which is where it was last.
     fake.navigate('https://other.example/')
     await settle(30)
-    expect(panelReads(state).at(-1)).toMatchObject({ taskId: 't3' })
-    expect(panel(root)!.querySelectorAll('pre')[1]!.textContent).toBe('worker started\nworker ready')
+    expect(shownTask(root)).toBe('Task t3')
+    expect(openTab(root)).toBe('Agents')
+    fake.navigate(PAGE)
+    await settle(30)
+    expect(shownTask(root)).toBe('Task t1')
+    expect(openTab(root)).toBe('Runn')
+    expect(panel(root)!.querySelector('.state')!.textContent).toBe('Stack running')
+
+    // The panel closes and opens again beside the same page.
+    dispose?.()
+    document.body.innerHTML = ''
+    const reopened = mount(fake)
+    await settle(30)
+    expect(shownTask(reopened.root)).toBe('Task t1')
+    expect(openTab(reopened.root)).toBe('Runn')
+    expect(panel(reopened.root)!.querySelector('.state')!.textContent).toBe('Stack running')
+  })
+
+  it("gives way to Agents when the task's panel goes", async () => {
+    const { fake, state, root } = mount()
+    await settle(30)
+    await openPanel(root)
+    state.views.t1 = null
+    await tasksChanged(fake)
+    expect(shownTask(root)).toBe('Task t1')
+    expect(openTab(root)).toBe('Agents')
+    expect(taskTabs(root)).toEqual(['Agents', 'Runs'])
   })
 })

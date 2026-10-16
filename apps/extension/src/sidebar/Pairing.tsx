@@ -84,7 +84,7 @@ export function Pairing(props: {
             <>
               <section aria-label="Paired">
                 <strong>Paired with {current.node.label}</strong>
-                <p class="quiet">Switch Nodes from the chip at the top.</p>
+                <p class="quiet">Switch Nodes in Settings.</p>
               </section>
               {/* Both optional: the same controls Settings has, so either can wait until later. */}
               <SiteAccess

@@ -20,12 +20,12 @@ This page covers each way in, what the agent receives, and which pages the exten
 
 1. Select text on the page, right-click it, and choose **Add to Acorn chat**.
 
-   The panel opens on the current task's conversation, the one you last had open, or its newest, with
+   The panel opens on the conversation you last had open, or the newest in the task you last opened, with
    the text in the draft as a **Selected text** chip.
 
 2. Add a message if you like, and click **Send**.
 
-If there's nowhere for the text to go, such as no task chosen yet, or a task with no conversation, the
+If there's nowhere for the text to go, such as no task opened yet, or a task with no conversation, the
 panel opens and says so in one line, and adds nothing.
 
 ## Add the page's link

@@ -1,6 +1,6 @@
 import { settle } from './fakeBrowser'
 
-// Steps through the panel's views the way a person does, for the sidebar tests.
+// Steps through the panel's levels the way a person does, for the sidebar tests.
 
 // A button by its words or, for an icon button, its accessible name.
 export const button = (root: ParentNode, name: string) =>
@@ -18,61 +18,87 @@ export async function pick(root: ParentNode, name: string, value: string) {
   await settle(20)
 }
 
-// Switches views from the bottom bar: Home, Agents, Workflows, or Settings.
-export async function tab(root: ParentNode, label: 'Home' | 'Agents' | 'Workflows' | 'Settings') {
-  button(root.querySelector('nav')!, label)!.click()
+const header = (root: ParentNode) => root.querySelector('header')!
+
+async function click(element: HTMLElement | undefined, what: string) {
+  if (!element) throw new Error(`No ${what} on screen.`)
+  element.click()
   await settle(20)
 }
 
-export const openSettings = (root: ParentNode) => tab(root, 'Settings')
+// Up one level: from a conversation to its task, or from a task or Settings to Home.
+export const back = (root: ParentNode) => click(button(header(root), 'Back'), 'Back button')
 
-// Back from a conversation to the Agents list, or from Settings to Home.
-export async function back(root: ParentNode) {
-  const fromConversation = button(root.querySelector('header')!, 'Back')
-  if (!fromConversation) return tab(root, 'Home')
-  fromConversation.click()
-  await settle(20)
+// Home, from any level.
+export async function goHome(root: ParentNode) {
+  while (button(header(root), 'Back')) await back(root)
 }
 
-// Switches Nodes from the Node chip's menu.
+// Settings, from the gear on Home.
+export async function openSettings(root: ParentNode) {
+  await goHome(root)
+  await click(button(header(root), 'Settings'), 'Settings button')
+}
+
+// Picks a tab under the open task: Agents, Runs, or a plugin's panel.
+export const tab = (root: ParentNode, label: string) =>
+  click(button(root.querySelector('[role="tablist"][aria-label="Task"]') ?? root, label), `${label} tab`)
+
+// The tabs under the open task, by label.
+export const taskTabs = (root: ParentNode) =>
+  [...root.querySelectorAll('[role="tablist"][aria-label="Task"] [role="tab"]')].map((tab) => tab.textContent)
+
+// Switches Nodes from Settings, then goes back Home.
 export async function useNode(root: ParentNode, label: string) {
-  button(root.querySelector('header .menu-items')!, label)!.click()
-  await settle(20)
-}
-
-// Makes a task current from the project's list on This page.
-export async function useTask(root: ParentNode, title: string) {
-  const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="This page"] [aria-label="Tasks"] button')]
-  rows.find((row) => row.querySelector('strong')?.textContent === title)!.click()
-  await settle(20)
-}
-
-// Makes a task current the way a remembered one comes back: Home reads the stored choice again as
-// Settings closes. A page that matches nothing offers no way to choose a task.
-export async function rememberTask(root: ParentNode, storage: Map<string, unknown>, projectId: string, taskId: string) {
-  storage.set('destination:n1', { projectId, taskId, sessionId: null })
   await openSettings(root)
+  const row = [...root.querySelectorAll('[aria-label="Nodes"] li')].find(
+    (item) => item.querySelector('strong')?.textContent === label,
+  )
+  await click(row && button(row, 'Use'), `Use button for ${label}`)
   await back(root)
 }
 
-// Opens a conversation from Agents, going back to the list first when one is open.
-export async function openChat(root: ParentNode, title: string) {
-  if (root.querySelector('[aria-label="Conversation"]')) await back(root)
-  else await tab(root, 'Agents')
-  const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Agents"] .row-button')]
-  rows.find((row) => row.querySelector('strong')?.textContent === title)!.click()
-  await settle(20)
+// Opens a task from Home's task list.
+export async function openTask(root: ParentNode, title: string) {
+  await goHome(root)
+  const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Home"] [aria-label="Tasks"] .row-button')]
+  await click(
+    rows.find((row) => row.querySelector('strong')?.textContent === title),
+    `task row ${title}`,
+  )
 }
 
-// The current task and conversation, as the panel names them.
+// Opens a task from the project's list on This page.
+export async function openSiteTask(root: ParentNode, title: string) {
+  const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="This page"] [aria-label="Tasks"] button')]
+  await click(
+    rows.find((row) => row.querySelector('strong')?.textContent === title),
+    `This page task row ${title}`,
+  )
+}
+
+// Opens a conversation from the open task's Agents tab, going back to it first when one is open.
+export async function openChat(root: ParentNode, title: string) {
+  if (root.querySelector('[aria-label="Conversation"]')) await back(root)
+  if (!root.querySelector('[aria-label="Agents"]')) await tab(root, 'Agents')
+  const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Agents"] .row-button')]
+  await click(
+    rows.find((row) => row.querySelector('strong')?.textContent === title),
+    `conversation row ${title}`,
+  )
+}
+
 // Home on a page that matches nothing: the task list without This page.
 export const idle = (root: ParentNode) =>
   root.querySelector('[aria-label="Home"] [aria-label="Tasks"]') !== null &&
   root.querySelector('[aria-label="This page"]') === null
-export const currentTask = (root: ParentNode) =>
-  root.querySelector('[aria-label="Current task"] strong')?.textContent ?? null
+// The task the top bar names, with its tabs under it.
+export const shownTask = (root: ParentNode) =>
+  root.querySelector('[role="tablist"][aria-label="Task"]')
+    ? (header(root).querySelector('.heading .title')?.textContent ?? null)
+    : null
 // An open conversation's title, as the top bar names it.
 export const conversationTitle = (root: ParentNode) =>
   root.querySelector('[aria-label="Conversation"]')
-    ? (root.querySelector('header .heading[data-eyebrow] h1')?.textContent ?? null)
+    ? (header(root).querySelector('.heading .title')?.textContent ?? null)
     : null

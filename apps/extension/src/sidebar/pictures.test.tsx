@@ -13,7 +13,7 @@ import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
 import { PROVIDER_MARKS } from '@acorn/plugin-agents/contract/providerMarks.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
-import { button, openChat } from '../test/sidebarUi'
+import { button, goHome, openChat, tab } from '../test/sidebarUi'
 import { App } from './App'
 
 // The sidebar pictures on the public site's browser extension pages (docs/site/specimens.md). Each scene
@@ -292,6 +292,8 @@ describe('the sidebar pictures on the site', () => {
       waiting: true,
     })
     await settle(40)
+    // The panel opens on the page's task; Back shows Home.
+    await goHome(root)
     expect(root.querySelector('[aria-label="This page"]')?.textContent).toContain('Retry failed webhooks')
     expect(root.textContent).toContain('Waiting for you')
     picture('sidebar-home', root)
@@ -327,8 +329,7 @@ describe('the sidebar pictures on the site', () => {
   it("a plugin's panel for the page's task", async () => {
     const { root } = mount({ url: `${ACME_APP}/`, title: 'Acme', paired: true, panel: true })
     await settle(40)
-    button(root.querySelector('nav')!, 'Acme app')!.click()
-    await settle(20)
+    await tab(root, 'Acme app')
     expect(root.querySelector('.view[aria-label="Acme app"] .state')?.textContent).toBe('Acme app running')
     picture('sidebar-plugin-panel', root)
   })

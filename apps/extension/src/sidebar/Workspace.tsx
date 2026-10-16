@@ -1,4 +1,4 @@
-import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
+import { Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
 import type { ProjectSite } from '@acorn/protocol/siteAssociations.ts'
 import type {
   BridgeAgentHint,
@@ -14,42 +14,32 @@ import type {
   BridgeWorkspace,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserPanelView } from '@acorn/protocol/plugin/handoffs.ts'
-import type { AgentRailState } from '@acorn/plugin-agents/contract/runtimeState.ts'
+import { Tabs, type TabDef } from '@acorn/client-core/kit/components/layout'
+import { agentRailMarkers } from '@acorn/plugin-agents/contract/runtimeState.ts'
 import type { BrowserApi } from '../browser'
 import { pageHandoffs, type PageHandoff } from '../handoffs'
-import { CallFailure, type RequestTarget } from '../messages'
+import { CallFailure } from '../messages'
 import { loadSiteChoices, pageScope, saveSiteChoices, type SiteChoices } from '../pageScope'
 import { agentCounts, type PageTask } from '../taskPages'
 import type { BridgeClient } from './bridgeClient'
 import { CaptureFailure, withCapture, type PageCapture } from '../capture'
 import { Conversation } from './Conversation'
-import type { Heading } from './Header'
 import { errorGuidance } from './guidance'
-import { Agents, CurrentTask, Tasks, ThisPage } from './Home'
-import {
-  changeDraft,
-  loadDestination,
-  loadHomeWorkspace,
-  loadTaskViews,
-  rememberTaskView,
-  saveDestination,
-  saveHomeWorkspace,
-  saveTaskViews,
-  type Destination,
-  type TaskView,
-} from '../localState'
+import { Agents, Tasks, ThisPage } from './Home'
+import { changeDraft, loadHomeWorkspace, saveHomeWorkspace, type TaskTab } from '../localState'
+import { locationTask, type Navigation } from './location'
 import { PluginPanel } from './PluginPanel'
+import type { Heading } from './TopBar'
 import { Waiting } from './Waiting'
-import { Workflows } from './Workflows'
+import { Workflows, runsLive } from './Workflows'
 
-// The work on one Node: the current task, the page beside the panel, and the conversations and
-// workflow runs of the page's task, or of the current task on its project's site. Home shows the page,
-// the current task, and one workspace's tasks; Agents lists the conversations, and Workflows the runs
-// and their steps. Opening a conversation makes its task current, shows Agents, and replaces the list
-// until the person goes back. The parent mounts one
-// per selected Node, and again each time Settings closes, so it restores the current task from
-// storage. Each list read checks on its return that the choice it was made for is still the choice,
-// so a slow reply can't fill the wrong list.
+// The tab glyph of a plugin panel that names none.
+const PANEL_GLYPH = 'puzzle'
+
+// The work on one Node, under the top bar: Home, or the task the location names with its tabs, or one
+// of its conversations. The parent mounts one per selected Node. Each list is keyed by its task, so a
+// slow reply fills only its own list, and anything that awaits checks on its return that the location
+// is still the one it started from.
 export function Workspace(props: {
   client: BridgeClient
   api: BrowserApi
@@ -60,39 +50,23 @@ export function Workspace(props: {
   hint: BridgeAgentHint | null
   reconnects: number
   projectChanges: number
-  // The bottom bar's tab, asking for Agents when a conversation opens or Workflows when a run starts,
-  // or for any tab as the page moves, whether there are runs to show there, and the two tabs' top bar
-  // heading. A plugin panel's tab is `panel:<pluginId>`.
-  tab: 'home' | TaskView['tab']
-  showAgents(): void
-  showWorkflows(): void
-  showTab(tab: 'home' | TaskView['tab']): void
-  // Counts the person's picks in the bottom bar.
-  tabPicks: number
-  hasWorkflows(has: boolean): void
-  // The Node's plugin panels, and which plugins have one for the task Agents shows.
-  panels: readonly BridgePanel[]
-  panelsShown(pluginIds: string[]): void
-  // How many of the task's agents are working, and how many need the person, for the Agents tab.
-  agentState(state: AgentRailState): void
-  // The remembered conversation came back as the panel opened.
-  resumed(): void
+  // Where the sidebar is, and what the top bar names under a task or in a conversation.
+  nav: Navigation
   heading(heading: Heading | null): void
+  // The Node's plugin panels, null until it answers.
+  panels: readonly BridgePanel[] | null
   // The page beside the panel, when it may be read, with the handoffs and site associations it is
   // matched against here in the browser.
   pageUrl: string | undefined
   handoffs: readonly BridgeHandoff[]
   sites: readonly ProjectSite[]
-  // Every active task on the Node with its links, the tasks the page belongs to, matched in the
-  // browser, and a task chip's click asking to show the page's task, with a new chat about the page
-  // for `chat`.
-  tasks: readonly BridgePageTask[]
+  // Every active task on the Node with its links, null until the background sends them, and the tasks
+  // the page belongs to, matched in the browser.
+  tasks: readonly BridgePageTask[] | null
   pageTasks: readonly PageTask[]
   // Whether the person hid the branch marker on an origin, and showing it there again.
   markerHidden(origin: string): boolean
   showMarker(origin: string): void
-  showTask: { chat: { url: string; title: string } | null } | null
-  shownTask(): void
   // A handoff the person asked for, from a task chip or This page's offer.
   handoff: PageHandoff | null
   startHandoff(handoff: PageHandoff): void
@@ -101,55 +75,56 @@ export function Workspace(props: {
   // conversation's draft for review, never straight to an agent.
   waitingContext: PageCapture | null
   setWaitingContext(capture: PageCapture | null): void
-  // Every request the Node's agents are waiting on, and one whose conversation the person asked to
-  // open from an OS notification.
+  // Every request the Node's agents are waiting on.
   requests: readonly BridgePendingRequest[]
-  openRequest: RequestTarget | null
-  openedRequest(): void
 }) {
   const nodeId = props.nodeId
+  const nav = props.nav
+  const location = nav.location
   const [projects, setProjects] = createSignal<BridgeProject[] | null>(null)
   const [workspaces, setWorkspaces] = createSignal<BridgeWorkspace[] | null>(null)
   // The workspace the person chose for Home's task list, if any.
   const [workspaceChoice, setWorkspaceChoice] = createSignal<string | null>(null)
+  // The open tasks of each project This page has shown.
   const [taskLists, setTaskLists] = createSignal<Record<string, BridgeTask[]>>({})
-  const [current, setCurrent] = createSignal<Destination>({ projectId: null, taskId: null, sessionId: null })
-  // Each task's conversations, as last read. Keyed by task, so a slow reply fills only its own list.
+  // Each task's conversations and workflow runs, as last read.
   const [sessionLists, setSessionLists] = createSignal<Record<string, BridgeAgentSession[]>>({})
-  // Each task's workflow runs, as last read, the run Workflows shows in a task, and the step whose
-  // conversation is open there. The last two name their task, so they only show while it's shown.
   const [runLists, setRunLists] = createSignal<Record<string, BridgeWorkflowRun[]>>({})
+  // Whether the Node runs the workflows plugin, which a failed runs read says it doesn't. Unknown until
+  // the first read answers.
+  const [runsAvailable, setRunsAvailable] = createSignal<boolean | null>(null)
+  // The run Runs shows in a task, and the step whose conversation is open. Each names its task.
   const [selectedRun, setSelectedRun] = createSignal<{ taskId: string; runId: string } | null>(null)
   const [openStep, setOpenStep] = createSignal<{
     taskId: string
     run: BridgeWorkflowRun
     step: BridgeWorkflowStep
   } | null>(null)
-  // The project This page shows, apart from the current task's.
+  // The project This page shows for a page on a project's site.
   const [pageProject, setPageProject] = createSignal<string | null>(null)
   const [siteChoices, setSiteChoices] = createSignal<SiteChoices>({})
-  // Each plugin's panel for the task Agents shows, by plugin: null when it has none for the task. Why
-  // the last read of a panel failed, and the log source the person picked in each.
+  // Each plugin's panel for the task, by plugin: null when it has none for the task. Why the last read
+  // of a panel failed, and the log source the person picked in each.
   const [panelViews, setPanelViews] = createSignal<Record<string, BrowserPanelView | null>>({})
   const [panelProblems, setPanelProblems] = createSignal<Record<string, string>>({})
   const [panelSources, setPanelSources] = createSignal<Record<string, string>>({})
   const [problem, setProblem] = createSignal<string | null>(null)
-  // Counts the tasks made current, so a restore whose task list answers late can't undo a later choice.
-  let chosen = 0
-  // What the sidebar last showed for each task, and whether it went to Home by itself because the page
-  // moved, rather than the person choosing Home.
-  let taskViews: Record<string, TaskView> = {}
-  let wentHome = false
-  // A task the page moved to while Workflows was open, whose runs, once read, say whether it stays.
-  let runsCheck: string | null = null
+
+  // The task the location shows. A memo, so a move within the task reads nothing again.
+  const taskId = createMemo(() => locationTask(location()))
+  const tab = (): TaskTab | null => {
+    const here = location()
+    return here.level === 'task' ? here.tab : null
+  }
+  const task = () => props.tasks?.find((row) => row.id === taskId()) ?? null
+  const pageTask = () => props.pageTasks[0] ?? null
+  const projectName = (id: string) => projects()?.find((row) => row.id === id)?.name ?? id
 
   const report = (error: unknown) => {
     // A reply refused because the Node changed under it is expected, and a missing bridge has its banner.
     if (error instanceof CallFailure && (error.code === 'not_selected' || error.code === 'host_unavailable')) return
     setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
   }
-  // Only the person's own choices are remembered, so a restore that stops part-way loses nothing.
-  const remember = () => void saveDestination(props.api.storage.local, nodeId, current())
 
   const loadProjects = async () => {
     setProblem(null)
@@ -164,49 +139,36 @@ export function Workspace(props: {
     }
   }
 
-  const loadTasks = async (projectId: string): Promise<BridgeTask[] | null> => {
+  const loadTasks = async (projectId: string) => {
     try {
       const result = await props.client.call({ op: 'tasks.list', nodeId, projectId })
       setTaskLists((lists) => ({ ...lists, [projectId]: result.tasks }))
-      return result.tasks
     } catch (error) {
       report(error)
+    }
+  }
+
+  // Reads a task's conversations, and returns them, or null when the read failed.
+  const loadSessions = async (forTask: string): Promise<BridgeAgentSession[] | null> => {
+    try {
+      const result = await props.client.call({ op: 'sessions.list', nodeId, taskId: forTask })
+      setSessionLists((lists) => ({ ...lists, [forTask]: result.sessions }))
+      return result.sessions
+    } catch (error) {
+      if (taskId() === forTask) report(error)
       return null
     }
   }
 
-  // The task Home's Agents shows: the page's, or the current task on its project's site. A page tied
-  // to neither shows no task's conversations.
-  const pageTask = () => props.pageTasks[0] ?? null
-  const agentsTask = (): { projectId: string | null; taskId: string | null } => {
-    const page = pageTask()
-    if (page) return { projectId: page.task.projectId, taskId: page.task.id }
-    const { projectId } = current()
-    return projectId && pageProjects().includes(projectId) ? current() : { projectId: null, taskId: null }
-  }
-
-  // Reads a task's conversations, then hands them to `then` if the task is still current.
-  const loadSessions = async (forTask: string, then?: (list: BridgeAgentSession[]) => void) => {
-    try {
-      const result = await props.client.call({ op: 'sessions.list', nodeId, taskId: forTask })
-      setSessionLists((lists) => ({ ...lists, [forTask]: result.sessions }))
-      if (current().taskId === forTask) then?.(result.sessions)
-    } catch (error) {
-      if (current().taskId === forTask || agentsTask().taskId === forTask) report(error)
-    }
-  }
-
-  // A Node without the workflows plugin answers with a failure, which leaves Workflows hidden.
+  // A Node without the workflows plugin answers with a failure, which leaves Runs out of the tabs.
   const loadRuns = async (forTask: string) => {
     try {
       const result = await props.client.call({ op: 'workflow.runs', nodeId, taskId: forTask })
       setRunLists((lists) => ({ ...lists, [forTask]: result.runs }))
-      if (runsCheck === forTask) {
-        runsCheck = null
-        if (!result.runs.length) leaveEmptyWorkflows(forTask)
-      }
-    } catch {
-      // Without the runs there is no Workflows tab; everything else still works.
+      setRunsAvailable(true)
+    } catch (error) {
+      if (error instanceof CallFailure && (error.code === 'not_selected' || error.code === 'host_unavailable')) return
+      setRunsAvailable(false)
     }
   }
 
@@ -221,49 +183,27 @@ export function Workspace(props: {
         taskId: forTask,
         ...(source ? { source } : {}),
       })
-      if (agentsTask().taskId !== forTask) return
+      if (taskId() !== forTask) return
       setPanelViews((views) => ({ ...views, [pluginId]: result.view }))
       setPanelProblems(({ [pluginId]: _cleared, ...rest }) => rest)
-      // An open panel the task doesn't have closes, and its tab with it.
-      if (result.view === null && openPanel() === pluginId) goHome()
     } catch (error) {
-      if (agentsTask().taskId !== forTask) return
+      if (taskId() !== forTask) return
       if (error instanceof CallFailure && (error.code === 'not_selected' || error.code === 'host_unavailable')) return
       const message = error instanceof CallFailure ? errorGuidance(error) : String(error)
       setPanelProblems((problems) => ({ ...problems, [pluginId]: message }))
     }
   }
-  const openPanel = () => (props.tab.startsWith('panel:') ? props.tab.slice('panel:'.length) : null)
+  const openPanel = () => tab()?.match(/^panel:(.+)$/)?.[1] ?? null
   const reloadOpenPanel = () => {
     const pluginId = openPanel()
-    const { taskId } = agentsTask()
-    if (pluginId && taskId) void loadPanel(pluginId, taskId)
+    const forTask = taskId()
+    if (pluginId && forTask) void loadPanel(pluginId, forTask)
   }
 
-  // Every change of task closes the conversation in the same write, so a conversation is never
-  // mounted with a task it doesn't belong to.
-  function useTask(projectId: string, taskId: string, then?: (list: BridgeAgentSession[]) => void) {
-    chosen++
-    setCurrent({ projectId, taskId, sessionId: null })
-    void loadSessions(taskId, then)
-  }
-
-  // A task named by storage, a request, or a handoff becomes current once its project's fresh list
-  // shows it is still open. A task the person chose since wins.
-  async function restore(projectId: string, taskId: string, then?: (list: BridgeAgentSession[]) => void) {
-    const mine = ++chosen
-    const tasks = await loadTasks(projectId)
-    if (mine === chosen && tasks?.some((task) => task.id === taskId)) useTask(projectId, taskId, then)
-  }
-
-  const showSession = (id: string) => setCurrent((destination) => ({ ...destination, sessionId: id }))
-
-  // The person opened a conversation, which makes its task current. Waiting context joins its stored
-  // draft first, through the same helper a send that finished elsewhere uses, so the composer finds it
-  // when it mounts.
-  async function openSession(target: { projectId: string; taskId: string }, id: string) {
-    const forTask = target.taskId
-    const mine = chosen
+  // The person opened a conversation. Waiting context joins its stored draft first, through the same
+  // helper a send that finished elsewhere uses, so the composer finds it when it mounts.
+  async function openSession(forTask: string, id: string) {
+    const started = location()
     const capture = props.waitingContext
     if (capture) {
       try {
@@ -282,260 +222,181 @@ export function Workspace(props: {
         )
       }
     }
-    // Another task was chosen meanwhile.
-    if (mine !== chosen) return
-    if (current().taskId !== forTask) {
-      chosen++
-      void loadTasks(target.projectId)
-    }
-    setCurrent({ projectId: target.projectId, taskId: forTask, sessionId: id })
-    props.showAgents()
-    remember()
+    if (location() === started) nav.openConversation(forTask, id)
   }
 
-  const pickTask = (projectId: string, taskId: string) => {
-    useTask(projectId, taskId)
-    remember()
+  // A task's newest conversation opens, or its Agents tab with the new-chat picker when it has none.
+  const chatInTask = async (forTask: string) => {
+    nav.openTask(forTask, 'agents')
+    const opened = location()
+    const newest = (await loadSessions(forTask))?.[0]
+    if (newest && location() === opened) void openSession(forTask, newest.id)
   }
-
-  const back = () => {
-    setCurrent((destination) => ({ ...destination, sessionId: null }))
-    remember()
-  }
-
-  // A task's newest conversation opens, or Agents with its new-chat picker when it has none.
-  const chatInTask = (projectId: string, taskId: string) =>
-    void restore(projectId, taskId, (list) => {
-      remember()
-      const newest = list[0]
-      if (newest) void openSession({ projectId, taskId }, newest.id)
-      else props.showAgents()
-    })
 
   // A handoff's linked or new task, with the item's context waiting for the conversation.
-  const openHandoffTask = (projectId: string, taskId: string, capture: PageCapture) => {
+  const openHandoffTask = (_projectId: string, forTask: string, capture: PageCapture) => {
     props.setWaitingContext(capture)
     props.dismissHandoff()
-    chatInTask(projectId, taskId)
+    void chatInTask(forTask)
   }
 
-  // Create task made the item's task. It becomes current, and Home shows it, with the item's context
-  // waiting for the first conversation the person opens.
-  const createdHandoffTask = (projectId: string, taskId: string, capture: PageCapture) => {
+  // Create task made the item's task, which This page shows once the task list catches up, with the
+  // item's context waiting for the first conversation the person opens.
+  const createdHandoffTask = (_projectId: string, _taskId: string, capture: PageCapture) => {
     props.setWaitingContext(capture)
     props.dismissHandoff()
-    void restore(projectId, taskId, () => remember())
   }
 
-  // Start workflow made the item's task and started a run in it, which Workflows shows.
-  const startedHandoffWorkflow = (projectId: string, taskId: string, runId: string) => {
+  // Start workflow made the item's task and started a run in it, which Runs shows.
+  const startedHandoffWorkflow = (_projectId: string, forTask: string, runId: string) => {
     props.dismissHandoff()
-    setSelectedRun({ taskId, runId })
-    void loadRuns(taskId)
-    props.showWorkflows()
-    void restore(projectId, taskId, () => remember())
+    setSelectedRun({ taskId: forTask, runId })
+    nav.openTask(forTask, 'runs')
   }
 
-  // Opens a request's conversation, as a remembered one is restored.
-  const openConversation = (target: Destination & { projectId: string; taskId: string }) => {
-    void saveDestination(props.api.storage.local, nodeId, target)
-    void restore(target.projectId, target.taskId, (list) => {
-      if (list.some((session) => session.id === target.sessionId)) showSession(target.sessionId!)
-      props.showAgents()
-    })
-  }
+  // The task changed: read its conversations and runs.
   createEffect(
-    on([() => props.openRequest, projects], ([target, loaded]) => {
-      if (!target || !loaded) return
-      props.openedRequest()
-      if (target.nodeId === nodeId) openConversation(target)
+    on(taskId, (id) => {
+      if (!id) return
+      void loadSessions(id)
+      void loadRuns(id)
     }),
   )
-
-  // A task chip was clicked: Home shows the page's task, and for New chat about this page, Agents with
-  // the page's link waiting for the conversation the person starts or opens next.
+  // The task, or the Node's panels, changed: read every panel, which also says which tabs show. A
+  // plugin answering no panel for the task has no tab.
   createEffect(
-    on(
-      () => props.showTask,
-      (request) => {
-        if (!request) return
-        props.shownTask()
-        if (current().sessionId) back()
-        if (!request.chat) return
-        const { url, title } = request.chat
-        props.setWaitingContext({ kind: 'link', id: crypto.randomUUID(), url, title, capturedAt: Date.now() })
-      },
-    ),
-  )
-  // The page's task changed: read its conversations.
-  createEffect(
-    on(
-      () => pageTask()?.task.id,
-      (taskId) => taskId && void loadSessions(taskId),
-    ),
-  )
-  // The task Agents and Workflows show changed: read its runs, and say whether it has any.
-  createEffect(
-    on(
-      () => agentsTask().taskId,
-      (taskId) => taskId && void loadRuns(taskId),
-    ),
-  )
-  createEffect(() => props.hasWorkflows(!!runLists()[agentsTask().taskId ?? '']?.length))
-  onCleanup(() => props.hasWorkflows(false))
-  // The task Agents shows, or the Node's panels, changed: read every panel, which also says which
-  // tabs show. A plugin answering no panel for the task has no tab. A memo, so a new task list that
-  // leaves the task as it was reads nothing.
-  const panelTask = createMemo(() => agentsTask().taskId)
-  createEffect(
-    on([panelTask, () => props.panels], ([taskId, panels]) => {
+    on([taskId, () => props.panels], ([id, panels]) => {
       setPanelViews({})
       setPanelProblems({})
-      if (taskId) for (const panel of panels) void loadPanel(panel.pluginId, taskId)
+      if (id) for (const panel of panels ?? []) void loadPanel(panel.pluginId, id)
     }),
   )
-  createEffect(() => props.panelsShown(Object.keys(panelViews()).filter((pluginId) => panelViews()[pluginId] !== null)))
-  onCleanup(() => props.panelsShown([]))
-  createEffect(() => {
-    const taskId = agentsTask().taskId
-    const { waiting, working } = taskId
-      ? agentCounts(taskId, sessionLists()[taskId], props.requests)
-      : { waiting: 0, working: 0 }
-    props.agentState({ working, attention: waiting })
-  })
-  onCleanup(() => props.agentState({ working: 0, attention: 0 }))
   // An open panel reads again when the Node's tasks change, which includes a plugin reporting a change.
   createEffect(on(() => props.tasks, reloadOpenPanel, { defer: true }))
+
+  // A tab the task turns out not to have gives way to Agents: Runs on a Node without workflows, or a
+  // panel whose plugin stopped or answers none for the task.
+  createEffect(() => {
+    const here = location()
+    if (here.level !== 'task' || here.tab === 'agents') return
+    const pluginId = openPanel()
+    const missing =
+      here.tab === 'runs'
+        ? runsAvailable() === false
+        : (props.panels !== null && !props.panels.some((panel) => panel.pluginId === pluginId)) ||
+          panelViews()[pluginId!] === null
+    if (missing) nav.openTask(here.taskId, 'agents')
+  })
+
+  // The task was archived or deleted: the Node's list had it, and the next one doesn't. A list without
+  // a task it never had says nothing, because the background sends an empty list before its first read.
+  createEffect(
+    on(
+      () => props.tasks,
+      (tasks, previous) => {
+        const id = taskId()
+        if (id && tasks && previous?.some((row) => row.id === id) && !tasks.some((row) => row.id === id)) nav.goHome()
+      },
+    ),
+  )
+
+  // The open conversation's row in its task's list, kept when a later read drops it, so the
+  // conversation stays to say it's gone and keep its draft. And the open step, for a step's conversation.
+  const session = createMemo<BridgeAgentSession | null>((last) => {
+    const here = location()
+    if (here.level !== 'conversation' || here.from !== 'agents') return null
+    const row = sessionLists()[here.taskId]?.find((candidate) => candidate.id === here.sessionId)
+    return row ?? (last?.id === here.sessionId ? last : null)
+  }, null)
   const step = () => {
+    const here = location()
     const open = openStep()
-    return open && open.taskId === agentsTask().taskId ? open : null
+    if (here.level !== 'conversation' || here.from !== 'runs' || !open) return null
+    return open.taskId === here.taskId && open.step.session?.id === here.sessionId ? open : null
   }
-  const goHome = () => {
-    wentHome = true
-    props.showTab('home')
-  }
-  // Workflows for a task with no runs has no tab, so after a page move it closes, as a plugin panel the
-  // task doesn't have does.
-  const leaveEmptyWorkflows = (taskId: string) => {
-    if (props.tab === 'workflows' && agentsTask().taskId === taskId) goHome()
-  }
+  // A conversation the list doesn't have yet, such as one a notification asked for, reads the list
+  // again. One the fresh list doesn't have either gives way to its task's Agents.
   createEffect(
     on(
-      () => props.tab,
-      (tab) => tab !== 'home' && (wentHome = false),
-      { defer: true },
-    ),
-  )
-
-  // Agents for the page's task, as the bottom bar and the page's own task rows ask for it. A
-  // conversation left open in another task gives way to what the sidebar last showed in the page's
-  // task, or that task's newest conversation. One the person opened from another task's row stays
-  // until they ask for Agents this way.
-  const showPageAgents = () => {
-    props.showAgents()
-    const task = pageTask()?.task
-    if (!task || !current().sessionId || current().taskId === task.id) return
-    const view = taskViews[task.id]
-    if (view?.tab === 'agents') showView(task, view)
-    else chatInTask(task.projectId, task.id)
-  }
-  // A pick is the person's choice, so the sidebar no longer counts as having gone Home by itself.
-  createEffect(
-    on(
-      () => props.tabPicks,
       () => {
-        wentHome = false
-        if (props.tab === 'agents') showPageAgents()
+        const here = location()
+        return here.level === 'conversation' && here.from === 'agents' ? here.sessionId : null
       },
-      { defer: true },
+      async (sessionId) => {
+        const here = location()
+        if (!sessionId || here.level !== 'conversation' || session()) return
+        const list = await loadSessions(here.taskId)
+        if (list && location() === here && !list.some((row) => row.id === sessionId))
+          nav.openTask(here.taskId, 'agents')
+      },
     ),
   )
 
-  const keepView = (taskId: string) => {
-    const tab = props.tab
-    // A conversation open in another task shows nothing of this one.
-    if (tab === 'home' || (tab === 'agents' && current().sessionId && current().taskId !== taskId)) return
-    // An open step needs nothing kept here. It stays open for its task until a step opens in another.
-    const open = openStep()?.taskId === taskId ? openStep() : null
-    const run = selectedRun()?.taskId === taskId ? selectedRun()!.runId : null
-    taskViews = rememberTaskView(taskViews, taskId, {
-      tab,
-      sessionId: tab === 'agents' && current().taskId === taskId ? current().sessionId : null,
-      runId: open?.run.id ?? run,
-    })
-    void saveTaskViews(props.api.storage.local, nodeId, taskViews)
-  }
-  // Shows a task's remembered view, or says it can't, when its plugin panel is gone. A conversation
-  // open in another task closes, unless the view is a conversation of its own. Drafts stay with the
-  // conversation they were written in.
-  const showView = (task: { id: string; projectId: string }, view: TaskView): boolean => {
-    if (view.tab.startsWith('panel:') && !props.panels.some((panel) => view.tab === `panel:${panel.pluginId}`))
-      return false
-    const sessionId = view.tab === 'agents' ? view.sessionId : null
-    if (sessionId)
-      void restore(task.projectId, task.id, (list) => {
-        if (!list.some((session) => session.id === sessionId)) return
-        showSession(sessionId)
-        remember()
+  // What the top bar names: the task with its project and branch, or the conversation under its task
+  // or run. The page's own task is tagged.
+  createEffect(() => {
+    const here = location()
+    const shown = task()
+    if (here.level === 'task' && shown)
+      return props.heading({
+        title: shown.title,
+        detail: [projectName(shown.projectId), shown.branch].filter(Boolean).join(' · '),
+        here: props.pageTasks.some((page) => page.task.id === shown.id),
       })
-    else if (current().sessionId) {
-      setCurrent((destination) => ({ ...destination, sessionId: null }))
-      remember()
-    }
-    if (view.tab === 'workflows' && view.runId) setSelectedRun({ taskId: task.id, runId: view.runId })
-    props.showTab(view.tab)
-    return true
+    const open = step()
+    if (open) return props.heading({ eyebrow: open.run.name, title: open.step.name })
+    const row = session()
+    props.heading(row ? { eyebrow: shown?.title, title: row.title } : null)
+  })
+  onCleanup(() => props.heading(null))
+
+  // The task's tabs: Agents always, Runs while the Node runs workflows, and each plugin with a panel
+  // for the task. The open tab stays drawn while its view loads, so it doesn't vanish under the person.
+  const taskTabs = (): TabDef[] => {
+    const id = taskId()
+    const open = tab()
+    if (!id) return []
+    const { waiting, working } = agentCounts(id, sessionLists()[id], props.requests)
+    const agentMarker = agentRailMarkers({ working, attention: waiting })[0]
+    return [
+      {
+        id: 'agents',
+        label: 'Agents',
+        icon: 'bot',
+        marker: agentMarker && {
+          icon: agentMarker.icon!,
+          tone: agentMarker.tone,
+          spin: agentMarker.busy,
+          label: agentMarker.label,
+        },
+      },
+      ...(runsAvailable() || open === 'runs'
+        ? [
+            {
+              id: 'runs',
+              label: 'Runs',
+              icon: 'workflow',
+              marker: runsLive(runLists()[id])
+                ? { icon: 'loader-circle', tone: 'accent' as const, spin: true, label: 'A run is running' }
+                : undefined,
+            },
+          ]
+        : []),
+      ...(props.panels ?? [])
+        .filter((panel) => panelViews()[panel.pluginId] || open === `panel:${panel.pluginId}`)
+        .map((panel) => ({ id: `panel:${panel.pluginId}`, label: panel.label, icon: panel.glyph ?? PANEL_GLYPH })),
+    ]
   }
 
-  // Where the sidebar goes when the page beside it moves, by navigating or switching tabs. A page of
-  // another task shows what the sidebar last showed for that task. With nothing remembered, Agents
-  // over an open conversation moves to that task's newest, Workflows closes when the task has no runs,
-  // and anything else stays. A page no task holds shows Home, even on a project's site, and an open
-  // conversation waits under Agents. Home stays put, unless the sidebar went there by itself. The
-  // tasks arriving, or a plugin publishing the page's address, moves nothing.
-  const pageTaskId = createMemo(() => pageTask()?.task.id ?? null)
-  createEffect(
-    on(
-      [() => props.pageUrl, pageTaskId],
-      ([url], previous) => {
-        const [lastUrl, left] = previous ?? [undefined, null]
-        if (url === lastUrl || (props.tab === 'home' && !wentHome)) return
-        const task = pageTask()?.task
-        if (!task) return props.tab === 'home' ? undefined : goHome()
-        if (task.id === left) return
-        const view = taskViews[task.id]
-        if (view && showView(task, view)) return
-        if (props.tab === 'agents' && current().sessionId && current().taskId !== task.id)
-          chatInTask(task.projectId, task.id)
-        if (props.tab !== 'workflows') return
-        const runs = runLists()[task.id]
-        if (!runs) runsCheck = task.id
-        else if (!runs.length) leaveEmptyWorkflows(task.id)
-      },
-      { defer: true },
-    ),
-  )
-  // What the sidebar shows for the page's task is kept each time it changes, never at the moment the
-  // page moves, when what shows still belongs to the task left behind. Home belongs to no task.
-  createEffect(
-    on(
-      [() => props.tab, current, selectedRun, openStep],
-      () => {
-        const taskId = pageTaskId()
-        if (taskId) keepView(taskId)
-      },
-      { defer: true },
-    ),
-  )
-
-  // A handoff shows on Home, so it closes the conversation. Home's own lookup leaves it under Agents.
-  createEffect(
-    on(
-      () => props.handoff,
-      (handoff) => handoff && !handoff.auto && current().sessionId && back(),
-      { defer: true },
-    ),
-  )
+  // One line under the bars when the page beside the panel isn't what the panel shows: another task's
+  // page, or an item no task holds. The offline strip, drawn above, wins over both.
+  const pageStrip = (): { kind: 'other'; task: BridgePageTask } | { kind: 'item' } | null => {
+    const id = taskId()
+    if (!id || !props.online) return null
+    const other = pageTask()
+    if (other) return other.task.id === id ? null : { kind: 'other', task: other.task }
+    return pageHandoffs(props.handoffs, props.pageUrl).length ? { kind: 'item' } : null
+  }
 
   // Projects for the page beside the panel. Every project with an association covering the page is a
   // candidate. The person's choice on this site, if any, replaces them; otherwise a single candidate
@@ -575,13 +436,13 @@ export function Workspace(props: {
     void saveSiteChoices(props.api.storage.local, nodeId, next)
   }
 
-  // Home lists the workspace the person chose, or else the current task's, or else the first.
+  // Home lists the workspace the person chose, or else the page's task's, or else the first.
   const homeWorkspace = () => {
     const list = workspaces() ?? []
     const choice = workspaceChoice()
     if (choice && list.some((workspace) => workspace.id === choice)) return choice
-    const currentProject = projects()?.find((project) => project.id === current().projectId)
-    return currentProject?.workspaceId ?? list[0]?.id ?? null
+    const pageProjectRow = projects()?.find((project) => project.id === pageTask()?.task.projectId)
+    return pageProjectRow?.workspaceId ?? list[0]?.id ?? null
   }
   const pickWorkspace = (id: string) => {
     setWorkspaceChoice(id)
@@ -589,22 +450,9 @@ export function Workspace(props: {
   }
 
   onMount(async () => {
-    const remembered = await loadDestination(props.api.storage.local, nodeId)
     setSiteChoices(await loadSiteChoices(props.api.storage.local, nodeId))
     setWorkspaceChoice(await loadHomeWorkspace(props.api.storage.local, nodeId))
-    // A view kept while these loaded is newer than the stored one.
-    taskViews = { ...(await loadTaskViews(props.api.storage.local, nodeId)), ...taskViews }
     await loadProjects()
-    // A request opened from a notification while this loaded chose already.
-    if (chosen || !remembered.projectId || !remembered.taskId) return
-    void restore(remembered.projectId, remembered.taskId, (list) => {
-      if (!list.some((session) => session.id === remembered.sessionId)) return
-      // The page belongs to another task, so its conversation isn't the one to open.
-      const page = pageTask()?.task
-      if (page && page.id !== remembered.taskId) return
-      showSession(remembered.sessionId!)
-      props.resumed()
-    })
   })
 
   // Another client started, renamed, or finished a conversation in this task, an agent moved one on,
@@ -614,12 +462,12 @@ export function Workspace(props: {
     on(
       () => props.hint,
       (hint) => {
-        const { taskId } = agentsTask()
-        if (hint?.nodeId !== nodeId || !taskId) return
-        const listed = (id: string) => sessionLists()[taskId]?.some((session) => session.id === id)
-        if (!hint.missed && !hint.tasks.includes(taskId) && !hint.sessions.some(listed)) return
-        void loadRuns(taskId)
-        void loadSessions(taskId)
+        const id = taskId()
+        if (hint?.nodeId !== nodeId || !id) return
+        const listed = (sessionId: string) => sessionLists()[id]?.some((row) => row.id === sessionId)
+        if (!hint.missed && !hint.tasks.includes(id) && !hint.sessions.some(listed)) return
+        void loadRuns(id)
+        void loadSessions(id)
       },
       { defer: true },
     ),
@@ -637,242 +485,203 @@ export function Workspace(props: {
       () => props.reconnects,
       () => {
         if (!projects()) void loadProjects()
-        const forTask = current().sessionId ? current().taskId : agentsTask().taskId
-        if (forTask) void loadSessions(forTask)
-        if (agentsTask().taskId) void loadRuns(agentsTask().taskId!)
+        const id = taskId()
+        if (id) {
+          void loadSessions(id)
+          void loadRuns(id)
+        }
         reloadOpenPanel()
       },
       { defer: true },
     ),
   )
 
-  const task = () => taskLists()[current().projectId ?? '']?.find((row) => row.id === current().taskId) ?? null
-  const session = () => sessionLists()[current().taskId ?? '']?.find((row) => row.id === current().sessionId) ?? null
-  const projectName = (id: string) => projects()?.find((row) => row.id === id)?.name ?? id
-  // Agents and Workflows name their list and its count in the top bar. An open conversation names itself.
-  createEffect(() => {
-    const { taskId } = agentsTask()
-    if (openPanel()) return
-    if (props.tab === 'workflows') {
-      // The Runs header below carries the count, as the desktop's does.
-      if (!step()) props.heading({ title: 'Workflows' })
-      return
-    }
-    if (current().sessionId) return
-    props.heading({ title: 'Agents', count: taskId ? sessionLists()[taskId]?.length : undefined })
-  })
-  onCleanup(() => props.heading(null))
-
   return (
-    <>
+    <Show when={location().level !== 'settings'}>
+      <Show when={location().level === 'task'}>
+        <Tabs
+          idPrefix="task"
+          ariaLabel="Task"
+          tabs={taskTabs()}
+          active={tab() ?? 'agents'}
+          onChange={(id) => nav.pickTab(id as TaskTab)}
+        />
+      </Show>
+      <Show when={pageStrip()}>
+        {(strip) => {
+          const shown = strip()
+          return shown.kind === 'other' ? (
+            <div class="strip" role="status">
+              <span class="grow">
+                This page is in <b>{shown.task.title}</b>
+              </span>
+              <button type="button" class="quiet" onClick={() => nav.openTask(shown.task.id)}>
+                Switch
+              </button>
+            </div>
+          ) : (
+            <div class="strip" role="status">
+              <span class="grow">This page has no task</span>
+              <button type="button" class="quiet" onClick={() => nav.goHome()}>
+                Start task
+              </button>
+            </div>
+          )
+        }}
+      </Show>
       <Show when={problem()}>
         <p class="banner problem" role="alert">
           {problem()}
         </p>
       </Show>
-      <Show when={props.tab === 'home'}>
-        <div class="view" aria-label="Home">
-          <Waiting
-            client={props.client}
-            nodeId={nodeId}
-            requests={props.requests}
-            online={props.online}
-            open={(request) => openConversation(request)}
-          />
-          <Show when={pageMatched()}>
-            <ThisPage
+      <Switch>
+        <Match when={location().level === 'home'}>
+          <div class="view" aria-label="Home">
+            <Waiting
               client={props.client}
               nodeId={nodeId}
+              requests={props.requests}
               online={props.online}
-              opensLinks={props.opensLinks}
-              pageUrl={props.pageUrl}
-              handoffs={props.handoffs}
-              pageTasks={props.pageTasks}
-              markerHidden={props.markerHidden}
-              showMarker={props.showMarker}
-              projectName={projectName}
-              chat={chatInTask}
-              showAgents={showPageAgents}
-              handoff={props.handoff}
-              startHandoff={props.startHandoff}
-              dismissHandoff={props.dismissHandoff}
-              openHandoffTask={openHandoffTask}
-              createdHandoffTask={createdHandoffTask}
-              startedHandoffWorkflow={startedHandoffWorkflow}
-              waitingContext={props.waitingContext}
-              dropWaitingContext={() => props.setWaitingContext(null)}
-              projects={projects()}
-              suggested={scope().suggested}
-              onSite={onSite()}
-              several={!pageProject() && pageProjects().length > 1}
-              project={pageProject()}
-              pickProject={pickProject}
-              tasks={pageProject() ? (taskLists()[pageProject()!] ?? null) : null}
-              currentTaskId={current().taskId}
-              pickTask={pickTask}
+              open={(request) => nav.openConversation(request.taskId, request.sessionId)}
             />
-            {/* The task the person last used stays pinned when the page is not its own. */}
-            <Show when={!pageTask() || (current().taskId && current().taskId !== pageTask()!.task.id)}>
-              <CurrentTask task={task()} projectName={current().projectId ? projectName(current().projectId!) : null} />
-            </Show>
-          </Show>
-          <Tasks
-            api={props.api}
-            nodeId={nodeId}
-            opensLinks={props.opensLinks}
-            workspaces={workspaces()}
-            workspaceId={homeWorkspace()}
-            pickWorkspace={pickWorkspace}
-            projects={(projects() ?? []).filter((project) => project.workspaceId === homeWorkspace())}
-            tasks={props.tasks}
-            pageTaskIds={props.pageTasks.map(({ task }) => task.id)}
-            currentTaskId={current().taskId}
-            showAgents={showPageAgents}
-            chat={chatInTask}
-          />
-        </div>
-      </Show>
-      <Show when={props.tab === 'agents'}>
-        <Show
-          when={current().sessionId}
-          keyed
-          fallback={
-            <div class="view" aria-label="Agents">
-              <Show
-                when={agentsTask().taskId}
-                keyed
-                fallback={<p class="empty quiet">This page belongs to no task. Choose one under Home.</p>}
-              >
-                {(taskId) => {
-                  const target = () => ({ projectId: agentsTask().projectId!, taskId })
-                  return (
-                    <Agents
-                      client={props.client}
-                      nodeId={nodeId}
-                      taskId={taskId}
-                      online={props.online}
-                      sessions={sessionLists()[taskId] ?? null}
-                      requests={props.requests}
-                      open={(id) => void openSession(target(), id)}
-                      started={(started) => {
-                        setSessionLists((lists) => ({
-                          ...lists,
-                          [taskId]: [started, ...(lists[taskId] ?? []).filter((row) => row.id !== started.id)],
-                        }))
-                        void openSession(target(), started.id)
-                      }}
-                    />
-                  )
-                }}
-              </Show>
-            </div>
-          }
-        >
-          {(sessionId) => (
-            <>
-              {/* The page beside the panel belongs to another task. The conversation stays, because pages
-                  are often visited to capture them into it; Switch opens that task, and drafts are kept. */}
-              <Show when={pageTask() && pageTask()!.task.id !== current().taskId ? pageTask() : null}>
-                {(other) => (
-                  <div class="banner notice row" role="status">
-                    <span class="grow">This page is in task {other().task.title}.</span>
-                    <button type="button" class="quiet" onClick={showPageAgents}>
-                      Switch
-                    </button>
-                  </div>
-                )}
-              </Show>
-              <Conversation
+            <Show when={pageMatched()}>
+              <ThisPage
                 client={props.client}
-                storage={props.api.storage}
-                target={{ nodeId, taskId: current().taskId!, sessionId }}
-                session={session()!}
-                taskTitle={task()?.title ?? ''}
-                back={back}
-                heading={props.heading}
+                nodeId={nodeId}
                 online={props.online}
                 opensLinks={props.opensLinks}
-                hint={props.hint}
-                reconnects={props.reconnects}
+                pageUrl={props.pageUrl}
+                handoffs={props.handoffs}
+                pageTasks={props.pageTasks}
+                markerHidden={props.markerHidden}
+                showMarker={props.showMarker}
+                projectName={projectName}
+                chat={(id) => void chatInTask(id)}
+                openTask={(id) => nav.openTask(id)}
+                handoff={props.handoff}
+                startHandoff={props.startHandoff}
+                dismissHandoff={props.dismissHandoff}
+                openHandoffTask={openHandoffTask}
+                createdHandoffTask={createdHandoffTask}
+                startedHandoffWorkflow={startedHandoffWorkflow}
+                waitingContext={props.waitingContext}
+                dropWaitingContext={() => props.setWaitingContext(null)}
+                projects={projects()}
+                suggested={scope().suggested}
+                onSite={onSite()}
+                several={!pageProject() && pageProjects().length > 1}
+                project={pageProject()}
+                pickProject={pickProject}
+                tasks={pageProject() ? (taskLists()[pageProject()!] ?? null) : null}
               />
-            </>
-          )}
-        </Show>
-      </Show>
-      <Show when={props.panels.find((panel) => panel.pluginId === openPanel())}>
-        {(panel) => (
-          <Show
-            when={agentsTask().taskId}
-            keyed
-            fallback={
-              <div class="view" aria-label={panel().label}>
-                <p class="empty quiet">This page belongs to no task. Choose one under Home.</p>
-              </div>
-            }
-          >
-            {(taskId) => (
-              <PluginPanel
-                panel={panel()}
+            </Show>
+            <Tasks
+              api={props.api}
+              nodeId={nodeId}
+              opensLinks={props.opensLinks}
+              workspaces={workspaces()}
+              workspaceId={homeWorkspace()}
+              pickWorkspace={pickWorkspace}
+              projects={(projects() ?? []).filter((project) => project.workspaceId === homeWorkspace())}
+              tasks={props.tasks ?? []}
+              pageTaskIds={props.pageTasks.map(({ task }) => task.id)}
+              openTask={(id) => nav.openTask(id)}
+              chat={(id) => void chatInTask(id)}
+            />
+          </div>
+        </Match>
+        <Match when={tab() === 'agents' && taskId()} keyed>
+          {(id) => (
+            <div class="view" aria-label="Agents">
+              <Agents
+                client={props.client}
                 nodeId={nodeId}
-                taskId={taskId}
-                view={panelViews()[panel().pluginId]}
-                problem={panelProblems()[panel().pluginId] ?? null}
-                opensLinks={props.opensLinks}
-                refresh={() => void loadPanel(panel().pluginId, taskId)}
-                pickSource={(source) => {
-                  setPanelSources((sources) => ({ ...sources, [panel().pluginId]: source }))
-                  void loadPanel(panel().pluginId, taskId)
+                taskId={id}
+                online={props.online}
+                sessions={sessionLists()[id] ?? null}
+                requests={props.requests}
+                open={(sessionId) => void openSession(id, sessionId)}
+                started={(started) => {
+                  setSessionLists((lists) => ({
+                    ...lists,
+                    [id]: [started, ...(lists[id] ?? []).filter((row) => row.id !== started.id)],
+                  }))
+                  void openSession(id, started.id)
                 }}
               />
-            )}
-          </Show>
-        )}
-      </Show>
-      <Show when={props.tab === 'workflows'}>
-        <Show
-          when={step()}
-          keyed
-          fallback={
-            <div class="view" aria-label="Workflows">
-              <Show
-                when={agentsTask().taskId}
-                keyed
-                fallback={<p class="empty quiet">This page belongs to no task. Choose one under Home.</p>}
-              >
-                {(taskId) => (
-                  <Workflows
-                    client={props.client}
-                    nodeId={nodeId}
-                    taskId={taskId}
-                    runs={runLists()[taskId] ?? null}
-                    selected={selectedRun()?.taskId === taskId ? selectedRun()!.runId : null}
-                    select={(runId) => setSelectedRun({ taskId, runId })}
-                    refreshRuns={() => void loadRuns(taskId)}
-                    open={(run, step) => setOpenStep({ taskId, run, step })}
-                  />
-                )}
-              </Show>
             </div>
-          }
-        >
-          {/* A step's conversation, named for the step under its run, with the way back to the run. */}
-          {(open) => (
+          )}
+        </Match>
+        <Match when={tab() === 'runs' && taskId()} keyed>
+          {(id) => (
+            <div class="view" aria-label="Runs">
+              <Workflows
+                client={props.client}
+                nodeId={nodeId}
+                taskId={id}
+                runs={runLists()[id] ?? null}
+                selected={selectedRun()?.taskId === id ? selectedRun()!.runId : null}
+                select={(runId) => setSelectedRun({ taskId: id, runId })}
+                refreshRuns={() => void loadRuns(id)}
+                open={(run, opened) => {
+                  setOpenStep({ taskId: id, run, step: opened })
+                  nav.openConversation(id, opened.session!.id, 'runs')
+                }}
+              />
+            </div>
+          )}
+        </Match>
+        <Match when={openPanel() && taskId()} keyed>
+          {(id) => (
+            <Show when={(props.panels ?? []).find((panel) => panel.pluginId === openPanel())}>
+              {(panel) => (
+                <PluginPanel
+                  panel={panel()}
+                  nodeId={nodeId}
+                  taskId={id}
+                  view={panelViews()[panel().pluginId]}
+                  problem={panelProblems()[panel().pluginId] ?? null}
+                  opensLinks={props.opensLinks}
+                  refresh={() => void loadPanel(panel().pluginId, id)}
+                  pickSource={(source) => {
+                    setPanelSources((sources) => ({ ...sources, [panel().pluginId]: source }))
+                    void loadPanel(panel().pluginId, id)
+                  }}
+                />
+              )}
+            </Show>
+          )}
+        </Match>
+        {/* Keyed by the conversation, so every reply and draft inside is bound to it. */}
+        <Match when={session()?.id} keyed>
+          {(sessionId) => (
             <Conversation
               client={props.client}
               storage={props.api.storage}
-              target={{ nodeId, taskId: open.step.session!.taskId, sessionId: open.step.session!.id }}
-              session={open.step.session!}
-              taskTitle={open.run.name}
-              back={() => setOpenStep(null)}
-              heading={(heading) => props.heading({ ...heading, title: open.step.name })}
+              target={{ nodeId, taskId: taskId()!, sessionId }}
+              session={session()!}
               online={props.online}
               opensLinks={props.opensLinks}
               hint={props.hint}
               reconnects={props.reconnects}
             />
           )}
-        </Show>
-      </Show>
-    </>
+        </Match>
+        <Match when={step()} keyed>
+          {(open) => (
+            <Conversation
+              client={props.client}
+              storage={props.api.storage}
+              target={{ nodeId, taskId: open.step.session!.taskId, sessionId: open.step.session!.id }}
+              session={open.step.session!}
+              online={props.online}
+              opensLinks={props.opensLinks}
+              hint={props.hint}
+              reconnects={props.reconnects}
+            />
+          )}
+        </Match>
+      </Switch>
+    </Show>
   )
 }

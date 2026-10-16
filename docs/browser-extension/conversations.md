@@ -114,12 +114,13 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
   screenshot's attachment ID once the Node holds it. It sits apart from the text because the text is
   saved on each keystroke and a screenshot can be megabytes. The background adds a selection here
   for [Add to Acorn chat](./page-capture.md#add-to-acorn-chat), and an open composer shows it.
-- `destination:<nodeId>`: the current task on that Node, with its project, and the conversation open
-  over Home, if any. The panel restores both when it opens and when Settings closes. Only the person's
-  own choices are saved, including the conversation **Add to Acorn chat** added a selection to.
-- `taskViews:<nodeId>`: what the sidebar last showed for each task, `{ tab, sessionId, runId }` by
-  task ID, for [moving between pages](./task-pages.md#moving-between-pages). It keeps the 50 tasks
-  used most recently.
+- `destination:<nodeId>`: the task the panel last showed on that Node, with its project, and the
+  conversation open in it, if any. A workflow step's conversation is kept as its task. Home and
+  Settings leave it alone, so a selection always has a conversation to go to. The panel returns to it
+  when it opens, and **Add to Acorn chat** saves the conversation it added a selection to.
+- `taskViews:<nodeId>`: the tab last picked under each task, `{ tab }` by task ID, for
+  [moving between pages](./task-pages.md#moving-between-pages). It keeps the 50 tasks used most
+  recently. A view stored by an older build may name the Runs tab `workflows`, which reads as `runs`.
 - `appearance`: the panel's `{ theme, style }`, with `theme` null to follow the system's light or dark
   ([appearance](./setup.md#appearance)).
 - `handoffs`: the selected Node's [handoffs](./handoffs.md#task-chips), `{ nodeId, handoffs }`,

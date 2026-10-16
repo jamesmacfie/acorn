@@ -11,7 +11,7 @@ import { processIsAlive, readJson, runningManifest } from './state.mjs'
 //
 //   open                 open the sidebar page in a tab, or reuse the open one
 //   text                 print the sidebar's visible text
-//   click TEXT           click the button whose text is TEXT
+//   click TEXT           click the button whose text or accessible name is TEXT, such as Back
 //   fill NAME VALUE      type VALUE into the input or text area named NAME, or pick the option of the
 //                        select named NAME whose value or text is VALUE
 //   check NAME           toggle the checkbox named NAME
@@ -33,7 +33,7 @@ const [verb, ...rest] = argv
 const actions = {
   text: () => 'document.body.innerText',
   click: (text) =>
-    `(() => { const target = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(text)}); if (!target) throw new Error('No button reads ' + ${JSON.stringify(text)}); target.click(); return 'clicked' })()`,
+    `(() => { const target = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(text)} || b.getAttribute('aria-label') === ${JSON.stringify(text)}); if (!target) throw new Error('No button reads ' + ${JSON.stringify(text)}); target.click(); return 'clicked' })()`,
   fill: (name, value) =>
     `(() => {
       const field = document.querySelector('[name=' + ${JSON.stringify(JSON.stringify(name))} + ']')

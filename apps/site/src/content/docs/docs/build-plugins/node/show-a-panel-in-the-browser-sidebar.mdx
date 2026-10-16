@@ -20,7 +20,7 @@ the task runs and links into it, answered as JSON by your Node half.
 
 ## The result
 
-On a page that belongs to a task with the Acme app running, the panel's navigation gains **Acme app**:
+On a page that belongs to a task with the Acme app running, the task's tabs in the panel gain **Acme app**:
 
 <SidebarPicture id="sidebar-plugin-panel" />
 
@@ -37,13 +37,13 @@ panel is about an app the task runs. The code is from
 
 <Steps>
 
-1. **Declare the panel.** `label` names it in the navigation, and `route` answers it. `pane` is optional:
+1. **Declare the panel.** `label` names its tab, and `route` answers it. `pane` is optional:
    one of your task panes, which **Open in Acorn** opens.
 
    <ExampleCode file="acme-browser/acorn-plugin.json" pick={['contributions.browserPanel']} />
 
 2. **Answer the route.** The extension calls `GET <route>?taskId=…` for the panel's task. Answer 404 for
-   a task with nothing to show, and the navigation item hides. Otherwise answer `{ blocks }`:
+   a task with nothing to show, and the tab hides. Otherwise answer `{ blocks }`:
 
    <ExampleCode file="acme-browser/node.js" region="panel" />
 
@@ -54,7 +54,7 @@ panel is about an app the task runs. The code is from
    <ExampleCode file="acme-browser/node.js" region="run-target" />
 
 4. **Check it.** Start the task's `web` run target, then open the app's page with the extension's panel
-   open. **Acme app** is in the navigation.
+   open. The panel opens on the task, with an **Acme app** tab.
 
 </Steps>
 

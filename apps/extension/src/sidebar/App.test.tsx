@@ -3,7 +3,7 @@ import { render } from 'solid-js/web'
 import { fingerprintWords } from '@acorn/protocol/fingerprintWords.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
-import { back, button, openSettings, pick, useNode } from '../test/sidebarUi'
+import { back, button, goHome, openSettings, pick, useNode } from '../test/sidebarUi'
 import { App } from './App'
 
 const FINGERPRINT = 'ab'.repeat(32)
@@ -112,7 +112,8 @@ function mount(
   return { fake, held, root }
 }
 
-const nodeChip = (root: HTMLElement) => root.querySelector('header summary')!.textContent
+// The selected Node, as the acorn on Home names it.
+const shownNode = (root: HTMLElement) => root.querySelector('header .mark')!.getAttribute('aria-label')
 const input = (root: HTMLElement, name: string) => root.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
 // Submits the form on screen: each pairing step shows one.
 const submit = (root: HTMLElement) =>
@@ -127,13 +128,14 @@ describe('sidebar', () => {
     const { held, root } = mount(['a', 'b'])
     await settle()
     await useNode(root, 'Node a')
-    expect(held.map((read) => read.nodeId)).toEqual(['a'])
-    // Switch to b while a's read is still out, then let both answer, b first.
+    // Home and Settings each read the projects.
+    expect(new Set(held.map((read) => read.nodeId))).toEqual(new Set(['a']))
+    // Switch to b while a's reads are still out, then let them all answer, b's first.
     await useNode(root, 'Node b')
-    held[1]!.release()
-    held[0]!.release()
+    for (const read of held.filter((each) => each.nodeId === 'b')) read.release()
+    for (const read of held.filter((each) => each.nodeId === 'a')) read.release()
     await settle()
-    expect(nodeChip(root)).toContain('Node b')
+    expect(shownNode(root)).toContain('Node b')
     // The page is on b's project's site, which This page suggests only from b's project list.
     const options = [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
     expect(options).toEqual(['Choose a project', 'b project'])
@@ -157,9 +159,21 @@ describe('sidebar', () => {
     fake.hosts[0]!.send({ v: 1, event: 'status', status: { nodeId: 'a', state: 'offline' } })
     await settle()
     expect(root.querySelector('header .dot')!.getAttribute('data-tone')).toBe('bad')
-    expect(root.querySelector('[data-testid="node-status"]')!.textContent).toBe(
-      'The Node is not answering. Check that it is running and reachable, then retry.',
-    )
+    const strip = root.querySelector('[data-testid="node-status"]')!
+    expect(strip.textContent).toBe('Node a is offlineRetry')
+    // Home stays readable under the strip.
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
+
+    // Retry asks again, and the answer brings the Node back.
+    const lists = () => fake.hosts[0]!.received.filter((message) => (message as Request).op === 'nodes.list').length
+    const before = lists()
+    button(strip, 'Retry')!.click()
+    await settle()
+    expect(lists()).toBe(before + 1)
+    fake.hosts[0]!.send({ v: 1, event: 'status', status: { nodeId: 'a', state: 'online' } })
+    await settle()
+    expect(root.querySelector('[data-testid="node-status"]')).toBeNull()
+    expect(root.querySelector('header .dot')!.getAttribute('data-tone')).toBe('ok')
   })
 
   it('pairs the Node on this Mac with a code alone, then offers what comes next', async () => {
@@ -184,7 +198,7 @@ describe('sidebar', () => {
     submit(root)
     await settle()
     expect(root.querySelector('[aria-label="Paired"]')!.textContent).toContain('Paired with This computer')
-    expect(nodeChip(root)).toContain('Node new')
+    expect(shownNode(root)).toContain('Node new')
     expect(root.querySelector('[aria-label="Notifications"]')).not.toBeNull()
     button(root, 'Done')!.click()
     await settle()
@@ -233,14 +247,15 @@ describe('sidebar', () => {
     type(input(root, 'pairing-code'), 'GOOD')
     submit(root)
     await settle()
-    expect(nodeChip(root)).toContain('Node new')
+    expect(shownNode(root)).toContain('Node new')
   })
 
-  it('lists paired Nodes to use while pairing, and pairs another or forgets one from the chip', async () => {
+  it('lists paired Nodes to use while pairing, and pairs another or forgets one from Settings', async () => {
     const { root } = mount(['a'], { local: { nodeId: 'a', endpoint: 'https://127.0.0.1:4317' } })
     await settle()
     await useNode(root, 'Node a')
-    button(root.querySelector('header .menu-items')!, 'Pair another')!.click()
+    await openSettings(root)
+    button(root.querySelector('[aria-label="Nodes"]')!, 'Pair a Node')!.click()
     await settle()
     // The Node on this Mac is already paired, so it shows as a Use row with its tag.
     const choose = root.querySelector('[aria-label="Choose a Node"]')!
@@ -248,11 +263,13 @@ describe('sidebar', () => {
     expect(choose.querySelector('li')!.textContent).toContain('Node aOn this Mac')
     button(choose, 'Use')!.click()
     await settle()
-    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
+    // Pairing closes back to Settings, where it was asked for.
+    expect(root.querySelector('[aria-label="Settings"]')).not.toBeNull()
 
-    button(root.querySelector('header .menu-items')!, 'Forget Node a')!.click()
+    button(root.querySelector('[aria-label="Nodes"]')!, 'Forget')!.click()
     await settle()
-    expect(nodeChip(root)).toContain('No Node')
+    await goHome(root)
+    expect(shownNode(root)).toBe('No Node')
   })
 
   it('shows the install command with Copy, and carries on once the bridge answers', async () => {

@@ -69,9 +69,9 @@ shows the project picker in Home's **This page** section:
 - **No candidate** shows no picker, and Home shows only its task list. To tie the page's site to a
   project, add it under Settings → **Projects**.
 
-Under the picker, **This page** lists the chosen project's open tasks, and clicking one makes it the
-current task. **New task in Acorn** opens the project in the desktop app. A page on a project's site
-never moves the current task by itself: the current task, its conversation, and its draft stay put
+Under the picker, **This page** lists the chosen project's open tasks, and clicking one opens it.
+**New task in Acorn** opens the project in the desktop app. A page on a project's site that belongs
+to no task moves nothing by itself: the task or conversation the panel shows, and its draft, stay put
 when the page changes, and only **This page** follows it.
 
 Task addresses use the prefix kind's grammar, an exact origin and a path prefix, and are matched the

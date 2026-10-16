@@ -54,8 +54,8 @@ user-level folder that `acorn browser install` writes. A Chrome started with `--
 
 ## Pair a Node
 
-The panel opens on pairing while no Node is paired. Later, choose **Pair another** from the Node chip's
-menu, or **Pair a Node** under **Nodes** in Settings.
+The panel opens on pairing while no Node is paired. Later, choose **Pair a Node** under **Nodes** in
+Settings.
 
 1. **Choose a Node.** The Node running on this Mac is listed first, as **This computer** with an **On
    this Mac** tag. The bridge found it in the same data folder `acorn` reads. Nodes this browser already
@@ -93,51 +93,20 @@ advertise its address, or be reached through an SSH tunnel, as
 - **After moving or upgrading the CLI or its Node runtime**, the launcher points at a path that's gone.
   The sidebar says the bridge stopped, and `acorn browser status` names the missing path. Run
   `acorn browser install` from the new copy, then click **Retry**. Pairings stay.
-- **After reinstalling the extension**, its pairings are still in the bridge. Choose the Node from the
-  Node chip's menu in the header, or click **Use** beside it in Settings.
+- **After reinstalling the extension**, its pairings are still in the bridge. Click **Use** beside the
+  Node in Settings.
 - **To remove the bridge**, run `acorn browser uninstall`. It removes the registrations and launchers,
   and names each browser's bridge folder, which still holds its pairings and tokens. Delete
   `~/Library/Application Support/acorn/browser-bridge/<browser>/` to remove them.
-- **Forget** in Settings or the Node chip's menu deletes one Node's pairing from this browser. Neither
+- **Forget** in Settings deletes one Node's pairing from this browser. Neither
   forgetting nor deleting the folder revokes the browser's device on the Node. Another paired client
   can revoke it with `DELETE /v1/core/devices/:id` ([authentication](../authentication.md)).
 
 ## The panel's views
 
-The panel opens on **Home**. The header holds the Acorn mark, the selected Node as a chip with a
-status dot, and the gear. The chip's menu switches Nodes, opens **Pair another**, and forgets the
-selected Node. When the bridge stopped
-or the Node isn't answering, one line under the header says so, with the next step from the table
-below. Nothing else about Nodes or site access shows on Home.
-
-Home lists, top to bottom:
-
-1. **Waiting for you**, only while an agent waits on a request, across every project on the Node.
-   Each request answers in place with the same buttons the conversation uses
-   ([request notifications](./notifications.md#the-waiting-list)).
-2. **This page**: what Acorn knows about the page, in one of three states: the task it belongs to, an
-   item no task holds with its handoff, or the project its site suggests with that project's open
-   tasks ([This page](./task-pages.md#this-page)). A page that matches none of them has no
-   **This page** section.
-3. **Agents**: every conversation in the page's task, or in the current task when the page is on its
-   project's site, grouped as **Managed chats**, **Inline chats**, and **Workflows**, each with its
-   agent, title, state, and last line. A page tied to no task or project shows none. A row opens the
-   conversation and makes its task current. **New chat** starts another from the desktop's New
-   picker: each harness or named login, then each custom agent.
-4. **Current task**: the task you last used, pinned whenever the page has a match but isn't its own.
-5. **Tasks**: one workspace's open tasks, grouped by project. A row opens the task's links, each
-   switching to its open tab or opening a new one ([Home's task list](./task-pages.md#homes-task-list)).
-
-A conversation opens over Home, with a back arrow and the task's name above the conversation's own,
-and **Open in Acorn** and **Copy Acorn link** for that conversation ([the panel's
-verbs](./handoffs.md#the-panels-verbs)). The composer's toolbar holds the
-three [capture](./page-capture.md) buttons, and each capture shows as a chip in the draft. Moving to
-a page with no task leaves the conversation open, so the person can capture that page into it. Moving
-to a page of a different task switches to that task's newest conversation, or its new-chat picker
-when it has none. Each conversation keeps its own draft.
-
-**Settings** holds the Node list and pairing, site access, each project's sites, notifications, and
-appearance.
+The panel is always on **Home**, on one task with its panes as tabs, or in one conversation inside a
+task, with **Settings** beside them. [Sidebar navigation](./navigation.md) covers each level's top
+bar, the tabs under a task, **Back**, and the strip under the bars.
 
 A state shows as a coloured dot beside a word, never colour alone: green for working or online, amber
 for waiting, red for failed or unreachable, and an empty ring for idle.

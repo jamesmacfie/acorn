@@ -1,22 +1,20 @@
 # Plugin panels in the browser extension
 
 This page covers plugin panels in the [browser extension](../browser-extension.md): a plugin's
-read-only view of the sidebar's task, its nav item, and the operation that reads it. The code is in
+read-only view of the sidebar's task, its tab, and the operation that reads it. The code is in
 `apps/extension/src/sidebar/PluginPanel.tsx`, `apps/extension/src/sidebar/Workspace.tsx`,
 `apps/extension/src/sidebar/App.tsx`, and `apps/cli/src/browser/bridge.ts`. How a plugin declares
 and serves a panel is in [browser panel](../plugin-authoring/browser-panel.md).
 
-## The nav item
+## The tab
 
-`handoffs.list` carries the Node's declared panels, without their routes. When the task the Agents
-tab shows changes, the sidebar reads every declared panel for it. That task is the page's own, or
-the current task on its project's site.
+`handoffs.list` carries the Node's declared panels, without their routes. When the sidebar opens
+another task, it reads every declared panel for that task.
 
-A plugin whose route answers a view gets a nav item after **Workflows** and before **Settings**,
-with its label and glyph. A plugin that answers 404 has no panel for the task, and no nav item. An
-open panel's nav item stays while its view loads. An open panel closes to Home, taking its nav item
-with it, when the tab moves to a page no task holds, when the new task has no panel, or when the
-plugin stops.
+A plugin whose route answers a view gets a tab under the task, after **Agents** and **Runs**, with
+its label and glyph. A plugin that answers 404 has no panel for the task, and no tab. An open panel's
+tab stays while its view loads. An open panel gives way to **Agents** when the task has no panel or
+the plugin stops. A page that belongs to no task leaves it open.
 
 ## The panel
 

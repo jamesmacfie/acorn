@@ -341,12 +341,8 @@ describe('architecture boundaries', () => {
       ],
       ['apps/extension/src/sidebar/main.tsx -> plugins/agents/src/contract/providerMarks.ts', 'harness brand marks'],
       [
-        'apps/extension/src/sidebar/App.tsx -> plugins/agents/src/contract/runtimeState.ts',
-        'marks the Agents tab while agents work',
-      ],
-      [
         'apps/extension/src/sidebar/Workspace.tsx -> plugins/agents/src/contract/runtimeState.ts',
-        'the Agents tab marker state',
+        'marks the Agents tab while agents work',
       ],
       // The extension sidebar starts and draws workflow runs.
       [

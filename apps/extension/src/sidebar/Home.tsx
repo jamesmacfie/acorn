@@ -43,10 +43,9 @@ export function ThisPage(props: {
   markerHidden(origin: string): boolean
   showMarker(origin: string): void
   projectName(id: string): string
-  // Opens a task's newest conversation, or the new-chat picker when it has none.
-  chat(projectId: string, taskId: string): void
-  // Shows Agents, which lists the page's task's conversations.
-  showAgents(): void
+  // Opens a task's newest conversation, or the new-chat picker when it has none, and opens a task.
+  chat(taskId: string): void
+  openTask(taskId: string): void
   handoff: PageHandoff | null
   startHandoff(handoff: PageHandoff): void
   dismissHandoff(): void
@@ -64,8 +63,6 @@ export function ThisPage(props: {
   project: string | null
   pickProject(id: string | null): void
   tasks: readonly BridgeTask[] | null
-  currentTaskId: string | null
-  pickTask(projectId: string, taskId: string): void
 }) {
   const offers = () => pageHandoffs(props.handoffs, props.pageUrl)
   const host = () => (props.pageUrl && URL.canParse(props.pageUrl) ? new URL(props.pageUrl).host : '')
@@ -117,7 +114,7 @@ export function ThisPage(props: {
                 <li>
                   {/* An app a plugin published for the task is named by its branch, with the
                       plugin's state, and its link goes to the plugin's pane, which has the logs. */}
-                  <button type="button" class="row-button" onClick={() => props.showAgents()}>
+                  <button type="button" class="row-button" onClick={() => props.openTask(task.id)}>
                     <Show
                       when={page.status}
                       fallback={
@@ -148,7 +145,7 @@ export function ThisPage(props: {
                     opensLinks={props.opensLinks}
                     label={page.status ? 'Logs in Acorn' : undefined}
                   />
-                  <button type="button" class="quiet" onClick={() => props.chat(task.projectId, task.id)}>
+                  <button type="button" class="quiet" onClick={() => props.chat(task.id)}>
                     Chat
                   </button>
                 </li>
@@ -205,7 +202,7 @@ export function ThisPage(props: {
 }
 
 // A page on a project's site with no item: the project its associations suggest, its open tasks to
-// make current, and New task, which opens the project in the desktop app.
+// open, and New task, which opens the project in the desktop app.
 function SiteProject(props: {
   nodeId: string
   opensLinks: boolean
@@ -215,8 +212,7 @@ function SiteProject(props: {
   project: string | null
   pickProject(id: string | null): void
   tasks: readonly BridgeTask[] | null
-  currentTaskId: string | null
-  pickTask(projectId: string, taskId: string): void
+  openTask(taskId: string): void
 }) {
   return (
     <>
@@ -262,12 +258,7 @@ function SiteProject(props: {
                     <For each={tasks()}>
                       {(task) => (
                         <li>
-                          <button
-                            type="button"
-                            class="row-button"
-                            aria-current={task.id === props.currentTaskId}
-                            onClick={() => props.pickTask(projectId(), task.id)}
-                          >
+                          <button type="button" class="row-button" onClick={() => props.openTask(task.id)}>
                             <strong>{task.title}</strong>
                             <Show when={task.branch}>{(branch) => <span class="quiet">{branch()}</span>}</Show>
                           </button>
@@ -323,8 +314,7 @@ function PageLabel(props: { page: BridgeTaskPage }) {
 }
 
 // Home's task list: one workspace's open tasks, grouped by project in the workspace's order. A row
-// shows the task's links, each switching to its open tab or opening a new one. The page's own task
-// shows Agents instead, as its row under This page does.
+// opens its task. Its links, each switching to its open tab or opening a new one, fold out beside it.
 export function Tasks(props: {
   api: BrowserApi
   nodeId: string
@@ -336,18 +326,13 @@ export function Tasks(props: {
   projects: readonly BridgeProject[]
   tasks: readonly BridgePageTask[]
   pageTaskIds: readonly string[]
-  currentTaskId: string | null
-  showAgents(): void
-  chat(projectId: string, taskId: string): void
+  openTask(taskId: string): void
+  chat(taskId: string): void
 }) {
   const tabs = openTabs(props.api)
   const [expanded, setExpanded] = createSignal<string | null>(null)
   const projectTasks = (projectId: string) => props.tasks.filter((task) => task.projectId === projectId)
   const listed = () => props.projects.some((project) => projectTasks(project.id).length)
-  const open = (task: BridgePageTask) => {
-    if (props.pageTaskIds.includes(task.id)) props.showAgents()
-    else setExpanded((shown) => (shown === task.id ? null : task.id))
-  }
 
   return (
     <section aria-label="Tasks">
@@ -380,20 +365,25 @@ export function Tasks(props: {
                 <For each={projectTasks(project.id)}>
                   {(task) => (
                     <li class="task">
-                      <button
-                        type="button"
-                        class="row-button"
-                        aria-current={task.id === props.currentTaskId}
-                        aria-expanded={props.pageTaskIds.includes(task.id) ? undefined : expanded() === task.id}
-                        onClick={() => open(task)}
-                      >
-                        <strong>{task.title}</strong>
-                        <span class="quiet">
-                          {[task.branch, props.pageTaskIds.includes(task.id) && 'This page']
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </span>
-                      </button>
+                      <div class="task-row">
+                        <button type="button" class="row-button" onClick={() => props.openTask(task.id)}>
+                          <strong>{task.title}</strong>
+                          <span class="quiet">
+                            {[task.branch, props.pageTaskIds.includes(task.id) && 'This page']
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          class="icon"
+                          aria-label={`${task.title} links`}
+                          aria-expanded={expanded() === task.id}
+                          onClick={() => setExpanded((shown) => (shown === task.id ? null : task.id))}
+                        >
+                          <Icon name="chevron-down" />
+                        </button>
+                      </div>
                       <Show when={expanded() === task.id}>
                         <ul class="task-links" aria-label={`${task.title} links`}>
                           <For each={task.pages}>
@@ -419,7 +409,7 @@ export function Tasks(props: {
                               opensLinks={props.opensLinks}
                               class="quiet"
                             />
-                            <button type="button" class="quiet" onClick={() => props.chat(task.projectId, task.id)}>
+                            <button type="button" class="quiet" onClick={() => props.chat(task.id)}>
                               Chat
                             </button>
                           </li>
@@ -556,27 +546,5 @@ function NewChat(props: {
         )}
       </Show>
     </>
-  )
-}
-
-// The task the person last used. It stays here whatever page is showing, so a capture always has a
-// conversation to go to.
-export function CurrentTask(props: { task: BridgeTask | null; projectName: string | null }) {
-  return (
-    <section aria-label="Current task">
-      <h2>Current task</h2>
-      <Show when={props.task} fallback={<p class="quiet">No task yet. Choose one under This page.</p>}>
-        {(task) => (
-          <p>
-            <strong>{task().title}</strong>
-            <span class="quiet">
-              {' '}
-              {props.projectName}
-              {task().branch ? ` · ${task().branch}` : ''}
-            </span>
-          </p>
-        )}
-      </Show>
-    </section>
   )
 }

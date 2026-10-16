@@ -18,6 +18,10 @@ import { errorGuidance } from './guidance'
 // How often a running workflow is read again. Its steps change without any hint the bridge passes on.
 const LIVE_RUN_RECHECK_MS = 3_000
 
+// Whether one of a task's runs is still going, which the Runs tab marks.
+export const runsLive = (runs: readonly BridgeWorkflowRun[] | undefined): boolean =>
+  Boolean(runs?.some((run) => runIsLive(run.status)))
+
 // One task's workflow runs, as the desktop's Workflows sidebar lists them and in the kit's own rows and
 // headers: the runs, newest first, then the chosen run's steps with how long each took. A step that ran
 // an agent opens its conversation.
