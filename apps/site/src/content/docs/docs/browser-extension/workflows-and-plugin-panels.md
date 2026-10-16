@@ -8,7 +8,7 @@ sources:
   - apps/extension/src/sidebar/Runs.tsx
   - apps/extension/src/sidebar/WorkflowForm.tsx
   - apps/extension/src/sidebar/PluginPanel.tsx
-checked: 'f03cdd5c6'
+checked: '68053b2e9'
 ---
 
 The browser panel can start a workflow on the item you're looking at, such as a pull request, or in a

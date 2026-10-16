@@ -11,7 +11,7 @@ sources:
   - apps/site/src/pages/schemas/[...file].ts
   - docs/cli.md
   - docs/shell/process.md
-checked: 'f03cdd5c6'
+checked: '68053b2e9'
 ---
 
 acorn publishes a JSON Schema for each file format you might write or read by hand. This page lists
