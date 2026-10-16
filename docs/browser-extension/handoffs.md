@@ -43,19 +43,19 @@ plugin's `label` stays in the chip's accessible name.
   **1 waiting** in the warning colour when an agent waits on the person. The background reads the
   conversations of each task an open page shows, and again when a hint names that task or one of its
   conversations. A conversation is waiting while the Node holds a request from it. A click opens the
-  panel on the task. The arrow beside it opens a menu: **Show in side panel**, **Open in
-  Acorn** (a plain `acorn://` link to the task, on its item's pane), **New chat about this page**
-  (the task's **Agents** tab, with the page's link waiting for the task's first chat), **Ask about an
-  element** (the [element picker](./element-picker.md)), and **Copy Acorn link**. A development
-  build leaves out Open in Acorn, as the panel does.
-- **A page no task holds** reads **Start task**. A click opens a menu with the desktop row menu's two
-  choices: **Create task** and **Start workflow…**. Either one opens the panel on the handoff card,
-  which resolves the page. **Start workflow…** opens it with the project's first workflow chosen.
+  panel on the task. The arrow beside it opens a menu: **Show in side panel**, **New chat about this
+  page** (the task's **Agents** tab, with the page's link waiting for its next chat), **Ask about an
+  element** (the [element picker](./element-picker.md)), a separator, **Open in Acorn** (a plain
+  `acorn://` link to the task, on its item's pane), and **Copy Acorn link**. A development build
+  leaves out Open in Acorn, as the panel does. Each entry's icon is a kit Lucide shape, inlined,
+  because the content script can't import the kit.
+- **A page no task holds** reads **Start task**. Its menu has **Create task** and **Run workflow…**.
+  Either opens the panel on Home with the handoff card, and **Run workflow…** opens its workflow
+  picker.
 
 Firefox opens its sidebar only from the extension's own controls, so there the chip's click opens
-the menu, with a line saying to click Acorn in the toolbar for the panel. A task's menu has Open in
-Acorn as a plain link, Ask about an element, and Copy Acorn link. Start task's choice hands the page
-to the background, and the handoff card shows when the person opens the sidebar.
+the menu, without the panel's entries, and with a line saying to click Acorn in the toolbar. Start
+task's choice hands the page to the background, and the card shows when the sidebar opens.
 
 A tab that stops matching, loses access, or whose Node is no longer selected is told to draw nothing,
 and its chip goes. That happens on navigation, on a removed grant (from the sidebar or the browser's
@@ -168,7 +168,7 @@ and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#w
 
 - The chip was checked in Chrome on a public pull request, with and without a task, including its
   menu, New chat about this page, Start task, and the chip changing when the task was archived.
-  Start task's menu, with Create task and Start workflow…, was checked in unit tests only.
+  Start task's menu, and the menus' icons and order, were checked in unit tests only.
   Firefox's chip and menu were checked in unit tests only. A chip's working and waiting counts were
   checked in unit tests only, because the session's Node ran no agent.
 - A page matches a task's address exactly, path case included. GitHub serves `Acme/Runn` and

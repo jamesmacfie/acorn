@@ -82,7 +82,8 @@ export function Handoff(props: {
   const [workflows, setWorkflows] = createSignal<Record<string, BridgeWorkflow[]>>({})
   const [workflowId, setWorkflowId] = createSignal('')
   const [values, setValues] = createSignal<Record<string, string>>({})
-  // The chip's menu asked for a workflow, so the first one is chosen once the list arrives.
+  // The chip's menu asked for a workflow, so Run workflow's picker opens with the card, until one is
+  // picked. Cancelling that workflow brings the picker back closed.
   let wantsWorkflow = props.handoff.start === 'workflow'
   // A create keeps its key, so a retry, after an unconfirmed create or a failed start, can't make a
   // second task. The starter keeps its own for the same task, workflow, and values.
@@ -118,12 +119,10 @@ export function Handoff(props: {
   }
   // Read up front, so Run workflow's picker opens on the list.
   createEffect(() => startable() && projectId() && void loadWorkflows(projectId()))
-  createEffect(() => {
-    const first = projectWorkflows()?.[0]
-    if (!wantsWorkflow || !first) return
+  const pickWorkflow = (id: string) => {
     wantsWorkflow = false
-    setWorkflowId(first.id)
-  })
+    setWorkflowId(id)
+  }
 
   const valueOf = (name: string): string =>
     inputText(values()[name] ?? (item() && workflow() ? seededValues(workflow()!, item()!)[name] : undefined))
@@ -338,7 +337,8 @@ export function Handoff(props: {
                               workflows={projectWorkflows()}
                               project={chosenProject()}
                               disabled={creating()}
-                              pick={setWorkflowId}
+                              defaultOpen={wantsWorkflow}
+                              pick={pickWorkflow}
                             />
                           </div>
                         }

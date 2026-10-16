@@ -26,6 +26,7 @@ export function WorkflowPicker(props: {
   chosen?: string
   disabled?: boolean
   placement?: PickerProps<never>['placement']
+  defaultOpen?: boolean
   pick(workflowId: string): void
 }) {
   return (
@@ -35,6 +36,7 @@ export function WorkflowPicker(props: {
       size="sm"
       disabled={props.disabled}
       placement={props.placement}
+      defaultOpen={props.defaultOpen}
       placeholder="Filter workflows"
       emptyText={props.workflows ? 'This project has no workflow to run. Publish one in Acorn.' : 'Loading workflows…'}
       items={(props.workflows ?? []).map((workflow) => ({

@@ -157,10 +157,12 @@ the toolbar button on the tab. The extension asks for nothing by itself. Browser
 and not by port, so `https://runn-05ea41.runn.localhost:5104` asks for all of
 `https://runn-05ea41.runn.localhost`.
 
-A click opens the panel on Home with the task. The arrow beside it opens a menu: **Show in side
-panel**, **Open in Acorn** (the task on the plugin's pane), **Ask about an element** (the
-[element picker](./element-picker.md)), **Copy Acorn link**, and **Hide on this site**. In Firefox
-the click opens the menu, which says to click Acorn in the toolbar for the panel.
+A click opens the panel on the task. The arrow beside it opens the task chip's menu without **New
+chat about this page**, each entry with its icon: **Show in side panel**, **Ask about an element**
+(the [element picker](./element-picker.md)), a separator, **Open in Acorn** (the task on the
+plugin's pane) and **Copy Acorn link**, then a separator and **Hide on this site**. In Firefox the
+click opens the menu, without **Show in side panel**, and the menu says to click Acorn in the
+toolbar for the panel.
 **Hide on this site** adds the page's origin to `hiddenMarkers` in `storage.local`
 ([browser storage](./conversations.md#browser-storage)), and the background takes the marker off
 every tab on that origin. **This page** shows it again. The background checks a marker click against

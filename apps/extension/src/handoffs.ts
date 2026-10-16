@@ -103,6 +103,8 @@ export type AskOpened =
   | {
       ok: true
       pickId: string
+      // The task's title, which heads its conversations in the box's To menu.
+      task: string
       sessions: { id: string; title: string }[]
       // The rows a new chat can start from, each by its `choiceKey`, and the one to choose first.
       agents: { key: string; label: string }[]

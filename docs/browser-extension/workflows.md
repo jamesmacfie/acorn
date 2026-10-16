@@ -12,7 +12,7 @@ operations behind them. The code is in `apps/extension/src/sidebar/Runs.tsx`,
 A workflow starts in two places, and both draw the same picker and form from `WorkflowForm.tsx`:
 
 - The handoff card's **Run workflow** picker lists the project's workflows, and the task chip's
-  **Start workflow…** opens the [handoff card](./handoffs.md#the-handoff-card) on the first of them.
+  **Run workflow…** opens the [handoff card](./handoffs.md#the-handoff-card) with that picker open.
   A chosen workflow shows its inputs, filled from the item, with **Start run** and **Cancel**.
 - A task's **Runs** tab has **Run workflow** in its header, with the task's project's workflows. See
   [starting a run in a task](#starting-a-run-in-a-task).

@@ -35,11 +35,11 @@ or **1 waiting** when an agent waits on you. Click it to open the panel on that 
 it opens a menu:
 
 - **Show in side panel** opens the panel on the task.
-- **Open in Acorn** opens the task in the desktop app, on the pane that shows the item.
 - **New chat about this page** opens the task's **Agents** tab, with the page's link waiting for the next
   conversation.
 - **Ask about an element** lets you point at part of the page and ask the task's agent
   ([Ask about an element](/docs/browser-extension/ask-about-an-element/)).
+- **Open in Acorn** opens the task in the desktop app, on the pane that shows the item.
 - **Copy Acorn link** copies a link to the task.
 
 The chip draws in its own sealed box, so the page can't restyle it or read it, and it follows the page's
@@ -48,8 +48,9 @@ light or dark theme.
 ## Bring an item into a task
 
 On a page no task holds, such as a pull request you haven't started on, the chip reads **Start task**.
-Its menu has **Create task** and **Start workflow…**, as the desktop app's row menu does. Either opens
-the panel on the handoff card, which Home also shows on its own for a page no task holds.
+Its menu has **Create task** and **Run workflow…**, the handoff card's two actions. Either opens the
+panel on the handoff card, which Home also shows on its own for a page no task holds. **Run workflow…**
+opens the card with its list of workflows open.
 
 <SidebarPicture id="sidebar-handoff" />
 
@@ -98,7 +99,7 @@ A page that's none of these has no **This page** section.
 
 On a task's running app, such as a local development server a plugin started for the task, the
 extension draws a small marker in the page's bottom-right corner: the task's branch and the app's state,
-such as **running**. Its menu has **Show in side panel**, **Open in Acorn**, **Ask about an element**,
+such as **running**. Its menu has **Show in side panel**, **Ask about an element**, **Open in Acorn**,
 **Copy Acorn link**, and **Hide on this site**. The site needs page access, as a chip does.
 
 ## Limits

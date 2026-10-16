@@ -20,7 +20,8 @@ task chip shows the first. A pick starts in one of two ways:
 - **Ask about an element** in the menu of the [task chip](./handoffs.md#task-chips) or the
   [branch marker](./task-pages.md#the-branch-marker), in both browsers. The person points at the
   element. The chip's script starts the picker through a global the two scripts share in the
-  extension's isolated world, which the page can't reach.
+  extension's isolated world, which the page can't reach. The build wraps each script in its own
+  function, so their minified names don't overwrite each other in that shared scope.
 
 While the person points, an outline follows the element under the pointer, and a click picks it. The
 page sees none of the pointer's presses then, so picking a button doesn't press it. **Esc** cancels.
@@ -34,22 +35,37 @@ connected, so that happens only when the host is down.
 ## The box
 
 The box sits below the element, or above it when there's no room, inside the viewport. It takes the
-page's light or dark theme and draws in a closed shadow root, as the task chip does. It holds a
-question field, two dropdowns, **Cancel**, and **Send**:
+page's light or dark theme and draws in a closed shadow root, as the task chip does. From the top, it
+holds:
 
-- **Conversation** offers **New chat**, chosen by default, and the task's conversations that aren't
-  archived.
-- **Agent** shows only for a new chat. It lists the rows of `agents.choices` that can start, the
-  same rows as the sidebar's **New chat**: each harness or its named logins, then each custom agent.
-  For more information, see [the agent operations](./conversations.md#the-agent-operations). A row's
-  value is its `choiceKey`, the harness, login, and custom agent joined with colons, such as
-  `claude:work:`, so a new chat starts the row the person chose. It defaults to the row last used
-  from the box, stored as `askAgent:<nodeId>` ([browser storage](./conversations.md#browser-storage)),
-  else the first. With none, it says no agent can start on this Node, and **Send** stays off for a
-  new chat.
+1. A line naming the element: a crosshair, its tag with its `id` or first class, and its size, such
+   as `button.pay-now · 168 × 34`.
+2. The question field.
+3. A bar with **To** on the left, a faint **esc** that closes the box, and **Send ↵** on the right.
 
-**Enter** sends, and **Shift+Enter** adds a line. **Cancel**, **Esc**, a tab switch, a navigation, or
-the element leaving the page closes the box and sends nothing.
+**To** shows where the question goes, such as **New chat · Claude**, and opens a menu inside the
+box's shadow root with two groups:
+
+- **New chat**: one row per row of `agents.choices` that can start, the same rows as the sidebar's
+  **New chat**: each harness or its named logins, then each custom agent. For more information, see
+  [the agent operations](./conversations.md#the-agent-operations). A row's value is its `choiceKey`,
+  the harness, login, and custom agent joined with colons, such as `claude:work:`, so a new chat
+  starts the row the person chose.
+- The task's title: one row per conversation in the task that isn't archived.
+
+**To** starts on a new chat with the row last used from the box, stored as `askAgent:<nodeId>`
+([browser storage](./conversations.md#browser-storage)), else the first. With no agent able to start,
+it says "No agent can start on this Node", and **Send** stays off until the person picks a
+conversation. With no conversation either, **To** is off. Choosing a row sets **To** and closes the
+menu. The menu opens under **To**, or above it when the box sits too low, and closes on Escape or a
+click anywhere else.
+
+The icons are the kit's Lucide shapes, inlined in `picker.ts`, because a content script can't import
+the kit.
+
+**Enter** sends, and **Shift+Enter** adds a line. **esc**, the Escape key, a tab switch, a
+navigation, or the element leaving the page closes the box and sends nothing. With the menu open,
+Escape closes the menu first.
 
 **Send** opens the panel inside the click. The background then uploads the screenshot, makes the new
 chat if one was chosen, and submits the turn. On success the box closes, the background saves the

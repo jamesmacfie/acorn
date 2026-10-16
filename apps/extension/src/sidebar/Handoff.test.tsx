@@ -236,6 +236,12 @@ async function chatAndSend(root: HTMLElement) {
   await settle(30)
 }
 
+// A row of the open picker.
+const pickedRow = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>('.repo-picker-popover .repo-picker-name')].find(
+    (row) => row.querySelector('span')?.textContent === label,
+  )!
+
 // A choice from the task chip's Start task menu, as the background reports it once the panel is open.
 async function clickSiteButton(fake: ReturnType<typeof fakeBrowser>, start: 'task' | 'workflow' = 'task') {
   fake.activeTab = { ...fake.activeTab, url: PAGE }
@@ -428,9 +434,12 @@ describe('a handoff in the sidebar', () => {
       host.send({ v: 1, id: request.id, ok: false, error: { code: 'ambiguous_mutation', message: 'lost' } })
     }
     await settle(20)
-    // The chip's Start workflow menu choice opens the card on the project's first workflow.
+    // The chip's Run workflow… menu choice opens the card with its workflow picker open.
     await clickSiteButton(fake, 'workflow')
     await settle(20)
+    expect(button(root, 'Run workflow')!.getAttribute('aria-expanded')).toBe('true')
+    pickedRow('PR review').click()
+    await settle()
     expect(chosen(root, 'Workflow')).toBe('PR review')
     button(root, 'Start run')!.click()
     await settle(30)
@@ -451,10 +460,14 @@ describe('a handoff in the sidebar', () => {
     await settle(20)
     await clickSiteButton(fake, 'workflow')
     await settle(20)
+    pickedRow('PR review').click()
+    await settle()
     button(root, 'Cancel')!.click()
     await settle()
     expect(root.querySelector('textarea[name="input-issue"]')).toBeNull()
     expect(button(root, 'Create task')).toBeDefined()
+    // The picker the chip opened stays closed once the person has used it.
+    expect(button(root, 'Run workflow')!.getAttribute('aria-expanded')).toBe('false')
     expect(chosen(root, 'Item')).toBe('acme/widget#42')
     await pickFrom(root, 'Item', 'acme/widget#43')
     expect(card(root)!.querySelector('.item-title')!.textContent).toBe('Speed up the build')
@@ -516,6 +529,8 @@ describe('a handoff in the sidebar', () => {
 
     await clickSiteButton(fake, 'workflow')
     await settle(20)
+    pickedRow('PR review').click()
+    await settle()
     const focus = root.querySelector<HTMLTextAreaElement>('textarea[name="input-focus"]')!
     focus.value = 'The retry loop'
     focus.dispatchEvent(new Event('input', { bubbles: true }))

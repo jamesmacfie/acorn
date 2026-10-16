@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show, type JSX } from 'solid-js'
+import { createMemo, createSignal, For, onMount, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type Placement } from '../../lib/controls/anchor'
 import PickerRow from './PickerRow'
@@ -75,6 +75,7 @@ export type PickerProps<T> = {
   disabled?: boolean // greys the button and blocks opening (e.g. repo is fixed in a task view)
   keepOpen?: boolean // stay open after a pick, so the same list can drive a multi-select (isActive marks the chosen ones)
   placement?: Placement // 'bottom-end' for a trigger at the right edge, so the list opens leftward
+  defaultOpen?: boolean // open once it mounts, as when the person asked for this list somewhere else
 }
 
 export default function Picker<T>(props: PickerProps<T>) {
@@ -121,6 +122,7 @@ export default function Picker<T>(props: PickerProps<T>) {
     popover.toggle()
     if (open()) queueMicrotask(() => inputRef?.focus())
   }
+  onMount(() => props.defaultOpen && toggle())
   const choose = (row: PickerItem) => {
     if (row.disabled) return
     if (props.items) props.onPick?.(row.id)
