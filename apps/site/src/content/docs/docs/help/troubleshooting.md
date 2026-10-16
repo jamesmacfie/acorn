@@ -5,7 +5,7 @@ sources:
   - docs/browser-extension/setup.md
   - docs/plugin-authoring/installing-a-hand-written-package.md
   - docs/security/plugin-bundles.md
-checked: 1e0ef8b80
+checked: 83c8184c2
 draft: true
 ---
 
