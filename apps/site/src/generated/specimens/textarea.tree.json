@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "title": "Textarea",
+    "caption": "A three-line text area holding a commit message.",
+    "terminal": {
+      "columns": 50,
+      "rows": 5
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Textarea",
+          "props": {
+            "label": "Commit message",
+            "rows": 3,
+            "value": "Fix the redirect after sign-in\n\nKeeps the next parameter."
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

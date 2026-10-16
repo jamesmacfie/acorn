@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { anchor, code, codeList, declarationOf, docOf, flat, number, table } from './factsFormat.mjs'
 
 const { manifestJsonSchema, pluginManifestVocabulary } = await import('@acorn/protocol/plugin/vocabulary.ts')
 const { NODE_EVENT_CHANNELS } = await import('@acorn/protocol/nodeEvents.ts')
@@ -31,15 +32,6 @@ const contributionPage = (key) => `contributions/${key.replace(/[A-Z]/g, (letter
 
 // ── Formatting ────────────────────────────────────────────────────────────────────────────────────
 
-const code = (value) => `\`${value}\``
-const codeList = (values) => values.map(code).join(', ')
-const number = (value) => value.toLocaleString('en-US')
-const anchor = (...parts) =>
-  parts
-    .join('-')
-    .replace(/[^A-Za-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .toLowerCase()
 const bytes = (value) =>
   value % (1024 * 1024) === 0
     ? `${number(value / (1024 * 1024))} MiB`
@@ -47,9 +39,6 @@ const bytes = (value) =>
       ? `${number(value / 1024)} KiB`
       : `${number(value)} bytes`
 const seconds = (ms) => (ms === 1000 ? '1 second' : ms % 1000 === 0 ? `${number(ms / 1000)} seconds` : `${number(ms)} ms`)
-
-/** A `ReferenceTable`: rows of `{ id, cells, href? }`, drawn with an anchor on each. */
-const table = (head, rows) => `<ReferenceTable head={${JSON.stringify(head)}} rows={${JSON.stringify(rows)}} />`
 
 // ── The manifest schema ───────────────────────────────────────────────────────────────────────────
 
@@ -376,9 +365,6 @@ const compiler = (files) => {
   return { program, checker: program.getTypeChecker() }
 }
 
-const flat = (text) => text.replace(/\s+/g, ' ').trim()
-const docOf = (symbol, checker) => flat(ts.displayPartsToString(symbol.getDocumentationComment(checker)))
-const declarationOf = (symbol) => symbol.valueDeclaration ?? symbol.declarations?.[0]
 
 /** A member's signature as its declaration writes it. */
 function signatureOf(symbol) {

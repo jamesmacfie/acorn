@@ -1,0 +1,27 @@
+---
+title: Graph
+description: Cards on a canvas, joined by edges. The terminal draws an indented list.
+sources:
+  - packages/client-core/src/kit/components/content/Graph.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Graph` for steps and what they wait on, such as a workflow. Each card is in `nodes`, each join is in `edges`, and `positions` places them. The terminal draws the same cards as a list indented by rank.
+
+<Specimen id="graph" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="graph" />
+
+## Related
+
+- [`Timeline`](/docs/components/collections/timeline/), for steps in a line.
+- [`Table`](/docs/components/collections/table/), for steps with fields.
+
+## Mistakes
+
+- Drawing a graph only a picture can explain. The terminal draws ranks and no wires, so the order has to make sense as a list.

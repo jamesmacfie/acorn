@@ -1,0 +1,29 @@
+---
+title: Card
+description: A framed group, optionally toned with a stripe or pressable.
+sources:
+  - packages/client-core/src/kit/components/content/Card.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Card` to frame one item, such as a turn in a review or a result. A `stripe` tones its leading edge, and `onPress` makes the whole card one control.
+
+<Specimen id="cards" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="cards" />
+
+## Related
+
+- [`Timeline`](/docs/components/collections/timeline/), for cards in sequence.
+- [`Alert`](/docs/components/content/alert/), for a message that needs a tone.
+- [`Section`](/docs/components/grouping/section/), for a group with no frame.
+
+## Mistakes
+
+- Giving a card `onPress` and also a button inside it. The card is one tab stop, so put the action on the card or on a button, not both.
+- Toning a card with a color. `stripe` takes `accent`, `ok`, `warn`, or `danger`.

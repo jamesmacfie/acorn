@@ -1,0 +1,100 @@
+{
+  "meta": {
+    "title": "Only",
+    "caption": "One line on both hosts, and one line each host draws on its own.",
+    "terminal": {
+      "columns": 50,
+      "rows": 2
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Text",
+              "props": {},
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Deploys run on the Node."
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Only",
+              "props": {
+                "hosts": [
+                  "dom"
+                ]
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "Text",
+                  "props": {
+                    "emphasis": "muted"
+                  },
+                  "children": [
+                    {
+                      "id": "n6",
+                      "type": "#text",
+                      "props": {
+                        "value": "Drag a row to reorder it."
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n7",
+              "type": "Only",
+              "props": {
+                "hosts": [
+                  "tui"
+                ]
+              },
+              "children": [
+                {
+                  "id": "n8",
+                  "type": "Text",
+                  "props": {
+                    "emphasis": "muted"
+                  },
+                  "children": [
+                    {
+                      "id": "n9",
+                      "type": "#text",
+                      "props": {
+                        "value": "Press Ctrl+Shift+Up to move a row."
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

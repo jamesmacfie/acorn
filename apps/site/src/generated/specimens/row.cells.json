@@ -1,0 +1,7 @@
+{"columns":60,"rows":5,"lines":[
+[{"text":" ","fg":"accent","bg":"hover"},{"text":" ","bg":"hover"},{"text":"Redirect loop after sign-in","bg":"hover","attrs":["inverse"]},{"text":"                        ACO-12","bg":"hover"}],
+[{"text":" ","fg":"accent"},{"text":" Flaky upload test                                  ACO-14"}],
+[{"text":" ","fg":"accent"},{"text":" Slow first paint                                   ACO-15"}],
+[{"text":"  "},{"text":"Opened by sam yesterday","fg":"muted"}],
+[]
+]}

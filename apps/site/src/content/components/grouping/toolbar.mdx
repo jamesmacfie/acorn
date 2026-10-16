@@ -1,0 +1,28 @@
+---
+title: Toolbar
+description: A bar of actions and facts on one line, with a rule under it.
+sources:
+  - packages/client-core/src/kit/components/layout/Toolbar.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Toolbar` for a row of actions over or under content. Put a `ToolbarSpacer` in it to push what follows to the far end.
+
+<Specimen id="toolbar" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="toolbar" />
+
+## Related
+
+- [`ToolbarSpacer`](/docs/components/grouping/toolbar-spacer/), to push actions to the end.
+- [`FilterBar`](/docs/components/grouping/filter-bar/), for a search or filter row.
+- [`Inline`](/docs/components/grouping/inline/), for a run with no rule.
+
+## Mistakes
+
+- Using a toolbar for a search field and its options. That's a `FilterBar`, which owns the inset and the divider a sidebar search draws.

@@ -79,6 +79,11 @@ const role = both ? 'group' : 'tabpanel'
     position: absolute;
     inset: var(--space-2) var(--space-4) auto auto;
   }
+  /* A modal covers the window in the app. Here it draws in its frame, so it never covers the page. */
+  .view :global(.overlay-backdrop) {
+    position: relative;
+    padding-block: var(--space-4);
+  }
   /* Side by side on a wide screen, one above the other on a narrow one. The terminal sizes its text to
      fit its column, as a terminal snapshot does: a cell is 0.6em wide in a monospace face. */
   .both .views {

@@ -1,0 +1,28 @@
+---
+title: DescriptionList
+description: A list of terms and descriptions. Facts is the form a tree uses.
+sources:
+  - packages/client-core/src/kit/components/content/DescriptionList.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`DescriptionList` takes item children in shell code. A tree has no item node to send it, so a tree draws the same list with `Facts`.
+
+<Specimen id="description-list" />
+
+<Specimen id="facts" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="facts" />
+
+## Related
+
+- [`Facts`](/docs/components/content/facts/), for a list a tree can fill.
+
+## Mistakes
+
+- Sending `DescriptionList` with plain children and expecting pairs. Use `Facts` with `items`.

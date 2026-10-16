@@ -1,0 +1,28 @@
+{
+  "meta": {
+    "title": "Markdown",
+    "caption": "A heading, a paragraph with code and a link, and a list.",
+    "terminal": {
+      "columns": 60,
+      "rows": 7
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Markdown",
+          "props": {
+            "text": "### Release notes\n\nSign-in now keeps the `next` parameter. See [the issue](https://linear.app/acme/issue/ACO-12).\n\n- Fixes the redirect loop\n- Adds a test for deep links"
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

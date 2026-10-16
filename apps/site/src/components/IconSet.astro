@@ -1,0 +1,127 @@
+---
+// The icons that draw without waiting, with a filter by name (docs/ui-design/icons.md). The set is the
+// kit's own eager half, so this grid shows what the app draws on its first pass. Each icon notes the
+// one-cell mark the terminal draws for it, where it has one. The generator passes the terminal's marks
+// and core's brand marks in, because they're read from source the site can't import.
+import eager from '../../../../packages/client-core/src/kit/tokens/iconNodes.eager.json'
+
+interface Props {
+  /** The terminal's one-cell mark, by icon name. */
+  glyphs: Record<string, string>
+  /** Core's brand marks: a name, one path's `d`, and the brand's own color. */
+  brands: { id: string; d: string; color?: string }[]
+}
+
+const { glyphs, brands } = Astro.props
+const attributes = (attrs: Record<string, string>) =>
+  Object.entries(attrs)
+    .filter(([name]) => name !== 'key')
+    .map(([name, value]) => `${name}="${value.replace(/"/g, '&quot;')}"`)
+    .join(' ')
+const icons = Object.entries(eager as unknown as Record<string, [string, Record<string, string>][]>)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([name, nodes]) => ({ name, svg: nodes.map(([tag, attrs]) => `<${tag} ${attributes(attrs)}/>`).join(''), glyph: glyphs[name] }))
+---
+
+<div class="icon-set not-content" data-icon-set>
+  <label class="filter" hidden data-filter>
+    Filter icons
+    <input type="search" placeholder="circle, arrow, git…" />
+  </label>
+  <p aria-live="polite" data-count>{icons.length} icons</p>
+  <ul class="icons">
+    {
+      icons.map(({ name, svg, glyph }) => (
+        <li data-name={name}>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            set:html={svg}
+          />
+          <code>{name}</code>
+          {glyph && <span class="glyph" title="The terminal's mark">{glyph}</span>}
+        </li>
+      ))
+    }
+  </ul>
+  <h3>Brand marks</h3>
+  <ul class="icons">
+    {
+      brands.map(({ id, d, color }) => (
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true" style={color ? `color: ${color}` : undefined}>
+            <path d={d} fill="currentColor" />
+          </svg>
+          <code>brand:{id}</code>
+        </li>
+      ))
+    }
+  </ul>
+</div>
+
+<script>
+  // The filter only hides icons, so a page without script lists every one.
+  for (const set of document.querySelectorAll<HTMLElement>('[data-icon-set]')) {
+    const label = set.querySelector<HTMLElement>('[data-filter]')!
+    const input = label.querySelector('input')!
+    const count = set.querySelector<HTMLElement>('[data-count]')!
+    const icons = [...set.querySelectorAll<HTMLElement>('[data-name]')]
+    input.addEventListener('input', () => {
+      const query = input.value.trim().toLowerCase()
+      const shown = icons.filter((icon) => (icon.hidden = !icon.dataset.name!.includes(query)) === false)
+      count.textContent = `${shown.length} of ${icons.length} icons`
+    })
+    label.hidden = false
+  }
+</script>
+
+<style>
+  .filter {
+    display: grid;
+    gap: var(--space-2);
+    max-inline-size: 24rem;
+  }
+  .filter input {
+    font: inherit;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .icons {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: var(--space-3);
+    padding: 0;
+    list-style: none;
+  }
+  .icons li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-inline-size: 0;
+  }
+  .icons li[hidden] {
+    display: none;
+  }
+  .icons svg {
+    flex: none;
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+  }
+  .icons code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: var(--fs-sm);
+  }
+  .glyph {
+    margin-inline-start: auto;
+    font-family: var(--font-mono);
+  }
+</style>

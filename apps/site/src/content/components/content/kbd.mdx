@@ -1,0 +1,26 @@
+---
+title: Kbd
+description: A key or a chord, drawn the way the host writes keys.
+sources:
+  - packages/client-core/src/kit/components/content/Kbd.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Kbd` for a shortcut in a line of text. The desktop draws a key cap, and the terminal writes the chord as its host does.
+
+<Specimen id="kbd" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="kbd" />
+
+## Related
+
+- [`Text`](/docs/components/content/text/), for the words around it.
+
+## Mistakes
+
+- Spelling a chord for one platform, such as `Cmd+K`, in plain text. Put it in `Kbd`, and the host writes it its own way.

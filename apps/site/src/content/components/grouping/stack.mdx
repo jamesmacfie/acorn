@@ -1,0 +1,29 @@
+---
+title: Stack
+description: Children one above the other, spaced by a gap role.
+sources:
+  - packages/client-core/src/kit/components/layout/Stack.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Stack` for a column of content. `gap` takes a space role, never a number, and `grow` makes the stack the region rather than a run of content inside one.
+
+<Specimen id="stack-and-inline" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="stack-and-inline" />
+
+## Related
+
+- [`Inline`](/docs/components/grouping/inline/), for children on one line.
+- [`Pane`](/docs/components/grouping/pane/), for the root of a pane.
+- [`Section`](/docs/components/grouping/section/), for a labeled group.
+
+## Mistakes
+
+- Passing `gap={8}` or a CSS length. A gap is one of the space roles, and anything else is dropped.
+- Setting `grow` on a stack that sits inside another run of content. `grow` means the stack fills its box, so it needs a `Pane` or a `Stack grow` around it.

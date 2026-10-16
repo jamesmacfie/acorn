@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "title": "Facts",
+    "caption": "Four facts about a deploy, in two columns.",
+    "terminal": {
+      "columns": 60,
+      "rows": 4
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Facts",
+          "props": {
+            "items": [
+              {
+                "label": "Environment",
+                "value": "staging"
+              },
+              {
+                "label": "Commit",
+                "value": "3f9a2c1",
+                "mono": true
+              },
+              {
+                "label": "Started",
+                "value": "12 minutes ago"
+              },
+              {
+                "label": "Duration",
+                "value": "2m 14s"
+              }
+            ]
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

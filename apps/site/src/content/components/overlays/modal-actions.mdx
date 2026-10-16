@@ -1,0 +1,27 @@
+---
+title: ModalActions
+description: The buttons at the foot of a modal.
+sources:
+  - packages/client-core/src/kit/components/overlays/Modal.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Put a modal's buttons in `ModalActions`. The host lines them up at the end of the dialog.
+
+<Specimen id="modal" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="modal" />
+
+## Related
+
+- [`Modal`](/docs/components/overlays/modal/), for the dialog around it.
+- [`Button`](/docs/components/inputs/button/), for each action.
+
+## Mistakes
+
+- Putting text in the actions. Keep it to buttons, and put the words in `ModalBody`.

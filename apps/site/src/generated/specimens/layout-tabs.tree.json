@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "title": "tabs",
+    "caption": "The host's tab bar, then the open tab's panel. A closed tab's panel isn't drawn.",
+    "terminal": {
+      "columns": 50,
+      "rows": 5
+    },
+    "width": 400
+  },
+  "layout": {
+    "name": "tabs",
+    "label": "Deploys",
+    "regions": [
+      "panel:overview",
+      "panel:checks"
+    ],
+    "tabs": [
+      {
+        "id": "overview",
+        "label": "Overview"
+      },
+      {
+        "id": "checks",
+        "label": "Checks"
+      }
+    ]
+  }
+}

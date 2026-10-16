@@ -1,0 +1,51 @@
+{
+  "meta": {
+    "title": "Grid",
+    "caption": "Three rows of query results, the second selected.",
+    "terminal": {
+      "columns": 60,
+      "rows": 5
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Grid",
+          "props": {
+            "ariaLabel": "Query results",
+            "columns": [
+              "id",
+              "email",
+              "plan"
+            ],
+            "rows": [
+              [
+                "1",
+                "alex@acme.dev",
+                "team"
+              ],
+              [
+                "2",
+                "sam@acme.dev",
+                "pro"
+              ],
+              [
+                "3",
+                "kim@acme.dev",
+                "free"
+              ]
+            ],
+            "selected": 1
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

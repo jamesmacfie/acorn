@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "title": "FilterBar",
+    "caption": "A filter input with an options button, as a sidebar draws its search.",
+    "terminal": {
+      "columns": 50,
+      "rows": 1
+    },
+    "width": 360
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "FilterBar",
+          "props": {
+            "ariaLabel": "Search issues"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Input",
+              "props": {
+                "kind": "filter",
+                "label": "Search issues",
+                "placeholder": "Search issues",
+                "value": "redirect"
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "IconButton",
+              "props": {
+                "icon": "list-filter",
+                "label": "Filter options"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

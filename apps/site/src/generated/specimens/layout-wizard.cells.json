@@ -1,0 +1,9 @@
+{"columns":60,"rows":7,"lines":[
+[{"text":"STEP 2 OF 3 · CHOOSE","fg":"muted"}],
+[{"text":"┌─Deploys──────────────────────────────────────────────────┐","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"step region","fg":"muted"},{"text":"                                               "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                          "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                          "},{"text":"│","fg":"accent"}],
+[{"text":"└──────────────────────────────────────────────────────────┘","fg":"accent"}],
+[{"text":"                                               [Back] "},{"text":"[Next]","fg":"accent"}]
+]}

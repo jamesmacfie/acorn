@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "title": "Composer",
+    "caption": "An empty composer with its placeholder and its send button.",
+    "terminal": {
+      "columns": 60,
+      "rows": 4
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Composer",
+          "props": {
+            "value": "",
+            "placeholder": "Ask about this deploy",
+            "submitLabel": "Send",
+            "onSubmit": {
+              "$handler": 1
+            }
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

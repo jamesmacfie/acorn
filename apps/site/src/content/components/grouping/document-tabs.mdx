@@ -1,0 +1,27 @@
+---
+title: DocumentTabs
+description: A strip of open documents, with a dot for unsaved changes.
+sources:
+  - packages/client-core/src/kit/components/layout/DocumentTabs.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `DocumentTabs` for open files or sessions the reader switches between. Each tab can mark unsaved changes, a run state, or a preview, and `onActivate` sends the id of the tab pressed.
+
+<Specimen id="document-tabs" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="document-tabs" />
+
+## Related
+
+- [`Tabs`](/docs/components/grouping/tabs/), for a fixed set of views.
+
+## Mistakes
+
+- Marking unsaved changes with an asterisk in the label. Set `dirty`, and both hosts draw a dot.
+- Expecting a tree's tabs to close. `onClose` isn't one of the twelve events, so a tree can't hear a close.

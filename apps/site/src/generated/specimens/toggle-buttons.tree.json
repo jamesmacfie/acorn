@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "title": "ToggleButton",
+    "caption": "Two toggles, one pressed in.",
+    "terminal": {
+      "columns": 40,
+      "rows": 1
+    },
+    "width": 320
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Inline",
+          "props": {
+            "gap": "inline"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "ToggleButton",
+              "props": {
+                "label": "Wrap lines",
+                "pressed": true
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "ToggleButton",
+              "props": {
+                "label": "Whitespace",
+                "pressed": false
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "title": "document-over-frame",
+    "caption": "The host's document over the plugin's frame, with the handle between them.",
+    "terminal": {
+      "columns": 50,
+      "rows": 14
+    },
+    "width": 400
+  },
+  "layout": {
+    "name": "document-over-frame",
+    "label": "Deploys",
+    "regions": [
+      "document",
+      "frame"
+    ]
+  }
+}

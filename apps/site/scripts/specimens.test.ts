@@ -6,10 +6,14 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { renumber } from '@acorn/plugin-examples/renumber.ts'
 import { createRemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'
+import { LAYOUTS } from '@acorn/client-core/host/layouts'
 import { TreeHost } from '@acorn/client-core/host/tree/TreeHost.tsx'
+import { Text } from '@acorn/client-core/kit/components/content'
+import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import { solidTree } from 'acorn-plugin-sdk/remote'
 import type { SpecimenMeta } from '../specimens/specimen'
 import examplePictures from '../specimens/examples.json'
+import layoutPictures from '../specimens/layouts.json'
 
 // The specimen generator's first two steps (docs/site/specimens.md): run each specimen's tree in this
 // process and record the batches it sends, then draw those batches with the desktop's TreeHost under
@@ -17,7 +21,9 @@ import examplePictures from '../specimens/examples.json'
 // `UPDATE_SPECIMENS=1` rewrites them. The terminal step is apps/tui/src/kit/specimens.test.tsx, which
 // reads the `.tree.json` files this one writes. An example plugin's picture, listed in
 // apps/site/specimens/examples.json, is recorded by examples/plugins/test/pictures.test.ts instead,
-// and this draws its HTML from the committed tree.
+// and this draws its HTML from the committed tree. A layout's picture, listed in
+// apps/site/specimens/layouts.json, is no tree: each host draws its own layout component, with every
+// region holding its name, and the `.tree.json` records the layout in place of batches.
 
 const OUT = join(import.meta.dirname, '../src/generated/specimens')
 const update = process.env.UPDATE_SPECIMENS === '1'
@@ -84,24 +90,53 @@ async function drawDesktop(batches: TreeMutation[][]): Promise<string> {
     host,
   )
   for (const ops of batches) deliver(ops)
+  // A modal draws through a portal, into the document's body rather than in its place, so the drawing
+  // is the host's markup followed by any portal's.
+  const drawn = () => [host, ...[...document.body.children].filter((element) => element !== host)]
+  const html = () =>
+    drawn()
+      .map((element) => element.innerHTML)
+      .join('')
   // Each root waits for its lazy nodes, such as a timeline or a code block, and draws nothing until
   // they load. So the drawing is done once it's something, and stays the same for one more turn.
-  let html = ''
+  let last = ''
   for (let turn = 0; turn < 200; turn += 1) {
     await new Promise((done) => setTimeout(done, 25))
-    if (host.innerHTML !== '' && host.innerHTML === html) break
-    html = host.innerHTML
+    if (html() !== '' && html() === last) break
+    last = html()
   }
-  reflectFormState(host)
-  html = host.innerHTML
+  for (const element of drawn()) reflectFormState(element)
+  last = html()
   dispose()
   host.remove()
   expect(problems).toEqual([])
+  return last
+}
+
+type LayoutPicture = (typeof layoutPictures)[number]
+// The pane a layout picture is drawn for, which a layout writes into its regions' names.
+const LAYOUT_LABEL = 'Deploys'
+
+/** Draws one of the host's layouts with each region holding its own name, and returns the HTML. */
+async function drawLayout({ id, layout, regions, ...props }: LayoutPicture): Promise<string> {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const named = Object.fromEntries(
+    regions.map((name) => [name, () => createComponent(Text, { emphasis: 'muted', children: `${name} region` })]),
+  )
+  const dispose = render(
+    () => LAYOUTS[layout as PaneLayoutName]({ ...props, stateKey: id, label: LAYOUT_LABEL, regions: named }),
+    host,
+  )
+  await new Promise((done) => setTimeout(done, 0))
+  const html = host.innerHTML
+  dispose()
+  host.remove()
   return html
 }
 
 /** A control's value is a property, which `innerHTML` leaves out, so copy it into the markup. */
-function reflectFormState(root: HTMLElement): void {
+function reflectFormState(root: Element): void {
   for (const input of root.querySelectorAll('input')) {
     if (input.type === 'checkbox' || input.type === 'radio') input.toggleAttribute('checked', input.checked)
     else input.setAttribute('value', input.value)
@@ -132,13 +167,16 @@ const KEPT_STYLE = /^(--[\w-]+|transform|width|height|min-width|top|left|positio
 /**
  * Makes the drawn HTML safe to commit and the same on every machine. Element ids become
  * `<specimen>-<n>`, which also keeps them unique on a page that shows several specimens. Scripts and
- * event handler attributes go, and an inline style keeps only what `KEPT_STYLE` allows.
+ * event handler attributes go, and an inline style keeps only what `KEPT_STYLE` allows. An image from
+ * another origin, such as a GitHub avatar, loses its `src`, because a site page loads nothing from
+ * another origin, so it draws as its empty frame.
  */
 function sanitize(specimen: string, html: string): string {
   const template = document.createElement('template')
   template.innerHTML = html
   const content = template.content
   for (const script of content.querySelectorAll('script')) script.remove()
+  for (const image of content.querySelectorAll('img[src^="http"]')) image.removeAttribute('src')
 
   const ids = new Map<string, string>()
   for (const element of content.querySelectorAll('[id]')) {
@@ -173,7 +211,7 @@ function sanitize(specimen: string, html: string): string {
 
 it('finds the specimens', () => {
   expect(specimens.length).toBeGreaterThan(0)
-  const ids = [...specimens.map((specimen) => specimen.id), ...examplePictures.map((picture) => picture.id)]
+  const ids = [specimens, examplePictures, layoutPictures].flat().map(({ id }) => id)
   expect(new Set(ids).size, 'Two specimens share an id. Ids are file names, and must be unique across groups.').toBe(
     ids.length,
   )
@@ -191,8 +229,18 @@ it.each(examplePictures)('$id draws the committed HTML of its example tree', asy
   check(`${id}.html`, `${sanitize(id, await drawDesktop(batches))}\n`)
 })
 
+it.each(layoutPictures)('$id draws the committed layout', async (picture) => {
+  const { id, layout, title, caption, terminal, width, regions, ...props } = picture
+  const meta: SpecimenMeta = { title, caption, terminal, width }
+  check(
+    `${id}.tree.json`,
+    `${JSON.stringify({ meta, layout: { name: layout, label: LAYOUT_LABEL, regions, ...props } }, null, 2)}\n`,
+  )
+  check(`${id}.html`, `${sanitize(id, await drawLayout(picture))}\n`)
+})
+
 it('commits no output for a specimen that no longer exists', () => {
-  const ids = [...specimens.map(({ id }) => id), ...examplePictures.map(({ id }) => id)]
+  const ids = [specimens, examplePictures, layoutPictures].flat().map(({ id }) => id)
   const expected = new Set(ids.flatMap((id) => [`${id}.tree.json`, `${id}.html`, `${id}.cells.json`]))
   const stale = readdirSync(OUT).filter((name) => !expected.has(name))
   if (update) for (const name of stale) rmSync(join(OUT, name))

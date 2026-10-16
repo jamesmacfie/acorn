@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "title": "wizard",
+    "caption": "The host's step indicator, the step, and the footer with every action.",
+    "terminal": {
+      "columns": 60,
+      "rows": 7
+    },
+    "width": 480
+  },
+  "layout": {
+    "name": "wizard",
+    "label": "Deploys",
+    "regions": [
+      "step"
+    ],
+    "steps": [
+      {
+        "id": "connect",
+        "label": "Connect"
+      },
+      {
+        "id": "choose",
+        "label": "Choose"
+      },
+      {
+        "id": "done",
+        "label": "Done"
+      }
+    ],
+    "current": "choose"
+  }
+}

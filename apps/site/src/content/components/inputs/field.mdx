@@ -1,0 +1,27 @@
+---
+title: Field
+description: A control's label, hint, error, and help.
+sources:
+  - packages/client-core/src/kit/components/inputs/Field.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Wrap a control in `Field` to label it. The label names the control, and the hint, the error, and `help` are read with it.
+
+<Specimen id="field" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="field" />
+
+## Related
+
+- [`SettingRow`](/docs/components/grouping/setting-row/), for a setting on a settings page.
+- [`Input`](/docs/components/inputs/input/), for the control inside.
+
+## Mistakes
+
+- Putting two controls in one field. The label names one, and with two it names none.

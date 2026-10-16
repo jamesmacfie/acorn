@@ -1,0 +1,27 @@
+---
+title: StatusDot
+description: A dot whose tone marks a state.
+sources:
+  - packages/client-core/src/kit/components/content/StatusDot.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `StatusDot` for a running, stopped, or failed state where a word would crowd the row. Give it a `label`, which names it for a screen reader.
+
+<Specimen id="status-dots" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="status-dots" />
+
+## Related
+
+- [`Badge`](/docs/components/content/badge/), for a state with a word.
+- [`Icon`](/docs/components/content/icon/), for a state with a shape.
+
+## Mistakes
+
+- Leaving the meaning to the color alone. Put the word beside it, or in `label`.

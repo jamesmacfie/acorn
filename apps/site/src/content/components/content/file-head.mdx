@@ -1,0 +1,26 @@
+---
+title: FileHead
+description: "A changed file's header: status, path, and lines added and removed."
+sources:
+  - packages/client-core/src/kit/diff/DiffRows.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `FileHead` for one file's line in a list of changes. `file` holds its status, path, and the counts.
+
+<Specimen id="file-head" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="file-head" />
+
+## Related
+
+- [`StackedDiff`](/docs/components/content/stacked-diff/), for the file and its patch.
+
+## Mistakes
+
+- Drawing the counts yourself beside a path. `FileHead` draws them, aligned, on both hosts.

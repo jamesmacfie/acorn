@@ -1,0 +1,26 @@
+---
+title: TableCell
+description: One cell of a table.
+sources:
+  - packages/client-core/src/kit/components/layout/Table.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`TableCell` holds one value. The terminal cuts its text to the column's width with an ellipsis.
+
+<Specimen id="table" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="table" />
+
+## Related
+
+- [`TableRow`](/docs/components/collections/table-row/), for the row around it.
+
+## Mistakes
+
+- Putting a `Badge` in a cell. The terminal draws it as `[object Object]`, so put the text in the cell.

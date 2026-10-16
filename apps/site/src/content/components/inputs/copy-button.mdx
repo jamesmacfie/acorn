@@ -1,0 +1,26 @@
+---
+title: CopyButton
+description: A button that copies a value.
+sources:
+  - packages/client-core/src/kit/components/inputs/CopyButton.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `CopyButton` beside a value the reader copies, such as a hash. The terminal copies with OSC 52 where it can, and prints the value to copy by hand where it can't.
+
+<Specimen id="copy-button" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="copy-button" />
+
+## Related
+
+- [`CodeBlock`](/docs/components/content/code-block/), for a block with its own copy control.
+
+## Mistakes
+
+- Leaving out `always` in a tree. Without it the button shows only when the reader hovers its row, and a tree can't set the class that row needs.

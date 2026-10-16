@@ -1,0 +1,5 @@
+{"columns":50,"rows":3,"lines":[
+[{"text":"build","attrs":["bold"]},{"text":" "},{"text":"[passed]","fg":"ok"}],
+[{"text":"test","attrs":["bold"]},{"text":" "},{"text":"[flaky]","fg":"warn"}],
+[{"text":"deploy","attrs":["bold"]},{"text":" [waiting]"}]
+]}

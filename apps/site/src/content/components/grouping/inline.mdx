@@ -1,0 +1,29 @@
+---
+title: Inline
+description: Children on one line, spaced by a gap role, wrapping when the line is too short.
+sources:
+  - packages/client-core/src/kit/components/layout/Inline.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Inline` for a run of short things on one line: a label and its badge, a row of buttons. It wraps when it runs out of room.
+
+<Specimen id="stack-and-inline" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="stack-and-inline" />
+
+## Related
+
+- [`Stack`](/docs/components/grouping/stack/), for children one above the other.
+- [`Toolbar`](/docs/components/grouping/toolbar/), for a bar of actions with a rule under it.
+- [`ChipRow`](/docs/components/collections/chip-row/), for a run of chips.
+
+## Mistakes
+
+- Leaving out `gap` between two runs of text. In the terminal two runs with nothing between them read as one word, so give it `gap="inline"`.
+- Relying on `even` in the terminal. The terminal ignores it, because equal columns mean nothing in a row of cells.

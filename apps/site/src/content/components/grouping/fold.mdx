@@ -1,0 +1,27 @@
+---
+title: Fold
+description: A group that opens and closes, with a label and an optional count.
+sources:
+  - packages/client-core/src/kit/components/layout/Fold.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Fold` for content a reader opens when they need it, such as a list of commits. The desktop builds the body the first time it opens and keeps it, so a closed fold costs nothing.
+
+<Specimen id="fold" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="fold" />
+
+## Related
+
+- [`Section`](/docs/components/grouping/section/), for a group that is always open.
+- [`Card`](/docs/components/grouping/card/), for a framed group.
+
+## Mistakes
+
+- Holding the open state in your tree when the reader is the only one who changes it. Leave `open` out and set `defaultOpen`, and the fold keeps its own state. Pass `open` with `onOpenChange` only when your code also opens or closes it.

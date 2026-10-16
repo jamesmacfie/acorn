@@ -10,14 +10,14 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { BOOKS } from './books.mjs'
 
 export const ROOT = fileURLToPath(new URL('../../../', import.meta.url))
 const SITE = 'apps/site/src'
 const DOCS = `${SITE}/content/docs`
-// The plugin reference's pages are generated into the docs collection from written halves, which carry
-// the frontmatter, so a reference page is its written half (apps/site/scripts/reference.mjs).
-const REFERENCE = `${SITE}/content/reference`
-const GENERATED = `${DOCS}/docs/build-plugins/reference/`
+// The plugin reference's and the components' pages are generated into the docs collection from written
+// halves, which carry the frontmatter, so a generated page is its written half (scripts/reference.mjs).
+const GENERATED = BOOKS.map((book) => ({ written: `apps/site/${book.written}`, docs: book.docs, folder: `${DOCS}/${book.docs}/` }))
 const PAGES = `${SITE}/pages`
 const SNAPSHOTS = `${SITE}/generated/snapshots`
 
@@ -70,20 +70,18 @@ function files(dir) {
 // A page at `agents/skills.md` serves `/agents/skills/`, and an `index` page serves its folder.
 const urlOf = (path) => `/${path.replace(/\.(md|mdx|astro)$/, '').replace(/(^|\/)index$/, '')}/`.replace(/\/+/g, '/')
 
-/** Every page the reports cover: docs pages, the reference's written halves, marketing pages with a `meta`
+/** Every page the reports cover: docs pages, the generated pages' written halves, marketing pages with a `meta`
  *  export, and shell snapshots. */
 export function pages() {
   const read = (file) => readFileSync(join(ROOT, file), 'utf8')
   const docs = files(DOCS)
-    .filter((file) => /\.mdx?$/.test(file) && !file.startsWith(GENERATED))
+    .filter((file) => /\.mdx?$/.test(file) && !GENERATED.some(({ folder }) => file.startsWith(folder)))
     .map((file) => ({ file, url: urlOf(relative(DOCS, file)), ...readMeta(read(file)) }))
-  const reference = files(REFERENCE)
-    .filter((file) => /\.mdx?$/.test(file))
-    .map((file) => ({
-      file,
-      url: urlOf(`docs/build-plugins/reference/${relative(REFERENCE, file)}`),
-      ...readMeta(read(file)),
-    }))
+  const reference = GENERATED.flatMap(({ written, docs }) =>
+    files(written)
+      .filter((file) => /\.mdx?$/.test(file))
+      .map((file) => ({ file, url: urlOf(`${docs}/${relative(written, file)}`), ...readMeta(read(file)) })),
+  )
   const marketing = files(PAGES)
     .filter((file) => file.endsWith('.astro') && read(file).includes('export const meta'))
     .map((file) => ({ file, url: urlOf(relative(PAGES, file)), ...readMeta(read(file)) }))

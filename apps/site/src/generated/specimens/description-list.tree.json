@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "title": "DescriptionList",
+    "caption": "A description list holding text. A tree has no item node to put in it, so Facts is the usual choice.",
+    "terminal": {
+      "columns": 60,
+      "rows": 1
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "DescriptionList",
+          "props": {
+            "layout": "facts"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Text",
+              "props": {},
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Deployed to staging by alex."
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

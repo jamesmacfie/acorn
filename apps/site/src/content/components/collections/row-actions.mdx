@@ -1,0 +1,27 @@
+---
+title: RowActions
+description: A row's actions, folded behind a menu button on the desktop.
+sources:
+  - packages/client-core/src/kit/components/layout/RowActions.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Put `RowActions` inside a `Row` for actions on that item. The desktop folds them behind one menu button. The terminal draws each action, because it has no hover to reveal them.
+
+<Specimen id="row-actions" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="row-actions" />
+
+## Related
+
+- [`Row`](/docs/components/collections/row/), for the row it sits in.
+- [`Button`](/docs/components/inputs/button/), for each action.
+
+## Mistakes
+
+- Expecting the desktop menu to list a tree's buttons. Its items are a function in shell code, so a tree's actions show in the terminal and the desktop draws only the button.

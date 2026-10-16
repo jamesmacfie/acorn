@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "title": "KeyValueEditor",
+    "caption": "Two request headers, and the blank row that waits for a third.",
+    "terminal": {
+      "columns": 60,
+      "rows": 4
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "KeyValueEditor",
+          "props": {
+            "ariaLabel": "Headers",
+            "rows": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "deploy-42"
+              }
+            ],
+            "onChange": {
+              "$handler": 1
+            }
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

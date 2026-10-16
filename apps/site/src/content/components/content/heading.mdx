@@ -1,0 +1,27 @@
+---
+title: Heading
+description: A document heading, with an optional eyebrow and help.
+sources:
+  - packages/client-core/src/kit/components/content/Heading.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Heading` for a heading inside content, such as an issue's title. `level` is 1 to 3, and `eyebrow` adds the small line above it.
+
+<Specimen id="headings-and-links" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="headings-and-links" />
+
+## Related
+
+- [`SectionHeader`](/docs/components/grouping/section-header/), for a pane or group header.
+- [`Text`](/docs/components/content/text/), with `emphasis="heading"` for a heading-weight run.
+
+## Mistakes
+
+- Using `level` to make text big. Use it for the outline of the content, as an HTML heading would.

@@ -1,0 +1,27 @@
+---
+title: SegmentedControl
+description: Two to four choices, all in view, one selected.
+sources:
+  - packages/client-core/src/kit/components/inputs/SegmentedControl.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `SegmentedControl` for a small choice that changes a view, such as unified or split. `onChange` sends the chosen value.
+
+<Specimen id="segmented-control" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="segmented-control" />
+
+## Related
+
+- [`Select`](/docs/components/inputs/select/), for more choices.
+- [`Tabs`](/docs/components/grouping/tabs/), for choices that switch panels.
+
+## Mistakes
+
+- Giving an option a `detail` picture. The terminal draws the labels only.

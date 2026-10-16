@@ -1,0 +1,26 @@
+---
+title: SplitHandle
+description: The drag handle between two halves of a split. A tree can't draw one.
+sources:
+  - packages/client-core/src/kit/components/layout/ListDetail.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`SplitHandle` is the grip the host draws between two regions. Its drag state is host-made and can't cross, so a tree draws nothing with it. The terminal moves a split by a key and draws no handle at all.
+
+<Specimen id="layout-list-detail" caption="The host draws the split and its handle in a list-detail layout." />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="list-detail" />
+
+## Related
+
+- [`ListDetail`](/docs/components/grouping/list-detail/), for a list and a detail the host splits.
+
+## Mistakes
+
+- Drawing your own split. Name a layout, or use `ListDetail`, and the host draws the handle and keeps its position.

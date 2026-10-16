@@ -1,0 +1,27 @@
+---
+title: HistoryMark
+description: The commit dot and lane lines beside one row of a history.
+sources:
+  - packages/client-core/src/kit/components/content/HistoryMark.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `HistoryMark` at the start of a commit row to draw its place in the graph. `slot` says its lane and the lines that join it to the rows above and below.
+
+<Specimen id="history" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="history" />
+
+## Related
+
+- [`Row`](/docs/components/collections/row/), for the commit row it sits in.
+- [`Graph`](/docs/components/collections/graph/), for steps rather than commits.
+
+## Mistakes
+
+- Leaving the parents and refs out of the row's text. The terminal draws a dot and a lane number, so the text has to name them.

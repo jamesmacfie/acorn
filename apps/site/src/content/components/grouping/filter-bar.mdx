@@ -1,0 +1,28 @@
+---
+title: FilterBar
+description: An inset row for a sidebar's search or filter controls.
+sources:
+  - packages/client-core/src/kit/components/layout/FilterBar.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `FilterBar` for the search or filter row at the top of a list. Put an `Input`, `Select`, or `Picker` in it, then any filter actions. It adds no tab stop and owns no state.
+
+<Specimen id="filter-bar" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="filter-bar" />
+
+## Related
+
+- [`Input`](/docs/components/inputs/input/), with `kind="filter"` for the field.
+- [`Toolbar`](/docs/components/grouping/toolbar/), for a bar of actions.
+- [`FindBar`](/docs/components/inputs/find-bar/), for stepping through matches.
+
+## Mistakes
+
+- Reading the field's `onInput` from a tree. Only `onChange`, the committed value, crosses, so filter on that.

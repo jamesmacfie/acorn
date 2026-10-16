@@ -1,0 +1,27 @@
+---
+title: TableHead
+description: A column's heading, with how it aligns and how much it matters.
+sources:
+  - packages/client-core/src/kit/components/layout/Table.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Put `TableHead` cells in a `TableRow head`. `priority` says which columns survive a narrow terminal: `low` goes first.
+
+<Specimen id="table" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="table" />
+
+## Related
+
+- [`TableRow`](/docs/components/collections/table-row/), for the header row.
+- [`TableCell`](/docs/components/collections/table-cell/), for the cells under it.
+
+## Mistakes
+
+- Putting `TableHead` in a row without `head`. The header row is the one that sets the columns.

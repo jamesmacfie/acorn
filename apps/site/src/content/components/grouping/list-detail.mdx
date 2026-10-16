@@ -1,0 +1,31 @@
+---
+title: ListDetail
+description: A list beside the detail of the selected item.
+sources:
+  - packages/client-core/src/kit/components/layout/ListDetail.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `ListDetail` with a `ListColumn` and a `DetailColumn` as its children. Above 80 columns the terminal draws both side by side, and below 80 it puts the list over the detail.
+
+<Specimen id="list-detail" />
+
+A pane can also name the `list-detail` layout, and the host draws the split. Use the node for a list and detail inside one region. For more information, see [Layouts](/docs/components/layouts/).
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="list-detail" />
+
+## Related
+
+- [`ListColumn`](/docs/components/grouping/list-column/), for the list side.
+- [`DetailColumn`](/docs/components/grouping/detail-column/), for the detail side.
+- [`Row`](/docs/components/collections/row/), for each item in the list.
+
+## Mistakes
+
+- Passing the list in the `list` prop. A prop can't hold a tree, so a tree passes a `ListColumn` child and sets `split`.
+- Naming a pane `list-detail` and also drawing a `ListDetail` inside it. The layout already draws the two columns.

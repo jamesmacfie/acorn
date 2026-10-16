@@ -1,0 +1,54 @@
+{
+  "meta": {
+    "title": "PickerRow",
+    "caption": "Two rows as an open picker lists them, the first one active.",
+    "terminal": {
+      "columns": 50,
+      "rows": 2
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "none"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "PickerRow",
+              "props": {
+                "label": "Alex",
+                "description": "alex@acme.dev",
+                "active": true,
+                "onSelect": {
+                  "$handler": 1
+                }
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "PickerRow",
+              "props": {
+                "label": "Sam",
+                "description": "sam@acme.dev",
+                "onSelect": {
+                  "$handler": 2
+                }
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

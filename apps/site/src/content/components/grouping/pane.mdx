@@ -1,0 +1,29 @@
+---
+title: Pane
+description: A bounded column that fills its region, the root of a plugin pane.
+sources:
+  - packages/client-core/src/kit/components/layout/Pane.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Pane` as the root of a tree that fills a pane or a region. Its header, tabs, and footer keep their height, and the body takes the rows that are left.
+
+<Specimen id="pane" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="pane" />
+
+## Related
+
+- [`Stack`](/docs/components/grouping/stack/), for a run of content inside the pane, or `grow` for the part that takes the room.
+- [`SectionHeader`](/docs/components/grouping/section-header/), for the pane's header line.
+- [`Toolbar`](/docs/components/grouping/toolbar/), for actions along the top or the bottom.
+
+## Mistakes
+
+- Putting two `Stack grow` children in one `Pane`. Only one region can take the room that is left.
+- Scrolling the whole pane. Let the body scroll, so the header and footer stay put, and set `TabPanel scroll={false}` when a child such as `Log` scrolls itself.

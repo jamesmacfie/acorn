@@ -1,0 +1,4 @@
+{"columns":50,"rows":2,"lines":[
+[{"text":"›","fg":"accent"},{"text":" Alex "},{"text":"alex@acme.dev","fg":"muted"}],
+[{"text":" ","fg":"accent"},{"text":" Sam "},{"text":"sam@acme.dev","fg":"muted"}]
+]}

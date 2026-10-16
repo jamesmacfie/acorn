@@ -1,0 +1,96 @@
+{
+  "meta": {
+    "title": "Heading and Link",
+    "caption": "A heading with an eyebrow, a smaller heading, and a link to a web page.",
+    "terminal": {
+      "columns": 60,
+      "rows": 5
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Stack",
+          "props": {
+            "gap": "row"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "Heading",
+              "props": {
+                "level": 1,
+                "eyebrow": "Linear · ACO-12"
+              },
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "#text",
+                  "props": {
+                    "value": "Redirect loop after sign-in"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n4",
+              "type": "Heading",
+              "props": {
+                "level": 3
+              },
+              "children": [
+                {
+                  "id": "n5",
+                  "type": "#text",
+                  "props": {
+                    "value": "Steps to reproduce"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n6",
+              "type": "Text",
+              "props": {},
+              "children": [
+                {
+                  "id": "n7",
+                  "type": "#text",
+                  "props": {
+                    "value": "Open a deep link while signed out."
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "n8",
+              "type": "Link",
+              "props": {
+                "href": "https://linear.app/acme/issue/ACO-12"
+              },
+              "children": [
+                {
+                  "id": "n9",
+                  "type": "#text",
+                  "props": {
+                    "value": "Open in Linear"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

@@ -1,4 +1,4 @@
-import { KIT_NODE_COMPONENTS } from 'acorn-plugin-sdk/remote'
+import { Graph } from 'acorn-plugin-sdk/remote'
 import type { SpecimenMeta } from '../specimen'
 
 export const meta: SpecimenMeta = {
@@ -8,10 +8,8 @@ export const meta: SpecimenMeta = {
   width: 480,
 }
 
-// The published SDK has no named `Graph` export yet, so this reaches it by name, the way a plugin
-// would today. Two ranks, because Graph fits its view to a measured canvas and jsdom measures nothing,
-// so a taller graph overflows the canvas's minimum height.
-const { Graph } = KIT_NODE_COMPONENTS
+// Two ranks, because Graph fits its view to a measured canvas and jsdom measures nothing, so a taller
+// graph overflows the canvas's minimum height.
 
 export default function GraphSpecimen() {
   return (

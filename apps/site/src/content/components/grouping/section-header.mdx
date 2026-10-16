@@ -1,0 +1,29 @@
+---
+title: SectionHeader
+description: A heading line for a pane, a group, or a sub-group, with an optional count and help.
+sources:
+  - packages/client-core/src/kit/components/layout/SectionHeader.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `SectionHeader` for the heading line at the top of a pane or above a group. `level` picks `pane`, `group`, or `sub`, and the host sizes it.
+
+<Specimen id="section" />
+
+<Specimen id="pane" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="section" />
+
+## Related
+
+- [`Section`](/docs/components/grouping/section/), for a heading with its content grouped under it.
+- [`Heading`](/docs/components/content/heading/), for a document heading inside content.
+
+## Mistakes
+
+- Sending controls in `actions`. A tree can send text there and nothing else. Put buttons in a `Toolbar` under the header instead.

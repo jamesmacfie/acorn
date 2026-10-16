@@ -1,0 +1,28 @@
+---
+title: MentionTextarea
+description: A text field that completes @mentions.
+sources:
+  - packages/client-core/src/kit/components/inputs/MentionTextarea.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `MentionTextarea` for a comment that can name people. Pass the names in `mentions`, and typing `@` opens a menu of them.
+
+<Specimen id="mention-textarea" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="mention-textarea" />
+
+## Related
+
+- [`Textarea`](/docs/components/inputs/textarea/), for a field with no mentions.
+- [`Composer`](/docs/components/inputs/composer/), for a message you send.
+
+## Mistakes
+
+- Reading the text from a tree. Its `onInput` isn't one of the twelve events, and its `onSubmit` sends nothing, so a tree can't read what was typed. Use a `Composer`, whose `onSubmit` sends the text.
+- Expecting the terminal to highlight a completed mention. It draws the text plain, with the menu under the field.

@@ -1,0 +1,56 @@
+---
+title: What the kit refuses
+description: What the kit won't take, and why, so you know before you ask.
+sources:
+  - docs/ui-design/closed-kit.md
+  - packages/protocol/src/tree/nodes.ts
+checked: afced2661
+---
+
+This page lists what the kit refuses, each with its reason. Read it when a prop you want isn't there.
+Each of these gets asked for again, and the answer stays no, because each one would make a plugin
+work on one host only.
+
+## Styling props
+
+{/* facts */}
+
+No `class`, `className`, or `style`, even for the desktop alone. Once a plugin can name a pixel or a
+color, the terminal has to guess what it meant, and the theme the person chose stops applying. A
+plugin that needs its own pixels, such as its brand's purple, draws them in a frame.
+
+## Raw values in a role
+
+A gap is `gap="row"`, never `gap={8}` or `gap="3"`. A terminal has no value for 8 pixels. Every role
+is a short list of meanings, and [Roles and tokens](/docs/components/roles-and-tokens/) gives each
+one's value on each host.
+
+## Laying out a pane yourself
+
+A plugin picks a [layout](/docs/components/layouts/) and fills its regions. There's no
+`orientation`, `columns`, or `width` setting. The host knows how wide the window is, and the answer to
+an arrangement no layout gives is a new layout, not a setting.
+
+## Anything that needs hover
+
+Everything a pointer reaches on hover, focus reaches too, and the terminal has no hover at all. A
+control that appears only on hover, or a meaning that lives only in a tip, is refused.
+
+## Handlers outside the twelve events
+
+A function crosses from a tree only as one of the 12 events, such as `onPress`, `onChange`, or
+`onSelect`. Neither host can deliver a raw key or a pointer event the other could match, so `onInput`,
+`onKeyDown`, `onPaste`, and the rest are dropped on the way. A component that needs one has a data
+form instead: `Input` sends `onChange` with the committed value, and `Picker` filters its own `items`.
+
+## Elements in props
+
+A prop is data. A tree can't put a component in a prop, only in children. So `ListDetail` takes its
+columns as children, not in its `list` prop, and `Facts` takes `{ label, value }` pairs. A prop typed
+for an element in shell code takes text from a tree.
+
+## Mixed control of a selection
+
+The host owns which item is selected, unless a component says its caller does. A component that says
+so is controlled for everything. Half and half, where the host moves the selection and the plugin
+sometimes overrides it, is refused, because two owners disagree after the first refetch.

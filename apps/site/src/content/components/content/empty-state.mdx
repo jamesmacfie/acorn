@@ -1,0 +1,27 @@
+---
+title: EmptyState
+description: What a list or pane shows when there's nothing in it.
+sources:
+  - packages/client-core/src/kit/components/content/EmptyState.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `EmptyState` when a list is empty or nothing is selected. Say what would fill it in a title and a line of text.
+
+<Specimen id="empty-state" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="empty-state" />
+
+## Related
+
+- [`Alert`](/docs/components/content/alert/), for a problem rather than an absence.
+- [`Spinner`](/docs/components/content/spinner/), while the list is still loading.
+
+## Mistakes
+
+- Putting a button inside it. The terminal draws a node inside `EmptyState` as `[object Object]`, so keep it to text and put the action in a toolbar.

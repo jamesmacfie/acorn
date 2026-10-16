@@ -1,0 +1,28 @@
+---
+title: SettingRow
+description: "One setting: its label, its control, and whether it saved."
+sources:
+  - packages/client-core/src/kit/components/layout/SettingRow.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `SettingRow` for one setting inside a `SettingsSection`. The label names the control, `savedAt` draws **Saved** for two seconds, and `error` draws the save error.
+
+<Specimen id="settings-section" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="settings-section" />
+
+## Related
+
+- [`SettingsSection`](/docs/components/grouping/settings-section/), for the group around it.
+- [`Field`](/docs/components/inputs/field/), for a labeled control outside settings.
+
+## Mistakes
+
+- Holding a **Saved** timer in your tree. Set `savedAt` to the time it saved, and the row keeps the timer.
+- Putting two controls in one row. The label names one control, and with two it names none.

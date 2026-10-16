@@ -1,0 +1,6 @@
+{"columns":50,"rows":4,"lines":[
+[{"text":"┌─Deploys────────────────────────────────────────┐","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"body region","fg":"muted"},{"text":"                                     "},{"text":"│","fg":"accent"}],
+[{"text":"│","fg":"accent"},{"text":"                                                "},{"text":"│","fg":"accent"}],
+[{"text":"└────────────────────────────────────────────────┘","fg":"accent"}]
+]}

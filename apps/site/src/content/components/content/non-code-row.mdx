@@ -1,0 +1,27 @@
+---
+title: NonCodeRow
+description: "A diff row that isn't code: a hunk header, a gap, or a file that doesn't diff."
+sources:
+  - packages/client-core/src/kit/diff/DiffRows.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`NonCodeRow` draws the rows of a diff between code lines, such as `@@ -1,3 +1,3 @@` or a note that a file is binary. Its `row` is one the diff viewer builds.
+
+<Specimen id="diff-rows" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="diff-rows" />
+
+## Related
+
+- [`DiffLine`](/docs/components/content/diff-line/), for a line of code.
+- [`StackedDiff`](/docs/components/content/stacked-diff/), for a whole patch.
+
+## Mistakes
+
+- Expecting its controls to work from a tree. Expanding a gap or replying to a thread needs functions that can't cross.

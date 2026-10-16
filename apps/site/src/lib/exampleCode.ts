@@ -1,6 +1,7 @@
 // The code a guide shows from an example plugin (docs/site/plugin-guides.md): a named region of a file,
 // or the parts of a manifest a step adds. Files mark a region with `// #region <name>` and
-// `// #endregion`. JSON can't hold a comment, so a manifest is cut by path instead.
+// `// #endregion`. JSON can't hold a comment, so a manifest is cut by path instead. A component page
+// shows a specimen's tree code the same way (docs/site/specimens.md).
 
 const MARKER = /^\s*\/\/ #(?:region\b.*|endregion)\s*$/
 
@@ -64,4 +65,16 @@ export function pick(manifest: string, paths: string[]): string {
 export function language(file: string): string {
   const extension = file.split('.').at(-1)!
   return { js: 'js', mjs: 'js', json: 'json', ts: 'ts', tsx: 'tsx', md: 'md', sql: 'sql' }[extension] ?? 'text'
+}
+
+/** A specimen's source as a plugin would write it: without the `meta` export the site reads, and
+ *  without the type import that export needs. */
+export function withoutMeta(source: string): string {
+  const meta = /^export const meta: SpecimenMeta = \{\n[\s\S]*?^\}\n/m
+  if (!meta.test(source)) throw new Error('The specimen has no `export const meta: SpecimenMeta = { … }`')
+  return source
+    .replace(/^import type \{ SpecimenMeta \} from '[^']+'\n/m, '')
+    .replace(meta, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }

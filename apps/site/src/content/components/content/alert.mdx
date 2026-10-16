@@ -1,0 +1,27 @@
+---
+title: Alert
+description: A message with a tone, inline or as a banner.
+sources:
+  - packages/client-core/src/kit/components/content/Alert.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Alert` for something the reader should notice: a warning, a failure, a success. `tone` says which, and `title` adds a bold first line.
+
+<Specimen id="alert" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="alert" />
+
+## Related
+
+- [`Card`](/docs/components/grouping/card/), with a stripe, for an item rather than a message.
+- [`EmptyState`](/docs/components/content/empty-state/), for an absence.
+
+## Mistakes
+
+- Using an alert for every state. Keep it for what needs attention, and use a `Badge` for an ordinary state.

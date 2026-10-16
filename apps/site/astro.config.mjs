@@ -14,14 +14,22 @@ const showDrafts = previewBuild || !process.argv.includes('build')
 const docsDir = new URL('./src/content/docs/', import.meta.url)
 const labDir = new URL('./src/lab/', import.meta.url)
 
-// The plugin reference is generated before Astro starts (scripts/reference.mjs), one page per manifest
-// contribution key, so the sidebar lists whatever pages it wrote.
-const contributionsDir = new URL('docs/build-plugins/reference/contributions/', docsDir)
-if (!existsSync(contributionsDir)) throw new Error('The plugin reference is not built. Run node scripts/reference.mjs.')
-const contributionPages = readdirSync(contributionsDir)
-  .filter((name) => name.endsWith('.mdx'))
-  .map((name) => `docs/build-plugins/reference/contributions/${name.replace(/\.mdx$/, '')}`)
-  .sort()
+// The plugin reference and the components are generated before Astro starts (scripts/reference.mjs),
+// one page per manifest contribution key and per kit node, so the sidebar lists whatever pages it wrote.
+function generatedPages(folder) {
+  const dir = new URL(`${folder}/`, docsDir)
+  if (!existsSync(dir)) throw new Error('The generated docs pages are not built. Run node scripts/reference.mjs.')
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.mdx'))
+    .map((name) => `${folder}/${name.replace(/\.mdx$/, '')}`)
+    .sort()
+}
+const contributionPages = generatedPages('docs/build-plugins/reference/contributions')
+// The kit's groups, in the order the site map gives them, each one's pages listed by name.
+const componentGroups = ['Grouping', 'Content', 'Inputs', 'Collections', 'Overlays', 'Rectangles'].map((label) => ({
+  label,
+  items: generatedPages(`docs/components/${label.toLowerCase()}`),
+}))
 
 // Starlight drops drafts from a production build and then fails on any sidebar slug it can't find, so
 // the sidebar leaves drafts out too.
@@ -332,6 +340,7 @@ export default defineConfig({
             'docs/components/one-kit-two-hosts',
             'docs/components/roles-and-tokens',
             'docs/components/layouts',
+            ...componentGroups,
             'docs/components/icons',
             'docs/components/themes-and-style-packs',
             'docs/components/keyboard-and-accessibility',

@@ -1,0 +1,27 @@
+---
+title: DiffLine
+description: "One line of a diff: its gutter, its marker, and its code."
+sources:
+  - packages/client-core/src/kit/diff/DiffRows.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+`DiffLine` draws one code row of a diff. Its `r` prop is the row the diff viewer builds: kind, line numbers, and the text as tokens. A tree that has a patch as text draws it with `StackedDiff` instead.
+
+<Specimen id="diff-rows" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="diff-rows" />
+
+## Related
+
+- [`StackedDiff`](/docs/components/content/stacked-diff/), for a whole patch from its text.
+- [`NonCodeRow`](/docs/components/content/non-code-row/), for a hunk header or a gap.
+
+## Mistakes
+
+- Building rows by hand when you have the patch text. `StackedDiff` parses a patch for you.

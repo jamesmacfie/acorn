@@ -1,0 +1,5 @@
+{"columns":40,"rows":3,"lines":[
+[{"text":"█████░▲░","fg":"accent"},{"text":" "},{"text":"62%","fg":"muted"}],
+[{"text":"███████░","fg":"warn"},{"text":" "},{"text":"91%","fg":"muted"}],
+[{"text":"◑","fg":"accent"}]
+]}

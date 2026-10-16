@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "title": "FileHead",
+    "caption": "A changed file's head: its status, its path, and the lines added and removed.",
+    "terminal": {
+      "columns": 60,
+      "rows": 1
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "FileHead",
+          "props": {
+            "file": {
+              "status": "modified",
+              "path": "src/login.ts",
+              "additions": 2,
+              "deletions": 1
+            }
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}

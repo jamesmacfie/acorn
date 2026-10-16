@@ -1,0 +1,27 @@
+---
+title: CodeBlock
+description: A block of code or output, with a copy control.
+sources:
+  - packages/client-core/src/kit/components/content/CodeBlock.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `CodeBlock` for a command, a snippet, or output the reader copies. Set `copy` to draw the copy control, and `ansi` for terminal output with color codes.
+
+<Specimen id="code-block" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="code-block" />
+
+## Related
+
+- [`Log`](/docs/components/content/log/), for a long run of output.
+- [`Markdown`](/docs/components/content/markdown/), for code inside prose.
+
+## Mistakes
+
+- Relying on color in `ansi` output for the terminal. The terminal drops the escape codes and draws it plain.

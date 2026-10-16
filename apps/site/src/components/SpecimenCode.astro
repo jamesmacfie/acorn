@@ -1,0 +1,19 @@
+---
+// The tree code behind a specimen, as a component page's example (docs/site/specimens.md). It's the
+// specimen's own source file, the code the generators ran to draw the picture, less the `meta` export
+// only the site reads. A specimen that isn't there fails the build.
+import { Code } from '@astrojs/starlight/components'
+import { withoutMeta } from '../lib/exampleCode.ts'
+
+interface Props {
+  id: string
+}
+
+const files = import.meta.glob<string>('../../specimens/*/*.tsx', { eager: true, query: '?raw', import: 'default' })
+
+const { id } = Astro.props
+const path = Object.keys(files).find((file) => file.endsWith(`/${id}.tsx`))
+if (!path) throw new Error(`There's no specimen "${id}". Add apps/site/specimens/<group>/${id}.tsx.`)
+---
+
+<Code code={withoutMeta(files[path]!)} lang="tsx" title={path.replace('../../', 'apps/site/')} />

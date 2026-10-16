@@ -1,0 +1,26 @@
+---
+title: TreeRow
+description: A row in a tree of items, indented by depth, with an open and closed mark.
+sources:
+  - packages/client-core/src/kit/components/layout/TreeRow.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `TreeRow` for nested items such as files in folders. `depth` indents it, `expandable` and `expanded` draw the mark, and `onToggle` reports a press on it.
+
+<Specimen id="tree-rows" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="tree-rows" />
+
+## Related
+
+- [`Row`](/docs/components/collections/row/), for a flat list.
+
+## Mistakes
+
+- Indenting with spaces in the label. Set `depth`, which both hosts indent by.

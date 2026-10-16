@@ -1,0 +1,27 @@
+---
+title: Facts
+description: Label and value pairs, in columns or tiles.
+sources:
+  - packages/client-core/src/kit/components/content/Facts.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Facts` for a short list of facts about one thing: a deploy, an error, a file. Each item is `{ label, value }`, and `mono` sets a value such as a hash in code type.
+
+<Specimen id="facts" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="facts" />
+
+## Related
+
+- [`DescriptionList`](/docs/components/content/description-list/), for the shell's form of the same list.
+- [`Table`](/docs/components/collections/table/), for many items with the same fields.
+
+## Mistakes
+
+- Sending a node as a value. A value is text, so format it as a string first.

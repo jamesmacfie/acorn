@@ -1,0 +1,26 @@
+---
+title: ModelBackendPicker
+description: Two selects for the model a Generate control spends.
+sources:
+  - packages/client-core/src/features/settings/models/ModelBackendPicker.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `ModelBackendPicker` where a plugin generates text, to choose a stored key or an agent CLI and one of its models. Pass `backends`, and `onChange` sends the pick.
+
+<Specimen id="model-backend-picker" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="model-backend-picker" />
+
+## Related
+
+- [`Select`](/docs/components/inputs/select/), for any other choice.
+
+## Mistakes
+
+- Hard-coding a backend or a model. Offer the backends the Node reports, and start on the backend's `defaultModelId`.

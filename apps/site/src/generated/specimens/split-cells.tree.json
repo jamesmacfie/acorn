@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "title": "SplitCell",
+    "caption": "One changed line as a split diff draws it: the old half beside the new. The terminal has no split diff.",
+    "terminal": {
+      "columns": 60,
+      "rows": 1
+    },
+    "width": 560
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Inline",
+          "props": {
+            "gap": "none",
+            "even": true
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "SplitCell",
+              "props": {
+                "r": {
+                  "kind": "delete",
+                  "path": "src/login.ts",
+                  "oldNo": 2,
+                  "newNo": null,
+                  "raw": "const next = \"/\"",
+                  "toks": [
+                    {
+                      "content": "const next = \"/\"",
+                      "light": "",
+                      "dark": ""
+                    }
+                  ]
+                },
+                "gutter": 2,
+                "canAdd": false
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "SplitCell",
+              "props": {
+                "r": {
+                  "kind": "insert",
+                  "path": "src/login.ts",
+                  "oldNo": null,
+                  "newNo": 2,
+                  "raw": "const next = params.get(\"next\") ?? \"/\"",
+                  "toks": [
+                    {
+                      "content": "const next = params.get(\"next\") ?? \"/\"",
+                      "light": "",
+                      "dark": ""
+                    }
+                  ]
+                },
+                "gutter": 2,
+                "canAdd": false
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

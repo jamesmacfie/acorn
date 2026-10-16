@@ -1,0 +1,27 @@
+---
+title: StackedDiff
+description: One file's patch, drawn as a unified diff.
+sources:
+  - packages/client-core/src/kit/diff/DiffRows.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `StackedDiff` to show one file's change from its patch text. It draws the file's header, each hunk, and each line.
+
+<Specimen id="stacked-diff" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="stacked-diff" />
+
+## Related
+
+- [`FileHead`](/docs/components/content/file-head/), for the header line alone.
+- [`CodeBlock`](/docs/components/content/code-block/), for code that isn't a change.
+
+## Mistakes
+
+- Sending a patch for many files. It draws one file, so send one `StackedDiff` per file.

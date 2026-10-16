@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "title": "Modal, ModalBody, and ModalActions",
+    "caption": "A small dialog asking before it deletes a branch.",
+    "terminal": {
+      "columns": 60,
+      "rows": 5
+    },
+    "width": 480
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Modal",
+          "props": {
+            "title": "Delete fix-login-redirect?",
+            "size": "sm",
+            "onDismiss": {
+              "$handler": 1
+            }
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "ModalBody",
+              "props": {},
+              "children": [
+                {
+                  "id": "n3",
+                  "type": "Text",
+                  "props": {},
+                  "children": [
+                    {
+                      "id": "n4",
+                      "type": "#text",
+                      "props": {
+                        "value": "The branch has two commits that aren't on main."
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "n5",
+              "type": "ModalActions",
+              "props": {},
+              "children": [
+                {
+                  "id": "n6",
+                  "type": "Button",
+                  "props": {
+                    "label": "Cancel",
+                    "variant": "ghost"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "n7",
+                  "type": "Button",
+                  "props": {
+                    "label": "Delete",
+                    "variant": "solid",
+                    "tone": "danger"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

@@ -1,0 +1,26 @@
+---
+title: UserAvatar
+description: A person's avatar from their GitHub login.
+sources:
+  - packages/client-core/src/kit/components/content/UserAvatar.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `UserAvatar` beside a person's name. It takes a GitHub `login`, and the terminal draws their initials in brackets.
+
+<Specimen id="user-avatar" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="user-avatar" />
+
+## Related
+
+- [`Chip`](/docs/components/content/chip/), for a person the reader can remove.
+
+## Mistakes
+
+- Using the avatar as the only name. Put the login or the name beside it.

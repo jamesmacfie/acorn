@@ -97,6 +97,7 @@ acorn-plugin-sdk/remote: value Chip
 acorn-plugin-sdk/remote: value ChipRow
 acorn-plugin-sdk/remote: value CodeBlock
 acorn-plugin-sdk/remote: value Composer
+acorn-plugin-sdk/remote: value ConfirmButton
 acorn-plugin-sdk/remote: value CopyButton
 acorn-plugin-sdk/remote: value DescriptionList
 acorn-plugin-sdk/remote: value DetailColumn
@@ -111,9 +112,12 @@ acorn-plugin-sdk/remote: value FileHead
 acorn-plugin-sdk/remote: value FilterBar
 acorn-plugin-sdk/remote: value FindBar
 acorn-plugin-sdk/remote: value Fold
+acorn-plugin-sdk/remote: value Graph
 acorn-plugin-sdk/remote: value Grid
 acorn-plugin-sdk/remote: value Heading
+acorn-plugin-sdk/remote: value HistoryMark
 acorn-plugin-sdk/remote: value Icon
+acorn-plugin-sdk/remote: value IconButton
 acorn-plugin-sdk/remote: value Inline
 acorn-plugin-sdk/remote: value Input
 acorn-plugin-sdk/remote: value KIT_NODE_COMPONENTS
@@ -137,11 +141,13 @@ acorn-plugin-sdk/remote: value Pane
 acorn-plugin-sdk/remote: value Picker
 acorn-plugin-sdk/remote: value PickerRow
 acorn-plugin-sdk/remote: value Popover
+acorn-plugin-sdk/remote: value Rectangle
 acorn-plugin-sdk/remote: value Row
 acorn-plugin-sdk/remote: value RowActions
 acorn-plugin-sdk/remote: value Rows
 acorn-plugin-sdk/remote: value Section
 acorn-plugin-sdk/remote: value SectionHeader
+acorn-plugin-sdk/remote: value Sections
 acorn-plugin-sdk/remote: value SegmentedControl
 acorn-plugin-sdk/remote: value Select
 acorn-plugin-sdk/remote: value SettingRow

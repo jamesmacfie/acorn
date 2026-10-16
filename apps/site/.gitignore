@@ -2,5 +2,7 @@
 test-results/
 playwright-report/
 
-# The plugin reference, built from src/content/reference/ by scripts/reference.mjs.
+# The plugin reference and the components, built from src/content/reference/ and
+# src/content/components/ by scripts/reference.mjs.
 src/content/docs/docs/build-plugins/reference/
+src/content/docs/docs/components/

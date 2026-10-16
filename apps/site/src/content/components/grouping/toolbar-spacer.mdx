@@ -1,0 +1,26 @@
+---
+title: ToolbarSpacer
+description: The gap that pushes what follows to the far end of a toolbar.
+sources:
+  - packages/client-core/src/kit/components/layout/Toolbar.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Put `ToolbarSpacer` between the start and the end of a `Toolbar`. Everything after it moves to the right edge.
+
+<Specimen id="toolbar" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="toolbar" />
+
+## Related
+
+- [`Toolbar`](/docs/components/grouping/toolbar/), for the bar it sits in.
+
+## Mistakes
+
+- Using a spacer outside a `Toolbar`. It pushes only inside a toolbar.

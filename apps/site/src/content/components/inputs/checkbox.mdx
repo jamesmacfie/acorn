@@ -1,0 +1,27 @@
+---
+title: Checkbox
+description: A box that turns a setting on or off, or a switch.
+sources:
+  - packages/client-core/src/kit/components/inputs/Checkbox.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Checkbox` for an on and off choice with a label. `switch` draws it as a switch, and `onChange` sends the new state.
+
+<Specimen id="checkboxes" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="checkboxes" />
+
+## Related
+
+- [`ToggleButton`](/docs/components/inputs/toggle-button/), for an on and off state on a button.
+- [`SettingRow`](/docs/components/grouping/setting-row/), for a setting on a settings page.
+
+## Mistakes
+
+- Sending a node as `label`. A tree sends text, so write the label as a string.

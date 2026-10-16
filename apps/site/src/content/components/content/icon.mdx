@@ -1,0 +1,27 @@
+---
+title: Icon
+description: A Lucide icon or a brand mark, with a tone.
+sources:
+  - packages/client-core/src/kit/components/content/Icon.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Icon` for a shape that carries meaning, such as a check for passed. `name` is a Lucide name or a `brand:` mark, and `tone` colors it. For more information, see [Icons](/docs/components/icons/).
+
+<Specimen id="icons" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="icons" />
+
+## Related
+
+- [`IconButton`](/docs/components/inputs/icon-button/), for an icon the reader presses.
+- [`StatusDot`](/docs/components/content/status-dot/), for a state with no shape.
+
+## Mistakes
+
+- Using an icon the terminal has no mark for, with no word beside it. The terminal draws nothing for an unmapped name, so put the meaning in text too.

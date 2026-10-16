@@ -1,0 +1,31 @@
+---
+title: Row
+description: "One item in a list: its title, its meta, and its controls."
+sources:
+  - packages/client-core/src/kit/components/layout/Row.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Row` for each item in a list, inside a `ListColumn`. `meta` draws at the end, `selected` marks the current item, and `variant="stacked"` puts a second child on a second line.
+
+<Specimen id="row" />
+
+<Specimen id="list-detail" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="row" />
+
+## Related
+
+- [`ListColumn`](/docs/components/grouping/list-column/), for the column around rows.
+- [`TreeRow`](/docs/components/collections/tree-row/), for nested items.
+- [`RowActions`](/docs/components/collections/row-actions/), for a row's actions.
+
+## Mistakes
+
+- Sending `collapsedIcon` while the row isn't collapsed. A row with it draws collapsed, so send it only while its column is.
+- Hiding controls until hover. The terminal has no hover, so a row's trailing controls always draw there.

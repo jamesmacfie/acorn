@@ -1,0 +1,26 @@
+---
+title: Only
+description: Content that draws on the named hosts and nowhere else.
+sources:
+  - packages/client-core/src/kit/components/layout/Only.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Wrap content in `Only` when it makes sense on one host, such as a hint about dragging. `hosts` is `["dom"]`, `["tui"]`, or both.
+
+<Specimen id="only" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="only" />
+
+## Related
+
+- [`Fallback`](/docs/components/rectangles/fallback/), for a substitute where a node can't draw.
+
+## Mistakes
+
+- Using `Only` to hide a feature on a host. A reader on the terminal should be able to do what the desktop does, so use it for hints, not for features.

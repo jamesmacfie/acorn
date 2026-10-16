@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "title": "IconButton",
+    "caption": "Three icon buttons. Each label names the button, and the terminal draws the label.",
+    "terminal": {
+      "columns": 40,
+      "rows": 1
+    },
+    "width": 320
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "Inline",
+          "props": {
+            "gap": "inline"
+          },
+          "children": [
+            {
+              "id": "n2",
+              "type": "IconButton",
+              "props": {
+                "icon": "refresh-cw",
+                "label": "Refresh"
+              },
+              "children": []
+            },
+            {
+              "id": "n3",
+              "type": "IconButton",
+              "props": {
+                "icon": "copy",
+                "label": "Copy link"
+              },
+              "children": []
+            },
+            {
+              "id": "n4",
+              "type": "IconButton",
+              "props": {
+                "icon": "trash-2",
+                "label": "Delete",
+                "tone": "danger"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    ]
+  ]
+}

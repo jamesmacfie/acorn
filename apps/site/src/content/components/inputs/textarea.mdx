@@ -1,0 +1,27 @@
+---
+title: Textarea
+description: A text field of several lines.
+sources:
+  - packages/client-core/src/kit/components/inputs/Textarea.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Textarea` for text that runs to more than a line, such as a commit message. `rows` is the height it starts at, and it grows as the text does.
+
+<Specimen id="textarea" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="textarea" />
+
+## Related
+
+- [`Input`](/docs/components/inputs/input/), for one line.
+- [`Composer`](/docs/components/inputs/composer/), for a message you send.
+
+## Mistakes
+
+- Treating `rows` as a fixed height. In the terminal it's a floor, and the field grows past it.

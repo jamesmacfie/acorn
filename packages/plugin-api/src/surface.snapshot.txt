@@ -597,8 +597,10 @@ ui/tree: FileHead
 ui/tree: FilterBar
 ui/tree: FindBar
 ui/tree: Fold
+ui/tree: Graph
 ui/tree: Grid
 ui/tree: Heading
+ui/tree: HistoryMark
 ui/tree: Icon
 ui/tree: IconButton
 ui/tree: Inline
@@ -631,6 +633,7 @@ ui/tree: RowActions
 ui/tree: Rows
 ui/tree: Section
 ui/tree: SectionHeader
+ui/tree: Sections
 ui/tree: SegmentedControl
 ui/tree: Select
 ui/tree: SettingRow

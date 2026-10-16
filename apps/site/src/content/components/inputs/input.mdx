@@ -1,0 +1,30 @@
+---
+title: Input
+description: A one-line text field.
+sources:
+  - packages/client-core/src/kit/components/inputs/Input.tsx
+  - docs/ui-design/every-node.md
+checked: afced2661
+---
+
+Use `Input` for a short value: a name, a port, a search. `onChange` sends the committed value. Wrap it in a `Field` to give it a label and help.
+
+<Specimen id="inputs" />
+
+<Specimen id="field" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="inputs" />
+
+## Related
+
+- [`Field`](/docs/components/inputs/field/), for the label and help around it.
+- [`Textarea`](/docs/components/inputs/textarea/), for more than one line.
+- [`Select`](/docs/components/inputs/select/), for a choice from a list.
+
+## Mistakes
+
+- Listening for `onInput` from a tree. It isn't one of the twelve events, so it's dropped. Use `onChange`.

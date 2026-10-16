@@ -1,0 +1,9 @@
+{"columns":60,"rows":7,"lines":[
+[{"text":"PULL REQUEST","fg":"muted"}],
+[{"text":"Fix the redirect after sign-in","attrs":["bold"]}],
+[{"text":"Signing in from a deep link now returns to that link."}],
+[{"text":"Opened by alex 2 hours ago","fg":"muted"}],
+[{"text":"src/login.ts"}],
+[{"text":"All checks passed","fg":"ok"}],
+[{"text":"Merge blocked","fg":"danger"}]
+]}

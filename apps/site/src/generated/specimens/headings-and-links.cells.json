@@ -1,0 +1,7 @@
+{"columns":60,"rows":5,"lines":[
+[{"text":"LINEAR · ACO-12","fg":"muted"}],
+[{"text":"Redirect loop after sign-in","attrs":["bold"]}],
+[{"text":"Steps to reproduce","attrs":["bold"]}],
+[{"text":"Open a deep link while signed out."}],
+[{"text":"Open in Linear","fg":"accent","attrs":["underline"]}]
+]}

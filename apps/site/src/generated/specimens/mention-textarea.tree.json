@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "title": "MentionTextarea",
+    "caption": "A comment field that completes @mentions from a list of names.",
+    "terminal": {
+      "columns": 50,
+      "rows": 4
+    },
+    "width": 400
+  },
+  "batches": [
+    [
+      {
+        "op": "insert",
+        "parent": null,
+        "index": 0,
+        "node": {
+          "id": "n1",
+          "type": "MentionTextarea",
+          "props": {
+            "label": "Comment",
+            "value": "Can @sam take a look?",
+            "mentions": [
+              "alex",
+              "sam",
+              "kim"
+            ],
+            "rows": 2
+          },
+          "children": []
+        }
+      }
+    ]
+  ]
+}
