@@ -17,8 +17,8 @@ covers both.
 
 ## Start a workflow on an item
 
-1. On the item's page, open the handoff card under **This page** on Home, or choose **Start
-   workflow…** from the chip's **Start task** menu.
+1. On the item's page, open the handoff card under **This page** on Home, or choose **Run
+   workflow…** from the chip's **Start task** menu, which opens the card with its list of workflows.
 2. Pick the project if several track the item, then click **Run workflow** and pick the workflow. The
    list has the workflows a task in that project can run: files in the repository or yours, and
    workflows made in the app that are published. A workflow with problems isn't listed.
