@@ -2,7 +2,7 @@ import { For, Match, Show, Switch, createEffect, createSignal } from 'solid-js'
 import type { BridgeHandoff, BridgePageTask, BridgeProject, BridgeWorkspace } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
-import { Field } from '@acorn/client-core/kit/components/primitives.tsx'
+import { Button, Field } from '@acorn/client-core/kit/components/primitives.tsx'
 import { projectLink } from '../acornLinks'
 import type { BrowserApi } from '../browser'
 import { onHandoffPage, pageHandoffs, type PageHandoff } from '../handoffs'
@@ -64,7 +64,6 @@ export function ThisPage(props: {
       pluginId: only.pluginId,
       handoffId: only.id,
       label: only.label,
-      glyph: only.glyph,
       url: props.pageUrl!,
       auto: true,
     })
@@ -122,9 +121,11 @@ export function ThisPage(props: {
           </ul>
           <For each={props.pageTasks.filter(({ page }) => page.status && props.markerHidden(page.origin))}>
             {({ page }) => (
-              <button type="button" class="link" onClick={() => props.showMarker(page.origin)}>
-                Show the branch marker on this site
-              </button>
+              <Button
+                label="Show the branch marker on this site"
+                variant="bare"
+                onPress={() => props.showMarker(page.origin)}
+              />
             )}
           </For>
         </Match>
@@ -134,20 +135,19 @@ export function ThisPage(props: {
             <span class="quiet grow">No task in Acorn for this yet.</span>
             <For each={offers()}>
               {(handoff) => (
-                <button
-                  type="button"
-                  onClick={() =>
+                <Button
+                  label="Look up in Acorn"
+                  variant="solid"
+                  tone="accent"
+                  onPress={() =>
                     props.startHandoff({
                       pluginId: handoff.pluginId,
                       handoffId: handoff.id,
                       label: handoff.label,
-                      glyph: handoff.glyph,
                       url: props.pageUrl!,
                     })
                   }
-                >
-                  Look up in Acorn
-                </button>
+                />
               )}
             </For>
           </div>

@@ -29,17 +29,19 @@ export function NeedsYouButton(props: ListProps) {
       ariaLabel="Needs you"
       trigger={(state) => (
         <Show when={props.requests.length || state.open()}>
-          <button
-            type="button"
-            class="needs-you-button"
-            aria-label="Needs you"
-            aria-haspopup="dialog"
-            aria-expanded={state.open()}
-            onClick={() => state.toggle()}
-          >
-            <Icon name="circle-alert" />
-            {props.requests.length}
-          </button>
+          <span class="needs-you-button">
+            <Button
+              label="Needs you"
+              variant="bare"
+              tone="warn"
+              opens="dialog"
+              expanded={state.open()}
+              onPress={() => state.toggle()}
+            >
+              <Icon name="circle-alert" />
+              {props.requests.length}
+            </Button>
+          </span>
         </Show>
       )}
     >

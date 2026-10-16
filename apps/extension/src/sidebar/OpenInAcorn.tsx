@@ -1,6 +1,7 @@
 import { Show, createSignal } from 'solid-js'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import { IconButton } from '@acorn/client-core/kit/components/inputs'
+import CopyButton from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 import { Button } from '@acorn/client-core/kit/components/primitives.tsx'
 
 // Follows an `acorn://` link as a plain link does, which both browsers hand to the app that registered
@@ -33,6 +34,7 @@ export function OpenInAcorn(props: { href: string | null; opensLinks: boolean; l
   )
 }
 
+// The labelled form is a kit `Button`, because `CopyButton` draws only the mark.
 function CopyAcornLink(props: { href: string; iconOnly?: boolean }) {
   const [copied, setCopied] = createSignal(false)
   const copy = async () => {
@@ -40,23 +42,17 @@ function CopyAcornLink(props: { href: string; iconOnly?: boolean }) {
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
-  const label = () => (copied() ? 'Copied' : 'Copy Acorn link')
   return (
     <Show
       when={props.iconOnly}
       fallback={
         <Button size="sm" tip={props.href} onPress={() => void copy().catch(() => {})}>
           <Icon name={copied() ? 'check' : 'copy'} />
-          {label()}
+          {copied() ? 'Copied' : 'Copy Acorn link'}
         </Button>
       }
     >
-      <IconButton
-        icon={copied() ? 'check' : 'copy'}
-        label={label()}
-        tipSub={props.href}
-        onPress={() => void copy().catch(() => {})}
-      />
+      <CopyButton text={props.href} title="Copy Acorn link" tipSub={props.href} size="sm" />
     </Show>
   )
 }

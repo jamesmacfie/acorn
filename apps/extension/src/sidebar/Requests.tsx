@@ -298,9 +298,13 @@ function RequestCard(props: {
                   </Show>
                 )}
               </For>
-              <button type="submit" disabled={disabled()}>
-                {sending() ? 'Sending…' : 'Submit answers'}
-              </button>
+              <Button
+                label={sending() ? 'Sending…' : 'Submit answers'}
+                variant="solid"
+                tone="accent"
+                submit
+                disabled={disabled()}
+              />
             </form>
           </Show>
           <Show when={request().options.length}>

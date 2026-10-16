@@ -86,7 +86,7 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
         state.active = request.nodeId as string
         return nodes()
       case 'handoffs.list':
-        return { nodeId, handoffs: nodeId === 'n1' ? state.handoffs : [], panels: [] }
+        return { nodeId, handoffs: nodeId === 'n1' ? state.handoffs : [], panels: [], icons: [] }
       case 'tasks.pages':
         return { nodeId, tasks: nodeId === 'n1' ? state.taskPages : [] }
       case 'sites.list':
@@ -971,7 +971,7 @@ describe('Go to task', () => {
     expect(shownTask(root)).toBe('Write guide')
 
     // The task's title opens it too, and Escape closes it.
-    root.querySelector<HTMLButtonElement>('header button.heading')!.click()
+    root.querySelector<HTMLButtonElement>('header .heading button')!.click()
     await settle(20)
     expect(palette()).not.toBeNull()
     await press('Escape')

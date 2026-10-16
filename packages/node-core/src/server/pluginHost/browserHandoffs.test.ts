@@ -82,6 +82,21 @@ describe('browser handoff declarations', () => {
     expect(response.taskAddresses).toEqual([{ pluginId: 'board', route: '/v1/p/board/addresses' }])
   })
 
+  it('advertises the logo only of a plugin that declares a handoff or a panel', async () => {
+    const icon = { d: 'M2 2h20v20H2z', color: '#5e6ad2' }
+    await host(
+      [
+        { name: 'board', init: () => {} },
+        { name: 'quiet', init: () => {} },
+      ],
+      {
+        loaded: { board: { ...binding([handoff('board')]), icon }, quiet: { ...binding([]), icon } },
+      },
+    )
+    const response = (await (await browserHandoffsRoute.request('/')).json()) as BrowserHandoffsResponse
+    expect(response.icons).toEqual([{ pluginId: 'board', ...icon }])
+  })
+
   it('advertises a declared panel, and drops it with the declaration', async () => {
     const panel = { label: 'Board', pane: 'board', route: '/v1/p/board/browser-panel' }
     const result = await host([{ name: 'board', init: () => {} }], {

@@ -239,15 +239,12 @@ export function Composer(props: {
                     {(content) => <pre class="context">{content()}</pre>}
                   </Show>
                 </details>
-                <button
-                  type="button"
-                  class="icon"
-                  aria-label={`Remove ${CAPTURE_NAMES[capture.kind]}: ${capture.title}`}
+                <IconButton
+                  icon="x"
+                  label={`Remove ${CAPTURE_NAMES[capture.kind]}: ${capture.title}`}
                   disabled={sending()}
-                  onClick={() => remove(capture)}
-                >
-                  ×
-                </button>
+                  onPress={() => remove(capture)}
+                />
               </li>
             )}
           </For>

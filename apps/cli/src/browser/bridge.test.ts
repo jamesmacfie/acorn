@@ -92,6 +92,7 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     // body, an Error for a 500, or a bare status.
     taskAddresses: [] as { pluginId: string; route: string }[],
     panels: [] as Record<string, unknown>[],
+    icons: [] as Record<string, unknown>[],
     pluginAnswers: new Map<string, unknown>(),
     createdTasks: [] as { key: string; body: Record<string, unknown> }[],
     projects: [{ id: 'p1', name: `${nodeId} project`, path: '/src/p1', workspaceId: 'w', sort: 0, hidden: false }],
@@ -174,7 +175,12 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     }
     if (url.pathname === '/v1/core/tasks') return reply(200, state.tasks)
     if (url.pathname === '/v1/core/browser-handoffs')
-      return reply(200, { handoffs: state.handoffs, taskAddresses: state.taskAddresses, panels: state.panels })
+      return reply(200, {
+        handoffs: state.handoffs,
+        taskAddresses: state.taskAddresses,
+        panels: state.panels,
+        icons: state.icons,
+      })
     if (state.pluginAnswers.has(url.pathname)) {
       const answer = state.pluginAnswers.get(url.pathname)
       if (answer instanceof Error) return reply(500, { error: { message: answer.message } })
@@ -1240,9 +1246,11 @@ describe('browser bridge handoffs', () => {
     return subject
   }
 
-  it('lists the declared handoffs without their routes', async () => {
+  it('lists the declared handoffs without their routes, and the logos that pass the manifest rule', async () => {
     const { call, node } = await selected()
     node.state.handoffs.push({ ...node.state.handoffs[0], id: 'stray', resolve: '/v1/p/agents/sessions' })
+    const icon = { pluginId: 'tracker', d: 'M2 2h20v20H2z', color: '#5e6ad2' }
+    node.state.icons.push(icon, { pluginId: 'sneaky', d: 'M0 0', color: 'url(https://sneaky.example/)' })
     expect(await call({ op: 'handoffs.list', nodeId: 'node-a' })).toEqual({
       nodeId: 'node-a',
       handoffs: [
@@ -1255,6 +1263,7 @@ describe('browser bridge handoffs', () => {
         },
       ],
       panels: [],
+      icons: [icon],
     })
   })
 

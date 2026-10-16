@@ -12,7 +12,7 @@ import {
 import { isolateNodePlugin } from './isolation'
 import { installedPluginInfo, loadExternalPlugins, loadedPluginBinding, pluginInstallDir } from './loader'
 import { PLUGIN_API_MAJOR, pluginManifestSchema } from './manifest'
-import { browserPanels, declareBrowserHandoffs } from '../pluginHost/browserHandoffs'
+import { browserIcons, browserPanels, declareBrowserHandoffs } from '../pluginHost/browserHandoffs'
 import type { CompiledNodePluginContext, PluginFetchHandler } from '../pluginHost/types'
 
 // The browser handoff contract from a stranger's side: a package on disk declares a site button and
@@ -32,6 +32,7 @@ const handoff = {
 }
 const taskAddresses = `/v1/p/${ID}/task-addresses`
 const browserPanel = { label: 'Tracker', glyph: 'kanban', pane: 'board', route: `/v1/p/${ID}/browser-panel` }
+const icon = { d: 'M2 2h20v20H2z', color: '#5e6ad2' }
 const pane = { target: 'pane', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' } }
 
 const manifest = (over: Record<string, unknown> = {}) => ({
@@ -41,6 +42,7 @@ const manifest = (over: Record<string, unknown> = {}) => ({
   baseline: 'acorn-1',
   apiVersion: PLUGIN_API_MAJOR,
   node: './dist/node.js',
+  icon,
   contributions: { browserHandoffs: [handoff], taskAddresses, browserPanel, frames: [pane] },
   ...over,
 })
@@ -74,10 +76,12 @@ describe('a loaded plugin declaring a browser handoff', () => {
     expect(loadedPluginBinding(result.loaded[0]!).browserHandoffs).toEqual([handoff])
     expect(loadedPluginBinding(result.loaded[0]!).taskAddresses).toBe(taskAddresses)
     expect(loadedPluginBinding(result.loaded[0]!).browserPanel).toEqual(browserPanel)
-    // Discovery lists what the binding declares.
+    // Discovery lists what the binding declares, and the plugin's logo for the sidebar to register.
     const undo = declareBrowserHandoffs(ID, [], loadedPluginBinding(result.loaded[0]!))
     expect(browserPanels()).toEqual([{ pluginId: ID, ...browserPanel }])
+    expect(browserIcons()).toEqual([{ pluginId: ID, ...icon }])
     undo()
+    expect(browserIcons()).toEqual([])
     expect(installedPluginInfo(result.installed[0]!).contributions.browserHandoffs).toEqual([handoff])
   })
 

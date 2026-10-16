@@ -15,6 +15,7 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserPanelView } from '@acorn/protocol/plugin/handoffs.ts'
 import { Tabs, type TabDef } from '@acorn/client-core/kit/components/layout'
+import { Button } from '@acorn/client-core/kit/components/primitives.tsx'
 import { agentRailMarkers } from '@acorn/plugin-agents/contract/runtimeState.ts'
 import type { BrowserApi } from '../browser'
 import { pageHandoffs, type PageHandoff } from '../handoffs'
@@ -628,16 +629,12 @@ export function Workspace(props: {
                 <span class="grow">
                   This page is in <b>{shown.task.title}</b>
                 </span>
-                <button type="button" class="quiet" onClick={() => nav.openTask(shown.task.id)}>
-                  Switch
-                </button>
+                <Button label="Switch" onPress={() => nav.openTask(shown.task.id)} />
               </div>
             ) : (
               <div class="strip" role="status">
                 <span class="grow">This page has no task</span>
-                <button type="button" class="quiet" onClick={() => nav.goHome()}>
-                  Start task
-                </button>
+                <Button label="Start task" onPress={() => nav.goHome()} />
               </div>
             )
           }}

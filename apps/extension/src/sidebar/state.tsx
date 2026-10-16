@@ -1,6 +1,7 @@
 import type { JSX } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type { BridgeAgentSession } from '@acorn/protocol/extensionBridge.ts'
+import { agentToolTone } from '@acorn/plugin-agents/contract/toolTone.ts'
 import { statusGuidance } from './guidance'
 
 // How the panel draws a state: a coloured dot beside a word, never colour alone. Green means working
@@ -38,15 +39,12 @@ export function agentState(session: BridgeAgentSession, waiting: boolean): { lab
   return AGENT_STATES[session.runtimeState] ?? { label: session.runtimeState, tone: 'idle' }
 }
 
-// A tool call's mark, in the desktop's colours (agentToolTone in the agents plugin's contract).
-type ToolMark = { icon: string; tone: 'ok' | 'accent' | 'danger' | 'muted' }
-const TOOL_MARKS: Record<string, ToolMark> = {
-  completed: { icon: 'circle-check', tone: 'ok' },
-  running: { icon: 'loader-circle', tone: 'accent' },
-  failed: { icon: 'circle-x', tone: 'danger' },
-}
-export const toolMark = (status: string | null): ToolMark =>
-  TOOL_MARKS[status ?? ''] ?? { icon: 'circle', tone: 'muted' }
+// A tool call's mark, in the desktop's colours.
+const TOOL_ICONS: Record<string, string> = { completed: 'circle-check', running: 'loader-circle', failed: 'circle-x' }
+export const toolMark = (status: string | null) => ({
+  icon: TOOL_ICONS[status ?? ''] ?? 'circle',
+  tone: agentToolTone(status),
+})
 
 // The agent's name as the panel shows it, from the provider the conversation runs on.
 export const agentName = (session: BridgeAgentSession) =>

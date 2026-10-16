@@ -40,6 +40,22 @@ describe('CopyButton', () => {
     expect(onCopy).toHaveBeenCalledWith('second')
   })
 
+  it("takes IconButton's look at a size, always shown, with the copied text as the tip's second line", () => {
+    const button = draw(() => (
+      <CopyButton text="acorn://n1/t/t1" title="Copy Acorn link" tipSub="acorn://n1/t/t1" size="sm" />
+    ))
+    expect(button.className).toBe('copy-btn ui-btn')
+    expect({ ...button.dataset }).toMatchObject({
+      variant: 'bare',
+      size: 'sm',
+      iconOnly: '',
+      always: '',
+      tip: 'Copy Acorn link',
+      tipSub: 'acorn://n1/t/t1',
+    })
+    expect(button.getAttribute('aria-label')).toBe('Copy Acorn link')
+  })
+
   it('marks itself always-visible only when asked', () => {
     expect(draw(() => <CopyButton text="x" />).dataset.always).toBeUndefined()
     dispose?.()

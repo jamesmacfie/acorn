@@ -1,7 +1,8 @@
 import { Match, Show, Switch, type JSX } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
-import { Kbd } from '@acorn/client-core/kit/components/primitives.tsx'
+import { IconButton } from '@acorn/client-core/kit/components/inputs'
+import { Button, Kbd } from '@acorn/client-core/kit/components/primitives.tsx'
 import { formatChord } from '@acorn/client-core/kit/lib/formatChord'
 import type { Location } from './location'
 import { nodeState } from './state'
@@ -43,11 +44,7 @@ export function TopBar(props: {
   openSettings(): void
   goToTask(): void
 }) {
-  const Back = () => (
-    <button type="button" class="icon" aria-label="Back" onClick={() => props.back()}>
-      <Icon name="chevron-left" />
-    </button>
-  )
+  const Back = () => <IconButton icon="chevron-left" label="Back" size="md" onPress={() => props.back()} />
   return (
     <header class="top" ref={props.ref}>
       <Switch>
@@ -57,11 +54,7 @@ export function TopBar(props: {
           </span>
           <strong class="grow">Acorn</strong>
           <Show when={props.cancel}>
-            {(cancel) => (
-              <button type="button" class="icon" aria-label="Cancel" onClick={() => cancel()()}>
-                <Icon name="x" />
-              </button>
-            )}
+            {(cancel) => <IconButton icon="x" label="Cancel" size="md" onPress={() => cancel()()} />}
           </Show>
         </Match>
         <Match when={props.location.level === 'home'}>
@@ -74,16 +67,16 @@ export function TopBar(props: {
             <span class="dot" data-tone={props.nodeLabel ? nodeState(props.status).tone : 'idle'} />
           </span>
           <Show when={props.nodeLabel} fallback={<span class="grow" />}>
-            <button type="button" class="go-to-task-button" aria-label="Go to task" onClick={() => props.goToTask()}>
-              <Icon name="search" />
-              <span class="grow">Go to task</span>
-              <Kbd size="xs">{GO_TO_TASK_KEYS}</Kbd>
-            </button>
+            <span class="go-to-task-button">
+              <Button label="Go to task" variant="bare" opens="dialog" onPress={() => props.goToTask()}>
+                <Icon name="search" />
+                <span class="grow">Go to task</span>
+                <Kbd size="xs">{GO_TO_TASK_KEYS}</Kbd>
+              </Button>
+            </span>
           </Show>
           {props.needsYou}
-          <button type="button" class="icon" aria-label="Settings" onClick={() => props.openSettings()}>
-            <Icon name="settings" />
-          </button>
+          <IconButton icon="settings" label="Settings" size="md" onPress={() => props.openSettings()} />
         </Match>
         <Match when={props.location.level === 'settings'}>
           <Back />
@@ -93,18 +86,20 @@ export function TopBar(props: {
         </Match>
         <Match when={props.location.level === 'task'}>
           <Back />
-          <button type="button" class="heading" aria-haspopup="dialog" onClick={() => props.goToTask()}>
-            <strong class="title">
-              {props.heading?.title}
-              <Icon name="chevron-down" tone="muted" />
-            </strong>
-            <span class="detail">
-              {props.heading?.detail}
-              <Show when={props.heading?.here}>
-                <span class="here">This page</span>
-              </Show>
-            </span>
-          </button>
+          <div class="heading">
+            <Button variant="bare" opens="dialog" onPress={() => props.goToTask()}>
+              <strong class="title">
+                {props.heading?.title}
+                <Icon name="chevron-down" tone="muted" />
+              </strong>
+              <span class="detail">
+                {props.heading?.detail}
+                <Show when={props.heading?.here}>
+                  <span class="here">This page</span>
+                </Show>
+              </span>
+            </Button>
+          </div>
           {props.needsYou}
           {props.menu}
         </Match>

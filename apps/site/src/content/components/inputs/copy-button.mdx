@@ -7,7 +7,9 @@ sources:
 checked: 'f03cdd5c6'
 ---
 
-Use `CopyButton` beside a value the reader copies, such as a hash. The terminal copies with OSC 52 where it can, and prints the value to copy by hand where it can't.
+Use `CopyButton` beside a value the reader copies, such as a hash. The terminal copies with OSC 52 where it can, and prints the value to copy by hand where it can't. It shows `title` as its words.
+
+Give it a `size` to draw it as an [`IconButton`](/docs/components/inputs/icon-button/) of that size, always shown, beside other icon buttons. `tipSub` adds a second line to its tip, such as the value it copies. The terminal has neither sizes nor tips, so it ignores both.
 
 <Specimen id="copy-button" />
 

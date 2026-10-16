@@ -4,7 +4,7 @@ import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type { BridgePageTask, BridgeProject, BridgeWorkspace } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import PickerRow from '@acorn/client-core/kit/components/inputs/PickerRow.tsx'
-import { Kbd } from '@acorn/client-core/kit/components/primitives.tsx'
+import { Button, Kbd } from '@acorn/client-core/kit/components/primitives.tsx'
 import { createAnchoredPopover } from '@acorn/client-core/kit/lib/anchor'
 import { restoreFocusOnCleanup } from '@acorn/client-core/kit/keys/trap'
 import { nodeState } from './state'
@@ -157,9 +157,7 @@ function Palette(props: Parameters<typeof GoToTask>[0]) {
       <div class="repo-picker-footer row">
         <span class="dot" data-tone={nodeState(props.status).tone} aria-hidden="true" />
         <span class="grow">{props.nodeLabel}</span>
-        <button type="button" class="link" onClick={close(props.switchNode)}>
-          Switch Node
-        </button>
+        <Button label="Switch Node" variant="bare" onPress={close(props.switchNode)} />
       </div>
     </>
   )

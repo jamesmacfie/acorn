@@ -196,6 +196,7 @@ function mount(options: { url: string; title: string; paired?: boolean; waiting?
             },
           ],
           panels: options.panel ? [{ pluginId: 'acme-browser', label: 'Acme app', glyph: 'app-window' }] : [],
+          icons: [],
         }
       case 'plugin.panel':
         return { nodeId: 'n1', pluginId: request.pluginId, taskId: request.taskId, view: acmePanel }

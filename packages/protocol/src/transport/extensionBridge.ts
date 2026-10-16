@@ -5,6 +5,7 @@ import {
   type BrowserHandoff,
   type BrowserPanel,
   type BrowserPanelView,
+  type PluginIcon,
 } from '../plugin/handoffs.ts'
 import {
   siteAssociationSchema,
@@ -531,7 +532,8 @@ export type BridgeResults = {
   // `data` is the content as base64, or null when it isn't an image or passes ATTACHMENT_MAX_BYTES.
   'attachment.read': { nodeId: string; taskId: string; attachment: BridgeAttachment; data: string | null }
   'attachment.delete': { nodeId: string; taskId: string; attachmentId: string; removed: boolean }
-  'handoffs.list': { nodeId: string; handoffs: BridgeHandoff[]; panels: BridgePanel[] }
+  // `icons` holds the logo of each plugin that declares a handoff or a panel, to register as `brand:<pluginId>`.
+  'handoffs.list': { nodeId: string; handoffs: BridgeHandoff[]; panels: BridgePanel[]; icons: PluginIcon[] }
   'handoff.resolve': { nodeId: string; url: string; items: BridgeHandoffItem[] }
   // `created` is false when an active task in that project was already linked, which is answered instead.
   'handoff.create': { nodeId: string; task: BridgeTask & { projectId: string }; created: boolean }

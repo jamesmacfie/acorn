@@ -16,7 +16,6 @@
       {
         "id": "issue",
         "label": "Open in Acorn",
-        "glyph": "ticket",
         "match": ["https://example.com/issues/{key}"],
         "anchors": ["body > div > h1", "h1"],
         "resolve": "/v1/p/acme-browser/browser/issue"

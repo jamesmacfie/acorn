@@ -21,7 +21,6 @@ route. This is one array element:
 {
   "id": "issue",
   "label": "Open in Acorn",
-  "glyph": "ticket",
   "match": ["https://tracker.example/{team}/issue/{key}"],
   "anchors": [".issue-header .actions", ".issue-header"],
   "resolve": "/v1/p/tracker/browser/issue"
@@ -32,12 +31,13 @@ route. This is one array element:
 | --- | --- |
 | `id` | Lowercase letters, digits, and hyphens, at most 64 characters, unique among this plugin's contributions. |
 | `label` | 1 to 40 characters. The chip shows the task's name or **Start task**, and keeps the label in its accessible name. The extension uses it as text, never as markup. |
-| `glyph` | Optional. A [Lucide](https://lucide.dev/icons/) icon name, at most 64 characters, that the sidebar's issue card draws beside the item. The extension can't load your plugin's own logo, so without a glyph the card shows GitHub's mark for GitHub and a document for anything else. |
 | `match` | 1 to 8 page addresses in the [content-link grammar](../plugins/descriptors.md#content-links): `https://` only, a literal host or one `*.` level, and literal or `{capture}` path segments. The page must have exactly as many segments as the pattern, and one trailing slash is allowed. Declare one pattern per arity. |
 | `anchors` | Up to 4 CSS selectors, each at most 200 characters. The chip goes at the end of the first element that matches and is drawn. A selector can't contain `{`, `}`, `;`, `<`, or a control character. Leave it empty to offer the handoff in the sidebar only. |
 | `resolve` | A route inside this plugin's own `/v1/p/<pluginId>/` namespace. |
 
 A plugin may declare up to 4. The Node refuses the whole manifest when a rule fails, as for any other.
+
+The sidebar's item card shows your plugin's logo, the manifest's top-level `icon`, or else a document.
 
 A compiled plugin declares the same descriptors on `NodePlugin.browserHandoffs`, beside `emits`.
 Both tiers pass the same schema and the same route check, so the extension can't tell them apart.

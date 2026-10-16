@@ -47,6 +47,8 @@ import {
   type BrowserPanel,
   type BrowserPanelView,
   browserPanelView,
+  pluginIcon,
+  type PluginIcon,
   TASK_ADDRESSES_MAX_BYTES,
   taskAddressList,
 } from '@acorn/protocol/plugin/handoffs.ts'
@@ -794,6 +796,7 @@ export function createBridge(options: {
           nodeId: request.nodeId,
           handoffs: body.handoffs.filter((handoff) => ownsRoute(handoff.pluginId, handoff.resolve)).map(bridgeHandoff),
           panels: declaredPanels(body).map(bridgePanel),
+          icons: declaredIcons(body),
         }
       }
       case 'handoff.resolve': {
@@ -941,6 +944,14 @@ const declaredPanels = (body: BrowserHandoffsResponse | null): BrowserPanel[] =>
   (Array.isArray(body?.panels) ? body.panels : []).filter((panel) => ownsRoute(panel.pluginId, panel.route))
 
 const bridgePanel = ({ route: _route, ...panel }: BrowserPanel): BridgePanel => panel
+
+// The logos discovery lists that pass the manifest's own rule, because a logo's colour reaches a style
+// in the sidebar. A Node from before logos were listed sends none.
+const declaredIcons = (body: BrowserHandoffsResponse | null): PluginIcon[] =>
+  (Array.isArray(body?.icons) ? body.icons : []).flatMap((icon) => {
+    const parsed = pluginIcon.safeParse(icon)
+    return parsed.success ? [parsed.data] : []
+  })
 
 const changedIdentityStatus = (nodeId: string): NodeStatus => ({
   nodeId,

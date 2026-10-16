@@ -1,4 +1,4 @@
-import { Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
+import { Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type {
   BridgeAgentHint,
@@ -8,8 +8,11 @@ import type {
   BridgePanel,
   BridgePendingRequest,
 } from '@acorn/protocol/extensionBridge.ts'
+import type { PluginIcon } from '@acorn/protocol/plugin/handoffs.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { Button } from '@acorn/client-core/kit/components/primitives.tsx'
+import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
 import { conversationLink, taskLink } from '../acornLinks'
 import type { BrowserApi } from '../browser'
 import { HIDDEN_MARKERS_KEY, type PageHandoff } from '../handoffs'
@@ -54,6 +57,15 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const [handoffs, setHandoffs] = createSignal<BridgeHandoff[]>([])
   // The selected Node's plugin panels, null until it answers.
   const [panels, setPanels] = createSignal<BridgePanel[] | null>(null)
+  // Their plugins' logos, registered as `brand:<pluginId>` as the desktop's client registers them, so an
+  // item card shows its plugin's logo. A kit mark of the same name, such as GitHub's, stays.
+  const [icons, setIcons] = createSignal<PluginIcon[]>([])
+  createEffect(() => {
+    const marks = icons()
+      .filter((icon) => !untrack(() => brandMarkRegistry.get(icon.pluginId)))
+      .map(({ pluginId, d, color }) => brandMarkRegistry.register({ id: pluginId, d, color }))
+    onCleanup(() => marks.forEach((mark) => mark.dispose()))
+  })
   const [handoff, setHandoff] = createSignal<PageHandoff | null>(null)
   // Counts toolbar clicks, after which the active page may be readable where it wasn't.
   const [pageChecks, setPageChecks] = createSignal(0)
@@ -172,6 +184,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
       if (result.nodeId !== fleet()?.activeNodeId) return
       setHandoffs(result.handoffs)
       setPanels(result.panels)
+      setIcons(result.icons)
     } catch {
       // Without the list the sidebar offers no handoff; pairing and conversations still work.
     }
@@ -204,6 +217,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     // A handoff belongs to the Node it was asked of, as the page buttons do.
     setHandoffs([])
     setPanels(null)
+    setIcons([])
     setHandoff(null)
     setSites([])
     if (next.activeNodeId) {
@@ -326,9 +340,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
         {(guidance) => (
           <div class="banner problem row" role="alert">
             <span class="grow">{guidance()}</span>
-            <button type="button" class="quiet" onClick={() => void refresh()}>
-              Retry
-            </button>
+            <Button label="Retry" onPress={() => void refresh()} />
           </div>
         )}
       </Show>
@@ -337,9 +349,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
         {(message) => (
           <div class="banner notice row" role="status">
             <span class="grow">{message()}</span>
-            <button type="button" class="quiet" onClick={() => setNotice(null)}>
-              Dismiss
-            </button>
+            <Button label="Dismiss" onPress={() => setNotice(null)} />
           </div>
         )}
       </Show>
@@ -361,9 +371,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
               </Show>
             </span>
             <Show when={offline()}>
-              <button type="button" class="quiet" onClick={() => void refresh()}>
-                Retry
-              </button>
+              <Button label="Retry" onPress={() => void refresh()} />
             </Show>
           </div>
         )}
@@ -373,9 +381,12 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
           <span class="grow">
             {fleet()!.nodes.length ? 'Choose a Node to work with.' : 'No Node is paired with this browser yet.'}
           </span>
-          <button type="button" onClick={() => (fleet()!.nodes.length ? nav.openSettings() : setPairing(true))}>
-            {fleet()!.nodes.length ? 'Choose a Node' : 'Pair a Node'}
-          </button>
+          <Button
+            label={fleet()!.nodes.length ? 'Choose a Node' : 'Pair a Node'}
+            variant="solid"
+            tone="accent"
+            onPress={() => (fleet()!.nodes.length ? nav.openSettings() : setPairing(true))}
+          />
         </div>
       </Show>
 

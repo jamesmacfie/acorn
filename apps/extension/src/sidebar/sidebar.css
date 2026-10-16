@@ -48,8 +48,11 @@ ul { list-style: none; margin: 0; padding: 0; }
 .heading .eyebrow { font-size: var(--fs-2xs); color: var(--text-muted); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); font-weight: var(--label-weight); }
 .here { display: inline-flex; align-items: center; gap: 3px; }
 .here::before { content: ''; width: 6px; height: 6px; border-radius: var(--radius-circle); background: var(--accent); }
-/* Home's Go to task fills the bar like a search field. A task's title opens it too. */
-.go-to-task-button {
+/* Home's Go to task, a kit button that fills the bar like a search field. A task's title, a bare kit
+ * button laid out as the heading, opens it too. Both start from `bare`, which the style packs leave
+ * alone, so they look the same in every pack. */
+.go-to-task-button { flex: 1; display: flex; min-width: 0; }
+.go-to-task-button > .ui-btn {
   flex: 1;
   min-width: 0;
   justify-content: flex-start;
@@ -60,9 +63,13 @@ ul { list-style: none; margin: 0; padding: 0; }
   background: var(--bg);
   border: var(--control-border);
 }
-.go-to-task-button:hover { color: var(--text); border-color: var(--accent); }
-button.heading { display: grid; justify-content: stretch; min-height: 0; color: inherit; background: none; border: 0; text-align: start; }
-button.heading:hover { background: var(--bg-hover); }
+.go-to-task-button > .ui-btn:hover:not(:disabled) { color: var(--text); background: var(--bg); border-color: var(--accent); }
+/* The bar's icon buttons draw their mark at the icon size in the text colour, as the bar's other marks. */
+.top .ui-btn[data-icon-only] { color: var(--text); font-size: var(--icon-size); }
+.heading:has(> .ui-btn) { padding: 0; }
+.heading > .ui-btn { display: grid; justify-content: stretch; gap: 0; min-width: 0; padding: var(--space-1) var(--space-2); color: inherit; line-height: inherit; text-align: start; }
+.heading > .ui-btn > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.heading > .ui-btn:hover:not(:disabled) { color: inherit; background: var(--bg-hover); }
 .heading .title .ui-icon { margin-inline-start: var(--space-1); vertical-align: -2px; }
 /* Go to task hangs under the bar, as wide as the panel less a margin, with the Node in its footer. Its
  * filter follows a search icon, so it needs less of the kit's inset. */
@@ -120,7 +127,7 @@ main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-st
 .view > section { border-bottom: var(--chrome-divider); }
 /* Home on a page that matches nothing: the Acorn mark alone, in the middle of the panel. */
 /* A lone button in a section or form keeps its own width rather than the column's. */
-:is(.view > section, .view > section > section, form) > button { justify-self: start; }
+:is(.view > section, .view > section > section, form) > .ui-btn { justify-self: start; }
 /* Settings: a setting's control takes its own width. The kit's fixed control column is sized for the
  * desktop's page and squeezes the label in a panel this narrow. Pairing's done screen has the same rows. */
 :is(.settings, .connect) { --setting-control-w: max-content; }
@@ -166,37 +173,10 @@ h2, h3 {
 @keyframes dot-pulse { 50% { opacity: 0.25; } }
 @media (prefers-reduced-motion: reduce) { .dot[data-tone='active'] { animation: none; } }
 
-/* ── Controls: 32 px buttons, inputs on the same rung ───────────────────────────────────────── */
-/* An `acorn://` link is an anchor, so the browser hands it to the desktop app, drawn as a button. The
- * kit's own controls keep the desktop's look, so these plain-element rules skip them: every `ui-`
- * class, the picker's `repo-picker-` parts, and `CopyButton`. The selectors weigh nothing, so any rule
- * with a class beats them. */
-:where(button, a.button):where(:not([class*='ui-'], [class*='repo-picker-'], .copy-btn)) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  min-height: var(--control-h);
-  padding: var(--pad-control);
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--accent-fg);
-  background: var(--accent);
-  border: var(--control-bw) solid var(--accent);
-  border-radius: var(--radius-control);
-  cursor: pointer;
-  transition: var(--transition-color);
-}
-a.button { text-decoration: none; white-space: nowrap; }
-button:disabled { opacity: 0.5; cursor: default; }
-:is(button, a.button).quiet { color: var(--text); background: var(--bg); border: var(--control-border); }
-:is(button, a.button).quiet:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--accent); }
-:is(button, a.button).link { min-height: 0; padding: 0; background: transparent; border: 0; color: var(--text-muted); }
-:is(button, a.button).link:hover:not(:disabled) { color: var(--text); }
-button.icon { width: var(--control-h); padding: 0; background: transparent; color: var(--text); border-color: transparent; font-size: var(--fs-lg); }
-button.icon:hover:not(:disabled) { background: var(--bg-hover); }
-button.icon[aria-pressed='true'] { background: var(--bg-selected); }
-button.icon svg { width: var(--icon-size); height: var(--icon-size); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* ── Fields: inputs on the buttons' rung ────────────────────────────────────────────────────── */
+/* Every button is the kit's. The last plain fields take these rules, which skip the kit's own: every
+ * `ui-` class and the picker's `repo-picker-` parts. The selectors weigh nothing, so any rule with a
+ * class beats them. */
 :where(input:not([type='checkbox']), select, textarea):where(:not([class*='ui-'], [class*='repo-picker-'])) {
   min-width: 0;
   min-height: var(--control-h);
@@ -250,9 +230,10 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .run-form { padding: 0 var(--pane-pad) var(--space-4); }
 
 /* ── Needs you ──────────────────────────────────────────────────────────────────────────────── */
-/* The top bar's amber button, with the count of requests waiting. */
-.needs-you-button {
-  flex: none;
+/* The top bar's amber button, with the count of requests waiting: a bare kit button, so the packs
+ * leave its colours alone. */
+.needs-you-button { flex: none; display: flex; }
+.needs-you-button > .ui-btn {
   gap: var(--space-2);
   min-height: var(--control-h-sm);
   padding: 0 var(--space-4);
@@ -263,7 +244,7 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
   border: var(--bw) solid var(--state-warn);
   border-radius: var(--radius-chip);
 }
-.needs-you-button:hover { background: color-mix(in srgb, var(--state-warn) 18%, var(--bg)); }
+.needs-you-button > .ui-btn:hover:not(:disabled) { color: var(--state-warn); background: color-mix(in srgb, var(--state-warn) 18%, var(--bg)); border-color: var(--state-warn); }
 /* Its popover holds the list against its own edge. */
 .ui-popover:has(> .needs-you-popover) { padding: 0; }
 .needs-you-popover { width: 340px; max-width: 100%; max-height: 420px; overflow: auto; }
@@ -320,7 +301,6 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .chip summary { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; list-style: none; overflow: hidden; }
 .chip summary::-webkit-details-marker { display: none; }
 .chip summary strong { font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chip button.icon { width: var(--control-h-sm); min-height: var(--control-h-sm); font-size: var(--fs); }
 .chip .thumb { height: var(--icon-box); width: auto; border-radius: var(--radius-xs); }
 .chip .quiet { display: block; overflow-wrap: anywhere; font-size: var(--fs-xs); }
 .chip blockquote, .chip pre.context { margin: var(--space-2) 0 0; padding-left: var(--space-4); border-left: var(--bw-strong) solid var(--border); white-space: pre-wrap; font: inherit; max-height: 8.5em; overflow: auto; }

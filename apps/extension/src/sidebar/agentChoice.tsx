@@ -1,6 +1,7 @@
 import { Show, createSignal } from 'solid-js'
 import type { BridgeAgentChoice, BridgeAgentSession } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { IconButton } from '@acorn/client-core/kit/components/inputs'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import { CallFailure, choiceKey, isUncertain } from '../messages'
 import type { BridgeClient } from './bridgeClient'
@@ -110,15 +111,7 @@ export function AgentPicker(props: {
       disabled={props.disabled}
       onSelect={props.pick}
       tools={
-        <button
-          type="button"
-          class="icon"
-          aria-label="Refresh provider health"
-          title="Refresh provider health"
-          onClick={() => void props.agents.load(true)}
-        >
-          <Icon name="refresh-cw" />
-        </button>
+        <IconButton icon="refresh-cw" label="Refresh provider health" onPress={() => void props.agents.load(true)} />
       }
     />
   )

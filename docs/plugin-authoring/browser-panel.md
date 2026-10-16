@@ -19,7 +19,7 @@ Declare it in the manifest. The manifest also needs a `node` entry:
 | Field | Meaning |
 | --- | --- |
 | `label` | The nav item's label and the panel's title, 1 to 40 characters. |
-| `glyph` | A Lucide icon name for the nav item. Without one, the nav item shows a generic panel icon. |
+| `glyph` | A Lucide icon name for the nav item, or `brand:<your plugin ID>` for the logo in your manifest's `icon`. Without one, the nav item shows a generic panel icon. |
 | `pane` | A task-scoped pane in the same manifest, which **Open in Acorn** opens on the task. Without one, the task opens on whichever pane it showed last. |
 | `route` | A `GET` route inside your own `/v1/p/<pluginId>/` namespace. |
 

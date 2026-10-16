@@ -7,6 +7,7 @@ import type {
   BridgeWorkflowStep,
 } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
 import {
@@ -79,7 +80,7 @@ const session = (id: string, taskId: string): BridgeAgentSession => ({
 })
 
 // One Node with two projects. Tasks and sessions are whatever the test puts in `state`.
-function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?: boolean; glyph?: string } = {}) {
+function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?: boolean; icon?: string } = {}) {
   const fake = fakeBrowser()
   fake.activeTab = { id: 7, windowId: 1, url: options.url ?? 'https://elsewhere.example/', title: 'Page' }
   const state = {
@@ -101,7 +102,12 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
           status: { nodeId: 'n1', state: 'online' },
         }
       case 'handoffs.list':
-        return { nodeId: 'n1', handoffs: [{ ...handoff, glyph: options.glyph }], panels: [] }
+        return {
+          nodeId: 'n1',
+          handoffs: [handoff],
+          panels: [],
+          icons: options.icon ? [{ pluginId: handoff.pluginId, d: options.icon }] : [],
+        }
       case 'handoff.resolve':
         return { nodeId: 'n1', url: request.url, items: state.items }
       case 'handoff.create': {
@@ -494,10 +500,13 @@ describe('a handoff in the sidebar', () => {
     await settle(20)
     await clickSiteButton(fake)
     expect(root.querySelector('a')).toBeNull()
-    button(root, 'Copy Acorn link')!.click()
+    const copy = button(root, 'Copy Acorn link')!
+    const link = `acorn://n1/open?url=${encodeURIComponent(PAGE)}`
+    // The kit's CopyButton, at IconButton's size, with the link as its tip's second line.
+    expect(copy.dataset.tipSub).toBe(link)
+    copy.click()
     await settle()
-    expect(writeText).toHaveBeenCalledWith(`acorn://n1/open?url=${encodeURIComponent(PAGE)}`)
-    expect(button(root, 'Copied')).toBeDefined()
+    expect(writeText).toHaveBeenCalledWith(link)
   })
 
   it('looks up the page beside it when no button could be drawn', async () => {
@@ -507,20 +516,24 @@ describe('a handoff in the sidebar', () => {
     expect(root.textContent).toContain('acme/widget#42')
   })
 
-  it("draws the handoff's glyph on the card, and a document without one", async () => {
+  it("draws the plugin's logo from the handoff list on the card, and a document without one", async () => {
     const drawn = (name: string) => {
       const host = document.createElement('div')
       render(() => <Icon name={name} tone="brand" />, host)
       return host.innerHTML
     }
-    const mark = (root: HTMLElement) => root.querySelector('.item-head > .ui-icon')!.outerHTML
+    const mark = (root: HTMLElement) => root.querySelector('.item-head > .ui-icon')!
     const plain = mount({ url: PAGE })
     await settle(30)
-    expect(mark(plain.root)).toBe(drawn('file-text'))
+    expect(mark(plain.root).outerHTML).toBe(drawn('file-text'))
     dispose?.()
-    const declared = mount({ url: PAGE, glyph: 'ticket' })
+    const declared = mount({ url: PAGE, icon: 'M2 2h20v20H2z' })
     await settle(30)
-    expect(mark(declared.root)).toBe(drawn('ticket'))
+    expect(mark(declared.root).querySelector('path')?.getAttribute('d')).toBe('M2 2h20v20H2z')
+    // The sidebar's registration goes with it.
+    dispose?.()
+    dispose = undefined
+    expect(brandMarkRegistry.get(handoff.pluginId)).toBeUndefined()
   })
 
   it('looks the item up again when the tab moves to another item', async () => {

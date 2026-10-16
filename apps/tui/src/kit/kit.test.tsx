@@ -1165,9 +1165,9 @@ const CASES: Case[] = [
   },
   {
     node: 'CopyButton',
-    draws: 'fallback: a control that copies where the terminal takes OSC 52, and prints otherwise',
-    render: () => <CopyButton text={() => 'copied text'} />,
-    check: (frame) => has(frame, 'Copy'),
+    draws: 'fallback: a control named by its title that copies where the terminal takes OSC 52, and prints otherwise',
+    render: () => <CopyButton text={() => 'copied text'} title="Copy branch" size="sm" />,
+    check: (frame) => has(frame, 'Copy branch'),
   },
   {
     node: 'ModelBackendPicker',

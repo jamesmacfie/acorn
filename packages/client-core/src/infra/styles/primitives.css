@@ -1249,7 +1249,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* ── CopyButton ─────────────────────────────────────────────────────────────────────────────
    Hidden until a `.copyable` ancestor is hovered. Here rather than in a sheet of its own, so the button
    is styled in every host that loads the kit's sheet: the desktop, a plugin frame, and the browser
-   extension's sidebar. */
+   extension's sidebar. One with a `size` also carries `.ui-btn` and IconButton's attributes, whose
+   heavier rules above give it IconButton's box. */
 .copy-btn {
   display: inline-flex;
   align-items: center;

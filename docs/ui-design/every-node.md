@@ -169,7 +169,7 @@ paint containment would clip a card's focus ring.
 | `KeyValueEditor` | none | A two-column table with editable cells, each cell a stop |
 | `FindBar` | stop | `/ query  3/12` on one line |
 | `Field` | none | The label above its child, with ` *` after it when `required`, the hint under it, then `help` as a grey line, because this host has no hover |
-| `CopyButton` | stop | A labeled Copy control sends OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
+| `CopyButton` | stop | A Copy control, labeled with its `title` when it has one, sends OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
 | `ModelBackendPicker` | stop | Two `Select`s over the backends a Generate control can spend: a stored key, or an installed agent CLI |
 
 `modelProviderFailure` is a presentation helper at `@acorn/plugin-api/ui/model-provider-failure`,

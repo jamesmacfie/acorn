@@ -1,7 +1,8 @@
-// The browser handoffs, task address routes, and sidebar panels each running plugin declares, for the
-// extension's discovery route (docs/plugin-authoring/browser-handoffs.md). Filled by the host from a
-// loaded manifest's `contributions.browserHandoffs`, `taskAddresses`, and `browserPanel`, or a built-in's
-// `NodePlugin.browserHandoffs` and `browserPanel`, and emptied with the plugin's other registrations. A package waiting
+// The browser handoffs, task address routes, and sidebar panels each running plugin declares, and its
+// logo, for the extension's discovery route (docs/plugin-authoring/browser-handoffs.md). Filled by the
+// host from a loaded manifest's `contributions.browserHandoffs`, `taskAddresses`, `browserPanel`, and
+// `icon`, or a built-in's `NodePlugin.browserHandoffs` and `browserPanel`, and emptied with the plugin's
+// other registrations. A package waiting
 // for review or a restart has no binding yet, so its declarations aren't here until it runs.
 import { z } from 'zod'
 import {
@@ -11,6 +12,7 @@ import {
   type BrowserHandoffDescriptor,
   type BrowserPanel,
   type BrowserPanelDescriptor,
+  type PluginIcon,
   type TaskAddressesRoute,
 } from '@acorn/protocol/plugin/handoffs.ts'
 
@@ -18,6 +20,7 @@ type Declaration = {
   handoffs: readonly BrowserHandoff[]
   taskAddresses: string | undefined
   panel: BrowserPanelDescriptor | undefined
+  icon: Omit<PluginIcon, 'pluginId'> | undefined
 }
 const declared = new Map<string, Declaration>()
 
@@ -60,17 +63,22 @@ function validatedPanel(
 }
 
 /** Record what `pluginId` declares. Returns the undo for the plugin's registration list. Only a loaded
- *  manifest declares `taskAddresses`, and its parse already confined the route to the plugin. A panel
- *  comes from a loaded manifest or a built-in's `NodePlugin.browserPanel`. */
+ *  manifest declares `taskAddresses` and `icon`, and its parse already confined the route to the plugin
+ *  and checked the logo. A panel comes from a loaded manifest or a built-in's `NodePlugin.browserPanel`. */
 export function declareBrowserHandoffs(
   pluginId: string,
   descriptors: readonly BrowserHandoffDescriptor[],
-  routes: { taskAddresses?: string; browserPanel?: BrowserPanelDescriptor } = {},
+  routes: {
+    taskAddresses?: string
+    browserPanel?: BrowserPanelDescriptor
+    icon?: Omit<PluginIcon, 'pluginId'>
+  } = {},
 ): () => void {
   const declaration = {
     handoffs: validated(pluginId, descriptors),
     taskAddresses: routes.taskAddresses,
     panel: validatedPanel(pluginId, routes.browserPanel),
+    icon: routes.icon,
   }
   declared.set(pluginId, declaration)
   return () => {
@@ -94,4 +102,11 @@ export const browserPanels = (): BrowserPanel[] =>
   [...declared.keys()].sort().flatMap((pluginId) => {
     const panel = declared.get(pluginId)!.panel
     return panel === undefined ? [] : [{ pluginId, ...panel }]
+  })
+
+/** The logo of every running plugin that declares a handoff or a panel and has one, ordered by plugin. */
+export const browserIcons = (): PluginIcon[] =>
+  [...declared.keys()].sort().flatMap((pluginId) => {
+    const { handoffs, panel, icon } = declared.get(pluginId)!
+    return icon && (handoffs.length || panel) ? [{ pluginId, ...icon }] : []
   })

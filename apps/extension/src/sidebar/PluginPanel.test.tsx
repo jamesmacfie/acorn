@@ -68,8 +68,9 @@ const view = (source = 'web', severity: 'info' | 'danger' = 'info'): BrowserPane
 })
 
 // One Node with a Runn panel. The page belongs to whichever task `state.pageTask` names, and the
-// panel's answer for each task is in `state.views`: a view, null for none, or a failure.
-function mount(fake = fakeBrowser()) {
+// panel's answer for each task is in `state.views`: a view, null for none, or a failure. `logo` gives
+// the plugin a manifest logo, which the panel's tab names as its glyph.
+function mount(fake = fakeBrowser(), logo?: string) {
   fake.activeTab = { id: 7, windowId: 1, url: PAGE, title: 'App' }
   const state = {
     pageTask: 't1',
@@ -89,7 +90,8 @@ function mount(fake = fakeBrowser()) {
         return {
           nodeId: 'n1',
           handoffs: [],
-          panels: [{ pluginId: 'runn', label: 'Runn', glyph: 'container', pane: 'runn' }],
+          panels: [{ pluginId: 'runn', label: 'Runn', glyph: logo ? 'brand:runn' : 'container', pane: 'runn' }],
+          icons: logo ? [{ pluginId: 'runn', d: logo }] : [],
         }
       case 'tasks.pages':
         // A second task, on another site, that has no Runn panel.
@@ -170,6 +172,14 @@ describe('plugin panels', () => {
     await settle(30)
     expect(shownTask(root)).toBe('Task t3')
     expect(taskTabs(root)).toEqual(['Agents', 'Runs'])
+  })
+
+  it("draws the plugin's logo on its tab when the glyph names it", async () => {
+    const { root } = mount(undefined, 'M2 2h20v20H2z')
+    await settle(30)
+    const runn = root.querySelector('[role="tablist"][aria-label="Task"] [role="tab"]:last-child')!
+    expect(runn.textContent).toBe('Runn')
+    expect(runn.querySelector('path')?.getAttribute('d')).toBe('M2 2h20v20H2z')
   })
 
   it('draws every block with the kit, under a header with Refresh and Open in Acorn', async () => {

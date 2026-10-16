@@ -83,7 +83,7 @@ function mount() {
           status: { nodeId: 'n1', state: 'online' },
         }
       case 'handoffs.list':
-        return { nodeId: 'n1', handoffs: [], panels: [] }
+        return { nodeId: 'n1', handoffs: [], panels: [], icons: [] }
       case 'tasks.pages':
         return {
           nodeId: 'n1',

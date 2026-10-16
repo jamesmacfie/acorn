@@ -469,7 +469,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [plugin panels](./future/extension-ux/09-plugin-panels.md), [Settings](./future/extension-ux/10-settings.md),
   [connecting](./future/extension-ux/11-connect.md), [the page's chip and
   marker](./future/extension-ux/12-on-the-page.md), and [a Context
-  picker](./future/extension-ux/13-context-picker.md).
+  picker](./future/extension-ux/13-context-picker.md), then [plugin reuse
+  passes](./future/extension-ux/plugin-reuse.md).
 
 ## Lessons from OpenCode proposal
 

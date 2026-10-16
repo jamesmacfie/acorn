@@ -147,9 +147,7 @@ export function Conversation(props: {
           </p>
         </Show>
         <Show when={(view()?.from ?? 0) > 0}>
-          <button type="button" class="quiet" onClick={() => void reader.earlier()}>
-            Earlier messages
-          </button>
+          <Button label="Earlier messages" onPress={() => void reader.earlier()} />
         </Show>
         <Show when={view()} fallback={<p class="quiet">{gone() ? '' : 'Loading the conversation…'}</p>}>
           <Show when={items().length || view()!.queued.length} fallback={<p class="quiet">No messages yet.</p>}>

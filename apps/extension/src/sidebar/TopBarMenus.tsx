@@ -1,6 +1,7 @@
 import { For, Show, type JSX } from 'solid-js'
 import type { BridgeTaskPage } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { IconButton } from '@acorn/client-core/kit/components/inputs'
 import { Menu } from '@acorn/client-core/kit/components/overlays'
 import type { BrowserApi } from '../browser'
 import { pageMatches } from '../taskPages'
@@ -16,16 +17,14 @@ function More(props: { label: string; children(context: MenuContext): JSX.Elemen
       ariaLabel={props.label}
       placement="bottom-end"
       trigger={(state) => (
-        <button
-          type="button"
-          class="icon"
-          aria-label={props.label}
-          aria-haspopup="menu"
-          aria-expanded={state.open()}
-          onClick={() => state.toggle()}
-        >
-          <Icon name="ellipsis" />
-        </button>
+        <IconButton
+          icon="ellipsis"
+          label={props.label}
+          size="md"
+          opens="menu"
+          expanded={state.open()}
+          onPress={() => state.toggle()}
+        />
       )}
     >
       {props.children}
