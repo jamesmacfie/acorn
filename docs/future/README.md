@@ -38,6 +38,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [plugin-rail-artwork.md](./plugin-rail-artwork.md) | Dynamic artwork and tooltips on plugin rail buttons, plus a shared artwork component for compiled UI and remote trees. | Proposed October 13, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
+| [usage-ui.md](./usage-ui.md) | Replace the account tabs in the plan usage popover with one row per account, showing each account's session and week bars, and fold the daily figures into one summary line. | Proposed October 16, 2026. Implementation not started. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan
