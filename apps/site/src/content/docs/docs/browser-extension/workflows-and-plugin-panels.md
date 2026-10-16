@@ -7,7 +7,7 @@ sources:
   - apps/extension/src/sidebar/Handoff.tsx
   - apps/extension/src/sidebar/Workflows.tsx
   - apps/extension/src/sidebar/PluginPanel.tsx
-checked: 83c8184c2
+checked: 97ab4d104
 ---
 
 The browser panel can start a workflow on the item you're looking at, such as a pull request, and follow
