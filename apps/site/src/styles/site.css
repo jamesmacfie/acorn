@@ -535,7 +535,7 @@ select {
   margin-block-start: var(--space-10);
 }
 /* A split hero: the headline on the left, and the paragraph and actions in a column beside it, both
-   starting under the eyebrow. */
+   starting under the eyebrow when there is one. */
 @media (min-width: 64rem) {
   .hero[data-split] {
     grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);

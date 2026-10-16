@@ -3,7 +3,7 @@
 This page covers how `apps/site` looks and why: the stylesheet, the fonts, the mark, the light and dark
 themes, the components, Starlight's replaced parts, and the checks that hold the design to the app.
 Read it before you style a page or add a component. [The public site](../site.md) covers running and
-deploying it.
+deploying it, and [marketing copy](./marketing-copy.md) covers how the marketing pages read.
 
 The site is built from acorn's own design tokens. The only color on a page is the color acorn draws:
 the site's chrome uses the theme's text, background, border, and accent tokens, so in Catppuccin Latte
@@ -102,7 +102,7 @@ The components are in `apps/site/src/components/`. Each has a comment that says 
 | --- | --- |
 | `SiteHeader`, `SiteFooter` | The header and the footer on every page. Below 50rem the header's links fold into a menu. |
 | `GitHubStars` | **Star on GitHub**, a plain link to the repository. It shows the star count, read at build time, from 100 stars. |
-| `Hero` | Eyebrow, headline, paragraph, and optional actions and picture. A marketing page puts it in the layout's `hero` slot. With `split`, the paragraph and actions sit beside the headline on a wide screen, so the picture starts higher. |
+| `Hero` | Headline, paragraph, and an optional eyebrow, actions, and picture. The landing page leaves the eyebrow out. A marketing page puts it in the layout's `hero` slot. With `split`, the paragraph and actions sit beside the headline on a wide screen, so the picture starts higher. |
 | `InstallBlock` | A tab per install method, its commands after a prompt, and **Copy**. |
 | `Specimen`, `SnapshotFrame` | A picture of acorn in a frame drawn like a pane, or a whole window. A specimen switches between its desktop and terminal views with tabs, or shows them side by side with `both`. Either takes a `caption` that replaces its own. |
 | `Snapshot`, `Cells` | A [shell snapshot](./snapshots.md) in its frame, and a terminal's cells, which specimens and snapshots share. |

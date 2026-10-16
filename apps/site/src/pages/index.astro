@@ -53,7 +53,7 @@ export const meta = {
 const steps = [
   {
     title: 'Open a task',
-    text: 'A task is one piece of work on one project, on its own branch. acorn creates its Git worktree the first time something needs the files.',
+    text: 'A task is one piece of work on one project. Give it a title, and acorn names a branch after it and creates its Git worktree the first time something needs the files.',
     specimen: 'task-rows',
     href: '/docs/using/tasks-and-worktrees/',
     link: 'Tasks and worktrees',
@@ -67,7 +67,7 @@ const steps = [
   },
   {
     title: 'Review and ship',
-    text: 'Read the diff, open the pull request, and merge it without leaving the task. Archive the task and acorn stops its agents and terminals and removes its worktree.',
+    text: 'Read the diff, open the pull request, and merge it without leaving the task. Archive the task and acorn stops its agents and terminals and removes its worktree, mess and all.',
     specimen: 'ship',
     href: '/docs/using/archive-and-restore/',
     link: 'Archive and restore',
@@ -113,7 +113,7 @@ const tour: { id: string; label: string; snapshot: SnapshotId; text: string; hre
     id: 'browser',
     label: 'Browser',
     snapshot: 'browser',
-    text: 'The Chrome and Firefox extension shows the task behind the page you’re on, and sends pages, selections, and screenshots to an agent.',
+    text: "The Chrome and Firefox extension shows the task behind the page you're on, and sends pages, selections, and screenshots to an agent.",
     href: '/features/browser/',
     link: 'More about the browser extension',
   },
@@ -237,10 +237,11 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
 <Marketing title="A workspace for working with coding agents" meta={meta}>
   <SoftwareApplication slot="head" release={release} />
-  <Hero slot="hero" eyebrow="A workspace for Claude Code and Codex" title="Let your agents go nuts." split>
+  <Hero slot="hero" title="Let your agents go nuts." split>
     <p>
-      A task gets its own branch, worktree, terminals, and agent sessions, so your agents make their mess somewhere
-      safe. Read the diff, merge the pull request, and archive the rest.
+      acorn is a workspace for Claude Code and Codex. Each task gets its own branch, worktree, terminals, and agent
+      sessions, so your agents make their mess somewhere safe. Read the diff, merge the pull request, and archive the
+      rest.
     </p>
     <p class="hero-meta">
       <a href="/docs/start/install/">macOS · Windows</a> ·{' '}
@@ -262,20 +263,16 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter" aria-labelledby="loop">
     <header class="chapter-head">
-      <p class="eyebrow">01 · The loop</p>
-      <h2 id="loop">From mess to merge.</h2>
+      <h2 id="loop">Every mess gets its own branch.</h2>
       <p class="lede">
-        A task is one piece of work on one project. The usual task gets a branch and a worktree of its own, so agents on
-        different tasks work in different checkouts.
+        The usual task gets a branch and a worktree of its own, so agents on different tasks work in different checkouts
+        and don't trip over each other.
       </p>
     </header>
     <ol class="loop">
       {
-        steps.map((step, index) => (
+        steps.map((step) => (
           <li>
-            <p class="loop-number" aria-hidden="true">
-              {String(index + 1).padStart(2, '0')}
-            </p>
             <h3>{step.title}</h3>
             <p>{step.text}</p>
             <a href={step.href}>{step.link}</a>
@@ -288,9 +285,8 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter" aria-labelledby="window">
     <header class="chapter-head">
-      <p class="eyebrow">02 · The window</p>
-      <h2 id="window">The whole job, in one window.</h2>
-      <p class="lede">Each task keeps the tools you'd otherwise open beside it.</p>
+      <h2 id="window">You can close a few windows now.</h2>
+      <p class="lede">The pull request, the terminals, and the other tools a task needs open as panes inside it.</p>
     </header>
     <Tour tabs={tour}>
       {tour.map((tab) => <Snapshot slot={tab.id} id={tab.snapshot} />)}
@@ -299,7 +295,6 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter band" aria-labelledby="plugins">
     <header class="chapter-head">
-      <p class="eyebrow">03 · Plugins</p>
       <h2 id="plugins">Take it apart.</h2>
       <p class="lede">
         Every pane in that window comes from a plugin, and so do the terminal drawer and most of the icons on its rails.
@@ -351,7 +346,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
       <div class="build-path">
         <h4>Or ask your agent</h4>
         <p>
-          Ask an agent in any task for “a pane that lists this task's TODO comments”. It reads your Node's plugin
+          Ask an agent in any task for "a pane that lists this task's TODO comments". It reads your Node's plugin
           vocabulary with <code>plugin_authoring</code>, writes the package, and asks to install it. Nothing installs
           until you approve. In development mode, the Node reloads the plugin each time the agent saves.{' '}
           <a href="/docs/build-plugins/start/have-your-agent-build-it/">Have your agent build it</a>
@@ -381,11 +376,9 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter" aria-labelledby="trust">
     <header class="chapter-head">
-      <p class="eyebrow">04 · Trust</p>
-      <h2 id="trust">Your machine. Your keys.</h2>
+      <h2 id="trust">The agents don't get your keys.</h2>
       <p class="lede">
-        Your code stays on the machine that runs the Node, and acorn keeps your keys from the agents and plugins that run
-        there.
+        Your code stays on the machine that runs the Node, and acorn limits what the agents and plugins there can reach.
       </p>
     </header>
     <ul class="cells">
@@ -453,8 +446,8 @@ const getAcorn = release ? 'Download' : 'Get acorn'
   }
 
   /* ── Chapters ──
-     Each of the four opens the same way: a numbered label after a short accent rule, a display heading,
-     and a lede, so the page reads as one story in four parts. */
+     Each of the four opens with a display heading and a lede. There's no label above the heading,
+     because a caps label over every heading is a mark of a generated page. */
   .chapter-head {
     display: grid;
     gap: var(--space-8);
@@ -462,16 +455,6 @@ const getAcorn = release ? 'Download' : 'Get acorn'
   }
   .chapter-head > * {
     margin: 0;
-  }
-  .chapter-head .eyebrow {
-    display: flex;
-    align-items: center;
-    gap: var(--space-6);
-  }
-  .chapter-head .eyebrow::before {
-    content: '';
-    inline-size: var(--space-11);
-    border-block-start: var(--bw-strong) solid var(--accent);
   }
   .chapter h2,
   .finale h2 {
@@ -504,7 +487,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     clip-path: inset(0 -100vmax);
   }
 
-  /* ── 01 · The loop ──
+  /* ── The loop ──
      The three steps side by side on a wide screen, each under a length of track. The accent fills the
      track left to right as the steps scroll through the window: one task moving from open to merged. */
   .loop {
@@ -542,20 +525,16 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     border-color: var(--accent);
     transform-origin: left;
   }
-  .loop-number {
-    font-family: var(--font-mono);
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-bold);
-  }
   /* Side by side, the steps share their rows, so the titles, the links, and the frames line up across
-     them, and each frame fills its row. */
+     them, and each frame fills its row. The steps carry no numbers, because the list and the
+     track already give the order. */
   @media (min-width: 64rem) {
     .loop {
       grid-template-columns: repeat(3, minmax(0, 1fr));
       row-gap: var(--space-6);
     }
     .loop > li {
-      grid-row: span 5;
+      grid-row: span 4;
       grid-template-rows: subgrid;
       row-gap: var(--space-6);
     }
@@ -594,7 +573,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     }
   }
 
-  /* ── 03 · Plugins ──
+  /* ── Plugins ──
      The hero's window again, with each part a plugin draws outlined in the accent. The selectors name
      each part by what the capture itself calls it, such as the Git pane's "Git list", so a new capture
      keeps them. The rail's Home and Archive aren't plugins, so they stay plain. */
@@ -826,7 +805,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     }
   }
 
-  /* ── 04 · Trust ── */
+  /* ── Trust ── */
   .cells {
     grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
   }
