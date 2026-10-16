@@ -404,15 +404,6 @@ export function createBridge(options: {
     return { nodeId, projects, workspaces }
   }
 
-  // Active tasks only, in the Node's order. The route lists every project's, so this keeps one.
-  async function listTasks(nodeId: string, projectId: string): Promise<BridgeResults['tasks.list']> {
-    const rows = await readList<Task>(nodeId, tasksRoute, (body) => body)
-    const tasks = rows
-      .filter((task) => task.projectId === projectId)
-      .map((task) => ({ id: task.id, title: task.title, branch: task.branch }))
-    return { nodeId, projectId, tasks }
-  }
-
   // One project's associations, read fresh from its config. A list that doesn't parse reads as none.
   async function projectSites(nodeId: string, projectId: string): Promise<SiteAssociation[]> {
     const body = (await nodeRequest(nodeId, {
@@ -629,8 +620,6 @@ export function createBridge(options: {
         return nodes()
       case 'projects.list':
         return listProjects(request.nodeId)
-      case 'tasks.list':
-        return listTasks(request.nodeId, request.projectId)
       case 'tasks.pages': {
         const [tasks, published] = await Promise.all([
           readList<Task>(request.nodeId, tasksRoute, (body) => body),

@@ -172,7 +172,6 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ ...envelope, op: z.literal('node.rename'), nodeId, label: z.string().trim().min(1).max(120) }),
   // Bound to the node it was asked of. The host refuses it once that node is no longer selected.
   z.strictObject({ ...envelope, op: z.literal('projects.list'), nodeId }),
-  z.strictObject({ ...envelope, op: z.literal('tasks.list'), nodeId, projectId: rowId }),
   // Every active task's page addresses, so the browser matches the page to its task itself and no
   // page address goes to the Node for it (docs/browser-extension/task-pages.md).
   z.strictObject({ ...envelope, op: z.literal('tasks.pages'), nodeId }),
@@ -515,7 +514,6 @@ export type BridgeResults = {
   'node.forget': BridgeNodes
   'node.rename': BridgeNodes
   'projects.list': { nodeId: string; projects: BridgeProject[]; workspaces: BridgeWorkspace[] }
-  'tasks.list': { nodeId: string; projectId: string; tasks: BridgeTask[] }
   'tasks.pages': { nodeId: string; tasks: BridgePageTask[] }
   'agents.choices': { nodeId: string; choices: BridgeAgentChoice[] }
   'sessions.list': { nodeId: string; sessions: BridgeAgentSession[] } & ({ taskId: string } | { workspaceId: string })

@@ -14,8 +14,8 @@ agents' state, is described here too.
 
 Each active task already records the addresses of its items. `tasks.pages` returns them for every
 active task on the selected Node, each with the task's ID, title, project, and branch. A task with no
-address has an empty list, so Home's task list can show every task. The host builds the list from the Node's own task list, `GET /v1/core/tasks`, the
-same read and device authority `tasks.list` uses, so it costs no GitHub or other provider call:
+address has an empty list, so Home's task list can show every task. The host builds the list from
+the Node's own task list, `GET /v1/core/tasks`, so it costs no GitHub or other provider call:
 
 - A pull request is the project's GitHub repository and the task's pull number, so its address is
   `https://github.com/<owner>/<name>/pull/<number>`, with `source` `github`.

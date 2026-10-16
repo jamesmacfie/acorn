@@ -1,6 +1,7 @@
 # Rework the browser extension's sidebar
 
-Date: October 16, 2026. Status: in progress. Phases 1 to 12 are done.
+Date: October 16, 2026. Status: phases 1 to 12 done on October 16 and 17, 2026, then two plugin reuse
+passes and a branch tidy. Phase 13 skipped.
 
 ## Plugin reuse pass 1
 

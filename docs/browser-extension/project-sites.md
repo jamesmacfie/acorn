@@ -6,8 +6,8 @@ are stored on the Node, how the sidebar matches and suggests, the override it re
 native operations. The shared rules are in `packages/protocol/src/projects/siteAssociations.ts`. Which projects a page
 belongs to, overrides included, is `pageScope` in `apps/extension/src/pageScope.ts`, which the sidebar
 and the [toolbar badge](./notifications.md) both use. The sidebar's side is in
-`apps/extension/src/sidebar/Workspace.tsx`, `Home.tsx`, and `ProjectSites.tsx`, and the host's in
-`apps/cli/src/browser/bridge.ts`.
+`apps/extension/src/sidebar/Workspace.tsx` and `Home.tsx`, with Settings' list in `Sites.tsx` and
+`AddSite.tsx`. The host's side is in `apps/cli/src/browser/bridge.ts`.
 
 ## What an association is
 

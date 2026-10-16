@@ -107,3 +107,24 @@ Proposals not done:
   the composer's field are plain elements, so the field rules keep their exclusion list for kit parts.
   Cost: four files, and `pnpm dev:extension:ui fill`, which finds fields by name.
 - **A shared panel renderer**, from pass 1, still waits for a host that wants a panel.
+
+## Branch tidy
+
+October 17, 2026. A last pass over the whole branch, read as one change.
+
+- **`tasks.list` is gone** from the bridge: the schema, the host, its test, the sidebar test fakes,
+  and the native messaging table. Nothing called it after phase 5.
+- **Needs you reads once.** The panel reads the waiting conversations in `createRequestReads`, and
+  every list on screen shares the reads, so the popover over Home reads nothing twice. With nothing
+  waiting, the top bar draws no empty popover anchor.
+- **A task archived while the panel was closed** sends the panel Home when it opens, instead of
+  showing a task with no title. The background sends no task list until it has read one, so the
+  panel can tell an empty list from one not read yet, and checks the stored task against the first.
+- **Drift.** `ProjectSites.test.tsx` is `Workspace.test.tsx`, since its component is gone. Agent
+  states are words only, because the rows draw icons, so their tones and the pulsing dot went. One
+  `expectedFailure` replaces four copies of the same check. A shared `shownTab` test helper replaces
+  two copies. Stale comments, a test name, and a doc that named a removed file are fixed.
+
+Left as they are: Home's sections draw their own header while the task's tabs use the kit's
+`Section`, because moving Home changes how it looks. `Workspace.tsx` stays one file: it holds the
+state every level shares, and each piece is small.

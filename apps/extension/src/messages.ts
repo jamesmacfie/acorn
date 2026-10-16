@@ -59,7 +59,7 @@ export type BackgroundMessage =
   // Why a right-click added nothing, in one line.
   | { type: 'notice'; notice: string }
   // The selected Node's tasks and the page addresses each is known by.
-  | { type: 'taskPages'; nodeId: string | null; tasks: BridgePageTask[] }
+  | { type: 'taskPages'; nodeId: string | null; tasks: BridgePageTask[] | null }
   // A task chip was clicked: show Home on the page's task, with a new chat about the page for `chat`.
   | { type: 'showTask'; chat: { url: string; title: string } | null }
 
@@ -76,3 +76,8 @@ export class CallFailure extends Error {
     super(message)
   }
 }
+
+// A reply refused because the selected Node changed under it, which is expected after a switch, or
+// because the bridge is missing, which its own banner explains. Neither needs a line of its own.
+export const expectedFailure = (error: unknown): boolean =>
+  error instanceof CallFailure && (error.code === 'not_selected' || error.code === 'host_unavailable')

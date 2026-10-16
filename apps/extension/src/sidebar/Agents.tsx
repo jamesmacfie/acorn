@@ -10,7 +10,7 @@ import type { PageCapture } from '../capture'
 import { AgentPicker, agentChoice } from './agentChoice'
 import type { BridgeClient } from './bridgeClient'
 import { CAPTURE_NAMES } from './Composer'
-import { NeedsYou } from './NeedsYou'
+import { NeedsYou, type RequestReads } from './NeedsYou'
 import { agentState } from './state'
 
 // The folds under Managed sessions, named as the desktop app's Agents sidebar names them.
@@ -36,6 +36,7 @@ export function Agents(props: {
   sessions: readonly BridgeAgentSession[] | null
   // Every request the Node's agents wait on. The tab shows its task's.
   requests: readonly BridgePendingRequest[]
+  reads: RequestReads
   pendingItem: PageCapture | null
   dropPendingItem(): void
   // Which folds are open, by label. Workspace holds it, so it lasts as long as the panel.
@@ -101,6 +102,7 @@ export function Agents(props: {
         client={props.client}
         nodeId={props.nodeId}
         requests={requests()}
+        reads={props.reads}
         online={props.online}
         inTask
         openConversation={(_taskId, sessionId) => props.open(sessionId)}
@@ -182,7 +184,7 @@ function SessionRow(props: { session: BridgeAgentSession; waiting: boolean; now:
             name={props.waiting ? 'circle-alert' : icon()}
             tone={props.waiting ? 'warn' : runtimeTone(props.session.runtimeState)}
             spin={!props.waiting && icon() === 'loader-circle'}
-            title={agentState(props.session, props.waiting).label}
+            title={agentState(props.session, props.waiting)}
           />
         }
         trailing={

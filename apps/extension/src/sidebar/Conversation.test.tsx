@@ -104,8 +104,6 @@ function node() {
         return {
           result: { nodeId: 'n1', sites: [{ projectId: 'p1', origin: 'https://example.test', pathPrefix: '/' }] },
         }
-      case 'tasks.list':
-        return { result: { nodeId: 'n1', projectId: 'p1', tasks: [{ id: 't1', title: 'Fix it', branch: null }] } }
       case 'sessions.list':
         return { result: { nodeId: 'n1', taskId: 't1', sessions: state.sessions.map((row) => ({ ...row })) } }
       case 'session.read': {
@@ -1308,7 +1306,7 @@ describe('Add to Acorn chat', () => {
     ])
   })
 
-  it("opens the current task's newest conversation from Home", async () => {
+  it('adds the selection to the newest conversation of the task the panel shows', async () => {
     const subject = mount(selected())
     await openSession(subject, 's2')
     await back(subject.root)

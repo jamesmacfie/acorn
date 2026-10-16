@@ -516,7 +516,6 @@ describe('This page', () => {
     await goHome(root)
     expect(thisPage(root).querySelector('strong')!.textContent).toBe('Fix login')
     expect(thisPage(root).querySelector('.row-meta')!.textContent).toBe('Web · fix/login')
-    expect(root.querySelector('[aria-label="Current task"]')).toBeNull()
 
     // Its one row opens the task.
     thisPage(root).querySelector<HTMLElement>('.ui-row')!.click()
@@ -597,6 +596,13 @@ describe('This page', () => {
     state.taskPages = []
     fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'n1' })
     await settle(20)
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
+  })
+
+  it('goes Home when the task it last showed was archived while the panel was closed', async () => {
+    const { fake, root } = mount({ url: 'https://elsewhere.example/' })
+    fake.storage.set('destination:n1', { projectId: 'p1', taskId: 't-gone', sessionId: null })
+    await settle(30)
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 

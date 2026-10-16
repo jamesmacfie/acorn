@@ -16,7 +16,7 @@ import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
 import { conversationLink, taskLink } from '../acornLinks'
 import type { BrowserApi } from '../browser'
 import { HIDDEN_MARKERS_KEY, type PageHandoff } from '../handoffs'
-import { CallFailure, type CallError, type HostState, type RequestTarget } from '../messages'
+import { CallFailure, expectedFailure, type CallError, type HostState, type RequestTarget } from '../messages'
 import { savePendingItem } from '../localState'
 import { pageTasks } from '../taskPages'
 import { activePageUrl } from './activePage'
@@ -24,7 +24,7 @@ import { bridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { errorGuidance, hostGuidance, installTitle, statusGuidance } from './guidance'
 import { createLocation, type Location } from './location'
-import { NeedsYouButton } from './NeedsYou'
+import { NeedsYouButton, createRequestReads } from './NeedsYou'
 import { InstallBridge, Pairing } from './Pairing'
 import { Settings } from './Settings'
 import { TopBar, type Heading } from './TopBar'
@@ -82,10 +82,10 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   // Why the page's right-click entry added nothing, until the person dismisses it or it works.
   const [notice, setNotice] = createSignal<string | null>(null)
   // The selected Node's tasks and their page addresses, as the background keeps them: null until the
-  // background has sent the selected Node's list.
-  const [taskPages, setTaskPages] = createSignal<{ nodeId: string | null; tasks: BridgePageTask[] }>({
+  // background has read the selected Node's list.
+  const [taskPages, setTaskPages] = createSignal<{ nodeId: string | null; tasks: BridgePageTask[] | null }>({
     nodeId: null,
-    tasks: [],
+    tasks: null,
   })
   const nodeTasks = () => (taskPages().nodeId === fleet()?.activeNodeId ? taskPages().tasks : null)
   // The apps plugins published for the selected Node's tasks, for site access.
@@ -97,7 +97,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const nav = createLocation({
     storage: props.api.storage.local,
     pageTaskId,
-    projectOf: (taskId) => nodeTasks()?.find((task) => task.id === taskId)?.projectId ?? null,
+    tasks: nodeTasks,
   })
   const [heading, setHeading] = createSignal<Heading | null>(null)
   // Whether Go to task is open, and the top bar it hangs under.
@@ -164,6 +164,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
       nav.openTask(taskId, chat ? 'agents' : undefined)
     },
   })
+  const requestReads = createRequestReads(client, requests)
   const selected = () => fleet()?.nodes.find((node) => node.nodeId === fleet()?.activeNodeId) ?? null
   const online = () => host().state === 'connected' && connected(status())
 
@@ -172,8 +173,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     try {
       await work()
     } catch (error) {
-      // A stale reply is expected after a switch, and the bridge banner already explains a missing host.
-      if (error instanceof CallFailure && (error.code === 'not_selected' || error.code === 'host_unavailable')) return
+      if (expectedFailure(error)) return
       setProblem(error instanceof CallFailure ? error : { code: 'node_error', message: String(error) })
     }
   }
@@ -299,6 +299,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                 client={client}
                 nodeId={nodeId}
                 requests={requests().nodeId === nodeId ? requests().requests : []}
+                reads={requestReads}
                 online={online()}
                 openConversation={nav.openConversation}
               />
@@ -471,6 +472,7 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
               startHandoff={setHandoff}
               dismissHandoff={() => setHandoff(null)}
               requests={requests().nodeId === nodeId ? requests().requests : []}
+              requestReads={requestReads}
             />
           )}
         </Show>

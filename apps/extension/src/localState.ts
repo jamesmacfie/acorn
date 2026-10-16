@@ -3,8 +3,7 @@ import type { PageCapture } from './capture'
 
 // What the sidebar keeps in this browser profile's storage: unsent drafts, the item waiting for each
 // task's first conversation, the destination it last showed on each Node, the tab last picked in each
-// task, and the workspace Home lists. None of it
-// leaves the browser until the person sends.
+// task, and the workspace Home lists. None of it leaves the browser until the person sends.
 
 type Storage = BrowserApi['storage']['local']
 

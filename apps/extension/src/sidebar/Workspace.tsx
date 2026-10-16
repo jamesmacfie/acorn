@@ -19,7 +19,7 @@ import { Button } from '@acorn/client-core/kit/components/primitives.tsx'
 import { agentRailMarkers } from '@acorn/plugin-agents/contract/runtimeState.ts'
 import type { BrowserApi } from '../browser'
 import { pageHandoffs, type PageHandoff } from '../handoffs'
-import { CallFailure } from '../messages'
+import { CallFailure, expectedFailure } from '../messages'
 import { loadSiteChoices, pageScope, saveSiteChoices, type SiteChoices } from '../pageScope'
 import { agentCounts, type PageTask } from '../taskPages'
 import type { BridgeClient } from './bridgeClient'
@@ -40,7 +40,7 @@ import {
   type TaskTab,
 } from '../localState'
 import { locationTask, type Navigation } from './location'
-import { NeedsYou } from './NeedsYou'
+import { NeedsYou, type RequestReads } from './NeedsYou'
 import { PluginPanel, panelMarker } from './PluginPanel'
 import type { Heading } from './TopBar'
 import { Runs, runsLive } from './Runs'
@@ -91,8 +91,9 @@ export function Workspace(props: {
   handoff: PageHandoff | null
   startHandoff(handoff: PageHandoff): void
   dismissHandoff(): void
-  // Every request the Node's agents are waiting on.
+  // Every request the Node's agents are waiting on, and their conversations as read.
   requests: readonly BridgePendingRequest[]
+  requestReads: RequestReads
 }) {
   const nodeId = props.nodeId
   const nav = props.nav
@@ -152,8 +153,7 @@ export function Workspace(props: {
   }
 
   const report = (error: unknown) => {
-    // A reply refused because the Node changed under it is expected, and a missing bridge has its banner.
-    if (error instanceof CallFailure && (error.code === 'not_selected' || error.code === 'host_unavailable')) return
+    if (expectedFailure(error)) return
     setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
   }
 
@@ -200,8 +200,7 @@ export function Workspace(props: {
       setRunLists((lists) => ({ ...lists, [forTask]: result.runs }))
       setRunsAvailable(true)
     } catch (error) {
-      if (error instanceof CallFailure && (error.code === 'not_selected' || error.code === 'host_unavailable')) return
-      setRunsAvailable(false)
+      if (!expectedFailure(error)) setRunsAvailable(false)
     }
   }
 
@@ -220,8 +219,7 @@ export function Workspace(props: {
       setPanelViews((views) => ({ ...views, [pluginId]: result.view }))
       setPanelProblems(({ [pluginId]: _cleared, ...rest }) => rest)
     } catch (error) {
-      if (taskId() !== forTask) return
-      if (error instanceof CallFailure && (error.code === 'not_selected' || error.code === 'host_unavailable')) return
+      if (taskId() !== forTask || expectedFailure(error)) return
       const message = error instanceof CallFailure ? errorGuidance(error) : String(error)
       setPanelProblems((problems) => ({ ...problems, [pluginId]: message }))
     }
@@ -334,7 +332,7 @@ export function Workspace(props: {
 
   // Tasks were archived or deleted: the Node's list had them, and the next one doesn't. The shown one
   // gives way to Home, and none keeps a waiting item. A list without a task it never had says nothing,
-  // because the background sends an empty list before its first read.
+  // because a task just made opens before the list has it.
   createEffect(
     on(
       () => props.tasks,
@@ -651,6 +649,7 @@ export function Workspace(props: {
                 client={props.client}
                 nodeId={nodeId}
                 requests={props.requests}
+                reads={props.requestReads}
                 online={props.online}
                 openConversation={nav.openConversation}
               />
@@ -707,6 +706,7 @@ export function Workspace(props: {
                   online={props.online}
                   sessions={sessionLists()[id] ?? null}
                   requests={props.requests}
+                  reads={props.requestReads}
                   pendingItem={pendingItem()}
                   dropPendingItem={() => void dropPendingItems(props.api.storage.local, nodeId, [id])}
                   folds={agentFolds()}

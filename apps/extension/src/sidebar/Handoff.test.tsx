@@ -24,6 +24,7 @@ import {
   openTask,
   pickFrom,
   runRows,
+  shownTab,
   shownTask,
   stepRows,
   tab,
@@ -85,7 +86,6 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
   fake.activeTab = { id: 7, windowId: 1, url: options.url ?? 'https://elsewhere.example/', title: 'Page' }
   const state = {
     items: options.items ?? [item()],
-    tasks: { p1: [{ id: 't1', title: 'Existing work', branch: null }], p2: [] } as Record<string, unknown[]>,
     sessions: { t1: [session('s1', 't1')] } as Record<string, BridgeAgentSession[]>,
     requests: [] as Request[],
     // The Node's tasks and their pages. A new task holds the item, so the page becomes its page.
@@ -112,7 +112,6 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
         return { nodeId: 'n1', url: request.url, items: state.items }
       case 'handoff.create': {
         const task = { id: 't-new', title: 'Fix the flaky test', branch: 'fix', projectId: request.projectId as string }
-        state.tasks[request.projectId as string] = [...state.tasks[request.projectId as string]!, task]
         state.pageTasks = [
           ...state.pageTasks,
           { ...task, pages: [{ origin: 'https://tracker.example', pathPrefix: '/items/42', source: 'tracker' }] },
@@ -158,8 +157,6 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
           ],
           workspaces: [{ id: 'w1', name: 'Main' }],
         }
-      case 'tasks.list':
-        return { nodeId: 'n1', projectId: request.projectId, tasks: state.tasks[request.projectId as string] ?? [] }
       case 'sessions.list':
         return { nodeId: 'n1', taskId: request.taskId, sessions: state.sessions[request.taskId as string] ?? [] }
       case 'session.read': {
@@ -218,8 +215,6 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
   return { fake, state, root }
 }
 
-const openTab = (root: HTMLElement) =>
-  root.querySelector('[role="tablist"][aria-label="Task"] [aria-selected="true"]')?.textContent ?? null
 const captures = (root: HTMLElement) =>
   [...root.querySelectorAll('[data-testid="capture"]')].map((row) => row.textContent)
 const card = (root: HTMLElement) => root.querySelector('[aria-label="Handoff"]')
@@ -299,7 +294,7 @@ describe('a handoff in the sidebar', () => {
       url: PAGE,
     })
     expect(shownTask(root)).toBe('Fix the flaky test')
-    expect(openTab(root)).toBe('Agents')
+    expect(shownTab(root)).toBe('Agents')
     expect(pendingItem(root)).toBe('Item · Fix the flaky testGoes with your first message.')
     // No conversation was started, and nothing went to an agent.
     expect(state.requests.some((request) => request.op === 'session.create' || request.op === 'turn.submit')).toBe(
@@ -412,7 +407,7 @@ describe('a handoff in the sidebar', () => {
     })
     expect(shownTask(root)).toBe('Fix the flaky test')
     expect(taskTabs(root)).toEqual(['Agents', 'Runs'])
-    expect(openTab(root)).toBe('Runs')
+    expect(shownTab(root)).toBe('Runs')
     // The started run is open, with its steps under it.
     expect(runRows(root).map((row) => row.getAttribute('aria-expanded'))).toEqual(['true'])
     const steps = () => stepRows(root, 'PR review')
@@ -425,7 +420,7 @@ describe('a handoff in the sidebar', () => {
     expect(root.querySelector('header .eyebrow')!.textContent).toBe('PR review')
     // Back from a step's conversation opens Runs.
     await back(root)
-    expect(openTab(root)).toBe('Runs')
+    expect(shownTab(root)).toBe('Runs')
     expect(steps()).toHaveLength(2)
   })
 
@@ -457,7 +452,7 @@ describe('a handoff in the sidebar', () => {
     expect(new Set(keys('handoff.create')).size).toBe(1)
     expect(keys('workflow.start')).toHaveLength(2)
     expect(new Set(keys('workflow.start')).size).toBe(1)
-    expect(openTab(root)).toBe('Runs')
+    expect(shownTab(root)).toBe('Runs')
   })
 
   it('cancels the workflow part, and picks between several items on one page', async () => {
@@ -589,7 +584,7 @@ describe('a handoff in the sidebar', () => {
       fake.navigate('https://elsewhere.example/')
       await settle(30)
       expect(shownTask(root)).toBe('Fix the flaky test')
-      expect(openTab(root)).toBe(label)
+      expect(shownTab(root)).toBe(label)
       fake.navigate(PAGE)
       await settle(30)
     }
@@ -695,10 +690,6 @@ describe('moving between task pages', () => {
   function twoTasks(url = ITEM_1) {
     const mounted = mount({ url })
     const { state } = mounted
-    state.tasks.p1 = [
-      { id: 't1', title: 'Existing work', branch: null },
-      { id: 't-new', title: 'Fix the flaky test', branch: 'fix' },
-    ]
     state.pageTasks = [
       pageTask('t1', 'Existing work', '/items/1'),
       pageTask('t-new', 'Fix the flaky test', '/items/42'),
@@ -737,7 +728,7 @@ describe('moving between task pages', () => {
     button(root.querySelector('.strip')!, 'Switch')!.click()
     await settle(30)
     expect(shownTask(root)).toBe('Fix the flaky test')
-    expect(openTab(root)).toBe('Agents')
+    expect(shownTab(root)).toBe('Agents')
   })
 
   it('opens the task of the page the tab switches to, on the tab last picked there, from Home too', async () => {
@@ -745,15 +736,15 @@ describe('moving between task pages', () => {
     await settle(30)
     await switchTo(fake, PAGE)
     expect(shownTask(root)).toBe('Fix the flaky test')
-    expect(openTab(root)).toBe('Agents')
+    expect(shownTab(root)).toBe('Agents')
     await tab(root, 'Runs')
     await switchTo(fake, ITEM_1)
     expect(shownTask(root)).toBe('Existing work')
-    expect(openTab(root)).toBe('Agents')
+    expect(shownTab(root)).toBe('Agents')
     await goHome(root)
     await switchTo(fake, PAGE)
     expect(shownTask(root)).toBe('Fix the flaky test')
-    expect(openTab(root)).toBe('Runs')
+    expect(shownTab(root)).toBe('Runs')
     expect(fake.storage.get('taskViews:n1')).toEqual({ 't-new': { tab: 'runs' } })
   })
 
@@ -775,11 +766,11 @@ describe('moving between task pages', () => {
     await settle(30)
     expect(conversationTitle(root)).toBe('Explain the PR')
     await back(root)
-    expect(openTab(root)).toBe('Runs')
+    expect(shownTab(root)).toBe('Runs')
     await openChat(root, 'Chat s2')
     await back(root)
     expect(shownTask(root)).toBe('Fix the flaky test')
-    expect(openTab(root)).toBe('Agents')
+    expect(shownTab(root)).toBe('Agents')
     await back(root)
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
@@ -811,6 +802,6 @@ describe('moving between task pages', () => {
     expect(shownTask(root)).toBe('Existing work')
     expect(taskTabs(root)).toEqual(['Agents'])
     await switchTo(fake, PAGE)
-    expect(openTab(root)).toBe('Agents')
+    expect(shownTab(root)).toBe('Agents')
   })
 })

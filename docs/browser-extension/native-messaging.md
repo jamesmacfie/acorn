@@ -21,7 +21,6 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `node.forget` | `nodeId` | `{ nodes, activeNodeId, status }` |
 | `node.rename` | `nodeId`, `label` (1 to 120 characters) | `{ nodes, activeNodeId, status }`. The name is this browser's own, so nothing on the Node or in other clients changes |
 | `projects.list` | `nodeId` | `{ nodeId, projects, workspaces }`, each project `{ id, name, path, hidden, workspaceId }` and each workspace `{ id, name }`, in the rail's order |
-| `tasks.list` | `nodeId`, `projectId` | `{ nodeId, projectId, tasks }`: that project's active tasks, each `{ id, title, branch }` |
 | `tasks.pages` | `nodeId` | `{ nodeId, tasks }`: every active task with a page address, each `{ id, title, branch, projectId, pages }`, including the app origins plugins publish; see [pages that belong to a task](./task-pages.md#pages-that-belong-to-a-task) |
 | `agents.choices` | `nodeId`, `refresh` (optional) | `{ nodeId, choices }`: the desktop's New picker rows; see [agent conversations](./conversations.md) |
 | `sessions.list` | `nodeId`, and `taskId` or `workspaceId` | `{ nodeId, taskId, sessions }` or `{ nodeId, workspaceId, sessions }`: the newest 100 unarchived sessions of the task, or of every task in the workspace |

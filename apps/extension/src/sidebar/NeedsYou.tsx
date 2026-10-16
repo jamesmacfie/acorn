@@ -11,10 +11,59 @@ const SETTLED_MS = 1_500
 
 const keyOf = (request: BridgePendingRequest) => `${request.sessionId} ${request.requestId}`
 
+// Each waiting conversation, as last read: its title, and its requests' details and buttons, which the
+// pending list leaves out.
+export type RequestReads = {
+  of(sessionId: string): BridgeSessionRead | undefined
+  reread(sessionId: string): void
+}
+
+// Reads each waiting conversation whenever the selected Node's pending list changes. The panel makes
+// one, so the top bar's list and the one under it read each conversation once between them.
+export function createRequestReads(
+  client: BridgeClient,
+  pending: () => { nodeId: string | null; requests: readonly BridgePendingRequest[] },
+): RequestReads {
+  const [reads, setReads] = createSignal<Record<string, BridgeSessionRead>>({})
+  const read = async (nodeId: string, sessionId: string) => {
+    try {
+      // Only the requests: no event is past the end, so the page carries none.
+      const page = await client.call({
+        op: 'session.read',
+        nodeId,
+        sessionId,
+        afterSeq: Number.MAX_SAFE_INTEGER,
+        limit: 1,
+      })
+      setReads((current) => ({ ...current, [sessionId]: page }))
+    } catch {
+      // The row still names the request, and a click opens its conversation.
+    }
+  }
+  createEffect(
+    on(
+      () => `${pending().nodeId} ${pending().requests.map(keyOf).join()}`,
+      () => {
+        const { nodeId, requests } = pending()
+        if (nodeId)
+          new Set(requests.map((request) => request.sessionId)).forEach((sessionId) => void read(nodeId, sessionId))
+      },
+    ),
+  )
+  return {
+    of: (sessionId) => reads()[sessionId],
+    reread(sessionId) {
+      const nodeId = pending().nodeId
+      if (nodeId) void read(nodeId, sessionId)
+    },
+  }
+}
+
 type ListProps = {
   client: BridgeClient
   nodeId: string
   requests: readonly BridgePendingRequest[]
+  reads: RequestReads
   online: boolean
   openConversation(taskId: string, sessionId: string): void
 }
@@ -22,13 +71,15 @@ type ListProps = {
 // The top bar's amber Needs you button, with the count, while an agent waits. It opens the same list
 // as Home's. Kept on screen while its popover is open, so the popover can say nothing waits.
 export function NeedsYouButton(props: ListProps) {
+  const [open, setOpen] = createSignal(false)
   return (
-    <Popover
-      placement="bottom-end"
-      role="dialog"
-      ariaLabel="Needs you"
-      trigger={(state) => (
-        <Show when={props.requests.length || state.open()}>
+    <Show when={props.requests.length || open()}>
+      <Popover
+        placement="bottom-end"
+        role="dialog"
+        ariaLabel="Needs you"
+        onDismiss={() => setOpen(false)}
+        trigger={(state) => (
           <span class="needs-you-button">
             <Button
               label="Needs you"
@@ -36,28 +87,31 @@ export function NeedsYouButton(props: ListProps) {
               tone="warn"
               opens="dialog"
               expanded={state.open()}
-              onPress={() => state.toggle()}
+              onPress={() => {
+                state.toggle()
+                setOpen(state.open())
+              }}
             >
               <Icon name="circle-alert" />
               {props.requests.length}
             </Button>
           </span>
-        </Show>
-      )}
-    >
-      {({ close }) => (
-        <div class="needs-you-popover">
-          <NeedsYou
-            {...props}
-            emptyText="Nothing waits on you."
-            openConversation={(taskId, sessionId) => {
-              close()
-              props.openConversation(taskId, sessionId)
-            }}
-          />
-        </div>
-      )}
-    </Popover>
+        )}
+      >
+        {({ close }) => (
+          <div class="needs-you-popover">
+            <NeedsYou
+              {...props}
+              emptyText="Nothing waits on you."
+              openConversation={(taskId, sessionId) => {
+                close()
+                props.openConversation(taskId, sessionId)
+              }}
+            />
+          </div>
+        )}
+      </Popover>
+    </Show>
   )
 }
 
@@ -71,31 +125,6 @@ export function NeedsYou(
     inTask?: boolean
   },
 ) {
-  // Each waiting conversation, read whenever the pending list changes: its title, and its requests'
-  // details and buttons, which the pending list leaves out.
-  const [reads, setReads] = createSignal<Record<string, BridgeSessionRead>>({})
-  const read = async (sessionId: string) => {
-    try {
-      // Only the requests: no event is past the end, so the page carries none.
-      const page = await props.client.call({
-        op: 'session.read',
-        nodeId: props.nodeId,
-        sessionId,
-        afterSeq: Number.MAX_SAFE_INTEGER,
-        limit: 1,
-      })
-      setReads((current) => ({ ...current, [sessionId]: page }))
-    } catch {
-      // The row still names the request, and a click opens its conversation.
-    }
-  }
-  createEffect(
-    on(
-      () => props.requests.map(keyOf).join(),
-      () => new Set(props.requests.map((request) => request.sessionId)).forEach((sessionId) => void read(sessionId)),
-    ),
-  )
-
   // A row answered here keeps its result on screen for a moment, even when the next pending list
   // drops the request first.
   const [held, setHeld] = createSignal<BridgePendingRequest[]>([])
@@ -134,12 +163,12 @@ export function NeedsYou(
                     client={props.client}
                     nodeId={props.nodeId}
                     pending={pending}
-                    read={reads()[pending.sessionId]}
+                    read={props.reads.of(pending.sessionId)}
                     inTask={props.inTask ?? false}
                     online={props.online}
                     open={() => props.openConversation(pending.taskId, pending.sessionId)}
                     answered={() => hold(pending)}
-                    reread={() => void read(pending.sessionId)}
+                    reread={() => props.reads.reread(pending.sessionId)}
                   />
                 )
               }}

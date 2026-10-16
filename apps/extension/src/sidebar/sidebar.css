@@ -119,13 +119,12 @@ main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-st
 .install-command > .ui-text:nth-child(2) { flex: 1; text-align: start; }
 
 /* ── Views and sections ─────────────────────────────────────────────────────────────────────── */
-/* Agents with no task to list. */
+/* A line in place of a list: loading, empty, or why it failed. */
 .empty { padding: var(--space-6); }
 /* One column no wider than the panel: an auto column grows to its longest unbroken word, so a long
  * command in the transcript widened the conversation past the composer and the panel. */
 .view > section, .conversation-body, .composer { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-row); padding: var(--space-6); }
 .view > section { border-bottom: var(--chrome-divider); }
-/* Home on a page that matches nothing: the Acorn mark alone, in the middle of the panel. */
 /* A lone button in a section or form keeps its own width rather than the column's. */
 :is(.view > section, .view > section > section, form) > .ui-btn { justify-self: start; }
 /* Settings: a setting's control takes its own width. The kit's fixed control column is sized for the
@@ -169,9 +168,6 @@ h2, h3 {
 .dot[data-tone='ok'] { background: var(--state-ok); border-color: var(--state-ok); }
 .dot[data-tone='warn'] { background: var(--state-warn); border-color: var(--state-warn); }
 .dot[data-tone='bad'] { background: var(--state-bad); border-color: var(--state-bad); }
-.dot[data-tone='active'] { background: var(--accent); border-color: var(--accent); animation: dot-pulse 1s var(--ease-in-out) infinite; }
-@keyframes dot-pulse { 50% { opacity: 0.25; } }
-@media (prefers-reduced-motion: reduce) { .dot[data-tone='active'] { animation: none; } }
 
 /* ── Fields: inputs on the buttons' rung ────────────────────────────────────────────────────── */
 /* Every button is the kit's. The last plain fields take these rules, which skip the kit's own: every

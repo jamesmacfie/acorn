@@ -5,7 +5,7 @@ import type { BrowserPanelView } from '@acorn/protocol/plugin/handoffs.ts'
 import { taskPaneLink } from '../acornLinks'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
-import { button, chosen, goHome, pickFrom, shownTask, tab, taskTabs } from '../test/sidebarUi'
+import { button, chosen, goHome, pickFrom, shownTab, shownTask, tab, taskTabs } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -98,8 +98,6 @@ function mount(fake = fakeBrowser(), logo?: string) {
         return { nodeId: 'n1', tasks: [pageTask(state.pageTask), pageTask('t3', 'https://other.example')] }
       case 'projects.list':
         return { nodeId: 'n1', projects: [{ id: 'p1', name: 'Widget', path: null, hidden: false }], workspaces: [] }
-      case 'tasks.list':
-        return { nodeId: 'n1', projectId: request.projectId, tasks: [] }
       case 'sessions.list':
         return { nodeId: 'n1', taskId: request.taskId, sessions: [] }
       case 'workflow.runs':
@@ -136,8 +134,6 @@ function mount(fake = fakeBrowser(), logo?: string) {
 }
 
 const panel = (root: HTMLElement) => root.querySelector<HTMLElement>('.view[aria-label="Runn"]')
-const openTab = (root: HTMLElement) =>
-  root.querySelector('[role="tablist"][aria-label="Task"] [aria-selected="true"]')?.textContent ?? null
 const panelReads = (state: ReturnType<typeof mount>['state']) =>
   state.requests.filter((request) => request.op === 'plugin.panel')
 const openPanel = (root: HTMLElement) => tab(root, 'Runn')
@@ -187,7 +183,7 @@ describe('plugin panels', () => {
     await settle(30)
     await openPanel(root)
     expect(shownTask(root)).toBe('Task t1')
-    expect(openTab(root)).toBe('Runn')
+    expect(shownTab(root)).toBe('Runn')
     // The first status block is the header. Its detail is the plugin's text, never markup: the first
     // line bold, and every later line muted, whatever it holds.
     expect(header(root)).toEqual(['Stack', 'running', '<b>Up</b> 3 minutes', 'fix/flake → main', '1 unresolved thread'])
@@ -307,7 +303,7 @@ describe('plugin panels', () => {
     fake.navigate('https://elsewhere.example/')
     await settle(30)
     expect(shownTask(root)).toBe('Task t1')
-    expect(openTab(root)).toBe('Runn')
+    expect(shownTab(root)).toBe('Runn')
     expect(header(root).slice(0, 2)).toEqual(['Stack', 'running'])
     expect(panelReads(state).length).toBe(reads)
   })
@@ -322,11 +318,11 @@ describe('plugin panels', () => {
     fake.navigate('https://other.example/')
     await settle(30)
     expect(shownTask(root)).toBe('Task t3')
-    expect(openTab(root)).toBe('Agents')
+    expect(shownTab(root)).toBe('Agents')
     fake.navigate(PAGE)
     await settle(30)
     expect(shownTask(root)).toBe('Task t1')
-    expect(openTab(root)).toBe('Runn')
+    expect(shownTab(root)).toBe('Runn')
     expect(header(root).slice(0, 2)).toEqual(['Stack', 'running'])
 
     // The panel closes and opens again beside the same page.
@@ -335,7 +331,7 @@ describe('plugin panels', () => {
     const reopened = mount(fake)
     await settle(30)
     expect(shownTask(reopened.root)).toBe('Task t1')
-    expect(openTab(reopened.root)).toBe('Runn')
+    expect(shownTab(reopened.root)).toBe('Runn')
     expect(header(reopened.root).slice(0, 2)).toEqual(['Stack', 'running'])
   })
 
@@ -346,7 +342,7 @@ describe('plugin panels', () => {
     state.views.t1 = null
     await tasksChanged(fake)
     expect(shownTask(root)).toBe('Task t1')
-    expect(openTab(root)).toBe('Agents')
+    expect(shownTab(root)).toBe('Agents')
     expect(taskTabs(root)).toEqual(['Agents', 'Runs'])
   })
 })

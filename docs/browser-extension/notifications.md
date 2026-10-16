@@ -82,8 +82,9 @@ places, drawn by the same component:
 
 Each request is a row: its title, then its conversation's title and its task's, then an icon for its
 kind. `requests.pending` names a request without its buttons, questions, or conversation title, so
-the list reads `session.read` with an `afterSeq` past the end for each waiting conversation whenever
-the pending list changes. That read carries the conversation's requests and no events.
+the panel reads `session.read` with an `afterSeq` past the end for each waiting conversation whenever
+the pending list changes. That read carries the conversation's requests and no events. Every list on
+screen shares it, so the popover over Home reads nothing twice.
 
 A click expands a row the sidebar can answer in place: a request with buttons and no form, or a form
 of one single-choice question, whose choices become the buttons. The expanded row shows the request's

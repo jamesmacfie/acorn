@@ -38,6 +38,10 @@ export const tab = (root: ParentNode, label: string) =>
 export const taskTabs = (root: ParentNode) =>
   [...root.querySelectorAll('[role="tablist"][aria-label="Task"] [role="tab"]')].map((tab) => tab.textContent)
 
+// The open task's selected tab, by label.
+export const shownTab = (root: ParentNode) =>
+  root.querySelector('[role="tablist"][aria-label="Task"] [aria-selected="true"]')?.textContent ?? null
+
 // Settings' row for a paired Node, by its name.
 export const nodeRow = (root: ParentNode, label: string) =>
   [...root.querySelectorAll<HTMLElement>('[data-settings-section="nodes"] .ui-row')].find(

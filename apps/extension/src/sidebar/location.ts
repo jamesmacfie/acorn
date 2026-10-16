@@ -32,16 +32,19 @@ export const locationTask = (location: Location): string | null =>
 // its tasks are kept in browser storage.
 export function createLocation(options: {
   storage: BrowserApi['storage']['local']
-  // The task the page beside the panel belongs to, and an active task's project.
+  // The task the page beside the panel belongs to, and the Node's active tasks, null until read.
   pageTaskId(): string | null
-  projectOf(taskId: string): string | null
+  tasks(): readonly { id: string; projectId: string }[] | null
 }) {
-  const { storage, pageTaskId, projectOf } = options
+  const { storage, pageTaskId, tasks } = options
+  const projectOf = (taskId: string) => tasks()?.find((task) => task.id === taskId)?.projectId ?? null
   const [location, setLocation] = createSignal<Location>({ level: 'home' })
   let nodeId: string | null = null
   let taskViews: Record<string, TaskView> = {}
   // While a Node's stored location loads, which follows the page itself once it has.
   let restoring = false
+  // The task the stored location named, until the Node's task list says whether it's still active.
+  let restored: string | null = null
 
   // Home and Settings leave the stored destination alone, so a selection added from the page's menu
   // still has a conversation to go to.
@@ -64,12 +67,19 @@ export function createLocation(options: {
     go({ level: 'conversation', taskId, sessionId, from })
   const goHome = () => go({ level: 'home' })
 
-  // The page beside the panel moved, or the Node's task list arrived. A page of a task opens that task,
+  // The page beside the panel moved, or the Node's task list arrived. A stored task the list doesn't
+  // have, archived while the panel was closed, gives way to Home. A page of a task opens that task,
   // unless Settings or a conversation is open: pages are often visited to capture them into the
   // conversation. A page of no task leaves the panel where it is.
   const followPage = (taskId: string | null) => {
+    if (restoring) return
+    const list = tasks()
+    if (restored && list) {
+      if (locationTask(location()) === restored && !list.some((task) => task.id === restored)) goHome()
+      restored = null
+    }
     const here = location()
-    if (restoring || !taskId || here.level === 'settings' || here.level === 'conversation') return
+    if (!taskId || here.level === 'settings' || here.level === 'conversation') return
     if (here.level !== 'task' || here.taskId !== taskId) openTask(taskId)
   }
 
@@ -103,6 +113,7 @@ export function createLocation(options: {
     async selectNode(next: string | null) {
       nodeId = next
       taskViews = {}
+      restored = null
       const started: Location = location().level === 'settings' ? location() : { level: 'home' }
       setLocation(started)
       restoring = next !== null
@@ -114,6 +125,7 @@ export function createLocation(options: {
       if (location() !== started || started.level === 'settings') return
       // Not through `go`: the destination is already stored, with a project the task list may not know yet.
       const { taskId, sessionId } = destination
+      restored = taskId
       if (taskId) setLocation(sessionId ? { level: 'conversation', taskId, sessionId, from: 'agents' } : taskAt(taskId))
       followPage(pageTaskId())
     },

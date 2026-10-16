@@ -731,13 +731,8 @@ describe('browser bridge agent operations', () => {
     return subject
   }
 
-  it('lists one project tasks, the agent profiles, and a task sessions', async () => {
+  it('lists the agent profiles and a task sessions', async () => {
     const { call, node } = await selected()
-    expect(await call({ op: 'tasks.list', nodeId: 'node-a', projectId: 'p1' })).toEqual({
-      nodeId: 'node-a',
-      projectId: 'p1',
-      tasks: [{ id: 't1', title: 'Fix it', branch: 'fix' }],
-    })
     // The desktop's New rows: the harness, then each custom agent on a harness this Node registers.
     expect(await call({ op: 'agents.choices', nodeId: 'node-a' })).toEqual({
       nodeId: 'node-a',

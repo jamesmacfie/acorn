@@ -40,7 +40,6 @@ describe('browser bridge requests', () => {
       { v: 1, id: 'a', op: 'node.forget', nodeId: 'n1' },
       { v: 1, id: 'a', op: 'node.rename', nodeId: 'n1', label: 'Studio Mac' },
       { v: 1, id: 'a', op: 'projects.list', nodeId: 'n1' },
-      { v: 1, id: 'a', op: 'tasks.list', nodeId: 'n1', projectId: 'p1' },
       { v: 1, id: 'a', op: 'agents.choices', nodeId: 'n1' },
       { v: 1, id: 'a', op: 'agents.choices', nodeId: 'n1', refresh: true },
       { v: 1, id: 'a', op: 'sessions.list', nodeId: 'n1', taskId: 't1' },

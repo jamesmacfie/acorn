@@ -31,7 +31,7 @@ const headerOf = (view: BrowserPanelView | null | undefined): StatusBlock | unde
   return first?.kind === 'status' ? first : undefined
 }
 
-/** The panel's tab marker: the header's icon, while the header says something is wrong. */
+// The panel's tab marker: the header's icon, while the header says something is wrong.
 export const panelMarker = (view: BrowserPanelView | null | undefined): TabDef['marker'] =>
   headerOf(view)?.severity === 'danger' ? { ...SEVERITY.danger, label: 'Needs attention' } : undefined
 
