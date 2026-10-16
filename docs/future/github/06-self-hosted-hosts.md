@@ -57,6 +57,10 @@ Decisions and deviations:
   that server. Otherwise it opens in the browser.
 - Replacing a company server's key without its address moves the connection to gitlab.com, and
   validation refuses the company token there, so nothing is saved.
+- A project path now comes from any server a person connects, so the importer holds each segment to
+  GitLab's path grammar before it names a clone folder, and puts `--` before git's clone arguments.
+- The Node's service graph is 1,902,479 B, 6,117 B more than at phase 5. It was already over the
+  1,832,800 B ceiling, so the ceiling isn't raised here.
 
 For later phases:
 

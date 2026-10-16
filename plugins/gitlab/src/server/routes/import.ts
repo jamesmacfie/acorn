@@ -17,6 +17,9 @@ import type { GitlabServers } from '../servers'
 // Import mirrored projects as acorn projects: link a folder that already holds a clone, or clone into
 // a parent folder. The shape of GitHub's importer (plugins/github/src/server/routes/repos/import.ts).
 
+// A namespace or project segment, which GitLab starts with a letter, digit, or underscore.
+const GITLAB_PATH_SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/
+
 const host = z.string().min(1).max(253)
 const item = z.discriminatedUnion('action', [
   z.object({ host, projectId: z.number().int().positive(), action: z.literal('map'), path: z.string().min(1) }),
@@ -67,9 +70,13 @@ export const gitlabImport = (
           path = entry.path
         } else {
           if (!isAbsolute(entry.parentDir)) throw new Error('Clone parent directory must be absolute.')
+          // The path comes from the server, which may be any host a person typed, so it's held to
+          // GitLab's own path grammar before it names a folder or reaches git's arguments.
+          if (!project.path.split('/').every((segment) => GITLAB_PATH_SEGMENT.test(segment)))
+            throw new Error(`GitLab sent a project path acorn won't clone into a folder: ${project.path}`)
           // The folder is the project's last path segment, as `git clone` would name it.
           const folder = project.path.split('/').pop()!
-          await core.git.gitOrThrow(['clone', `${server.origin}/${project.path}.git`, folder], {
+          await core.git.gitOrThrow(['clone', '--', `${server.origin}/${project.path}.git`, folder], {
             cwd: entry.parentDir,
             env: { GIT_TERMINAL_PROMPT: '0' },
           })

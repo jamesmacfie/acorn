@@ -9,6 +9,7 @@ import { createGitlabServers, gitlabOrigin } from './servers'
 import { forgetOtherConnections, readCachedProjects, resolveProject } from './mirror/projects'
 import { projectReads } from './routes/projectReads'
 import { createBrowserHandoffHandler } from './browserHandoff'
+import { gitlabImport } from './routes/import'
 
 vi.mock('./gitlabApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./gitlabApi')>()),
@@ -199,5 +200,48 @@ describe('a company GitLab server', () => {
       }),
     ])
     expect((await resolve('https://gitlab.other.test/group/api/-/merge_requests/3')).status).toBe(403)
+  })
+
+  it("clones from the server's address, and refuses a project path that could reach git as an option", async () => {
+    fake.projects.push({ id: 8, path: 'group/--upload-pack=touch', defaultBranch: 'main', mergeRequests: [] })
+    const session = { origin: COMPANY, token: 'token' }
+    await resolveProject(session, testDb.db, company.id, 'group/api')
+    await resolveProject(session, testDb.db, company.id, 'group/--upload-pack=touch')
+    const servers = createGitlabServers({
+      connections: async () => [company],
+      claim: () => ({ dispose: () => {} }),
+      forgetOthers: async () => {},
+    })
+    await servers.sync()
+    const cloned: string[][] = []
+    const core = {
+      git: { gitOrThrow: async (args: string[]) => void cloned.push(args) },
+      projects: {
+        byRepository: async () => null,
+        create: async () => ({ id: 'project-1' }),
+        update: async (id: string) => ({ id }),
+      },
+    } as unknown as Pick<CoreServices, 'projects' | 'git'>
+    const app = new Hono<AppEnv>()
+      .use('/api/*', ...testGate({ kind: 'device', userId: 'owner' } as Principal))
+      .route('/api/import', gitlabImport(testDb.db, core, servers))
+    const clone = async (projectId: number) => {
+      const response = await app.fetch(
+        new Request('http://acorn.test/api/import', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            projects: [{ host: 'gitlab.example.test', projectId, action: 'clone', parentDir: '/src' }],
+          }),
+        }),
+        {} as Env,
+      )
+      return ((await response.json()) as { results: { ok: boolean; error?: string }[] }).results[0]
+    }
+
+    expect(await clone(8)).toMatchObject({ ok: false, error: expect.stringContaining("won't clone") })
+    expect(cloned).toEqual([])
+    expect(await clone(7)).toMatchObject({ ok: true })
+    expect(cloned).toEqual([['clone', '--', `${COMPANY}/group/api.git`, 'api']])
   })
 })
