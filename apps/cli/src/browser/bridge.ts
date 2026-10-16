@@ -368,7 +368,6 @@ export function createBridge(options: {
     return list as Row[]
   }
 
-  // A task's newest hundred sessions, which is one page of the route. Archived sessions are left out.
   // The newest 100 unarchived sessions, the most the Node's route returns.
   async function listSessions(
     nodeId: string,
