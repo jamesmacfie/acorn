@@ -14,10 +14,6 @@ The dev server runs at `http://localhost:4321`. It shows every draft page and th
 
 ## Build it
 
-```sh
-pnpm --filter @acorn/site build
-```
-
 The build writes the static site to `apps/site/dist`. There are two kinds of build:
 
 | Build | Command | Drafts and `/lab/` |
