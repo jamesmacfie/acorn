@@ -13,6 +13,7 @@ export type PageHandoff = {
   pluginId: string
   handoffId: string
   label: string
+  glyph?: string
   url: string
   start?: HandoffStart
   auto?: boolean

@@ -2,7 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import Icon from '../content/Icon'
 
 // Small copy-to-clipboard button. Hidden by default; a `.copyable` ancestor reveals it on hover
-// (see styles/copy.css). Shows a brief check on success.
+// (see the CopyButton block in primitives.css). Shows a brief check on success.
 //
 // `onCopy` exists because a sandboxed plugin frame has no `navigator.clipboard`; it copies through
 // the bridge instead.

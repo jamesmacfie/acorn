@@ -6,6 +6,7 @@ import type {
   BridgePageTask,
   BridgeWorkflowStep,
 } from '@acorn/protocol/extensionBridge.ts'
+import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
 import {
@@ -78,7 +79,7 @@ const session = (id: string, taskId: string): BridgeAgentSession => ({
 })
 
 // One Node with two projects. Tasks and sessions are whatever the test puts in `state`.
-function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?: boolean } = {}) {
+function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?: boolean; glyph?: string } = {}) {
   const fake = fakeBrowser()
   fake.activeTab = { id: 7, windowId: 1, url: options.url ?? 'https://elsewhere.example/', title: 'Page' }
   const state = {
@@ -100,7 +101,7 @@ function mount(options: { items?: BridgeHandoffItem[]; url?: string; opensLinks?
           status: { nodeId: 'n1', state: 'online' },
         }
       case 'handoffs.list':
-        return { nodeId: 'n1', handoffs: [handoff], panels: [] }
+        return { nodeId: 'n1', handoffs: [{ ...handoff, glyph: options.glyph }], panels: [] }
       case 'handoff.resolve':
         return { nodeId: 'n1', url: request.url, items: state.items }
       case 'handoff.create': {
@@ -504,6 +505,22 @@ describe('a handoff in the sidebar', () => {
     await settle(30)
     expect(state.requests.filter((request) => request.op === 'handoff.resolve')).toHaveLength(1)
     expect(root.textContent).toContain('acme/widget#42')
+  })
+
+  it("draws the handoff's glyph on the card, and a document without one", async () => {
+    const drawn = (name: string) => {
+      const host = document.createElement('div')
+      render(() => <Icon name={name} tone="brand" />, host)
+      return host.innerHTML
+    }
+    const mark = (root: HTMLElement) => root.querySelector('.item-head > .ui-icon')!.outerHTML
+    const plain = mount({ url: PAGE })
+    await settle(30)
+    expect(mark(plain.root)).toBe(drawn('file-text'))
+    dispose?.()
+    const declared = mount({ url: PAGE, glyph: 'ticket' })
+    await settle(30)
+    expect(mark(declared.root)).toBe(drawn('ticket'))
   })
 
   it('looks the item up again when the tab moves to another item', async () => {

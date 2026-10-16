@@ -152,6 +152,7 @@ export function siteButtons(
         pluginId: handoff.pluginId,
         handoffId: handoff.id,
         label: handoff.label,
+        glyph: handoff.glyph,
         url: sender.url,
         // The page sent this, so only the two known choices pass.
         start: message.start === 'workflow' ? 'workflow' : 'task',

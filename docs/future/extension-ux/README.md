@@ -2,6 +2,48 @@
 
 Date: October 16, 2026. Status: in progress. Phases 1 to 12 are done.
 
+## Plugin reuse pass 1
+
+October 17, 2026. A pass so a third-party plugin gets what a first-party one gets in the sidebar, and
+the sidebar draws with the kit's parts, fixed in the kit where they were broken.
+
+- **Panel header.** A header's `detail` reads as one rule: the first line bold, every later line
+  muted. The sidebar no longer draws a line holding "→" in monospace for GitHub's branches.
+  [Browser panel](../../plugin-authoring/browser-panel.md) states the rule.
+- **Handoff glyph.** A handoff descriptor takes an optional Lucide `glyph`, which the issue card
+  draws before the kit's mark for the plugin or a document. The example plugin `acme-browser` sets
+  one. [Browser handoffs](../../plugin-authoring/browser-handoffs.md) documents it.
+- **Copy button.** The kit's `CopyButton` rules moved from `copy.css` into `primitives.css`, so the
+  button is styled wherever the kit's sheet loads. `copy.css` is gone; its two other rules styled
+  classes nothing used. The panel's link rows use `CopyButton`. The export ceiling didn't change. The
+  dev build's **Copy Acorn link** stays an `IconButton`, because it stands in for **Open in Acorn**
+  beside two icon buttons and its tip shows the link.
+- **Fold marker.** `Fold`'s triangle, and a tree row's twist, size from `--bw-marker`, not
+  `--marker-w`, so Modern and Cute show them on the desktop too. Cozy's triangles grow from 2 to 3
+  pixels.
+- **Kit fixes out of `sidebar.css`.** A menu item's note now gives way before its label in the kit.
+  Segmented controls fit their container and wrap a long label. The `spin` keyframes moved beside the
+  kit rules that use them. The sidebar's plain button and field rules now skip the picker's
+  `repo-picker-` parts and `CopyButton`, so kit pickers look as on the desktop and two patches went.
+  Markdown rules that repeated the kit's are deleted. Kept as the sidebar's own: the setting control
+  width, which is the kit's token for a narrow host, and the narrower segment inset in Add a site.
+
+Proposals not done:
+
+- **Real plugin logos.** A manifest already carries its logo as path data in `icon` and `icons`. The
+  handoff list could carry it to the sidebar, which would register it as `brand:<id>`, so a glyph is
+  needed only as a fallback. Cost: a field from node-core's handoff list through the bridge, the
+  sidebar's registration, and tests, about five files.
+- **A shared panel renderer.** Moving `PanelHeader`, `Block`, and the severity table into
+  `@acorn/client-core` as `BrowserPanelBlocks` would let the desktop or the terminal show a panel.
+  Cost: one moved component and its tests. It waits for a host that wants a panel.
+- **Kit buttons for the sidebar's last plain buttons.** About 20 plain `<button>`s remain, in the
+  top bar, banners, and the request form. Moving them to the kit's `Button` and `IconButton` would
+  delete the sidebar's controls block of about 40 lines and its exclusion list. Cost: about ten
+  files, the tests that find them by class, and a screenshot pass.
+- **`CopyButton` sizes.** A size matching `IconButton` and a tip line for the copied text would let
+  **Copy Acorn link** use it. Cost: two props in the kit and the terminal host.
+
 This folder turns the clickable prototype at `references/extension-ux/acorn-extension-ux.html` into
 thirteen phases a developer can pick up one at a time. The last is optional. Read this page first. It says how to read the
 prototype, what holds across every phase, and the order to work in.

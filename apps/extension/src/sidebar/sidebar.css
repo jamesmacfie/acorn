@@ -64,12 +64,11 @@ ul { list-style: none; margin: 0; padding: 0; }
 button.heading { display: grid; justify-content: stretch; min-height: 0; color: inherit; background: none; border: 0; text-align: start; }
 button.heading:hover { background: var(--bg-hover); }
 .heading .title .ui-icon { margin-inline-start: var(--space-1); vertical-align: -2px; }
-/* The panel's own button and field rules would centre a kit picker's rows and box its filter. */
-.repo-picker-popover .repo-picker-filter { padding-inline: var(--space-3); border: 0; background: none; }
-.repo-picker-popover .repo-picker-name { display: block; min-height: 0; }
-/* Go to task hangs under the bar, as wide as the panel less a margin, with the Node in its footer. */
+/* Go to task hangs under the bar, as wide as the panel less a margin, with the Node in its footer. Its
+ * filter follows a search icon, so it needs less of the kit's inset. */
 .go-to-task { width: calc(100vw - 2 * 4px); max-width: none; }
 .go-to-task .repo-picker-tools { padding-inline: var(--space-5) var(--space-3); }
+.go-to-task .repo-picker-filter { padding-inline: var(--space-3); }
 .go-to-task .repo-picker-name > small { font-family: var(--font-mono); }
 .go-to-task-lead { flex: none; display: inline-flex; width: 1em; padding-inline-start: var(--space-2); color: var(--text-muted); }
 .go-to-task .repo-picker-footer { gap: var(--space-3); padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6); font-size: var(--fs-sm); }
@@ -125,13 +124,8 @@ main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-st
 /* Settings: a setting's control takes its own width. The kit's fixed control column is sized for the
  * desktop's page and squeezes the label in a panel this narrow. Pairing's done screen has the same rows. */
 :is(.settings, .connect) { --setting-control-w: max-content; }
-/* Add a site's Match: the four kinds share the dialog's width, so the last isn't cut off in the
- * Terminal pack's wider letters. A long label wraps instead. */
-[role='dialog'] .ui-segments { display: flex; }
-[role='dialog'] .ui-segment { flex: 1 1 auto; min-width: 0; padding-inline: var(--space-2); }
-/* A menu item's note, such as a Node's address beside Copy address, gives way before its label does. */
-.ui-menu-label { flex: 1 0 auto; }
-.ui-menu-trailing { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Add a site's Match: a narrower inset, so the four kinds fit the dialog on one line where they can. */
+[role='dialog'] .ui-segment { padding-inline: var(--space-2); }
 /* A theme's colour, in Settings' theme picker. */
 .swatch { display: inline-block; flex: none; width: 12px; height: 12px; border: var(--control-border); border-radius: var(--radius-chip); vertical-align: -1px; }
 h2, h3 {
@@ -159,8 +153,6 @@ h2, h3 {
 /* A conversation's provider logo beside its model. */
 .agent-meta { display: flex; align-items: center; gap: var(--space-2); }
 .idle-dot { width: 6px; height: 6px; border-radius: var(--radius-circle); border: 1.5px solid var(--text-faint); }
-/* The kit's spinning icon turns on base.css's keyframes, which the panel doesn't load. */
-@keyframes spin { to { transform: rotate(360deg); } }
 .row { display: flex; gap: var(--gap-inline); align-items: center; flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
 
@@ -176,10 +168,10 @@ h2, h3 {
 
 /* ── Controls: 32 px buttons, inputs on the same rung ───────────────────────────────────────── */
 /* An `acorn://` link is an anchor, so the browser hands it to the desktop app, drawn as a button. The
- * kit's own controls (`ui-` classes) keep the desktop's look, so these plain-element rules skip them.
- * The selector weighs nothing, so any rule with a class beats it: a row, a menu item, a rail tab, or
- * a picker row draws as itself, not as an accent-filled button. */
-:where(button, a.button):where(:not([class*='ui-'])) {
+ * kit's own controls keep the desktop's look, so these plain-element rules skip them: every `ui-`
+ * class, the picker's `repo-picker-` parts, and `CopyButton`. The selectors weigh nothing, so any rule
+ * with a class beats them. */
+:where(button, a.button):where(:not([class*='ui-'], [class*='repo-picker-'], .copy-btn)) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -205,7 +197,7 @@ button.icon { width: var(--control-h); padding: 0; background: transparent; colo
 button.icon:hover:not(:disabled) { background: var(--bg-hover); }
 button.icon[aria-pressed='true'] { background: var(--bg-selected); }
 button.icon svg { width: var(--icon-size); height: var(--icon-size); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-input:not([type='checkbox']):where(:not([class*='ui-'])), select:where(:not([class*='ui-'])), textarea:where(:not([class*='ui-'])) {
+:where(input:not([type='checkbox']), select, textarea):where(:not([class*='ui-'], [class*='repo-picker-'])) {
   min-width: 0;
   min-height: var(--control-h);
   padding: var(--space-2) var(--space-4);
@@ -302,24 +294,15 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 /* What the agent is doing, above the message box. */
 .activity { display: flex; align-items: center; gap: var(--space-3); min-height: var(--control-h-sm); font-size: var(--fs-sm); }
 
-/* Rendered Markdown, on the desktop's .ui-markdown rules (client-core primitives.css). Lists get their
- * markers back from the reset at the top. */
-.ui-markdown { font-size: var(--fs-sm); line-height: var(--lh); }
+/* Rendered Markdown sits on the kit's own .ui-markdown rules (client-core primitives.css). These put
+ * back what the panel's reset and its section headings take away, and trim a message card's edges. */
 .ui-markdown > :first-child { margin-top: var(--space-1); }
 .ui-markdown > :last-child { margin-bottom: 0; }
-.ui-markdown p { margin: var(--space-3) 0; }
 .ui-markdown ul { list-style: disc; }
 .ui-markdown ol { list-style: decimal; }
 .ui-markdown :is(ul, ol) { margin: var(--space-3) 0; padding-left: var(--space-8); }
-.ui-markdown :is(pre, code) { font-family: var(--font-mono); background: var(--bg-subtle); border-radius: var(--radius); }
-.ui-markdown pre { margin: var(--space-3) 0; padding: var(--space-4); overflow-x: auto; border: var(--surface-border); }
-.ui-markdown pre code { background: none; }
+.ui-markdown pre { margin: var(--space-3) 0; }
 .ui-markdown :is(h1, h2, h3, h4, h5, h6) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); font-weight: var(--fw-semibold); color: var(--text); text-transform: none; letter-spacing: normal; }
-.ui-markdown a { color: var(--accent); }
-.ui-markdown blockquote { margin: var(--space-4) 0; padding-left: var(--space-5); border-left: var(--surface-bw) solid var(--border); color: var(--text-muted); }
-.ui-markdown table { display: block; width: max-content; max-width: 100%; overflow-x: auto; margin: var(--space-4) 0; border-collapse: collapse; overflow-wrap: break-word; }
-.ui-markdown :is(th, td) { padding: var(--space-3) var(--space-6); border: var(--chrome-divider); text-align: start; vertical-align: top; }
-.ui-markdown th { background: var(--bg-subtle); font-weight: var(--fw-semibold); }
 .attachments { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .attachments .thumb { display: block; height: var(--icon-box); width: auto; border-radius: var(--radius-xs); }
 .composer { position: sticky; bottom: 0; background: var(--bg); border-top: var(--chrome-divider); }

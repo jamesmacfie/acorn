@@ -4485,6 +4485,12 @@
                 "maxLength": 40,
                 "description": "The button's text, drawn as plain text."
               },
+              "glyph": {
+                "description": "A Lucide icon name for the sidebar's item card.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
               "match": {
                 "minItems": 1,
                 "maxItems": 8,

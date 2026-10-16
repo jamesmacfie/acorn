@@ -7,7 +7,7 @@ sources:
   - packages/protocol/src/plugin/handoffs.ts
   - examples/plugins/acme-browser/acorn-plugin.json
   - examples/plugins/acme-browser/node.js
-checked: 832747727
+checked: '832747727'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -51,6 +51,8 @@ Node to see it.
    - `anchors` are CSS selectors. The chip goes at the end of the first one that matches and is drawn.
      Leave the list empty to offer the handoff in the panel only.
    - `label` is the chip's accessible name, drawn as text.
+   - `glyph` is optional: a Lucide icon name that the sidebar's item card shows, because the
+     extension can't load your plugin's logo.
 
 2. **Resolve the page.** The extension posts the page's `url` and the `captures` from your pattern.
    Treat the captures as the only thing the page tells you, and look the item up with the person's own

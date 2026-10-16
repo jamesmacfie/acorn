@@ -198,7 +198,9 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 
    The turn is here rather than on the shared `.spin` class for the reason written on
    `.ui-icon[data-spin]` below: `.spin` switches itself off under prefers-reduced-motion, which left
-   a frozen loader on screen for anyone running that setting. */
+   a frozen loader on screen for anyone running that setting. The keyframes are here too, beside the
+   two kit rules that turn on them, so a host that loads this sheet without base.css still spins. */
+@keyframes spin { to { transform: rotate(360deg); } }
 .ui-spinner {
   display: inline-block;
   flex: none;
@@ -911,16 +913,20 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    --radius-control. */
 /* The height sits on the group, not on each segment: the group's border counts inside it, as a
    button's does, so a segmented control lines up with a button of the same size. */
+/* No wider than what holds it: in a narrow dialog the segments shrink and a long label wraps, rather
+   than the last segment being cut off. */
 .ui-segments {
   flex: none;
   display: inline-flex;
+  max-width: 100%;
   min-height: var(--control-h-sm);
   border: var(--control-border);
   border-radius: var(--radius-control);
   overflow: hidden;
 }
 .ui-segment {
-  flex: 1 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
   font: inherit;
   font-size: var(--fs-xs);
   padding: 0 var(--space-4);
@@ -981,7 +987,19 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* A choice item's check, or a blank as wide, so chosen and unchosen labels start together. */
 .ui-menu-check { flex: none; display: inline-flex; align-items: center; width: 1em; }
 .ui-menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ui-menu-trailing { flex: none; color: var(--text-faint); font-size: var(--fs-2xs); }
+/* When an item runs out of room, its note gives way and its label keeps its width, rather than the
+   label wrapping beside a long note such as a Node's address. Only beside a note: a Select's options
+   have none, and a long one there still wraps to the list's width. */
+.ui-menu-item:has(> .ui-menu-trailing) > .ui-menu-label { flex: 1 0 auto; }
+.ui-menu-trailing {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-size: var(--fs-2xs);
+}
 /* The same group label a list draws, inset to the menu's items. */
 .ui-menu-label-row {
   padding: var(--space-5) var(--space-4) var(--space-2);
@@ -1006,10 +1024,11 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   flex: none;
   width: 0;
   height: 0;
-  /* A triangle from borders, so its size follows the marker width token rather than a font. */
-  border-top: var(--marker-w) solid transparent;
-  border-bottom: var(--marker-w) solid transparent;
-  border-left: var(--marker-w) solid currentColor;
+  /* A triangle from borders. It sizes from `--bw-marker`, not `--marker-w`, which says a row is selected
+     and which Modern and Cute zero: the triangle is what opens the fold, so no pack may hide it. */
+  border-top: var(--bw-marker) solid transparent;
+  border-bottom: var(--bw-marker) solid transparent;
+  border-left: var(--bw-marker) solid currentColor;
   transition: transform var(--dur-short) var(--ease-out);
 }
 .ui-fold[open] > .ui-fold-summary .ui-fold-marker { transform: rotate(90deg); }
@@ -1227,9 +1246,38 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 }
 @media (prefers-reduced-motion: reduce) { .ui-meter-mark { transition: none; } }
 
+/* ── CopyButton ─────────────────────────────────────────────────────────────────────────────
+   Hidden until a `.copyable` ancestor is hovered. Here rather than in a sheet of its own, so the button
+   is styled in every host that loads the kit's sheet: the desktop, a plugin frame, and the browser
+   extension's sidebar. */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+/* `data-always` is for a button with no `.copyable` ancestor to hover: a bar of its own, or a plugin
+   tree, which cannot set a class on anything. */
+.copyable:hover .copy-btn,
+.copy-btn[data-always],
+.copy-btn:focus-visible {
+  opacity: 1;
+}
+.copy-btn:hover {
+  color: var(--text);
+}
+/* On a markdown code fence, sit top-right, same corner as CodeBlock's own button below. The wrapper is
+   already `position: relative`, and it's the CopyButton's only direct-child use. */
+.ui-code-wrap > .copy-btn { position: absolute; top: var(--space-2); right: var(--space-2); }
+
 /* ── CodeBlock ──────────────────────────────────────────────────────────────────────────────
-   Nine mono-block rules. `.copyable` on the wrapper is the existing shared convention from
-   copy.css, which is already a frame-served role sheet. */
+   Nine mono-block rules. `.copyable` on the wrapper is CopyButton's reveal convention, above. */
 .ui-code-wrap { position: relative; min-width: 0; }
 .ui-code {
   margin: 0;
@@ -1253,7 +1301,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-code [data-fg] { color: light-dark(var(--l), var(--r)); }
 .ui-code [data-bg] { background: light-dark(var(--lb), var(--rb)); }
 /* CodeBlock's own copy button, reached by position for the same reason. A markdown fence's button
-   is a CopyButton and styles/copy.css owns that one. */
+   is a CopyButton, placed in the CopyButton block above. */
 .ui-code-wrap > .ui-btn { position: absolute; top: var(--space-2); right: var(--space-2); }
 
 /* ── Table ──────────────────────────────────────────────────────────────────────────────────
@@ -1342,9 +1390,10 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   width: 0;
   height: 0;
   margin-right: var(--space-2);
-  border-top: var(--marker-w) solid transparent;
-  border-bottom: var(--marker-w) solid transparent;
-  border-left: var(--marker-w) solid var(--text-faint);
+  /* Sized as the fold's triangle is, and for the same reason. */
+  border-top: var(--bw-marker) solid transparent;
+  border-bottom: var(--bw-marker) solid transparent;
+  border-left: var(--bw-marker) solid var(--text-faint);
   cursor: pointer;
   transition: transform var(--dur-short) var(--ease-out);
 }

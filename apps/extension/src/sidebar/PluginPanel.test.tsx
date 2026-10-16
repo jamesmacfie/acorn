@@ -179,11 +179,11 @@ describe('plugin panels', () => {
     expect(shownTask(root)).toBe('Task t1')
     expect(openTab(root)).toBe('Runn')
     // The first status block is the header. Its detail is the plugin's text, never markup: the first
-    // line bold, a line with "→" second in monospace, and the rest muted.
+    // line bold, and every later line muted, whatever it holds.
     expect(header(root)).toEqual(['Stack', 'running', '<b>Up</b> 3 minutes', 'fix/flake → main', '1 unresolved thread'])
     expect(panel(root)!.querySelector('b')).toBeNull()
     const lines = [...panel(root)!.querySelectorAll('.panel-head .ui-text')]
-    expect(lines.map((line) => line.getAttribute('data-emphasis'))).toEqual(['strong', 'mono', 'muted'])
+    expect(lines.map((line) => line.getAttribute('data-emphasis'))).toEqual(['strong', 'muted', 'muted'])
     expect(panel(root)!.querySelector('.panel-head .ui-badge')!.getAttribute('data-tone')).toBe('ok')
 
     const services = rows(root, 'Services')
@@ -247,15 +247,12 @@ describe('plugin panels', () => {
     button(database!, 'Copy')!.click()
     await settle()
     expect(writeText).toHaveBeenCalledWith('postgres://localhost:5432/app')
-    expect(button(database!, 'Copied')).toBeDefined()
-    // Copying from the row that opens doesn't follow its link. The window hears the click after the
-    // row's handler, which Solid delegates to the document.
-    const prevented = vi.fn((event: Event) => event.defaultPrevented)
-    window.addEventListener('click', prevented, { once: true })
-    button(app!, 'Copy')!.click()
+    // Copying from the row that opens doesn't follow its link.
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+    button(app!, 'Copy')!.dispatchEvent(click)
     await settle()
     expect(writeText).toHaveBeenLastCalledWith('https://app.example/')
-    expect(prevented).toHaveReturnedWith(true)
+    expect(click.defaultPrevented).toBe(true)
   })
 
   it('reads the view again for the log source the person picks', async () => {

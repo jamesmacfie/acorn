@@ -5,7 +5,7 @@ sources:
   - docs/browser-extension/element-picker.md
   - apps/extension/src/background/askElement.ts
   - apps/extension/src/content/picker.ts
-checked: 832747727
+checked: '832747727'
 ---
 
 On a page that belongs to a task, such as the app the task is building, you can point at one part of the

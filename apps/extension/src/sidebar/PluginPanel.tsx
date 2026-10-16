@@ -4,6 +4,7 @@ import type { BrowserPanelBlock, BrowserPanelView } from '@acorn/protocol/plugin
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import { Heading, Log, Text } from '@acorn/client-core/kit/components/content'
 import { IconButton } from '@acorn/client-core/kit/components/inputs'
+import CopyButton from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import { Inline, Section, Stack, type TabDef } from '@acorn/client-core/kit/components/layout'
 import { Badge, Row } from '@acorn/client-core/kit/components/primitives.tsx'
@@ -98,7 +99,8 @@ export function PluginPanel(props: {
   )
 }
 
-// The label, the state as a badge, then the detail's lines.
+// The label, the state as a badge, then the detail's lines: the first in bold, as the panel's subtitle,
+// and the rest muted. docs/plugin-authoring/browser-panel.md states the rule for plugin authors.
 function PanelHeader(props: { status: StatusBlock }) {
   const lines = () => props.status.detail?.split('\n').filter(Boolean) ?? []
   return (
@@ -107,15 +109,9 @@ function PanelHeader(props: { status: StatusBlock }) {
         <Heading level={2}>{props.status.label}</Heading>
         <Badge tone={SEVERITY[props.status.severity].badge}>{props.status.state}</Badge>
       </Inline>
-      {/* shortcut: the bold title and the monospace "→" line read the GitHub plugin's convention out of
-          free text. An optional `lines` field on the status block, with a severity per line, would say it. */}
       <Index each={lines()}>
         {(line, index) => (
-          <Text
-            wrap
-            emphasis={index === 0 ? 'strong' : index === 1 && line().includes('→') ? 'mono' : 'muted'}
-            tone={index === 0 ? undefined : 'muted'}
-          >
+          <Text wrap emphasis={index === 0 ? 'strong' : 'muted'} tone={index === 0 ? undefined : 'muted'}>
             {line()}
           </Text>
         )}
@@ -151,7 +147,7 @@ function Block(props: { block: BrowserPanelBlock; pickSource(source: string): vo
                   leading={<Icon name="link" tone="muted" />}
                   trailing={
                     <>
-                      <Copy text={link.url} />
+                      <CopyButton text={link.url} always />
                       <Show when={opens(link)}>
                         <Icon name="arrow-up-right" tone="muted" />
                       </Show>
@@ -210,21 +206,5 @@ function Block(props: { block: BrowserPanelBlock; pickSource(source: string): vo
         )}
       </Match>
     </Switch>
-  )
-}
-
-function Copy(props: { text: string }) {
-  const [copied, setCopied] = createSignal(false)
-  const copy = async () => {
-    await navigator.clipboard.writeText(props.text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }
-  return (
-    <IconButton
-      icon={copied() ? 'check' : 'copy'}
-      label={copied() ? 'Copied' : 'Copy'}
-      onPress={() => void copy().catch(() => {})}
-    />
   )
 }

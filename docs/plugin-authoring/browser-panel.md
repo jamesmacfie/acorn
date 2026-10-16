@@ -64,8 +64,10 @@ has to ship in Acorn before a plugin can send it.
 The extension draws everything as plain text, never as markup.
 
 Put a `status` block first to head the panel. Its `state` shows as a badge in the severity's colour,
-and its `detail` as lines under the label: the first line in bold, a second line that holds "→" in
-monospace, such as `fix/retry → main`, and the rest muted. Any other `status` block draws as a row.
+and its `detail` as lines under the label. The first line is the panel's subtitle, in bold, so put
+the line that names the thing there, such as a pull request's title. Every later line is muted, in
+the order you send them. The extension reads nothing else in the text: no markup, and no line drawn
+differently for what it holds. Any other `status` block draws as a row.
 A `danger` header marks the panel's tab. Rows and statuses get an icon by severity, so send `info`
 for a passing state. [Plugin panels](../browser-extension/plugin-panels.md#the-panel) has the table.
 

@@ -83,8 +83,8 @@ The card shows in Home's [**This page**](./task-pages.md#this-page) section, in 
 opens it for a page a handoff matches and no task holds, and a chip's click brings it forward. It
 resolves the page through `handoff.resolve` and draws the item in the kit's `Card`:
 
-1. The head: the plugin's logo (only the kit's own, such as GitHub's; others show a document), the
-   item's key and connection, its title, and **Open in Acorn** as an arrow, through `open?url=`.
+1. The head: the handoff's `glyph`, or the kit's mark for the plugin, such as GitHub's, or a document.
+   Then the item's key and connection, its title, and **Open in Acorn** as an arrow, through `open?url=`.
    Several items, such as one per connection, put a kit `Picker` in place of the key.
 2. An item a task already holds shows that task as This page's task row, which opens it.
 3. Otherwise, the project: its name, or a **Project** picker under **Tracks this issue** when several

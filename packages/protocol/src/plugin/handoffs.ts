@@ -43,6 +43,9 @@ export const browserHandoffDescriptor = z.object({
     .describe("The handoff's ID, in lowercase letters, digits, and dashes."),
   // The button's text. Drawn as text, never as markup.
   label: z.string().trim().min(1).max(40).describe("The button's text, drawn as plain text."),
+  // The sidebar can't load a plugin's own logo, which the desktop's client registers, so the item card
+  // draws this Lucide icon instead.
+  glyph: z.string().min(1).max(64).optional().describe("A Lucide icon name for the sidebar's item card."),
   match: z
     .array(pagePattern)
     .min(1)

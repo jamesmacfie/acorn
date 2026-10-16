@@ -45,9 +45,10 @@ const seededValues = (workflow: BridgeWorkflow, item: BridgeHandoffItem): Record
   )
 }
 
-// The plugin's logo, when the panel has its mark. Only the kit's own marks, such as GitHub's, reach the
-// extension: a plugin registers its marks in the desktop's client, which the panel doesn't load.
-const pluginMark = (pluginId: string) => (brandMarkRegistry.get(pluginId) ? `brand:${pluginId}` : 'file-text')
+// The handoff's own glyph, then the plugin's logo when the kit has its mark, as it has GitHub's, then a
+// document. A plugin registers its own marks in the desktop's client, which the panel doesn't load.
+const handoffMark = (handoff: PageHandoff) =>
+  handoff.glyph ?? (brandMarkRegistry.get(handoff.pluginId) ? `brand:${handoff.pluginId}` : 'file-text')
 
 // One handoff on one Node, as This page's card: the item, and in a project that tracks it, Create task
 // or a workflow run in a new task. An item a task already holds shows that task instead. A created
@@ -237,7 +238,7 @@ export function Handoff(props: {
               {(current) => (
                 <>
                   <div class="item-head">
-                    <Icon name={pluginMark(props.handoff.pluginId)} tone="brand" />
+                    <Icon name={handoffMark(props.handoff)} tone="brand" />
                     <div class="item-text">
                       <span class="item-id">
                         <Show when={resolved().length > 1} fallback={<b>{current().identifier}</b>}>

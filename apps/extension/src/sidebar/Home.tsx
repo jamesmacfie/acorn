@@ -64,6 +64,7 @@ export function ThisPage(props: {
       pluginId: only.pluginId,
       handoffId: only.id,
       label: only.label,
+      glyph: only.glyph,
       url: props.pageUrl!,
       auto: true,
     })
@@ -140,6 +141,7 @@ export function ThisPage(props: {
                       pluginId: handoff.pluginId,
                       handoffId: handoff.id,
                       label: handoff.label,
+                      glyph: handoff.glyph,
                       url: props.pageUrl!,
                     })
                   }

@@ -31,9 +31,9 @@ icon and a tone in one table, `SEVERITY` in `PluginPanel.tsx`:
 A panel has no "ok" severity. A plugin sends `info` for a passing check or an approving review.
 
 - The view's first block, when it's a `status` block, is the header: the label in large type and the
-  state as a `Badge` in the severity's tone. Each line of `detail` follows. The first line is bold, a
-  second line that holds "→" is monospace, and the rest are muted. That reads the GitHub plugin's
-  lines out of free text, and an optional field on the block would replace it.
+  state as a `Badge` in the severity's tone. Each line of `detail` follows. The first line is bold, as
+  the panel's subtitle, and every later line is muted. The rule reads nothing else in the text, so it
+  holds for every plugin.
 - A later `status` block is a row with its severity's icon, its state at the right, and its detail as
   the row's tip.
 - `rows` is a section with its title and count, and a kit `Row` for each row: the severity's icon,

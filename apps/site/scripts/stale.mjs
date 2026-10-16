@@ -32,7 +32,8 @@ const SNAPSHOT_SOURCES = {
   '.cells.json': ['apps/tui/src/chrome/', 'apps/tui/src/paint/'],
 }
 
-const CHECKED = /^(\s*checked:\s*['"]?)([0-9a-f]{7,40})/m
+// Written back quoted, because YAML reads an all-digit hash as a number, which the site's schema refuses.
+const CHECKED = /^(\s*checked:\s*)['"]?([0-9a-f]{7,40})['"]?/m
 const SOURCES = /^\s*sources:\s*(\[[^\]]*\]|(?:\n\s*-\s.*)+)/m
 const COVERS = /^\s*covers:\s*(\[[^\]]*\]|(?:\n\s*-\s.*)+)/m
 // The commit a snapshot was captured at, near the top of the file: `<!-- commit 3f9a2c1, … -->` in the
@@ -126,7 +127,7 @@ function mark(target) {
     )
   const head = git('rev-parse', '--short', 'HEAD')
   const path = join(ROOT, page.file)
-  writeFileSync(path, readFileSync(path, 'utf8').replace(CHECKED, `$1${head}`))
+  writeFileSync(path, readFileSync(path, 'utf8').replace(CHECKED, `$1'${head}'`))
   console.log(`${page.url} is checked at ${head}.`)
 }
 
