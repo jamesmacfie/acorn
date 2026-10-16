@@ -14,6 +14,7 @@ import {
   integrationsOptions,
   projectsOptions,
   readJson,
+  refResolutionsOptions,
   scanContentRefs,
   tasksKey,
   tasksOptions,
@@ -24,6 +25,7 @@ import {
 import type { Integration } from '@acorn/protocol/api.ts'
 import { pullRoute, type PullDetail } from '../shared/api'
 import type { PullRef } from '../shared/pullRef'
+import { branchReferenceCandidates } from './pullDetail/branchReferences'
 import { pullDetailOptions } from './queries'
 
 export type PullTaskTarget = PullRef & {
@@ -101,8 +103,8 @@ export async function promotePullToTask(queryClient: QueryClient, target: PullTa
 }
 
 // A task link needs an unambiguous connection. Both the direct PR action and the confirmation
-// dialog derive links here, so they record the same references from the PR body.
-async function linksForPull(queryClient: QueryClient, target: PullRef & { projectId: string }) {
+// dialog derive links here, so they record the same references from the PR body and branch.
+async function linksForPull(queryClient: QueryClient, target: PullTaskTarget) {
   const detail = await queryClient
     .ensureQueryData(pullDetailOptions(target.owner, target.repo, target.number, true))
     .catch(() => undefined)
@@ -111,19 +113,31 @@ async function linksForPull(queryClient: QueryClient, target: PullRef & { projec
     (connection) => connection.providerId === 'linear' && connection.status === 'connected',
   )
   const linearId = await linearConnectionForProject(queryClient, target.projectId, linears)
-  return linksFromBody(detail?.pull?.body, linearId)
+  return linksFromPull(detail?.pull?.body, detail?.pull?.headRef ?? target.headRef, linearId)
 }
 
-function linksFromBody(body: string | null | undefined, linearId: string | null) {
-  return linearId
-    ? scanContentRefs([body])
-        .filter((ref) => ref.providerId === 'linear')
-        .map((ref) => ({
-          connectionId: linearId,
-          identifier: ref.item,
-          ref: { displayId: ref.item, url: ref.url },
-        }))
+async function linksFromPull(body: string | null | undefined, headRef: string | null, linearId: string | null) {
+  if (!linearId) return []
+  const fromBody = scanContentRefs([body])
+    .filter((ref) => ref.providerId === 'linear')
+    .map((ref) => ({ identifier: ref.item, url: ref.url }))
+  // A branch like `jordan/sec-354-fix` names its ticket too. Those fragments are guesses, so only the
+  // ones Linear confirms become links, the same rule the PR view's linked issues follow. A failed
+  // lookup keeps the body's links rather than blocking the task.
+  const named = new Set(fromBody.map((ref) => ref.identifier.toUpperCase()))
+  const candidates = branchReferenceCandidates(headRef).filter((identifier) => !named.has(identifier))
+  const fromBranch = candidates.length
+    ? await refResolutionsOptions('linear', candidates)
+        .queryFn()
+        .catch(() => [])
     : []
+  return [...fromBody, ...fromBranch.filter((issue) => candidates.includes(issue.identifier))].map(
+    ({ identifier, url }) => ({
+      connectionId: linearId,
+      identifier,
+      ref: { displayId: identifier, ...(url ? { url } : {}) },
+    }),
+  )
 }
 
 // The URL resolver already fetched the full detail. Prepare from that item and read only the
@@ -139,7 +153,7 @@ async function linksForResolvedPull(pull: NonNullable<PullDetail['pull']>, proje
     async () => (await readJson<ProjectsResponse>(projectsRoute)).projects,
     (workspaceId) => readJson<WorkspaceExternalProjectsResponse>(workspaceExternalProjectsRoute(workspaceId)),
   )
-  return linksFromBody(pull.body, linearId)
+  return linksFromPull(pull.body, pull.headRef, linearId)
 }
 
 /**
