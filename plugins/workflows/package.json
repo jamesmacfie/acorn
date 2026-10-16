@@ -18,7 +18,6 @@
     "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-context": "workspace:*",
-    "@acorn/plugin-github": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",
     "@acorn/plugin-terminal": "workspace:*",
     "@acorn/protocol": "workspace:*",

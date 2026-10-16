@@ -30,4 +30,7 @@ export type CoreServices = {
   identity: CoreIdentityService
   projects: CoreProjectService
   telemetry: CoreTelemetryService
+  /** The ids of the running plugins that declare a code host, such as `github`. Available with
+   *  `projects:read`. */
+  codeHosts(): string[]
 }

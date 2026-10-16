@@ -6,7 +6,7 @@ import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import type { GateFormOutput, GateFormProposal } from '../../shared/gateForm'
 import { resolveGateFormProposal } from '../validation/bindings'
 import { setTimeout as delay } from 'node:timers/promises'
-import { CI_SETTLED_POLICY, type CiSettledValue } from '@acorn/plugin-github/contract/workflowPolicies.ts'
+import { CODE_HOST_POLICY, type CiSettledValue } from '../../contract/extensions'
 import { DEFAULT_POLL_INTERVAL_MS, MIN_POLL_INTERVAL_MS, readPolicyWait } from '../../shared/policyWait'
 import { waitForPolicy, type PolicyWaitOptions } from './policyWait'
 import { intersectToolCeilings } from './tools'
@@ -35,6 +35,9 @@ const AGENT_VERDICT_SCHEMA = {
 }
 const AGENT_VERDICT_INSTRUCTIONS =
   'Answer with a verdict. Say pass when the condition holds, wait when it does not hold yet but still could, and fail when it never will. Give one line on what you saw as the reason.'
+
+/** What each code host policy reads, for the message when a task has nobody to ask. */
+const CODE_HOST_READS = { [CODE_HOST_POLICY.ciSettled]: 'checks', [CODE_HOST_POLICY.reviewReceived]: 'reviews' }
 
 const sleepUnlessAborted = (ms: number, signal: AbortSignal): Promise<void> =>
   delay(ms, undefined, { signal }).catch(() => undefined)
@@ -107,17 +110,25 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
       {
         describe: {
           label: 'Checks passed',
-          description: 'Whether every check on the pull request passed. Another name for github:ci-settled.',
+          description:
+            "Whether every check on the pull request passed. Asks the code host's ci-settled policy, such as github:ci-settled.",
           icon: 'shield-check',
           fields: [],
         },
-        // Resolved per call: the GitHub plugin may init after this one, or be turned off. Off means
-        // there is nothing to check, which fails closed rather than passing.
-        evaluate: async (ctx, step) =>
-          (await services.policy(CI_SETTLED_POLICY)?.evaluate(ctx, step)) ?? {
-            verdict: 'fail',
-            detail: 'The GitHub plugin is off, so there are no checks to read.',
-          },
+        evaluate: (ctx, step) => askCodeHost(CODE_HOST_POLICY.ciSettled, ctx, step),
+      },
+    ],
+    [
+      'review-received',
+      {
+        describe: {
+          label: 'Review received',
+          description:
+            "Whether someone reviewed the pull request after the wait started. Asks the code host's review-received policy, such as github:review-received.",
+          icon: 'messages-square',
+          fields: [],
+        },
+        evaluate: (ctx, step) => askCodeHost(CODE_HOST_POLICY.reviewReceived, ctx, step),
       },
     ],
     [
@@ -316,6 +327,32 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
     }
   }
 
+  /** The policy `<host>:<entryId>` from the code host of the task's pull request, or why there is none.
+   *  Resolved per call, because the task's pull request can move and the code host may init after this
+   *  plugin or be turned off. */
+  async function codeHostPolicy(
+    taskId: string,
+    entryId: keyof typeof CODE_HOST_READS,
+  ): Promise<{ policy: RunnablePolicy } | { error: string }> {
+    const reads = CODE_HOST_READS[entryId]
+    const host = await services.deps.taskCodeHost?.(taskId)
+    if (!host) return { error: `This task has no pull request, so there are no ${reads} to read.` }
+    const policy = services.policy(`${host}:${entryId}`)
+    if (!policy)
+      return { error: `The ${host} plugin is off or has no ${entryId} policy, so there are no ${reads} to read.` }
+    return { policy }
+  }
+
+  // Nobody to ask fails closed: no checks or reviews to read must not pass a gate.
+  async function askCodeHost(
+    entryId: keyof typeof CODE_HOST_READS,
+    policyCtx: PolicyContext,
+    ctx: StepHandlerContext,
+  ): Promise<PolicyVerdict> {
+    const found = await codeHostPolicy(policyCtx.taskId, entryId)
+    return 'error' in found ? { verdict: 'fail', detail: found.error } : found.policy.evaluate(policyCtx, ctx)
+  }
+
   async function runPolicy(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
     const id = ctx.def.policy ?? ''
     const policy = services.policy(id)
@@ -388,8 +425,9 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
 
   async function runCiLoop(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
     const max = Math.min(ctx.def.maxIterations ?? 3, ctx.budget.maxTurns ?? MAX_STEP_TURNS, MAX_STEP_TURNS)
-    const ci = services.policy(CI_SETTLED_POLICY)
-    if (!ci) return { status: 'failed', error: 'The GitHub plugin is off, so there are no checks to read.' }
+    const found = await codeHostPolicy(ctx.run.taskId, CODE_HOST_POLICY.ciSettled)
+    if ('error' in found) return { status: 'failed', error: found.error }
+    const ci = found.policy
     let iteration = ctx.step.iteration
     let sessionId = ctx.step.sessionId ?? undefined
     let agentSessionId = ctx.step.agentSessionId ?? undefined

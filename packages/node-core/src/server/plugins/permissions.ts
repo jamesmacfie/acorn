@@ -140,6 +140,9 @@ export function scopeCore(
         ...granted.projects,
         ...projectsFor(core.projects, keys, pluginId, providers),
       } as ProjectService
+      // A project's repository already names the code host that holds it, so the roster of them is a
+      // project read too.
+      granted.codeHosts = core.codeHosts
     }
     // Anything else is a facet this acorn does not have. Ignored rather than rejected, so a manifest
     // naming a facet from a later build loses that one grant instead of failing to load.

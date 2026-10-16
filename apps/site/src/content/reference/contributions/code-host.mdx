@@ -3,7 +3,7 @@ title: codeHost
 description: 'The Git hosts whose repositories your plugin understands, such as gitlab.com.'
 sources:
   - docs/plugins/code-hosts.md
-checked: '1e5d6a032'
+checked: 'dd67cf0fd'
 ---
 
 `codeHost` claims Git hosts, such as `gitlab.com`. acorn stamps your plugin's ID on every project whose
@@ -11,6 +11,11 @@ origin remote is on one of them, and your data sources get the paths of those pr
 `changeRequest` block tells acorn how to check out, name, and show your host's pull or merge requests.
 Its `api` names the routes acorn's pull request tools, such as `pr_checks`, read a task's change
 request from. One per plugin.
+
+To let workflows wait for your host's CI, file a `ci-settled` workflow policy, and a `review-received`
+one for reviews. A workflow's `checks-green`, `review-received`, and `ci-loop` steps ask yours when the
+task's pull request is on your host. Emit `checks-changed` when checks change, and workflow triggers
+check early instead of waiting up to five minutes.
 
 ## A minimal example
 

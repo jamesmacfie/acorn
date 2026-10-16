@@ -498,6 +498,7 @@ acorn-plugin-types: member CoreSecretService.use
 acorn-plugin-types: member CoreSecretService.useOptional
 acorn-plugin-types: member CoreServices.agentToolProvenance
 acorn-plugin-types: member CoreServices.agentToolProvenance.verify
+acorn-plugin-types: member CoreServices.codeHosts
 acorn-plugin-types: member CoreServices.context
 acorn-plugin-types: member CoreServices.data
 acorn-plugin-types: member CoreServices.fs

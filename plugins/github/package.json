@@ -20,6 +20,7 @@
     "@acorn/diff-document": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
+    "@acorn/plugin-workflows": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@solidjs/router": "^0.16.1",
     "@tanstack/solid-query": "^5.101.0",

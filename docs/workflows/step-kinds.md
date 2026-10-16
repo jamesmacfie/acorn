@@ -111,7 +111,20 @@ poll, which the gate retries at its next interval.
 | `github:review-received` | [GitHub](../github-integration/mirror.md#checks-and-workflow-policies) | `pass` once someone other than the author or a bot reviews or comments after `since`. |
 | `terminal:command-check` | [terminal](../terminal/run-targets.md#workflow-steps) | A command's exit code: 0 passes, 75 waits, anything else fails. |
 | `agent` | workflows | A one-shot agent turn with read-only tools answers. |
-| `checks-green` | workflows | Another name for `github:ci-settled`, kept for workflows that use it. |
+| `checks-green` | workflows | Asks the `ci-settled` policy of the task's code host. |
+| `review-received` | workflows | Asks the `review-received` policy of the task's code host. |
+
+A code host that supports CI files a policy with the entry id `ci-settled`, and one that supports
+reviews files `review-received`, so the host mints `<plugin>:ci-settled` and
+`<plugin>:review-received`. That's a naming convention, with the ids in `CODE_HOST_POLICY` in
+`plugins/workflows/src/contract/extensions.ts`. A `ci-settled` policy answers with a `value` shaped
+like `CiSettledValue` from the same file, which `ci-loop` reads the failing checks from.
+
+`checks-green`, `review-received`, and `ci-loop` find the task's primary change request when they ask,
+and call the policy its code host filed ([code hosts](../plugins/code-hosts.md#workflow-ci)). A task
+with no pull request, or a code host with no such policy, fails closed with a message that says which.
+New workflow files should use the neutral names. A file that names `github:review-received` keeps
+asking GitHub, even on a task whose pull request is somewhere else.
 
 The built-in `agent` policy runs a fresh one-shot turn per poll, as `decide` does, with a fixed
 `{ verdict, reason }` schema. It gets read-only tools so it can notice a change, and its last answer
@@ -121,8 +134,8 @@ Each poll takes an agent slot and adds to the run's budget, so its minimum inter
 condition.
 
 A plugin that workflows depends on can't import the workflows package, so it keeps a copy of the
-type. The GitHub copy is `plugins/github/src/contract/workflowPolicies.ts`, and the terminal copy is
-beside its step kinds. A test in the workflows plugin holds both against the real type.
+type. The terminal plugin's copy is beside its step kinds, and a test in the workflows plugin holds it
+against the real type. Other plugins, GitHub included, import the types from the workflows contract.
 
 ## Progress events
 

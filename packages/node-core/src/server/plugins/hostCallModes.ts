@@ -105,6 +105,7 @@ const modes = {
       setup: 'async',
     },
     telemetry: { enabled: 'sync', onBatch: 'sync' },
+    codeHosts: 'sync',
   },
 } as const satisfies {
   [K in Exclude<keyof NodePluginContext, 'name' | 'core'>]: Methods<NodePluginContext[K]>

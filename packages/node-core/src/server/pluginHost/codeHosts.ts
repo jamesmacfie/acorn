@@ -43,3 +43,6 @@ export function codeHostFor(host: string): string | null {
 export function changeRequestDeclaration(provider: string): CodeHostDescriptor['changeRequest'] {
   return declared.get(provider)?.declaration.changeRequest
 }
+
+/** The ids of the running plugins that declare a code host. */
+export const runningCodeHosts = (): string[] => [...declared.keys()]

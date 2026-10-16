@@ -5,7 +5,7 @@
 // Each poll refreshes the task's PR from GitHub first. The local copy otherwise only refreshes when
 // somebody opens the PR, and a run nobody is watching would read a copy older than the agent's push.
 import type { CoreServices, PluginDatabase, StoredConnection } from '@acorn/plugin-api/node'
-import type { CiSettledValue, GithubWorkflowPolicy, PolicyVerdict } from '../contract/workflowPolicies'
+import type { CiSettledValue, PolicyContribution, PolicyVerdict } from '@acorn/plugin-workflows/contract/extensions.ts'
 import { checkFailed, checkPending, mirroredTaskPull, reviewActivitySince, taskChecks } from './mirrorQueries'
 import { refreshPullDetail } from './routes/pulls/pullRefresh'
 import type { GithubEmit } from './events'
@@ -38,7 +38,7 @@ export function githubWorkflowPolicies(
   core: PolicyCore,
   providers: ProviderAccess,
   emit: GithubEmit,
-): { ciSettled: GithubWorkflowPolicy; reviewReceived: GithubWorkflowPolicy } {
+): { ciSettled: PolicyContribution; reviewReceived: PolicyContribution } {
   /** The task's PR, refreshed from GitHub. A throw is a failed poll, which the gate retries. */
   async function refreshed(taskId: string): Promise<Refreshed> {
     const pull = await mirroredTaskPull(db, core, core.identity.active(), taskId)
@@ -56,7 +56,7 @@ export function githubWorkflowPolicies(
     return { pull, headSha: result.headSha, checksSha: result.checksSha }
   }
 
-  const ciSettled: GithubWorkflowPolicy = {
+  const ciSettled: PolicyContribution = {
     describe: {
       label: 'CI finished',
       description: 'Wait for every check on the pull request to finish. Passes when they all passed.',
@@ -106,7 +106,7 @@ export function githubWorkflowPolicies(
     },
   }
 
-  const reviewReceived: GithubWorkflowPolicy = {
+  const reviewReceived: PolicyContribution = {
     describe: {
       label: 'Review received',
       description:

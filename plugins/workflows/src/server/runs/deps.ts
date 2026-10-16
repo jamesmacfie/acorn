@@ -49,6 +49,9 @@ export type RunnerDeps = {
   writeHandoff(taskId: string, runId: string, stepName: string, body: string): Promise<void>
   finishHandoffs?(taskId: string, runId: string): Promise<void>
   assembleContext(taskId: string, runId: string): Promise<string>
+  /** The plugin id of the code host that owns the task's pull request, or null when it has none. Absent
+   *  means no task has one, so `checks-green`, `review-received`, and `ci-loop` fail closed. */
+  taskCodeHost?(taskId: string): Promise<string | null>
   /** The pause between a polling gate's checks. Absent means a real timer; a test passes its own. */
   sleep?(ms: number, signal: AbortSignal): Promise<void>
   // Every notification carries a run reference and, when applicable, a step reference.

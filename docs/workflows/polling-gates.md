@@ -17,7 +17,7 @@ answers `pass` or `fail`, or the timeout passes. Then it reports a fourth verdic
 
 | TOML key | What it does |
 | --- | --- |
-| `policy` | The policy to ask, such as `github:review-received`. |
+| `policy` | The policy to ask, such as `review-received`. |
 | `[steps.with]` | The policy's settings. Strings render one level deep, as a contributed kind's `with` does. |
 | `timeout_ms` | How long to keep asking. Setting it is what turns polling on. |
 | `interval_ms` | How long to sleep after a `wait`. Defaults to 60,000, or the policy's minimum when that is higher. |
@@ -40,7 +40,7 @@ names of failing checks or the review comments that arrived.
 id = "await-review"
 name = "Wait for review"
 kind = "gate-policy"
-policy = "github:review-received"
+policy = "review-received"
 interval_ms = 120000
 timeout_ms = 86400000
 
@@ -57,7 +57,7 @@ removed once the policy settles, so a retry starts a fresh wait. The run pane re
 so a reload shows when the gate asks next without waiting for it.
 
 The sleep between polls stops on the step's abort signal, so cancelling the run stops the wait at
-once. A policy that throws, or a GitHub read that fails, is retried at the next interval. Three failed
+once. A policy that throws, or a code host read that fails, is retried at the next interval. Three failed
 polls in a row fail the step with the last error, so a revoked token doesn't wait a whole day. An
 answer other than the three verdicts fails the step at once.
 
@@ -79,13 +79,18 @@ counts as busy, because nothing is waiting then.
 
 ## `ci-loop`
 
-`ci-loop` asks `github:ci-settled` through the same polling code. Each round waits for the checks to
+`ci-loop` asks the `ci-settled` policy of the task's code host, such as `github:ci-settled`, through
+the same polling code. Each round waits for the checks to
 settle, for up to `checks_timeout_ms` (default 1,800,000). It finishes on `pass` and fails on
 `timed-out`. On `fail` it runs a fix turn with the failing check names, in the same session as its
 earlier rounds, then starts the next round. A round after a fix waits for the new commit's checks to
 appear rather than failing because there are none yet. The round limit, `max_iterations`, still ends
-the step at a safety rail. With the GitHub plugin off, `ci-loop` fails because there are no checks to
-read.
+the step at a safety rail. With no pull request on the task, or with its code host off or filing no
+`ci-settled` policy, `ci-loop` fails because there are no checks to read.
+
+A code host that emits `checks-changed` also wakes the workflow trigger sweep early, so a trigger
+waiting on CI doesn't wait for the five-minute clock. The sweep follows code hosts that start or stop
+after the workflows plugin.
 
 ## Related pages
 

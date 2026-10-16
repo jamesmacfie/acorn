@@ -69,6 +69,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       return note ? `# Context\n\n## Notes\n${note.body}` : ''
     },
     defaultProfileId: () => 'claude-code',
+    // The task's pull request is on GitHub unless a test says otherwise.
+    taskCodeHost: async () => 'github',
     notify: vi.fn(),
   })
 
@@ -113,13 +115,14 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     }
   }
 
-  // A stand-in for the GitHub plugin's CI policy, answering from a script. The last answer repeats.
-  const ciPolicy = (answers: PolicyVerdict[]) => {
+  // A stand-in for a code host's policy, GitHub's CI one by default, answering from a script. The last
+  // answer repeats.
+  const ciPolicy = (answers: PolicyVerdict[], id = 'github:ci-settled') => {
     let poll = 0
     const evaluate = vi.fn(async (_ctx: PolicyContext) => answers[Math.min(poll++, answers.length - 1)]!)
     const policy = {
-      id: 'github:ci-settled',
-      pluginId: 'github',
+      id,
+      pluginId: id.split(':')[0]!,
       order: 0,
       value: { evaluate, describe: { label: 'CI', description: 'CI.', icon: 'x', fields: [], minIntervalMs: 30_000 } },
     }
@@ -317,6 +320,79 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(ci.evaluate).toHaveBeenCalledTimes(3)
     // The round after a fix waits for the new commit's checks to appear rather than failing on none.
     expect(ci.evaluate.mock.calls[2]![0].with).toEqual({ missing: 'wait' })
+  })
+
+  describe('on a task whose pull request is on another code host', () => {
+    const gitlab = (answers: PolicyVerdict[], id = 'gitlab-test:ci-settled', host: string | null = 'gitlab-test') => {
+      const ci = ciPolicy(answers, id)
+      const d = deps()
+      const runStep = vi.fn(d.runStep)
+      const runner = new WorkflowRunner(
+        wf.db,
+        { ...d, runStep, sleep: noSleep, taskCodeHost: async () => host },
+        ci.extensions,
+      )
+      const run = async (step: WorkflowDef['steps'][number]) => {
+        const runId = await runner.start('task1', {
+          baseline: 'acorn-1',
+          formatVersion: 1,
+          name: step.name,
+          steps: [step],
+        })
+        await waitDone(runner, runId)
+        return { run: (await runner.run(runId))!, step: (await runner.steps(runId))[0]! }
+      }
+      return { ...ci, runStep, run }
+    }
+    const checksGreen = {
+      id: 'checks',
+      name: 'checks',
+      kind: 'gate-policy',
+      policy: 'checks-green',
+      timeoutMs: 600_000,
+    }
+    const ciLoop = { id: 'ci-fix', name: 'ci-fix', kind: 'ci-loop', maxIterations: 3 }
+
+    it("checks-green waits, fails, and passes on that host's ci-settled", async () => {
+      const host = gitlab([{ verdict: 'wait', detail: 'Pipeline running.' }, red('lint'), { verdict: 'pass' }])
+      const failed = await host.run(checksGreen)
+      expect(failed.run.status).toBe('failed')
+      expect(failed.step.error).toContain('CI red')
+      expect((await host.run(checksGreen)).run.status).toBe('done')
+      expect(host.evaluate).toHaveBeenCalledTimes(3)
+    })
+
+    it("the CI loop waits, fixes a red round, and passes on that host's ci-settled", async () => {
+      const host = gitlab([{ verdict: 'wait', detail: 'Pipeline running.' }, red('lint'), { verdict: 'pass' }])
+      const { run, step } = await host.run(ciLoop)
+      expect(run.status).toBe('done')
+      expect(step.iteration).toBe(1)
+      expect(host.runStep).toHaveBeenCalledTimes(1)
+      expect(host.runStep.mock.calls[0]![2].prompt).toContain('- lint: FAILURE')
+      expect(host.evaluate).toHaveBeenCalledTimes(3)
+    })
+
+    it("review-received asks that host's review-received", async () => {
+      const host = gitlab([{ verdict: 'pass', detail: 'Reviewed by sam.' }], 'gitlab-test:review-received')
+      const step = { id: 'review', name: 'review', kind: 'gate-policy', policy: 'review-received' }
+      expect((await host.run(step)).run.status).toBe('done')
+      expect(host.evaluate).toHaveBeenCalledWith(expect.objectContaining({ taskId: 'task1' }))
+    })
+
+    it.each([
+      ['a host with no CI policy', 'gitlab-test', 'The gitlab-test plugin is off or has no ci-settled policy'],
+      ['no pull request', null, 'This task has no pull request'],
+    ])('with %s, checks-green and the CI loop fail and say why', async (_case, taskHost, message) => {
+      // GitHub's CI policy is there, and must not be asked for a task that isn't on GitHub.
+      const host = gitlab([{ verdict: 'pass' }], 'github:ci-settled', taskHost)
+      for (const step of [checksGreen, ciLoop]) {
+        const { run, step: row } = await host.run(step)
+        expect(run.status).toBe('failed')
+        expect(row.error).toContain(message)
+      }
+      expect(host.evaluate).not.toHaveBeenCalled()
+      expect(host.runStep).not.toHaveBeenCalled()
+    })
   })
 
   it('CI loop: exhaustion → safety-rail, NOT failed', async () => {

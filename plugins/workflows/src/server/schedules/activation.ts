@@ -1,4 +1,4 @@
-import { describeError, type NodePlugin, type PluginDatabase } from '@acorn/plugin-api/node'
+import { describeError, type Disposable, type NodePlugin, type PluginDatabase } from '@acorn/plugin-api/node'
 import { destinationQuery } from '../validation/destination'
 import { parseWorkflowScheduleTarget, WorkflowScheduleService, type WorkflowScheduleScheduler } from './service'
 import type { WorkflowSchedulesBridge } from '../routes/schedules'
@@ -100,16 +100,38 @@ export const workflowScheduleBridge = (scheduleService: WorkflowScheduleService)
   }
 }
 
-/** A Node clock backs trigger sweeps, with GitHub changes as an early wakeup. */
+/** A Node clock backs trigger sweeps, with a code host's `checks-changed` as an early wakeup. */
 export const registerWorkflowTriggers = (
-  ctx: Pick<PluginContext, 'events' | 'schedules' | 'log'>,
+  ctx: Pick<PluginContext, 'core' | 'events' | 'schedules' | 'log'>,
   runner: WorkflowRunner,
 ): void => {
-  ctx.events.on('plugin:github:checks-changed', () => {
+  const sweep = () => {
     void runner
       .pollTriggers()
       .catch((error) => ctx.log.warn(`trigger sweep after checks-changed failed: ${describeError(error).message}`))
-  })
+  }
+  // One subscription per running code host, kept in step with the roster so a code host that starts
+  // or stops after this plugin is followed too.
+  const hosts = new Map<string, Disposable>()
+  const followCodeHosts = () => {
+    const running = new Set(ctx.core.codeHosts())
+    for (const [id, subscription] of hosts) {
+      if (running.has(id)) continue
+      subscription.dispose()
+      hosts.delete(id)
+    }
+    for (const id of running) {
+      if (hosts.has(id)) continue
+      try {
+        hosts.set(id, ctx.events.on(`plugin:${id}:checks-changed`, sweep))
+      } catch {
+        // A code host that doesn't emit `checks-changed` refuses the subscription. Its tasks wait for
+        // the clock.
+      }
+    }
+  }
+  followCodeHosts()
+  ctx.events.on('plugins:changed', followCodeHosts)
   ctx.schedules.register({
     scheduleId: 'triggers',
     name: 'Workflow triggers',

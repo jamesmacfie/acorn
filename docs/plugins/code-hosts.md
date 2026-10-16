@@ -23,7 +23,8 @@ A host is a bare lowercase name, with no scheme or port. The declaration needs a
 because only a running node half registers it. It also needs `projects:read`, or a grant that implies
 it, in `permissions.node.core`: a code host's data sources get the paths of the projects on its hosts,
 so the person consents to that in the trust prompt like any other project read. The registry is
-`packages/node-core/src/server/pluginHost/codeHosts.ts`, and it empties when the plugin stops.
+`packages/node-core/src/server/pluginHost/codeHosts.ts`, and it empties when the plugin stops. A
+plugin reads which code hosts are running with `ctx.core.codeHosts()`.
 
 The provider is the plugin's own id, so two plugins can't declare the same provider. When two running
 plugins claim one host, a built-in beats a loaded plugin, and between two of the same tier the lower
@@ -131,6 +132,19 @@ session, as `attachChangeRequest` does. An error answer's `error.message` reache
 The section's label is the declared `label`, so a GitLab task reads `Merge request`, and its item label
 starts with the declared `prefix`, as in `!12 Fix the importer`. The task a section's `assemble` receives,
 and `TaskContext.task`, carry the primary as `changeRequest: { provider, number }`.
+
+## Workflow CI
+
+A code host that supports CI files a `ci-settled` policy against the workflows plugin's
+`workflows:policy` point, and one that supports reviews files `review-received`. The workflow names
+`checks-green`, `review-received`, and `ci-loop` ask the policy filed by the plugin that holds the
+task's primary change request ([gate policies](../workflows/step-kinds.md#gate-policies)). Import
+`CODE_HOST_POLICY`, `CiSettledValue`, and `WORKFLOW_POLICY` from
+`plugins/workflows/src/contract/extensions.ts`.
+
+Emit `plugin:<id>:checks-changed`, and declare the verb in `emits`, when a change request's checks
+change. The workflow trigger sweep runs early on it for every running code host, and waits for its
+five-minute clock otherwise.
 
 ## The GitHub-named fields
 

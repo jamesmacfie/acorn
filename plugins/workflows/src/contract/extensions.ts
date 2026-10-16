@@ -12,6 +12,7 @@ import type { PolicyContribution, StepKindContribution, WorkflowTriggerContribut
 
 export type {
   PolicyContribution,
+  PolicyVerdict,
   StepField,
   StepHandler,
   StepHandlerContext,
@@ -40,3 +41,16 @@ export const WORKFLOW_POLICY = extensionPointId<PolicyContribution>('workflows:p
 /** Something that decides, on each sweep, which workflows should start. The sweep runs on the node's
  *  scheduler, so a trigger fires with no client attached (docs/schedules.md). */
 export const WORKFLOW_TRIGGER = extensionPointId<WorkflowTriggerContribution>('workflows:trigger')
+
+/** The entry ids a code host files its CI and review policies under, minted as `<pluginId>:ci-settled`
+ *  and `<pluginId>:review-received`. `checks-green`, `ci-loop`, and `review-received` ask the one filed by
+ *  the code host of the task's pull request (docs/workflows/step-kinds.md § Gate policies). */
+export const CODE_HOST_POLICY = { ciSettled: 'ci-settled', reviewReceived: 'review-received' } as const
+
+/** The `value` a code host's `ci-settled` policy answers with: every check that failed, and every one
+ *  still running. `ci-loop` hands the failures to its fix turn. */
+export type CiSettledValue = {
+  failing: { name: string; status: string | null; url: string | null }[]
+  pending: string[]
+  total: number
+}

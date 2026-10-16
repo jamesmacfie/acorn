@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { makeTestPluginDb } from '@acorn/plugin-api/testkit'
 import type { Extension, ExtensionPointId } from '@acorn/plugin-api/node'
 import type { TerminalWorkflowPolicy, TerminalWorkflowStepKind } from '@acorn/plugin-terminal/contract/workflowSteps.ts'
-import type { GithubWorkflowPolicy } from '@acorn/plugin-github/contract/workflowPolicies.ts'
 import { WORKFLOW_STEP_KIND, type PolicyContribution, type StepKindContribution } from '../../contract/extensions'
 import { BUILTIN_STEP_KINDS } from './builtins'
 import { validateWorkflow } from '../validation/definition'
@@ -204,11 +203,10 @@ describe('the terminal mirror of the contribution type', () => {
   })
 })
 
-// The same for the policy copies in plugins/terminal and plugins/github, which this package depends on.
-describe('the mirrors of the policy type', () => {
-  it('still satisfy the type the gate polls through', () => {
+// The same for the policy copy in plugins/terminal, which this package depends on.
+describe('the terminal mirror of the policy type', () => {
+  it('still satisfies the type the gate polls through', () => {
     const terminal: PolicyContribution = null as unknown as TerminalWorkflowPolicy
-    const github: PolicyContribution = null as unknown as GithubWorkflowPolicy
-    expect([terminal, github]).toEqual([null, null])
+    expect(terminal).toBeNull()
   })
 })

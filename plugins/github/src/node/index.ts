@@ -4,7 +4,6 @@ import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/repos/import'
 import { createGithubProvider } from '../server/provider'
 import { mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
-import { WORKFLOW_POLICY } from '../contract/workflowPolicies'
 import { githubWorkflowPolicies } from '../server/workflowPolicies'
 import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
 import { githubClientId } from '../server/config'
@@ -17,6 +16,7 @@ import { pullSource } from '../shared/pullSource'
 import { actionsSource } from '../shared/actionsRegistration'
 import { branchSource } from '../shared/branchSource'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
+import { CODE_HOST_POLICY, WORKFLOW_POLICY } from '@acorn/plugin-workflows/contract/extensions.ts'
 import { pullRequestEditorLineMarkers } from '../server/editorLineMarkers'
 import { startPullDiscovery } from '../server/pullDiscovery'
 import { setGithubApiTelemetry } from '../server/githubApi'
@@ -165,12 +165,14 @@ export const githubPlugin = (): NodePlugin => {
         ctx.tools.register(tool)
       discovery = startPullDiscovery(ctx)
 
-      // Two `gate-policy` verdict sources, filed against the workflows plugin's point by its id string
-      // (../contract/workflowPolicies.ts says why). They become `github:ci-settled` and
-      // `github:review-received`.
+      // Two `gate-policy` verdict sources, `github:ci-settled` and `github:review-received`. Their entry
+      // ids are the ones `checks-green`, `ci-loop`, and `review-received` ask a task's code host for.
       const policies = githubWorkflowPolicies(store, ctx.core, ctx.providers, emit)
-      ctx.extensionPoints.handle(WORKFLOW_POLICY, { id: 'ci-settled', value: policies.ciSettled })
-      ctx.extensionPoints.handle(WORKFLOW_POLICY, { id: 'review-received', value: policies.reviewReceived })
+      ctx.extensionPoints.handle(WORKFLOW_POLICY, { id: CODE_HOST_POLICY.ciSettled, value: policies.ciSettled })
+      ctx.extensionPoints.handle(WORKFLOW_POLICY, {
+        id: CODE_HOST_POLICY.reviewReceived,
+        value: policies.reviewReceived,
+      })
 
       ctx.capabilities.provide(GITHUB_MIRROR, {
         repositories: async (userId) => (await readCachedRepos(store, userId)).map(toPublicRepo),

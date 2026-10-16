@@ -13,7 +13,7 @@ export const BUILTIN_STEP_KINDS = [
   'write-dataset',
   'if',
 ] as const
-export const BUILTIN_POLICIES = ['checks-green', 'agent'] as const
+export const BUILTIN_POLICIES = ['checks-green', 'review-received', 'agent'] as const
 
 /** Every branch names a step that waits on the branching one. Graph edges, not list position: a step
  *  that omits `after` waits on the step before it, and that implicit edge also satisfies this. */

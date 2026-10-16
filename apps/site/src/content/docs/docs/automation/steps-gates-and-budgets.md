@@ -12,7 +12,7 @@ sources:
   - plugins/terminal/src/server/workflowSteps.ts
   - plugins/database/src/server/workflowSteps.ts
   - plugins/http/src/server/workflowStep.ts
-checked: 07aa959a0
+checked: dd67cf0fd
 ---
 
 This page covers what each kind of step does, and how steps fit together: the order they run in,
@@ -177,7 +177,7 @@ once, and not yet counts as a failure.
 id = "ci"
 name = "Wait for CI"
 kind = "gate-policy"
-policy = "github:ci-settled"
+policy = "checks-green"
 interval_ms = 60000
 timeout_ms = 3600000
 
@@ -188,14 +188,19 @@ fail = "fix"
 
 | Policy | Passes when |
 | --- | --- |
-| `github:ci-settled` | Every check on the task's pull request passed. It fails as soon as one fails. |
-| `github:review-received` | Someone other than the author or a bot reviewed or commented. |
+| `checks-green` | Every check on the task's pull request passed. It fails as soon as one fails. |
+| `review-received` | Someone other than the author or a bot reviewed or commented. |
 | `terminal:command-check` | A command exits 0. Exit 75 means not yet, and anything else fails. |
 | `agent` | An agent, with read-only tools, says the condition in its `prompt` is true. It asks at most every 5 minutes, and each ask costs a turn. |
 
+`checks-green` and `review-received` ask the plugin for the code host that has the task's pull request,
+such as GitHub. Each code host also offers the same policies under its own name, such as
+`github:ci-settled` and `github:review-received`. A task with no pull request, or a code host that
+doesn't offer the policy, fails the step.
+
 The interval is at least 30 seconds, and 60 by default. With `branches`, each answer, `pass`, `fail`,
 or `timed-out`, leads to its own step. Without them, anything but pass fails the step. Three failed
-asks in a row, such as GitHub not answering, fail the step.
+asks in a row, such as the code host not answering, fail the step.
 
 **Fix the checks** combines the two: it waits for CI, and on a failure asks an agent to fix the failing
 checks, then waits again, up to `max_iterations` rounds:
