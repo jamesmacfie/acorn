@@ -254,6 +254,25 @@ describe('runtime contribution descriptors', () => {
     ).toEqual(['route must be inside /v1/p/board/'])
   })
 
+  it('makes a code host declare a node half and a project read', () => {
+    const codeHost = { label: 'GitLab', hosts: ['gitlab.com'] }
+    expect(messages(manifest({ codeHost }))).toEqual([
+      'a code host reads the projects on its hosts; declare `projects:read` in permissions.node.core',
+      'a code host is claimed while the node half runs; declare `node` in the manifest',
+    ])
+    const declared = pluginManifestSchema.safeParse({
+      id: 'board',
+      name: 'Board',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '1',
+      node: './dist/node.js',
+      permissions: { node: { core: ['projects:write'] } },
+      contributions: { codeHost },
+    })
+    expect(messages(declared)).toEqual([])
+  })
+
   it('requires a node half and rejects duplicate local ids across carriers', () => {
     expect(
       messages(

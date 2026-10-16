@@ -103,6 +103,65 @@ const customAgentDescriptor = z.object({
     .describe("The riskiest of acorn's own tools the agent may call: `read`, `write`, or `execute`."),
 })
 
+// The Git hosts whose repositories this plugin names, such as `gitlab.com` (docs/plugins/code-hosts.md).
+// The provider is the plugin's own id, so two providers can't collide. Hosts are bare lowercase names,
+// with no scheme or port, because core compares them with the host it parses from a remote.
+export const codeHostDescriptor = z.object({
+  label: z.string().min(1).max(64).describe("The host's name as a person reads it, such as `GitLab`."),
+  hosts: z
+    .array(
+      z
+        .string()
+        .max(253)
+        .regex(
+          /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/,
+          'a host is a bare lowercase name',
+        ),
+    )
+    .min(1)
+    .max(16)
+    .describe('Bare lowercase host names, such as `gitlab.com`, with no scheme or port.'),
+  // How core treats this host's change requests, its pull or merge requests. Every field is optional.
+  changeRequest: z
+    .object({
+      // The ref core fetches from origin to check one out, such as `merge-requests/{number}/head`.
+      // Without one, core fetches the source branch by name. It's a Git argument, so no leading dash,
+      // no `:` that would end the refspec, and no `..`.
+      ref: z
+        .string()
+        .max(200)
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*\{number\}[A-Za-z0-9._/-]*$/, 'a ref is a path holding {number} once')
+        .refine((ref) => !ref.includes('..'), 'a ref has no ..')
+        .optional()
+        .describe(
+          'The ref acorn fetches to check one out, holding `{number}` once, such as `merge-requests/{number}/head`. Without it, acorn fetches the source branch.',
+        ),
+      // What a person calls one, such as `merge request`, and the mark before its number in a title.
+      label: z
+        .string()
+        .min(1)
+        .max(64)
+        .optional()
+        .describe('What a person calls one in an error, such as `merge request`. Defaults to `change request`.'),
+      prefix: z
+        .string()
+        .min(1)
+        .max(4)
+        .optional()
+        .describe('The mark before its number in a task title, such as `!`. Defaults to `#`.'),
+      // The client pane that shows one. A task whose primary change request is on this host opens on it.
+      pane: z
+        .string()
+        .min(1)
+        .max(64)
+        .optional()
+        .describe('The pane that shows one. A task whose main change request is on this host opens on it.'),
+    })
+    .optional()
+    .describe("How acorn treats this host's pull or merge requests. Every field is optional."),
+})
+export type CodeHostDescriptor = z.infer<typeof codeHostDescriptor>
+
 // `api` and `events` are enforced by client-core's frame broker. `contributions` stays loose: a manifest
 // written for a newer acorn should contribute less on an older one rather than fail to parse.
 //
@@ -282,6 +341,10 @@ const contributionsShape = z.looseObject({
     .describe(
       "A read-only panel in the browser extension's sidebar for a task, served by a route on your Node half. One per plugin.",
     ),
+  // Compiled plugins declare the same thing on `NodePlugin.codeHost`.
+  codeHost: codeHostDescriptor
+    .optional()
+    .describe('The Git hosts whose repositories your plugin names, and how acorn treats their change requests.'),
 })
 
 // Every contribution kind a manifest may declare, as a runtime list.
@@ -715,4 +778,5 @@ export type PluginContributions = {
   browserHandoffs?: Omit<import('./handoffs.ts').BrowserHandoff, 'pluginId'>[]
   taskAddresses?: string
   browserPanel?: import('./handoffs.ts').BrowserPanelDescriptor
+  codeHost?: CodeHostDescriptor
 } & Record<string, unknown>

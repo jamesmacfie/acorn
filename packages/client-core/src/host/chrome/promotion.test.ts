@@ -21,8 +21,6 @@ describe('descriptor promotion', () => {
       await Promise.resolve(
         promotion.prepare(ITEM, {
           projectId: 'project-1',
-          owner: '',
-          repo: '',
           branch: 'fallback',
         }),
       ),
@@ -37,16 +35,13 @@ describe('descriptor promotion', () => {
   it('preserves an established provider origin when the row declares one', async () => {
     const promotion = descriptorPromotion('rollbar', { create: vi.fn(), link: vi.fn(), ...owned })
     expect(
-      await promotion.prepare(
-        { ...ITEM, task: { ...ITEM.task, origin: 'rollbar' } },
-        { projectId: 'project-1', owner: '', repo: '' },
-      ),
+      await promotion.prepare({ ...ITEM, task: { ...ITEM.task, origin: 'rollbar' } }, { projectId: 'project-1' }),
     ).toMatchObject({ origin: 'rollbar' })
   })
 
   it('replaces an origin owned by another plugin while preserving owned subtypes', async () => {
     const promotion = descriptorPromotion('rollbar', { create: vi.fn(), link: vi.fn(), ...owned })
-    const context = { projectId: 'project-1', owner: '', repo: '' }
+    const context = { projectId: 'project-1' }
 
     await expect(
       promotion.prepare({ ...ITEM, task: { ...ITEM.task, origin: 'linear' } }, context),
@@ -68,8 +63,8 @@ describe('descriptor promotion', () => {
       },
       ownsConnection: async () => true,
     })
-    const task = await promotion.create(await promotion.prepare(ITEM, { projectId: 'project-1', owner: '', repo: '' }))
-    await promotion.afterCreate?.(task, ITEM, { projectId: 'project-1', owner: '', repo: '' })
+    const task = await promotion.create(await promotion.prepare(ITEM, { projectId: 'project-1' }))
+    await promotion.afterCreate?.(task, ITEM, { projectId: 'project-1' })
     expect(order).toEqual(['create', 'link'])
   })
 
@@ -86,10 +81,8 @@ describe('descriptor promotion', () => {
       },
       ownsConnection: async () => true,
     })
-    const task = await promotion.create(await promotion.prepare(ITEM, { projectId: 'project-1', owner: '', repo: '' }))
-    await expect(promotion.afterCreate?.(task, ITEM, { projectId: 'project-1', owner: '', repo: '' })).rejects.toThrow(
-      'link failed',
-    )
+    const task = await promotion.create(await promotion.prepare(ITEM, { projectId: 'project-1' }))
+    await expect(promotion.afterCreate?.(task, ITEM, { projectId: 'project-1' })).rejects.toThrow('link failed')
     expect(order).toEqual(['create', 'link'])
   })
 

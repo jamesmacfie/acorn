@@ -148,6 +148,13 @@ export const agentSearchFormat = sqliteTable('agent_search_format', {
   version: integer('version').notNull(),
 })
 
+// One row: when the last start's command settle began. No harness outlives the Node, so every command
+// opened before then was settled by that pass, and the next start reads only newer events. No row makes
+// the next start read every event once.
+export const agentCommandSettle = sqliteTable('agent_command_settle', {
+  settledBefore: integer('settled_before').notNull(),
+})
+
 export const agentRequests = sqliteTable(
   'agent_requests',
   {
@@ -325,6 +332,19 @@ export const agentMcpServers = sqliteTable('agent_mcp_servers', {
   configJson: text('config_json').notNull(),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+// One sign-in per MCP server that has one (docs/mcp/sign-in.md). Kept out of
+// `agent_mcp_servers.config_json` because that config's digest keys consent and tool approval, and a
+// token refresh every hour would void both. `state_json` is sealed: tokens, the client registration,
+// and the discovered endpoints. `url` is the server the tokens were issued for.
+export const agentMcpOauth = sqliteTable('agent_mcp_oauth', {
+  name: text('name').primaryKey(),
+  url: text('url').notNull(),
+  stateJson: text('state_json').notNull(),
+  status: text('status').notNull(), // signed_in | expired
+  signedInAt: integer('signed_in_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })
 

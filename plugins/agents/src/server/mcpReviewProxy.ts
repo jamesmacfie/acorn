@@ -1,13 +1,12 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServer, type Server as HttpServer } from 'node:http'
-import { homedir } from 'node:os'
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
+import type { FetchLike, Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { AgentDriverMcpServer } from './drivers/types'
 import { mcpCatalogue, type McpCatalogue } from './mcpCatalogue'
+import { McpSignInRequired } from './mcpSignIn'
+import { mcpUpstream } from './mcpUpstream'
 
 const MAX_MESSAGE_BYTES = 1024 * 1024
 const DEADLINE_MS = 30_000
@@ -18,19 +17,27 @@ type Rpc = JSONRPCMessage & { id?: string | number; method?: string; params?: Re
 type Approval = { revision: string; digest: string; version: number; tools: Record<string, unknown>[] }
 
 export type McpReviewProxyPorts = {
-  approved(): Promise<Approval | null>
-  observed(catalogue: McpCatalogue): void
+  /** Absent when the server has review off and the relay is there only to sign its requests. Then
+   *  tools/list and tools/call pass through like everything else. */
+  review?: {
+    approved(): Promise<Approval | null>
+    observed(catalogue: McpCatalogue): void
+  }
   closed(): void
 }
 
-/** A byte-limited JSON-RPC relay. It keeps the upstream transport that the harness actually reaches,
- *  and changes only tools/list and tools/call. Every other supported MCP message passes through. */
+/** A byte-limited JSON-RPC relay. It keeps the upstream transport that the harness actually reaches.
+ *  With review on it changes only tools/list and tools/call, and every other supported MCP message
+ *  passes through. With `signedFetch`, the upstream carries a signed-in server's token
+ *  (docs/mcp/sign-in.md), and a refused sign-in answers the request rather than
+ *  closing the relay, so the next request after a new sign-in works. */
 export class McpReviewProxy {
   readonly #upstream: Transport
   readonly #downstream: StreamableHTTPServerTransport
   readonly #listener: HttpServer
   readonly #token = randomBytes(32).toString('base64url')
   readonly #ports: McpReviewProxyPorts
+  readonly #review: McpReviewProxyPorts['review'] | null
   readonly #deadlineMs: number
   readonly #pending = new Map<
     string | number,
@@ -41,7 +48,7 @@ export class McpReviewProxy {
   readonly #gated = new Map<string | number, { cancelled: boolean }>()
   #startPromise: Promise<void> | null = null
   #closed = false
-  #quarantined = true
+  #quarantined: boolean
   #requiresFreshApproval = false
   #lastDigest: string | null = null
   #busyCatalogue: { generation: number; promise: Promise<McpCatalogue> } | null = null
@@ -56,23 +63,17 @@ export class McpReviewProxy {
     sessionId: string,
     revision: string,
     ports: McpReviewProxyPorts,
-    deadlineMs = DEADLINE_MS,
+    options: { deadlineMs?: number; signedFetch?: FetchLike } = {},
   ) {
+    const deadlineMs = options.deadlineMs ?? DEADLINE_MS
     this.name = server.name
     this.sessionId = sessionId
     this.revision = revision
     this.#ports = ports
+    this.#review = ports.review ?? null
+    this.#quarantined = !!this.#review
     this.#deadlineMs = Number.isFinite(deadlineMs) ? Math.max(1, Math.min(DEADLINE_MS, deadlineMs)) : DEADLINE_MS
-    this.#upstream =
-      server.transport === 'stdio'
-        ? new StdioClientTransport({
-            command: server.command,
-            args: server.args,
-            env: server.env,
-            cwd: homedir(),
-            stderr: 'pipe',
-          })
-        : new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers: server.headers } })
+    this.#upstream = mcpUpstream(server, options.signedFetch)
     // The transport refuses a declared or streamed body over the cap with a 413. Reading the request
     // here as well would start it flowing before the transport attaches its reader and lose the body.
     this.#downstream = new StreamableHTTPServerTransport({
@@ -82,7 +83,8 @@ export class McpReviewProxy {
     this.#upstream.onmessage = (message) => {
       void this.#fromUpstream(message as Rpc)
     }
-    this.#upstream.onerror = () => {
+    this.#upstream.onerror = (error) => {
+      if (error instanceof McpSignInRequired) return
       void this.close()
     }
     this.#upstream.onclose = () => {
@@ -104,7 +106,7 @@ export class McpReviewProxy {
         return
       }
       if (req.headers['last-event-id']) {
-        res.writeHead(409).end('MCP event replay is unavailable on reviewed connections. Reconnect.')
+        res.writeHead(409).end("MCP event replay is unavailable through acorn's relay. Reconnect.")
         return
       }
       void this.#downstream.handleRequest(req, res).catch(() => {
@@ -122,7 +124,7 @@ export class McpReviewProxy {
       })
     })
     const address = this.#listener.address()
-    if (!address || typeof address === 'string') throw new Error('The MCP review proxy could not bind a loopback port.')
+    if (!address || typeof address === 'string') throw new Error('The MCP relay could not bind a loopback port.')
     this.url = `http://127.0.0.1:${address.port}/mcp`
     return { transport: 'http', name: this.name, url: this.url, headers: { Authorization: `Bearer ${this.#token}` } }
   }
@@ -142,7 +144,9 @@ export class McpReviewProxy {
   }
 
   async #fromHarness(message: Rpc): Promise<void> {
-    const gated = message.id !== undefined && (message.method === 'tools/list' || message.method === 'tools/call')
+    const review = this.#review
+    const gated =
+      !!review && message.id !== undefined && (message.method === 'tools/list' || message.method === 'tools/call')
     const gate = gated ? { cancelled: false } : null
     if (gate) {
       if (this.#gated.has(message.id!)) {
@@ -181,10 +185,10 @@ export class McpReviewProxy {
         return
       }
       if ((message.method === 'tools/list' || message.method === 'tools/call') && message.id === undefined) return
-      if (message.method === 'tools/list' && message.id !== undefined) {
+      if (review && message.method === 'tools/list' && message.id !== undefined) {
         const catalogue = await this.catalogue()
         const generation = this.#generation
-        const approved = await this.#ports.approved()
+        const approved = await review.approved()
         if (gate?.cancelled) return
         const admitted =
           generation === this.#generation &&
@@ -199,10 +203,10 @@ export class McpReviewProxy {
         } as Rpc)
         return
       }
-      if (message.method === 'tools/call' && message.id !== undefined) {
+      if (review && message.method === 'tools/call' && message.id !== undefined) {
         const catalogue = await this.catalogue()
         const generation = this.#generation
-        const approved = await this.#ports.approved()
+        const approved = await review.approved()
         if (gate?.cancelled) return
         const name = message.params?.name
         if (
@@ -244,8 +248,8 @@ export class McpReviewProxy {
       }
       if (gate) this.#gated.delete(message.id!) // The request is now tracked by #forwarded.
       await this.#send(this.#upstream, message)
-      if (message.method === 'notifications/initialized') void this.catalogue().catch(() => undefined)
-    } catch {
+      if (review && message.method === 'notifications/initialized') void this.catalogue().catch(() => undefined)
+    } catch (error) {
       if (message.id !== undefined) {
         const forwarded = this.#forwarded.get(message.id)
         if (forwarded) {
@@ -254,9 +258,10 @@ export class McpReviewProxy {
         }
       }
       if (!gate?.cancelled && message.id !== undefined && message.method)
-        await this.#replyError(message.id, 'The MCP review proxy could not forward this request.').catch(
-          () => undefined,
-        )
+        await this.#replyError(
+          message.id,
+          error instanceof McpSignInRequired ? error.message : 'The MCP relay could not forward this request.',
+        ).catch(() => undefined)
     } finally {
       if (gate && this.#gated.get(message.id!) === gate) this.#gated.delete(message.id!)
     }
@@ -276,7 +281,8 @@ export class McpReviewProxy {
         if (forwarded) {
           clearTimeout(forwarded.timer)
           this.#forwarded.delete(message.id)
-          if (forwarded.method === 'initialize' && 'result' in message) {
+          // Review announces approvals as a list change, so the harness must know to listen for one.
+          if (this.#review && forwarded.method === 'initialize' && 'result' in message) {
             const result = message.result as Record<string, unknown>
             const capabilities = result.capabilities as Record<string, unknown> | undefined
             message = {
@@ -292,7 +298,7 @@ export class McpReviewProxy {
           }
         } else return // A timed-out response is no longer attached to a harness request.
       }
-      if (message.method === 'notifications/tools/list_changed') {
+      if (this.#review && message.method === 'notifications/tools/list_changed') {
         this.#quarantined = true
         this.#requiresFreshApproval = true
         this.#lastDigest = null
@@ -410,9 +416,9 @@ export class McpReviewProxy {
               this.#requiresFreshApproval = true
             }
             this.#lastDigest = catalogue.digest
-            this.#ports.observed(catalogue)
+            this.#review?.observed(catalogue)
           }
-          const approved = await this.#ports.approved()
+          const approved = await this.#review?.approved()
           if (generation !== this.#generation || this.#closed)
             throw new Error('The MCP catalogue changed during review.')
           this.#quarantined =

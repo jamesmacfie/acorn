@@ -49,7 +49,6 @@ export {
 // Host services used to exercise plugin routes without constructing a full Node.
 export { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 export { settleBackground } from '@acorn/node-core/server/background.ts'
-export { patchBlobKey } from '@acorn/node-core/server/blobs.ts'
 export { BridgeError, setRouteTestCapability } from '@acorn/node-core/server/bridge.ts'
 export { createTaskService, createProjectService } from '@acorn/node-core/server/core'
 export { createCoreServices } from '@acorn/node-core/server/core/index.ts'

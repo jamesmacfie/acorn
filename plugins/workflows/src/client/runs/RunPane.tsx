@@ -18,7 +18,7 @@ import {
 import { RunGraph } from './RunGraph'
 import { formatUsage, kindLabel, runGlyph, runTone, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import { isLiveRun, type RunPaneModel } from './runPaneModel'
-import type { WorkflowRunProjection } from '../../shared/api'
+import type { WorkflowRunProjection } from '../../contract/wire.ts'
 
 // The run pane's list column: this task's runs, then the selected run's steps in the same reading
 // order and the same indentation the editor draws (docs/workflows/routes-and-ui.md § Routes and UI).

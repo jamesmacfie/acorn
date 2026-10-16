@@ -38,6 +38,13 @@ export const githubPlugin = (): NodePlugin => {
     // This module's own URL, so the host can walk from here for the migration chain
     // (docs/plugins/data-ownership.md § Data ownership).
     migrationsModule: import.meta.url,
+    // Projects whose remote is on github.com are GitHub's (docs/plugins/code-hosts.md). GitHub serves
+    // every pull request's head at `pull/<n>/head`, a fork's included, and the PR pane shows one.
+    codeHost: {
+      label: 'GitHub',
+      hosts: ['github.com'],
+      changeRequest: { ref: 'pull/{number}/head', label: 'pull request', prefix: '#', pane: 'pr' },
+    },
     // The pull request button on github.com
     // (docs/github-integration/tasks-and-references.md § Browser handoff). Its route below loads on
     // the first handoff.
@@ -56,6 +63,9 @@ export const githubPlugin = (): NodePlugin => {
         resolve: '/v1/p/github/browser/pull-request',
       },
     ],
+    // The task's pull request in the extension's sidebar (docs/plugin-authoring/browser-panel.md). `pane`
+    // is the PR pane's ID in the client half, which the host can't see from here.
+    browserPanel: { label: 'Pull request', glyph: 'git-pull-request', pane: 'pr', route: '/v1/p/github/browser-panel' },
     init: async (ctx) => {
       // Opens and migrates before init returns; every router below closes over this handle rather
       // than reading one off the request environment (docs/data-layer/plugin-databases.md § Plugin databases).
@@ -129,6 +139,13 @@ export const githubPlugin = (): NodePlugin => {
           })
         }),
         { prefix: '/browser' },
+      )
+
+      ctx.routes.register(
+        lazyRouter(async () =>
+          (await import('../server/browserPanel')).browserPanel(store, ctx.core, emit, () => ctx.events.status()),
+        ),
+        { prefix: '/browser-panel', note: "GET ?taskId= — the task's pull request in the extension's sidebar" },
       )
 
       for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status(), emit))

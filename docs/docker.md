@@ -12,6 +12,26 @@ and doesn't store the inventory as application data. The plugin is in `plugins/d
 - Logs, stats, inspect, and exec.
 - Start/stop/restart/pause/unpause/remove, Compose lifecycle, and prune.
 - Task badges, summaries, and archive-time teardown prompts.
+- A read-only panel in the browser extension's sidebar. See [Browser panel](#browser-panel).
+
+## Browser panel
+
+The plugin declares a [browser panel](./plugin-authoring/browser-panel.md) as `NodePlugin.browserPanel`.
+`GET /v1/p/docker/browser-panel?taskId=<id>[&source=<id>]` is device-only, because container logs can
+hold credentials. It lists the task's containers the way the task pane's own read does, from
+[matching](#matching) on the working directory only, and answers 404 when there are none. If the daemon
+can't be reached, it answers that error instead of a view.
+
+The view has a status block with each failing or starting container named, a row per container, a
+`http://localhost:<port>` link per published TCP port, and the last 200 log lines of one container.
+The log source ID is the lowercased container name, so a recreated Compose container keeps the
+sidebar's choice. Without a choice, the panel shows the first failing container, then the first
+running one. Health comes from the status text, such as "Up 3 hours (unhealthy)", because the events
+watcher drops health events. The code is `plugins/docker/src/server/browserPanel.ts`.
+
+When a container event passes the watcher's debounce, the plugin calls `ctx.events.status()`, so an
+open panel reads again. New log lines don't trigger a read. The port links assume the browser runs on
+the Node's own computer.
 
 ## Client
 
@@ -30,6 +50,12 @@ loading stats are centered. Logs is a `Log` with a `FindBar`, Stats
 is a run of `Meter`s, and Terminal is a `Rectangle kind="pty"` wrapping the exec surface. A rectangle
 is the kit's admission that a PTY owns its own pixels: the node owns the box and the way in and out of
 it with the keyboard, and xterm owns everything inside.
+
+A published port on Info copies its address. Docker publishes on the Node's machine, so for a remote
+Node the address takes its host from the Node's endpoint (`plugins/docker/src/client/nodeAddress.ts`).
+A port bound to that machine's loopback, such as `127.0.0.1:3000`, copies a `localhost` address with a
+note that it opens only on the Node or through an SSH tunnel. Without a task in scope, **Copy shell
+command** copies a `docker exec` line, and for a remote Node the notice names the Node to run it on.
 
 Another plugin can send someone to one container. Its surface declares a `destinations` entry with
 `targetKind: "docker-container"` and calls `bridge.ui.openDestination` with the container's short id.

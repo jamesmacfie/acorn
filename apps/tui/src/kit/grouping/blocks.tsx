@@ -8,6 +8,7 @@ import { slotColor } from '../../appearance'
 import { Line, Rule, slot } from '../cells'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from '../roles'
 import { stop } from '../../keys/stops'
+import { Spinner } from '../showing/marks'
 
 export function Pane(props: PaneProps<JSX.Element>) {
   return (
@@ -245,6 +246,9 @@ export function FilterBar(props: FilterBarProps) {
       columnGap={spaceCells('inline')}
     >
       {props.children}
+      <Show when={props.busy}>
+        <Spinner />
+      </Show>
     </box>
   )
 }

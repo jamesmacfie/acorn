@@ -148,3 +148,70 @@ export type WorkflowStepRow = {
   // Which dispatch step spawned this one, when one did. The run pane draws a child under its parent.
   parentStepId?: string | null
 }
+
+export type WorkflowBudget = {
+  maxWallTimeMs?: number
+  maxCostUsd?: number
+  maxInputTokens?: number
+  maxOutputTokens?: number
+  maxTurns?: number
+}
+
+export type WorkflowUsageSummary = {
+  costUsd: number
+  inputTokens: number
+  outputTokens: number
+  turns: number
+}
+
+/** One admitted child workflow, projected from the dispatch ledger and child run row. */
+export type WorkflowChildRunSummary = {
+  taskMode?: 'child' | 'parent'
+  agentSessionId?: string | null
+  result?: DataValue | null
+  /** An agent item's completion condition, as its last check left it. */
+  goal?: { status: string; continuations: number; reason: string | null }
+  outputs?: Record<string, DataValue>
+  parentTaskId: string
+  parentRunId: string
+  parentStepId: string
+  itemKey: string | null
+  taskId: string
+  runId: string
+  name: string | null
+  dispatchState: 'reserved' | 'task-created' | 'run-started' | 'cancelling' | 'terminal'
+  runStatus:
+    | 'running'
+    | 'gated'
+    | 'cancelling'
+    | 'done'
+    | 'completed-with-failures'
+    | 'failed'
+    | 'safety-rail'
+    | 'cancelled'
+    | null
+  resultSummary: string | null
+  error: string | null
+  usage: WorkflowUsageSummary | null
+  updatedAt: number
+}
+
+// What the run and step routes answer, with the run's place in its tree. The CLI reads these too.
+export type WorkflowRunProjection = WorkflowRunRow & {
+  rootRunId: string | null
+  parentRunId: string | null
+  parentStepId: string | null
+  rootTaskId: string
+  rootRunName: string
+  parentTaskId: string | null
+  parentRunName: string | null
+  depth: number
+  /** Root runs report the complete tree. Child runs report only their own admitted turns. */
+  usage: WorkflowUsageSummary | null
+  /** The agent session that started this run with `workflow_run`, and the limits it ran under. */
+  launchedBy?: { sessionId: string; title: string; limits: WorkflowBudget }
+}
+
+export type WorkflowStepProjection = WorkflowStepRow & {
+  children: WorkflowChildRunSummary[]
+}

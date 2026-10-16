@@ -9,6 +9,9 @@ export type TerminalSessions = {
   // Every session the engine currently knows about, running or exited. The handoff's return path reads
   // `status` and `agentSessionId` off these to refuse re-taking control while the shell is still live.
   list(): Promise<TerminalSession[]>
+  // Calls back once when a running session stops: its command exited, or the terminal was removed.
+  // The handoff closes what it started for the terminal here. Answers the unsubscribe.
+  onStopped(listener: (sessionId: string) => void): () => void
 }
 
 export const TERMINAL_SESSIONS = capabilityId<TerminalSessions>('terminal.sessions')

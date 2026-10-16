@@ -1,10 +1,13 @@
-import { setManagedAgentReferenceHandler } from '@acorn/plugin-api/client'
+import type { ReferenceTargetContribution } from '@acorn/plugin-api/client'
 import { appendManagedDraft } from './sessions/managedDrafts'
 import { managedAgentStore } from './sessions/managedStore'
 import { openManagedSession } from './sessions/managedSelection'
 
-export function activateManagedAgentReferences(): () => void {
-  setManagedAgentReferenceHandler(async (taskId, reference) => {
+// Ahead of core's terminal-session fallback, so a task with a managed session gets the draft there.
+export const managedReferenceTarget: ReferenceTargetContribution = {
+  id: 'agents.managed-session',
+  priority: 100,
+  deliver: async (taskId, reference) => {
     const deactivate = managedAgentStore.activate()
     try {
       const sessions = await managedAgentStore.loadTask(taskId)
@@ -18,6 +21,5 @@ export function activateManagedAgentReferences(): () => void {
     } finally {
       deactivate()
     }
-  })
-  return () => setManagedAgentReferenceHandler(null)
+  },
 }

@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/plugin-api/client'
-import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
+import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../contract/wire.ts'
 import { ChildRuns, RunLineage } from './RunRelationships'
 
 const tasks = [

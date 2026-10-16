@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
+import { buildVersion } from '../../scripts/buildVersion.mts'
 import { describeChunks } from '../../scripts/chunkGraph.mts'
 import { isRuntimeResolved } from './externals'
 import { thirdPartyNotices } from './thirdPartyNotices'
@@ -54,6 +55,7 @@ export default defineConfig({
     'process.env': 'process.env',
     'global.process.env': 'global.process.env',
     'globalThis.process.env': 'globalThis.process.env',
+    __ACORN_BUILD__: JSON.stringify(buildVersion()),
   },
   build: {
     // Both deployments run a current Node: the desktop stages a pinned runtime

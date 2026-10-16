@@ -38,6 +38,7 @@ import { AGENT_EVENT_SCHEMA_VERSION, agentEventSearchText } from '../../contract
 import type { AgentLifecyclePublisher, AgentSessionChange, SessionRenameSource } from '../../contract/lifecycle'
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../../shared/schemas'
 import type { CheckResults } from '../../shared/delegationSchemas'
+import type { CommandScope } from './commandLifecycle'
 import { sessionCursor, type SessionListFilter } from '../../shared/sessionList'
 import type { RemovedArtifactObject } from './artifactStore'
 import {
@@ -1314,9 +1315,22 @@ export class AgentStore {
     })
   }
 
-  async unfinishedCommands(sessionId?: string): Promise<AgentEventRecord[]> {
+  async unfinishedCommands(scope: CommandScope = {}): Promise<AgentEventRecord[]> {
     const { unfinishedCommands } = await import('./commandLifecycle')
-    return this.db.transaction((tx) => unfinishedCommands(tx, sessionId))
+    return this.db.transaction((tx) => unfinishedCommands(tx, scope))
+  }
+
+  /** When the last start's command settle began, or undefined before the first one finished. */
+  commandsSettledBefore(): number | undefined {
+    return this.db.get<{ settledBefore: number }>(sql`SELECT settled_before AS settledBefore FROM agent_command_settle`)
+      ?.settledBefore
+  }
+
+  markCommandsSettled(settledBefore: number): void {
+    this.db.transaction((tx) => {
+      tx.run(sql`DELETE FROM agent_command_settle`)
+      tx.run(sql`INSERT INTO agent_command_settle VALUES (${settledBefore})`)
+    })
   }
 
   /** Recompute a session's queued-turn count and store it on the row. Called after every change that

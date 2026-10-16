@@ -9,7 +9,7 @@ import {
   integrationsOptions,
   nodeReady,
   patchProject,
-  pickFolder,
+  pickNodeFolder,
   projectPath,
   projectsOptions,
   savePref,
@@ -217,7 +217,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
 
   async function openFolder() {
     if (!canAddProjectFromFolder()) return
-    const path = await pickFolder()
+    const path = await pickNodeFolder(nodeId)
     if (!path || !stillHere()) return
     setBusy(true)
     setError('')

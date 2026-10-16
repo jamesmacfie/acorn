@@ -1,5 +1,66 @@
 # Phase 7: move single-consumer facade exports to their owners
 
+## Completion note
+
+Landed October 15, 2026.
+
+What changed:
+
+- `node tools/arch/facadeConsumers.ts` counts who imports each facade name, tests included. The
+  per-export table, with each one's group and reason, is in
+  [the audit table](./07-plugin-api-audit-table.md). It started at 11 names with no importer and 398
+  with one, out of 772.
+- `tools/arch/facadeConsumers.test.ts` fails when a facade name has no importer outside the facade.
+  Adding an unimported name to the surface snapshot makes it fail.
+- `ctx.referenceTargets` on the compiled client context replaces `setManagedAgentReferenceHandler`.
+  `sendReferenceToAgent` asks targets from the highest `priority` down, and the first answer wins.
+  Core registers the task's latest running agent session at priority 0. Agents registers its managed
+  sessions at 100, in `init`. `docs/contribution-kinds.md` has the row.
+- Agents provides `agents.defaultProfile` (`plugins/agents/src/contract/defaultProfile.ts`).
+  `DEFAULT_PROFILE_ID` is gone from node-core and the facade. Workflows reads the capability through
+  `RunnerDeps.defaultProfileId`, and passes it on in both validation catalogs and in
+  `WorkflowCatalog.defaultProfileId`.
+- Moved into their plugin: GitHub's check-status helpers (`client/checks/checkStatus.ts`), GitHub's
+  blob cache keys (`server/blobKeys.ts`), and the codex stdout adapter
+  (`plugins/agents/src/server/profiles/codexStream.ts`).
+- `WorkflowNotice` is exported as `NoticeFrame`, its protocol name. `ui/tree: createArmedConfirm`,
+  which nothing imported, is gone.
+- `docs/plugins/plugin-api.md` § Change the facade states the rule and the check.
+
+Decisions and deviations:
+
+- The check exempts closed-kit nodes on `ui` and `ui/tree`. Ten have no importer: `Pane`, `Grid`,
+  `PickerRow`, `KeyValueEditor`, `Fallback`, four diff rows, and `Rectangle`. Deleting them would break
+  the kit's support matrix and its two-host parity, and the kit offers every node to every plugin.
+  The support matrix test already holds that list.
+- A workflow step that names no profile, on a Node where nothing publishes a default, passes
+  validation and fails when it runs, with "This step names no agent profile, and no plugin supplies a
+  default." Agents is a required plugin, so a real Node always has the default. Strict validation would
+  have meant a default in every test catalog.
+- Kept, with the reason in the table: terminal drawer state (`isTerminalMax`,
+  `consumeTerminalFocusIntent`), because both shells read it, and phase 8 owns the shells' terminal
+  wiring. Also `wsOnWorkflowStepChanged`, because moving it means the Node sends the frame on a plugin
+  channel, which is a wire change. Also `previewUrlForClient` and `remotePreviewBlocked`, which phase 9
+  decides.
+- `agents.defaultProfile` isn't in the published capability catalogue. The published packages are out
+  of scope, and the catalogue already leaves out other agents capabilities.
+
+Checked on the final tree: knip, `tsc` in every package, and the tests for plugin-api, agents, GitHub
+(312 passed), terminal, workflows (650 passed), client-core, node-core (1,805 passed), the Node app,
+and the arch tests. These reds also fail on base `95b292259`: agents `toolFoldPrefs`, terminal
+`TerminalPanel` (two), client-core `cssHygiene` border-radius, the plugin-disable pair (git routes
+only), and six arch tests (client console baseline, two doc citation checks, doc paths, two test
+focus checks). oxlint stops on an unused import in `apps/extension/src/sidebar/Handoff.test.tsx`, and
+the format check flags six files this phase doesn't touch.
+
+For later phases:
+
+- Run `node tools/arch/facadeConsumers.ts` before adding or pruning a facade name. 385 names have one
+  importer, and the table says why each stays.
+- Phase 8: the task drawer exports and `requestTerminalFocusIntent` are the shells' terminal wiring.
+- Workflow socket frames (`wsOnWorkflowStepChanged`, `wsOnWorkflowStepEvent`) still live in core's
+  socket client.
+
 Date: October 14, 2026. Status: proposed.
 
 ## Goal

@@ -169,19 +169,16 @@ and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#w
   Start task's menu, with Create task and Start workflow…, was checked in unit tests only.
   Firefox's chip and menu were checked in unit tests only. A chip's working and waiting counts were
   checked in unit tests only, because the session's Node ran no agent.
-
 - A page matches a task's address exactly, path case included. GitHub serves `Acme/Runn` and
   `acme/runn` as one repository, so a pull request opened under another spelling of the project's
   repository doesn't match. Linear's link records the issue's slug address, so the short address
   `linear.app/<workspace>/issue/<key>` doesn't match until Linear redirects to the slug.
-
 - A resolve against GitHub's API wasn't checked in a browser: the session's Node had no GitHub
   connection, and connecting one needs a person. The handoff reached GitHub's route and showed its
   "Connect GitHub" answer. A loaded fixture plugin carried the rest of the flow in both browsers.
 - Chrome's site grant wasn't checked, because Chrome's permission prompt can't be answered by a
   driver. Chrome's buttons were checked with the toolbar button's `activeTab`, and grants and removal
   in Firefox.
-
 - A Linear resolution against Linear's API wasn't checked in a browser. The session's Node had only a
   fake Linear key, which Linear rejects, so the handoff showed Linear's "reconnect" answer. Unit tests
   and the Node's parity tests cover a resolution, two workspaces with the same key, and the projects.

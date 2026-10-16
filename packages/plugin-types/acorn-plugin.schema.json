@@ -4561,6 +4561,63 @@
             "label",
             "route"
           ]
+        },
+        "codeHost": {
+          "description": "The Git hosts whose repositories your plugin names, and how acorn treats their change requests.",
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "The host's name as a person reads it, such as `GitLab`."
+            },
+            "hosts": {
+              "minItems": 1,
+              "maxItems": 16,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 253,
+                "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$"
+              },
+              "description": "Bare lowercase host names, such as `gitlab.com`, with no scheme or port."
+            },
+            "changeRequest": {
+              "description": "How acorn treats this host's pull or merge requests. Every field is optional.",
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "description": "The ref acorn fetches to check one out, holding `{number}` once, such as `merge-requests/{number}/head`. Without it, acorn fetches the source branch.",
+                  "type": "string",
+                  "maxLength": 200,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*\\{number\\}[A-Za-z0-9._/-]*$"
+                },
+                "label": {
+                  "description": "What a person calls one in an error, such as `merge request`. Defaults to `change request`.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "prefix": {
+                  "description": "The mark before its number in a task title, such as `!`. Defaults to `#`.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4
+                },
+                "pane": {
+                  "description": "The pane that shows one. A task whose main change request is on this host opens on it.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              }
+            }
+          },
+          "required": [
+            "label",
+            "hosts"
+          ]
         }
       },
       "additionalProperties": {}

@@ -1,2 +1,3 @@
 export { contextSnapshot } from './contextSnapshot.ts'
-export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHandler } from './reference.ts'
+export { formatFileReference, sendReferenceToAgent } from './reference.ts'
+export type { ReferenceTargetContribution } from './reference.ts'

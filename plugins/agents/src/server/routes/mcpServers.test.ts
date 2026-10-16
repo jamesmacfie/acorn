@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv, Env } from '@acorn/plugin-api/testkit'
 import type { AgentMcpServer } from '../../shared/mcpServers'
-import { agentMcpServers, setAgentMcpServersBridge, type AgentMcpServersBridge } from './mcpServers'
+import { agentMcpServers } from './mcpServers'
+import { setAgentMcpServersBridge, type AgentMcpServersBridge } from './mcpServersBridge'
 
 const request = (path: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${path}`, {
@@ -19,7 +20,7 @@ const as = (principal: Record<string, unknown>) => {
   })
   return app.route('/api/agents', agentMcpServers)
 }
-const device = () => as({ kind: 'device', userId: 'james' })
+const device = () => as({ kind: 'device', userId: 'james', deviceId: 'laptop' })
 // An agent session's own ACORN_API_TOKEN.
 const agent = () => as({ kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
 
@@ -36,6 +37,10 @@ const saved: AgentMcpServer = {
   consented: true,
   reviewTools: false,
   approvedCatalogueDigest: null,
+  auth: 'headers',
+  signIn: null,
+  clientId: null,
+  clientSecretStored: false,
 }
 
 describe('Settings → MCP servers routes', () => {
@@ -68,6 +73,22 @@ describe('Settings → MCP servers routes', () => {
     pendingReviews: async () => [],
     approveReview: async () => {
       throw new Error('not called')
+    },
+    startSignIn: async (name, redirectUri, deviceId) => {
+      calls.push(`sign-in:${name}:${redirectUri}:${deviceId}`)
+      return { attemptId: 'attempt', authorizationUrl: 'https://auth.example/authorize' }
+    },
+    finishSignIn: async (name, attemptId, deviceId, input) => {
+      calls.push(`finish:${name}:${attemptId}:${deviceId}:${JSON.stringify(input)}`)
+      return saved
+    },
+    cancelSignIn: async (name, attemptId, deviceId) => {
+      calls.push(`cancel:${name}:${attemptId}:${deviceId}`)
+      return true
+    },
+    signOut: async (name) => {
+      calls.push(`sign-out:${name}`)
+      return saved
     },
   })
 
@@ -121,6 +142,23 @@ describe('Settings → MCP servers routes', () => {
       ).status,
     ).toBe(403)
     expect((await app.fetch(request('/api/agents/mcp-servers/reviews'), {} as Env)).status).toBe(403)
+    expect(
+      (
+        await app.fetch(
+          request('/api/agents/mcp-servers/linear/sign-in', 'POST', { redirectUri: 'http://127.0.0.1:5555/cb' }),
+          {} as Env,
+        )
+      ).status,
+    ).toBe(403)
+    expect(
+      (
+        await app.fetch(
+          request('/api/agents/mcp-servers/linear/sign-in/attempt/finish', 'POST', { code: 'c', state: 's' }),
+          {} as Env,
+        )
+      ).status,
+    ).toBe(403)
+    expect((await app.fetch(request('/api/agents/mcp-servers/linear/sign-out', 'POST'), {} as Env)).status).toBe(403)
     expect(
       (
         await app.fetch(
@@ -212,5 +250,49 @@ describe('Settings → MCP servers routes', () => {
     ).toBe(200)
     expect((await app.fetch(request('/api/agents/mcp-servers/gone', 'DELETE'), {} as Env)).status).toBe(404)
     expect(calls).toEqual(['save:linear', 'remove:gone'])
+  })
+
+  // The browser's return trip carries a one-time code, so it may only land on this machine.
+  it('accepts only a loopback http return address for a sign-in', async () => {
+    const calls: string[] = []
+    setAgentMcpServersBridge(bridge(calls))
+    const app = device()
+    const start = (redirectUri: string) =>
+      app.fetch(request('/api/agents/mcp-servers/linear/sign-in', 'POST', { redirectUri }), {} as Env)
+    for (const refused of [
+      'https://127.0.0.1:5555/cb',
+      'http://example.com/cb',
+      'http://192.168.1.2:5555/cb',
+      'http://user:pass@127.0.0.1:5555/cb',
+      'not a url',
+    ])
+      expect((await start(refused)).status, refused).toBe(400)
+    for (const accepted of ['http://127.0.0.1:5555/cb', 'http://[::1]:5555/cb', 'http://localhost/acorn-oauth'])
+      expect((await start(accepted)).status, accepted).toBe(200)
+    expect(calls).toEqual([
+      'sign-in:linear:http://127.0.0.1:5555/cb:laptop',
+      'sign-in:linear:http://[::1]:5555/cb:laptop',
+      'sign-in:linear:http://localhost/acorn-oauth:laptop',
+    ])
+  })
+
+  it('passes the calling device to finish and cancel, and takes a pasted address', async () => {
+    const calls: string[] = []
+    setAgentMcpServersBridge(bridge(calls))
+    const app = device()
+    const finish = (body: unknown) =>
+      app.fetch(request('/api/agents/mcp-servers/linear/sign-in/attempt/finish', 'POST', body), {} as Env)
+    expect((await finish({ code: 'c', state: 's' })).status).toBe(200)
+    expect((await finish({ address: 'http://127.0.0.1/acorn-oauth?code=c&state=s' })).status).toBe(200)
+    expect((await finish({ code: 'c' })).status).toBe(400)
+    expect((await finish({ code: 'c', state: 's', address: 'x' })).status).toBe(400)
+    expect(
+      (await app.fetch(request('/api/agents/mcp-servers/linear/sign-in/attempt', 'DELETE'), {} as Env)).status,
+    ).toBe(200)
+    expect(calls).toEqual([
+      'finish:linear:attempt:laptop:{"code":"c","state":"s"}',
+      'finish:linear:attempt:laptop:{"address":"http://127.0.0.1/acorn-oauth?code=c&state=s"}',
+      'cancel:linear:attempt:laptop',
+    ])
   })
 })

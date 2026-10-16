@@ -26,6 +26,9 @@ const agents: CustomAgent[] = [
   },
 ]
 
+// The codex harness's accounts, which decide whether the editor offers an account at all.
+let codexAccounts: Array<{ name: string; authenticated: boolean }> = []
+
 const confirmAction = vi.fn(async (_question: { title: string }) => false)
 vi.mock('@acorn/plugin-api/ui/host', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@acorn/plugin-api/ui/host')>()),
@@ -51,6 +54,7 @@ vi.mock('../sessions/managedClient', () => ({
         label: 'Codex',
         installed: true,
         diagnostics: [],
+        accounts: codexAccounts,
         configOptions: [
           {
             id: 'reasoning',
@@ -91,8 +95,11 @@ afterEach(() => {
   deleteCustomAgent.mockClear()
   confirmAction.mockReset()
   confirmAction.mockResolvedValue(false)
+  codexAccounts = []
+  agents[0]!.account = undefined
 })
 
+const accountPicker = () => document.querySelector<HTMLButtonElement>('button[aria-label="Account"]')
 const nameField = () => document.querySelector<HTMLInputElement>('[data-settings-section="agent"] input')
 
 describe('the custom agents settings page', () => {
@@ -179,5 +186,51 @@ describe('the custom agents settings page', () => {
     expect(deleteCustomAgent).toHaveBeenCalledWith(expect.anything(), 'a1')
     // Back on the list.
     expect(host.querySelector('[data-settings-section="agents"]')).not.toBeNull()
+  })
+
+  it('offers an account only once the harness has more than one', async () => {
+    codexAccounts = [{ name: 'personal', authenticated: true }]
+    const host = draw()
+    await settle()
+    buttons(host, 'New agent')[0]!.click()
+    await settle()
+    // One account is already the default, so there is nothing to choose.
+    expect(accountPicker()).toBeNull()
+    buttons(host, '‹ Custom agents')[0]!.click()
+    await settle()
+
+    codexAccounts = [...codexAccounts, { name: 'work', authenticated: true }]
+    const second = draw()
+    await settle()
+    buttons(second, 'Edit')[0]!.click()
+    await settle()
+    accountPicker()!.click()
+    await settle()
+    document.querySelector<HTMLButtonElement>('[role="option"][data-value="work"]')!.click()
+    await settle()
+    buttons(second, 'Save')[0]!.click()
+    await settle()
+    expect(saveCustomAgent).toHaveBeenLastCalledWith(
+      expect.anything(),
+      'a1',
+      expect.objectContaining({ account: 'work' }),
+    )
+  })
+
+  it('keeps a saved account clearable after its harness drops to one account', async () => {
+    codexAccounts = [{ name: 'personal', authenticated: true }]
+    agents[0]!.account = 'work'
+    const host = draw()
+    await settle()
+    buttons(host, 'Edit')[0]!.click()
+    await settle()
+    accountPicker()!.click()
+    await settle()
+    expect(document.querySelector('[role="option"][data-value="work"]')?.textContent).toContain('work (removed)')
+    document.querySelector<HTMLButtonElement>('[role="option"][data-value=""]')!.click()
+    await settle()
+    buttons(host, 'Save')[0]!.click()
+    await settle()
+    expect(saveCustomAgent.mock.lastCall?.[2]).not.toHaveProperty('account', 'work')
   })
 })

@@ -58,7 +58,7 @@ export function startPullDiscovery(ctx: DiscoveryContext): { dispose(): Promise<
         current.pullNumber != null
       )
         return
-      await ctx.core.tasks.adoptPullNumbers(owner, repo, new Map([[branch, pull.number]]))
+      await ctx.core.tasks.adoptChangeRequests('github', repository, new Map([[branch, pull.number]]))
     })
   }
 

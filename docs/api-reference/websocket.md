@@ -24,7 +24,7 @@ asynchronous failure inside its connection.
 A single-viewer upgrade keeps raw JSON channel frames and the terminal binary layout: 36 ASCII session UUID
 bytes, then the payload. `NodeBroker` uses this transport by default, the terminal client included.
 The desktop helper opts in to viewers when the Node advertises viewer version 1
-([versioning](./transport.md#versioning)).
+([versioning](./versioning.md)).
 
 On an opted-in socket the transport adds these frames:
 

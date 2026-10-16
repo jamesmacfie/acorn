@@ -3,6 +3,7 @@ import { foreignRailSources, RAIL_SOURCE_VISIBILITY_MAX } from '@acorn/protocol/
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../../../infra/persistence/persistedState'
 import { agentContextRegistry } from '../sources/agentContexts'
+import { referenceTargetRegistry, type ReferenceTargetContribution } from '../../../features/agent/reference'
 import { attentionRegistry, type AttentionSourceContribution } from '../rail/attention'
 import { nodeStatRegistry, type NodeStatContribution } from '../rail/nodeStats'
 import { paneRegistry, type PaneRegistration } from '../panes/panes'
@@ -136,6 +137,8 @@ type CompiledClientPluginContext = ClientPluginContext & {
   // Live, node-scoped summaries for host navigation and send pickers. The compiled owner keeps its
   // complete records and the registration is disposed with its other contributions.
   sessionSources: { register(source: SessionSource): void }
+  // Where "Add to agent" drops a file reference, tried by priority (features/agent/reference.ts).
+  referenceTargets: ClientContributionPoint<ReferenceTargetContribution>
   // The same word the node uses for the same idea, and deliberately not the same shape
   // (shell/schedules.ts).
   schedules: ClientContributionPoint<ClientScheduleContribution>
@@ -305,6 +308,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   return {
     name,
     sessionSources: { register: (source) => record(registerSessionSource(name, source)) },
+    referenceTargets: own(referenceTargetRegistry),
     panes: own<PaneRegistration>(paneRegistry),
     // The registry is heterogeneous by construction, so widening the item type here is the erasure
     // rather than a hole. Nothing downstream reads a promotion without selecting the source by id.

@@ -50,8 +50,7 @@ export function Promotion(props: { request: PromotionRequest }) {
       .flatMap((task) => (task.branch ? [task.branch] : []))
   const context = (candidate?: string) => ({
     projectId: props.request.projectId ?? '',
-    owner: project()?.github?.owner ?? '',
-    repo: project()?.github?.name ?? '',
+    repository: project()?.repository,
     branch: candidate,
     existingBranches: existingBranches(),
   })

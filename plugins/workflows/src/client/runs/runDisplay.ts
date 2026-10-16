@@ -1,8 +1,7 @@
 // How a run and its steps read in the run pane. The status glyphs, tones, words, and elapsed times
 // are in plugins/workflows/src/contract/statusDisplay.ts, which the browser extension draws from too.
 // This adds what only the desktop shows: step kinds, progress lines, and usage.
-import type { WorkflowStepRow } from '../../contract/wire.ts'
-import type { WorkflowUsageSummary } from '../../shared/api'
+import type { WorkflowStepRow, WorkflowUsageSummary } from '../../contract/wire.ts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { readPolicyWait } from '../../shared/policyWait'
 

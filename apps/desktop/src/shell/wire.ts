@@ -37,6 +37,9 @@ export type HelperMethod =
   | 'config-read'
   | 'config-write'
   | 'config-location'
+  | 'oauth-listen'
+  | 'oauth-result'
+  | 'oauth-close'
 
 export type HelperRequest = { id: number; method: HelperMethod; params: unknown }
 export type HelperReplyTiming = {

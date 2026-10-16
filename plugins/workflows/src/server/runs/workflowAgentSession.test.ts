@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { makeTestPluginDb } from '@acorn/plugin-api/testkit'
-import { agentProfileRegistry, DEFAULT_PROFILE_ID, type ExtensionPointId } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, type ExtensionPointId } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runner'
 import { inlinePrompt } from './deps'
 import type { WorkflowDef } from '../../shared/workflowContracts'
+
+// What the agents plugin publishes as its default profile, which these tests stand in for.
+const DEFAULT_PROFILE_ID = 'claude-code'
 
 // When a step's row learns which managed session it is running in. The session id rides along on the
 // forwarded events and the row takes the first one it sees, so `runForSession` answers while the step
@@ -51,6 +54,7 @@ describe('custom workflow timeouts', () => {
           runStep,
           writeHandoff: async () => {},
           assembleContext: async () => '',
+          defaultProfileId: () => DEFAULT_PROFILE_ID,
           notify: () => {},
         },
         noExtensions,
@@ -102,6 +106,7 @@ describe('which harness a step runs on', () => {
           },
           writeHandoff: async () => {},
           assembleContext: async () => '',
+          defaultProfileId: () => DEFAULT_PROFILE_ID,
           notify: () => {},
         },
         noExtensions,
@@ -118,6 +123,28 @@ describe('which harness a step runs on', () => {
       await vi.waitFor(() => expect(asked).toEqual([DEFAULT_PROFILE_ID]))
     } finally {
       profile()
+      testDb.cleanup()
+    }
+  })
+
+  it('fails a step that names no harness when no plugin publishes a default', async () => {
+    const testDb = makeTestPluginDb('workflows')
+    const runStep = vi.fn<RunnerDeps['runStep']>().mockResolvedValue(ok)
+    try {
+      const runner = new WorkflowRunner(
+        testDb.db,
+        { runStep, writeHandoff: async () => {}, assembleContext: async () => '', notify: () => {} },
+        noExtensions,
+      )
+      const runId = await runner.start(
+        'task-1',
+        v2({ baseline: 'acorn-1' as const, name: 'W', steps: [{ name: 'look', kind: 'agent', prompt: 'go' }] }),
+      )
+
+      await vi.waitFor(async () => expect((await runner.run(runId))?.status).toBe('failed'))
+      expect(runStep).not.toHaveBeenCalled()
+      expect((await runner.steps(runId))[0]?.error).toContain('names no agent profile')
+    } finally {
       testDb.cleanup()
     }
   })
@@ -144,6 +171,7 @@ describe('workflow attendance ownership', () => {
           runStep,
           writeHandoff: async () => {},
           assembleContext: async () => '',
+          defaultProfileId: () => DEFAULT_PROFILE_ID,
           notify: () => {},
         },
         noExtensions,
@@ -194,6 +222,7 @@ describe('a step running in a managed session', () => {
       },
       writeHandoff: async () => {},
       assembleContext: async () => '',
+      defaultProfileId: () => DEFAULT_PROFILE_ID,
       notify: () => {},
     }
 
@@ -256,6 +285,7 @@ describe('what a step that runs an agent is given', () => {
           },
           writeHandoff: async () => {},
           assembleContext: async () => '',
+          defaultProfileId: () => DEFAULT_PROFILE_ID,
           notify: () => {},
         },
         noExtensions,

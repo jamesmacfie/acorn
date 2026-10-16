@@ -1,6 +1,6 @@
 # Keep the Node, client, and plugin splits honest
 
-Date: October 14, 2026. Status: proposed. Implementation not started.
+Date: October 14, 2026. Status: phases 1 to 9 implemented October 15, 2026. Phase 10, the remote preview proxy, is proposed.
 
 This programme fixes the places where acorn's two founding splits have drifted. The first split is
 the Node and the client: the Node owns data and execution, and a client on another machine presents
@@ -50,6 +50,7 @@ can build the same experience on the same seams, with no core edit.
 | [7](./07-plugin-api-audit.md) | Single-consumer and unused facade exports move to their owners or go. |
 | [8](./08-app-plugin-imports.md) | The CLI and shells import plugin contracts through a listed, tested set. |
 | [9](./09-remote-preview.md) | A spike decides how a remote Node's preview reaches the desktop safely. |
+| [10](./10-remote-preview-proxy.md) | The Node proxies a remote preview to a confined loopback origin on the desktop. |
 
 ## Order and dependencies
 
@@ -63,8 +64,8 @@ Phase 5 must land before phase 6. Both change stored data and the published plug
 them together even if they ship apart. Each keeps the GitHub-named fields readable until the next
 plugin API major, as [forward compatibility](../../plugins/forward-compatibility.md) describes.
 
-Phases 7 and 8 are cleanup with no data changes. Take them whenever there is room. Phase 9 is a
-design spike, and its outcome decides whether a build phase follows.
+Phases 7 and 8 are cleanup with no data changes. Take them whenever there is room. Phase 9 was a
+design spike. It decided to build, and phase 10 is that build.
 
 ## What this programme leaves to others
 

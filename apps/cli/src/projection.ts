@@ -1,3 +1,4 @@
+import type { AgentEventRecord, AgentSession, AgentTurn } from '@acorn/plugin-agents/contract/wire.ts'
 import type { ArchivedTask, NodePluginState, Project, Task, Workspace } from '@acorn/protocol/api.ts'
 
 const apiVersion = 'acorn.cli/v1' as const
@@ -69,22 +70,7 @@ export const pluginResources = (nodeId: string, state: NodePluginState) =>
     installedVersion: row.installed?.version ?? null,
   }))
 
-export type AgentSessionRow = {
-  id: string
-  taskId: string
-  providerId: string
-  profileId: string
-  kind: string
-  title: string
-  runtimeState: string
-  attention: string
-  lastEventSeq: number
-  queuedTurns: number
-  createdAt: number
-  updatedAt: number
-}
-
-export const agentSessionResource = (nodeId: string, row: AgentSessionRow, extra: Record<string, unknown> = {}) => ({
+export const agentSessionResource = (nodeId: string, row: AgentSession, extra: Record<string, unknown> = {}) => ({
   apiVersion,
   kind: 'AgentSession' as const,
   nodeId,
@@ -103,10 +89,7 @@ export const agentSessionResource = (nodeId: string, row: AgentSessionRow, extra
   ...extra,
 })
 
-export const agentTurnAck = (
-  nodeId: string,
-  row: { id: string; sessionId: string; status: string; ordinal: number },
-) => ({
+export const agentTurnAck = (nodeId: string, row: AgentTurn) => ({
   apiVersion,
   kind: 'AgentTurnAck' as const,
   nodeId,
@@ -116,18 +99,7 @@ export const agentTurnAck = (
   ordinal: row.ordinal,
 })
 
-export const agentEventResource = (
-  nodeId: string,
-  row: {
-    id: string
-    sessionId: string
-    turnId: string | null
-    seq: number
-    event: unknown
-    createdAt: number
-    foldedThroughSeq?: number
-  },
-) => ({
+export const agentEventResource = (nodeId: string, row: AgentEventRecord) => ({
   apiVersion,
   kind: 'AgentEvent' as const,
   nodeId,

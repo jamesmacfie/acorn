@@ -154,7 +154,7 @@ describe('TaskPaneHost', () => {
   })
 
   it('falls back to the first pane the task does offer when its layout names one it cannot show', () => {
-    // DEFAULT_PANE is the PR pane, and a task on a project with no GitHub remote has no PR.
+    // A layout saved while the PR pane's plugin ran, on a task this one can't show it for.
     pane({ id: 'pr', order: 0, when: (subject) => subject.github !== null })
     pane({ id: 'changes', order: 1 })
     layout.panes = ['pr']
@@ -163,6 +163,21 @@ describe('TaskPaneHost', () => {
 
     expect(drawn()).toEqual(['changes'])
     expect(host.textContent).not.toContain('No pane to show')
+  })
+
+  // The code host's declared pane, wherever it sits in the switcher.
+  it("opens an empty layout on its change request's pane, and otherwise on the first pane", () => {
+    pane({ id: 'changes', order: 0 })
+    pane({ id: 'gitlab-test-mr', order: 5 })
+    layout.panes = []
+
+    mount(task({ changeRequest: { provider: 'gitlab-test', number: 12, pane: 'gitlab-test-mr' } }))
+    expect(drawn()).toEqual(['gitlab-test-mr'])
+    dispose()
+    host.remove()
+
+    mount(task({ changeRequest: null }))
+    expect(drawn()).toEqual(['changes'])
   })
 
   it('marks the fallback pane as shown, and opens a second pane beside it', () => {

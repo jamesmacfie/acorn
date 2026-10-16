@@ -9,12 +9,18 @@ import {
   agentMcpServerConsentRoute,
   agentMcpReviewsRoute,
   agentMcpReviewRoute,
+  agentMcpSignInAttemptRoute,
+  agentMcpSignInFinishRoute,
+  agentMcpSignInRoute,
+  agentMcpSignOutRoute,
   type AgentMcpPendingReview,
   type AgentMcpPackagePlan,
   type AgentMcpPackageTest,
   type AgentMcpProbeResult,
   type AgentMcpServer,
   type AgentMcpServerInput,
+  type AgentMcpSignInFinish,
+  type AgentMcpSignInStarted,
 } from '../../shared/mcpServers'
 
 export const agentMcpServersQueryKey = ['agents', 'mcp-servers'] as const
@@ -107,4 +113,39 @@ export const approveAgentMcpReview = (review: AgentMcpPendingReview) =>
       timeoutMs: 45_000,
     },
     (response) => `MCP catalogue approval ${response.status}`,
+  )
+
+// Sign-in (docs/mcp/sign-in.md). Starting runs discovery and may register a client,
+// and finishing exchanges the code, each a round trip to the server's sign-in host from the node.
+export const startAgentMcpSignIn = (name: string, redirectUri: string) =>
+  writeJson<AgentMcpSignInStarted>(
+    agentMcpSignInRoute(name),
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ redirectUri }),
+      timeoutMs: 45_000,
+    },
+    (response) => `MCP sign-in ${response.status}`,
+  )
+
+export const finishAgentMcpSignIn = (name: string, attemptId: string, input: AgentMcpSignInFinish) =>
+  writeJson<AgentMcpServer>(
+    agentMcpSignInFinishRoute(name, attemptId),
+    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input), timeoutMs: 45_000 },
+    (response) => `MCP sign-in ${response.status}`,
+  )
+
+export const cancelAgentMcpSignIn = (name: string, attemptId: string) =>
+  writeJson<{ ok: true }>(
+    agentMcpSignInAttemptRoute(name, attemptId),
+    { method: 'DELETE' },
+    (response) => `MCP sign-in cancel ${response.status}`,
+  )
+
+export const signOutAgentMcpServer = (name: string) =>
+  writeJson<AgentMcpServer>(
+    agentMcpSignOutRoute(name),
+    { method: 'POST', timeoutMs: 30_000 },
+    (response) => `MCP sign-out ${response.status}`,
   )

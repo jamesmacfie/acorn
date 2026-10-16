@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js'
-import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
+import type { ProjectRepository, Task, TaskSeed } from '@acorn/protocol/api.ts'
 import type { ProviderCapabilityName } from '@acorn/protocol/integrations.ts'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import type { InAppTarget } from '../panes/contentLinks'
@@ -8,8 +8,8 @@ import { projectPath } from '../commands/corePaths'
 
 type SourcePromotionContext = {
   projectId: string
-  owner: string
-  repo: string
+  // The project's repository, when the caller has the project at hand.
+  repository?: ProjectRepository | null
   branch?: string
   existingBranches?: string[]
 }

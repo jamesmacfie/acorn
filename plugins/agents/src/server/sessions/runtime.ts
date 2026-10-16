@@ -42,6 +42,10 @@ import { isActiveSubagent } from './stateMachine'
 // holds the node for milliseconds, and a larger one holds it longer for little gain.
 const HISTORY_BATCH = 200
 
+// How far before its own start a command settle reaches back. Rereading ten minutes of settled events is
+// cheap, and it covers a network time correction that set the clock back between two starts.
+const COMMAND_SETTLE_CLOCK_MARGIN_MS = 10 * 60_000
+
 /**
  * A button answer must be one the stored request offered. The client builds its buttons from that
  * same list, so only a forged or stale answer fails here, and it fails before the claim: the request
@@ -120,6 +124,10 @@ export class ManagedAgentRuntime {
    * listener binds, because it interrupts every unsettled session (AGENTS_RUNTIME).
    */
   async reconcile(): Promise<void> {
+    // The settle below reads only events written since the last start's settle began. Taken before any
+    // read, and the margin covers a clock set back between starts. See `agentCommandSettle`.
+    const settleStartedAt = Date.now() - COMMAND_SETTLE_CLOCK_MARGIN_MS
+    const settleScope = { since: this.store.commandsSettledBefore() ?? 0 }
     for (const session of await this.store.unsettledSessions()) {
       await this.store.interruptActiveTurn(session.id, 'Acorn restarted while the provider turn was active.')
       await this.store.expirePendingRequests(session.id)
@@ -138,10 +146,10 @@ export class ManagedAgentRuntime {
       }
     }
     await this.store.requeueSteeringTurns()
-    await this.engine.settleCommands()
+    await this.engine.settleCommands(settleScope)
     // No harness outlives the Node, so a background command still marked running lost the process that
     // would have reported its exit. Its session can be `ready`, which the rule above leaves running.
-    for (const record of await this.store.unfinishedCommands()) {
+    for (const record of await this.store.unfinishedCommands(settleScope)) {
       if (record.event.type !== 'tool' || !record.event.tool.background) continue
       await this.engine.record(record.sessionId, record.turnId, {
         type: 'tool',
@@ -154,6 +162,8 @@ export class ManagedAgentRuntime {
         },
       })
     }
+    // Only once both passes finish, so a start that dies partway reads the same events again next time.
+    this.store.markCommandsSettled(settleStartedAt)
     await this.store.cancelWorkflowFollowUps()
     await this.attachments.collectGarbage()
     // A start's skill folder goes when its process stops. One left by a Node that died is removed here,
@@ -294,16 +304,20 @@ export class ManagedAgentRuntime {
           created: false,
         }
     }
-    // The caller's choice, or the one a fork's config carries from its source, or else the harness's
-    // default account. The HTTP route drops a client's own `config.account`, so a request names an
-    // account only through `account`. A session resuming a provider reference stays on the login it
-    // came from, because the CLI finds the reference only in that folder.
+    // The caller's choice, or the one a fork's config carries from its source, or the custom agent's,
+    // or else the harness's default account. The HTTP route drops a client's own `config.account`, so a
+    // request names an account only through `account`. A session resuming a provider reference stays on
+    // the login it came from, because the CLI finds the reference only in that folder.
     const account =
       input.account ??
       sessionAccount(input.config) ??
       (input.resumeProviderSessionRef
         ? null
-        : await this.engine.readWhileRunning(() => this.engine.accounts.defaultAccount(input.providerId)))
+        : await this.engine.readWhileRunning(
+            async () =>
+              (await this.customAgentAccount(input.customAgentId)) ??
+              this.engine.accounts.defaultAccount(input.providerId),
+          ))
     const provider = await this.engine.readWhileRunning(() =>
       this.providers.usable((candidate) => candidate.id === input.providerId, account),
     )
@@ -405,6 +419,14 @@ export class ManagedAgentRuntime {
   async customAgents(): Promise<CustomAgent[]> {
     const userId = this.currentUserId()
     return userId ? readCustomAgents(this.core.prefs, userId) : customAgentRegistry.list()
+  }
+
+  /** The account a custom agent names, while this Node still holds it. One the person has since
+   *  removed gives null, so the start falls back to the harness's default account. */
+  async customAgentAccount(customAgentId: string | undefined): Promise<string | null> {
+    if (!customAgentId) return null
+    const agent = (await this.customAgents()).find((candidate) => candidate.id === customAgentId)
+    return agent?.account && (await this.engine.accounts.has(agent.providerId, agent.account)) ? agent.account : null
   }
 
   /**
@@ -826,6 +848,7 @@ export class ManagedAgentRuntime {
       name: server.name,
       transport: server.transport,
       enabled: selected.has(server.name),
+      signIn: server.signIn,
     }))
     const reported = await this.engine.sessionHandleIfPresent(sessionId, async (handle) =>
       handle.mcpStatus ? handle.mcpStatus().catch(() => null) : null,

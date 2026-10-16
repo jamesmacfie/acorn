@@ -230,7 +230,7 @@ export function createTaskDraftStore(
         await queryClient.invalidateQueries({ queryKey: tasksKey })
         if (!alive || activeNodeId() !== draft.nodeId) return
         if (!onCreated) {
-          activateTaskSignals(task, { pane: 'pr' })
+          activateTaskSignals(task)
           navigate(pathForTask(task))
         }
       } else {
@@ -289,7 +289,7 @@ export function createTaskDraftStore(
     openCreatedTask: () => {
       const task = createdTask()
       if (!task || activeNodeId() !== draft.nodeId) return
-      activateTaskSignals(task, { pane: 'pr' })
+      activateTaskSignals(task)
       navigate(pathForTask(task))
       close()
     },

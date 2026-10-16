@@ -11,8 +11,10 @@ export const getProfile = (id: string | undefined): ProfileDef =>
   agentProfileRegistry.get(id ?? 'shell') ?? agentProfileRegistry.require('shell')
 export const requireProfile = (id: string): ProfileDef => agentProfileRegistry.require(id)
 
+// A container or service manager often sets no SHELL, and a Linux image may have no zsh.
+const defaultShell = process.platform === 'darwin' ? '/bin/zsh' : '/bin/sh'
 export const resolveCommand = (p: ProfileDef): string =>
-  p.command === '$SHELL' ? process.env.SHELL || '/bin/zsh' : p.command
+  p.command === '$SHELL' ? process.env.SHELL || defaultShell : p.command
 
 function onPath(command: string): boolean {
   try {

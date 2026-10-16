@@ -1,7 +1,8 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type AgentProfileContribution, codexJsonAdapter, registerAcornMcp } from '@acorn/plugin-api/node'
+import { type AgentProfileContribution, registerAcornMcp } from '@acorn/plugin-api/node'
+import { codexJsonAdapter } from './codexStream'
 import { codexMcpCommands } from './mcpCommands'
 import { codexModels } from './codexModels'
 

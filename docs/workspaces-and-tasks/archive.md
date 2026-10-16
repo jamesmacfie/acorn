@@ -22,6 +22,10 @@ create more subtasks while it runs. A failure leaves the parent active and names
 Subtasks already archived stay archived, and retry skips them. Selected plugin cleanups apply to the
 task whose concerns appeared in the dialog. Restore acts on one task at a time.
 
+A task with active subtasks also has **Archive children** in its rail menu. After one confirmation, it
+archives each direct subtask, with its nested subtasks, one at a time, and leaves the task itself
+active. That dialog asks plugins nothing, as with the subtasks of an archived parent.
+
 Without the terminal capability, the status-only archive also archives every descendant and runs
 each task's archiving hook. It retains their worktrees. Task-scoped callers cannot archive a tree
 containing tasks outside their scope.
@@ -148,7 +152,7 @@ token can archive its own tree but never delete one. The Node runs these steps:
    plugin, the client archives with the status flip first and then deletes.
 2. Claim every task in the tree with the archive gate and check that each is still archived. Another
    archive in progress, or a restore that got there first, answers 409.
-3. In one core transaction, delete the `tasks`, `task_pulls`, `task_links`, and `task_script_attempts`
+3. In one core transaction, delete the `tasks`, `task_change_requests`, `task_pulls`, `task_links`, and `task_script_attempts`
    rows, and the client preferences keyed by those task ids, and insert a row in `deleted_tasks` for
    each.
 4. Broadcast the tasks change, run the `core:task-deleted` hook with the deleted ids, and answer

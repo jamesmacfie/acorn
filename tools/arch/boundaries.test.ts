@@ -284,6 +284,136 @@ describe('architecture boundaries', () => {
     expect([...new Set(appToApp)].sort()).toEqual([])
   })
 
+  it("an app imports a plugin's contract/ only through a listed edge", () => {
+    // Each entry is an app depending on one specific plugin, with the reason. The same list is in
+    // docs/first-party-plugins.md § What the apps import from plugins. Activation entrypoints
+    // (`node/index.ts`, `client/index.ts`) aren't listed, because composition roots exist to import them.
+    const APP_CONTRACT_IMPORTS = new Map([
+      // The CLI's built-in `agent` and `workflow` commands read these plugins' route shapes.
+      [
+        'apps/cli/src/agentCommands.ts -> plugins/agents/src/contract/wire.ts',
+        'agent session, turn, and event responses',
+      ],
+      ['apps/cli/src/projection.ts -> plugins/agents/src/contract/wire.ts', 'projects agent rows into CLI resources'],
+      [
+        'apps/cli/src/workflowCommands.ts -> plugins/workflows/src/contract/wire.ts',
+        'workflow run, step, and definition responses',
+      ],
+      // The browser extension's native bridge relays managed agent sessions.
+      ['apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/wire.ts', 'agent session shapes it relays'],
+      [
+        'apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/appApproval.ts',
+        'app approval wording and targets',
+      ],
+      ['apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/lifecycle.ts', 'agent lifecycle socket frames'],
+      [
+        'apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/sessionModel.ts',
+        'the session model summary line',
+      ],
+      ['apps/cli/src/browser/bridge.ts -> plugins/agents/src/contract/wire.ts', 'agent shapes in bridge messages'],
+      [
+        'apps/cli/src/browser/agents.ts -> plugins/agents/src/contract/newSessionChoices.ts',
+        'the new-session harness and custom agent choices',
+      ],
+      [
+        'apps/cli/src/browser/bridge.ts -> plugins/agents/src/contract/newSessionChoices.ts',
+        'custom agent shapes in bridge messages',
+      ],
+      // It also relays workflow definitions and runs, and the agents a run started.
+      [
+        'apps/cli/src/browser/bridge.ts -> plugins/workflows/src/contract/wire.ts',
+        'workflow shapes in bridge messages',
+      ],
+      ['apps/cli/src/browser/workflows.ts -> plugins/agents/src/contract/wire.ts', "a run's agent sessions"],
+      [
+        'apps/cli/src/browser/workflows.ts -> plugins/workflows/src/contract/wire.ts',
+        'workflow definition, run, and step shapes',
+      ],
+      // The desktop task header opens a terminal profile.
+      [
+        'apps/desktop/src/client/TaskView.tsx -> plugins/terminal/src/contract/sessionsClient.ts',
+        'creates a terminal session',
+      ],
+      // The extension sidebar draws agent sessions.
+      [
+        'apps/extension/src/sidebar/Home.tsx -> plugins/agents/src/contract/runtimeState.ts',
+        'session state icon and tone',
+      ],
+      ['apps/extension/src/sidebar/main.tsx -> plugins/agents/src/contract/providerMarks.ts', 'harness brand marks'],
+      [
+        'apps/extension/src/sidebar/App.tsx -> plugins/agents/src/contract/runtimeState.ts',
+        'marks the Agents tab while agents work',
+      ],
+      [
+        'apps/extension/src/sidebar/Workspace.tsx -> plugins/agents/src/contract/runtimeState.ts',
+        'the Agents tab marker state',
+      ],
+      // The extension sidebar starts and draws workflow runs.
+      [
+        'apps/extension/src/sidebar/Handoff.tsx -> plugins/workflows/src/contract/itemInputs.ts',
+        "prefills a workflow's inputs from the page's item",
+      ],
+      [
+        'apps/extension/src/sidebar/Workflows.tsx -> plugins/workflows/src/contract/statusDisplay.ts',
+        'run and step glyphs, tones, and elapsed times',
+      ],
+      // The Node composition root runs startup work through these capabilities.
+      [
+        'apps/node/src/composition/composition.ts -> plugins/agents/src/contract/runtime.ts',
+        'agents reconcile at boot',
+      ],
+      [
+        'apps/node/src/composition/composition.ts -> plugins/github/src/contract/mirror.ts',
+        'storage footprint at boot',
+      ],
+      [
+        'apps/node/src/composition/composition.ts -> plugins/terminal/src/contract/runtime.ts',
+        'tmux reconcile at boot',
+      ],
+      [
+        'apps/node/src/composition/composition.ts -> plugins/workflows/src/contract/runner.ts',
+        'workflow reconcile at boot',
+      ],
+      // The terminal client draws the terminal drawer itself, and hosts the workflow launch dialog.
+      [
+        'apps/tui/src/chrome/Sessions.tsx -> plugins/terminal/src/contract/hostClient.ts',
+        'terminal sessions and their PTYs',
+      ],
+      [
+        'apps/tui/src/chrome/Sessions.tsx -> plugins/terminal/src/contract/wire.ts',
+        'terminal session and profile rows',
+      ],
+      [
+        'apps/tui/src/chrome/Sessions.tsx -> plugins/terminal/src/contract/toolbarActions.ts',
+        'the drawer toolbar point',
+      ],
+      [
+        'apps/tui/src/chrome/Sessions.tsx -> plugins/agents/src/contract/handoffClient.ts',
+        'hands a session back to managed mode',
+      ],
+      ['apps/tui/src/chrome/sessionPty.ts -> plugins/terminal/src/contract/wire.ts', 'PTY stream messages'],
+      ['apps/tui/src/chrome/Shell.tsx -> plugins/workflows/src/contract/gitLaunch.ts', 'the launch-from-commit dialog'],
+    ])
+    const found = [
+      ...new Set(
+        EDGES.filter(
+          (e) => e.fromPkg.kind === 'app' && !isTestCode(e.fromFile) && isContract(e.target.pkg, e.target.file),
+        ).map((e) => `${rel(e.fromFile)} -> ${rel(e.target.file!)}`),
+      ),
+    ].sort()
+    expect(found, 'anti-vacuity: the scan sees a listed edge').toContain(
+      'apps/cli/src/projection.ts -> plugins/agents/src/contract/wire.ts',
+    )
+    expect(
+      found.filter((edge) => !APP_CONTRACT_IMPORTS.has(edge)),
+      'List each new edge in APP_CONTRACT_IMPORTS with its reason, and on docs/first-party-plugins.md.',
+    ).toEqual([])
+    expect(
+      [...APP_CONTRACT_IMPORTS.keys()].filter((edge) => !found.includes(edge)),
+      'These listed edges are gone. Remove them here and on docs/first-party-plugins.md.',
+    ).toEqual([])
+  })
+
   it('protocol is a pure sink: zod only, no first-party imports, no node/electron', () => {
     const proto = EDGES.filter((e) => e.fromPkg.name === '@acorn/protocol')
     const allowed = new Set(['zod', 'vitest'])
@@ -359,12 +489,11 @@ describe('architecture boundaries', () => {
       'packages/client-core/src/host/frames/sdk/connection.ts',
       'packages/client-core/src/host/frames/sdk/frameMount.ts',
       'packages/client-core/src/host/frames/sdk/treeChannel.ts',
-      // The terminal client's three deliberate ones. Its stderr is the screen, so none of these is
-      // a log line (docs/tui/reporting.md § What the terminal client reports).
+      // The terminal client's two deliberate ones. Its stderr is the screen, so neither is a log
+      // line (docs/tui/reporting.md § What the terminal client reports).
       //
-      // A person answering a pairing prompt, before the renderer exists.
-      'apps/tui/src/node/pair.ts',
-      // The same prompt's instructions, for a running node this device holds no token for.
+      // How to get a pairing code, for a running node this device holds no token for. It prints
+      // before the renderer exists.
       'apps/tui/src/node/open.ts',
       // "Open the data folder" in a terminal is the path itself, printed on the way out because the
       // renderer owns the screen until then.
@@ -660,7 +789,7 @@ describe('architecture boundaries', () => {
       // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
       // `LinkPreviewHost` (docs/frontend/startup-budget.md). The token and style pack stylesheets, which
       // the browser extension loads without the app's own stylesheet.
-      '@acorn/client-core': 189, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, and the Markdown fence model and view.
+      '@acorn/client-core': 194, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, and TreeHost for the site's component pages.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
       // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
       // public site's plugin reference reads to check its examples and list the grants.
@@ -827,10 +956,7 @@ describe('architecture boundaries', () => {
       ['packages/dashboards-core/src/outline.ts', 'context is a binding address; database is a Lucide icon name'],
       ['packages/node-core/src/server/dashboards/run.ts', 'context is a binding address and preview is a run mode'],
       ['packages/node-core/src/server/dataSources/coreTasks.ts', 'context is a binding address in a starter plan'],
-      [
-        'packages/node-core/src/server/queries/sourceContext.ts',
-        'context is a host binding; github names the core-owned project repository facet',
-      ],
+      ['packages/node-core/src/server/queries/sourceContext.ts', 'context is a host binding'],
       ['packages/node-core/src/server/queries/validation.ts', 'context is a binding address'],
       ['packages/protocol/src/dashboards/panels.ts', 'preview is a dashboard run mode'],
       ['packages/protocol/src/data/queries/contextTime.ts', 'context is a binding address'],
@@ -1084,6 +1210,27 @@ describe('architecture boundaries', () => {
     expect(readsHostGlobal('const w = window.acornish')).toBe(false)
     // And the seam itself must still be doing the reading, or it's been hollowed out.
     expect(readsHostGlobal(readFileSync(join(SEAM, 'index.ts'), 'utf8'))).toBe(true)
+  })
+
+  it('only the Node-aware picker and the device install target open the folder picker', () => {
+    // The picker returns a path on this client's disk. A caller that sends it to a Node has to check
+    // that the Node is local first, and that check is easy to forget, so `pickNodeFolder` makes it for
+    // everyone (docs/architecture/packages.md § Runtime rules).
+    const CALLS_PICKER = /\bpickFolder\s*\(/
+    const callsPicker = (source: string): boolean =>
+      CALLS_PICKER.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    const callers = PACKAGES.flatMap((p) => walk(p.src))
+      .filter((f) => !isTestCode(f) && callsPicker(readFileSync(f, 'utf8')))
+      .map(rel)
+      .sort()
+    expect(callers).toEqual([
+      'packages/client-core/src/features/settings/plugins/InstallPlugin.tsx',
+      'packages/client-core/src/features/workspaces/addProject.ts',
+    ])
+    // Anti-vacuity: the declaration isn't a call, and prose about the picker isn't one either.
+    expect(callsPicker('const path = await pickFolder()')).toBe(true)
+    expect(callsPicker('export const pickFolder = async (): Promise<string | null> =>')).toBe(false)
+    expect(callsPicker('// `pickFolder()` is for paths this device reads')).toBe(false)
   })
 
   it('the terminal client keeps custody out of everything that draws', () => {

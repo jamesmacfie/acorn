@@ -43,7 +43,6 @@ describe('the attachment record over HTTP', () => {
       DB: core.db,
       DATA_DIR: dir,
       NODE_ID: root.nodeId,
-      APP_VERSION: 'test',
       NODE_FINGERPRINT: 'ff'.repeat(32),
       ...testSecretEnv(ENC_KEY),
       INTERNAL_TOKEN: INTERNAL,

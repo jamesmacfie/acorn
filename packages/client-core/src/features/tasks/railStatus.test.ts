@@ -15,7 +15,6 @@ const status = (p: Partial<TaskStatus>): TaskStatus => ({
 })
 
 const inputs = (over: Partial<RailStatusInputs> = {}): RailStatusInputs => ({
-  checks: null,
   unread: false,
   status: status({}),
   archiving: false,
@@ -34,9 +33,9 @@ describe('railStatusMarkers', () => {
 
   it('gives every marker a meaning and exactly one representation', () => {
     const markers = railStatusMarkers(
-      inputs({ checks: 'failure', unread: true, pinned: true, status: status({ dirty: true, dirtyCount: 3 }) }),
+      inputs({ unread: true, pinned: true, status: status({ dirty: true, dirtyCount: 3 }) }),
     )
-    expect(markers.map((m) => m.id)).toEqual(['needs', 'pinned', 'checks'])
+    expect(markers.map((m) => m.id)).toEqual(['needs', 'pinned'])
     expect(markers.every((m) => m.label && !!m.icon !== !!m.dotTone && m.placements.length)).toBe(true)
   })
 
@@ -45,11 +44,10 @@ describe('railStatusMarkers', () => {
   })
 
   it('gives every simultaneous state its own corner', () => {
-    // The busiest a core-only row gets: checks, an unread notice, pinned.
-    expect(placements({ checks: 'pending', unread: true, pinned: true })).toEqual({
+    // The busiest a core-only row gets: an unread notice and pinned. CI checks are the code host's.
+    expect(placements({ unread: true, pinned: true })).toEqual({
       needs: 'top-end',
       pinned: 'top-start',
-      checks: 'bottom-end',
     })
   })
 

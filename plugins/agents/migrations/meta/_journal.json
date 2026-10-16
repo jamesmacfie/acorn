@@ -92,6 +92,20 @@
       "when": 1791859104195,
       "tag": "0016_agent_turn_steering",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1792046121858,
+      "tag": "0017_agent_command_settle",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1792099860565,
+      "tag": "0018_agent_mcp_oauth",
+      "breakpoints": true
     }
   ]
 }

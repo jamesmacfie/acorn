@@ -10,7 +10,8 @@ steps. A custom agent is one session with a known setup.
 The record is `CustomAgent` in `plugins/agents/src/shared/customAgents.ts`. Its options are the same
 `optionId -> value` table a session default uses ([new-session defaults](./defaults.md)), so it names
 no model field of its own. `maxToolRisk` is the highest-risk acorn tool the session may call, and like
-every ceiling it only narrows ([agent tools](../agent-tools.md)).
+every ceiling it only narrows ([agent tools](../agent-tools.md)). `account` is optional and names the
+[harness account](./accounts.md) its sessions start on.
 
 Your agents are one `prefs` row per user, `agents:custom-agents:v1`. A plugin's agents are held in
 memory while the plugin is enabled and aren't written anywhere. `GET /v1/p/agents/custom-agents`
@@ -25,6 +26,11 @@ session's `config` (ID, name, glyph, instructions), the agent's options as `requ
 and its ceiling as `toolCeiling`. A `customAgent` a caller put in `config` is dropped, and an agent on
 another harness than the one named is refused. The options apply after your defaults, so an agent that
 names only a model keeps your reasoning level. Applying them doesn't write your `last` values.
+
+The agent's `account` comes after an account the caller names or a fork carries, and before the
+harness's default account. A delegated child takes it over its parent's account. An agent whose account
+was removed falls back to the default account rather than failing (`customAgentAccount` in
+`runtime.ts`).
 
 Drivers read the snapshot, not the live list. Editing an agent changes later sessions, and a resumed
 session gets what it got at creation:
@@ -51,6 +57,11 @@ options for that harness, so a harness you haven't run lately shows no pickers.
 
 The icon control is the shared `IconPicker`. You can search Lucide icons, pick a random one, or reset
 to the harness's icon, which removes the `glyph` override.
+
+The **Account** picker shows only when the harness has more than one account, because with one the
+default account is that account. It lists **Default account** first, which clears the choice. A saved
+account stays listed, marked removed, after the harness drops below two accounts, so you can still
+clear it.
 
 ## From a plugin
 

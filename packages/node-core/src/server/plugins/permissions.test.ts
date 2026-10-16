@@ -6,6 +6,7 @@ import type { CoreServices } from '../core'
 import { pluginManifestSchema, type NodePermissions } from './manifest'
 import { HOST_OWNED_CAPABILITY_IDS, scopeCapabilities, scopeCore } from './permissions'
 import { hostFunctionMode } from './hostCallModes'
+import { declareCodeHost } from '../pluginHost/codeHosts'
 import { createTaskService } from '../core/tasks'
 import type { AppDatabase } from '../db'
 
@@ -32,6 +33,7 @@ const CORE = {
   projects: {
     byId: marker('byId'),
     byGithub: marker('byGithub'),
+    byRepository: marker('byRepository'),
     byWorkspace: marker('byWorkspace'),
     checkouts: marker('checkouts'),
     externalProjects,
@@ -162,7 +164,14 @@ describe('scopeCore', () => {
 
   it('keeps project config and its executable scripts out of the read grant', () => {
     const read = scoped({ core: ['projects:read'] }).projects
-    expect(Object.keys(read).sort()).toEqual(['byGithub', 'byId', 'byWorkspace', 'checkouts', 'externalProjects'])
+    expect(Object.keys(read).sort()).toEqual([
+      'byGithub',
+      'byId',
+      'byRepository',
+      'byWorkspace',
+      'checkouts',
+      'externalProjects',
+    ])
     // The disclosure the trust prompt has to name: "read projects" includes every mapped project path
     // on the machine.
     expect(read.checkouts).toBe(CORE.projects.checkouts)
@@ -200,6 +209,7 @@ describe('scopeCore', () => {
       'assertConfigTrusted',
       'byGithub',
       'byId',
+      'byRepository',
       'byWorkspace',
       'checkouts',
       'config',
@@ -208,11 +218,35 @@ describe('scopeCore', () => {
     ])
   })
 
+  it('names a loaded plugin as the holder, and refuses an external id on a host it does not hold', async () => {
+    const undo = declareCodeHost('demo', { label: 'Demo', hosts: ['git.demo.test'] }, false)
+    const create = vi.fn(async (_input: unknown) => ({}))
+    const update = vi.fn(async (_id: string, _patch: unknown, _holder?: string) => ({}))
+    const { projects } = scoped({ core: ['projects:write'] }, {
+      ...CORE,
+      projects: { ...CORE.projects, create, update },
+    } as unknown as CoreServices)
+    try {
+      await projects.update('project', { repositoryExternalId: '1' })
+      expect(update).toHaveBeenCalledWith('project', { repositoryExternalId: '1' }, 'demo')
+      await expect(projects.create({ name: 'x', github: { owner: 'a', name: 'b', repoId: 3 } })).rejects.toThrow(
+        /github\.com/,
+      )
+      await projects.create({ name: 'x', repository: { host: 'git.demo.test', path: 'a/b', externalId: '4' } })
+      // Without an external id there's nothing of another provider's to set.
+      await projects.create({ name: 'x', repository: { host: 'github.com', path: 'a/b' } })
+      expect(create).toHaveBeenCalledTimes(2)
+    } finally {
+      undo()
+    }
+  })
+
   it('lets write imply read without silently implying config access', () => {
     const write = scoped({ core: ['projects:write'] }).projects
     expect(Object.keys(write).sort()).toEqual([
       'byGithub',
       'byId',
+      'byRepository',
       'byWorkspace',
       'checkouts',
       'create',

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
+import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import type { WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
@@ -10,6 +10,9 @@ import { catalogValidation } from './generate'
 import { generateWorkflowRequest } from './generationRequest'
 import { resolveWorkflowGraph, type WorkflowResolutionScope } from '../definitions/resolution'
 import { WorkflowRunner, type RunnerDeps } from '../runs/runner'
+
+// What the agents plugin publishes as its default profile, which these tests stand in for.
+const DEFAULT_PROFILE_ID = 'claude-code'
 
 const stepResult = {
   status: 'ok' as const,
@@ -138,6 +141,7 @@ describe('workflow dispatch authoring', () => {
       runStep: vi.fn(async () => stepResult),
       writeHandoff: vi.fn(async () => undefined),
       assembleContext: vi.fn(async () => ''),
+      defaultProfileId: () => DEFAULT_PROFILE_ID,
       notify: vi.fn(),
       dispatchChildWorkflow: (request, signal) => dispatcher.dispatch(request, signal),
       dispatchChildWorkflows: (requests, signal) => dispatcher.dispatchMany(requests, signal),

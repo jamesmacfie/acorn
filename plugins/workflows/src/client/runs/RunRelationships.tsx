@@ -1,7 +1,7 @@
 import { For, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
 import { Alert, Badge, Card, CodeBlock, Fold, Icon, Inline, Link, Stack, Text } from '@acorn/plugin-api/ui'
-import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
+import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../contract/wire.ts'
 import { formatUsage, runGlyph, runTone, statusLabel } from './runDisplay'
 
 const TERMINAL = new Set(['done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'])

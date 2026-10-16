@@ -52,8 +52,12 @@ export function projectCommandEvents(
   })
 }
 
+/** One session's commands, or only commands whose events were written at or after `since`. A scope with
+ *  neither reads every event, which is gigabytes on a long-used Node. */
+export type CommandScope = { sessionId?: string; since?: number }
+
 /** Latest unfinished command states only; output stays in its original ledger rows. */
-export function unfinishedCommands(tx: Transaction, sessionId?: string): AgentEventRecord[] {
+export function unfinishedCommands(tx: Transaction, { sessionId, since }: CommandScope = {}): AgentEventRecord[] {
   return tx
     .all<{
       id: string
@@ -70,6 +74,7 @@ export function unfinishedCommands(tx: Transaction, sessionId?: string): AgentEv
       FROM agent_events
       WHERE json_extract(event_json, '$.type') = 'tool'
         ${sessionId ? sql`AND session_id = ${sessionId}` : sql``}
+        ${since !== undefined ? sql`AND created_at >= ${since}` : sql``}
       GROUP BY session_id, turn_id, json_extract(event_json, '$.tool.id')
       HAVING max(json_extract(event_json, '$.tool.kind') = 'execute')
     )

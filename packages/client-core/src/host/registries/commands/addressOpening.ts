@@ -231,9 +231,7 @@ async function openAddress(address: Address, link = ''): Promise<LinkRefusal | {
         }
         const item = await source.promotion.fromContentLink(claim.target, projectId)
         if (!ownsRequest()) return staleRequest()
-        const owner = typeof claim.target.owner === 'string' ? claim.target.owner : ''
-        const repo = typeof claim.target.repo === 'string' ? claim.target.repo : ''
-        if (!item || !source.promotion.canPromote(item, { projectId, owner, repo })) {
+        if (!item || !source.promotion.canPromote(item, { projectId })) {
           return reportLinkFailure(shownLink, 'Provider cannot promote this item')
         }
         shell.openProject(projectPath(projectId), source.id)

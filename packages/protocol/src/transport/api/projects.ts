@@ -32,10 +32,16 @@ export const workspaceProjectOrderBody = z
   .strict()
 export type WorkspaceProjectOrder = z.infer<typeof workspaceProjectOrderBody>
 
+// A project's Git remote (docs/plugins/code-hosts.md): the host and path core parses from any remote,
+// both lowercased, and the code host plugin that claims the host. `provider` is null on a host no
+// running plugin claims. `externalId` is the provider's own id for the repository, when it set one.
+export type ProjectRepository = { provider: string | null; host: string; path: string; externalId: string | null }
+
 // A project is a folder on the node's machine, the unit a workspace groups
-// (docs/workspaces-and-tasks.md). `vcs` and `github` are detected facets, not requirements: a plain
-// folder has neither, a git checkout without a GitHub remote has only `vcs`, and `path` is null for a
-// project imported from GitHub but not yet cloned.
+// (docs/workspaces-and-tasks.md). `vcs` and `repository` are detected facets, not requirements: a plain
+// folder has neither, a git checkout without a remote has only `vcs`, and `path` is null for a project
+// imported from a code host but not yet cloned. `github` is `repository` read as GitHub's owner and
+// name, present only for a `github.com` remote. `repository` is absent from a Node older than it.
 export type Project = {
   id: string
   name: string
@@ -48,6 +54,7 @@ export type Project = {
   vcs: 'git' | null
   defaultBranch: string | null
   remoteUrl: string | null
+  repository?: ProjectRepository | null
   github: { owner: string; name: string; repoId: number | null } | null
 }
 export type ProjectSeed = { path: string; workspaceId?: string; name?: string }
@@ -143,6 +150,11 @@ export type WorkspaceExternalProjectsResponse = { projects: WorkspaceExternalPro
 // the icon map belongs to the client. An unrecognized name falls back to rendering as text.
 export const ICON_NAME_RE = /^[a-z0-9-]{1,40}$/
 
+// A pull or merge request that backs a task (docs/plugins/code-hosts.md § Change requests).
+// `provider` is the code host plugin that claims its host, or null when none does. `pane` is the
+// client pane that host declared for it, absent while that plugin isn't running.
+export type TaskChangeRequest = { provider: string | null; number: number; pane?: string }
+
 export type Task = {
   id: string
   title: string
@@ -150,9 +162,14 @@ export type Task = {
   origin: string
   projectId: string
   branch: string | null
+  // Its project's `repository`, absent from a Node older than it.
+  repository?: ProjectRepository | null
   github: { owner: string; name: string } | null
   worktreePath: string | null
+  // The primary change request's number when it's on github.com, for the GitHub-named readers.
   pullNumber: number | null
+  // The task's primary change request, absent from a Node older than it.
+  changeRequest?: TaskChangeRequest | null
   status: 'active' | 'archived' | 'cancelled'
   parentId: string | null // task tree (docs/workspaces-and-tasks.md): delegated and nested-workflow tasks point at their creating task
   sort: number
@@ -176,6 +193,9 @@ export type TaskSeed = {
   // takes the branch from it, so `branch` is ignored when this is set.
   worktreePath?: string
   skipSetup?: boolean
+  // A change request on the project's repository, which becomes the task's primary one. `pullNumber`
+  // is the same thing under its GitHub name.
+  changeRequest?: { number: number; sourceBranch?: string }
   pullNumber?: number
   links?: TaskLinkSeed[]
 }

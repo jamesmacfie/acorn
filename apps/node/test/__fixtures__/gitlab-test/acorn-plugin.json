@@ -1,0 +1,21 @@
+{
+  "id": "gitlab-test",
+  "name": "GitLab test host",
+  "version": "1.0.0",
+  "apiVersion": "5",
+  "baseline": "acorn-1",
+  "node": "./node.js",
+  "permissions": { "node": { "core": ["projects:read"] } },
+  "contributions": {
+    "codeHost": {
+      "label": "GitLab test",
+      "hosts": ["gitlab.test"],
+      "changeRequest": {
+        "ref": "merge-requests/{number}/head",
+        "label": "merge request",
+        "prefix": "!",
+        "pane": "gitlab-test-mr"
+      }
+    }
+  }
+}

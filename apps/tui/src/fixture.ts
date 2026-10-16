@@ -29,6 +29,7 @@ export const TASK: Task = {
   github: { owner: 'runn-fast', name: 'acorn' },
   worktreePath: '/tmp/acorn-fixture/fix-login',
   pullNumber: 42,
+  changeRequest: { provider: 'github', number: 42, pane: 'pr' },
   parentId: null,
   sort: 0,
 }

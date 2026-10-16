@@ -9,9 +9,9 @@ import { dockerArchiveConcern } from './archiveCheck'
 import { setDockerBridge } from './routes/docker'
 import { docker, DockerCliError } from './cli'
 
-const mocks = vi.hoisted(() => ({ containers: vi.fn(), invalidate: vi.fn(), config: vi.fn() }))
+const mocks = vi.hoisted(() => ({ containers: vi.fn(), invalidate: vi.fn(), config: vi.fn(), logTail: vi.fn() }))
 vi.mock('./dockerService', () => ({
-  getDockerService: () => ({ containers: mocks.containers, invalidate: mocks.invalidate }),
+  getDockerService: () => ({ containers: mocks.containers, invalidate: mocks.invalidate, logTail: mocks.logTail }),
   disposeDocker: vi.fn(),
 }))
 vi.mock('./dockerConfig', () => ({
@@ -87,6 +87,16 @@ describe('Docker task authority', () => {
   it('lists only root-associated containers and never consults repository hints', async () => {
     expect(await dockerBridge(ctx.core).taskContainers(task.id)).toEqual([own, loose])
     expect(mocks.config).not.toHaveBeenCalled()
+  })
+
+  it("builds the browser panel from the task's own containers, and 404s a task with none", async () => {
+    mocks.logTail.mockRejectedValue(new Error('docker logs timed out'))
+    const view = await dockerBridge(ctx.core).browserPanel(task.id, null)
+    expect(view.blocks.find((b) => b.kind === 'rows')).toMatchObject({ rows: [{}, {}] })
+    expect(view.blocks.find((b) => b.kind === 'logs')).toMatchObject({ lines: ['docker logs timed out'] })
+    expect(mocks.logTail).toHaveBeenCalledWith(loose.id, 200)
+    mocks.containers.mockResolvedValue([foreign, unverified])
+    await expect(dockerBridge(ctx.core).browserPanel(task.id, null)).rejects.toMatchObject({ status: 404 })
   })
 
   it('preserves display-only hints in the device summary but excludes explicit foreign roots', async () => {

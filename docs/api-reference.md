@@ -14,9 +14,12 @@ modules own field and validation details, and there's no OpenAPI document or gen
 
 ## Pages
 
-[Transport, pairing, and versioning](./api-reference/transport.md) covers the namespaces, the broker's
-request deadline, pairing codes and their limits, the protocol major and the tolerant handshake, the
-middleware order, idempotency keys, and the error envelope.
+[Transport and pairing](./api-reference/transport.md) covers the namespaces, the broker's request
+deadline, pairing codes and their limits, the middleware order, idempotency keys, and the error
+envelope.
+
+[Versioning](./api-reference/versioning.md) covers the protocol major, the tolerant handshake, how far
+apart a client's and a Node's builds may be, and how a route leaves the API.
 
 [Core routes](./api-reference/core-routes.md) lists every `/v1/core` route with its gate: node
 administration, plugins, schedules, preferences, integrations, telemetry, workspaces, projects,

@@ -83,4 +83,6 @@ export type RunnerDeps = {
   authorizeRepoConfig?(taskId: string): Promise<void>
   /** Optional for tests that construct a runner without a host. */
   telemetry?: PluginTelemetry
+  /** The profile a step that names none runs on, from the agents plugin. Absent when nothing supplies one. */
+  defaultProfileId?(): string | undefined
 }

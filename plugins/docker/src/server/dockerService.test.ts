@@ -2,12 +2,17 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ spawn: vi.fn(), docker: vi.fn(), env: vi.fn(() => ({})) }))
+const mocks = vi.hoisted(() => ({ spawn: vi.fn(), docker: vi.fn(), dockerOutput: vi.fn(), env: vi.fn(() => ({})) }))
 vi.mock('node:child_process', async (original) => ({
   ...(await original<typeof import('node:child_process')>()),
   spawn: mocks.spawn,
 }))
-vi.mock('./cli', () => ({ docker: mocks.docker, dockerEnv: mocks.env, DockerCliError: class extends Error {} }))
+vi.mock('./cli', () => ({
+  docker: mocks.docker,
+  dockerOutput: mocks.dockerOutput,
+  dockerEnv: mocks.env,
+  DockerCliError: class extends Error {},
+}))
 import { disposeDocker, getDockerService } from './dockerService'
 import { SharedDockerStreams } from './sharedStreams'
 
@@ -160,6 +165,30 @@ it('retries one failed watcher and ignores late cleanup from its predecessor', a
   await vi.advanceTimersByTimeAsync(60000)
   expect(children).toHaveLength(2)
   expect(vi.getTimerCount()).toBe(0)
+})
+
+it('asks for a panel read when containers change, and not for other scopes', async () => {
+  vi.useFakeTimers()
+  const broadcast = vi.fn(),
+    status = vi.fn(),
+    service = getDockerService(broadcast, status)
+  await service.containers()
+  children[0].stdout.write('{"Type":"image"}\n')
+  await vi.advanceTimersByTimeAsync(300)
+  expect(broadcast).toHaveBeenCalledTimes(1)
+  expect(status).not.toHaveBeenCalled()
+  children[0].stdout.write('{"Type":"container"}\n{"Type":"container"}\n')
+  await vi.advanceTimersByTimeAsync(300)
+  expect(status).toHaveBeenCalledTimes(1)
+})
+
+it('merges a log tail from both streams in time order and drops the timestamps', async () => {
+  mocks.dockerOutput.mockResolvedValue({
+    stdout: '2026-10-16T01:00:00.000000001Z one\n2026-10-16T01:00:00.000000003Z three\r\n',
+    stderr: '2026-10-16T01:00:00.000000002Z two\n',
+  })
+  expect(await getDockerService().logTail('web-1', 2)).toEqual(['two', 'three'])
+  expect(mocks.dockerOutput.mock.calls[0][0]).toEqual(['logs', '--tail', '2', '--timestamps', 'web-1'])
 })
 
 it('recovers after synchronous spawn failure and suppresses disposal callbacks', async () => {

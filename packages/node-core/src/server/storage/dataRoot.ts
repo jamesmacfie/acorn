@@ -227,7 +227,7 @@ export function openDataRoot(dir: string): DataRoot {
         `${identityPath} is unreadable or has no matching ${ACORN_BASELINE} baseline. Reset this root; its identity cannot be adopted.`,
       )
     }
-    // No `protocolVersion` field (docs/data-layer/data-root.md § `node.json`, docs/api-reference/transport.md § Versioning).
+    // No `protocolVersion` field (docs/data-layer/data-root.md § `node.json`, docs/api-reference/versioning.md § Versioning).
     let identity: NodeIdentity = existing ?? { baseline: ACORN_BASELINE, nodeId: randomUUID(), createdAt: Date.now() }
     if (!existing) writePrivateAtomic(identityPath, `${JSON.stringify(identity, null, 2)}\n`)
     else chmodSync(identityPath, 0o600)

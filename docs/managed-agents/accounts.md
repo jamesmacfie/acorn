@@ -49,7 +49,9 @@ there too. Acorn gives each extra account its own folder and points the CLI at i
   the default file goes. When Claude saves a setting from inside an account session, the change can
   reach the shared file through the link.
 - **Other readers.** The terminal handoff passes the same variable. A delegated child on its parent's
-  harness inherits the parent's account.
+  harness inherits the parent's account, unless it's a custom agent that names its own.
+- **Custom agents.** A custom agent can name an account. Its sessions start there while the Node still
+  holds it, and on the default account otherwise ([custom agents](./custom-agents.md)).
 
 ## Add an account
 
@@ -115,6 +117,9 @@ a usage limit, the wait reads the quota of the session's own account. For more i
   skills and settings file are linked in. Linking the rest, as T3 Code does, needs a list of private files per
   CLI release. Wait until someone misses them. Acorn's own server isn't one of them either. A session on an account gets it
   when it starts, and again in a terminal handoff ([MCP](../mcp.md#configuration)).
+- The servers in Settings → MCP reach every account. One
+  [sign-in to a remote server](../mcp/sign-in.md) on the Node serves them all, so no
+  account needs a `claude mcp add` of its own.
 - A contributed harness can't declare `accounts`. The field would let a plugin choose a variable that
   Acorn sets to a path in its data root, so it needs its own review before it joins the manifest.
 - Acorn doesn't offer to start a session on another account when one runs out of quota.

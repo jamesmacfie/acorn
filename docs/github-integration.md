@@ -140,6 +140,31 @@ permission GitHub reports.
 A check row with a run behind it opens that run's steps in a modal: failed steps start open, and the
 first one opened fetches the whole job log once and slices every step out of it.
 
+## Browser panel
+
+GitHub declares the browser extension's **Pull request** panel as `browserPanel` on its compiled
+plugin. `GET /v1/p/github/browser-panel?taskId=<id>`, in `plugins/github/src/server/browserPanel.ts`,
+answers device callers only. It answers 404 for a task with no `pullNumber` or a project with no
+GitHub repository, so that task shows no nav item. With no GitHub connection, it answers one status
+block that says to connect in **Settings** > **Services**.
+
+Otherwise it reads the pull request through `readPullDetail`, the PR pane's composite read, and
+`pullPanelView` turns the detail into up to four blocks, leaving out an empty one:
+
+- A status block with the state, the title, the branches, what blocks the merge, unresolved review
+  threads, and auto-merge. Conflicts or a failed check make it `danger`, a running check `pending`,
+  and a change request `warn`. A merged or closed pull request is always `info`.
+- **Checks**: failed checks first, then running ones, then the rest, at most 64. The failure and
+  pending rules are `checkFailed` and `checkPending`, the ones the CI policy and `pr_checks` use.
+- **Reviews**: each reviewer's latest submitted review, then each requested reviewer who hasn't
+  reviewed. A comment after a change request leaves the change request standing.
+- **Links**: the pull request, its checks tab, and each failed check's page.
+
+The extension never polls. When the read starts a background refresh, the refresh's `pr-synced`
+also calls `ctx.events.status()`, which makes an open panel read again. That read finds the mirror
+fresh and starts no refresh. The panel takes no actions: **Open in Acorn** opens the task's `pr`
+pane.
+
 ## Pages
 
 - [The GitHub mirror](./github-integration/mirror.md): the mirror, pull request detail and files, and

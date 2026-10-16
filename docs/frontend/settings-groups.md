@@ -136,3 +136,9 @@ code (`NodePairingCode.tsx`); the browser one words it for the extension's panel
 pairing code. Revoking means the Node tears up this client's credential, and confusing the two is how
 an owner loses access to a remote Node
 ([Node enrollment](../node-enrollment.md)).
+
+Each Node's row also shows the build it runs. When that differs from the client's own build, one
+warning names both and says that plugins bundled with the Node's build ask for trust again. A side
+run from source has no stamp, so that difference shows as a plain line. Builds of one protocol
+version work together, so the row stays usable
+([Mixed builds](../api-reference/versioning.md#mixed-builds)).

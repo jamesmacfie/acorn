@@ -17,6 +17,12 @@ export const agentMcpPackageTestRoute = (planId: string) =>
 export const agentMcpServerConsentRoute = (name: string) => `${agentMcpServerRoute(name)}/consent`
 export const agentMcpReviewsRoute = `${agentMcpServersRoute}/reviews`
 export const agentMcpReviewRoute = (name: string) => `${agentMcpServerRoute(name)}/review`
+export const agentMcpSignInRoute = (name: string) => `${agentMcpServerRoute(name)}/sign-in`
+export const agentMcpSignInAttemptRoute = (name: string, attemptId: string) =>
+  `${agentMcpSignInRoute(name)}/${encodeURIComponent(attemptId)}`
+export const agentMcpSignInFinishRoute = (name: string, attemptId: string) =>
+  `${agentMcpSignInAttemptRoute(name, attemptId)}/finish`
+export const agentMcpSignOutRoute = (name: string) => `${agentMcpServerRoute(name)}/sign-out`
 
 // acorn's own server registers under one of these two (node-core/server/mcpRegister.ts). A user server
 // with the same name would shadow it in whichever harness reads names last.
@@ -36,6 +42,13 @@ const MAX_PAIRS = 64
 const MAX_TEXT = 4_096
 
 export type AgentMcpTransport = 'stdio' | 'http'
+
+/** How an HTTP server is authenticated: fixed headers, or a sign-in the node keeps for every session
+ *  (docs/mcp/sign-in.md). */
+export type AgentMcpAuth = 'headers' | 'oauth'
+
+/** A sign-in's state. `expired` means the server refused a refresh, so the person signs in again. */
+export type AgentMcpSignIn = { status: 'signed_out' | 'signed_in' | 'expired'; signedInAt: number | null }
 
 /** An environment variable or header as the node returns it. A secret's value is always `null`. */
 export type AgentMcpPair = { name: string; value: string | null; secret: boolean }
@@ -60,6 +73,13 @@ export type AgentMcpServer = {
   consented: boolean
   reviewTools: boolean
   approvedCatalogueDigest: string | null
+  auth: AgentMcpAuth
+  /** Null for a server with headers. */
+  signIn: AgentMcpSignIn | null
+  /** A pre-made OAuth client, for a server that does not let a client register itself. */
+  clientId: string | null
+  /** Whether a client secret is stored. Its value never comes back. */
+  clientSecretStored: boolean
 }
 
 export type AgentMcpManagedPackage = {
@@ -130,8 +150,15 @@ export const agentMcpServerInputSchema = z
     values: z.array(pairInput).max(MAX_PAIRS).optional(),
     enabled: z.boolean(),
     reviewTools: z.boolean().optional(),
+    auth: z.enum(['headers', 'oauth']).optional(),
+    clientId: z.string().trim().max(MAX_TEXT).optional(),
+    /** A string replaces the stored secret, null removes it, and leaving it out keeps it. */
+    clientSecret: z.string().max(MAX_TEXT).nullable().optional(),
   })
   .superRefine((input, ctx) => {
+    if (input.auth === 'oauth' && input.transport !== 'http') {
+      ctx.addIssue({ code: 'custom', path: ['auth'], message: 'Only an HTTP server can be signed in to.' })
+    }
     if (input.transport === 'stdio' && !input.command) {
       ctx.addIssue({ code: 'custom', path: ['command'], message: 'A stdio server needs a command.' })
     }
@@ -156,6 +183,11 @@ export const agentMcpServerInputSchema = z
       }
     }
   })
+
+/** The browser's return trip: the code and state a listener caught, or the address the person pasted. */
+export type AgentMcpSignInFinish = { code: string; state: string } | { address: string }
+
+export type AgentMcpSignInStarted = { attemptId: string; authorizationUrl: string }
 
 export const agentMcpPackagePlanInputSchema = z.object({
   coordinate: z.string().min(1).max(256),
@@ -203,7 +235,8 @@ export type AgentMcpReportedServer = {
 
 /** The session panel's view. `reported` is null when the harness reports nothing or is not running. */
 export type AgentSessionMcp = {
-  servers: Array<{ name: string; transport: AgentMcpTransport; enabled: boolean }>
+  /** `signIn` is null for a server with headers, as on `AgentMcpServer`. */
+  servers: Array<{ name: string; transport: AgentMcpTransport; enabled: boolean; signIn: AgentMcpSignIn | null }>
   reported: AgentMcpReportedServer[] | null
   /** Why the switches are locked, such as a turn in progress. */
   locked: string | null

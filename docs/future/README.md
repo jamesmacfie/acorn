@@ -15,8 +15,10 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
 | [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
+| [github/](./github/README.md) | Eight phases that give a GitLab or Bitbucket plugin the GitHub plugin's experience: agent context and workflow CI by code host, the remaining GitHub assumptions, shared review views, GitLab, self-hosted hosts, fork checkout, and Bitbucket Cloud. | Proposed October 16, 2026. Implementation not started. |
 | [marketing/](./marketing/README.md) | Twenty-one phases for the public website at `acorn.sh`: positioning, wireframes and design, real UI drawn by both hosts, the landing and feature pages, download and changelog, the user docs, the generated plugin reference, plugin guides with tested examples, and the component docs. | Proposed October 15, 2026. Implementation not started. |
-| [split/](./split/README.md) | Nine phases that fix drift in the Node and client split and the core and plugin split, including forge-neutral repositories and change requests. | Proposed October 14, 2026. Implementation not started. |
+| [opencode/](./opencode/README.md) | Three ideas from OpenCode 2: one cap on tool results, memory changes told to running sessions, and a script tool that calls other tools. Also the external OpenCode harness package. | Proposed October 16, 2026. The harness plan is from October 9, 2026. Implementation not started. |
+| [split/](./split/README.md) | Ten phases that fix drift in the Node and client split and the core and plugin split, including forge-neutral repositories and change requests. | Phases 1 to 9 implemented October 15, 2026. Phase 10, the remote preview proxy, is proposed. |
 | [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
 
 ## The single files
@@ -26,9 +28,12 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [bundle.md](./bundle.md) | Container coordination, platform archives, bundled runtime, Windows operation support, installer, desktop TUI embedding, and macOS signing. | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
 | [dashboards-gaps.md](./dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision. | Followups to the implemented studio and derived sources. Replaces the completed phase plans. |
+| [extension-docker-panel.md](./extension-docker-panel.md) | A read-only Docker panel in the browser extension's sidebar: the task's containers, ports, and logs. | Implemented October 16, 2026. The real-browser check remains open. |
+| [extension-github-panel.md](./extension-github-panel.md) | Let built-in plugins declare a browser extension panel, then a read-only panel for the task's pull request state, checks, and reviews. | Implemented October 16, 2026. The check in a real browser remains open. |
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
 | [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
-| [opencode.md](./opencode.md) | An external OpenCode harness package: one manifest, a conformance run, and a narrower `envPassthrough` in the authoring example. | Proposed October 9, 2026. Implementation not started. |
+| [mcp-sign-in.md](./mcp-sign-in.md) | Sign in to a remote MCP server once per Node from Settings → MCP. The Node keeps and refreshes the tokens, and sessions on every account reach the server through a relay. | Implemented October 16, 2026. The checks against real servers (Sentry, Codex, and `pnpm dev:remote`) remain open. |
+| [performance-spans.md](./performance-spans.md) | Slow-call child spans on the Node, sleep and hidden-window marks, and spans for tool availability, plan usage, archiving, the repository lock, host load, and outbound APIs. | Proposed October 16, 2026, from seven days of Sentry data. Implementation not started. |
 | [plugin-rail-artwork.md](./plugin-rail-artwork.md) | Dynamic artwork and tooltips on plugin rail buttons, plus a shared artwork component for compiled UI and remote trees. | Proposed October 13, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
@@ -68,7 +73,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 ## Retired folders
 
 `cleanup/` shipped all seventeen proposals and was deleted on October 12, 2026. The reference
-pages each proposal touched own the result: [mixed builds](../api-reference/transport.md#mixed-builds) for the
+pages each proposal touched own the result: [mixed builds](../api-reference/versioning.md#mixed-builds) for the
 version policy, [formatting](../local-development/formatting.md) for the formatter, and
 [conventions](../conventions.md) for the comment and staleness rules. Each proposal's completion
 note remains in Git history.

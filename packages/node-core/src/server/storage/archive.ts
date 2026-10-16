@@ -28,6 +28,7 @@ import { branchExists, discardWorktree, setWorktreeAside } from '../worktrees/wo
 import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 import { broadcastTasksChanged } from '../notify'
 import { admitCheckout, checkoutAdmissionFor } from '../core/checkoutAdmission'
+import { primaryChangeRequest } from '../core/changeRequests'
 
 const exec = promisify(execFile)
 
@@ -298,8 +299,14 @@ export async function restoreTask(
   const project = await projectForTask(db, t)
   const checkout = project?.vcs === 'git' && project.path && isDir(project.path) ? project.path : null
   const branch = checkout ? t.branch : null
-  // A pull request task fetches its head again, so only a local branch can be lost for good.
-  if (checkout && branch && t.pullNumber == null && !opts.newBranch && !(await branchExists(checkout, branch))) {
+  // A change request task fetches its head again, so only a local branch can be lost for good.
+  if (
+    checkout &&
+    branch &&
+    !opts.newBranch &&
+    !(await primaryChangeRequest(db, t.id)) &&
+    !(await branchExists(checkout, branch))
+  ) {
     return { ok: false, reason: `Branch '${branch}' no longer exists.`, branchMissing: true }
   }
   // Only a row that is still archived. A delete that ran during the branch check above removed it, and

@@ -1,7 +1,9 @@
 import { createEffect, createMemo, createSignal, Index, Show } from 'solid-js'
 import type { Project, Workspace } from '@acorn/protocol/api.ts'
 import { resolveProjectColor } from '@acorn/protocol/projectColor.ts'
-import { canPickFolder } from '../../infra/platform'
+import { activeNodeId } from '../../infra/node/activeNode'
+import { canPickNodeFolder, pickNodeFolder } from './addProject'
+import { NodePathForm } from './NodePathForm'
 import { createWorkspace, patchProject } from './workspaceMutations'
 import { PROJECT_COLOR_OPTIONS } from './ProjectColorInput'
 import { Text } from '../../kit/components/content/Text'
@@ -47,8 +49,9 @@ export function ProjectTable(props: {
   allowMove?: boolean
   openProject: (projectId: string) => void
   openWorkspace?: (workspaceId: string) => void
-  /** Give a path-less project a folder from its row. Without it the row only says it has none. */
-  mapFolder?: (projectId: string) => void
+  /** Give a path-less project a folder from its row, resolving whether it landed. Without it the row
+   *  only says it has none. */
+  mapFolder?: (projectId: string, path: string) => Promise<boolean>
   /** Refetch the lists the table was drawn from, once the writes land. */
   refresh: () => Promise<unknown>
 }) {
@@ -75,6 +78,14 @@ export function ProjectTable(props: {
       return next
     })
   const chosen = () => all().filter((project) => isSelected(project.id))
+  // The row whose folder is being typed, for a Node the picker can't browse.
+  const [typingFolder, setTypingFolder] = createSignal<string>()
+  const addFolder = async (projectId: string) => {
+    const nodeId = activeNodeId()
+    if (!canPickNodeFolder(nodeId)) return setTypingFolder(projectId)
+    const path = await pickNodeFolder(nodeId)
+    if (path && activeNodeId() === nodeId) await props.mapFolder?.(projectId, path)
+  }
 
   return (
     <>
@@ -201,15 +212,24 @@ export function ProjectTable(props: {
                         <Show
                           when={project().path}
                           fallback={
-                            <span class="ws-row-nopath">
-                              No folder on disk
-                              <Show when={props.mapFolder && canPickFolder()}>
-                                {' '}
-                                <Button variant="bare" size="sm" onPress={() => props.mapFolder?.(project().id)}>
-                                  Add folder
-                                </Button>
-                              </Show>
-                            </span>
+                            <Show
+                              when={typingFolder() === project().id && props.mapFolder}
+                              fallback={
+                                <span class="ws-row-nopath">
+                                  No folder on disk
+                                  <Show when={props.mapFolder}>
+                                    {' '}
+                                    <Button variant="bare" size="sm" onPress={() => void addFolder(project().id)}>
+                                      Add folder
+                                    </Button>
+                                  </Show>
+                                </span>
+                              }
+                            >
+                              {(mapFolder) => (
+                                <NodePathForm action="Add folder" submit={(path) => mapFolder()(project().id, path)} />
+                              )}
+                            </Show>
                           }
                         >
                           {/* The last two folders tell projects apart. The tip holds the whole path. */}

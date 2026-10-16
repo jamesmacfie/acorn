@@ -2,6 +2,7 @@ import { builtinModules } from 'node:module'
 import { isAbsolute, resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
+import { buildVersion } from '../../scripts/buildVersion.mts'
 import { startupGraph } from './startupGraph'
 
 // The terminal client's bundle. Shaped after apps/node's config, because the output is the same kind
@@ -146,7 +147,7 @@ export default defineConfig({
   },
   plugins: [solid({ solid: { generate: 'universal', moduleName: RECONCILER } }), startupGraph()],
   ssr: { noExternal: true },
-  define: { __ACORN_HOST__: '"tui"' },
+  define: { __ACORN_HOST__: '"tui"', __ACORN_BUILD__: JSON.stringify(buildVersion()) },
   build: {
     target: 'node22',
     outDir: 'dist',

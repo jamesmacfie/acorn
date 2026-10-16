@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js'
 import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import { canPickFolder, pickFolder } from '../../../infra/platform'
+import { canPickNodeFolder, pickNodeFolder } from '../../workspaces/addProject'
 import { Alert, Button, Input, Select } from '../../../kit/components/primitives'
 import { Inline } from '../../../kit/components/layout/Inline'
 import { SettingRow } from '../../../kit/components/layout/SettingRow'
@@ -42,9 +43,8 @@ function buildInstallSource(kind: SourceKind, raw: string): PluginInstallSource 
 
 export function InstallPlugin(props: {
   nodeLabel: string
-  /** Whether the node in the header is this computer's own. The folder picker browses this device, so a
-   *  path picked for a remote node would mean something else there; a remote node keeps the text field. */
-  nodeIsLocal: boolean
+  /** The node in the header. A remote node keeps the text field, because the picker browses this device. */
+  nodeId: string | null
   install: (target: InstallTarget, source: PluginInstallSource) => Promise<void>
   onClose: () => void
 }) {
@@ -64,7 +64,10 @@ export function InstallPlugin(props: {
     { value: 'url', label: 'Tarball URL' },
     ...(target() === 'node' || canPickFolder() ? [{ value: 'path', label: 'Local folder' }] : []),
   ]
-  const canBrowse = () => kind() === 'path' && canPickFolder() && (target() === 'device' || props.nodeIsLocal)
+  const canBrowse = () =>
+    kind() === 'path' && (target() === 'device' ? canPickFolder() : canPickNodeFolder(props.nodeId))
+  // This device reads a device folder itself, so only that target takes a path from this device's disk.
+  const browse = () => (target() === 'device' ? pickFolder() : pickNodeFolder(props.nodeId))
   const pickTarget = (next: InstallTarget) => {
     setTarget(next)
     if (next === 'device' && kind() === 'path' && !canPickFolder()) setKind('github')
@@ -125,7 +128,7 @@ export function InstallPlugin(props: {
             <Button
               disabled={busy()}
               onPress={() =>
-                void pickFolder().then((path) => {
+                void browse().then((path) => {
                   if (path) setSpec(path)
                 })
               }

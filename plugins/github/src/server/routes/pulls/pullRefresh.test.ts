@@ -72,6 +72,9 @@ describe('shared pull refresh operations', () => {
       remoteUrl: 'https://github.com/acme/web.git',
       githubOwner: 'acme',
       githubName: 'web',
+      repoProvider: 'github',
+      repoHost: 'github.com',
+      repoPath: 'acme/web',
       githubRepoId: REPO_ID,
       createdAt: now,
       updatedAt: now,
@@ -209,13 +212,13 @@ describe('shared pull refresh operations', () => {
       createdAt: 1,
       updatedAt: 1,
     })
-    const adoptPullNumbers = vi.spyOn(tasks, 'adoptPullNumbers')
+    const adopt = vi.spyOn(tasks, 'adoptChangeRequests')
     const fetcher = vi.fn(async () => new Response('unavailable', { status: 500 }))
 
     const result = await refreshOpenPulls('token', plugin.db, { tasks }, key, fetcher)
 
     expect(result.ok).toBe(false)
-    expect(adoptPullNumbers).not.toHaveBeenCalled()
+    expect(adopt).not.toHaveBeenCalled()
     expect((await core.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task-1')))[0].pullNumber).toBeNull()
     expect(await plugin.db.select().from(pullRequests)).toEqual([])
   })
@@ -257,6 +260,17 @@ describe('shared pull refresh operations', () => {
         updatedAt: 1,
       },
     ])
+    // The primary as core stores it, beside the copy in `tasks.pull_number`.
+    await core.db.insert(schema.taskChangeRequests).values({
+      taskId: 'task-taken',
+      provider: 'github',
+      repoHost: 'github.com',
+      repoPath: 'acme/web',
+      number: 99,
+      role: 'primary',
+      provenance: 'task',
+      createdAt: 1,
+    })
     const fetcher = vi.fn(async () =>
       json(
         [

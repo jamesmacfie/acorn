@@ -2,8 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { createComponent } from 'solid-js'
 import { createRoot } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WorkflowStepRow } from '../../contract/wire.ts'
-import type { WorkflowRunProjection } from '../../shared/api'
+import type { WorkflowRunProjection, WorkflowStepRow } from '../../contract/wire.ts'
 
 // The pane's model under jsdom rather than in bare Node, because everything asserted here is
 // reactive: a frame moves a signal and a memo has to see it. The node-environment project resolves

@@ -176,6 +176,40 @@ describe('command lifecycle across restart and delayed output', () => {
     expect(await cards(session.id)).toMatchObject([{ status: 'unknown', background: true, output: 'first\n' }])
   })
 
+  it('settles only commands written since the last start began, then records when this one began', async () => {
+    async function backgroundCommand() {
+      const { session, turn } = await open()
+      await command(session.id, turn.id, 'item/started')
+      await store.recordEvent(session.id, turn.id, {
+        type: 'tool',
+        tool: { id: 'cmd', title: '', kind: 'execute', background: true },
+      })
+      await store.recordEvent(session.id, turn.id, { type: 'turn_completed' })
+      return session
+    }
+    const older = await backgroundCommand()
+    // As if the previous start's settle began after `older` was written, so that start owned it.
+    store.markCommandsSettled(Date.now() + 1)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    const newer = await backgroundCommand()
+    runtime = new ManagedAgentRuntime({
+      db: ctx.storage.open(),
+      core: ctx.core,
+      dataDir: ctx.dataDir,
+      secrets: ctx.env.SECRETS,
+      internalEnv: () => ({}),
+      currentUserId: () => null,
+      registry: new AgentDriverRegistry(),
+    })
+    const startedAt = Date.now()
+    await runtime.reconcile()
+    expect(await cards(newer.id)).toMatchObject([{ status: 'unknown', background: true }])
+    expect(await cards(older.id)).toMatchObject([{ status: 'running', background: true }])
+    // Ten minutes back from the start, for a clock set back before the next one.
+    expect(store.commandsSettledBefore()).toBeGreaterThanOrEqual(startedAt - 10 * 60_000 - 1_000)
+    expect(store.commandsSettledBefore()).toBeLessThan(startedAt)
+  })
+
   it('settles a background command with its exit code', async () => {
     const { session, turn } = await open()
     await command(session.id, turn.id, 'item/started')

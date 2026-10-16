@@ -38,12 +38,11 @@ import {
   Toolbar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
-import type { WorkflowStepRow } from '../../contract/wire.ts'
+import type { WorkflowStepProjection, WorkflowStepRow } from '../../contract/wire.ts'
 import { MAX_STEP_BODY_JSON_BYTES, WORKFLOW_STEP_BODY_POINT } from '../../contract/stepBody.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { AGENTS_CONVERSATION } from '@acorn/plugin-agents/contract/conversation.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
-import type { WorkflowStepProjection } from '../../shared/api'
 import { gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
 import type { WorkflowGateForm } from '../../shared/workflowContracts'
 import TypedValueField from '../editor/TypedValueField'

@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
-import { type AppEnv, fileBodyBlobKey, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
+import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
+import { fileBodyBlobKey } from '../../blobKeys'
 import { gh, ghError } from '../../githubApi'
 import { resolveRepoForUser } from '../mirror/repoMirror'
 import { githubToken } from '../../githubToken'

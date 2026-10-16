@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../../node/schema'
-import type { WorkflowRunProjection, WorkflowUsageSummary } from '../../../shared/api'
+import type { WorkflowRunProjection, WorkflowUsageSummary } from '../../../contract/wire.ts'
 import type { WorkflowBudget } from '../../../shared/workflowContracts'
 
 const admissionFields = {

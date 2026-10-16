@@ -5,6 +5,7 @@
 // The options are the same `optionId -> value` table a session default is, because model, reasoning
 // and permission mode are all options a provider advertises about itself. Nothing here names one.
 import { z } from 'zod'
+import { ACCOUNT_NAME_PATTERN } from './accounts'
 
 export const customAgentsRoute = '/v1/p/agents/custom-agents'
 export const customAgentsPreferenceKey = 'agents:custom-agents:v1'
@@ -24,6 +25,9 @@ export const customAgentInputSchema = z.object({
   description: z.string().trim().max(500).optional(),
   providerId: id,
   profileId: id,
+  // The harness account sessions start on. Absent, or naming an account the Node no longer holds, means
+  // the harness's default account (docs/managed-agents/accounts.md).
+  account: z.string().regex(ACCOUNT_NAME_PATTERN).optional(),
   options: z
     .record(id, z.string().max(500))
     .refine((value) => Object.keys(value).length <= 20, {

@@ -19,6 +19,7 @@ import {
 } from '@acorn/plugin-api/ui'
 import { confirmAction, IconPicker } from '@acorn/plugin-api/ui/host'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
+import { accountLabel } from '../../shared/accounts'
 import { MAX_CUSTOM_AGENT_INSTRUCTIONS, type CustomAgent, type CustomAgentInput } from '../../shared/customAgents'
 import { managedAgentApi } from '../sessions/managedClient'
 import ProviderGlyph from '../sessions/ProviderGlyph'
@@ -179,8 +180,20 @@ function AgentEditor(props: {
   const update = (patch: Partial<CustomAgentInput>) => props.onChange({ ...draft(), ...patch })
   const chooseHarness = (providerId: string) => {
     const next = providerFor(providerId)
-    // Options belong to one harness, so a switch starts the new one on its own choices.
-    if (next) update({ providerId, profileId: next.profileId, options: {} })
+    // Options and accounts belong to one harness, so a switch starts the new one on its own choices.
+    if (next) update({ providerId, profileId: next.profileId, account: undefined, options: {} })
+  }
+  // With one account there is nothing to choose, because the default is that account. A saved choice
+  // stays visible after accounts are removed, so it can still be cleared.
+  const accountChoices = () => {
+    const names = provider()?.accounts?.map((account) => account.name) ?? []
+    const saved = draft().account
+    if (names.length < 2 && !saved) return []
+    return [
+      { value: '', label: 'Default account' },
+      ...names.map((name) => ({ value: name, label: accountLabel(provider(), name) })),
+      ...(saved && !names.includes(saved) ? [{ value: saved, label: `${saved} (removed)` }] : []),
+    ]
   }
   const chooseOption = (optionId: string, value: string) => {
     const options = { ...draft().options }
@@ -294,6 +307,16 @@ function AgentEditor(props: {
               onChange={chooseHarness}
             />
           </Field>
+          <Show when={accountChoices().length}>
+            <Field label="Account">
+              <Select
+                label="Account"
+                value={draft().account ?? ''}
+                options={accountChoices()}
+                onChange={(account) => update({ account: account || undefined })}
+              />
+            </Field>
+          </Show>
           <Show
             when={props.advertised[draft().providerId]?.length}
             fallback={

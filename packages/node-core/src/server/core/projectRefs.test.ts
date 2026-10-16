@@ -26,6 +26,10 @@ describe('CoreServices.projects', () => {
         name: 'widget',
         path: join(dir, 'old'),
         workspaceId: 'workspace-1',
+        repoProvider: 'github',
+        repoHost: 'github.com',
+        repoPath: 'acme/widget',
+        repoExternalId: '7',
         githubOwner: 'acme',
         githubName: 'widget',
         githubRepoId: 7,
@@ -37,6 +41,10 @@ describe('CoreServices.projects', () => {
         name: 'widget clone',
         path: join(dir, 'new'),
         workspaceId: 'workspace-1',
+        repoProvider: 'github',
+        repoHost: 'github.com',
+        repoPath: 'acme/widget',
+        repoExternalId: '7',
         githubOwner: 'acme',
         githubName: 'widget',
         githubRepoId: 7,
@@ -109,11 +117,13 @@ describe('CoreServices.projects', () => {
       name: 'widget',
       path: join(dir, 'old'),
       workspaceId: 'workspace-1',
+      repository: { provider: 'github', host: 'github.com', path: 'acme/widget', externalId: '7' },
       github: { owner: 'acme', name: 'widget', repoId: 7 },
     })
     expect(ref).not.toHaveProperty('setupScript')
     expect(ref).not.toHaveProperty('vcs')
     expect(await projects.byGithub('acme', 'widget')).toMatchObject({ id: 'project-old' })
+    expect(await projects.byRepository('github', 'acme/widget')).toMatchObject({ id: 'project-old' })
     expect(await projects.byId('missing')).toBeNull()
   })
 

@@ -11,9 +11,10 @@ plugin's declaration from `plugins/<id>/acorn-plugin.config.mjs`, where the dire
 plugin id, so the declared surface is reviewed beside the code it describes. Its default target is
 the development data root. `--package-root` stages the same package for distribution.
 
-`apps/desktop/scripts/build-bundled-plugins.mjs` holds the bundled roster: agent-cost, database,
-http, linear, model-providers, rollbar, and sentry-telemetry. The desktop packages the result as
-read-only application resources and asks the Node to reconcile it before discovery:
+`scripts/bundled-plugins.mjs` holds the bundled roster: agent-cost, database, http, linear,
+model-providers, rollbar, and sentry-telemetry. The desktop build and the standalone Node tarball
+both build it. The desktop packages the result as read-only application resources, the tarball as a
+`plugins` folder, and each asks its Node to reconcile it before discovery:
 
 - The Node updates only packages recorded as app-owned.
 - An owner-installed version wins.

@@ -31,10 +31,12 @@ remembered page, and the settings-local node switcher have automated coverage in
 105. Walk every group in the rail and open each page once. Confirm that each page's body draws, that
      its breadcrumb names its group, and that the scope chip reads **This device**, **Node: <label>**,
      or **Workspace: <name>** as the page's registration says.
-106. Pair a second node. On Installed, Security and backup, Audit log, Schedules, Run history, and
-     Telemetry, switch the header to the second node and confirm that the page shows that node's
-     data while the top bar's node, after closing settings, is still the first. On Services and
-     on a loaded plugin's page, confirm that the chip is plain text naming the active node.
+106. Pair the container node from `pnpm dev:remote` ([remote Node](../local-development/remote-node.md)),
+     which has its own filesystem, unlike a second node on this Mac. On Installed, Security and
+     backup, Audit log, Schedules, Run history, and Telemetry, switch the header to the second node
+     and confirm that the page shows that node's data while the top bar's node, after closing
+     settings, is still the first. On Services and on a loaded plugin's page, confirm that the chip
+     is plain text naming the active node.
 107. From the GitHub pane's shortcuts link, confirm that settings opens on **Keyboard shortcuts**.
      From the palette's **Settings** group, confirm that every page in the rail has a row and that
      picking one while settings is open moves to that page.

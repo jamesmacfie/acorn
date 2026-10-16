@@ -59,6 +59,9 @@ export default function AgentMcpPanel(props: { sessionId: string; onClose: () =>
 
   const acorns = (name: string) => RESERVED_MCP_SERVER_NAMES.has(name)
   const reported = () => mcp.data?.reported ?? null
+  // Acorn signs in to these itself, so the harness's own sign-in can't help with them.
+  const signsIn = (name: string) => !!mcp.data?.servers.find((server) => server.name === name)?.signIn
+  const openSettings = () => clientEvents.emit('presentation:open-settings', { tab: 'agent-mcp-servers' })
 
   return (
     <Section label="MCP servers" actions={<IconButton icon="x" label="Close MCP servers" onPress={props.onClose} />}>
@@ -83,30 +86,36 @@ export default function AgentMcpPanel(props: { sessionId: string; onClose: () =>
             >
               <For each={mcp.data?.servers ?? []}>
                 {(server) => (
-                  <Checkbox
-                    switch
-                    size="sm"
-                    label={server.name}
-                    checked={selected().has(server.name)}
-                    disabled={!!mcp.data?.locked || applying()}
-                    onChange={(on) =>
-                      setSelected((before) => {
-                        const next = new Set(before)
-                        if (on) next.add(server.name)
-                        else next.delete(server.name)
-                        return next
-                      })
-                    }
-                  />
+                  <Inline>
+                    <Checkbox
+                      switch
+                      size="sm"
+                      label={server.name}
+                      checked={selected().has(server.name)}
+                      disabled={!!mcp.data?.locked || applying()}
+                      onChange={(on) =>
+                        setSelected((before) => {
+                          const next = new Set(before)
+                          if (on) next.add(server.name)
+                          else next.delete(server.name)
+                          return next
+                        })
+                      }
+                    />
+                    <Show when={server.signIn && server.signIn.status !== 'signed_in'}>
+                      <Badge size="xs" tone="warn">
+                        needs sign-in
+                      </Badge>
+                      <Button variant="bare" size="sm" onPress={openSettings}>
+                        Sign in from Settings
+                      </Button>
+                    </Show>
+                  </Inline>
                 )}
               </For>
             </Show>
             <Inline spread>
-              <Button
-                variant="bare"
-                size="sm"
-                onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-mcp-servers' })}
-              >
+              <Button variant="bare" size="sm" onPress={openSettings}>
                 Manage servers
               </Button>
               <Show when={changed()}>
@@ -137,7 +146,9 @@ export default function AgentMcpPanel(props: { sessionId: string; onClose: () =>
           {(servers) => (
             <Stack gap="inline">
               <Text emphasis="eyebrow">What the agent reports</Text>
-              <For each={servers()}>{(server) => <ReportedRow server={server} acorn={acorns(server.name)} />}</For>
+              <For each={servers()}>
+                {(server) => <ReportedRow server={server} acorn={acorns(server.name)} signsIn={signsIn(server.name)} />}
+              </For>
             </Stack>
           )}
         </Show>
@@ -146,7 +157,7 @@ export default function AgentMcpPanel(props: { sessionId: string; onClose: () =>
   )
 }
 
-function ReportedRow(props: { server: AgentMcpReportedServer; acorn: boolean }) {
+function ReportedRow(props: { server: AgentMcpReportedServer; acorn: boolean; signsIn: boolean }) {
   return (
     <Stack gap="none">
       <Inline>
@@ -167,6 +178,11 @@ function ReportedRow(props: { server: AgentMcpReportedServer; acorn: boolean }) 
             {detail()}
           </Text>
         )}
+      </Show>
+      <Show when={props.signsIn && props.server.status !== 'connected'}>
+        <Text emphasis="muted" wrap>
+          Acorn signs in to this server for the agent. Check its sign-in in Settings → MCP.
+        </Text>
       </Show>
     </Stack>
   )

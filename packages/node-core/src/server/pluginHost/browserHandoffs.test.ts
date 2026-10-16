@@ -94,6 +94,31 @@ describe('browser handoff declarations', () => {
     await result.dispose()
   })
 
+  it("advertises a built-in's panel, and ignores the field on a loaded plugin", async () => {
+    const panel = { label: 'Tracker', pane: 'tracker', route: '/v1/p/tracker/browser-panel' }
+    await host(
+      [
+        { name: 'tracker', browserPanel: panel, init: () => {} },
+        { name: 'board', browserPanel: { label: 'Board', route: '/v1/p/board/compiled' }, init: () => {} },
+      ],
+      { loaded: { board: binding([], undefined, { label: 'Board', route: '/v1/p/board/manifest' }) } },
+    )
+    const response = (await (await browserHandoffsRoute.request('/')).json()) as BrowserHandoffsResponse
+    expect(response.panels).toEqual([
+      { pluginId: 'board', label: 'Board', route: '/v1/p/board/manifest' },
+      { pluginId: 'tracker', ...panel },
+    ])
+  })
+
+  it("refuses a built-in panel that reads through another plugin's routes", async () => {
+    await expect(
+      host([{ name: 'tracker', browserPanel: { label: 'Tracker', route: '/v1/p/agents/x' }, init: () => {} }]),
+    ).rejects.toThrow(/outside \/v1\/p\/tracker\//)
+    await expect(
+      host([{ name: 'tracker', browserPanel: { label: '', route: '/v1/p/tracker/x' }, init: () => {} }]),
+    ).rejects.toThrow()
+  })
+
   it('advertises nothing for a disabled plugin, or one whose init failed', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     await host(

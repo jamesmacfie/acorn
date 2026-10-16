@@ -1,5 +1,52 @@
 # Phase 8: list and test which plugin contracts the apps import
 
+## Completion note
+
+Landed October 15, 2026.
+
+What changed:
+
+- A test in `tools/arch/boundaries.test.ts` lists every production import from an app into a
+  plugin's `contract/` folder, as `<app file> -> <contract file>`, with a reason for each. It fails on
+  an import missing from the list, and on a listed import that's gone. Test code is exempt.
+  Activation entrypoints aren't listed.
+- [First-party plugins](../../first-party-plugins.md#what-the-apps-import-from-plugins) has the same
+  list in words, and [package boundaries](../../architecture/packages.md#what-an-app-may-import)
+  points at it.
+- The CLI reads the agents and workflows route shapes from each plugin's `contract/wire.ts`.
+  `AgentSessionRow` is gone from `apps/cli/src/projection.ts`. `agentCommands.ts` dropped its
+  `Provider`, `Turn`, `Snapshot`, `EventRow`, and `EventPage` copies, and `workflowCommands.ts` dropped
+  `Run`, `Step`, and `Definition`. The CLI has `@acorn/plugin-workflows` as a dev dependency, like
+  agents, because the bundle inlines it.
+- [Agents and workflows](../../cli/agents-and-workflows.md#why-these-commands-are-built-in) says why
+  `agent` and `workflow` are built in, and when to move them onto `cliCommands`.
+
+Decisions and deviations:
+
+- The run and step routes answer `WorkflowRunProjection` and `WorkflowStepProjection`, which lived in
+  the workflows plugin's `shared/api.ts`, where no app may import them. They moved to
+  `contract/wire.ts` with `WorkflowChildRunSummary`, `WorkflowUsageSummary`, and `WorkflowBudget`.
+  `shared/workflowContracts.ts` re-exports `WorkflowBudget`. Every importer in the plugin points at the
+  contract. Nothing about the wire changed.
+- The doc named four app files. The scan found 21 edges, including the extension sidebar, the Node
+  composition root's capability tokens, the CLI's browser bridge, and `apps/tui/src/chrome/sessionPty.ts`.
+  All are listed.
+- The merged run list (`/v1/core/runs`) and the step status read keep their inline shapes in the CLI.
+  The first is a core route, and the second has no named contract type.
+
+Checked: changing `runtimeState` in `AgentSession` failed `tsc` in `apps/cli` in five places, and an
+unlisted import in `TaskView.tsx` failed the new test with the edge named. The CLI tests (124), the
+workflows tests (650), `tsc` in the CLI, workflows, and arch tests, knip, oxlint, the format check, and
+the CLI build pass. Four arch reds predate this phase and match phase 7's list: the client console
+baseline, two doc citation checks, and doc paths.
+
+For later phases:
+
+- A new app import from a plugin's `contract/` goes in both lists with its reason.
+- Terminal drawer state (`setTerminalOpen`, `isTerminalMax`, `consumeTerminalFocusIntent`,
+  `requestTerminalFocusIntent`) stays in client-core. The first-party page records why, and it moves
+  only with the drawer.
+
 Date: October 14, 2026. Status: proposed.
 
 ## Goal

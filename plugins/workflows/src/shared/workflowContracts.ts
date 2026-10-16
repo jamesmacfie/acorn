@@ -7,17 +7,12 @@ import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { DataBinding } from '@acorn/protocol/dataBindings.ts'
+import type { WorkflowBudget } from '../contract/wire.ts'
 
 export type WorkflowPosture = 'gated' | 'autonomous'
 export type { ToolCeiling, ToolRisk } from '@acorn/protocol/toolPolicy.ts'
 
-export type WorkflowBudget = {
-  maxWallTimeMs?: number
-  maxCostUsd?: number
-  maxInputTokens?: number
-  maxOutputTokens?: number
-  maxTurns?: number
-}
+export type { WorkflowBudget }
 
 // A value the person starting the run supplies. `${inputs.<name>}` reaches it from a prompt, a child
 // prompt, and any string inside `with` (docs/workflows/execution.md § Execution model). A run freezes the
@@ -298,6 +293,8 @@ export type WorkflowCatalog = {
   kinds: { id: string; pluginId: string | null; describe: StepKindDescription | null }[]
   policies: { id: string; pluginId: string | null; describe?: PolicyDescription }[]
   profiles: { id: string; label: string; managed: boolean; structured: boolean }[]
+  /** The profile a step that names none runs on. Absent when no plugin supplies one. */
+  defaultProfileId?: string
   /** Saved workflows that the selected project can resolve. This metadata contains no definition
    *  body, input default, credential, or runtime value. */
   workflows?: WorkflowCatalogTarget[]

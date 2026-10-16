@@ -10,28 +10,60 @@ import {
   createProject,
   createProjectRef,
   detectProject,
-  parseGithubRemote,
+  getProject,
+  parseGitRemote,
   patchProject,
   projectByGithub,
+  projectByRepository,
+  toProjectRef,
+  updateProjectRef,
 } from './projects'
+import { declareCodeHost } from '../pluginHost/codeHosts'
 import { deleteProject } from './projectDeletion'
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' })
 
-describe('parseGithubRemote', () => {
-  it('parses https and ssh forms, with and without .git, case-insensitively', () => {
-    expect(parseGithubRemote('https://github.com/acme/web.git')).toEqual({ owner: 'acme', name: 'web' })
-    expect(parseGithubRemote('git@github.com:acme/web')).toEqual({ owner: 'acme', name: 'web' })
-    expect(parseGithubRemote('git@github.com:/acme/web')).toEqual({ owner: 'acme', name: 'web' })
-    expect(parseGithubRemote('git@GITHUB.COM:/Acme/Web.git')).toEqual({ owner: 'Acme', name: 'Web' })
-    expect(parseGithubRemote('ssh://git@GITHUB.COM/Acme/Web.git')).toEqual({ owner: 'Acme', name: 'Web' })
-    expect(parseGithubRemote('git@github.com://acme/web')).toBeNull()
-    expect(parseGithubRemote('https://github.com//acme/web')).toBeNull()
-    expect(parseGithubRemote('ssh://git@github.com//acme/web')).toBeNull()
-    expect(parseGithubRemote('https://gitlab.com/acme/web.git')).toBeNull()
-    expect(parseGithubRemote('https://example.com/github.com/acme/web.git')).toBeNull()
-    expect(parseGithubRemote('https://github.com.evil/acme/web.git')).toBeNull()
-    expect(parseGithubRemote('')).toBeNull()
+describe('parseGitRemote', () => {
+  const github = { host: 'github.com', path: 'acme/web' }
+  it('parses https, ssh, and scp-like forms, with and without .git, lowercased', () => {
+    expect(parseGitRemote('https://github.com/acme/web.git')).toEqual(github)
+    expect(parseGitRemote('git@github.com:acme/web')).toEqual(github)
+    expect(parseGitRemote('git@github.com:/acme/web')).toEqual(github)
+    expect(parseGitRemote('git@GITHUB.COM:/Acme/Web.git')).toEqual(github)
+    expect(parseGitRemote('ssh://git@GITHUB.COM/Acme/Web.git')).toEqual(github)
+    expect(parseGitRemote('https://user@github.com/acme/web/')).toEqual(github)
+  })
+
+  it('keeps any host and a nested path, and drops the port', () => {
+    expect(parseGitRemote('git@gitlab.example.com:group/subgroup/repo.git')).toEqual({
+      host: 'gitlab.example.com',
+      path: 'group/subgroup/repo',
+    })
+    expect(parseGitRemote('ssh://git@gitlab.example.com:2222/group/repo.git')).toEqual({
+      host: 'gitlab.example.com',
+      path: 'group/repo',
+    })
+    expect(parseGitRemote('https://bitbucket.org/workspace/repo.git')).toEqual({
+      host: 'bitbucket.org',
+      path: 'workspace/repo',
+    })
+    // The host is the URL's, so a lookalike path cannot borrow github.com.
+    expect(parseGitRemote('https://example.com/github.com/acme/web.git')).toEqual({
+      host: 'example.com',
+      path: 'github.com/acme/web',
+    })
+    expect(parseGitRemote('https://github.com.evil/acme/web.git')?.host).toBe('github.com.evil')
+  })
+
+  it('refuses empty segments, queries, local paths, and other schemes', () => {
+    expect(parseGitRemote('git@github.com://acme/web')).toBeNull()
+    expect(parseGitRemote('https://github.com//acme/web')).toBeNull()
+    expect(parseGitRemote('ssh://git@github.com//acme/web')).toBeNull()
+    expect(parseGitRemote('https://github.com/acme/web?tab=1')).toBeNull()
+    expect(parseGitRemote('/srv/git/web.git')).toBeNull()
+    expect(parseGitRemote('file:///srv/git/web.git')).toBeNull()
+    expect(parseGitRemote('https://github.com/acme/my web')).toBeNull()
+    expect(parseGitRemote('')).toBeNull()
   })
 })
 
@@ -192,6 +224,98 @@ describe('createProject / detectProject', () => {
   it('canonicalizes GitHub facets written by the project import seam', async () => {
     const project = await createProjectRef(testDb.db, { name: 'web', github: { owner: ' Acme ', name: ' Web ' } })
     expect(project.github).toEqual({ owner: 'acme', name: 'web', repoId: null })
+  })
+
+  describe('the repository facet', () => {
+    const undos: (() => void)[] = []
+    afterEach(() => undos.splice(0).forEach((undo) => undo()))
+    const repo = (name: string, remote: string) => {
+      const folder = join(dir, name)
+      mkdirSync(folder)
+      git(folder, 'init')
+      git(folder, 'remote', 'add', 'origin', remote)
+      return folder
+    }
+
+    it('gives an unclaimed host a host and path with no provider', async () => {
+      const created = await createProject(testDb.db, {
+        path: repo('nested', 'git@gitlab.example.com:group/sub/api.git'),
+      })
+      if (!created.ok) throw new Error('create failed')
+      expect(toProjectRef(created.project)).toMatchObject({
+        name: 'api',
+        repository: { provider: null, host: 'gitlab.example.com', path: 'group/sub/api', externalId: null },
+        github: null,
+      })
+      expect(created.project.githubOwner).toBeNull()
+    }, 20_000)
+
+    it('names the claiming plugin, and still names one installed after the project was added', async () => {
+      const early = await createProject(testDb.db, { path: repo('early', 'https://gitlab.test/group/sub/api.git') })
+      if (!early.ok) throw new Error('create failed')
+      expect(early.project.repoProvider).toBeNull()
+      undos.push(declareCodeHost('gitlab-test', { label: 'GitLab test', hosts: ['gitlab.test'] }, false))
+      expect(toProjectRef(early.project).repository?.provider).toBe('gitlab-test')
+      const late = await createProject(testDb.db, { path: repo('late', 'git@gitlab.test:group/sub/api.git') })
+      if (!late.ok) throw new Error('create failed')
+      expect(late.project.repoProvider).toBe('gitlab-test')
+      // Two clones of one repository: the oldest wins, as with projectByGithub.
+      expect((await projectByRepository(testDb.db, 'gitlab-test', 'Group/Sub/API'))?.id).toBe(early.project.id)
+      expect(await projectByRepository(testDb.db, 'github', 'group/sub/api')).toBeNull()
+    }, 20_000)
+
+    it('reads a github.com repository as the GitHub facet, field for field', async () => {
+      const project = await createProjectRef(testDb.db, {
+        name: 'web',
+        github: { owner: 'Acme', name: 'Web', repoId: 7 },
+      })
+      expect(project).toMatchObject({
+        repository: { host: 'github.com', path: 'acme/web', externalId: '7' },
+        github: { owner: 'acme', name: 'web', repoId: 7 },
+      })
+      const updated = await updateProjectRef(testDb.db, project.id, { repositoryExternalId: '42' })
+      expect(updated?.github).toEqual({ owner: 'acme', name: 'web', repoId: 42 })
+      // The GitHub columns follow, for readers that still query them.
+      const row = await projectByGithub(testDb.db, 'acme', 'web')
+      expect(row).toMatchObject({ githubOwner: 'acme', githubName: 'web', githubRepoId: 42, repoExternalId: '42' })
+    })
+
+    it('lets a holder set the external id only on the repository it holds, even across a path change', async () => {
+      undos.push(declareCodeHost('gitlab-test', { label: 'GitLab test', hosts: ['gitlab.test'] }, false))
+      const created = await createProject(testDb.db, { path: repo('held', 'git@gitlab.test:group/api.git') })
+      if (!created.ok) throw new Error('create failed')
+      const id = created.project.id
+      await expect(updateProjectRef(testDb.db, id, { repositoryExternalId: '1' }, 'other')).rejects.toThrow(
+        /gitlab\.test/,
+      )
+      expect(
+        (await updateProjectRef(testDb.db, id, { repositoryExternalId: '1' }, 'gitlab-test'))?.repository,
+      ).toMatchObject({ externalId: '1' })
+      // Re-pointing the folder at a github.com clone in the same call doesn't carry the write across.
+      const clone = repo('clone', 'git@github.com:acme/web.git')
+      await expect(updateProjectRef(testDb.db, id, { path: clone, githubRepoId: 9 }, 'gitlab-test')).rejects.toThrow(
+        /github\.com/,
+      )
+      expect(await getProject(testDb.db, id)).toMatchObject({ repoHost: 'github.com', githubRepoId: null })
+    }, 20_000)
+
+    it('keeps the provider and external id of the same repository when the claim goes away', async () => {
+      const undo = declareCodeHost('gitlab-test', { label: 'GitLab test', hosts: ['gitlab.test'] }, false)
+      const created = await createProject(testDb.db, { path: repo('kept', 'git@gitlab.test:group/api.git') })
+      if (!created.ok) throw new Error('create failed')
+      await updateProjectRef(testDb.db, created.project.id, { repositoryExternalId: '99' })
+      undo()
+      expect(await detectProject(testDb.db, created.project.id)).toMatchObject({
+        repoProvider: 'gitlab-test',
+        repoExternalId: '99',
+      })
+      git(created.project.path!, 'remote', 'set-url', 'origin', 'git@gitlab.test:group/other.git')
+      expect(await detectProject(testDb.db, created.project.id)).toMatchObject({
+        repoProvider: null,
+        repoPath: 'group/other',
+        repoExternalId: null,
+      })
+    }, 20_000)
   })
 
   // tasks.project_id carries no foreign key, so nothing in the database enforces this. Left undone it

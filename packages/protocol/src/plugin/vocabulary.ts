@@ -22,7 +22,7 @@ export type JsonSchema = {
   const?: string
   default?: unknown
   description?: string
-  type?: string
+  type?: string | string[]
   minimum?: number
   maximum?: number
   minLength?: number
@@ -73,7 +73,7 @@ export type PluginManifestVocabulary = {
     contributionCaps: Record<string, number>
     // Contributions that are one route on the plugin's node half rather than a list.
     contributionRoutes: string[]
-    // Contributions that are one object rather than a list, such as `browserPanel`.
+    // Contributions that are one object rather than a list, such as `browserPanel` and `codeHost`.
     contributionObjects: string[]
     frameTargets: string[]
     slots: string[]

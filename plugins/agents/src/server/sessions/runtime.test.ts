@@ -35,7 +35,7 @@ import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../sessionD
 import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults'
 import { AgentDelegationService } from '../delegation/service'
 import { AgentDelegationStore } from '../delegation/store'
-import { saveCustomAgent } from '../customAgents'
+import { customAgentRegistry, saveCustomAgent } from '../customAgents'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 import type { SecretCheckReport } from '@acorn/protocol/secretChecks.ts'
 
@@ -2998,8 +2998,8 @@ describe('managed agent runtime conformance', () => {
     const startsBefore = starts.length
     const view = await runtime.setSessionMcpServers(session.id, ['docs'])
     expect(view.servers).toEqual([
-      { name: 'docs', transport: 'http', enabled: true },
-      { name: 'linear', transport: 'stdio', enabled: false },
+      { name: 'docs', transport: 'http', enabled: true, signIn: null },
+      { name: 'linear', transport: 'stdio', enabled: false, signIn: null },
     ])
     await vi.waitFor(() => expect(starts.length).toBe(startsBefore + 1))
     expect(starts.at(-1)!.mcpServers.map((server) => server.name)).toEqual(['docs'])
@@ -3090,6 +3090,38 @@ describe('sessions pinned to an extra account', () => {
     await runtime.removeAccount('fake', 'work')
     await runtime.removeAccount('fake', 'personal')
     expect((await create({})).config.account).toBeUndefined()
+  })
+
+  it("starts a custom agent's sessions on its own account, and on the default once that account is gone", async () => {
+    for (const name of ['personal', 'work']) {
+      await runtime.addAccount('fake', name)
+      driver.signedIn.add(join(dataDir, 'agent-accounts', 'fake', name))
+    }
+    const unregister = customAgentRegistry.register({
+      id: 'test:reviewer',
+      name: 'Reviewer',
+      providerId: 'fake',
+      profileId: 'fake',
+      account: 'work',
+      options: {},
+      source: { kind: 'plugin', pluginId: 'test' },
+    })
+    const start = () =>
+      runtime.createSession({
+        taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        customAgentId: 'test:reviewer',
+        config: {},
+      })
+    try {
+      expect((await start()).config.account).toBe('work')
+      await runtime.removeAccount('fake', 'work')
+      expect((await start()).config.account).toBe('personal')
+    } finally {
+      unregister()
+    }
   })
 
   it('starts on the account folder only once that account is signed in', async () => {

@@ -8,6 +8,7 @@ export type TaskRef = {
   skipSetup: boolean
   /** `null` until the worktree is first created. Call `tasks.root(taskId)` rather than reading it. */
   worktreePath: string | null
+  /** The primary change request's number when it's on github.com. Read `tasks.changeRequests` for any host. */
   pullNumber: number | null
 }
 
@@ -24,6 +25,31 @@ export type TaskPullRelation = AttachTaskPullInput & {
   taskId: string
   role: 'primary' | 'related'
   provenance: 'agent'
+}
+/** A change request your code host owns, on the repository `provider` and `path` name. `sourceBranch`
+ *  is the branch it merges from. Core fetches it by name when your code host declares no ref. */
+export type AttachChangeRequestInput = {
+  provider: string
+  path: string
+  number: number
+  sourceBranch?: string
+  sessionId: string
+  requestId?: string
+}
+/** A change request linked to a task. The `primary` one is the task's own: core checks it out and opens
+ *  its code host's pane. `provenance` says how it was linked: on the task itself, adopted from a branch,
+ *  or attached by an agent. */
+export type TaskChangeRequest = {
+  taskId: string
+  provider: string | null
+  host: string
+  path: string
+  number: number
+  role: 'primary' | 'related'
+  provenance: 'task' | 'adopted' | 'agent'
+  sourceBranch?: string
+  sessionId?: string
+  requestId?: string
 }
 
 export type RunTarget = {
@@ -79,8 +105,19 @@ export type CoreTaskService = {
    *  `status` is `active`, `archived`, or `cancelled`. */
   inProject(projectId: string): Promise<{ id: string; title: string; status: string }[]>
   links(taskId: string): Promise<TaskLinkRef[]>
+  /** Every change request linked to the task, oldest first. */
+  changeRequests(taskId: string): Promise<TaskChangeRequest[]>
+  /** Link a change request an agent opened inside the task. The first one takes the task's empty primary
+   *  slot, and later ones are related. Throws when the repository isn't the task project's. */
+  attachChangeRequest(taskId: string, input: AttachChangeRequestInput): Promise<TaskChangeRequest>
+  /** Give each active task on the repository with no primary change request the one whose source branch
+   *  is the task's branch. Returns how many tasks took one. */
+  adoptChangeRequests(provider: string, path: string, branchToNumber: ReadonlyMap<string, number>): Promise<number>
+  /** The agent-attached change requests on github.com. Use `changeRequests`. */
   pulls(taskId: string): Promise<TaskPullRelation[]>
+  /** `attachChangeRequest` for a github.com repository. */
   attachPull(taskId: string, input: AttachTaskPullInput): Promise<TaskPullRelation>
+  /** `adoptChangeRequests` for a github.com repository. */
   adoptPullNumbers(repoOwner: string, repoName: string, branchToPull: ReadonlyMap<string, number>): Promise<number>
   /** Ask core to create a task rather than writing core-owned rows. The worktree is not created here. */
   createChild(parentTaskId: string, seed: ChildTaskSeed, intendedChildId?: string): Promise<string>

@@ -75,6 +75,7 @@ symbol rather than its file. To cite a doc, follow [writing-docs.md](./docs/writ
 | `pnpm dev:agent -- --session <name>` | Starts an isolated desktop session you can drive. |
 | `pnpm dev:tui:agent -- --session <name>` | Starts an isolated terminal client you can drive. |
 | `pnpm dev:extension -- --browser chrome --session <name>` | Opens an isolated Chrome or Firefox with the extension loaded and reloading. |
+| `pnpm dev:remote -- --session <name>` | Starts a Node in a Linux container and pairs a desktop session to it. Use it for every remote Node check. |
 | `pnpm db:generate` and `pnpm db:check` | Generate and check database migrations. |
 
 ## Test and lint quickly

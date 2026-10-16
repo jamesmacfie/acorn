@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { agentProfileRegistry, DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
+import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import * as schema from '../../node/schema'
 import type { ResolvedWorkflowGraph, WorkflowDef } from '../../shared/workflowContracts'
@@ -11,6 +11,9 @@ import { prepareWorkflowReprocess } from '../processing/reprocess'
 import { workflowSelectionPage } from '../processing/readModel'
 import { workflowRunById, workflowRunsForTask } from '../runs/read/readModel'
 import { WorkflowProcessingStore } from '../processing/store'
+
+// What the agents plugin publishes as its default profile, which these tests stand in for.
+const DEFAULT_PROFILE_ID = 'claude-code'
 
 const result = (structuredOutput: unknown = null) => ({
   status: 'ok' as const,
@@ -137,6 +140,7 @@ describe('workflow map lifecycle', () => {
       runStep: async (_taskId, def) => result(def.name === 'source' ? { tickets } : { reviewed: def.name }),
       writeHandoff: async () => undefined,
       assembleContext: async () => '',
+      defaultProfileId: () => DEFAULT_PROFILE_ID,
       notify: vi.fn(),
       cancelChildTask: async (taskId) => void cancelledTasks.push(taskId),
       ...overrides,

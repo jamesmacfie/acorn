@@ -318,9 +318,12 @@ export class AgentDelegationService {
     const custom = await this.customAgentFor(input)
     const defaults = await this.runtime.spawnedAgentDefaults()
     const profileId = spawnProfileId(defaults, caller.profileId, input.profileId, custom)
-    // A child on its parent's harness runs on the parent's login, which the person picked for this work.
+    // A custom agent's own account comes first, because the person picked it for that agent. Otherwise a
+    // child on its parent's harness runs on the parent's login, which the person picked for this work.
     // Another harness has logins of its own, so its child takes that harness's default.
-    const account = caller.managedSession?.profileId === profileId ? sessionAccount(caller.managedSession.config) : null
+    const account =
+      (await this.runtime.customAgentAccount(custom?.id)) ??
+      (caller.managedSession?.profileId === profileId ? sessionAccount(caller.managedSession.config) : null)
     const provider = await this.runtime.providers.usable((candidate) => candidate.profileId === profileId, account)
     if (!provider) throw new ToolError('bad_request', `Profile '${profileId}' does not support managed sessions.`)
     if (!provider.installed || signedIn(provider, account) === false) {

@@ -7,9 +7,18 @@ import { toast } from '../notifications/toast'
 import { createProject } from './workspaceMutations'
 import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 
-/** The native picker selects a path on the desktop's machine. */
-export const canAddProjectFromFolder = (): boolean =>
-  canPickFolder() && nodes().some((node) => node.nodeId === activeNodeId() && node.local)
+/** The native picker selects a path on the desktop's machine, so it can only choose a folder for the
+ *  local Node. */
+export const canPickNodeFolder = (nodeId: string | null): boolean =>
+  canPickFolder() && nodes().some((node) => node.nodeId === nodeId && node.local)
+
+/** Every folder a Node will read is picked here, so no path from this client's disk reaches a remote
+ *  Node. Resolves null when `nodeId` isn't local, when there's no picker, and when the owner cancels.
+ *  `pickFolder()` is for paths this device reads itself. */
+export const pickNodeFolder = async (nodeId: string | null): Promise<string | null> =>
+  canPickNodeFolder(nodeId) ? pickFolder() : null
+
+export const canAddProjectFromFolder = (): boolean => canPickNodeFolder(activeNodeId())
 
 /** Registers a folder in the active Node's mode; grouped mode may assign its workspace. */
 export async function addProjectFromFolder(
@@ -20,7 +29,7 @@ export async function addProjectFromFolder(
   try {
     if (!canAddProjectFromFolder()) throw new Error('Choose the local Node to add a folder.')
     const nodeId = activeNodeId()
-    const path = await pickFolder()
+    const path = await pickNodeFolder(nodeId)
     if (!path) return
     if (activeNodeId() !== nodeId) throw new Error('The active Node changed. Choose the folder again.')
     const knownProjectIds = new Set(

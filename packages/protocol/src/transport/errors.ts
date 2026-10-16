@@ -12,7 +12,7 @@ import { z } from 'zod'
 //
 // A closed *floor*, not an exclusive allowlist. Domain codes are load-bearing on the client:
 // `needs-trust` opens the config-trust modal and `provider_needs_auth` rewrites the message. Client
-// and Node ship from the same repo and release together (docs/api-reference/transport.md § Versioning),
+// and Node ship from the same repo and release together (docs/api-reference/versioning.md § Versioning),
 // so a route may return its own documented code, and anything without one falls back to these.
 const ERROR_CODES = [
   'bad_request',

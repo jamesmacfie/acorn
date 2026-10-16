@@ -17,9 +17,10 @@ export function pullRequestSection(source: ContextPullRequestSource): PluginCont
     label: 'Pull request',
     defaultIncluded: false,
     budget: { maxItems: 1, maxBytesPerItem: 2_000, overflow: 'truncate-tail' },
-    async assemble({ userLogin, task, github }) {
-      if (task.pullNumber == null || !github) return { items: [] }
-      const pr = await source(userLogin, github.owner, github.name, task.pullNumber)
+    async assemble({ userLogin, task, repository }) {
+      const [owner, name, ...rest] = repository?.provider === 'github' ? repository.path.split('/') : []
+      if (task.pullNumber == null || !owner || !name || rest.length) return { items: [] }
+      const pr = await source(userLogin, owner, name, task.pullNumber)
       if (!pr) return { items: [] }
       const changedFiles = pr.changedFiles
       return {

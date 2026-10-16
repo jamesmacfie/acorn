@@ -55,10 +55,6 @@ export type RuntimeBindings = {
   // plugin route, so anything placed here is readable by all of them. The key material stays
   // inside server/transport/tls.ts and server/transport/listener.ts, which are the only modules that need it.
   NODE_FINGERPRINT: string
-  // The app version this node is running, reported at GET /v1/node to an authenticated caller
-  // (docs/api-reference/transport.md § Versioning). Injected rather than read from a package.json, because the
-  // service is a bundled artifact by then and only the composition root knows the real version.
-  APP_VERSION: string
   // A CLI-owned standalone process's ephemeral identity. Only the authenticated Node probe
   // exposes it, so lifecycle commands can distinguish a restarted Node from a reused PID.
   SERVICE_INSTANCE_ID?: string
@@ -98,7 +94,7 @@ export type RuntimeBindings = {
 export type Env = RuntimeBindings & Partial<HttpBindings>
 
 // Immutable file and patch bodies keyed by content (docs/caching.md § Immutable blob cache). One
-// file per key under `dir`; keys are `filebody:<sha>` and `patch:sha256:<hex>` (server/blobs.ts),
+// file per key under `dir`; keys are `filebody:<sha>` and `patch:sha256:<hex>` (plugins/github/src/server/blobKeys.ts),
 // with each colon sanitized for a safe filename.
 export type BlobCache = {
   get(key: string): Promise<string | null>
@@ -236,7 +232,6 @@ export type BindingsOptions = {
   dbPath: string
   blobsDir: string
   nodeId: string
-  appVersion: string
   serviceInstanceId?: string
   capabilities: Pick<CapabilityRegistry, 'get' | 'require'>
   // The desktop helper's delivered keys. Without them, a standalone Node reads or mints its key files.
@@ -250,7 +245,6 @@ export function makeBindings({
   dbPath,
   blobsDir,
   nodeId,
-  appVersion,
   serviceInstanceId,
   capabilities,
   keys,
@@ -276,7 +270,6 @@ export function makeBindings({
     // certificates. It reads the same one twice, which is what lets the routes hold the public
     // fingerprint without the bindings ever touching the private key.
     NODE_FINGERPRINT: ensureCert(dataDir).fingerprint,
-    APP_VERSION: appVersion,
     ...(serviceInstanceId ? { SERVICE_INSTANCE_ID: serviceInstanceId } : {}),
     BLOBS: diskBlobCache(blobCachePath),
     SESSION_ENC_KEY: encKey,

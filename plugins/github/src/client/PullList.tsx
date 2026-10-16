@@ -3,9 +3,6 @@ import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/soli
 import { useNavigate, useParams } from '@solidjs/router'
 import {
   activateTaskSignals,
-  CHECK_TONE,
-  checksState,
-  checksSummary,
   clientEvents,
   contextMenuItems,
   formatRelativeTime,
@@ -20,6 +17,7 @@ import {
   workspacesOptions,
   type ItemRowTarget,
 } from '@acorn/plugin-api/client'
+import { CHECK_TONE, checksState, checksSummary } from './checks/checkStatus'
 import {
   Alert,
   Button,
@@ -186,7 +184,6 @@ export default function PullList() {
     return [...local, ...(search.data?.pulls ?? []).filter((pull) => !seen.has(pull.number))]
   })
   const searchNotice = () => {
-    if (searchStatus() === 'searching') return 'Searching GitHub…'
     if (searchStatus() === 'failed') return "Couldn't search GitHub. Showing loaded matches."
     if (searchStatus() === 'done' && search.data?.incomplete) {
       return `GitHub has ${search.data.total} matches. Add to the search to narrow it.`
@@ -319,7 +316,7 @@ export default function PullList() {
         {/* Under the strip rather than beside it. Open and Closed choose which list this is; the filter
             is about the list that choice produced, and squeezed into the tab row it had no room and no
             inset of its own. */}
-        <FilterBar ariaLabel="Search pull requests">
+        <FilterBar ariaLabel="Search pull requests" busy={searchStatus() === 'searching'}>
           <Input
             kind="filter"
             label="Search pull requests"
@@ -330,7 +327,7 @@ export default function PullList() {
         </FilterBar>
         <Show when={shown().length ? searchNotice() : undefined}>
           {(notice) => (
-            <EmptyState align="start" size="sm" busy={searchStatus() === 'searching'}>
+            <EmptyState align="start" size="sm">
               {notice()}
             </EmptyState>
           )}
@@ -395,17 +392,18 @@ export default function PullList() {
         <Show
           when={items().length}
           fallback={
-            <EmptyState align="start" size="sm">
-              {searchStatus() === 'idle'
-                ? tab() === 'open'
-                  ? 'No open pull requests.'
-                  : 'No closed pull requests.'
-                : searchStatus() === 'searching'
-                  ? 'Searching GitHub…'
+            // The search bar's spinner stands in while GitHub answers.
+            <Show when={searchStatus() !== 'searching'}>
+              <EmptyState align="start" size="sm">
+                {searchStatus() === 'idle'
+                  ? tab() === 'open'
+                    ? 'No open pull requests.'
+                    : 'No closed pull requests.'
                   : searchStatus() === 'failed'
                     ? "No loaded pull requests match, and GitHub couldn't be searched."
                     : 'No pull requests match.'}
-            </EmptyState>
+              </EmptyState>
+            </Show>
           }
         >
           <Rows

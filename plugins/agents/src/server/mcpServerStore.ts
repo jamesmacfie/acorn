@@ -3,11 +3,12 @@
 //
 // One row per server, keyed by name. A secret value is sealed on the way in and revealed only by
 // `resolve()`, which runs when a provider starts. Nothing that reads the list, the settings page
-// included, ever sees one.
+// included, ever sees one. A server's sign-in lives beside it in McpSignIns, loaded on first use.
 import { and, asc, eq } from 'drizzle-orm'
 import { createHash } from 'node:crypto'
 import { realpath } from 'node:fs/promises'
 import { isAbsolute, join, relative, sep } from 'node:path'
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { PluginDatabase, SecretService } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
 import type { AgentDriverMcpServer } from './drivers/types'
@@ -16,9 +17,14 @@ import type {
   AgentMcpPair,
   AgentMcpServer,
   AgentMcpServerInput,
+  AgentMcpSignIn,
+  AgentMcpSignInFinish,
+  AgentMcpSignInStarted,
   AgentMcpTransport,
 } from '../shared/mcpServers'
 import type { McpInstalledPackage } from './mcpPackageInstall'
+import type { McpSignIns } from './mcpSignIn'
+import { LazyService } from './sessions/lazyService'
 
 // Exactly one of `value` and `sealed` is set: `sealed` when the pair is a secret.
 type StoredPair = { name: string; secret: boolean; value?: string; sealed?: string }
@@ -32,7 +38,14 @@ type StoredConfig = {
   consentRevision?: string
   reviewTools?: boolean
   approvedCatalogue?: { revision: string; digest: string; version: number; tools: Record<string, unknown>[] }
+  // Present only for a server with sign-in, so a row saved before sign-in existed keeps its revision.
+  auth?: 'oauth'
+  clientId?: string
+  /** Sealed. */
+  clientSecret?: string
 }
+
+type SignInStatuses = Awaited<ReturnType<McpSignIns['statuses']>>
 
 type Row = typeof schema.agentMcpServers.$inferSelect
 
@@ -57,6 +70,9 @@ function storedConfig(row: Row): StoredConfig | null {
         parsed.approvedCatalogue && typeof parsed.approvedCatalogue.digest === 'string'
           ? parsed.approvedCatalogue
           : undefined,
+      ...(parsed.auth === 'oauth' ? { auth: 'oauth' as const } : {}),
+      ...(typeof parsed.clientId === 'string' ? { clientId: parsed.clientId } : {}),
+      ...(typeof parsed.clientSecret === 'string' ? { clientSecret: parsed.clientSecret } : {}),
     }
   } catch {
     return null
@@ -68,7 +84,19 @@ function configRevision(config: StoredConfig, enabled: boolean): string {
   return createHash('sha256').update(JSON.stringify({ content, enabled })).digest('hex')
 }
 
-function publicServer(row: Row, config: StoredConfig): AgentMcpServer {
+// What tokens are bound to. A change to any of it makes the stored tokens useless, so they are dropped.
+const signInIdentity = (config: StoredConfig | null | undefined): string | null =>
+  config?.auth === 'oauth' ? JSON.stringify([config.url, config.clientId ?? null, config.clientSecret ?? null]) : null
+
+function signInState(name: string, config: StoredConfig, statuses: SignInStatuses): AgentMcpSignIn | null {
+  if (config.auth !== 'oauth') return null
+  const stored = statuses.get(name)
+  return stored && stored.url === config.url
+    ? { status: stored.status, signedInAt: stored.signedInAt }
+    : { status: 'signed_out', signedInAt: null }
+}
+
+function publicServer(row: Row, config: StoredConfig, statuses: SignInStatuses): AgentMcpServer {
   const revision = configRevision(config, row.enabled)
   return {
     name: row.name,
@@ -88,6 +116,10 @@ function publicServer(row: Row, config: StoredConfig): AgentMcpServer {
     consented: config.consentRevision === revision,
     reviewTools: config.reviewTools === true,
     approvedCatalogueDigest: config.approvedCatalogue?.revision === revision ? config.approvedCatalogue.digest : null,
+    auth: config.auth ?? 'headers',
+    signIn: signInState(row.name, config, statuses),
+    clientId: config.clientId ?? null,
+    clientSecretStored: !!config.clientSecret,
   }
 }
 
@@ -96,6 +128,7 @@ export class AgentMcpServerStore {
   readonly #secrets: SecretService
   readonly #managedRoot: string | undefined
   readonly #activeManagedRoots = new Set<ReadonlySet<string>>()
+  readonly #signIns: LazyService<McpSignIns>
 
   holdManagedRoots(roots: readonly string[]): () => void {
     const held = new Set(roots)
@@ -109,24 +142,37 @@ export class AgentMcpServerStore {
     return new Set([...this.#activeManagedRoots].flatMap((roots) => [...roots]))
   }
 
-  constructor(db: PluginDatabase, secrets: SecretService, managedRoot?: string) {
+  /** `redact` hears every token and client secret a sign-in reveals, for the runtime's redaction list. */
+  constructor(
+    db: PluginDatabase,
+    secrets: SecretService,
+    managedRoot?: string,
+    redact: (value: string) => void = () => undefined,
+  ) {
     this.#db = db
     this.#secrets = secrets
     this.#managedRoot = managedRoot
+    // Loaded on first use, because the OAuth client is a large part of a boot graph that only sign-in
+    // needs (apps/node/scripts/check-service-budget.mjs).
+    this.#signIns = new LazyService(() =>
+      import('./mcpSignIn').then(({ McpSignIns }) => new McpSignIns(db, secrets, redact)),
+    )
   }
 
   async list(): Promise<AgentMcpServer[]> {
     const rows = await this.#db.select().from(schema.agentMcpServers).orderBy(asc(schema.agentMcpServers.name))
-    return rows.flatMap((row) => {
+    const configs = rows.flatMap((row) => {
       const config = storedConfig(row)
-      return config ? [publicServer(row, config)] : []
+      return config ? [[row, config] as const] : []
     })
+    const statuses = await this.#statuses(configs.map(([, config]) => config))
+    return configs.map(([row, config]) => publicServer(row, config, statuses))
   }
 
   async get(name: string): Promise<AgentMcpServer | null> {
     const row = await this.#row(name)
     const config = row && storedConfig(row)
-    return row && config ? publicServer(row, config) : null
+    return row && config ? publicServer(row, config, await this.#statuses([config])) : null
   }
 
   /** The servers a new session starts with. */
@@ -171,6 +217,17 @@ export class AgentMcpServerStore {
       managed: priorConfig?.managed,
       reviewTools: input.reviewTools === true,
     }
+    if (input.auth === 'oauth') {
+      config.auth = 'oauth'
+      if (input.clientId) config.clientId = input.clientId
+      const secret =
+        input.clientSecret === undefined
+          ? priorConfig?.clientSecret
+          : input.clientSecret
+            ? await this.#secrets.seal(input.clientSecret)
+            : undefined
+      if (secret && config.clientId) config.clientSecret = secret
+    }
     const revision = configRevision(config, input.enabled)
     if (priorConfig?.consentRevision === revision) config.consentRevision = revision
     config.approvedCatalogue = priorConfig?.approvedCatalogue
@@ -182,6 +239,8 @@ export class AgentMcpServerStore {
         target: schema.agentMcpServers.name,
         set: { configJson: JSON.stringify(config), enabled: input.enabled, updatedAt: now },
       })
+    const priorSignIn = signInIdentity(priorConfig)
+    if (priorSignIn && priorSignIn !== signInIdentity(config)) await (await this.#signIns.get()).forget(name)
     const saved = await this.get(name)
     if (!saved) throw new Error('The MCP server was not saved.')
     return saved
@@ -200,7 +259,7 @@ export class AgentMcpServerStore {
       .where(and(eq(schema.agentMcpServers.name, name), eq(schema.agentMcpServers.configJson, row.configJson)))
       .returning({ name: schema.agentMcpServers.name })
     if (!changed.length) throw new Error('The MCP server changed. Review its configuration again.')
-    return publicServer(row, config)
+    return publicServer(row, config, await this.#statuses([config]))
   }
 
   async approvedCatalogue(
@@ -245,7 +304,7 @@ export class AgentMcpServerStore {
       .where(and(eq(schema.agentMcpServers.name, name), eq(schema.agentMcpServers.configJson, row.configJson)))
       .returning({ name: schema.agentMcpServers.name })
     if (!changed.length) throw new Error('The MCP server configuration changed before approval.')
-    return publicServer(row, config)
+    return publicServer(row, config, await this.#statuses([config]))
   }
 
   async revokeCatalogue(name: string, revision: string, digest: string): Promise<void> {
@@ -343,6 +402,7 @@ export class AgentMcpServerStore {
           .onConflictDoNothing()
           .returning({ name: schema.agentMcpServers.name })
     if (!changed.length) throw new Error('The managed server changed before activation.')
+    if (signInIdentity(beforeConfig)) await (await this.#signIns.get()).forget(name)
     const saved = await this.get(name)
     if (!saved) throw new Error('The managed MCP package was installed but its server was not saved.')
     return saved
@@ -352,7 +412,53 @@ export class AgentMcpServerStore {
     const before = await this.#row(name)
     if (!before) return false
     await this.#db.delete(schema.agentMcpServers).where(eq(schema.agentMcpServers.name, name))
+    await (await this.#signIns.get()).forget(name)
     return true
+  }
+
+  /** Starts a sign-in for a saved, consented server that has sign-in on (docs/mcp/sign-in.md). The
+   *  person's own client secret is revealed only for this. */
+  async startSignIn(name: string, redirectUri: string, deviceId: string): Promise<AgentMcpSignInStarted> {
+    const row = await this.#row(name)
+    const config = row && storedConfig(row)
+    if (!row || !config) throw new Error('No MCP server has that name.')
+    if (config.auth !== 'oauth' || !config.url)
+      throw new Error('This server does not use sign-in. Save it with sign-in first.')
+    if (config.consentRevision !== configRevision(config, row.enabled))
+      throw new Error('Review and consent to this exact server configuration before signing in.')
+    const configured = config.clientId
+      ? {
+          clientId: config.clientId,
+          clientSecret: config.clientSecret
+            ? await this.#secrets.reveal(config.clientSecret, 'agent MCP server: sign in')
+            : null,
+        }
+      : null
+    return (await this.#signIns.get()).start(name, config.url, redirectUri, deviceId, configured)
+  }
+
+  async finishSignIn(
+    name: string,
+    attemptId: string,
+    deviceId: string,
+    input: AgentMcpSignInFinish,
+  ): Promise<AgentMcpServer | null> {
+    await (await this.#signIns.get()).finish(name, attemptId, deviceId, input)
+    return this.get(name)
+  }
+
+  async cancelSignIn(name: string, attemptId: string, deviceId: string): Promise<boolean> {
+    return (await this.#signIns.get()).cancel(name, attemptId, deviceId)
+  }
+
+  async signOut(name: string): Promise<AgentMcpServer | null> {
+    await (await this.#signIns.get()).signOut(name)
+    return this.get(name)
+  }
+
+  /** The fetch the node's own connection to a signed-in server uses (McpSignIns.fetchFor). */
+  async signedFetch(name: string, url: string): Promise<FetchLike> {
+    return (await this.#signIns.get()).fetchFor(name, url)
   }
 
   /**
@@ -371,13 +477,13 @@ export class AgentMcpServerStore {
     secrets: string[]
     unavailable: string[]
     managedRoots: string[]
-    revisions: Record<string, { revision: string; reviewTools: boolean }>
+    revisions: Record<string, { revision: string; reviewTools: boolean; signIn: boolean }>
   }> {
     const servers: AgentDriverMcpServer[] = []
     const secrets: string[] = []
     const unavailable: string[] = []
     const managedRoots: string[] = []
-    const revisions: Record<string, { revision: string; reviewTools: boolean }> = {}
+    const revisions: Record<string, { revision: string; reviewTools: boolean; signIn: boolean }> = {}
     for (const name of names) {
       signal?.throwIfAborted()
       const row = await this.#row(name)
@@ -386,6 +492,13 @@ export class AgentMcpServerStore {
       if (!config) continue
       if (config.consentRevision !== configRevision(config, row!.enabled)) {
         unavailable.push(name)
+        continue
+      }
+      const signInSecrets =
+        config.auth === 'oauth' && config.url ? await (await this.#signIns.get()).secretsFor(name, config.url) : []
+      signal?.throwIfAborted()
+      if (!signInSecrets) {
+        unavailable.push(`${name} (not signed in)`)
         continue
       }
       let managedRoot: string | null = null
@@ -433,9 +546,13 @@ export class AgentMcpServerStore {
         unavailable.push(name)
         continue
       }
-      secrets.push(...revealed)
+      secrets.push(...revealed, ...signInSecrets)
       if (managedRoot) managedRoots.push(managedRoot)
-      revisions[name] = { revision: configRevision(config, row!.enabled), reviewTools: config.reviewTools === true }
+      revisions[name] = {
+        revision: configRevision(config, row!.enabled),
+        reviewTools: config.reviewTools === true,
+        signIn: config.auth === 'oauth',
+      }
       if (config.transport === 'stdio' && config.command) {
         servers.push({ transport: 'stdio', name, command: config.command, args: config.args, env: values })
       } else if (config.transport === 'http' && config.url) {
@@ -443,6 +560,11 @@ export class AgentMcpServerStore {
       }
     }
     return { servers, secrets, unavailable, managedRoots, revisions }
+  }
+
+  // Sign-in state for the list. Skips loading McpSignIns when no server uses sign-in.
+  async #statuses(configs: readonly StoredConfig[]): Promise<SignInStatuses> {
+    return configs.some((config) => config.auth === 'oauth') ? (await this.#signIns.get()).statuses() : new Map()
   }
 
   async #row(name: string): Promise<Row | null> {
