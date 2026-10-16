@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, createSignal, onMount } from 'solid-js'
+import { For, Match, Show, Switch, createEffect, onMount } from 'solid-js'
 import type {
   BridgeAgentChoice,
   BridgeAgentSession,
@@ -7,14 +7,12 @@ import type {
   BridgePendingRequest,
   BridgeProject,
   BridgeTask,
-  BridgeTaskPage,
   BridgeWorkspace,
 } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
 import { runtimeIcon, runtimeTone } from '@acorn/plugin-agents/contract/runtimeState.ts'
-import type { BrowserApi } from '../browser'
-import { itemTaskLink, projectLink, taskLink } from '../acornLinks'
+import { itemTaskLink, projectLink } from '../acornLinks'
 import { onHandoffPage, pageHandoffs, type PageHandoff } from '../handoffs'
 import type { PageTask } from '../taskPages'
 import { AgentPicker, agentChoice } from './agentChoice'
@@ -22,7 +20,6 @@ import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { Handoff } from './Handoff'
 import { OpenInAcorn } from './OpenInAcorn'
-import { openTabs, showPage, tabFor } from './openTabs'
 import { State } from './state'
 
 // Home's sections below Waiting for you. Workspace owns the state they draw.
@@ -294,31 +291,9 @@ function ProjectOptions(props: { projects: readonly BridgeProject[]; selected: s
   )
 }
 
-// Where a task's link goes, as its row names it: a plugin's app by its state, any other page by its
-// address without the scheme.
-function PageLabel(props: { page: BridgeTaskPage }) {
-  return (
-    <Show
-      when={props.page.status}
-      fallback={<span class="grow">{`${new URL(props.page.origin).host}${props.page.pathPrefix}`}</span>}
-    >
-      {(status) => (
-        <span class="grow">
-          <State tone={status().tone}>
-            {status().label} {status().state}
-          </State>
-        </span>
-      )}
-    </Show>
-  )
-}
-
 // Home's task list: one workspace's open tasks, grouped by project in the workspace's order. A row
-// opens its task. Its links, each switching to its open tab or opening a new one, fold out beside it.
+// opens its task, whose ⋯ menu has its links.
 export function Tasks(props: {
-  api: BrowserApi
-  nodeId: string
-  opensLinks: boolean
   workspaces: readonly BridgeWorkspace[] | null
   workspaceId: string | null
   pickWorkspace(id: string): void
@@ -327,10 +302,7 @@ export function Tasks(props: {
   tasks: readonly BridgePageTask[]
   pageTaskIds: readonly string[]
   openTask(taskId: string): void
-  chat(taskId: string): void
 }) {
-  const tabs = openTabs(props.api)
-  const [expanded, setExpanded] = createSignal<string | null>(null)
   const projectTasks = (projectId: string) => props.tasks.filter((task) => task.projectId === projectId)
   const listed = () => props.projects.some((project) => projectTasks(project.id).length)
 
@@ -364,57 +336,15 @@ export function Tasks(props: {
               <ul class="rows" aria-label={project.name}>
                 <For each={projectTasks(project.id)}>
                   {(task) => (
-                    <li class="task">
-                      <div class="task-row">
-                        <button type="button" class="row-button" onClick={() => props.openTask(task.id)}>
-                          <strong>{task.title}</strong>
-                          <span class="quiet">
-                            {[task.branch, props.pageTaskIds.includes(task.id) && 'This page']
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          class="icon"
-                          aria-label={`${task.title} links`}
-                          aria-expanded={expanded() === task.id}
-                          onClick={() => setExpanded((shown) => (shown === task.id ? null : task.id))}
-                        >
-                          <Icon name="chevron-down" />
-                        </button>
-                      </div>
-                      <Show when={expanded() === task.id}>
-                        <ul class="task-links" aria-label={`${task.title} links`}>
-                          <For each={task.pages}>
-                            {(page) => (
-                              <li class="row">
-                                <PageLabel page={page} />
-                                <button
-                                  type="button"
-                                  class="quiet"
-                                  onClick={() => void showPage(props.api, tabs(), page)}
-                                >
-                                  {tabFor(tabs(), page) ? 'Switch to tab' : 'Open'}
-                                </button>
-                              </li>
-                            )}
-                          </For>
-                          <li class="row">
-                            <Show when={!task.pages.length}>
-                              <span class="quiet grow">No links for this task.</span>
-                            </Show>
-                            <OpenInAcorn
-                              href={taskLink(props.nodeId, task.id)}
-                              opensLinks={props.opensLinks}
-                              class="quiet"
-                            />
-                            <button type="button" class="quiet" onClick={() => props.chat(task.id)}>
-                              Chat
-                            </button>
-                          </li>
-                        </ul>
-                      </Show>
+                    <li>
+                      <button type="button" class="row-button" onClick={() => props.openTask(task.id)}>
+                        <strong>{task.title}</strong>
+                        <span class="quiet">
+                          {[task.branch, props.pageTaskIds.includes(task.id) && 'This page']
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
+                      </button>
                     </li>
                   )}
                 </For>

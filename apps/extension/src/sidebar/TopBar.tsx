@@ -1,6 +1,8 @@
-import { Match, Show, Switch } from 'solid-js'
+import { Match, Show, Switch, type JSX } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { Kbd } from '@acorn/client-core/kit/components/primitives.tsx'
+import { formatChord } from '@acorn/client-core/kit/lib/formatChord'
 import type { Location } from './location'
 import { nodeState } from './state'
 
@@ -16,17 +18,24 @@ const Acorn = () => (
   </svg>
 )
 
+// The key that opens Go to task, as the panel writes it: ⌘K on a Mac, Ctrl+K elsewhere.
+const GO_TO_TASK_KEYS = formatChord(/Mac/.test(navigator.userAgent) ? 'meta+k' : 'ctrl+k')
+
 // The bar above every level, drawn from where the sidebar is. Home shows the acorn with the selected
-// Node's state as a dot, and the Settings gear. A task, a conversation, and Settings show Back and
-// what they are.
+// Node's state as a dot, Go to task, and the Settings gear. A task, a conversation, and Settings show
+// Back and what they are, and a task's title opens Go to task too.
 export function TopBar(props: {
   location: Location
   heading: Heading | null
   // The selected Node, if any, and its state, which the acorn's dot shows.
   nodeLabel: string | null
   status: NodeStatus | null
+  // The ⋯ menu for the task or conversation shown, if any.
+  menu?: JSX.Element
+  ref(element: HTMLElement): void
   back(): void
   openSettings(): void
+  goToTask(): void
 }) {
   const Back = () => (
     <button type="button" class="icon" aria-label="Back" onClick={() => props.back()}>
@@ -34,7 +43,7 @@ export function TopBar(props: {
     </button>
   )
   return (
-    <header class="top">
+    <header class="top" ref={props.ref}>
       <Switch>
         <Match when={props.location.level === 'home'}>
           <span
@@ -45,7 +54,13 @@ export function TopBar(props: {
             <Acorn />
             <span class="dot" data-tone={props.nodeLabel ? nodeState(props.status).tone : 'idle'} />
           </span>
-          <span class="grow" />
+          <Show when={props.nodeLabel} fallback={<span class="grow" />}>
+            <button type="button" class="go-to-task-button" aria-label="Go to task" onClick={() => props.goToTask()}>
+              <Icon name="search" />
+              <span class="grow">Go to task</span>
+              <Kbd size="xs">{GO_TO_TASK_KEYS}</Kbd>
+            </button>
+          </Show>
           <button type="button" class="icon" aria-label="Settings" onClick={() => props.openSettings()}>
             <Icon name="settings" />
           </button>
@@ -58,15 +73,19 @@ export function TopBar(props: {
         </Match>
         <Match when={props.location.level === 'task'}>
           <Back />
-          <div class="heading">
-            <strong class="title">{props.heading?.title}</strong>
+          <button type="button" class="heading" aria-haspopup="dialog" onClick={() => props.goToTask()}>
+            <strong class="title">
+              {props.heading?.title}
+              <Icon name="chevron-down" tone="muted" />
+            </strong>
             <span class="detail">
               {props.heading?.detail}
               <Show when={props.heading?.here}>
                 <span class="here">This page</span>
               </Show>
             </span>
-          </div>
+          </button>
+          {props.menu}
         </Match>
         <Match when={props.location.level === 'conversation'}>
           <Back />
@@ -74,6 +93,7 @@ export function TopBar(props: {
             <span class="eyebrow">{props.heading?.eyebrow}</span>
             <strong class="title">{props.heading?.title}</strong>
           </div>
+          {props.menu}
         </Match>
       </Switch>
     </header>

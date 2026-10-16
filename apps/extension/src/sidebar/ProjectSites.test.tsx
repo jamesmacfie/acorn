@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'solid-js/web'
 import type { BridgeAgentSession, BridgeHandoff, BridgePageTask } from '@acorn/protocol/extensionBridge.ts'
 import { sameSite, type ProjectSite, type SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
@@ -65,6 +65,8 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
     // Each Node's tasks with their page addresses, and its handoffs.
     taskPages: [{ id: 't1', title: 'Fix login', branch: null, projectId: 'p1', pages: [] }] as BridgePageTask[],
     handoffs: [] as BridgeHandoff[],
+    // Conversations archived here, which the task's list leaves out.
+    archived: [] as string[],
   }
   const nodes = () => ({
     nodes: ['n1', 'n2'].map((nodeId) => ({ nodeId, label: nodeId, endpoint: `https://${nodeId}.test`, local: false })),
@@ -118,7 +120,14 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
             request.projectId === 'p1' ? [{ id: 't1', title: 'Fix login', branch: null }, ...state.addedTasks] : [],
         }
       case 'sessions.list':
-        return { nodeId, taskId: request.taskId, sessions: request.taskId === 't1' ? [session] : [] }
+        return {
+          nodeId,
+          taskId: request.taskId,
+          sessions: request.taskId === 't1' && !state.archived.includes(session.id) ? [session] : [],
+        }
+      case 'session.archive':
+        state.archived.push(request.sessionId as string)
+        return { nodeId, sessionId: request.sessionId }
       case 'requests.pending':
         return { nodeId, requests: state.pending }
       case 'session.read':
@@ -688,15 +697,11 @@ describe('Home task list', () => {
   })
   const tasks = (root: HTMLElement) => root.querySelector('section[aria-label="Tasks"]')!
   const rows = (root: HTMLElement) =>
-    [...tasks(root).querySelectorAll('li.task .row-button strong')].map((row) => row.textContent)
+    [...tasks(root).querySelectorAll('.row-button strong')].map((row) => row.textContent)
   const row = (root: HTMLElement, title: string) =>
-    [...tasks(root).querySelectorAll<HTMLButtonElement>('li.task .row-button')].find(
+    [...tasks(root).querySelectorAll<HTMLButtonElement>('.row-button')].find(
       (element) => element.querySelector('strong')!.textContent === title,
     )!
-  const toggleLinks = async (root: HTMLElement, title: string) => {
-    button(tasks(root), `${title} links`)!.click()
-    await settle(20)
-  }
 
   it("lists one workspace's tasks by project, and remembers the workspace chosen", async () => {
     const { fake, state, root } = mount({ url: 'https://example.com/' })
@@ -715,50 +720,16 @@ describe('Home task list', () => {
     expect(rows(root)).toEqual(['Tidy'])
   })
 
-  it('opens a task from its row, and folds out its links, switching to an open tab or opening a new one', async () => {
-    const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
+  it("opens a task from its row, and the page's task from This page", async () => {
+    const { state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
     state.taskPages = [
       task('t1', 'Fix login', 'p1', [
         { origin: 'https://github.com', pathPrefix: '/acme/web/pull/7', source: 'github' },
       ]),
-      task('t2', 'Write guide', 'p2', [
-        { origin: 'https://linear.app', pathPrefix: '/acme/issue/ENG-1', source: 'linear' },
-        {
-          origin: 'https://runn-1.runn.localhost:5104',
-          pathPrefix: '/',
-          source: 'runn',
-          status: { label: 'Runn stack', state: 'running', tone: 'ok' },
-        },
-      ]),
-      task('t3', 'Tidy docs', 'p2'),
+      task('t2', 'Write guide', 'p2'),
     ]
-    fake.otherTabs = [{ id: 9, windowId: 2, url: 'https://linear.app/acme/issue/ENG-1/fix-it' }]
     await settle(30)
     await goHome(root)
-    const links = () =>
-      [...tasks(root).querySelectorAll('.task-links li')].map((item) => item.textContent?.replace(/\s+/g, ' ').trim())
-
-    await toggleLinks(root, 'Write guide')
-    expect(links()).toEqual([
-      'linear.app/acme/issue/ENG-1Switch to tab',
-      'Runn stack runningOpen',
-      'Copy Acorn linkChat',
-    ])
-    button(tasks(root), 'Switch to tab')!.click()
-    button(tasks(root), 'Open')!.click()
-    await settle(20)
-    expect(fake.shownTabs).toEqual([9])
-    expect(fake.focusedWindows).toEqual([2])
-    expect(fake.createdTabs).toEqual(['https://runn-1.runn.localhost:5104/'])
-    // The tab closed, so its link opens a new one.
-    fake.closeTab(9)
-    await settle(20)
-    expect(links()[0]).toBe('linear.app/acme/issue/ENG-1Open')
-
-    // One task's links at a time, and a task with none says so.
-    await toggleLinks(root, 'Tidy docs')
-    expect(links()).toEqual(['No links for this task.Copy Acorn linkChat'])
-
     // A row opens its task, and so does the page's task under This page.
     row(root, 'Write guide').click()
     await settle(30)
@@ -770,5 +741,210 @@ describe('Home task list', () => {
     expect(
       [...root.querySelectorAll('[aria-label="Agents"] .row-button strong')].map((item) => item.textContent),
     ).toEqual(['Chat s1'])
+  })
+})
+
+// Menus and the palette draw in a portal on the document's body, outside the panel's root.
+const menuItems = () =>
+  [...document.querySelectorAll('[role="menu"] :is(.ui-menu-item, .ui-menu-label-row)')].map((item) => item.textContent)
+const menuItem = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>('[role="menu"] .ui-menu-item')].find((item) =>
+    item.textContent?.startsWith(label),
+  )!
+const choose = async (label: string) => {
+  menuItem(label).click()
+  await settle(20)
+}
+const palette = () => document.querySelector<HTMLElement>('[role="dialog"][aria-label="Go to task"]')
+// The palette's group labels, marked with #, and its rows' titles, in order.
+const paletteRows = () =>
+  [...palette()!.querySelectorAll('.go-to-task-group, .repo-picker-row')].map((item) =>
+    item.classList.contains('go-to-task-group')
+      ? `# ${item.textContent}`
+      : item.querySelector('.repo-picker-name > span')!.textContent,
+  )
+const press = async (key: string, init: KeyboardEventInit = {}) => {
+  ;(document.activeElement ?? document).dispatchEvent(
+    new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }),
+  )
+  await settle(20)
+}
+const commandK = () => press('k', { metaKey: true })
+const filterPalette = async (text: string) => {
+  const input = palette()!.querySelector('input')!
+  input.value = text
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle(20)
+}
+const pageTask = (
+  id: string,
+  title: string,
+  projectId: string,
+  branch: string | null,
+  pages: BridgePageTask['pages'],
+) => ({
+  id,
+  title,
+  branch,
+  projectId,
+  pages,
+})
+
+describe('Go to task', () => {
+  const PULL = { origin: 'https://github.com', pathPrefix: '/acme/web/pull/7', source: 'github' }
+
+  it("lists Home, the page's task, then each project's tasks under its workspace, and filters by title and branch", async () => {
+    const { state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
+    state.taskPages = [
+      pageTask('t1', 'Fix login', 'p1', 'fix-login', [PULL]),
+      pageTask('t2', 'Write guide', 'p2', null, []),
+      pageTask('t3', 'Tidy', 'p3', 'tidy-up', []),
+    ]
+    await settle(30)
+    expect(shownTask(root)).toBe('Fix login')
+
+    await commandK()
+    expect(paletteRows()).toEqual([
+      'Home',
+      '# This page',
+      'Fix login',
+      '# Main › Docs',
+      'Write guide',
+      '# Other › Everything',
+      'Tidy',
+    ])
+    expect(palette()!.querySelector('.repo-picker-row:nth-of-type(3) small')?.textContent).toBe('fix-login')
+    // The task the top bar names is checked.
+    const checked = [...palette()!.querySelectorAll('.repo-picker-row')].filter((item) =>
+      item.querySelector('.go-to-task-lead svg'),
+    )
+    expect(checked.map((item) => item.querySelector('.repo-picker-name > span')!.textContent)).toEqual([
+      'Home',
+      'Fix login',
+    ])
+    expect(palette()!.textContent).toContain('Project checkout')
+
+    await filterPalette('tidy-u')
+    expect(paletteRows()).toEqual(['# Other › Everything', 'Tidy'])
+    await filterPalette('nothing like it')
+    expect(palette()!.textContent).toContain('No open task matches.')
+
+    // Arrow keys move from Home, and Enter opens the task under the cursor.
+    await filterPalette('')
+    await press('ArrowDown')
+    await press('ArrowDown')
+    await press('Enter')
+    expect(palette()).toBeNull()
+    expect(shownTask(root)).toBe('Write guide')
+
+    // The task's title opens it too, and Escape closes it.
+    root.querySelector<HTMLButtonElement>('header button.heading')!.click()
+    await settle(20)
+    expect(palette()).not.toBeNull()
+    await press('Escape')
+    expect(palette()).toBeNull()
+  })
+
+  it('opens with ⌘K from Home, a task, a conversation, and Settings, and names the Node in its footer', async () => {
+    const { root } = mount({ url: 'https://example.com/' })
+    await settle(30)
+    const opensAndCloses = async () => {
+      await commandK()
+      expect(palette()).not.toBeNull()
+      await commandK()
+      expect(palette()).toBeNull()
+    }
+    await opensAndCloses()
+    await openTask(root, 'Fix login')
+    await opensAndCloses()
+    await openChat(root, 'Chat s1')
+    expect(conversationTitle(root)).toBe('Chat s1')
+    await opensAndCloses()
+    await openSettings(root)
+    await opensAndCloses()
+
+    // Home's button opens it, and Switch Node in the footer opens Settings.
+    await goHome(root)
+    button(root.querySelector('header')!, 'Go to task')!.click()
+    await settle(20)
+    const footer = palette()!.querySelector('.repo-picker-footer')!
+    expect(footer.textContent).toContain('n1')
+    button(footer, 'Switch Node')!.click()
+    await settle(20)
+    expect(palette()).toBeNull()
+    expect(root.querySelector('header .title')?.textContent).toBe('Settings')
+  })
+})
+
+describe('the task and conversation menus', () => {
+  it("lists the task's pages, each switching to its browser tab or opening one, with its Acorn link and Settings", async () => {
+    const writeText = vi.fn(async () => {})
+    Object.assign(navigator, { clipboard: { writeText } })
+    const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
+    state.taskPages = [
+      pageTask('t1', 'Fix login', 'p1', null, [
+        { origin: 'https://github.com', pathPrefix: '/acme/web/pull/7', source: 'github' },
+        { origin: 'https://linear.app', pathPrefix: '/acme/issue/ENG-1', source: 'linear' },
+        {
+          origin: 'https://runn-1.runn.localhost:5104',
+          pathPrefix: '/',
+          source: 'runn',
+          status: { label: 'Runn stack', state: 'running', tone: 'ok' },
+        },
+      ]),
+    ]
+    fake.otherTabs = [{ id: 9, windowId: 2, url: 'https://linear.app/acme/issue/ENG-1/fix-it' }]
+    await settle(30)
+    expect(shownTask(root)).toBe('Fix login')
+
+    const openMenu = async () => {
+      button(root, 'Task menu')!.click()
+      await settle(20)
+    }
+    await openMenu()
+    // A development build has no desktop to open the link, so it only copies it.
+    expect(menuItems()).toEqual([
+      'Copy Acorn link',
+      'Pages',
+      'Pull request #7This tab',
+      'linear.app/acme/issue/ENG-1Switch to tab',
+      'Runn stackrunning',
+      'Settings',
+    ])
+    await choose('linear.app')
+    expect(fake.shownTabs).toEqual([9])
+    expect(fake.focusedWindows).toEqual([2])
+    await openMenu()
+    await choose('Runn stack')
+    expect(fake.createdTabs).toEqual(['https://runn-1.runn.localhost:5104/'])
+    // The tab closed, so its link opens a new one.
+    fake.closeTab(9)
+    await settle(20)
+    await openMenu()
+    expect(menuItems()).toContain('linear.app/acme/issue/ENG-1Open')
+    await choose('Copy Acorn link')
+    expect(writeText).toHaveBeenCalledWith('acorn://n1/t/t1')
+    await openMenu()
+    await choose('Settings')
+    expect(root.querySelector('header .title')?.textContent).toBe('Settings')
+  })
+
+  it("archives a conversation from its menu and goes back to the task's Agents, which no longer lists it", async () => {
+    const { state, root } = mount({ url: 'https://example.com/' })
+    await settle(30)
+    await openTask(root, 'Fix login')
+    await openChat(root, 'Chat s1')
+    button(root, 'Conversation menu')!.click()
+    await settle(20)
+    expect(menuItems()).toEqual(['Copy Acorn link', 'Archive chat'])
+    await choose('Archive chat')
+    await settle(20)
+
+    const archives = state.requests.filter((request) => request.op === 'session.archive')
+    expect(archives).toEqual([expect.objectContaining({ nodeId: 'n1', sessionId: 's1', key: expect.any(String) })])
+    expect(conversationTitle(root)).toBeNull()
+    expect(shownTask(root)).toBe('Fix login')
+    expect(root.querySelector('[aria-label="Agents"]')).not.toBeNull()
+    expect(root.querySelector('[aria-label="Agents"]')!.textContent).not.toContain('Chat s1')
   })
 })

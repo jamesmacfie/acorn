@@ -17,7 +17,7 @@ export function OpenInAcorn(props: { href: string | null; opensLinks: boolean; c
   )
 }
 
-export function CopyAcornLink(props: { href: string; class?: string }) {
+function CopyAcornLink(props: { href: string; class?: string }) {
   const [copied, setCopied] = createSignal(false)
   const copy = async () => {
     await navigator.clipboard.writeText(props.href)

@@ -211,6 +211,8 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     input: turnInputSchema,
     key: operationKey,
   }),
+  // Archives a conversation, as the desktop's Archive does. The Node keeps it, out of every list.
+  z.strictObject({ ...envelope, op: z.literal('session.archive'), nodeId, sessionId: rowId, key: operationKey }),
   // Answers one request the agent is waiting on. `requestId` is the agents plugin's provider request
   // ID. The key is kept by the sidebar for that request and answer only, never stored, so an answer is
   // sent again only when the person presses it again.
@@ -502,6 +504,7 @@ export type BridgeResults = {
   'session.read': BridgeSessionRead
   'session.create': { nodeId: string; session: BridgeAgentSession }
   'turn.submit': { nodeId: string; sessionId: string; turnId: string }
+  'session.archive': { nodeId: string; sessionId: string }
   // The request as the Node holds it after the answer. One already settled comes back unchanged.
   'request.resolve': { nodeId: string; sessionId: string; request: BridgeAgentRequest }
   // Oldest first. Only active tasks' requests: an archived task has no conversation to open.

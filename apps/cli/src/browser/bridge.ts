@@ -294,7 +294,7 @@ export function createBridge(options: {
   async function nodeResponse(
     nodeId: string,
     request: {
-      method: 'GET' | 'POST' | 'PUT' | 'DELETE'
+      method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
       path: string
       body?: unknown
       form?: Extract<NodeFetchBody, { kind: 'form' }>
@@ -685,6 +685,15 @@ export function createBridge(options: {
           body: { input, source: 'interactive', effectivePolicy: {} },
         })) as AgentTurn
         return { nodeId: request.nodeId, sessionId: request.sessionId, turnId: turn.id }
+      }
+      case 'session.archive': {
+        await nodeRequest(request.nodeId, {
+          method: 'PATCH',
+          path: sessionRoute(request.sessionId),
+          key: request.key,
+          body: { archived: true },
+        })
+        return { nodeId: request.nodeId, sessionId: request.sessionId }
       }
       case 'request.resolve': {
         // The Node settles a request once. An answer to one already settled, from here or another

@@ -3,8 +3,6 @@ import type { BridgeAgentHint, BridgeAgentSession, BridgeAttachmentRef } from '@
 import { renderMarkdown } from '@acorn/client-core/kit/lib/markdown'
 import type { BrowserApi } from '../browser'
 import { CallFailure } from '../messages'
-import { conversationLink } from '../acornLinks'
-import { CopyAcornLink, OpenInAcorn } from './OpenInAcorn'
 import { attachmentPreviews } from './attachmentPreviews'
 import type { BridgeClient } from './bridgeClient'
 import { Composer } from './Composer'
@@ -48,14 +46,11 @@ export function Conversation(props: {
   // The conversation's row as its task's list read it, until the conversation's own read arrives.
   session: BridgeAgentSession
   online: boolean
-  // Whether Open in Acorn may open the desktop app, or copies its link.
-  opensLinks: boolean
   hint: BridgeAgentHint | null
   reconnects: number
 }) {
   const target = props.target
   const listed = props.session
-  const link = conversationLink(target.nodeId, target.taskId, target.sessionId)
   const [view, setView] = createSignal<ConversationWindow | null>(null)
   const [readError, setReadError] = createSignal<CallFailure | null>(null)
   const previews = attachmentPreviews((attachmentId) =>
@@ -117,8 +112,6 @@ export function Conversation(props: {
       <div class="subhead">
         <span class="grow">{[agentName(session()), session().model].filter(Boolean).join(' · ')}</span>
         <State tone={state().tone}>{state().label}</State>
-        <OpenInAcorn href={link} opensLinks={props.opensLinks} class="link" />
-        <Show when={props.opensLinks && link}>{(href) => <CopyAcornLink href={href()} class="link" />}</Show>
       </div>
       <div class="conversation-body">
         <Show when={readError() && !gone()}>

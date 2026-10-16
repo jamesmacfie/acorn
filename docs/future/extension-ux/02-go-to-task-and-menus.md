@@ -1,6 +1,64 @@
 # Phase 2: Go to task, and the task and conversation menus
 
-Date: October 16, 2026. Status: proposed. Depends on [phase 1](./01-navigation.md).
+Date: October 16, 2026. Status: done on October 16, 2026. Depends on [phase 1](./01-navigation.md).
+
+## Completion note
+
+Landed on October 16, 2026. **Go to task** opens from Home's top bar button, a task's title, and ⌘K
+or Ctrl+K at every level, Settings included. A task's ⋯ menu holds its Acorn links, its pages, and
+Settings. A conversation's ⋯ menu holds its Acorn links and **Archive chat**, which calls the new
+`session.archive` bridge operation. Home's task rows lost their links fold-out, and the conversation
+lost the links under its header. [Sidebar navigation](../../browser-extension/navigation.md) has a
+new **Go to task** section and documents both menus.
+
+Decisions and deviations:
+
+- The palette, `sidebar/GoToTask.tsx`, isn't the kit's `Picker`. `Picker` owns its trigger button
+  and anchors to it, and this palette has three ways to open it and none of them is its own button.
+  It draws `PickerRow` and the picker's classes on the kit's anchored popover instead, so it looks
+  like a picker without changing `Picker`. `group` wasn't added to `Picker`, because nothing calls it
+  yet. Phase 5 adds it with its project picker.
+- To get there, `@acorn/client-core` now exports `./kit/lib/anchor` (`createAnchoredPopover`) and
+  `./kit/keys/trap` (`restoreFocusOnCleanup`, so Escape puts focus back where it was).
+- The palette reads no tasks. `tasks.pages` already returns every active task with its title,
+  branch, and project, from the same Node route as `tasks.list`. So no `tasks.list` reads, and no
+  `projectId` change to it.
+- The keyboard cursor uses `PickerRow`'s `active` mark. The task the top bar names is marked with a
+  check in the row's leading slot instead, and Home's row has the house there. Rows have no state
+  icon yet, because phase 3 defines it.
+- ⌘K and Ctrl+K both work everywhere, as the composer's ⌘↩ does. The button shows ⌘K on a Mac and
+  ⌃K elsewhere, through `formatChord`. ⌘K also closes the palette when it's open.
+- `GoToTask` is drawn by `Workspace.tsx`, which has the projects and workspaces. `App.tsx` owns
+  whether it's open, the top bar element it hangs under, and the key. Its footer names the Node with
+  the acorn's dot colours. **Switch Node** opens Settings.
+- The menus are in `sidebar/TopBarMenus.tsx`, and `App.tsx` passes them to `TopBar` as `menu`. **Open
+  in Acorn** in a menu follows the link through a detached anchor's click, the same way the panel's
+  `<a>` links reach the desktop. Where `opensLinks` is false, only **Copy Acorn link** shows.
+- A page row in the task menu says **This tab**, **Switch to tab**, or **Open** when no tab shows it,
+  as Home's fold-out did, and an app says its state. A GitHub pull request reads "Pull request #N".
+  Other pages read as their host and path.
+- **Archive chat** goes back with `back()`, so a step's conversation returns to **Runs**. After the
+  archive, `App.tsx` bumps an `archives` counter, and `Workspace.tsx` reads the task's conversations
+  again instead of waiting for an agent hint.
+- A workflow step's conversation links to its run's task, not the step's own child task, which only
+  `Workspace.tsx` knows. Pass that task up through `Heading` if the desktop link turns out wrong for
+  a step.
+- The sidebar's generic button and field rules centred the palette's rows and boxed its filter field.
+  `sidebar.css` overrides both for `.go-to-task` only. The **New chat** picker has the same centred
+  rows. Phase 6 should check it.
+
+For later phases:
+
+- Phase 3: Home's task row is now a single `.row-button` in an `li` with no class. The links are
+  gone. The palette's rows want the state icon you define, in `GoToTask.tsx`'s `leading`.
+- Phase 4: the top bar's `menu` slot sits at the right of a task and a conversation. Put **Needs
+  you** before it.
+- Phase 5: add `group` to the kit's `Picker` for the project picker. `GoToTask.tsx`'s
+  `.go-to-task-group` label shows the look.
+- Phase 7: the conversation's subhead now holds only the agent name and state.
+- Tests: `ProjectSites.test.tsx` has the palette and menu helpers: `commandK`, `press`,
+  `paletteRows`, `menuItems`, and `choose`. Menus and the palette draw in a portal on
+  `document.body`, not in the test's root.
 
 ## Goal
 

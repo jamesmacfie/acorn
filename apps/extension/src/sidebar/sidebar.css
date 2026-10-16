@@ -48,6 +48,33 @@ ul { list-style: none; margin: 0; padding: 0; }
 .heading .eyebrow { font-size: var(--fs-2xs); color: var(--text-muted); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); font-weight: var(--label-weight); }
 .here { display: inline-flex; align-items: center; gap: 3px; }
 .here::before { content: ''; width: 6px; height: 6px; border-radius: var(--radius-circle); background: var(--accent); }
+/* Home's Go to task fills the bar like a search field. A task's title opens it too. */
+.go-to-task-button {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  text-align: start;
+  min-height: var(--control-h-sm);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  color: var(--text-muted);
+  background: var(--bg);
+  border: var(--control-border);
+}
+.go-to-task-button:hover { color: var(--text); border-color: var(--accent); }
+button.heading { display: grid; justify-content: stretch; min-height: 0; color: inherit; background: none; border: 0; text-align: start; }
+button.heading:hover { background: var(--bg-hover); }
+.heading .title .ui-icon { margin-inline-start: var(--space-1); vertical-align: -2px; }
+/* Go to task hangs under the bar, as wide as the panel less a margin, with the Node in its footer.
+ * The panel's own button and field rules would centre its rows and box its filter. */
+.go-to-task { width: calc(100vw - 2 * 4px); max-width: none; }
+.go-to-task .repo-picker-tools { padding-inline: var(--space-5) var(--space-3); }
+.go-to-task .repo-picker-filter { padding-inline: var(--space-3); border: 0; background: none; }
+.go-to-task .repo-picker-name { display: block; min-height: 0; }
+.go-to-task .repo-picker-name > small { font-family: var(--font-mono); }
+.go-to-task-group { padding: var(--space-4) var(--space-6) var(--space-1); font-size: var(--fs-2xs); color: var(--text-muted); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); font-weight: var(--label-weight); }
+.go-to-task-lead { flex: none; display: inline-flex; width: 1em; padding-inline-start: var(--space-2); color: var(--text-muted); }
+.go-to-task .repo-picker-footer { gap: var(--space-3); padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6); font-size: var(--fs-sm); }
+.go-to-task .repo-picker-footer .dot { width: 7px; height: 7px; }
 /* A task's tabs stay under the bar as the view scrolls. */
 main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-sticky); background: var(--bg-subtle); }
 
@@ -147,12 +174,6 @@ h2, h3 {
 /* A New picker row's harness mark and, for a login shown as an icon, the account's icon. */
 .agent-marks { display: inline-flex; align-items: center; gap: var(--space-2); }
 .row-button[aria-current='true'] { box-shadow: inset var(--marker-w) 0 0 var(--accent); padding-left: var(--space-4); }
-/* A Home task row, with the toggle for its links beside it and the links open under it. */
-.rows > li.task { flex-direction: column; align-items: stretch; gap: 0; }
-.task-row { display: flex; align-items: center; min-width: 0; }
-.task-row > button.icon { color: var(--text-muted); }
-.task-links { display: grid; gap: var(--space-2); padding: 0 0 var(--space-3) var(--space-4); font-size: var(--fs-sm); }
-.task-links > li > .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .section-head > select { width: auto; max-width: 60%; }
 /* The kit's spinning icon turns on base.css's keyframes, which the panel doesn't load. */
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -1,4 +1,4 @@
-import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
+import { Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type {
   BridgeAgentHint,
@@ -10,6 +10,7 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { conversationLink, taskLink } from '../acornLinks'
 import type { BrowserApi } from '../browser'
 import { HIDDEN_MARKERS_KEY, type PageHandoff } from '../handoffs'
 import { CallFailure, type CallError, type HostState, type RequestTarget } from '../messages'
@@ -18,10 +19,11 @@ import { activePageUrl } from './activePage'
 import { bridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { INSTALL_COMMAND, errorGuidance, hostGuidance, installFixes, statusGuidance } from './guidance'
-import { createLocation } from './location'
+import { createLocation, type Location } from './location'
 import { Pairing } from './Pairing'
 import { Settings } from './Settings'
 import { TopBar, type Heading } from './TopBar'
+import { ConversationMenu, TaskMenu } from './TopBarMenus'
 import { Workspace } from './Workspace'
 
 // How often the panel asks again for a bridge the person is installing.
@@ -84,6 +86,11 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     projectOf: (taskId) => nodeTasks()?.find((task) => task.id === taskId)?.projectId ?? null,
   })
   const [heading, setHeading] = createSignal<Heading | null>(null)
+  // Whether Go to task is open, and the top bar it hangs under.
+  const [goToTask, setGoToTask] = createSignal(false)
+  const [topBar, setTopBar] = createSignal<HTMLElement>()
+  // Counts conversations archived here, after which the task's list reads again.
+  const [archives, setArchives] = createSignal(0)
   // The origins the branch marker is hidden on. Its own menu hides it, and This page shows it again.
   const [hiddenMarkers, setHiddenMarkers] = createSignal<string[]>([])
   const readHiddenMarkers = (value: unknown) =>
@@ -211,6 +218,25 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   const forget = (nodeId: string) => attempt(async () => showFleet(await client.call({ op: 'node.forget', nodeId })))
 
   onMount(() => void refresh())
+  // ⌘K, or Ctrl+K, opens Go to task from anywhere in the panel once it has focus.
+  const onKey = (event: KeyboardEvent) => {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'k') return
+    event.preventDefault()
+    if (fleet()?.activeNodeId && !pairing()) setGoToTask((open) => !open)
+  }
+  onMount(() => document.addEventListener('keydown', onKey))
+  onCleanup(() => document.removeEventListener('keydown', onKey))
+
+  const at = <Level extends Location['level']>(level: Level) => {
+    const here = nav.location()
+    return here.level === level ? (here as Extract<Location, { level: Level }>) : null
+  }
+  const archive = (nodeId: string, sessionId: string) =>
+    attempt(async () => {
+      await client.call({ op: 'session.archive', nodeId, sessionId, key: crypto.randomUUID() })
+      setArchives((count) => count + 1)
+      if (at('conversation')?.sessionId === sessionId) nav.back()
+    })
   // A conversation an OS notification or a right-click asked to open, once its Node is the selected one.
   createEffect(
     on([openRequest, () => fleet()?.activeNodeId], ([target, nodeId]) => {
@@ -240,11 +266,42 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
         heading={heading()}
         nodeLabel={selected()?.label ?? null}
         status={status()}
+        ref={setTopBar}
         back={nav.back}
         openSettings={() => {
           setPairing(false)
           nav.openSettings()
         }}
+        goToTask={() => setGoToTask(true)}
+        menu={
+          <Show when={fleet()?.activeNodeId}>
+            {(nodeId) => (
+              <Switch>
+                <Match when={at('task')}>
+                  {(here) => (
+                    <TaskMenu
+                      api={props.api}
+                      href={taskLink(nodeId(), here().taskId)}
+                      opensLinks={props.opensLinks ?? false}
+                      pages={nodeTasks()?.find((task) => task.id === here().taskId)?.pages ?? []}
+                      pageUrl={pageUrl()}
+                      openSettings={nav.openSettings}
+                    />
+                  )}
+                </Match>
+                <Match when={at('conversation')}>
+                  {(here) => (
+                    <ConversationMenu
+                      href={conversationLink(nodeId(), here().taskId, here().sessionId)}
+                      opensLinks={props.opensLinks ?? false}
+                      archive={() => void archive(nodeId(), here().sessionId)}
+                    />
+                  )}
+                </Match>
+              </Switch>
+            )}
+          </Show>
+        }
       />
       {/* One line for anything wrong with the bridge or the Node, with the next step. */}
       <Show when={hostGuidance(host())}>
@@ -367,6 +424,12 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
               projectChanges={projectChanges()}
               nav={nav}
               heading={setHeading}
+              goToTask={goToTask()}
+              closeGoToTask={() => setGoToTask(false)}
+              topBar={topBar()}
+              nodeLabel={selected()?.label ?? ''}
+              status={status()}
+              archives={archives()}
               panels={panels()}
               pageUrl={pageUrl()}
               handoffs={handoffs()}

@@ -113,16 +113,8 @@ The picker beside **Tasks** chooses the workspace. The sidebar keeps the choice 
 `homeWorkspace:<nodeId>` in `storage.local`. With no choice, it shows the page's task's workspace,
 or else the first one.
 
-A row opens its task. The chevron beside it folds out the task's links, one task at a time:
-
-- Each address the task is known by, as its host and path, or as the plugin's state line for an app
-  a plugin published. **Switch to tab** brings forward the tab already showing it, matched the same way
-  a page is matched to its task, and focuses that tab's window. **Open** opens it in a new tab.
-- **Open in Acorn** on the task, and **Chat**, which opens the task's newest conversation. A task with
-  no address says so.
-
-The sidebar learns which links are open from the `tabs` permission, which gives every tab's address.
-It reads the tabs again when one navigates or closes. Tab addresses stay in the browser.
+A row opens its task. The task's links are in its ⋯ menu
+([a task and its tabs](./navigation.md#a-task-and-its-tabs)).
 
 ## The branch marker
 

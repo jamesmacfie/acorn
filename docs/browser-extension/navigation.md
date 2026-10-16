@@ -1,10 +1,12 @@
 # Sidebar navigation in the browser extension
 
 This page covers how the [browser extension](../browser-extension.md)'s sidebar is laid out: its
-three levels, the top bar at each, the tabs under a task, **Back**, and the strip under the bars. How
-the panel follows the browser tab is in [moving between pages](./task-pages.md#moving-between-pages).
-The code is in `apps/extension/src/sidebar/location.ts`, which holds the level and the moves between
-levels, `apps/extension/src/sidebar/TopBar.tsx`, and `apps/extension/src/sidebar/Workspace.tsx`.
+three levels, the top bar at each, **Go to task**, the ⋯ menus, the tabs under a task, **Back**, and
+the strip under the bars. How the panel follows the browser tab is in
+[moving between pages](./task-pages.md#moving-between-pages). The code is in
+`apps/extension/src/sidebar/location.ts`, which holds the level and the moves between levels,
+`apps/extension/src/sidebar/TopBar.tsx`, `apps/extension/src/sidebar/GoToTask.tsx`,
+`apps/extension/src/sidebar/TopBarMenus.tsx`, and `apps/extension/src/sidebar/Workspace.tsx`.
 
 ## Levels and Back
 
@@ -18,8 +20,8 @@ Home.
 
 ## Home
 
-Home's top bar holds the acorn, with a dot for the selected Node's state, and the Settings gear. The
-dot is green while the Node answers, amber while its live updates pause, and red when it doesn't
+Home's top bar holds the acorn, with a dot for the selected Node's state, the **Go to task** button
+with its key, and the Settings gear. The dot is green while the Node answers, amber while its live updates pause, and red when it doesn't
 answer. Home lists, top to bottom:
 
 1. **Waiting for you**, only while an agent waits on a request, across every project on the Node.
@@ -35,8 +37,18 @@ answer. Home lists, top to bottom:
 ## A task and its tabs
 
 A task's top bar holds **Back**, then the task's title over its project and branch. A **This page**
-tag follows when the page beside the panel belongs to the task. Under the bar, the kit's tab strip
-holds the task's panes:
+tag follows when the page beside the panel belongs to the task. The title opens
+[Go to task](#go-to-task). The ⋯ at the right holds the task's menu:
+
+- **Open in Acorn** and **Copy Acorn link** ([the panel's verbs](./handoffs.md#the-panels-verbs)).
+- **Pages**, when the task has any: each pull request, other address, or app a plugin published for
+  it. A row says **This tab** when it's the page beside the panel, **Switch to tab** when another tab
+  shows it, and **Open** otherwise. An app shows its state instead. Choosing one brings that tab and
+  its window forward, or opens the page in a new tab. The sidebar learns which tabs show what from
+  the `tabs` permission, and reads the tabs again when one navigates or closes.
+- **Settings**.
+
+Under the bar, the kit's tab strip holds the task's panes:
 
 - **Agents**, always: every conversation in the task, grouped as **Managed sessions**, **Workflow
   runs**, and **Inline chats**, each with its agent, title, and state. A row opens the conversation.
@@ -54,11 +66,28 @@ loads, so it doesn't vanish under the person.
 ## A conversation
 
 A conversation's top bar holds **Back**, then the conversation's title, with its task's title above
-it. A workflow step's conversation shows the step's name, with its run's name above it. The
-conversation has **Open in Acorn** and **Copy Acorn link** ([the panel's
-verbs](./handoffs.md#the-panels-verbs)). The composer's toolbar holds the three
+it. A workflow step's conversation shows the step's name, with its run's name above it. The ⋯ at the
+right holds **Open in Acorn**, **Copy Acorn link** ([the panel's
+verbs](./handoffs.md#the-panels-verbs)), and **Archive chat**. Archiving sends `session.archive`,
+which archives the conversation as the desktop's Archive does, so it leaves every list. The panel
+then goes back to the tab the conversation came from and reads its list again. The composer's toolbar holds the three
 [capture](./page-capture.md) buttons, and each capture shows as a chip in the draft. Each
 conversation keeps its own draft ([agent conversations](./conversations.md)).
+
+## Go to task
+
+**Go to task** works like the desktop's palette. **⌘K** on a Mac, or **Ctrl+K** elsewhere, opens it
+from any level once the panel has focus, and so do Home's **Go to task** button and a task's title.
+A side panel gets keyboard focus only after a click into it, which is the browser's rule.
+
+It hangs under the top bar and lists **Home**, then a **This page** group with the page's task, then
+one group per project, labelled "Workspace › project", in the order `projects.list` returns. The
+page's task isn't repeated. Each row shows the task's title over its branch, or "Project checkout"
+for a task with no branch, and the task the top bar names has a check. Typing filters by title and
+branch. The arrow keys move, **Enter** opens, and **Escape** closes. The tasks are the `tasks.pages`
+list the sidebar already keeps, so opening it reads nothing.
+
+The footer names the selected Node with a dot for its state. **Switch Node** opens Settings.
 
 ## The strip under the bars
 

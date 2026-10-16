@@ -28,6 +28,7 @@ let dispose: (() => void) | undefined
 afterEach(() => {
   dispose?.()
   document.body.innerHTML = ''
+  vi.restoreAllMocks()
 })
 
 type Request = Record<string, unknown> & { id: string; op: string }
@@ -357,12 +358,19 @@ describe('a handoff in the sidebar', () => {
     which.dispatchEvent(new Event('change', { bubbles: true }))
     await settle()
     expect(opens().map((link) => link.getAttribute('href'))).toEqual(['acorn://n1/t/t1'])
-    // The conversation header opens the task on the agents pane with this conversation selected.
+    // The conversation's menu opens the task on the agents pane with this conversation selected.
     button(root, 'Chat')!.click()
     await settle(30)
-    const head = root.querySelector('[aria-label="Conversation"] .subhead')!
-    expect(head.querySelector('a')!.getAttribute('href')).toBe('acorn://n1/t/t1?pane=agents&item=s1')
-    expect(button(head, 'Copy Acorn link')).toBeDefined()
+    button(root, 'Conversation menu')!.click()
+    await settle(20)
+    const followed: string[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      followed.push(this.href)
+    })
+    const items = [...document.querySelectorAll<HTMLButtonElement>('[role="menu"] .ui-menu-item')]
+    expect(items.map((item) => item.textContent)).toEqual(['Open in Acorn', 'Copy Acorn link', 'Archive chat'])
+    items[0]!.click()
+    expect(followed).toEqual(['acorn://n1/t/t1?pane=agents&item=s1'])
   })
 
   it('copies the Acorn link instead of opening it in a development build', async () => {

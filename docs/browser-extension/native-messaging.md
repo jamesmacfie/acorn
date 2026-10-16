@@ -27,6 +27,7 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `session.read` | `nodeId`, `sessionId`, `afterSeq`, `limit` (at most 500) | `{ nodeId, sessionId, session, records, reach, queued }` |
 | `session.create` | `nodeId`, `taskId`, `providerId`, `profileId`, `customAgentId` and `account` (optional), `key` | `{ nodeId, session }` |
 | `turn.submit` | `nodeId`, `sessionId`, `input`, `key` | `{ nodeId, sessionId, turnId }` |
+| `session.archive` | `nodeId`, `sessionId`, `key` | `{ nodeId, sessionId }`: the host sends `PATCH` with `{ archived: true }` to the session's route |
 | `request.resolve` | `nodeId`, `sessionId`, `requestId`, `resolution`, `key` | `{ nodeId, sessionId, request }`; see [answering the agent](./conversations.md#answering-the-agent) |
 | `attachment.upload`, `attachment.read`, `attachment.delete` | `nodeId`, `taskId`, and the attachment | See [page capture](./page-capture.md#attachment-operations) |
 | `handoffs.list`, `handoff.resolve`, `handoff.create` | `nodeId`, and the handoff and page | See [handoffs](./handoffs.md#native-operations) |

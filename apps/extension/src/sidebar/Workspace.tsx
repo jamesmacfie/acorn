@@ -1,4 +1,5 @@
 import { Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
+import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type { ProjectSite } from '@acorn/protocol/siteAssociations.ts'
 import type {
   BridgeAgentHint,
@@ -25,6 +26,7 @@ import type { BridgeClient } from './bridgeClient'
 import { CaptureFailure, withCapture, type PageCapture } from '../capture'
 import { Conversation } from './Conversation'
 import { errorGuidance } from './guidance'
+import { GoToTask } from './GoToTask'
 import { Agents, Tasks, ThisPage } from './Home'
 import { changeDraft, loadHomeWorkspace, saveHomeWorkspace, type TaskTab } from '../localState'
 import { locationTask, type Navigation } from './location'
@@ -53,6 +55,14 @@ export function Workspace(props: {
   // Where the sidebar is, and what the top bar names under a task or in a conversation.
   nav: Navigation
   heading(heading: Heading | null): void
+  // Whether Go to task is open, closing it, and the top bar it hangs under. Its footer names the Node.
+  goToTask: boolean
+  closeGoToTask(): void
+  topBar: HTMLElement | undefined
+  nodeLabel: string
+  status: NodeStatus | null
+  // Counts conversations the top bar archived, after which the open task's list reads again.
+  archives: number
   // The Node's plugin panels, null until it answers.
   panels: readonly BridgePanel[] | null
   // The page beside the panel, when it may be read, with the handoffs and site associations it is
@@ -472,6 +482,16 @@ export function Workspace(props: {
       { defer: true },
     ),
   )
+  createEffect(
+    on(
+      () => props.archives,
+      () => {
+        const id = taskId()
+        if (id) void loadSessions(id)
+      },
+      { defer: true },
+    ),
+  )
   // A project was added, renamed, hidden, or removed, here or by another client.
   createEffect(
     on(
@@ -497,191 +517,202 @@ export function Workspace(props: {
   )
 
   return (
-    <Show when={location().level !== 'settings'}>
-      <Show when={location().level === 'task'}>
-        <Tabs
-          idPrefix="task"
-          ariaLabel="Task"
-          tabs={taskTabs()}
-          active={tab() ?? 'agents'}
-          onChange={(id) => nav.pickTab(id as TaskTab)}
-        />
-      </Show>
-      <Show when={pageStrip()}>
-        {(strip) => {
-          const shown = strip()
-          return shown.kind === 'other' ? (
-            <div class="strip" role="status">
-              <span class="grow">
-                This page is in <b>{shown.task.title}</b>
-              </span>
-              <button type="button" class="quiet" onClick={() => nav.openTask(shown.task.id)}>
-                Switch
-              </button>
-            </div>
-          ) : (
-            <div class="strip" role="status">
-              <span class="grow">This page has no task</span>
-              <button type="button" class="quiet" onClick={() => nav.goHome()}>
-                Start task
-              </button>
-            </div>
-          )
-        }}
-      </Show>
-      <Show when={problem()}>
-        <p class="banner problem" role="alert">
-          {problem()}
-        </p>
-      </Show>
-      <Switch>
-        <Match when={location().level === 'home'}>
-          <div class="view" aria-label="Home">
-            <Waiting
-              client={props.client}
-              nodeId={nodeId}
-              requests={props.requests}
-              online={props.online}
-              open={(request) => nav.openConversation(request.taskId, request.sessionId)}
-            />
-            <Show when={pageMatched()}>
-              <ThisPage
+    <>
+      <GoToTask
+        open={props.goToTask}
+        close={props.closeGoToTask}
+        anchor={props.topBar}
+        tasks={props.tasks ?? []}
+        projects={projects()}
+        workspaces={workspaces()}
+        pageTaskId={pageTask()?.task.id ?? null}
+        shownTaskId={taskId()}
+        nodeLabel={props.nodeLabel}
+        status={props.status}
+        goHome={nav.goHome}
+        openTask={(id) => nav.openTask(id)}
+        switchNode={nav.openSettings}
+      />
+      <Show when={location().level !== 'settings'}>
+        <Show when={location().level === 'task'}>
+          <Tabs
+            idPrefix="task"
+            ariaLabel="Task"
+            tabs={taskTabs()}
+            active={tab() ?? 'agents'}
+            onChange={(id) => nav.pickTab(id as TaskTab)}
+          />
+        </Show>
+        <Show when={pageStrip()}>
+          {(strip) => {
+            const shown = strip()
+            return shown.kind === 'other' ? (
+              <div class="strip" role="status">
+                <span class="grow">
+                  This page is in <b>{shown.task.title}</b>
+                </span>
+                <button type="button" class="quiet" onClick={() => nav.openTask(shown.task.id)}>
+                  Switch
+                </button>
+              </div>
+            ) : (
+              <div class="strip" role="status">
+                <span class="grow">This page has no task</span>
+                <button type="button" class="quiet" onClick={() => nav.goHome()}>
+                  Start task
+                </button>
+              </div>
+            )
+          }}
+        </Show>
+        <Show when={problem()}>
+          <p class="banner problem" role="alert">
+            {problem()}
+          </p>
+        </Show>
+        <Switch>
+          <Match when={location().level === 'home'}>
+            <div class="view" aria-label="Home">
+              <Waiting
                 client={props.client}
                 nodeId={nodeId}
-                online={props.online}
-                opensLinks={props.opensLinks}
-                pageUrl={props.pageUrl}
-                handoffs={props.handoffs}
-                pageTasks={props.pageTasks}
-                markerHidden={props.markerHidden}
-                showMarker={props.showMarker}
-                projectName={projectName}
-                chat={(id) => void chatInTask(id)}
-                openTask={(id) => nav.openTask(id)}
-                handoff={props.handoff}
-                startHandoff={props.startHandoff}
-                dismissHandoff={props.dismissHandoff}
-                openHandoffTask={openHandoffTask}
-                createdHandoffTask={createdHandoffTask}
-                startedHandoffWorkflow={startedHandoffWorkflow}
-                waitingContext={props.waitingContext}
-                dropWaitingContext={() => props.setWaitingContext(null)}
-                projects={projects()}
-                suggested={scope().suggested}
-                onSite={onSite()}
-                several={!pageProject() && pageProjects().length > 1}
-                project={pageProject()}
-                pickProject={pickProject}
-                tasks={pageProject() ? (taskLists()[pageProject()!] ?? null) : null}
-              />
-            </Show>
-            <Tasks
-              api={props.api}
-              nodeId={nodeId}
-              opensLinks={props.opensLinks}
-              workspaces={workspaces()}
-              workspaceId={homeWorkspace()}
-              pickWorkspace={pickWorkspace}
-              projects={(projects() ?? []).filter((project) => project.workspaceId === homeWorkspace())}
-              tasks={props.tasks ?? []}
-              pageTaskIds={props.pageTasks.map(({ task }) => task.id)}
-              openTask={(id) => nav.openTask(id)}
-              chat={(id) => void chatInTask(id)}
-            />
-          </div>
-        </Match>
-        <Match when={tab() === 'agents' && taskId()} keyed>
-          {(id) => (
-            <div class="view" aria-label="Agents">
-              <Agents
-                client={props.client}
-                nodeId={nodeId}
-                taskId={id}
-                online={props.online}
-                sessions={sessionLists()[id] ?? null}
                 requests={props.requests}
-                open={(sessionId) => void openSession(id, sessionId)}
-                started={(started) => {
-                  setSessionLists((lists) => ({
-                    ...lists,
-                    [id]: [started, ...(lists[id] ?? []).filter((row) => row.id !== started.id)],
-                  }))
-                  void openSession(id, started.id)
-                }}
+                online={props.online}
+                open={(request) => nav.openConversation(request.taskId, request.sessionId)}
+              />
+              <Show when={pageMatched()}>
+                <ThisPage
+                  client={props.client}
+                  nodeId={nodeId}
+                  online={props.online}
+                  opensLinks={props.opensLinks}
+                  pageUrl={props.pageUrl}
+                  handoffs={props.handoffs}
+                  pageTasks={props.pageTasks}
+                  markerHidden={props.markerHidden}
+                  showMarker={props.showMarker}
+                  projectName={projectName}
+                  chat={(id) => void chatInTask(id)}
+                  openTask={(id) => nav.openTask(id)}
+                  handoff={props.handoff}
+                  startHandoff={props.startHandoff}
+                  dismissHandoff={props.dismissHandoff}
+                  openHandoffTask={openHandoffTask}
+                  createdHandoffTask={createdHandoffTask}
+                  startedHandoffWorkflow={startedHandoffWorkflow}
+                  waitingContext={props.waitingContext}
+                  dropWaitingContext={() => props.setWaitingContext(null)}
+                  projects={projects()}
+                  suggested={scope().suggested}
+                  onSite={onSite()}
+                  several={!pageProject() && pageProjects().length > 1}
+                  project={pageProject()}
+                  pickProject={pickProject}
+                  tasks={pageProject() ? (taskLists()[pageProject()!] ?? null) : null}
+                />
+              </Show>
+              <Tasks
+                workspaces={workspaces()}
+                workspaceId={homeWorkspace()}
+                pickWorkspace={pickWorkspace}
+                projects={(projects() ?? []).filter((project) => project.workspaceId === homeWorkspace())}
+                tasks={props.tasks ?? []}
+                pageTaskIds={props.pageTasks.map(({ task }) => task.id)}
+                openTask={(id) => nav.openTask(id)}
               />
             </div>
-          )}
-        </Match>
-        <Match when={tab() === 'runs' && taskId()} keyed>
-          {(id) => (
-            <div class="view" aria-label="Runs">
-              <Workflows
-                client={props.client}
-                nodeId={nodeId}
-                taskId={id}
-                runs={runLists()[id] ?? null}
-                selected={selectedRun()?.taskId === id ? selectedRun()!.runId : null}
-                select={(runId) => setSelectedRun({ taskId: id, runId })}
-                refreshRuns={() => void loadRuns(id)}
-                open={(run, opened) => {
-                  setOpenStep({ taskId: id, run, step: opened })
-                  nav.openConversation(id, opened.session!.id, 'runs')
-                }}
-              />
-            </div>
-          )}
-        </Match>
-        <Match when={openPanel() && taskId()} keyed>
-          {(id) => (
-            <Show when={(props.panels ?? []).find((panel) => panel.pluginId === openPanel())}>
-              {(panel) => (
-                <PluginPanel
-                  panel={panel()}
+          </Match>
+          <Match when={tab() === 'agents' && taskId()} keyed>
+            {(id) => (
+              <div class="view" aria-label="Agents">
+                <Agents
+                  client={props.client}
                   nodeId={nodeId}
                   taskId={id}
-                  view={panelViews()[panel().pluginId]}
-                  problem={panelProblems()[panel().pluginId] ?? null}
-                  opensLinks={props.opensLinks}
-                  refresh={() => void loadPanel(panel().pluginId, id)}
-                  pickSource={(source) => {
-                    setPanelSources((sources) => ({ ...sources, [panel().pluginId]: source }))
-                    void loadPanel(panel().pluginId, id)
+                  online={props.online}
+                  sessions={sessionLists()[id] ?? null}
+                  requests={props.requests}
+                  open={(sessionId) => void openSession(id, sessionId)}
+                  started={(started) => {
+                    setSessionLists((lists) => ({
+                      ...lists,
+                      [id]: [started, ...(lists[id] ?? []).filter((row) => row.id !== started.id)],
+                    }))
+                    void openSession(id, started.id)
                   }}
                 />
-              )}
-            </Show>
-          )}
-        </Match>
-        {/* Keyed by the conversation, so every reply and draft inside is bound to it. */}
-        <Match when={session()?.id} keyed>
-          {(sessionId) => (
-            <Conversation
-              client={props.client}
-              storage={props.api.storage}
-              target={{ nodeId, taskId: taskId()!, sessionId }}
-              session={session()!}
-              online={props.online}
-              opensLinks={props.opensLinks}
-              hint={props.hint}
-              reconnects={props.reconnects}
-            />
-          )}
-        </Match>
-        <Match when={step()} keyed>
-          {(open) => (
-            <Conversation
-              client={props.client}
-              storage={props.api.storage}
-              target={{ nodeId, taskId: open.step.session!.taskId, sessionId: open.step.session!.id }}
-              session={open.step.session!}
-              online={props.online}
-              opensLinks={props.opensLinks}
-              hint={props.hint}
-              reconnects={props.reconnects}
-            />
-          )}
-        </Match>
-      </Switch>
-    </Show>
+              </div>
+            )}
+          </Match>
+          <Match when={tab() === 'runs' && taskId()} keyed>
+            {(id) => (
+              <div class="view" aria-label="Runs">
+                <Workflows
+                  client={props.client}
+                  nodeId={nodeId}
+                  taskId={id}
+                  runs={runLists()[id] ?? null}
+                  selected={selectedRun()?.taskId === id ? selectedRun()!.runId : null}
+                  select={(runId) => setSelectedRun({ taskId: id, runId })}
+                  refreshRuns={() => void loadRuns(id)}
+                  open={(run, opened) => {
+                    setOpenStep({ taskId: id, run, step: opened })
+                    nav.openConversation(id, opened.session!.id, 'runs')
+                  }}
+                />
+              </div>
+            )}
+          </Match>
+          <Match when={openPanel() && taskId()} keyed>
+            {(id) => (
+              <Show when={(props.panels ?? []).find((panel) => panel.pluginId === openPanel())}>
+                {(panel) => (
+                  <PluginPanel
+                    panel={panel()}
+                    nodeId={nodeId}
+                    taskId={id}
+                    view={panelViews()[panel().pluginId]}
+                    problem={panelProblems()[panel().pluginId] ?? null}
+                    opensLinks={props.opensLinks}
+                    refresh={() => void loadPanel(panel().pluginId, id)}
+                    pickSource={(source) => {
+                      setPanelSources((sources) => ({ ...sources, [panel().pluginId]: source }))
+                      void loadPanel(panel().pluginId, id)
+                    }}
+                  />
+                )}
+              </Show>
+            )}
+          </Match>
+          {/* Keyed by the conversation, so every reply and draft inside is bound to it. */}
+          <Match when={session()?.id} keyed>
+            {(sessionId) => (
+              <Conversation
+                client={props.client}
+                storage={props.api.storage}
+                target={{ nodeId, taskId: taskId()!, sessionId }}
+                session={session()!}
+                online={props.online}
+                hint={props.hint}
+                reconnects={props.reconnects}
+              />
+            )}
+          </Match>
+          <Match when={step()} keyed>
+            {(open) => (
+              <Conversation
+                client={props.client}
+                storage={props.api.storage}
+                target={{ nodeId, taskId: open.step.session!.taskId, sessionId: open.step.session!.id }}
+                session={open.step.session!}
+                online={props.online}
+                hint={props.hint}
+                reconnects={props.reconnects}
+              />
+            )}
+          </Match>
+        </Switch>
+      </Show>
+    </>
   )
 }
