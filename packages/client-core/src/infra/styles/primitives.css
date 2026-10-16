@@ -1129,6 +1129,20 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   cursor: pointer;
 }
 .ui-graph-cut:hover { color: var(--danger); border-color: var(--danger); }
+.ui-graph-edge-label {
+  position: absolute;
+  inset: 0 auto auto 0;
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  /* Tight, so the label fits between a straight wire's control and its target (graphLayout.ts). */
+  line-height: var(--lh-tight);
+  background: var(--bg);
+  border: var(--control-border);
+  border-radius: var(--radius-surface);
+  pointer-events: none;
+}
 .ui-graph-cut:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
 
 /* ── Meter ──────────────────────────────────────────────────────────────────────────────────

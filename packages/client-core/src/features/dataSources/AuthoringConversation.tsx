@@ -41,6 +41,7 @@ import { Fold } from '../../kit/components/layout/Fold'
 import { ModalActions, ModalBody } from '../../kit/components/overlays/Modal'
 import { Inline } from '../../kit/components/layout/Inline'
 import { Stack } from '../../kit/components/layout/Stack'
+import { SectionHeader } from '../../kit/components/layout/SectionHeader'
 import { Text } from '../../kit/components/content/Text'
 
 const TIMEOUT_MS = 11 * 60_000
@@ -397,7 +398,10 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
     >
       <Show when={clarification()}>
         {(value) => (
-          <Alert title={value().question}>
+          <Stack gap="row">
+            <Text emphasis="strong" wrap>
+              {value().question}
+            </Text>
             <Inline gap="inline" wrap>
               <For each={value().choices}>
                 {(option) => (
@@ -410,61 +414,58 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
                 Dismiss
               </Button>
             </Inline>
-          </Alert>
+          </Stack>
         )}
       </Show>
+      {/* Not an Alert: an Alert with no tone is drawn as an error, and a proposal isn't one. */}
       <Show when={proposal()}>
         {(value) => (
-          <Alert
-            tone={value().problems.length ? 'warn' : undefined}
-            title={docked ? 'AI proposal' : 'Review AI proposal'}
-          >
-            <Stack gap="row">
-              <Text wrap>{value().summary}</Text>
-              <Show
-                when={props.proposalDetail}
-                fallback={
-                  <>
-                    <For each={value().diff.slice(0, 20)}>
-                      {(change) => (
-                        <Text
-                          wrap
-                        >{`${CHANGE_WORD[change.change] ?? change.change} ${describe(change.path, value().candidate)}: ${clipped(change.before)} → ${clipped(change.after)}`}</Text>
-                      )}
-                    </For>
-                    <Show when={value().diff.length > 20}>
-                      <Text emphasis="muted">{`and ${value().diff.length - 20} more changes`}</Text>
-                    </Show>
-                  </>
-                }
+          <Stack gap="row">
+            <SectionHeader level="sub">{docked ? 'AI proposal' : 'Review AI proposal'}</SectionHeader>
+            <Text wrap>{value().summary}</Text>
+            <Show
+              when={props.proposalDetail}
+              fallback={
+                <>
+                  <For each={value().diff.slice(0, 20)}>
+                    {(change) => (
+                      <Text
+                        wrap
+                      >{`${CHANGE_WORD[change.change] ?? change.change} ${describe(change.path, value().candidate)}: ${clipped(change.before)} → ${clipped(change.after)}`}</Text>
+                    )}
+                  </For>
+                  <Show when={value().diff.length > 20}>
+                    <Text emphasis="muted">{`and ${value().diff.length - 20} more changes`}</Text>
+                  </Show>
+                </>
+              }
+            >
+              {(detail) => detail()(value())}
+            </Show>
+            <For each={value().unaddressed ?? []}>
+              {(item) => <Text wrap>{`${docked ? 'Not covered' : 'Not addressed'}: ${item}`}</Text>}
+            </For>
+            <For each={value().problems}>{(problem) => <Alert tone="warn">{problem}</Alert>}</For>
+            <Show when={docked} fallback={<Text emphasis="muted">{usage(value())}</Text>}>
+              <Fold label="Details" level="sub" defaultOpen={false}>
+                <Text emphasis="muted" wrap>
+                  {usage(value())}
+                </Text>
+              </Fold>
+            </Show>
+            <Inline gap="inline">
+              <Button
+                variant="solid"
+                disabled={value().problems.length > 0 || props.disabled}
+                onPress={() => void apply(value())}
               >
-                {(detail) => detail()(value())}
-              </Show>
-              <For each={value().unaddressed ?? []}>
-                {(item) => <Text wrap>{`${docked ? 'Not covered' : 'Not addressed'}: ${item}`}</Text>}
-              </For>
-              <For each={value().problems}>{(problem) => <Text wrap>{problem}</Text>}</For>
-              <Show when={docked} fallback={<Text emphasis="muted">{usage(value())}</Text>}>
-                <Fold label="Details" level="sub" defaultOpen={false}>
-                  <Text emphasis="muted" wrap>
-                    {usage(value())}
-                  </Text>
-                </Fold>
-              </Show>
-              <Inline gap="inline">
-                <Button
-                  variant="solid"
-                  disabled={value().problems.length > 0 || props.disabled}
-                  onPress={() => void apply(value())}
-                >
-                  {docked ? 'Apply' : 'Apply reviewed edit'}
-                </Button>
-                <Button variant="bare" onPress={reject}>
-                  {docked ? 'Discard' : 'Reject'}
-                </Button>
-              </Inline>
-            </Stack>
-          </Alert>
+                {docked ? 'Apply' : 'Apply reviewed edit'}
+              </Button>
+              <Button variant="bare" onPress={reject}>
+                {docked ? 'Discard' : 'Reject'}
+              </Button>
+            </Inline>
+          </Stack>
         )}
       </Show>
       <Show when={stopped()}>{(value) => <Alert tone="warn">{value().reason}</Alert>}</Show>
@@ -505,9 +506,11 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
       </DockedConversation>
     )
 
-  // What to ask comes first, then what the AI may read. Who answers sits beside Send.
+  // The AI's answer comes first, with its Apply and Reject in view, then the box for the next message
+  // and what the AI may read. Who answers sits beside Send.
   const body = (
     <Stack gap="row">
+      {reply}
       <Field label="What should AI change?" group>
         <Textarea
           label="What should AI change?"
@@ -540,7 +543,6 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
         </Inline>
       </Show>
       {feedback}
-      {reply}
     </Stack>
   )
   if (layout === 'fold')

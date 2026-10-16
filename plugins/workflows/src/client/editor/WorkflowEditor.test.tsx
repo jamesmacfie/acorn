@@ -259,10 +259,9 @@ describe('reviewing an AI proposal', () => {
     expect(button('Undo')?.disabled).toBe(true)
   })
 
-  // A new workflow's proposal is all additions, which carry no `before`, and drawing one must not throw
-  // inside the render: the dialog would freeze on its first status line. A change names the step it
-  // touches, found in the proposal when the change adds it.
-  it('draws a proposal that adds and removes paths', async () => {
+  // The proposal reads as the workflow it would leave: each step by name with what it does, marked
+  // new or changed, then the steps it drops. No JSON.
+  it('draws a proposal as the outline it would leave', async () => {
     const candidate = { ...generated, steps: [{ ...generated.steps[0]!, id: 'step-7', name: 'Angle one' }] }
     authorTurn.mockResolvedValue({
       state: 'proposal',
@@ -282,9 +281,14 @@ describe('reviewing an AI proposal', () => {
     })
     await mount('db:abc')
     await propose()
-    expect(document.body.textContent).toContain('Added Angle one: nothing →')
-    expect(document.body.textContent).toContain('Removed plan:')
-    expect(document.body.textContent).toContain('→ nothing')
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('Renames the workflow to "Investigate".')
+    expect(text).toContain('Angle one')
+    expect(text).toContain('One angle')
+    expect(text).toContain('New')
+    expect(text).toContain('plan')
+    expect(text).toContain('Removed')
+    expect(text).not.toContain('{"')
     expect(button('Apply reviewed edit')).toBeDefined()
   })
 

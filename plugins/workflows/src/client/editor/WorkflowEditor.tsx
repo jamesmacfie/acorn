@@ -59,6 +59,8 @@ import GraphView from './GraphView'
 import JsonTab from './JsonTab'
 import NodeInspector from './NodeInspector'
 import NodeList from './NodeList'
+import ProposalOutline from './ProposalOutline'
+import type { WorkflowDef } from '../../shared/workflowContracts'
 import { requestWorkflowStart } from './startRequest'
 import { forgetNodeInLayout } from '../layoutPrefs'
 import { childWorkflowDefinition, connectCreatedChild } from './childAuthoring'
@@ -698,12 +700,13 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
                   base={draft().def}
                   label={draft().def.name}
                   disabled={store.readOnly() || store.busy()}
-                  describePath={(path, candidate) =>
-                    changeSubject(path, [
-                      draft().def,
-                      candidate as { steps?: readonly { id?: string; name: string }[] },
-                    ])
-                  }
+                  proposalDetail={(proposal) => (
+                    <ProposalOutline
+                      base={proposal.base as WorkflowDef}
+                      candidate={proposal.candidate as WorkflowDef}
+                      catalog={store.catalog()}
+                    />
+                  )}
                   onApply={(proposal) =>
                     store.current(address) ? applyProposal(proposal) : 'The workflow selection changed.'
                   }
@@ -806,18 +809,6 @@ const SAVE_BADGE: Record<SaveState, { word: string; tone?: 'warn' | 'danger'; ti
 /** A conflicting value as a person reads it: text as itself, anything else as its JSON. */
 const asText = (value: unknown): string =>
   value === undefined ? 'Not set' : typeof value === 'string' ? value : JSON.stringify(value)
-
-/** "Approve the release › prompt" for a proposal's `/steps/<id>/prompt`. The step is looked up in the
- *  draft, then in the proposal, which holds a step the change adds. */
-const changeSubject = (
-  path: string,
-  defs: readonly ({ steps?: readonly { id?: string; name: string }[] } | undefined)[],
-): string => {
-  const [top, key, ...rest] = path.split('/').filter(Boolean)
-  if (top !== 'steps' || !key) return path.split('/').filter(Boolean).join(' › ') || 'the workflow'
-  const name = defs.flatMap((def) => def?.steps ?? []).find((step) => (step.id ?? step.name) === key)?.name ?? key
-  return [name, ...rest].join(' › ')
-}
 
 /** The step a merge conflict sits in, by name, or the definition field it touches. `mergeWorkflow`
  *  names a step as `/steps/@{id}`. */

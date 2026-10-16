@@ -89,13 +89,17 @@ export function stepSummary(step: WorkflowStepDef, def: WorkflowDef, catalog: Wo
   return described?.label ?? kind
 }
 
+/** The name of the branch `parent` takes to reach `target`, or undefined when `target` only runs after it. */
+export function branchEdgeLabel(parent: WorkflowStepDef, target: string): string | undefined {
+  const branch = Object.entries(parent.branches ?? {}).find(([, to]) => to === target)?.[0]
+  if (branch === undefined || kindOf(parent) !== 'if') return branch
+  return branch === 'true' ? 'If' : 'Otherwise'
+}
+
 export function branchLabel(step: WorkflowStepDef, def: WorkflowDef): string | undefined {
   for (const parent of def.steps) {
-    for (const [branch, target] of Object.entries(parent.branches ?? {})) {
-      if (target !== stepIdentity(step)) continue
-      if (kindOf(parent) === 'if') return branch === 'true' ? 'If' : 'Otherwise'
-      return branch
-    }
+    const label = branchEdgeLabel(parent, stepIdentity(step))
+    if (label) return label
   }
   return undefined
 }

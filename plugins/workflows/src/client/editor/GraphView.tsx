@@ -7,6 +7,7 @@ import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { stepKindPluginId, unavailableCatalogKind } from '../../shared/stepKindAvailability'
 import { LAYOUT_WRITE_DELAY_MS, readLayout, writeLayout, type WorkflowLayout } from '../layoutPrefs'
 import { graphOrder, type DraftSelection, type WorkflowDraft } from './draft'
+import { branchEdgeLabel } from './outlineModel'
 
 // The graph view: the same nodes the list column draws, as a picture
 // (docs/workflows/authoring.md § Authoring).
@@ -50,7 +51,16 @@ export default function GraphView(props: {
     }),
   )
 
-  const edges = createMemo(() => order().flatMap((row) => row.parents.map((from) => ({ from, to: row.name }))))
+  // A branch edge carries its branch's name, so a decision reads as one rather than as a chain.
+  const edges = createMemo(() =>
+    order().flatMap((row) =>
+      row.parents.map((from) => {
+        const parent = def().steps.find((step) => stepIdentity(step) === from)
+        const label = parent && branchEdgeLabel(parent, row.name)
+        return label ? { from, to: row.name, label } : { from, to: row.name }
+      }),
+    ),
+  )
 
   // Read once and held: positions are a device scrap, and re-reading storage on every frame of a
   // drag would be the only thing here that touched it.
