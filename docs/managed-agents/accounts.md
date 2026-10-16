@@ -70,9 +70,10 @@ the folder's name. The folder itself keeps its name, because the CLI finds its l
 by the folder's path, and sessions and routes keep naming the account by it.
 
 The section has one **Show accounts as** switch, with **Name** and **Icon**, for every harness. With
-**Icon** on, the **New** menu, the empty pane's cards, the task sidebar's session rows, and the
-session header draw an account's icon in place of its name. An account with no icon keeps its name.
-The palette, search, the plan usage rows, and screen readers still use the name.
+**Icon** on, the **New** menu, the empty pane's cards, the task sidebar's session rows, the session
+header, the plan usage button, and the plan usage panel's account rows draw an account's icon in
+place of its name. An account with no icon keeps its name. The palette, search, and screen readers
+still use the name.
 
 Display names and icons live in an `.accounts.json` file beside each harness's `.default`, which drops
 an account's entry when the account goes (`AgentAccounts.details`). The switch is a `.show-as` file at

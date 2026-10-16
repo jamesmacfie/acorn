@@ -1,6 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentProviderUsage, AgentUsageSnapshot } from '../../shared/usage'
+import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 
 const provider = (id: string, label: string): AgentProviderUsage => ({
   provider: id,
@@ -37,10 +38,15 @@ vi.mock('./usageStore', () => ({
 
 const { default: AgentUsageSection } = await import('./AgentUsageSection')
 const disposers: Array<() => void> = []
-const mount = (defaultAccounts?: Record<string, string>) => {
+const mount = (defaultAccounts?: Record<string, string>, providers?: AgentProviderDescriptor[]) => {
   const host = document.createElement('div')
   document.body.append(host)
-  disposers.push(render(() => <AgentUsageSection showHeader={false} defaultAccounts={defaultAccounts} />, host))
+  disposers.push(
+    render(
+      () => <AgentUsageSection showHeader={false} defaultAccounts={defaultAccounts} providers={providers} />,
+      host,
+    ),
+  )
   return host
 }
 afterEach(() => {
@@ -105,6 +111,21 @@ describe('AgentUsageSection', () => {
       const [home, work] = rows(mount({ claude: 'work' }))
       expect(home!.open).toBe(false)
       expect(work!.open).toBe(true)
+    })
+
+    it("draws an account's icon in place of its name when the harness shows icons", () => {
+      snapshot = { providers: [reading('me@home.test', 81), reading('me@work.test', 23, 'work')], refreshedAt: 1 }
+      const claude = {
+        id: 'claude',
+        accountDisplay: 'icon',
+        accounts: [{ name: 'work', icon: 'briefcase' }],
+      } as unknown as AgentProviderDescriptor
+      const [home, work] = rows(mount(undefined, [claude])).map((row) => row.querySelector('summary')!)
+
+      expect(work!.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('work')
+      expect(work!.textContent).not.toContain('work')
+      // The usual sign-in has no icon to draw, so it keeps its name.
+      expect(home!.textContent).toContain('Usual sign-in')
     })
   })
 })
