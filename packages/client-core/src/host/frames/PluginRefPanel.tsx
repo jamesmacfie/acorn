@@ -82,11 +82,16 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
           }
         >
           {(contribution) => (
-            <RemoteTree
-              contribution={contribution()}
-              props={() => ({ item: props.displayId })}
-              scope={() => ({ item: props.displayId })}
-            />
+            <div class="layout-single-body">
+              {/* The tree is a `single` layout's one region (`singleRegionTree`), so it gets that
+                  layout's body box: the box scrolls, pads the sides, and lets bars and tabs reach the
+                  panel's edges, as the same tree does in a pane. */}
+              <RemoteTree
+                contribution={contribution()}
+                props={() => ({ item: props.displayId })}
+                scope={() => ({ item: props.displayId })}
+              />
+            </div>
           )}
         </Show>
         <Show when={props.detail?.footerPointId}>
