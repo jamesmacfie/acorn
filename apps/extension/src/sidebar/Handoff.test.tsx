@@ -221,11 +221,13 @@ const pendingItem = (root: HTMLElement) => root.querySelector('[aria-label="Pend
 const resolvedUrls = (state: { requests: Request[] }) =>
   state.requests.filter((request) => request.op === 'handoff.resolve').map((request) => request.url)
 
-// Starts a chat in the open task from New chat's picker, then sends a message.
+// Starts the first chat in the open task from its empty state's picker, then sends a message.
 async function chatAndSend(root: HTMLElement) {
-  await pickFrom(root, 'New chat', 'Claude Code')
+  await pickFrom(root, 'Start a chat', 'Claude Code')
   await settle(30)
   const box = root.querySelector<HTMLTextAreaElement>('textarea[name="message"]')!
+  // A chat just started puts the cursor in its message box.
+  expect(document.activeElement).toBe(box)
   box.value = 'Look into it'
   box.dispatchEvent(new Event('input', { bubbles: true }))
   root

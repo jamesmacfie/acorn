@@ -8,7 +8,17 @@ import type {
 } from '@acorn/protocol/extensionBridge.ts'
 import { SELECTED_NODE_KEY, startBackground } from '../background/background'
 import { fakeBrowser, settle, type FakeHost } from '../test/fakeBrowser'
-import { back, button, conversationTitle, openChat, openTask, shownTask, tab, taskTabs } from '../test/sidebarUi'
+import {
+  back,
+  button,
+  chatRows,
+  conversationTitle,
+  openChat,
+  openTask,
+  shownTask,
+  tab,
+  taskTabs,
+} from '../test/sidebarUi'
 import { reportResize } from '../test/sidebarSetup'
 import { App } from './App'
 
@@ -547,17 +557,22 @@ describe('conversation', () => {
 })
 
 describe('home', () => {
-  // Each row's title, its provider, model, and state line, and whether its state icon turns.
+  // Each row's title, its provider and model line, its state icon's name, whether that icon turns, and
+  // its trailing text.
   const rows = (root: HTMLElement) =>
-    [...root.querySelectorAll('[aria-label="Agents"] .row-button')].map((row) => [
-      row.querySelector('strong')!.textContent,
-      row.querySelector('.agent-meta')!.textContent,
-      row.querySelector('.ui-icon[data-spin]') !== null,
+    chatRows(root).map((row) => [
+      row.querySelector('.row-title')!.textContent,
+      row.querySelector('.row-meta')!.textContent,
+      row.querySelector('.ui-row-leading [role="img"]')!.getAttribute('aria-label'),
+      row.querySelector('.ui-row-leading [data-spin]') !== null,
+      row.querySelector('.ui-row-trailing')!.textContent,
     ])
   it("lists the task's conversations as the desktop does, and goes back from one", async () => {
     const subject = mount()
     subject.state.sessions[0]!.model = 'Opus · High'
+    subject.state.sessions[0]!.updatedAt = Date.now() - 2 * 60_000
     subject.state.sessions[1]!.runtimeState = 'working'
+    subject.state.sessions[1]!.updatedAt = Date.now()
     await settle()
     // The list is the task's, not Home's.
     expect(subject.root.querySelector('.view[aria-label="Agents"]')).toBeNull()
@@ -565,10 +580,30 @@ describe('home', () => {
     expect(shownTask(subject.root)).toBe('Fix it')
     // A Node without workflows has no Runs tab.
     expect(taskTabs(subject.root)).toEqual(['Agents'])
+    // The icon says the state, so the line under the title doesn't. A provider with no logo is named.
     expect(rows(subject.root)).toEqual([
-      ['Chat s1', 'claude · Opus · High · ready', false],
-      ['Chat s2', 'claude · working', true],
+      ['Chat s1', 'claude · Opus · High', 'Ready', false, '2m ago'],
+      ['Chat s2', 'claude', 'Working', true, 'now'],
     ])
+
+    // A conversation waiting on the person leads with the alert and trails it, under the task's own
+    // Needs you list, whose rows leave the task's title out.
+    subject.state.agentRequests.push(permission())
+    subject.state.host!.send({
+      v: 1,
+      event: 'agent',
+      nodeId: 'n1',
+      sessions: ['s1'],
+      tasks: [],
+      missed: false,
+      requests: true,
+    })
+    await settle(20)
+    expect(rows(subject.root)[0]).toEqual(['Chat s1', 'claude · Opus · High', 'Waiting for you', false, '2m ago'])
+    expect(subject.root.querySelectorAll('.ui-row-trailing [data-tone="warn"]').length).toBe(1)
+    const needsYou = subject.root.querySelector('.view[aria-label="Agents"] section[aria-label="Needs you"]')!
+    expect(needsYou.querySelector('.row-meta')!.textContent).toBe('Chat s1')
+    subject.state.agentRequests.length = 0
 
     await openChat(subject.root, 'Chat s1')
     expect(subject.root.querySelector('.view[aria-label="Agents"]')).toBeNull()
@@ -615,22 +650,51 @@ describe('home', () => {
     expect(marker()).toBe('1 agent needs you')
   })
 
-  it('groups the conversations into managed sessions, workflow runs, and inline chats', async () => {
+  it('groups the conversations into managed sessions, then closed folds that stay as the person leaves them', async () => {
     const subject = mount()
     subject.state.sessions.push(session('s3', { kind: 'workflow' }), session('s4', { inline: true }))
     subject.state.events.set('s3', []).set('s4', [])
     await settle()
     await openTask(subject.root, 'Fix it')
     await tab(subject.root, 'Agents')
-    const groups = [...subject.root.querySelectorAll('[aria-label="Agents"] ul.rows')].map((list) => [
-      list.getAttribute('aria-label'),
-      [...list.querySelectorAll('strong')].map((row) => row.textContent),
+    const view = () => subject.root.querySelector<HTMLElement>('.view[aria-label="Agents"]')!
+    const titles = () => chatRows(subject.root).map((row) => row.querySelector('.row-title')!.textContent)
+    const folds = () =>
+      [...view().querySelectorAll('details')].map((fold) => [
+        fold.querySelector('.ui-section-header-label')!.textContent,
+        fold.querySelector('.ui-section-header-count')!.textContent,
+        fold.open,
+      ])
+    // New chat sits in the Managed sessions header.
+    expect(button(view().querySelector('section[aria-label="Managed sessions"]')!, 'New chat')).toBeDefined()
+    expect(titles()).toEqual(['Chat s1', 'Chat s2'])
+    expect(folds()).toEqual([
+      ['Workflow runs', '1', false],
+      ['Inline chats', '1', false],
     ])
-    expect(groups).toEqual([
-      ['Managed sessions', ['Chat s1', 'Chat s2']],
-      ['Workflow runs', ['Chat s3']],
-      ['Inline chats', ['Chat s4']],
+
+    view().querySelector<HTMLElement>('details summary')!.click()
+    await settle(20)
+    expect(titles()).toEqual(['Chat s1', 'Chat s2', 'Chat s3'])
+    // The fold is still open after a conversation and back.
+    await openChat(subject.root, 'Chat s3')
+    await back(subject.root)
+    expect(folds()).toEqual([
+      ['Workflow runs', '1', true],
+      ['Inline chats', '1', false],
     ])
+  })
+
+  it('offers to start the first chat in a task with none', async () => {
+    const subject = mount()
+    subject.state.sessions.length = 0
+    await settle()
+    await openTask(subject.root, 'Fix it')
+    const view = subject.root.querySelector<HTMLElement>('.view[aria-label="Agents"]')!
+    expect(view.querySelector('.ui-empty-title')!.textContent).toBe('No chats in this task')
+    expect(view.querySelector('[aria-label="Pending item"]')).toBeNull()
+    expect(button(view, 'Start a chat')).toBeDefined()
+    expect(button(view, 'New chat')).toBeUndefined()
   })
 })
 

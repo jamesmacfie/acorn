@@ -45,6 +45,8 @@ export function Conversation(props: {
   target: DraftTarget
   // The conversation's row as its task's list read it, until the conversation's own read arrives.
   session: BridgeAgentSession
+  // The person just started it, so the message box takes the cursor.
+  focused?: boolean
   online: boolean
   hint: BridgeAgentHint | null
   reconnects: number
@@ -187,6 +189,7 @@ export function Conversation(props: {
         storage={props.storage}
         target={target}
         blocked={blocked()}
+        focused={props.focused ?? false}
         settled={() => void reader.refresh()}
       />
     </div>

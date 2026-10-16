@@ -107,8 +107,8 @@ the card, as it clears the page buttons.
 
 ### The item waiting for the first chat
 
-After **Create task**, the task's **Agents** tab shows the item as a chip, such as **Item · Fix the
-flaky test**, with ×. It belongs to that task alone, under `pendingItem:<nodeId>:<taskId>` in
+After **Create task**, the task's **Agents** tab shows the item as a chip with ×, such as **Item ·
+Fix the flaky test**, in its empty state, or above its conversations when the task has some. It belongs to that task alone, under `pendingItem:<nodeId>:<taskId>` in
 `storage.local`, as does the page link the chip's **New chat about this page** leaves. The next
 conversation opened or started in the task takes it into its draft as a capture, once however often
 it's handed off. × drops it, as does the task leaving the Node's list while the panel is open.

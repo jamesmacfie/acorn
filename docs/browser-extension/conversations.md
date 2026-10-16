@@ -13,8 +13,9 @@ The agent operations are thin calls to the agents plugin's routes, with that plu
 (`plugins/agents/src/contract/wire.ts`). The host imports them for types only, so the CLI bundle
 carries none of its code. It narrows each answer to what the sidebar draws:
 
-- A session row keeps its IDs, title, kind, `runtimeState`, `attention`, `lastEventSeq`, and
-  `archivedAt`, and drops `config`.
+- A session row keeps its IDs, title, kind, `runtimeState`, `attention`, `lastEventSeq`,
+  `archivedAt`, and `updatedAt`. It drops `config`, after reading the model and its reasoning effort
+  out of it as one line, such as `Opus · High`.
 - `session.read` asks the session route for `afterSeq`, `limit`, and `fold=1`, so each tool call
   arrives as one record. Each record keeps its ID, seq, turn, and `foldedThroughSeq`. Only the
   session's own user and agent messages, tool calls, and errors are kept, and a tool call keeps only
@@ -33,6 +34,32 @@ carries none of its code. It narrows each answer to what the sidebar draws:
 - `session.create` sends `kind: 'interactive'`, the row's `customAgentId` and `account` when it has
   them, and an empty `config`, so the Node applies the same defaults any other client gets. The
   sidebar's **New chat** is the kit's own `Picker`, as on the desktop.
+
+## A task's Agents tab
+
+`Agents` in `apps/extension/src/sidebar/Agents.tsx` lays out the tab as the desktop's Agents sidebar
+does. From the top:
+
+1. **Needs you**, with the task's waiting requests, drawn only while one waits. Its rows leave out the
+   task's title, since the tab already names it ([the Needs you list](./notifications.md#the-needs-you-list)).
+2. **Managed sessions**, the kit's `Section`, with **New chat** in its header.
+3. **Workflow runs** and **Inline chats**, each the kit's `Fold` with its count, closed until the
+   person opens it. A fold with no rows isn't drawn. The panel remembers which folds are open until it
+   closes, for every task, and never stores it.
+
+Each conversation is the kit's stacked `Row`. It leads with the state icon from the agents plugin's
+`runtimeIcon` and `runtimeTone`, which turns while the agent works. While the agent waits on the
+person, the amber alert takes its place and trails the row too. The icon's accessible name is the
+state's words, because the row doesn't write them out. Under the title sit the provider's logo, or its
+ID when it has none, and the model. The row ends with the time since `updatedAt`, such as "2m ago",
+which moves on each minute. A press opens the conversation.
+
+A task with no conversation shows the kit's `EmptyState` instead: "No chats in this task", then the
+[item waiting for the first chat](./handoffs.md#the-item-waiting-for-the-first-chat) as a chip, then
+**Start a chat**. An item waiting on a task that has conversations shows above **Managed sessions**.
+
+Picking an agent from **New chat** or **Start a chat** starts the conversation, opens it, and puts
+the cursor in its message box. Opening a conversation any other way leaves the focus alone.
 
 ## Writes and retries
 

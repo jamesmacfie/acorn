@@ -5,7 +5,7 @@ sources:
   - docs/browser-extension/conversations.md
   - docs/browser-extension/setup.md
   - docs/browser-extension/task-pages.md
-  - apps/extension/src/sidebar/Home.tsx
+  - apps/extension/src/sidebar/Agents.tsx
   - apps/extension/src/sidebar/Composer.tsx
   - apps/extension/src/sidebar/Conversation.tsx
   - apps/extension/src/sidebar/Requests.tsx
@@ -27,11 +27,13 @@ belongs to, such as the task holding the pull request you're on
 Click a task on Home to open another. **Back** goes up a level, from a conversation to its task and from
 a task to Home.
 
-- The task's **Agents** tab lists its conversations, grouped as **Managed sessions**, **Workflow runs**,
-  and **Inline chats**, each with its agent, its state, and whether it waits on you. Click one to open
-  it.
-- **New chat** starts one, with the same choices as the desktop app's **New**: each harness or named
-  login, then each custom agent.
+- The task's **Agents** tab lists its conversations under **Managed sessions**, each with its state as
+  an icon, its agent and model, and how long ago it last changed. **Workflow runs** and **Inline
+  chats** sit below as folds, closed until you open them. Requests waiting on you in this task head the
+  tab. Click a conversation to open it.
+- **New chat**, at the right of **Managed sessions**, starts one, with the same choices as the desktop
+  app's **New**: each harness or named login, then each custom agent. A task with no conversation shows
+  **Start a chat** instead. The new conversation opens with the cursor in its message box.
 
 <SidebarPicture id="sidebar-conversation" />
 

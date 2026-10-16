@@ -9,6 +9,7 @@ sources:
   - apps/extension/src/sidebar/Composer.tsx
   - apps/extension/src/sidebar/Workspace.tsx
   - apps/extension/src/sidebar/Home.tsx
+  - apps/extension/src/sidebar/Agents.tsx
 checked: 97ab4d104
 ---
 

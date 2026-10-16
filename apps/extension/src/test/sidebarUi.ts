@@ -95,13 +95,17 @@ export async function openSiteTask(root: ParentNode, title: string) {
   )
 }
 
+// The open task's conversation rows, under Managed sessions and in the open folds.
+export const chatRows = (root: ParentNode) => [
+  ...root.querySelectorAll<HTMLElement>('[aria-label="Agents"] .agents .ui-row'),
+]
+
 // Opens a conversation from the open task's Agents tab, going back to it first when one is open.
 export async function openChat(root: ParentNode, title: string) {
   if (root.querySelector('[aria-label="Conversation"]')) await back(root)
   if (!root.querySelector('[aria-label="Agents"]')) await tab(root, 'Agents')
-  const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Agents"] .row-button')]
   await click(
-    rows.find((row) => row.querySelector('strong')?.textContent === title),
+    chatRows(root).find((row) => row.querySelector('.row-title')?.textContent === title),
     `conversation row ${title}`,
   )
 }

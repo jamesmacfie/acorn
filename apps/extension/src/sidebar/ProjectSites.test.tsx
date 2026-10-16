@@ -7,6 +7,7 @@ import { fakeBrowser, settle } from '../test/fakeBrowser'
 import {
   back,
   button,
+  chatRows,
   conversationTitle,
   goHome,
   idle,
@@ -466,8 +467,7 @@ describe('This page', () => {
     match: ['https://github.com/{owner}/{repo}/pull/{number}'],
     anchors: [],
   }
-  const agentRows = (root: HTMLElement) =>
-    [...root.querySelectorAll('[aria-label="Agents"] .row-button strong')].map((row) => row.textContent)
+  const agentRows = (root: HTMLElement) => chatRows(root).map((row) => row.querySelector('.row-title')!.textContent)
 
   it('opens the task a page belongs to, names it, and shows it on Home, matched in the browser', async () => {
     const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7/files' })
@@ -519,10 +519,10 @@ describe('This page', () => {
     expect(root.querySelector('.strip')!.textContent).toBe('This page is in Speed up searchSwitch')
     button(root.querySelector('.strip')!, 'Switch')!.click()
     await settle(30)
-    // Speed up search has no conversation, so its Agents tab shows the new-chat picker.
+    // Speed up search has no conversation, so its Agents tab offers to start one.
     expect(shownTask(root)).toBe('Speed up search')
     expect(root.querySelector('[aria-label="Conversation"]')).toBeNull()
-    expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'New chat')).toBeDefined()
+    expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'Start a chat')).toBeDefined()
     expect(root.querySelector('.strip')).toBeNull()
     expect(fake.storage.get('destination:n1')).toMatchObject({ taskId: 't2' })
     // With no conversation open, the panel follows the page to its task.
@@ -841,9 +841,7 @@ describe('Home task list', () => {
     root.querySelector<HTMLElement>('[aria-label="This page"] .ui-row')!.click()
     await settle(30)
     expect(shownTask(root)).toBe('Fix login')
-    expect(
-      [...root.querySelectorAll('[aria-label="Agents"] .row-button strong')].map((item) => item.textContent),
-    ).toEqual(['Chat s1'])
+    expect(chatRows(root).map((row) => row.querySelector('.row-title')!.textContent)).toEqual(['Chat s1'])
   })
 })
 

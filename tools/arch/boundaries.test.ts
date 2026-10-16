@@ -336,7 +336,7 @@ describe('architecture boundaries', () => {
       ],
       // The extension sidebar draws agent sessions.
       [
-        'apps/extension/src/sidebar/Home.tsx -> plugins/agents/src/contract/runtimeState.ts',
+        'apps/extension/src/sidebar/Agents.tsx -> plugins/agents/src/contract/runtimeState.ts',
         'session state icon and tone',
       ],
       ['apps/extension/src/sidebar/main.tsx -> plugins/agents/src/contract/providerMarks.ts', 'harness brand marks'],

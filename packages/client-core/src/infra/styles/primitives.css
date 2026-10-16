@@ -2211,6 +2211,9 @@ a.ui-row:hover { background: var(--bg-hover); }
    goes with it. */
 .repo-picker > .ui-btn { max-width: 300px; }
 .repo-picker-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* An icon before a picker's text, such as New chat's plus. A label that is only an icon has no text to
+   space it from. */
+.repo-picker-label > .ui-icon:first-child:not(:only-child) { margin-inline-end: var(--space-2); vertical-align: -0.125em; }
 .repo-picker-chevron { flex: none; color: var(--text-muted); font-size: var(--fs-2xs); }
 
 .repo-picker-popover {

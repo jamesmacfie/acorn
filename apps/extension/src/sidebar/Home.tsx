@@ -1,26 +1,14 @@
-import { For, Match, Show, Switch, createEffect, createSignal, onMount } from 'solid-js'
-import type {
-  BridgeAgentChoice,
-  BridgeAgentSession,
-  BridgeHandoff,
-  BridgePageTask,
-  BridgePendingRequest,
-  BridgeProject,
-  BridgeWorkspace,
-} from '@acorn/protocol/extensionBridge.ts'
+import { For, Match, Show, Switch, createEffect, createSignal } from 'solid-js'
+import type { BridgeHandoff, BridgePageTask, BridgeProject, BridgeWorkspace } from '@acorn/protocol/extensionBridge.ts'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
-import { Chip, Field } from '@acorn/client-core/kit/components/primitives.tsx'
-import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
-import { runtimeIcon, runtimeTone } from '@acorn/plugin-agents/contract/runtimeState.ts'
+import { Field } from '@acorn/client-core/kit/components/primitives.tsx'
 import { projectLink } from '../acornLinks'
 import type { BrowserApi } from '../browser'
 import { onHandoffPage, pageHandoffs, type PageHandoff } from '../handoffs'
 import type { AgentCounts, PageTask } from '../taskPages'
-import { AgentPicker, agentChoice } from './agentChoice'
 import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
-import { CAPTURE_NAMES } from './Composer'
 import { Handoff } from './Handoff'
 import { OpenInAcorn } from './OpenInAcorn'
 import { openTabs } from './openTabs'
@@ -339,143 +327,5 @@ export function Tasks(props: {
         </For>
       </Show>
     </section>
-  )
-}
-
-// The kinds of conversation a task has, grouped and named as the desktop app's Agents sidebar groups them.
-const SESSION_GROUPS: { label: string; has(session: BridgeAgentSession): boolean }[] = [
-  { label: 'Managed sessions', has: (session) => !session.inline && session.kind !== 'workflow' },
-  { label: 'Workflow runs', has: (session) => !session.inline && session.kind === 'workflow' },
-  { label: 'Inline chats', has: (session) => session.inline },
-]
-
-// A provider's logo, when the agents plugin has one for it (main.tsx registers them).
-const providerMark = (providerId: string) =>
-  brandMarkRegistry.get(`agents/${providerId}`) ? `brand:agents/${providerId}` : undefined
-
-// Every conversation in the Agents task, grouped by kind. A row is the desktop's: the state as an icon,
-// the title, and the provider, model, and state in words, with a mark when the agent waits on the
-// person. A row opens it, and New chat's picker starts another. The item waiting for the task's first
-// conversation shows as a chip the person can remove.
-export function Agents(props: {
-  client: BridgeClient
-  nodeId: string
-  taskId: string
-  online: boolean
-  sessions: readonly BridgeAgentSession[] | null
-  requests: readonly BridgePendingRequest[]
-  pendingItem: PageCapture | null
-  dropPendingItem(): void
-  open(sessionId: string): void
-  started(session: BridgeAgentSession): void
-}) {
-  const waiting = (sessionId: string) => props.requests.some((request) => request.sessionId === sessionId)
-
-  return (
-    <section aria-label="Agents">
-      <Show when={props.pendingItem}>
-        {(item) => (
-          <div class="pending-item" aria-label="Pending item">
-            <Chip
-              leading={<Icon name={item().kind === 'link' ? 'link' : 'file-text'} />}
-              onRemove={() => props.dropPendingItem()}
-            >
-              {CAPTURE_NAMES[item().kind]} · {item().title}
-            </Chip>
-            <span class="quiet">Goes with your first message.</span>
-          </div>
-        )}
-      </Show>
-      <Show when={props.sessions} fallback={<p class="quiet">Loading conversations…</p>}>
-        {(sessions) => (
-          <Show when={sessions().length} fallback={<p class="quiet">This task has no conversation yet.</p>}>
-            <For each={SESSION_GROUPS}>
-              {(group) => {
-                const rows = () => sessions().filter(group.has)
-                return (
-                  <Show when={rows().length}>
-                    <h3>{group.label}</h3>
-                    <ul class="rows" aria-label={group.label}>
-                      <For each={rows()}>
-                        {(session) => {
-                          const icon = () => runtimeIcon(session.runtimeState)
-                          return (
-                            <li>
-                              <button type="button" class="row-button agent-row" onClick={() => props.open(session.id)}>
-                                {/* The loader turns, as a working session's does on the desktop. */}
-                                <Icon
-                                  name={icon()}
-                                  tone={runtimeTone(session.runtimeState)}
-                                  spin={icon() === 'loader-circle'}
-                                />
-                                <span class="agent-text">
-                                  <strong>{session.title}</strong>
-                                  <span class="quiet agent-meta">
-                                    <Show when={providerMark(session.providerId)}>
-                                      {(mark) => <Icon name={mark()} tone="brand" />}
-                                    </Show>
-                                    <span>
-                                      {[session.providerId, session.model, session.runtimeState]
-                                        .filter(Boolean)
-                                        .join(' · ')}
-                                    </span>
-                                  </span>
-                                </span>
-                                <Show when={waiting(session.id)}>
-                                  <Icon name="circle-alert" tone="warn" title="Waiting for you" />
-                                </Show>
-                              </button>
-                            </li>
-                          )
-                        }}
-                      </For>
-                    </ul>
-                  </Show>
-                )
-              }}
-            </For>
-          </Show>
-        )}
-      </Show>
-      <NewChat
-        client={props.client}
-        nodeId={props.nodeId}
-        taskId={props.taskId}
-        online={props.online}
-        started={props.started}
-      />
-    </section>
-  )
-}
-
-// Starts a conversation in one task from the agent the person picks.
-function NewChat(props: {
-  client: BridgeClient
-  nodeId: string
-  taskId: string
-  online: boolean
-  started(session: BridgeAgentSession): void
-}) {
-  const agents = agentChoice(props.client, props.nodeId)
-  onMount(() => void agents.load())
-
-  const start = async (choice: BridgeAgentChoice) => {
-    const session = await agents.start(props.taskId, choice)
-    if (session) props.started(session)
-  }
-
-  return (
-    <>
-      <div class="row">
-        <AgentPicker agents={agents} disabled={!props.online} pick={(choice) => void start(choice)} />
-      </div>
-      <Show when={agents.problem()}>
-        {(message) => (
-          <p class="problem" role="alert">
-            {message()}
-          </p>
-        )}
-      </Show>
-    </>
   )
 }

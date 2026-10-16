@@ -51,10 +51,9 @@ the right holds the task's menu:
 
 Under the bar, the kit's tab strip holds the task's panes:
 
-- **Agents**, always: every conversation in the task, grouped as **Managed sessions**, **Workflow
-  runs**, and **Inline chats**, each with its agent, title, and state. A row opens the conversation.
-  **New chat** starts another from the desktop's New picker: each harness or named login, then each
-  custom agent. The tab carries the desktop Agent button's marker: the alert glyph while an agent
+- **Agents**, always: the task's waiting requests, then its conversations under **Managed
+  sessions**, with **New chat** in that header, then **Workflow runs** and **Inline chats** as closed
+  folds ([a task's Agents tab](./conversations.md#a-tasks-agents-tab)). The tab carries the desktop Agent button's marker: the alert glyph while an agent
   waits on the person, or else a turning loader while one works.
 - **Runs**, while the Node runs the workflows plugin, with a turning loader while a run runs
   ([the Runs tab](./workflows.md#the-runs-tab)).

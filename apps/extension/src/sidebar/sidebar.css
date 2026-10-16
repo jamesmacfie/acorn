@@ -164,24 +164,21 @@ h2, h3 {
   border-radius: 0;
 }
 .row-button:hover:not(:disabled) { background: var(--bg-hover); }
-/* An agent row, the desktop's stacked row: the state icon beside the title, and the provider's logo,
- * model, and state in words under it. */
-.row-button.agent-row { display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-3) var(--space-2); }
-.agent-row > .ui-icon { margin-top: 0.2em; }
-.agent-text { flex: 1; display: grid; gap: var(--space-1); min-width: 0; }
-.agent-meta { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: var(--fs-sm); }
 /* A New picker row's harness mark and, for a login shown as an icon, the account's icon. */
 .agent-marks { display: inline-flex; align-items: center; gap: var(--space-2); }
 .row-button[aria-current='true'] { box-shadow: inset var(--marker-w) 0 0 var(--accent); padding-left: var(--space-4); }
-/* Home's task rows and This page's task, the kit's stacked row: the agent mark beside the title, and
- * the branch and the agents' state under it. */
+/* Home's task rows, This page's task, and a task's conversations, the kit's stacked row: a state mark
+ * beside the title, and a line of detail under it. A section's own padding takes the place of the
+ * row's, except on the Agents tab, whose rows sit under the kit's section headers. */
 .task-rows .ui-row { padding-inline: var(--space-2); }
-.task-rows .ui-row-leading { width: 14px; justify-content: center; margin-top: 0.2em; }
+:is(.task-rows, .agent-rows) .ui-row-leading { width: 14px; justify-content: center; margin-top: 0.2em; }
 .row-title, .row-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-title { font-size: var(--fs); }
 .row-meta { font-size: var(--fs-xs); color: var(--text-muted); }
 .row-meta .branch { font-family: var(--font-mono); }
 .row-meta .needs-you { color: var(--state-warn); }
+/* A conversation's provider logo beside its model. */
+.agent-meta { display: flex; align-items: center; gap: var(--space-2); }
 .idle-dot { width: 6px; height: 6px; border-radius: var(--radius-circle); border: 1.5px solid var(--text-faint); }
 /* The kit's spinning icon turns on base.css's keyframes, which the panel doesn't load. */
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -274,8 +271,10 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .item-title { line-height: 1.35; }
 .hint { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); color: var(--text-muted); }
 .handoff .divider { margin: 0; border: 0; border-top: var(--divider); }
-/* The item waiting for a task's first chat, on its Agents tab. */
+/* The item waiting for a task's next chat, above its Agents tab's list or centred in its empty state. */
 .pending-item { display: grid; justify-items: start; gap: var(--space-2); }
+.ui-empty .pending-item { justify-items: center; }
+.agents > .pending { padding: var(--space-4) var(--pane-pad) 0; }
 
 /* ── Needs you ──────────────────────────────────────────────────────────────────────────────── */
 /* The top bar's amber button, with the count of requests waiting. */

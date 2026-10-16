@@ -36,6 +36,8 @@ export function Composer(props: {
   target: DraftTarget
   // Why sending is off right now, or null.
   blocked: string | null
+  // Put the cursor in the message box when the composer opens.
+  focused: boolean
   // A send finished, either way. The conversation reads itself again.
   settled(): void
 }) {
@@ -76,7 +78,9 @@ export function Composer(props: {
     props.storage.onChanged.removeListener(followStorage)
   })
 
+  let box!: HTMLTextAreaElement
   onMount(() => {
+    if (props.focused) box.focus()
     // Text typed before storage answered wins over the stored text.
     void loadDraft(props.storage.local, target).then((stored) => {
       if (!mounted) return
@@ -241,6 +245,7 @@ export function Composer(props: {
       </Show>
       <div class="field">
         <textarea
+          ref={box}
           name="message"
           rows={expanded() ? 18 : 3}
           maxLength={TURN_TEXT_MAX_CHARS}

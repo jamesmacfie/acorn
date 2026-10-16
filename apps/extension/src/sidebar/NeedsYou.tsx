@@ -65,6 +65,8 @@ export function NeedsYou(
   props: ListProps & {
     // What to say when nothing waits. Without it the list draws nothing then.
     emptyText?: string
+    // The list sits in its task, so its rows leave the task's title out.
+    inTask?: boolean
   },
 ) {
   // Each waiting conversation, read whenever the pending list changes: its title, and its requests'
@@ -131,6 +133,7 @@ export function NeedsYou(
                     nodeId={props.nodeId}
                     pending={pending}
                     read={reads()[pending.sessionId]}
+                    inTask={props.inTask ?? false}
                     online={props.online}
                     open={() => props.openConversation(pending.taskId, pending.sessionId)}
                     answered={() => hold(pending)}
@@ -186,6 +189,7 @@ function NeedsYouRow(props: {
   pending: BridgePendingRequest
   // Its conversation, once read.
   read: BridgeSessionRead | undefined
+  inTask: boolean
   online: boolean
   open(): void
   answered(): void
@@ -203,7 +207,7 @@ function NeedsYouRow(props: {
     const full = request()
     return result() ?? (full && full.status !== 'pending' ? settledText(full, full.answer) : null)
   }
-  const meta = () => [props.read?.session.title, props.pending.taskTitle].filter(Boolean).join(' · ')
+  const meta = () => [props.read?.session.title, !props.inTask && props.pending.taskTitle].filter(Boolean).join(' · ')
 
   return (
     <li>

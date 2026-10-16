@@ -70,10 +70,12 @@ the selection moves to another Node. A count is never older than the Node's own 
 ## The Needs you list
 
 The list shows every waiting request on the selected Node, across its projects, not only the page's:
-the badge says what waits for this page, and the list says what waits anywhere. It shows in two
+the badge says what waits for this page, and the list says what waits anywhere. It shows in three
 places, drawn by the same component:
 
 - At the top of Home, as a **Needs you** section with its count, while something waits.
+- At the top of a task's **Agents** tab, with that task's requests only, while one waits. Its rows
+  leave out the task's title.
 - In the top bar of Home, a task, and a conversation, as an amber **Needs you** button with the count.
   It opens the list in a popover. The button isn't drawn while nothing waits, or during pairing or in
   Settings. A popover left open after the last request goes says "Nothing waits on you."

@@ -26,7 +26,8 @@ import { CaptureFailure, withCapture, type PageCapture } from '../capture'
 import { Conversation } from './Conversation'
 import { errorGuidance } from './guidance'
 import { GoToTask } from './GoToTask'
-import { Agents, Tasks, ThisPage } from './Home'
+import { Agents } from './Agents'
+import { Tasks, ThisPage } from './Home'
 import {
   changeDraft,
   changedPendingItem,
@@ -124,6 +125,11 @@ export function Workspace(props: {
   const [panelSources, setPanelSources] = createSignal<Record<string, string>>({})
   // The item waiting for the shown task's first conversation, as storage holds it.
   const [pendingItem, setPendingItem] = createSignal<PageCapture | null>(null)
+  // Which of the Agents tab's folds are open, by label, for every task. Not stored: a fold opens closed
+  // in a new panel.
+  const [agentFolds, setAgentFolds] = createSignal<Record<string, boolean>>({})
+  // The conversation just started here, whose message box takes the cursor when it opens.
+  const [startedSession, setStartedSession] = createSignal<string | null>(null)
   const [problem, setProblem] = createSignal<string | null>(null)
 
   // The task the location shows. A memo, so a move within the task reads nothing again.
@@ -687,8 +693,11 @@ export function Workspace(props: {
                   requests={props.requests}
                   pendingItem={pendingItem()}
                   dropPendingItem={() => void dropPendingItems(props.api.storage.local, nodeId, [id])}
+                  folds={agentFolds()}
+                  fold={(label, open) => setAgentFolds((folds) => ({ ...folds, [label]: open }))}
                   open={(sessionId) => void openSession(id, sessionId)}
                   started={(started) => {
+                    setStartedSession(started.id)
                     setSessionLists((lists) => ({
                       ...lists,
                       [id]: [started, ...(lists[id] ?? []).filter((row) => row.id !== started.id)],
@@ -747,6 +756,7 @@ export function Workspace(props: {
                 storage={props.api.storage}
                 target={{ nodeId, taskId: taskId()!, sessionId }}
                 session={session()!}
+                focused={startedSession() === sessionId}
                 online={props.online}
                 hint={props.hint}
                 reconnects={props.reconnects}
