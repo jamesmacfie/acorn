@@ -13,6 +13,7 @@ const PAGE = 'apps/site/src/content/docs/docs/reference/environment-variables.md
 // that prefix.
 const INTERNAL = {
   ACORN_BASELINE: 'A constant naming the data format, not a variable.',
+  ACORN_BUILD: 'A constant naming the build, not a variable.',
   ACORN_PIN_MISMATCH: 'An error code, not a variable.',
   'ACORN_FIXTURE_*': "Switches for the terminal client's test fixture.",
   'ACORN_CLI_*': 'The command line sets these for the Node it starts with `node start --background`.',

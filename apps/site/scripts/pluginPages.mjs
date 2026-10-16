@@ -10,8 +10,8 @@ import { ROOT } from './stale.mjs'
 // text because none of the three loads in plain Node. The Node alone runs the agent browser, and only
 // the clients run the Context pane and the first-run wizard.
 const COMPILED = ['apps/desktop/src/client/plugins.ts', 'apps/tui/src/roster.ts', 'apps/node/src/composition/plugins.ts']
-// The bundled packages, read as text because importing the script builds them.
-const BUNDLED = 'apps/desktop/scripts/build-bundled-plugins.mjs'
+// The bundled packages, read as text so the check never loads the build script's imports.
+const BUNDLED = 'scripts/bundled-plugins.mjs'
 
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
