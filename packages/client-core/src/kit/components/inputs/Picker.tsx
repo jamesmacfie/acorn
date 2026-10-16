@@ -1,8 +1,8 @@
-import { createMemo, createSignal, For, Show, type JSX } from 'solid-js'
+import { createMemo, createSignal, For, onMount, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type Placement } from '../../lib/controls/anchor'
 import PickerRow from './PickerRow'
-import { Button } from './Button'
+import { Button, type ButtonProps } from './Button'
 import { ConfirmButton } from './ConfirmButton'
 import Icon from '../content/Icon'
 import { claimField, FieldProvider, NO_FIELD } from './controlAttrs'
@@ -34,6 +34,9 @@ export type PickerItem = {
   disabled?: boolean
   /** Draws the row's own remove control, which reports through `onRemove`. */
   removable?: boolean
+  /** A label over the rows of one group, such as "Suggested for this page". The rows of a group come
+   *  together in `items`, and the label shows above the first of them that the filter keeps. */
+  group?: string
 }
 
 export type PickerProps<T> = {
@@ -67,9 +70,12 @@ export type PickerProps<T> = {
   /** The trigger's size, as any Button's. A picker in a bar of `sm` buttons takes `sm` too, or it
    *  stands 6px taller than everything beside it. */
   size?: Extract<Size, 'sm' | 'md'>
+  /** The trigger's look, as any Button's. A picker in a section's heading is a `ghost`. */
+  variant?: ButtonProps['variant']
   disabled?: boolean // greys the button and blocks opening (e.g. repo is fixed in a task view)
   keepOpen?: boolean // stay open after a pick, so the same list can drive a multi-select (isActive marks the chosen ones)
   placement?: Placement // 'bottom-end' for a trigger at the right edge, so the list opens leftward
+  defaultOpen?: boolean // open once it mounts, as when the person asked for this list somewhere else
 }
 
 export default function Picker<T>(props: PickerProps<T>) {
@@ -116,6 +122,7 @@ export default function Picker<T>(props: PickerProps<T>) {
     popover.toggle()
     if (open()) queueMicrotask(() => inputRef?.focus())
   }
+  onMount(() => props.defaultOpen && toggle())
   const choose = (row: PickerItem) => {
     if (row.disabled) return
     if (props.items) props.onPick?.(row.id)
@@ -137,6 +144,7 @@ export default function Picker<T>(props: PickerProps<T>) {
         id={field?.id}
         describedBy={field?.describedBy()}
         size={props.size}
+        variant={props.variant}
         opens="listbox"
         expanded={open()}
         disabled={props.disabled}
@@ -175,30 +183,37 @@ export default function Picker<T>(props: PickerProps<T>) {
                 <ul class="repo-picker-list">
                   <For each={rows()}>
                     {(row, index) => (
-                      <PickerRow
-                        label={row.label}
-                        description={row.note}
-                        active={row.active}
-                        disabled={row.disabled}
-                        leading={
-                          row.removable ? (
-                            <ConfirmButton
-                              variant="bare"
-                              size="xs"
-                              iconOnly
-                              label={props.removeLabel ?? 'Remove'}
-                              tip={props.removeLabel ?? 'Remove'}
-                              confirmLabel={`${props.removeLabel ?? 'Remove'}?`}
-                              onConfirm={() => props.onRemove?.(row.id)}
-                            >
-                              <Icon name="x" />
-                            </ConfirmButton>
-                          ) : (
-                            props.leading?.((props.results?.(filter()) ?? [])[index()] as T)
-                          )
-                        }
-                        onSelect={() => choose(row)}
-                      />
+                      <>
+                        <Show when={row.group && row.group !== rows()[index() - 1]?.group}>
+                          <li class="repo-picker-group" role="presentation">
+                            {row.group}
+                          </li>
+                        </Show>
+                        <PickerRow
+                          label={row.label}
+                          description={row.note}
+                          active={row.active}
+                          disabled={row.disabled}
+                          leading={
+                            row.removable ? (
+                              <ConfirmButton
+                                variant="bare"
+                                size="xs"
+                                iconOnly
+                                label={props.removeLabel ?? 'Remove'}
+                                tip={props.removeLabel ?? 'Remove'}
+                                confirmLabel={`${props.removeLabel ?? 'Remove'}?`}
+                                onConfirm={() => props.onRemove?.(row.id)}
+                              >
+                                <Icon name="x" />
+                              </ConfirmButton>
+                            ) : (
+                              props.leading?.((props.results?.(filter()) ?? [])[index()] as T)
+                            )
+                          }
+                          onSelect={() => choose(row)}
+                        />
+                      </>
                     )}
                   </For>
                 </ul>

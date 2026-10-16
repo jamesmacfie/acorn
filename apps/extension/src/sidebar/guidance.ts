@@ -6,20 +6,17 @@ import type { CallError, HostState } from '../messages'
 
 export const INSTALL_COMMAND = 'acorn browser install'
 
-// The bridge states that installing it fixes. The panel shows the command for them, and checks again.
-export const installFixes = (host: HostState): boolean => host.state === 'missing' || host.state === 'forbidden'
+// The bridge states that installing it fixes, as the title of the screen that shows the command. The
+// panel checks again until the bridge answers.
+export function installTitle(host: HostState): string | null {
+  if (host.state === 'missing') return 'Install the browser bridge'
+  if (host.state === 'forbidden') return 'Repair the browser bridge'
+  return null
+}
 
 export function hostGuidance(host: HostState): string | null {
-  switch (host.state) {
-    case 'missing':
-      return 'The Acorn browser bridge is not installed. Run this in a terminal:'
-    case 'forbidden':
-      return 'The installed bridge does not allow this extension. Run this in a terminal to repair it:'
-    case 'exited':
-      return `${host.message ?? 'The bridge stopped.'} Retry, or run \`acorn browser status\` to check the install.`
-    default:
-      return null
-  }
+  if (host.state !== 'exited') return null
+  return `${host.message ?? 'The bridge stopped.'} Retry, or run \`acorn browser status\` to check the install.`
 }
 
 export function errorGuidance(error: CallError): string {

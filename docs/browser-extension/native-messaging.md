@@ -19,14 +19,16 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `node.collect` | `label` | The paired Node's record once the owner allows the ask, or `null` while they haven't. A denial or an expiry fails with `pairing_failed` |
 | `node.select` | `nodeId` or `null` | `{ nodes, activeNodeId, status }` |
 | `node.forget` | `nodeId` | `{ nodes, activeNodeId, status }` |
+| `node.rename` | `nodeId`, `label` (1 to 120 characters) | `{ nodes, activeNodeId, status }`. The name is this browser's own, so nothing on the Node or in other clients changes |
 | `projects.list` | `nodeId` | `{ nodeId, projects, workspaces }`, each project `{ id, name, path, hidden, workspaceId }` and each workspace `{ id, name }`, in the rail's order |
-| `tasks.list` | `nodeId`, `projectId` | `{ nodeId, projectId, tasks }`: that project's active tasks, each `{ id, title, branch }` |
 | `tasks.pages` | `nodeId` | `{ nodeId, tasks }`: every active task with a page address, each `{ id, title, branch, projectId, pages }`, including the app origins plugins publish; see [pages that belong to a task](./task-pages.md#pages-that-belong-to-a-task) |
 | `agents.choices` | `nodeId`, `refresh` (optional) | `{ nodeId, choices }`: the desktop's New picker rows; see [agent conversations](./conversations.md) |
-| `sessions.list` | `nodeId`, `taskId` | `{ nodeId, taskId, sessions }`: the task's newest 100 unarchived sessions |
+| `sessions.list` | `nodeId`, and `taskId` or `workspaceId` | `{ nodeId, taskId, sessions }` or `{ nodeId, workspaceId, sessions }`: the newest 100 unarchived sessions of the task, or of every task in the workspace |
 | `session.read` | `nodeId`, `sessionId`, `afterSeq`, `limit` (at most 500) | `{ nodeId, sessionId, session, records, reach, queued }` |
 | `session.create` | `nodeId`, `taskId`, `providerId`, `profileId`, `customAgentId` and `account` (optional), `key` | `{ nodeId, session }` |
 | `turn.submit` | `nodeId`, `sessionId`, `input`, `key` | `{ nodeId, sessionId, turnId }` |
+| `session.archive` | `nodeId`, `sessionId`, `key` | `{ nodeId, sessionId }`: the host sends `PATCH` with `{ archived: true }` to the session's route |
+| `session.cancel` | `nodeId`, `sessionId`, `key` | `{ nodeId, sessionId }`: the host sends `POST` with an empty body to the session's `cancel` route, which stops its running turn; see [stopping the agent](./transcript.md#the-state-line) |
 | `request.resolve` | `nodeId`, `sessionId`, `requestId`, `resolution`, `key` | `{ nodeId, sessionId, request }`; see [answering the agent](./conversations.md#answering-the-agent) |
 | `attachment.upload`, `attachment.read`, `attachment.delete` | `nodeId`, `taskId`, and the attachment | See [page capture](./page-capture.md#attachment-operations) |
 | `handoffs.list`, `handoff.resolve`, `handoff.create` | `nodeId`, and the handoff and page | See [handoffs](./handoffs.md#native-operations) |

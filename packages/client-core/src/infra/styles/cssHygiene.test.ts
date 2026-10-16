@@ -175,7 +175,8 @@ describe('the plugin-frame stylesheet is self-contained', () => {
     // Hooks with no base rule of their own, styled only through a state or a child, so there is
     // nothing for the served subset to be missing. `.ui-fold` is a <details> element; only
     // `[open]` matters. `.active` and `.disabled` are state modifiers on `.repo-picker-row`.
-    const hooks = new Set(['ui-fold', 'active', 'disabled'])
+    // `.copyable` only reveals a CopyButton inside it on hover.
+    const hooks = new Set(['ui-fold', 'active', 'disabled', 'copyable'])
     const orphans = [...new Set([...primitives.matchAll(/\.([a-z][a-z0-9-]{2,})/g)].map((m) => m[1]))]
       .filter((name) => !hooks.has(name))
       .filter((name) => !new RegExp(`(^|[\\s,>+~])\\.${name}\\s*(,|\\{)`, 'm').test(servedText))

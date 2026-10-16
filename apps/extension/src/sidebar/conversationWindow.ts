@@ -11,16 +11,28 @@ import type {
 // Events per read, and how far behind the end the window may fall before it jumps to the end again.
 export const CONVERSATION_PAGE = 200
 
+export type ToolLine = { key: string; kind: 'tool'; title: string; status: string | null }
+
+// A run this long or longer folds into one line. Two lines read as quickly as a folded one would.
+const TOOL_FOLD_AT = 3
+
+// `at` is when the Node recorded the message. `workflow` marks a workflow step's prompt, which the
+// person didn't write.
 export type ConversationItem =
-  | { key: string; kind: 'you'; text: string; attachments: BridgeAttachmentRef[] }
-  | { key: string; kind: 'agent' | 'error'; text: string }
-  | { key: string; kind: 'tool'; title: string; status: string | null }
+  | { key: string; kind: 'you'; text: string; attachments: BridgeAttachmentRef[]; at: number; workflow: boolean }
+  | { key: string; kind: 'agent'; text: string; at: number }
+  | { key: string; kind: 'error'; text: string }
+  | ToolLine
+  // A run of tool lines with nothing between them. Its key is its first line's, so it stays the same
+  // run as later lines join it.
+  | { key: string; kind: 'tools'; lines: ToolLine[] }
 
 // Messages, tool summaries, and errors in seq order. A streamed message arrives as appends on one
 // message id and reads as one message. A tool call arrives as an opener and later updates on one id,
 // and reads as one line whose title and status keep the last value reported; a field an update leaves
 // out is unchanged. An update at or below the seq a folded record already covers is skipped, so a
-// record read twice can't apply twice.
+// record read twice can't apply twice. Runs of TOOL_FOLD_AT or more tool lines come back as one
+// `tools` item.
 export function conversationItems(records: readonly BridgeConversationRecord[]): ConversationItem[] {
   const items: ConversationItem[] = []
   const tools = new Map<string, { at: number; through: number }>()
@@ -39,12 +51,19 @@ export function conversationItems(records: readonly BridgeConversationRecord[]):
         continue
       }
       message = { at: items.length, turnId: record.turnId, messageId: event.messageId }
-      items.push({ key: record.id, kind: 'agent', text: event.text })
+      items.push({ key: record.id, kind: 'agent', text: event.text, at: record.createdAt })
       continue
     }
     message = null
     if (event.type === 'user_message')
-      items.push({ key: record.id, kind: 'you', text: event.text, attachments: event.attachments ?? [] })
+      items.push({
+        key: record.id,
+        kind: 'you',
+        text: event.text,
+        attachments: event.attachments ?? [],
+        at: record.createdAt,
+        workflow: event.workflow ?? false,
+      })
     else if (event.type === 'error') items.push({ key: record.id, kind: 'error', text: event.message })
     else {
       const toolKey = `${record.turnId ?? 'session'}:${event.toolId}`
@@ -61,7 +80,27 @@ export function conversationItems(records: readonly BridgeConversationRecord[]):
       items.push({ key: record.id, kind: 'tool', title: event.title || 'Tool call', status: event.status ?? null })
     }
   }
-  return items
+  return groupToolRuns(items)
+}
+
+// After the fold above, because an update can change a line anywhere in the list.
+function groupToolRuns(items: ConversationItem[]): ConversationItem[] {
+  const grouped: ConversationItem[] = []
+  let run: ToolLine[] = []
+  const endRun = () => {
+    if (run.length >= TOOL_FOLD_AT) grouped.push({ key: run[0]!.key, kind: 'tools', lines: run })
+    else grouped.push(...run)
+    run = []
+  }
+  for (const item of items) {
+    if (item.kind === 'tool') run.push(item)
+    else {
+      endRun()
+      grouped.push(item)
+    }
+  }
+  endRun()
+  return grouped
 }
 
 export type ConversationWindow = {

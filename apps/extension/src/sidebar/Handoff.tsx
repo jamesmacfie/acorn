@@ -1,18 +1,25 @@
 import { For, Show, createEffect, createSignal, on, onMount } from 'solid-js'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { BridgeHandoffItem, BridgeWorkflow } from '@acorn/protocol/extensionBridge.ts'
+import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
+import { Button, Card, Field } from '@acorn/client-core/kit/components/primitives.tsx'
+import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
 import {
   collectItemWorkflowInputs,
   itemWorkflowInputsReady,
   prefillFromItem,
 } from '@acorn/plugin-workflows/contract/itemInputs.ts'
 import { CallFailure, isUncertain } from '../messages'
-import type { HandoffStart, PageHandoff } from '../handoffs'
-import { itemTaskLink, outsideItemLink } from '../acornLinks'
+import type { PageHandoff } from '../handoffs'
+import { outsideItemLink } from '../acornLinks'
+import type { AgentCounts } from '../taskPages'
 import { OpenInAcorn } from './OpenInAcorn'
+import { PageTaskRow } from './TaskRow'
 import type { BridgeClient } from './bridgeClient'
 import type { PageCapture } from '../capture'
 import { errorGuidance } from './guidance'
+import { WorkflowForm, WorkflowPicker, inputText, workflowStarter } from './WorkflowForm'
 
 // What the item's context becomes in a draft: the plugin's proposal, or the item's title and address
 // when it proposed none.
@@ -38,10 +45,14 @@ const seededValues = (workflow: BridgeWorkflow, item: BridgeHandoffItem): Record
   )
 }
 
-// One handoff on one Node: resolve the page, then let the person chat in or open a linked task, or, in
-// a project the plugin tied the item to, create a task or start a workflow in a new one, as the chip's
-// menu chose. A created task's item context only ever lands in a draft, so nothing reaches an agent
-// until the person sends; a workflow's agents start at once. docs/browser-extension/handoffs.md.
+// The plugin's logo, from the kit for GitHub's or from its manifest through the handoff list, or a
+// document for a plugin with none.
+const pluginMark = (pluginId: string) => (brandMarkRegistry.get(pluginId) ? `brand:${pluginId}` : 'file-text')
+
+// One handoff on one Node, as This page's card: the item, and in a project that tracks it, Create task
+// or a workflow run in a new task. An item a task already holds shows that task instead. A created
+// task's item waits for its first conversation, where it lands in the draft, so nothing reaches an
+// agent until the person sends; a workflow's agents start at once. docs/browser-extension/handoffs.md.
 export function Handoff(props: {
   client: BridgeClient
   nodeId: string
@@ -51,28 +62,33 @@ export function Handoff(props: {
   online: boolean
   // Whether Open in Acorn may open the desktop app, or copies its link.
   opensLinks: boolean
-  // Open this task's newest conversation, or a new chat when it has none, with this context waiting.
-  openTask(projectId: string, taskId: string, capture: PageCapture): void
-  // Create task made the item's task: show it, with this context waiting for its first conversation.
-  createdTask(projectId: string, taskId: string, capture: PageCapture): void
-  // Start workflow made the item's task and started this run in it.
+  projectName(id: string): string
+  projectWorkspace(id: string): string | undefined
+  agents(taskId: string): AgentCounts
+  openTask(taskId: string): void
+  // Create task made the item's task: open it, with this item waiting for its first conversation.
+  createdTask(projectId: string, taskId: string, item: PageCapture): void
+  // Start run made the item's task and started this run in it.
   startedWorkflow(projectId: string, taskId: string, runId: string): void
+  // The tab left the item, and closing the card loses nothing.
   dismiss(): void
 }) {
   const [items, setItems] = createSignal<BridgeHandoffItem[] | null>(null)
   const [problem, setProblem] = createSignal<string | null>(null)
   const [chosen, setChosen] = createSignal(0)
   const [projectId, setProjectId] = createSignal('')
-  const [start, setStart] = createSignal<HandoffStart>(props.handoff.start ?? 'task')
   const [creating, setCreating] = createSignal(false)
-  // Each project's runnable workflows, as last read, the one chosen, and what the person typed.
+  // Each project's runnable workflows, as last read, the one chosen, if any, and what the person typed.
   const [workflows, setWorkflows] = createSignal<Record<string, BridgeWorkflow[]>>({})
   const [workflowId, setWorkflowId] = createSignal('')
   const [values, setValues] = createSignal<Record<string, string>>({})
+  // The chip's menu asked for a workflow, so Run workflow's picker opens with the card, until one is
+  // picked. Cancelling that workflow brings the picker back closed.
+  let wantsWorkflow = props.handoff.start === 'workflow'
   // A create keeps its key, so a retry, after an unconfirmed create or a failed start, can't make a
-  // second task. A start keeps its own for the same task, workflow, and values.
+  // second task. The starter keeps its own for the same task, workflow, and values.
   let lastCreate: { key: string; identifier: string; connectionId: string; projectId: string } | null = null
-  let lastStart: { key: string; taskId: string; workflowId: string; inputs: string } | null = null
+  const startRun = workflowStarter(props.client, props.nodeId, setProblem)
 
   const target = () => ({
     pluginId: props.handoff.pluginId,
@@ -89,8 +105,9 @@ export function Handoff(props: {
     setValues({})
   }
 
+  const chosenProject = () => item()?.projects.find((project) => project.id === projectId())?.name ?? ''
   const projectWorkflows = () => workflows()[projectId()] ?? null
-  const workflow = () => projectWorkflows()?.find((each) => each.id === workflowId()) ?? projectWorkflows()?.[0] ?? null
+  const workflow = () => projectWorkflows()?.find((each) => each.id === workflowId()) ?? null
   const loadWorkflows = async (forProject: string) => {
     if (workflows()[forProject]) return
     try {
@@ -100,14 +117,20 @@ export function Handoff(props: {
       setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
     }
   }
-  createEffect(() => startable() && start() === 'workflow' && projectId() && void loadWorkflows(projectId()))
-
-  const valueOf = (name: string): string => {
-    const value = values()[name] ?? (item() && workflow() ? seededValues(workflow()!, item()!)[name] : undefined)
-    return value === undefined ? '' : typeof value === 'string' ? value : JSON.stringify(value)
+  // Read up front, so Run workflow's picker opens on the list.
+  createEffect(() => startable() && projectId() && void loadWorkflows(projectId()))
+  const pickWorkflow = (id: string) => {
+    wantsWorkflow = false
+    setWorkflowId(id)
   }
-  const ready = () =>
-    start() === 'task' || (!!workflow() && itemWorkflowInputsReady(workflow()!.id, workflow()!.inputs, valueOf))
+
+  const valueOf = (name: string): string =>
+    inputText(values()[name] ?? (item() && workflow() ? seededValues(workflow()!, item()!)[name] : undefined))
+  const ready = () => !!workflow() && itemWorkflowInputsReady(workflow()!.id, workflow()!.inputs, valueOf)
+  const cancelWorkflow = () => {
+    setWorkflowId('')
+    setValues({})
+  }
 
   const resolve = async () => {
     setProblem(null)
@@ -149,42 +172,15 @@ export function Handoff(props: {
     }
   }
 
-  // The run's ID, or null with `problem` saying why there isn't one.
-  const startRun = async (taskId: string, chosen: BridgeWorkflow, inputs: Record<string, DataValue>) => {
-    const asked = { taskId, workflowId: chosen.id, inputs: JSON.stringify(inputs) }
-    const same =
-      lastStart?.taskId === asked.taskId &&
-      lastStart.workflowId === asked.workflowId &&
-      lastStart.inputs === asked.inputs
-    const key = same ? lastStart!.key : crypto.randomUUID()
-    lastStart = { key, ...asked }
-    try {
-      const result = await props.client.call({
-        op: 'workflow.start',
-        nodeId: props.nodeId,
-        taskId,
-        defId: chosen.id,
-        ...(Object.keys(inputs).length ? { inputs } : {}),
-        key,
-      })
-      return result.runId
-    } catch (error) {
-      if (error instanceof CallFailure && isUncertain(error.code))
-        setProblem("The Node didn't confirm the run. Start it again to retry; the Node won't start a second one.")
-      else setProblem(error instanceof CallFailure ? errorGuidance(error) : String(error))
-      return null
-    }
-  }
-
-  // Makes the linked task, then for a workflow starts the run in it. A retry after either step failed
-  // reuses both keys, so nothing is made twice.
-  const submit = async () => {
+  // Makes the linked task, then for a run starts the chosen workflow in it. A retry after either step
+  // failed reuses both keys, so nothing is made twice.
+  const submit = async (run: boolean) => {
     const current = item()
     const forProject = projectId()
     const chosen = workflow()
-    if (!current || !forProject || creating() || !ready()) return
+    if (!current || !forProject || creating() || (run && !ready())) return
     let inputs: Record<string, DataValue> = {}
-    if (start() === 'workflow') {
+    if (run) {
       try {
         inputs = collectItemWorkflowInputs(chosen!.inputs, valueOf)
       } catch (error) {
@@ -197,8 +193,8 @@ export function Handoff(props: {
     try {
       const task = await create(current, forProject)
       if (!task) return
-      if (start() === 'task') return props.createdTask(task.projectId, task.id, handoffCapture(current))
-      const runId = await startRun(task.id, chosen!, inputs)
+      if (!run) return props.createdTask(task.projectId, task.id, handoffCapture(current))
+      const runId = await startRun(task.id, chosen!.id, inputs)
       if (runId) props.startedWorkflow(task.projectId, task.id, runId)
     } finally {
       setCreating(false)
@@ -217,201 +213,163 @@ export function Handoff(props: {
     ),
   )
 
-  const projectName = (id: string) => item()?.projects.find((project) => project.id === id)?.name
-
   return (
     <div class="handoff" role="group" aria-label="Handoff">
-      <p class="quiet">{props.handoff.url}</p>
-      <Show when={!props.onPage && edited()}>
-        <p class="notice">This is about a page you've left. It stays open so what you typed isn't lost.</p>
-      </Show>
-      <Show when={problem()}>
-        {(message) => (
-          <p class="problem" role="alert">
-            {message()}
-          </p>
-        )}
-      </Show>
-      <Show when={items()} fallback={problem() ? null : <p class="quiet">Looking it up…</p>}>
-        {(resolved) => (
-          <Show
-            when={resolved().length}
-            fallback={<p class="notice">Nothing on this page is an item this Node can open.</p>}
-          >
-            <Show when={resolved().length > 1}>
-              <label>
-                Which one
-                <select name="handoff-item" onChange={(event) => choose(Number(event.currentTarget.value))}>
-                  <For each={resolved()}>
-                    {(candidate, index) => (
-                      <option value={index()} selected={index() === chosen()}>
-                        {`${candidate.identifier} · ${candidate.connection.label}`}
-                      </option>
-                    )}
-                  </For>
-                </select>
-              </label>
-            </Show>
-            <Show when={item()}>
+      <Card pad="sm">
+        <Show when={!props.onPage && edited()}>
+          <p class="notice">This is about a page you've left. It stays open so what you typed isn't lost.</p>
+        </Show>
+        <Show when={problem()}>
+          {(message) => (
+            <div class="row">
+              <p class="problem grow" role="alert">
+                {message()}
+              </p>
+              <Button size="sm" onPress={() => void resolve()}>
+                Try again
+              </Button>
+            </div>
+          )}
+        </Show>
+        <Show when={items()} fallback={problem() ? null : <p class="quiet">Looking it up…</p>}>
+          {(resolved) => (
+            <Show when={item()} fallback={<p class="notice">Nothing on this page is an item this Node can open.</p>}>
               {(current) => (
                 <>
-                  <p>
-                    <strong>{current().identifier}</strong> {current().title}
-                    <span class="quiet"> · {current().connection.label}</span>
-                  </p>
+                  <div class="item-head">
+                    <Icon name={pluginMark(props.handoff.pluginId)} tone="brand" />
+                    <div class="item-text">
+                      <span class="item-id">
+                        <Show when={resolved().length > 1} fallback={<b>{current().identifier}</b>}>
+                          <Picker
+                            label={current().identifier}
+                            ariaLabel="Item"
+                            size="sm"
+                            variant="ghost"
+                            placeholder="Filter items"
+                            emptyText="No item matches."
+                            items={resolved().map((candidate, index) => ({
+                              id: String(index),
+                              label: candidate.identifier,
+                              note: candidate.title,
+                              active: index === chosen(),
+                            }))}
+                            onPick={(index) => choose(Number(index))}
+                          />
+                        </Show>
+                        <span>{current().connection.label}</span>
+                      </span>
+                      <strong class="item-title">{current().title}</strong>
+                    </div>
+                    <OpenInAcorn
+                      href={outsideItemLink(props.nodeId, current().url)}
+                      opensLinks={props.opensLinks}
+                      iconOnly
+                    />
+                  </div>
                   <Show
-                    when={current().linkedTasks.length}
+                    when={!current().linkedTasks.length}
                     fallback={
-                      <div class="row">
-                        <span class="quiet grow">No task in Acorn for this yet.</span>
-                        <OpenInAcorn
-                          href={outsideItemLink(props.nodeId, current().url)}
-                          opensLinks={props.opensLinks}
-                          class="quiet"
-                        />
-                      </div>
+                      <ul class="task-rows" aria-label="Linked tasks">
+                        <For each={current().linkedTasks}>
+                          {(task) => (
+                            <PageTaskRow
+                              title={task.title}
+                              project={props.projectName(task.projectId)}
+                              branch={null}
+                              agents={props.agents(task.id)}
+                              onPress={() => props.openTask(task.id)}
+                            />
+                          )}
+                        </For>
+                      </ul>
                     }
                   >
-                    <ul class="rows" aria-label="Linked tasks">
-                      <For each={current().linkedTasks}>
-                        {(task) => (
-                          <li>
-                            <div class="grow">
-                              <strong>{task.title}</strong>
-                              <span class="quiet">{projectName(task.projectId) ?? ''}</span>
-                            </div>
-                            <OpenInAcorn
-                              href={itemTaskLink(props.nodeId, props.handoff.pluginId, task.id)}
-                              opensLinks={props.opensLinks}
-                            />
-                            <button
-                              type="button"
-                              class="quiet"
-                              onClick={() => props.openTask(task.projectId, task.id, handoffCapture(current()))}
-                            >
-                              Chat
-                            </button>
-                          </li>
-                        )}
-                      </For>
-                    </ul>
-                  </Show>
-                  <Show
-                    when={current().projects.length}
-                    fallback={<p class="notice">No project on this Node tracks {current().identifier}.</p>}
-                  >
-                    <Show when={startable()}>
-                      <div class="row">
-                        <select
-                          name="handoff-start"
-                          aria-label="Start"
-                          onChange={(event) => setStart(event.currentTarget.value as HandoffStart)}
-                        >
-                          <option value="task" selected={start() === 'task'}>
-                            Create task
-                          </option>
-                          <option value="workflow" selected={start() === 'workflow'}>
-                            Start workflow
-                          </option>
-                        </select>
-                        <Show
-                          when={current().projects.length > 1}
-                          fallback={<span class="quiet">In {current().projects[0]!.name}</span>}
-                        >
-                          <select
-                            name="handoff-project"
-                            aria-label="Project"
-                            onChange={(event) => setProjectId(event.currentTarget.value)}
-                          >
-                            <For each={current().projects}>
-                              {(project) => (
-                                <option value={project.id} selected={project.id === projectId()}>
-                                  {project.name}
-                                </option>
-                              )}
-                            </For>
-                          </select>
-                        </Show>
-                      </div>
-                      <Show when={start() === 'workflow'}>
-                        <Show when={projectWorkflows()} fallback={<p class="quiet">Loading workflows…</p>}>
-                          {(list) => (
-                            <Show
-                              when={list().length}
-                              fallback={
-                                <p class="notice">
-                                  This project has no workflow to run. Create and publish one in Acorn.
-                                </p>
-                              }
-                            >
-                              <select
-                                name="handoff-workflow"
-                                aria-label="Workflow"
-                                onChange={(event) => setWorkflowId(event.currentTarget.value)}
-                              >
-                                <For each={list()}>
-                                  {(each) => (
-                                    <option value={each.id} selected={each.id === workflow()?.id}>
-                                      {each.name}
-                                    </option>
-                                  )}
-                                </For>
-                              </select>
-                              <For each={workflow()?.inputs}>
-                                {(input) => (
-                                  <label>
-                                    {input.label ?? input.name}
-                                    {input.required ? ' *' : ''}
-                                    <textarea
-                                      name={`input-${input.name}`}
-                                      rows={2}
-                                      value={valueOf(input.name)}
-                                      onInput={(event) =>
-                                        setValues((typed) => ({ ...typed, [input.name]: event.currentTarget.value }))
-                                      }
-                                    />
-                                    <Show when={input.description}>
-                                      {(description) => <span class="quiet">{description()}</span>}
-                                    </Show>
-                                  </label>
-                                )}
-                              </For>
-                            </Show>
-                          )}
-                        </Show>
+                    <Show
+                      when={current().projects.length}
+                      fallback={<p class="notice">No project on this Node tracks {current().identifier}.</p>}
+                    >
+                      <Show
+                        when={current().projects.length > 1}
+                        fallback={
+                          <p class="hint">
+                            <Icon name="folder" tone="muted" />
+                            {current().projects[0]!.name}
+                          </p>
+                        }
+                      >
+                        <Field label="Project" layout="row">
+                          <Picker
+                            label={chosenProject()}
+                            ariaLabel="Project"
+                            size="sm"
+                            placeholder="Filter projects"
+                            emptyText="No project matches."
+                            items={current().projects.map((project) => ({
+                              id: project.id,
+                              label: project.name,
+                              note: props.projectWorkspace(project.id),
+                              group: 'Tracks this issue',
+                              active: project.id === projectId(),
+                            }))}
+                            onPick={setProjectId}
+                          />
+                        </Field>
                       </Show>
-                      <div class="row">
-                        <button
-                          type="button"
-                          disabled={creating() || !props.online || !ready()}
-                          onClick={() => void submit()}
-                        >
-                          {creating() ? 'Starting…' : start() === 'task' ? 'Create task' : 'Start workflow'}
-                        </button>
-                        <span class="quiet grow">
-                          {start() === 'task'
-                            ? 'The item waits for the first conversation you open.'
-                            : 'The workflow starts its agents straight away.'}
-                        </span>
-                      </div>
+                      <Show
+                        when={workflow()}
+                        fallback={
+                          <div class="row">
+                            <Button
+                              size="sm"
+                              variant="solid"
+                              tone="accent"
+                              busy={creating()}
+                              disabled={!props.online}
+                              onPress={() => void submit(false)}
+                            >
+                              <Icon name="plus" />
+                              Create task
+                            </Button>
+                            <WorkflowPicker
+                              label="Run workflow"
+                              name="Run workflow"
+                              workflows={projectWorkflows()}
+                              project={chosenProject()}
+                              disabled={creating()}
+                              defaultOpen={wantsWorkflow}
+                              pick={pickWorkflow}
+                            />
+                          </div>
+                        }
+                      >
+                        {(chosen) => (
+                          <>
+                            <hr class="divider" />
+                            <WorkflowForm
+                              workflow={chosen()}
+                              workflows={projectWorkflows()}
+                              project={chosenProject()}
+                              valueOf={valueOf}
+                              edit={(name, value) => setValues((typed) => ({ ...typed, [name]: value }))}
+                              choose={setWorkflowId}
+                              ready={ready()}
+                              busy={creating()}
+                              disabled={!props.online}
+                              start={() => void submit(true)}
+                              cancel={cancelWorkflow}
+                            />
+                          </>
+                        )}
+                      </Show>
                     </Show>
                   </Show>
                 </>
               )}
             </Show>
-          </Show>
-        )}
-      </Show>
-      <div class="row">
-        <Show when={problem()}>
-          <button type="button" class="quiet" onClick={() => void resolve()}>
-            Try again
-          </button>
+          )}
         </Show>
-        <button type="button" class="quiet" onClick={() => props.dismiss()}>
-          Dismiss
-        </button>
-      </div>
+      </Card>
     </div>
   )
 }

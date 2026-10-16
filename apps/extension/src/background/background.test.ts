@@ -575,6 +575,7 @@ describe('site buttons', () => {
         expect(answer).toEqual({
           ok: true,
           pickId: expect.any(String),
+          task: 'Fix billing rounding',
           sessions: [{ id: 's1', title: 'Billing rounding' }],
           agents: [
             { key: 'claude::', label: 'Claude' },

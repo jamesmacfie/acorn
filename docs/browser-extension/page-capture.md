@@ -36,12 +36,11 @@ chip, and puts it in a draft without the person opening the panel first:
 
 1. The click opens the panel, inside the click, where both browsers allow it: Chrome's
    `sidePanel.open` and Firefox's `sidebarAction.open`.
-2. The background reads the selected Node and the current task from `selectedNodeId` and
-   `destination:<nodeId>` ([browser storage](./conversations.md#browser-storage)). The draft is the
-   conversation the panel would open for that task: the one it last showed, or else the task's
-   newest, as **Chat** opens.
+2. The background reads the selected Node and the task the panel last showed from `selectedNodeId`
+   and `destination:<nodeId>` ([browser storage](./conversations.md#browser-storage)). The draft is
+   the conversation the panel last showed in that task, or else the task's newest, as **Chat** opens.
 3. It reads the selection from the clicked tab's window, adds it to that conversation's stored
-   draft, and remembers the conversation as the one open over Home.
+   draft, and remembers the conversation as the one the panel shows next.
 4. The panel opens the conversation. A composer already showing it picks the capture up from storage,
    so the next save there keeps it.
 
@@ -146,8 +145,8 @@ read comes back in reply chunks like any large reply.
 
 `session.read` lists what a person's turn sent with its message, as `attachments: [{ id, image, name }]`,
 and drops the `[Attachment: <id>]` lines that name them for the agent. A queued turn carries the same
-list. The conversation reads each image once through `attachment.read` and shows it from an object
-URL. Anything else shows its name. Leaving the conversation revokes every object URL it made, and a
+list. The conversation shows each attachment as a chip with its name. It reads each image once
+through `attachment.read` and shows it in the chip from an object URL. Leaving the conversation revokes every object URL it made, and a
 read that answers after that makes none.
 
 ## Gaps

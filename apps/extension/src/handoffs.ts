@@ -8,7 +8,7 @@ import { matchHandoffPage } from '@acorn/protocol/plugin/handoffs.ts'
 
 // A handoff on one page: a chip click, or Home's own lookup, which sets `auto`. `start` is what the
 // chip's menu chose to do with the item: make a task, or start a workflow in one.
-export type HandoffStart = 'task' | 'workflow'
+type HandoffStart = 'task' | 'workflow'
 export type PageHandoff = {
   pluginId: string
   handoffId: string
@@ -103,6 +103,8 @@ export type AskOpened =
   | {
       ok: true
       pickId: string
+      // The task's title, which heads its conversations in the box's To menu.
+      task: string
       sessions: { id: string; title: string }[]
       // The rows a new chat can start from, each by its `choiceKey`, and the one to choose first.
       agents: { key: string; label: string }[]

@@ -111,6 +111,8 @@ export function Row(props: {
   height?: number
   /** The accessible name, where the row's own text is not one. */
   label?: string
+  /** Whether what the row opens is showing, for a row that opens and closes what follows it. */
+  expanded?: boolean
   /** Pointer or keyboard focus entered or left the row. One callback rather than four handlers,
    *  because every caller does the same thing with all four: start a prefetch, then cancel it. */
   onHover?: (entered: boolean) => void
@@ -183,6 +185,7 @@ export function Row(props: {
         data-tip={tipText()}
         data-tip-at={tipText() && props.tipAt !== undefined ? props.tipAt : undefined}
         aria-label={props.label}
+        aria-expanded={props.expanded}
         aria-selected={props.item ? !!props.selected : undefined}
         style={placement(props)}
         onFocus={() => {
@@ -267,6 +270,7 @@ export function Row(props: {
       data-tip={tipText()}
       data-tip-at={tipText() && props.tipAt !== undefined ? props.tipAt : undefined}
       aria-label={props.label}
+      aria-expanded={props.expanded}
       aria-selected={props.item ? !!props.selected : undefined}
       style={placement(props)}
       role={props.item?.role ?? (props.onPress || props.onMenu ? 'button' : undefined)}

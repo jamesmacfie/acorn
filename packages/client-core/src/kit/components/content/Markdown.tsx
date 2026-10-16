@@ -194,7 +194,7 @@ export default function Markdown(props: {
         if (props.copy) {
           for (const wrap of wraps) {
             // Per block rather than on the root, so hovering one fence does not light up every button in
-            // the document (styles/copy.css keys the reveal off a `.copyable` ancestor).
+            // the document (CopyButton's rules in primitives.css key the reveal off a `.copyable` ancestor).
             wrap.classList.add('copyable')
             // Read once, before the highlight or diagram pass replaces the `<pre>` it lives in. Neither
             // changes the text, and a diagram has no `<code>` left to read.

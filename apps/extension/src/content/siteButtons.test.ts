@@ -68,7 +68,10 @@ const drawn = () => [...document.querySelectorAll('[data-acorn-handoff]')]
 const chip = (index = 0) => roots.get(drawn()[index]!)!
 const main = () => chip().querySelector<HTMLButtonElement>('.main')!
 const menu = () => chip().querySelector<HTMLElement>('[role="menu"]')
-const items = () => [...(menu()?.children ?? [])].map((item) => item.textContent)
+// A separator reads as '-'.
+const entries = (list: Element | null | undefined) =>
+  [...(list?.children ?? [])].map((item) => (item.getAttribute('role') === 'separator' ? '-' : item.textContent))
+const items = () => entries(menu())
 const item = (name: string) => [...menu()!.children].find((element) => element.textContent === name) as HTMLElement
 
 // The person's own click, delivered through the listeners the script added, bubbling to the chip.
@@ -150,12 +153,16 @@ describe('task chips in the page', () => {
     expect(menu()!.hidden).toBe(false)
     expect(items()).toEqual([
       'Show in side panel',
-      'Open in Acorn ↗',
       'New chat about this page',
       'Ask about an element',
+      '-',
+      'Open in Acorn',
       'Copy Acorn link',
     ])
-    expect(item('Open in Acorn ↗').getAttribute('href')).toBe('acorn://n1/t/t1?pane=pr')
+    // Each entry leads with its icon.
+    for (const entry of menu()!.querySelectorAll('[role="menuitem"]'))
+      expect(entry.firstElementChild?.localName).toBe('svg')
+    expect(item('Open in Acorn').getAttribute('href')).toBe('acorn://n1/t/t1?pane=pr')
     press(item('New chat about this page'))
     expect(sent.at(-1)).toEqual({ type: 'acorn:chip', key: 'tracker:item', action: 'chat' })
     expect(menu()!.hidden).toBe(true)
@@ -183,11 +190,17 @@ describe('task chips in the page', () => {
       'Show in side panel',
       'New chat about this page',
       'Ask about an element',
+      '-',
       'Copy Acorn link',
     ])
   })
 
-  it('reads Start task with no task, and offers to create a task or start a workflow from its menu', () => {
+  it('leaves out the separator when nothing follows it', () => {
+    show([button({ ...task, link: null })])
+    expect(items()).toEqual(['Show in side panel', 'New chat about this page', 'Ask about an element'])
+  })
+
+  it('reads Start task with no task, and offers to create a task or run a workflow from its menu', () => {
     show([button()])
     expect(main().textContent).toBe('Start task')
     expect(main().getAttribute('aria-label')).toBe('Start task (Open in Acorn)')
@@ -197,8 +210,8 @@ describe('task chips in the page', () => {
     press(main())
     expect(sent).toEqual([])
     expect(menu()!.hidden).toBe(false)
-    expect(items()).toEqual(['Create task', 'Start workflow…'])
-    press(item('Start workflow…'))
+    expect(items()).toEqual(['Create task', 'Run workflow…'])
+    press(item('Run workflow…'))
     expect(sent).toEqual([{ type: 'acorn:handoff', key: 'tracker:item', start: 'workflow' }])
     expect(menu()!.hidden).toBe(true)
     press(main())
@@ -213,8 +226,9 @@ describe('task chips in the page', () => {
     expect(sent).toEqual([])
     expect(menu()!.hidden).toBe(false)
     expect(items()).toEqual([
-      'Open in Acorn ↗',
       'Ask about an element',
+      '-',
+      'Open in Acorn',
       'Copy Acorn link',
       'To open the panel on this task, click Acorn in the toolbar.',
     ])
@@ -222,7 +236,7 @@ describe('task chips in the page', () => {
     // With no task a choice hands the page to the background, to wait for the sidebar.
     show([button()], { opensPanel: false })
     press(main())
-    expect(items()).toEqual(['Create task', 'Start workflow…', 'Then click Acorn in the toolbar to open the panel.'])
+    expect(items()).toEqual(['Create task', 'Run workflow…', 'Then click Acorn in the toolbar to open the panel.'])
     press(item('Create task'))
     expect(sent).toEqual([{ type: 'acorn:handoff', key: 'tracker:item', start: 'task' }])
   })
@@ -245,7 +259,7 @@ describe('the branch marker on a local app', () => {
   const markers = () => [...document.querySelectorAll('[data-acorn-marker]')]
   const pill = () => roots.get(markers()[0]!)!
   const pillMain = () => pill().querySelector<HTMLButtonElement>('.main')!
-  const pillItems = () => [...(pill().querySelector('[role="menu"]')?.children ?? [])].map((item) => item.textContent)
+  const pillItems = () => entries(pill().querySelector('[role="menu"]'))
   const pillItem = (name: string) =>
     [...pill().querySelector('[role="menu"]')!.children].find((element) => element.textContent === name) as HTMLElement
 
@@ -268,12 +282,14 @@ describe('the branch marker on a local app', () => {
     press(pill().querySelector('.more')!)
     expect(pillItems()).toEqual([
       'Show in side panel',
-      'Open in Acorn ↗',
       'Ask about an element',
+      '-',
+      'Open in Acorn',
       'Copy Acorn link',
+      '-',
       'Hide on this site',
     ])
-    expect(pillItem('Open in Acorn ↗').getAttribute('href')).toBe('acorn://n1/t/t1?pane=runn')
+    expect(pillItem('Open in Acorn').getAttribute('href')).toBe('acorn://n1/t/t1?pane=runn')
     press(pillItem('Hide on this site'))
     expect(sent.at(-1)).toEqual({ type: 'acorn:marker', action: 'hide' })
   })
@@ -284,9 +300,11 @@ describe('the branch marker on a local app', () => {
     press(pillMain())
     expect(sent).toEqual([])
     expect(pillItems()).toEqual([
-      'Open in Acorn ↗',
       'Ask about an element',
+      '-',
+      'Open in Acorn',
       'Copy Acorn link',
+      '-',
       'Hide on this site',
       'To open the panel on this task, click Acorn in the toolbar.',
     ])

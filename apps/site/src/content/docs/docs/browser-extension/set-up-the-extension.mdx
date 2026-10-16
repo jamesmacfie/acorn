@@ -8,7 +8,7 @@ sources:
   - apps/extension/src/manifest.ts
   - apps/extension/src/sidebar/Pairing.tsx
   - apps/extension/src/sidebar/guidance.ts
-checked: 07aa959a0
+checked: '45e550384'
 ---
 
 import SidebarPicture from '../../../../components/SidebarPicture.astro'
@@ -41,8 +41,8 @@ with no part played by the desktop app.
 
 2. Run `acorn browser status`. Each browser should show `registered`, with no problem.
 
-If the panel is already open, it shows `acorn browser install` with **Copy** until the bridge answers,
-then carries on by itself.
+If the panel is already open, it shows **Install the browser bridge** with the command, which copies
+when you click it, until the bridge answers. Then it carries on by itself.
 
 ## Build and load the extension
 
@@ -64,31 +64,35 @@ The panel opens on pairing until it's paired with a Node.
 
 To pair with the Node on this Mac:
 
-1. Under **Choose a Node**, pick **This computer**, marked **On this Mac**, and click **Continue**. The
-   bridge found it in acorn's data folder and checked its certificate, so there are no identity words
-   to compare.
-2. Under **Allow in Acorn**, the panel shows three words. The desktop app opens **Allow a new client?**
-   with the same words. Click **Allow** there.
+1. Under **Connect to Acorn**, click **Connect** on **This computer**. The bridge found that Node in
+   acorn's data folder and checked its certificate, so there are no identity words to compare.
+2. Under **Approve in Acorn**, the panel shows three words. The desktop app opens **Allow a new
+   client?** with the same words. Click **Allow** there.
 
    The panel moves on by itself.
 
-Or, with no desktop app open, paste a pairing code instead: from **Settings** > **Machines** >
-**Nodes** > **Pair a browser** in the desktop app, or from a standalone Node's terminal.
+Or, with no desktop app open, click **Use a pairing code instead** and paste a code: from **Settings**
+> **Machines** > **Nodes** > **Pair a browser** in the desktop app, or from a standalone Node's
+terminal.
 
 To pair with a Node on another machine:
 
-1. Click **Use another address**, type the Node's address, and click **Check identity**.
+1. Click **Connect to another Node**, type the Node's address, and click **Check**.
 2. Compare the six words with the ones the Node shows ([Pair a device or a remote
-   Node](/docs/nodes/pair-a-device-or-a-remote-node/#get-a-pairing-code)). Tick **The words match** only if
-   they do, and click **Continue**.
+   Node](/docs/nodes/pair-a-device-or-a-remote-node/#get-a-pairing-code)). Click **They match** only if
+   they do.
 3. Paste the pairing code. **Pair a browser** on the Node's row in the desktop app gives one. Click
    **Pair**.
 
-Once paired, the panel offers **Allow** for each site where the Node's plugins put buttons, such as
-`github.com`, and notifications. Both are optional, and both are in the panel's Settings later.
+The panel names the Node on this Mac **This computer**, and another Node by its address. A Node's
+**⋯** menu in the panel's Settings renames it.
+
+Once paired, the panel offers a switch for each site where the Node's plugins put buttons, such as
+`github.com`, and one for notifications. Both are optional, and both are in the panel's Settings later.
+Click **Done** to go Home.
 
 Each browser pairs on its own, so pair Chrome and Firefox separately. To pair with another Node later,
-choose **Pair another** from the Node menu at the top of the panel.
+click **Pair** beside **Nodes** in the panel's Settings. **Use** there switches Nodes.
 
 ## What the browser asks for, and why
 
@@ -104,23 +108,24 @@ choose **Pair another** from the Node menu at the top of the panel.
 
 Two more are optional, and the browser asks before granting either:
 
-- **Access to a site**, from **Allow** beside it in the panel's **Settings** > **Permissions**. It lets
-  the extension draw buttons on that site's pages and read them for its suggestions.
-- **Notifications**, from the tick in **Settings** > **Notifications**.
+- **Access to a site**, from its switch in the panel's **Settings** > **Sites**. It lets the extension
+  draw buttons on that site's pages and read them for its suggestions.
+- **Notifications**, from the switch in **Settings** > **Notifications**.
 
 The extension reads no site until you allow it, or click the toolbar button on it. It's off in private
 windows.
 
 ## What the panel tells you
 
-When something's wrong, a line under the panel's header says what, and what to do:
+Without the bridge, the panel shows only the command to install it. Once it's installed, when
+something's wrong, a line under the panel's header says what, and what to do:
 
 | The panel says | What to do |
 | --- | --- |
-| The bridge isn't installed | Run `acorn browser install`. The panel checks again every three seconds. |
+| Install the browser bridge, or Repair the browser bridge | Run `acorn browser install`. The panel checks again every three seconds. |
 | The bridge stopped | Click **Retry**, or run `acorn browser status` to see why. |
 | The pairing code didn't work | Check the code and try again. A code works once, for 10 minutes. |
-| The Node on this Mac can't be read | Use **Use another address** instead. |
+| The Node on this Mac can't be read | Use **Connect to another Node** instead. |
 | The Node and the extension can't talk to each other | Update whichever is older. |
 | The Node isn't answering | Check that it's running. |
 | The Node revoked this browser | Forget the Node and pair again. |
@@ -134,7 +139,8 @@ When something's wrong, a line under the panel's header says what, and what to d
   install` from the new copy, then **Retry**. Pairings stay.
 - **After reinstalling the extension**, pick the Node again from the Node menu, or **Use** beside it in
   Settings.
-- **To forget a Node**, choose **Forget** in the Node menu or Settings. This browser forgets it. The
+- **To forget a Node**, open its **⋯** menu in Settings, choose **Forget**, and click again to confirm.
+  This browser forgets it. The
   Node still lists the browser as paired until you revoke it there.
 - **To remove the bridge**, run `acorn browser uninstall`. It keeps each browser's pairings in
   `~/Library/Application Support/acorn/browser-bridge/<browser>/`. Delete that folder to remove them.

@@ -13,7 +13,7 @@ import { brandMarkRegistry } from '@acorn/client-core/kit/tokens'
 import { PROVIDER_MARKS } from '@acorn/plugin-agents/contract/providerMarks.ts'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
-import { button, openChat } from '../test/sidebarUi'
+import { button, goHome, openChat, tab } from '../test/sidebarUi'
 import { App } from './App'
 
 // The sidebar pictures on the public site's browser extension pages (docs/site/specimens.md). Each scene
@@ -169,12 +169,6 @@ function mount(options: { url: string; title: string; paired?: boolean; waiting?
           projects: [{ id: 'p1', name: 'billing-api', path: null, hidden: false, workspaceId: 'w1' }],
           workspaces: [{ id: 'w1', name: 'Fernwood' }],
         }
-      case 'tasks.list':
-        return {
-          nodeId: 'n1',
-          projectId: 'p1',
-          tasks: pageTasks.map(({ id, title, branch }) => ({ id, title, branch })),
-        }
       case 'tasks.pages':
         // With the panel, the task's app also answers at its own address.
         return {
@@ -202,13 +196,16 @@ function mount(options: { url: string; title: string; paired?: boolean; waiting?
             },
           ],
           panels: options.panel ? [{ pluginId: 'acme-browser', label: 'Acme app', glyph: 'app-window' }] : [],
+          icons: [],
         }
       case 'plugin.panel':
         return { nodeId: 'n1', pluginId: request.pluginId, taskId: request.taskId, view: acmePanel }
       case 'handoff.resolve':
         return { nodeId: 'n1', url: request.url, items: [handoffItem] }
       case 'sessions.list':
-        return { nodeId: 'n1', taskId: request.taskId, sessions: request.taskId === 't1' ? sessions : [] }
+        return request.workspaceId
+          ? { nodeId: 'n1', workspaceId: request.workspaceId, sessions }
+          : { nodeId: 'n1', taskId: request.taskId, sessions: request.taskId === 't1' ? sessions : [] }
       case 'session.read': {
         const row = sessions.find((candidate) => candidate.id === request.sessionId)!
         const read = row.id === 's1' ? records.filter((record) => record.seq > (request.afterSeq as number)) : []
@@ -238,6 +235,12 @@ function mount(options: { url: string; title: string; paired?: boolean; waiting?
                 },
               ]
             : [],
+        }
+      case 'workflows.list':
+        return {
+          nodeId: 'n1',
+          projectId: request.projectId,
+          workflows: [{ id: 'fix', name: 'Fix an issue', inputs: [{ name: 'issue', label: 'Issue', required: true }] }],
         }
       case 'workflow.runs':
         return { nodeId: 'n1', taskId: request.taskId, runs: [] }
@@ -292,8 +295,10 @@ describe('the sidebar pictures on the site', () => {
       waiting: true,
     })
     await settle(40)
+    // The panel opens on the page's task; Back shows Home.
+    await goHome(root)
     expect(root.querySelector('[aria-label="This page"]')?.textContent).toContain('Retry failed webhooks')
-    expect(root.textContent).toContain('Waiting for you')
+    expect(root.querySelector('.view [aria-label="Needs you"]')).toBeTruthy()
     picture('sidebar-home', root)
   })
 
@@ -327,9 +332,10 @@ describe('the sidebar pictures on the site', () => {
   it("a plugin's panel for the page's task", async () => {
     const { root } = mount({ url: `${ACME_APP}/`, title: 'Acme', paired: true, panel: true })
     await settle(40)
-    button(root.querySelector('nav')!, 'Acme app')!.click()
-    await settle(20)
-    expect(root.querySelector('.view[aria-label="Acme app"] .state')?.textContent).toBe('Acme app running')
+    await tab(root, 'Acme app')
+    expect(root.querySelector('.view[aria-label="Acme app"] .panel-head .ui-heading-title')?.textContent).toBe(
+      'Acme app',
+    )
     picture('sidebar-plugin-panel', root)
   })
 })

@@ -117,7 +117,9 @@ set `--divider-w: 0`, and such a border would disappear in two of the four packs
 `--stripe-w` and `--marker-w` are a related pair. `--marker-w` says a row is selected, which a pack can
 express as a background fill instead. `--stripe-w` carries information in its color, such as a
 project's task-tab color or a review note's state, so a pack may zero `--marker-w` but never
-`--stripe-w`.
+`--stripe-w`. A disclosure triangle, `Fold`'s marker or a tree row's twist, sizes from the scale rung
+`--bw-marker` rather than either role, because it's the control that opens the content and no pack may
+hide it.
 
 ## Style packs
 

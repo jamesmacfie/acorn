@@ -47,6 +47,8 @@ import {
   type BrowserPanel,
   type BrowserPanelView,
   browserPanelView,
+  pluginIcon,
+  type PluginIcon,
   TASK_ADDRESSES_MAX_BYTES,
   taskAddressList,
 } from '@acorn/protocol/plugin/handoffs.ts'
@@ -294,7 +296,7 @@ export function createBridge(options: {
   async function nodeResponse(
     nodeId: string,
     request: {
-      method: 'GET' | 'POST' | 'PUT' | 'DELETE'
+      method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
       path: string
       body?: unknown
       form?: Extract<NodeFetchBody, { kind: 'form' }>
@@ -368,9 +370,12 @@ export function createBridge(options: {
     return list as Row[]
   }
 
-  // A task's newest hundred sessions, which is one page of the route. Archived sessions are left out.
-  async function taskSessions(nodeId: string, taskId: string): Promise<AgentSession[]> {
-    const query = new URLSearchParams({ taskId, archived: 'false', limit: '100' })
+  // The newest 100 unarchived sessions, the most the Node's route returns.
+  async function listSessions(
+    nodeId: string,
+    scope: { taskId: string } | { workspaceId: string },
+  ): Promise<AgentSession[]> {
+    const query = new URLSearchParams({ ...scope, archived: 'false', limit: '100' })
     return readList<AgentSession>(
       nodeId,
       `${agentsRoute}/sessions?${query}`,
@@ -397,15 +402,6 @@ export function createBridge(options: {
     }))
     const workspaces = groups.toSorted((a, b) => a.sort - b.sort).map((group) => ({ id: group.id, name: group.name }))
     return { nodeId, projects, workspaces }
-  }
-
-  // Active tasks only, in the Node's order. The route lists every project's, so this keeps one.
-  async function listTasks(nodeId: string, projectId: string): Promise<BridgeResults['tasks.list']> {
-    const rows = await readList<Task>(nodeId, tasksRoute, (body) => body)
-    const tasks = rows
-      .filter((task) => task.projectId === projectId)
-      .map((task) => ({ id: task.id, title: task.title, branch: task.branch }))
-    return { nodeId, projectId, tasks }
   }
 
   // One project's associations, read fresh from its config. A list that doesn't parse reads as none.
@@ -618,10 +614,12 @@ export function createBridge(options: {
         if (activeNodeId === request.nodeId) select(null)
         fleet.forget(request.nodeId)
         return nodes()
+      case 'node.rename':
+        if (!fleet.rename(request.nodeId, request.label))
+          throw new BridgeFailure('unknown_node', 'This browser has not paired that Node.')
+        return nodes()
       case 'projects.list':
         return listProjects(request.nodeId)
-      case 'tasks.list':
-        return listTasks(request.nodeId, request.projectId)
       case 'tasks.pages': {
         const [tasks, published] = await Promise.all([
           readList<Task>(request.nodeId, tasksRoute, (body) => body),
@@ -645,8 +643,10 @@ export function createBridge(options: {
         return { nodeId: request.nodeId, choices: bridgeChoices(providers, agents) }
       }
       case 'sessions.list': {
-        const rows = await taskSessions(request.nodeId, request.taskId)
-        return { nodeId: request.nodeId, taskId: request.taskId, sessions: rows.map(bridgeSession) }
+        // The schema lets through exactly one of the two.
+        const scope = request.taskId ? { taskId: request.taskId } : { workspaceId: request.workspaceId! }
+        const rows = await listSessions(request.nodeId, scope)
+        return { nodeId: request.nodeId, ...scope, sessions: rows.map(bridgeSession) }
       }
       case 'session.read': {
         const query = `?afterSeq=${request.afterSeq}&limit=${request.limit}&fold=1`
@@ -685,6 +685,24 @@ export function createBridge(options: {
           body: { input, source: 'interactive', effectivePolicy: {} },
         })) as AgentTurn
         return { nodeId: request.nodeId, sessionId: request.sessionId, turnId: turn.id }
+      }
+      case 'session.archive': {
+        await nodeRequest(request.nodeId, {
+          method: 'PATCH',
+          path: sessionRoute(request.sessionId),
+          key: request.key,
+          body: { archived: true },
+        })
+        return { nodeId: request.nodeId, sessionId: request.sessionId }
+      }
+      case 'session.cancel': {
+        await nodeRequest(request.nodeId, {
+          method: 'POST',
+          path: `${sessionRoute(request.sessionId)}/cancel`,
+          key: request.key,
+          body: {},
+        })
+        return { nodeId: request.nodeId, sessionId: request.sessionId }
       }
       case 'request.resolve': {
         // The Node settles a request once. An answer to one already settled, from here or another
@@ -767,6 +785,7 @@ export function createBridge(options: {
           nodeId: request.nodeId,
           handoffs: body.handoffs.filter((handoff) => ownsRoute(handoff.pluginId, handoff.resolve)).map(bridgeHandoff),
           panels: declaredPanels(body).map(bridgePanel),
+          icons: declaredIcons(body),
         }
       }
       case 'handoff.resolve': {
@@ -875,7 +894,9 @@ export function createBridge(options: {
         const steps = await readList<WorkflowStepRow>(request.nodeId, runStepsRoute(request.runId), (body) => body)
         // The run's task, and the task of each step the runner gave one of its own.
         const taskIds = new Set([request.taskId, ...steps.flatMap((step) => stepTaskId(step) ?? [])])
-        const sessions = (await Promise.all([...taskIds].map((taskId) => taskSessions(request.nodeId, taskId)))).flat()
+        const sessions = (
+          await Promise.all([...taskIds].map((taskId) => listSessions(request.nodeId, { taskId })))
+        ).flat()
         return { nodeId: request.nodeId, runId: request.runId, steps: bridgeSteps(steps, sessions, bridgeSession) }
       }
       case 'plugin.panel': {
@@ -912,6 +933,14 @@ const declaredPanels = (body: BrowserHandoffsResponse | null): BrowserPanel[] =>
   (Array.isArray(body?.panels) ? body.panels : []).filter((panel) => ownsRoute(panel.pluginId, panel.route))
 
 const bridgePanel = ({ route: _route, ...panel }: BrowserPanel): BridgePanel => panel
+
+// The logos discovery lists that pass the manifest's own rule, because a logo's colour reaches a style
+// in the sidebar. A Node from before logos were listed sends none.
+const declaredIcons = (body: BrowserHandoffsResponse | null): PluginIcon[] =>
+  (Array.isArray(body?.icons) ? body.icons : []).flatMap((icon) => {
+    const parsed = pluginIcon.safeParse(icon)
+    return parsed.success ? [parsed.data] : []
+  })
 
 const changedIdentityStatus = (nodeId: string): NodeStatus => ({
   nodeId,

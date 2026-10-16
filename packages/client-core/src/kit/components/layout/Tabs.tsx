@@ -1,6 +1,7 @@
 import type { TabPanelProps } from '@acorn/protocol/tree/nodes.ts'
 import { children, createEffect, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import Icon from '../content/Icon'
+import type { Tone } from '../../tokens/tokens'
 import { createCollection } from '../../keys/collection'
 import { revealActiveTab, trackTabOverflow } from './tabScroll'
 
@@ -13,6 +14,8 @@ export type TabDef = {
   icon?: string
   /** The tip on hover and focus, where the label alone does not say what the tab is. */
   title?: string
+  /** A state drawn after the label, such as an agent waiting or working, with its meaning in words. */
+  marker?: { icon: string; tone?: Tone; spin?: boolean; label: string }
 }
 
 // Reusable tab strip. Renders only the tablist and drives the active id; the panels are the
@@ -90,6 +93,11 @@ export function Tabs(props: {
               {t.label}
               <Show when={t.count != null}>
                 <span class="ui-tab-count">{t.count}</span>
+              </Show>
+              <Show when={t.marker}>
+                {(marker) => (
+                  <Icon name={marker().icon} tone={marker().tone} spin={marker().spin} title={marker().label} />
+                )}
               </Show>
             </button>
           )}

@@ -1,6 +1,22 @@
 # Rework the browser extension's sidebar
 
-Date: October 16, 2026. Status: proposed. Implementation not started.
+Date: October 16, 2026. Status: phases 1 to 12 done on October 16 and 17, 2026, then two plugin reuse
+passes and a branch tidy. Phase 13 skipped.
+
+## Plugin reuse pass 1
+
+October 17, 2026. A third-party plugin gets what a first-party one gets in the sidebar, and the sidebar
+draws with the kit's parts, fixed in the kit where they were broken: one rule for a panel header's
+detail, `CopyButton` styled wherever the kit loads, and fold markers in every pack. See
+[plugin reuse passes](./plugin-reuse.md#pass-1) for the changes and the proposals it left.
+
+## Plugin reuse pass 2
+
+October 17, 2026. A plugin's manifest logo reaches the sidebar with the handoff list, so an issue card
+shows it, and pass 1's handoff `glyph` is gone. Every sidebar button is a kit `Button`, `IconButton`,
+or `CopyButton`, which now takes a size and a second tip line. See
+[plugin reuse passes](./plugin-reuse.md#pass-2) for the changes, the audit of each sidebar component
+against the desktop and the terminal, and the proposals not done, with their cost.
 
 This folder turns the clickable prototype at `references/extension-ux/acorn-extension-ux.html` into
 thirteen phases a developer can pick up one at a time. The last is optional. Read this page first. It says how to read the

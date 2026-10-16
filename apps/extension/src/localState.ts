@@ -1,9 +1,9 @@
 import type { BrowserApi } from './browser'
 import type { PageCapture } from './capture'
 
-// What the sidebar keeps in this browser profile's storage: unsent drafts, the destination it last
-// showed on each Node, what it last showed for each task, and the workspace Home lists. None of it leaves the browser until the person
-// sends.
+// What the sidebar keeps in this browser profile's storage: unsent drafts, the item waiting for each
+// task's first conversation, the destination it last showed on each Node, the tab last picked in each
+// task, and the workspace Home lists. None of it leaves the browser until the person sends.
 
 type Storage = BrowserApi['storage']['local']
 
@@ -78,6 +78,35 @@ export const acknowledged =
         : {}),
   })
 
+// An item waiting for a task's first conversation: a handed-off issue, or the page the task chip asked
+// a new chat about. One per task, so it never joins a chat in another task, and kept in storage, so it
+// outlives the panel. It joins the draft of the next conversation opened in its task.
+const pendingItemKey = (nodeId: string, taskId: string) => `pendingItem:${nodeId}:${taskId}`
+
+export async function loadPendingItem(storage: Storage, nodeId: string, taskId: string): Promise<PageCapture | null> {
+  const stored = (await storage.get([pendingItemKey(nodeId, taskId)]))[pendingItemKey(nodeId, taskId)]
+  return stored && typeof stored === 'object' ? (stored as PageCapture) : null
+}
+
+export const savePendingItem = (storage: Storage, nodeId: string, taskId: string, item: PageCapture): Promise<void> =>
+  storage.set({ [pendingItemKey(nodeId, taskId)]: item })
+
+export const dropPendingItems = (storage: Storage, nodeId: string, taskIds: readonly string[]): Promise<void> =>
+  storage.remove(taskIds.map((taskId) => pendingItemKey(nodeId, taskId)))
+
+// The task's item as a storage change left it, null when it went, or undefined when it wasn't touched.
+export function changedPendingItem(
+  nodeId: string,
+  taskId: string,
+  changes: Record<string, { newValue?: unknown }>,
+): PageCapture | null | undefined {
+  if (!(pendingItemKey(nodeId, taskId) in changes)) return undefined
+  const item = changes[pendingItemKey(nodeId, taskId)]?.newValue
+  return item && typeof item === 'object' ? (item as PageCapture) : null
+}
+
+// The task and conversation the sidebar last showed on a Node, which a selection added from the page's
+// menu goes to.
 export type Destination = { projectId: string | null; taskId: string | null; sessionId: string | null }
 
 const destinationKey = (nodeId: string) => `destination:${nodeId}`
@@ -90,13 +119,10 @@ export async function loadDestination(storage: Storage, nodeId: string): Promise
 export const saveDestination = (storage: Storage, nodeId: string, destination: Destination): Promise<void> =>
   storage.set({ [destinationKey(nodeId)]: destination })
 
-// What the sidebar last showed for a task, so moving back to the task's page shows it again: the tab,
-// and the conversation or workflow run open in it.
-export type TaskView = {
-  tab: 'agents' | 'workflows' | `panel:${string}`
-  sessionId: string | null
-  runId: string | null
-}
+// A tab under a task. A plugin's panel is `panel:<pluginId>`.
+export type TaskTab = 'agents' | 'runs' | `panel:${string}`
+// What the sidebar remembers of a task: the tab the person last picked there, which the task opens on.
+export type TaskView = { tab: TaskTab }
 
 // The most tasks remembered on a Node. The oldest is forgotten first.
 const TASK_VIEWS_MAX = 50
@@ -104,7 +130,14 @@ const taskViewsKey = (nodeId: string) => `taskViews:${nodeId}`
 
 export async function loadTaskViews(storage: Storage, nodeId: string): Promise<Record<string, TaskView>> {
   const stored = (await storage.get([taskViewsKey(nodeId)]))[taskViewsKey(nodeId)]
-  return stored && typeof stored === 'object' ? (stored as Record<string, TaskView>) : {}
+  if (!stored || typeof stored !== 'object') return {}
+  // Views stored by older builds name the Runs tab `workflows`.
+  return Object.fromEntries(
+    Object.entries(stored as Record<string, { tab: string }>).map(([taskId, view]) => [
+      taskId,
+      { tab: (view.tab === 'workflows' ? 'runs' : view.tab) as TaskTab },
+    ]),
+  )
 }
 
 // Keys keep insertion order, so the task saved last goes to the end and the first ones are the oldest.

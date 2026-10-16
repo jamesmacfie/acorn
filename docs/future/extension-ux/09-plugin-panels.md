@@ -1,6 +1,69 @@
 # Phase 9: plugin panels drawn with more care
 
-Date: October 16, 2026. Status: proposed. Depends on [phase 1](./01-navigation.md).
+Date: October 16, 2026. Status: done on October 17, 2026. Depends on [phase 1](./01-navigation.md).
+
+## Completion note
+
+Landed on October 17, 2026. `PluginPanel.tsx` draws every block with the kit's parts. The first
+`status` block is a header: the label in the kit's `Heading`, the state as a `Badge` toned by
+severity, and the detail's lines as `Text`, the first bold, a second holding "→" in monospace, the
+rest muted. **Refresh** and **Open in Acorn** are `IconButton`s at its right. Each block is the kit's
+`Section` with its title and count. Rows and later `status` blocks are kit `Row`s with an icon from
+the `SEVERITY` table. Links are stacked rows with the address shown without its scheme, a **Copy**
+icon button, and, for a web address that answers, the whole row as a link with a faint arrow. The log
+source is a ghost `Picker`, and the lines are the kit's `Log`. A `danger` header marks the panel's
+tab. [Plugin panels](../../browser-extension/plugin-panels.md),
+[browser panel](../../plugin-authoring/browser-panel.md), the site's page on workflows and plugin
+panels, and the site's plugin panel picture are updated. The block contract is unchanged.
+
+Decisions and deviations:
+
+- The tab's marker is the severity table's red `circle-x`, named "Needs attention", not a dot.
+  `TabDef.marker` draws an icon, and the Agents and Runs markers are icons too. `panelMarker` in
+  `PluginPanel.tsx` makes it, beside the table, and `Workspace.tsx` reads it as it reads `runsLive`.
+- The header's badge takes the block's severity, as designed, so an open pull request with a failing
+  check reads **Open** in red. The prototype shows it green.
+- The log lines don't repeat the source's name in bold on each line. The picker in the section's
+  header already names it, and the kit's `Log` takes plain lines. `Log` is the part plugins and the
+  terminal client draw logs with, so using it beat keeping a sidebar-only `pre`.
+- The picker's filter reads "Filter sources", not "Filter containers". The block is generic, and a
+  plugin's sources need not be containers.
+- **Refresh** turns while a read it or a source pick started is out, and during the first read. A
+  read the Node's change hint starts doesn't turn it. `refresh` and `pickSource` return the read's
+  promise for that.
+- **Copy** is the kit's `IconButton` with the panel's own copied state, not the kit's `CopyButton`.
+  `CopyButton`'s look is in `copy.css`, which `@acorn/client-core` doesn't export, and adding an
+  export means raising the package's export ceiling for one small button.
+- A link that opens is the kit `Row`'s own `href`, which sets `target="_blank"` for an outside
+  address. The row already ignores a click on a control inside it, so **Copy** doesn't follow the
+  link.
+- A later `status` block's detail is the row's tip. Neither plugin sends one, so the row stays one
+  line.
+- With no `status` block first, the header still draws **Refresh** and **Open in Acorn**, with
+  nothing at the left.
+- The blocks sit in `.panel-blocks`, so the sidebar's `.view > section` padding doesn't double the
+  kit sections' own. The old `.panel-block` rules are gone. Two rules remain in `sidebar.css`: the
+  header's layout, and a 24em cap on the log's height.
+- The site's page said none of the shipped plugins has a browser panel. It now names the GitHub and
+  Docker panels.
+
+How close this is to the desktop and terminal: neither draws `browserPanelView` at all. A panel is
+an extension-only surface, so there was no second renderer to share. What the panel draws with is
+shared: `Heading`, `Badge`, `Text`, `Inline`, `Stack`, `Section`, `Row`, `IconButton`, `Picker`, and
+`Log` are kit parts, and the terminal host has all of them. Sidebar-only, so a plugin can't reach it:
+`PluginPanel`, `PanelHeader`, `Block`, `Copy`, and the `SEVERITY` table, plus `.panel-head` and
+`.panel-blocks .ui-log-lines` in `sidebar.css`. To draw a panel on the desktop or in the terminal,
+move `PanelHeader` and `Block` into the kit, or into `@acorn/client-core` beside it, as a
+`BrowserPanelBlocks` component taking the view and the two callbacks, and drop the header's two CSS
+rules for `Inline` with `spread`. The extension would then pass `OpenInAcorn` in as the header's
+action. That needs a host that wants to show a panel, such as a task pane, which no plan has yet.
+
+For later phases:
+
+- A panel's header and rows are kit parts with no sidebar CSS beyond `.panel-head`.
+- Tests: `PluginPanel.test.tsx` has `header`, `rows`, `mark`, and `logLines`, and picks a log
+  source through `pickFrom(panel, 'Log source', …)`. `pnpm dev:extension:ui pick "Log source" db`
+  does the same in a browser.
 
 ## Goal
 

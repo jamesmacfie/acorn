@@ -9,19 +9,22 @@ Topic pages:
 - [Native messaging](./browser-extension/native-messaging.md): the frames, every operation and event
   between the background and the native host, and the frame limits.
 - [Set up and troubleshoot](./browser-extension/setup.md): install the bridge and the development
-  builds, pair, repair or remove them, the panel's views and appearance, and what each sidebar state
-  means.
+  builds, pair, repair or remove them, appearance, and what each sidebar state means.
+- [Sidebar navigation](./browser-extension/navigation.md): Home, a task with its tabs, and a
+  conversation, with the top bar, **Back**, and the strip under the bars at each.
 - [Agent conversations](./browser-extension/conversations.md): the agent operations, change hints,
   the conversation window, send retries, and browser storage.
+- [The conversation view](./browser-extension/transcript.md): the transcript, folded tool calls, the
+  state line with **Stop**, and the message box's keys.
 - [Page capture](./browser-extension/page-capture.md): the link, selection, and screenshot captures,
   the page's **Add to Acorn chat** entry, page access, sending them, and the attachment operations.
 - [Ask Acorn about an element](./browser-extension/element-picker.md): the element picker and its checks.
 - [Handoffs](./browser-extension/handoffs.md): the task chip on websites, the handoff card, the
   panel's verbs and its `acorn://` links, and the operations that resolve a page and create a linked
   task.
-- [Workflows](./browser-extension/workflows.md): starting a workflow, and the Workflows tab.
+- [Workflows](./browser-extension/workflows.md): starting a workflow, and a task's Runs tab.
 - [Plugin panels](./browser-extension/plugin-panels.md): a plugin's read-only view of the sidebar's
-  task, its nav item, and the operation that reads it.
+  task, its tab, and the operation that reads it.
 - [Pages matched to tasks](./browser-extension/task-pages.md): the `tasks.pages` read, the app
   addresses plugins publish, matching the page to its task in the browser, Home's **This page**
   section, and the branch marker on a local app.
@@ -34,9 +37,10 @@ Topic pages:
 
 Three pieces carry a request from the sidebar to a Node:
 
-1. The extension, `apps/extension/`. Its sidebar page (`src/sidebar/`) has three views: Home, about
-   the page beside it and the current task, a conversation that opens over Home, and Settings, behind
-   the gear, for Nodes, pairing, and site access ([the panel's views](./browser-extension/setup.md#the-panels-views)).
+1. The extension, `apps/extension/`. Its sidebar page (`src/sidebar/`) is at one of three levels: Home,
+   about the page beside it and the Node's tasks, one task with its panes as tabs, or one conversation
+   inside a task. Settings, behind the gear, is one page of Nodes, sites, notifications, and appearance
+   ([sidebar navigation](./browser-extension/navigation.md)).
    Its background (`src/background/`) owns the one native port. Chrome runs the
    background as a module service worker and shows the page in its side panel. Firefox runs it as a
    background script and shows the page in its sidebar. `src/browser.ts` types the slice of the
@@ -105,13 +109,16 @@ person just chose. A probe comes from one of two operations:
   it, so the sidebar shows no identity words. With no Node holding the root, it answers `null`. A
   held root with no `node.json`, or a certificate that doesn't read, is `node_error`.
 - **`node.probe`** probes an address the person typed. The sidebar shows the fingerprint as six words,
-  and asks for the code only after the person ticks **The words match**.
+  and asks for the code only after the person clicks **They match**.
 
 The local probe can also pair by approval
 ([pairing by approval](./api-reference/transport.md#pairing-by-approval)). `node.ask` asks the Node
 over the kept probe and keeps the secret in the host, so the extension never holds it. The sidebar
-shows the phrase and calls `node.collect` once a second until the owner allows it in the desktop. A
-typed address can't ask, because the Node answers an ask only from its own computer.
+shows the phrase and calls `node.collect` once a second until the owner allows it in the desktop, with
+**Use a pairing code instead** one click away for a Node no desktop is watching. A typed address can't
+ask, because the Node answers an ask only from its own computer. The sidebar names the Node in
+`node.collect` and `node.pair` itself, "This computer" or the address's host, and Settings renames it
+with `node.rename`.
 
 Each browser keeps its own custody, apart from the CLI's and the desktop's: a `FleetStore` and token
 files under `~/Library/Application Support/acorn/browser-bridge/<browser>/`. The folder is mode 0700

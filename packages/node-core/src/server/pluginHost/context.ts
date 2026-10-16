@@ -36,7 +36,7 @@ import { AGENTS_HARNESS_REGISTRY, qualifiedHarnessId } from './harnesses'
 import { AGENTS_CUSTOM_AGENT_REGISTRY } from './customAgents'
 import { registerSkill } from './skills'
 import type { PackageSkill } from '../plugins/skills'
-import type { BrowserHandoffDescriptor, BrowserPanelDescriptor } from '@acorn/protocol/plugin/handoffs.ts'
+import type { BrowserHandoffDescriptor, BrowserPanelDescriptor, PluginIcon } from '@acorn/protocol/plugin/handoffs.ts'
 import { registerTaskCheck } from './taskChecks'
 import { registerSearchProvider } from './search'
 import { declareAuditAction, qualifiedAuditAction, recordAudit } from '../audit'
@@ -122,6 +122,8 @@ export type LoadedPluginBinding = {
   taskAddresses?: string
   // Its browser extension sidebar panel, kept beside the handoffs.
   browserPanel?: BrowserPanelDescriptor
+  // The manifest's logo, which the extension's discovery read sends with the handoffs and the panel.
+  icon?: Omit<PluginIcon, 'pluginId'>
   // The Git hosts it claims, replayed into the code host registry (./codeHosts.ts).
   codeHost?: CodeHostDescriptor
   destinations?: readonly NonNullable<PluginFrameSurface['destinations']>[number][]

@@ -115,9 +115,15 @@ function conversationEvent(record: AgentEventRecord, turn: AgentTurn | undefined
     case 'user_message': {
       if (event.subagentId) return null
       const attachments = event.automatic ? [] : turnAttachments(turn)
-      return attachments.length
-        ? { type: 'user_message', text: withoutAttachmentLines(event.text), attachments }
-        : { type: 'user_message', text: event.text }
+      // A step's prompt, as the desktop labels it. The nudge a step sends after a turn ends without its
+      // result continues an earlier turn, and the desktop names Acorn as its sender instead.
+      const workflow = turn?.source === 'workflow' && !turn.effectivePolicy.continuationOf
+      return {
+        type: 'user_message',
+        text: attachments.length ? withoutAttachmentLines(event.text) : event.text,
+        ...(attachments.length ? { attachments } : {}),
+        ...(workflow ? { workflow: true } : {}),
+      }
     }
     case 'assistant_message':
       if (event.subagentId) return null

@@ -28,9 +28,10 @@ launcher script, so install it from the copy of the CLI you keep:
 
 [The browser host](../cli/browser-host.md) covers the files these commands write.
 
-If the panel is already open, it shows `acorn browser install` with a **Copy** button while the bridge
-is missing. It checks again every three seconds and carries on by itself once the bridge answers.
-**Retry** checks at once.
+If the panel is already open, it shows only **Install the browser bridge**, with the command as one
+button that copies it, and a spinner. A bridge that refuses this extension shows the same screen as
+**Repair the browser bridge**. The panel checks again every three seconds and carries on by itself
+once the bridge answers.
 
 ## Build and load the extension
 
@@ -54,25 +55,29 @@ user-level folder that `acorn browser install` writes. A Chrome started with `--
 
 ## Pair a Node
 
-The panel opens on pairing while no Node is paired. Later, choose **Pair another** from the Node chip's
-menu, or **Pair a Node** under **Nodes** in Settings.
+The panel opens on pairing while no Node is paired. Later, click **Pair** in the **Nodes** header in
+Settings.
 
-1. **Choose a Node.** The Node running on this Mac is listed first, as **This computer** with an **On
-   this Mac** tag. The bridge found it in the same data folder `acorn` reads. Nodes this browser already
-   paired show as rows with **Use**. For a Node elsewhere, click **Use another address**.
-2. **Identity.** The Node on this Mac needs no check by eye: the bridge pinned the certificate from the
-   Node's own files. For another address, enter its HTTPS address and click **Check identity**. Compare
-   the six words with the ones the Node shows: the code panel in the desktop's **Settings → Nodes**, or
-   a standalone Node's banner. Tick **The words match** only if they do, then click **Continue**.
-3. **Allow or code.** For the Node on this Mac, the panel asks the Node and shows three words under
-   **Allow in Acorn**. The desktop opens a dialog with the same words. Click **Allow** there, and the
-   panel moves on by itself. Otherwise, paste a pairing code. The desktop shows one in **Settings →
-   Nodes → Pair a browser**. A standalone Node prints one at start, and `kill -USR1 <pid>` prints
-   another. The name fills in as **This computer** for the Node on this Mac, or the address for
-   another. Click **Pair**.
-4. **Done.** The panel names the Node it paired with. It offers **Allow** for each site where the Node's
-   plugins put buttons, such as `github.com`, and a box for notifications. Both are optional, and both
-   stay in Settings.
+Each step is one screen under a bare top bar: the acorn and "Acorn", with **Cancel** on a middle step
+to go back to the first. The first step has **Cancel** too when a Node is already paired, and it
+closes pairing.
+
+1. **Connect to Acorn.** The Node running on this Mac shows as a card, **This computer** with its
+   address and **Connect**. The bridge found it in the same data folder `acorn` reads. With no Node on
+   this Mac, or one already paired, the card is left out. **Connect to another Node** is under it.
+2. **Approve in Acorn.** **Connect** asks the Node and shows three words. The desktop opens a dialog
+   with the same words. Click **Allow** there, and the panel moves on by itself. **Use a pairing code
+   instead** shows the code field. A Node that can't take an ask goes straight to the code.
+3. **Another Node.** Enter its HTTPS address and click **Check**. **Check its identity** shows six
+   words. Compare them with the ones the Node shows: the code panel in the desktop's **Settings →
+   Nodes**, or a standalone Node's banner. Click **They match** only if they do. The Node on this Mac
+   needs no check by eye: the bridge pinned the certificate from the Node's own files.
+4. **Enter the pairing code.** The desktop shows one in **Settings → Nodes → Pair a browser**. A
+   standalone Node prints one at start, and `kill -USR1 <pid>` prints another. Click **Pair**.
+5. **Connected.** The panel names the Node it paired with: **This computer** for the Node on this Mac,
+   or the address's host for another. Rename it in Settings. **Allow on these sites** has an access
+   switch for each site where the Node's plugins put buttons, such as `github.com`, and
+   **Notifications** has its switch. Both are optional, and both stay in Settings. **Done** goes Home.
 
 Each browser pairs on its own, so pair Chrome and Firefox separately. A Node on another computer must
 advertise its address, or be reached through an SSH tunnel, as
@@ -80,11 +85,13 @@ advertise its address, or be reached through an SSH tunnel, as
 
 ## Turn on site features
 
-- In Settings, click **Allow** beside a site under **Permissions** for its buttons, sidebar handoffs,
-  and project suggestions. The browser asks you first.
+- In Settings, turn on a site's switch under **Sites** for its buttons, sidebar handoffs, and project
+  suggestions. The browser asks you first. Turning it off asks nothing
+  ([project sites](./project-sites.md#settings--sites)).
 - To capture from a site you haven't allowed, click the Acorn toolbar button on that page, then
   capture.
-- In Settings, tick **Notify me when an agent waits** for OS notifications. The browser asks you first.
+- In Settings, turn on **When an agent needs you** under **Notifications** for OS notifications. The
+  browser asks you first.
 - A handoff works only for a plugin running on the selected Node. The desktop's Node has GitHub, Linear,
   and Rollbar. A standalone Node has GitHub, and needs Linear and Rollbar installed as plugins.
 
@@ -93,51 +100,24 @@ advertise its address, or be reached through an SSH tunnel, as
 - **After moving or upgrading the CLI or its Node runtime**, the launcher points at a path that's gone.
   The sidebar says the bridge stopped, and `acorn browser status` names the missing path. Run
   `acorn browser install` from the new copy, then click **Retry**. Pairings stay.
-- **After reinstalling the extension**, its pairings are still in the bridge. Choose the Node from the
-  Node chip's menu in the header, or click **Use** beside it in Settings.
+- **After reinstalling the extension**, its pairings are still in the bridge. Click **Use** beside the
+  Node in Settings.
+- **Rename** in a Node's ⋯ menu in Settings turns its name into a field: Enter or leaving the field
+  saves, and Escape cancels. It calls `node.rename`, so the bridge keeps the name. The name is this
+  browser's own, so nothing on the Node or in other clients changes.
 - **To remove the bridge**, run `acorn browser uninstall`. It removes the registrations and launchers,
   and names each browser's bridge folder, which still holds its pairings and tokens. Delete
   `~/Library/Application Support/acorn/browser-bridge/<browser>/` to remove them.
-- **Forget** in Settings or the Node chip's menu deletes one Node's pairing from this browser. Neither
+- **Forget** in a Node's ⋯ menu in Settings deletes its pairing from this browser, after a second
+  click on **Forget *name*?**. Neither
   forgetting nor deleting the folder revokes the browser's device on the Node. Another paired client
   can revoke it with `DELETE /v1/core/devices/:id` ([authentication](../authentication.md)).
 
 ## The panel's views
 
-The panel opens on **Home**. The header holds the Acorn mark, the selected Node as a chip with a
-status dot, and the gear. The chip's menu switches Nodes, opens **Pair another**, and forgets the
-selected Node. When the bridge stopped
-or the Node isn't answering, one line under the header says so, with the next step from the table
-below. Nothing else about Nodes or site access shows on Home.
-
-Home lists, top to bottom:
-
-1. **Waiting for you**, only while an agent waits on a request, across every project on the Node.
-   Each request answers in place with the same buttons the conversation uses
-   ([request notifications](./notifications.md#the-waiting-list)).
-2. **This page**: what Acorn knows about the page, in one of three states: the task it belongs to, an
-   item no task holds with its handoff, or the project its site suggests with that project's open
-   tasks ([This page](./task-pages.md#this-page)). A page that matches none of them has no
-   **This page** section.
-3. **Agents**: every conversation in the page's task, or in the current task when the page is on its
-   project's site, grouped as **Managed chats**, **Inline chats**, and **Workflows**, each with its
-   agent, title, state, and last line. A page tied to no task or project shows none. A row opens the
-   conversation and makes its task current. **New chat** starts another from the desktop's New
-   picker: each harness or named login, then each custom agent.
-4. **Current task**: the task you last used, pinned whenever the page has a match but isn't its own.
-5. **Tasks**: one workspace's open tasks, grouped by project. A row opens the task's links, each
-   switching to its open tab or opening a new one ([Home's task list](./task-pages.md#homes-task-list)).
-
-A conversation opens over Home, with a back arrow and the task's name above the conversation's own,
-and **Open in Acorn** and **Copy Acorn link** for that conversation ([the panel's
-verbs](./handoffs.md#the-panels-verbs)). The composer's toolbar holds the
-three [capture](./page-capture.md) buttons, and each capture shows as a chip in the draft. Moving to
-a page with no task leaves the conversation open, so the person can capture that page into it. Moving
-to a page of a different task switches to that task's newest conversation, or its new-chat picker
-when it has none. Each conversation keeps its own draft.
-
-**Settings** holds the Node list and pairing, site access, each project's sites, notifications, and
-appearance.
+The panel is always on **Home**, on one task with its panes as tabs, or in one conversation inside a
+task, with **Settings** beside them. [Sidebar navigation](./navigation.md) covers each level's top
+bar, the tabs under a task, **Back**, and the strip under the bars.
 
 A state shows as a coloured dot beside a word, never colour alone: green for working or online, amber
 for waiting, red for failed or unreachable, and an empty ring for idle.
@@ -151,7 +131,10 @@ the app does, with `data-theme` and `data-style` on the page's root element
 
 The desktop keeps its appearance as a device preference the extension can't read, so the panel has
 its own. By default it follows the system's light or dark setting with the Terminal style. Settings →
-**Appearance** offers the app's 12 themes and 4 style packs. The choice is kept in `storage.local`
+**Appearance** offers the app's 12 themes in the kit's `Picker`, with **System** first, and the 4 style
+packs as a segmented control. Each theme's row shows a swatch of its background. The sheet scopes
+those colours to `:root`, so `THEMES` in `appearance.ts` carries each one, and
+`appearance.test.ts` checks it against `tokens-theme.css`. The choice is kept in `storage.local`
 under `appearance` ([browser storage](./conversations.md#browser-storage)), and every open panel
 follows a change made in any of them.
 
@@ -164,10 +147,10 @@ Each failure has a next step, written in `apps/extension/src/sidebar/guidance.ts
 
 | State | How it is detected | Next step shown |
 | --- | --- | --- |
-| Host missing | The port closes with "not found" (Chrome) or "No such native application" (Firefox) | Run `acorn browser install`, with **Copy**; the panel checks again every three seconds |
+| Host missing or refusing | The port closes with "not found" (Chrome) or "No such native application" (Firefox), or "forbidden" or "not allowed" when the registration doesn't list this extension | **Install the browser bridge** or **Repair the browser bridge**, with the command to copy; the panel checks again every three seconds |
 | Host stopped | Any other close, or no reply within 10 seconds. A launcher whose runtime or entry moved exits at once | Retry, or run `acorn browser status` |
 | Bad code | The Node refuses the pairing | Check the code and try again |
-| Node on this Mac unreadable | `node.local` fails: the data folder is held but its `node.json` or certificate doesn't read, or the Node presents another certificate | The reason, under the Node list; **Use another address** still works |
+| Node on this Mac unreadable | `node.local` fails: the data folder is held but its `node.json` or certificate doesn't read, or the Node presents another certificate | The reason, in place of the card; **Connect to another Node** still works |
 | Incompatible | The probe reports another protocol, or the broker marks the Node `incompatible` | Update whichever side is older |
 | Offline | The broker reports `offline`, or a read fails | Check that the Node is running |
 | Revoked | The Node answers 401 `unauthenticated` | Forget the Node and pair again |

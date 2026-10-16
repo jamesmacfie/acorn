@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../content/contentLinkPattern.ts'
 import { parseSiteAddress } from '../projects/siteAssociations.ts'
-import { pluginRoute } from './manifest/manifestFields.ts'
+import { brandMark, pluginRoute } from './manifest/manifestFields.ts'
 
 // Browser handoffs: a plugin's button on a website, which the browser extension draws and which hands
 // the page's item to an Acorn task. A plugin declares the pages, the label, where the button goes, and
@@ -69,13 +69,19 @@ export type BrowserHandoffDescriptor = z.input<typeof browserHandoffDescriptor>
 // One declared handoff as discovery advertises it: the descriptor, bound to the plugin that serves it.
 export type BrowserHandoff = z.output<typeof browserHandoffDescriptor> & { pluginId: string }
 
+// A plugin's logo, from its manifest's `icon`, which the sidebar registers as `brand:<pluginId>`.
+export const pluginIcon = brandMark.extend({ pluginId: z.string().min(1).max(64) })
+export type PluginIcon = z.infer<typeof pluginIcon>
+
 // The Node's list of handoffs its active plugins declare, and the task address route and sidebar panel
-// each declares. Device-only: it describes the plugin surface.
+// each declares, with the logo of each plugin that declares a handoff or a panel. The sidebar can't load
+// a plugin's client, which is where the desktop gets the logo. Device-only: it describes the plugin surface.
 export const browserHandoffsRoute = '/v1/core/browser-handoffs'
 export type BrowserHandoffsResponse = {
   handoffs: BrowserHandoff[]
   taskAddresses: TaskAddressesRoute[]
   panels: BrowserPanel[]
+  icons: PluginIcon[]
 }
 
 // What the resolve route receives: the page address, and the captures the caller matched from one of
@@ -204,8 +210,14 @@ export const TASK_ADDRESSES_MAX_BYTES = 64 * 1024
 export const browserPanelDescriptor = z.object({
   // The nav item's label, such as "Runn".
   label: z.string().trim().min(1).max(40).describe("The panel's name in the sidebar's navigation."),
-  // A Lucide icon name for the nav item.
-  glyph: z.string().min(1).max(64).optional().describe('A Lucide icon name for the navigation item.'),
+  // A Lucide icon name for the nav item, or `brand:<pluginId>` for the manifest's logo, which the
+  // sidebar registers from the discovery read's `icons`.
+  glyph: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .describe("A Lucide icon name for the navigation item, or `brand:<id>` for the plugin's logo."),
   // A task-scoped pane in the same manifest, which Open in Acorn opens.
   pane: z.string().min(1).max(64).optional().describe('A task pane in this manifest that **Open in Acorn** opens.'),
   // GET ?taskId=<id>[&source=<id>] → BrowserPanelView, or 404 for a task with no panel.

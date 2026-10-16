@@ -1,7 +1,8 @@
 # Phase 13: a Context picker in the composer (optional)
 
-Date: October 16, 2026. Status: proposed, and waiting on a decision. Depends on
-[phase 7](./07-conversation.md).
+Date: October 16, 2026. Status: skipped. On October 16, 2026, the plan's owner chose to
+leave the Context picker out. The right-click entry stays the way to capture a page, and the **Context** slot
+in phase 7's bar stays empty.
 
 ## The decision
 

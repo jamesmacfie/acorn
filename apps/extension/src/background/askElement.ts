@@ -149,6 +149,7 @@ export function askElement(
     return {
       ok: true,
       pickId: pick.id,
+      task: task.title,
       sessions: pick.sessions.map(({ id, title }) => ({ id, title })),
       agents: pick.agents.map((agent, index) => ({ key: keys[index]!, label: agent.label })),
       agent: keys.find((key) => key === remembered) ?? keys[0] ?? null,

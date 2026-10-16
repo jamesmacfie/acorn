@@ -5,7 +5,7 @@ sources:
   - docs/browser-extension/element-picker.md
   - apps/extension/src/background/askElement.ts
   - apps/extension/src/content/picker.ts
-checked: 07aa959a0
+checked: '832747727'
 ---
 
 On a page that belongs to a task, such as the app the task is building, you can point at one part of the
@@ -21,8 +21,8 @@ it is in the page, and a screenshot of it. This page covers how to ask and what'
    A box opens beside the element.
 
 2. Type your question.
-3. Under **Conversation**, keep **New chat** or pick one of the task's conversations. For a new chat,
-   **Agent** picks who answers. It starts on the one you used last time.
+3. **To** says where it goes. It starts on a new chat with the agent you used last time. To change
+   it, click **To** and pick another agent's new chat, or one of the task's conversations.
 4. Click **Send**, or press Enter. Shift+Enter adds a line.
 
    The panel opens on the conversation, where the reply arrives.
@@ -30,7 +30,7 @@ it is in the page, and a screenshot of it. This page covers how to ask and what'
 In Firefox, the box says **Sent. Click Acorn in the toolbar to see the reply.**, because Firefox opens
 its panel only from the toolbar.
 
-**Cancel**, Esc, switching tab, or leaving the page closes the box and sends nothing.
+Esc, switching tab, or leaving the page closes the box and sends nothing.
 
 ## What's sent
 

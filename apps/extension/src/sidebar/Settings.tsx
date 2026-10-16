@@ -1,24 +1,30 @@
 import { For, Show, createResource, createSignal, onCleanup, onMount } from 'solid-js'
-import type { BridgeHandoff, BridgeNodes, BridgeProject } from '@acorn/protocol/extensionBridge.ts'
-import type { ProjectSite, SiteAddress, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
-import { TabPanel, Tabs } from '@acorn/client-core/kit/components/layout'
+import type { NodeRecord } from '@acorn/protocol/broker.ts'
+import type { BridgeHandoff, BridgeNodes, BridgeTaskPage } from '@acorn/protocol/extensionBridge.ts'
+import type { ProjectSite, SiteAssociation } from '@acorn/protocol/siteAssociations.ts'
+import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import { Text } from '@acorn/client-core/kit/components/content'
+import { IconButton } from '@acorn/client-core/kit/components/inputs'
+import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
+import { SettingRow, SettingsSection } from '@acorn/client-core/kit/components/layout'
+import { Menu } from '@acorn/client-core/kit/components/overlays'
+import {
+  Badge,
+  Button,
+  Checkbox,
+  EmptyState,
+  Input,
+  Row,
+  SegmentedControl,
+  StatusDot,
+} from '@acorn/client-core/kit/components/primitives.tsx'
 import type { BrowserApi } from '../browser'
 import { STYLES, THEMES, loadAppearance, saveAppearance, type Appearance } from './appearance'
 import type { BridgeClient } from './bridgeClient'
-import { loadDestination } from '../localState'
-import { ProjectSites } from './ProjectSites'
-import { SiteAccess } from './SiteAccess'
+import { Sites } from './Sites'
 
-const TABS = [
-  { id: 'nodes', label: 'Nodes' },
-  { id: 'projects', label: 'Projects' },
-  { id: 'permissions', label: 'Permissions' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'appearance', label: 'Appearance' },
-]
-
-// Everything that isn't the work, under the desktop's tab strip: the Nodes and pairing, each project's
-// sites, which sites the extension may read, notifications, and appearance.
+// Everything that isn't the work, on one page in the desktop's settings parts: the paired Nodes, the
+// sites the extension works on, notifications, and appearance.
 export function Settings(props: {
   api: BrowserApi
   client: BridgeClient
@@ -26,133 +32,197 @@ export function Settings(props: {
   online: boolean
   pair(): void
   select(nodeId: string): void
+  rename(nodeId: string, label: string): void
   forget(nodeId: string): void
   handoffs: readonly BridgeHandoff[]
   sites: readonly ProjectSite[]
   // The apps plugins published for the selected Node's tasks, whose sites can be allowed.
-  apps: readonly SiteAddress[]
+  apps: readonly BridgeTaskPage[]
   pageUrl: string | undefined
   sitesChanged(projectId: string, sites: SiteAssociation[]): void
 }) {
-  const [tab, setTab] = createSignal('nodes')
   return (
     <div class="view settings" aria-label="Settings">
-      <Tabs tabs={TABS} active={tab()} onChange={setTab} idPrefix="settings" ariaLabel="Settings" />
-      <TabPanel idPrefix="settings" id="nodes" active={tab()}>
-        <section aria-label="Nodes">
-          <Show
-            when={props.fleet?.nodes.length}
-            fallback={
-              <p class="quiet">
-                {/* Pairings live in the bridge, so until it answers the panel can't say there are none. */}
-                {props.fleet
-                  ? 'No Node is paired with this browser yet.'
-                  : 'The paired Nodes show once the bridge answers.'}
-              </p>
-            }
-          >
-            <ul class="rows">
-              <For each={props.fleet?.nodes}>
-                {(node) => (
-                  <li>
-                    <div class="grow">
-                      <strong>{node.label}</strong>
-                      <span class="quiet">{node.endpoint}</span>
-                    </div>
-                    <Show
-                      when={node.nodeId === props.fleet?.activeNodeId}
-                      fallback={
-                        <button type="button" onClick={() => props.select(node.nodeId)}>
-                          Use
-                        </button>
-                      }
-                    >
-                      <span class="quiet">Selected</span>
-                    </Show>
-                    <button type="button" class="quiet" onClick={() => props.forget(node.nodeId)}>
-                      Forget
-                    </button>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </Show>
-          <button type="button" onClick={() => props.pair()}>
-            Pair a Node
-          </button>
-        </section>
-      </TabPanel>
-      <TabPanel idPrefix="settings" id="projects" active={tab()}>
-        <Show when={props.fleet?.activeNodeId} keyed fallback={<p class="quiet">Choose a Node to see its projects.</p>}>
-          {(nodeId) => (
-            <NodeProjects
-              client={props.client}
-              storage={props.api.storage.local}
-              nodeId={nodeId}
-              online={props.online}
-              sites={props.sites}
-              pageUrl={props.pageUrl}
-              sitesChanged={props.sitesChanged}
-            />
-          )}
-        </Show>
-      </TabPanel>
-      <TabPanel idPrefix="settings" id="permissions" active={tab()}>
-        <SiteAccess api={props.api} handoffs={props.handoffs} sites={props.sites} apps={props.apps} />
-      </TabPanel>
-      <TabPanel idPrefix="settings" id="notifications" active={tab()}>
-        <Notifications permissions={props.api.permissions} />
-      </TabPanel>
-      <TabPanel idPrefix="settings" id="appearance" active={tab()}>
-        <AppearanceSettings storage={props.api.storage.local} />
-      </TabPanel>
+      <Nodes
+        fleet={props.fleet}
+        online={props.online}
+        pair={props.pair}
+        select={props.select}
+        rename={props.rename}
+        forget={props.forget}
+      />
+      <Sites
+        api={props.api}
+        client={props.client}
+        nodeId={props.fleet?.activeNodeId ?? null}
+        online={props.online}
+        handoffs={props.handoffs}
+        sites={props.sites}
+        apps={props.apps}
+        pageUrl={props.pageUrl}
+        changed={props.sitesChanged}
+      />
+      <Notifications permissions={props.api.permissions} />
+      <AppearanceSettings storage={props.api.storage.local} />
     </div>
   )
 }
 
-// The selected Node's projects and their sites. Mounted per Node, so a list read for one never fills
-// another's.
-function NodeProjects(props: {
-  client: BridgeClient
-  storage: BrowserApi['storage']['local']
-  nodeId: string
+// The Nodes this browser is paired with. The one in use has a dot for its connection; another has
+// Use. Each has a menu to rename it here, copy its address, or forget it, which asks first.
+function Nodes(props: {
+  fleet: BridgeNodes | null
   online: boolean
-  sites: readonly ProjectSite[]
-  pageUrl: string | undefined
-  sitesChanged(projectId: string, sites: SiteAssociation[]): void
+  pair(): void
+  select(nodeId: string): void
+  rename(nodeId: string, label: string): void
+  forget(nodeId: string): void
 }) {
-  const nodeId = props.nodeId
-  const [projects, setProjects] = createSignal<BridgeProject[] | null>(null)
-  // The current task's project, for Add site to start on.
-  const [current, setCurrent] = createSignal<string | null>(null)
-  onMount(async () => {
-    setCurrent((await loadDestination(props.storage, nodeId)).projectId)
-    const result = await props.client.call({ op: 'projects.list', nodeId }).catch(() => null)
-    setProjects(result ? result.projects.filter((project) => !project.hidden) : [])
-  })
-
+  // The Node whose name is a field. Outside the rows, which a renamed fleet draws again.
+  const [renaming, setRenaming] = createSignal<string | null>(null)
+  // Enter or leaving the field saves, as the desktop's rename does. Enter and the blur that follows
+  // both arrive for one rename, so only the first saves.
+  const commitRename = (node: NodeRecord, value: string) => {
+    if (renaming() !== node.nodeId) return
+    setRenaming(null)
+    const label = value.trim()
+    if (label && label !== node.label) props.rename(node.nodeId, label)
+  }
   return (
-    <section aria-label="Project sites">
-      <Show when={projects()} fallback={<p class="quiet">Reading the projects…</p>}>
-        {(list) => (
-          <Show
-            when={list().length}
-            fallback={<p class="quiet">The projects show once the Node answers. Open Settings again to retry.</p>}
-          >
-            <ProjectSites
-              client={props.client}
-              nodeId={nodeId}
-              projects={list()}
-              sites={props.sites}
-              projectId={current()}
-              pageUrl={props.pageUrl}
-              online={props.online}
-              changed={props.sitesChanged}
-            />
-          </Show>
-        )}
+    <SettingsSection
+      id="nodes"
+      label="Nodes"
+      actions={
+        <Button size="sm" variant="ghost" onPress={() => props.pair()}>
+          <Icon name="plus" /> Pair
+        </Button>
+      }
+    >
+      <Show
+        when={props.fleet?.nodes.length}
+        fallback={
+          <EmptyState align="start" size="sm">
+            {/* Pairings live in the bridge, so until it answers the panel can't say there are none. */}
+            {props.fleet
+              ? 'No Node is paired with this browser yet.'
+              : 'The paired Nodes show once the bridge answers.'}
+          </EmptyState>
+        }
+      >
+        <For each={props.fleet?.nodes}>
+          {(node) => {
+            const inUse = () => node.nodeId === props.fleet?.activeNodeId
+            let field!: HTMLInputElement
+            return (
+              <Row
+                variant="stacked"
+                leading={
+                  <Show when={inUse()} fallback={<StatusDot tone="muted" />}>
+                    <StatusDot
+                      tone={props.online ? 'ok' : 'danger'}
+                      label={props.online ? 'Connected' : 'Not connected'}
+                    />
+                  </Show>
+                }
+                trailing={
+                  <>
+                    <Show
+                      when={inUse()}
+                      fallback={
+                        <Button size="sm" onPress={() => props.select(node.nodeId)}>
+                          Use
+                        </Button>
+                      }
+                    >
+                      <Badge size="xs">In use</Badge>
+                    </Show>
+                    <NodeMenu
+                      node={node}
+                      rename={() => setRenaming(node.nodeId)}
+                      forget={() => props.forget(node.nodeId)}
+                    />
+                  </>
+                }
+              >
+                <Show when={renaming() === node.nodeId} fallback={<Text>{node.label}</Text>}>
+                  <Input
+                    label="Node name"
+                    name="node-name"
+                    value={node.label}
+                    maxLength={120}
+                    ref={(element) => {
+                      field = element
+                      queueMicrotask(() => {
+                        element.focus()
+                        element.select()
+                      })
+                    }}
+                    onSubmit={(value) => commitRename(node, value)}
+                    onBlur={() => commitRename(node, field.value)}
+                    // Handled here, so the Escape that ends a rename does nothing else.
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Escape') return
+                      event.preventDefault()
+                      setRenaming(null)
+                    }}
+                  />
+                </Show>
+                <Text emphasis="mono" tone="muted">
+                  {node.endpoint}
+                </Text>
+              </Row>
+            )
+          }}
+        </For>
       </Show>
-    </section>
+    </SettingsSection>
+  )
+}
+
+// A Node's ⋯ menu. Forget arms first and asks "Forget <name>?", because pairing again takes a code.
+function NodeMenu(props: { node: NodeRecord; rename(): void; forget(): void }) {
+  return (
+    <Menu
+      ariaLabel={`${props.node.label} actions`}
+      placement="bottom-end"
+      trigger={(state) => (
+        <IconButton
+          icon="ellipsis"
+          label="Node actions"
+          variant="ghost"
+          size="sm"
+          opens="menu"
+          expanded={state.open()}
+          onPress={state.toggle}
+        />
+      )}
+    >
+      {(context) => (
+        <>
+          <Menu.Item context={context} leading={<Icon name="pencil" />} onSelect={() => props.rename()}>
+            Rename
+          </Menu.Item>
+          <Menu.Item
+            context={context}
+            leading={<Icon name="copy" />}
+            trailing={props.node.endpoint}
+            onSelect={() => void navigator.clipboard.writeText(props.node.endpoint).catch(() => {})}
+          >
+            Copy address
+          </Menu.Item>
+          <Menu.Separator />
+          <Menu.Item
+            context={context}
+            leading={<Icon name="trash-2" />}
+            tone="danger"
+            confirm={`Forget ${props.node.label}?`}
+            onSelect={() => props.forget()}
+          >
+            Forget {props.node.label}
+          </Menu.Item>
+        </>
+      )}
+    </Menu>
   )
 }
 
@@ -171,30 +241,27 @@ export function Notifications(props: { permissions: BrowserApi['permissions'] })
     props.permissions.onAdded.removeListener(onAccess)
     props.permissions.onRemoved.removeListener(onAccess)
   })
-  // `request` must run inside the person's click, so nothing is awaited before it.
-  // A declined prompt fires no permission event, so the box is set from the browser's answer.
-  const toggle = (box: HTMLInputElement) => {
-    const asked = box.checked ? props.permissions.request(NOTIFICATIONS) : props.permissions.remove(NOTIFICATIONS)
-    void asked
-      .catch(() => false)
-      .then(async () => {
-        box.checked = await props.permissions.contains(NOTIFICATIONS)
-      })
-  }
+  // `request` must run inside the person's click, so nothing is awaited before it. A declined prompt
+  // fires no permission event and answers false, which puts the switch back.
+  const toggle = (on: boolean) =>
+    (on ? props.permissions.request(NOTIFICATIONS) : props.permissions.remove(NOTIFICATIONS)).catch(() => false)
   return (
-    <section aria-label="Notifications">
-      <label class="check">
-        <input
-          type="checkbox"
-          name="notify"
-          checked={allowed() === true}
-          onChange={(event) => toggle(event.currentTarget)}
-        />
-        Notify me when an agent waits on the projects of the page I'm on
-      </label>
-    </section>
+    <SettingsSection id="notifications" label="Notifications">
+      <SettingRow label="When an agent needs you" description="For projects of the page you are on">
+        <Checkbox switch name="notify" checked={allowed() === true} onChange={toggle} />
+      </SettingRow>
+    </SettingsSection>
   )
 }
+
+// Light and Dark side by side, for System, which follows the computer's choice between them.
+const SYSTEM_SWATCH = `linear-gradient(135deg, ${THEMES[0]![2]} 50%, ${THEMES[1]![2]} 50%)`
+type ThemeChoice = { id: string | null; label: string; swatch: string }
+const THEME_CHOICES: readonly ThemeChoice[] = [
+  { id: null, label: 'System', swatch: SYSTEM_SWATCH },
+  ...THEMES.map(([id, label, swatch]) => ({ id, label, swatch })),
+]
+const Swatch = (props: { colour: string }) => <span class="swatch" style={{ background: props.colour }} />
 
 // The panel's theme and style pack. Saving is enough: every open panel applies the stored choice.
 function AppearanceSettings(props: { storage: BrowserApi['storage']['local'] }) {
@@ -207,35 +274,39 @@ function AppearanceSettings(props: { storage: BrowserApi['storage']['local'] }) 
     setAppearance({ ...appearance(), ...next })
     void saveAppearance(props.storage, appearance())
   }
+  const theme = () => THEME_CHOICES.find((choice) => choice.id === appearance().theme) ?? THEME_CHOICES[0]!
   return (
-    <section aria-label="Appearance">
-      <label>
-        Theme
-        <select name="theme" onChange={(event) => change({ theme: event.currentTarget.value || null })}>
-          <option value="" selected={!appearance().theme}>
-            System (Light or Dark)
-          </option>
-          <For each={THEMES}>
-            {([id, label]) => (
-              <option value={id} selected={id === appearance().theme}>
-                {label}
-              </option>
-            )}
-          </For>
-        </select>
-      </label>
-      <label>
-        Style
-        <select name="style" onChange={(event) => change({ style: event.currentTarget.value })}>
-          <For each={STYLES}>
-            {([id, label]) => (
-              <option value={id} selected={id === appearance().style}>
-                {label}
-              </option>
-            )}
-          </For>
-        </select>
-      </label>
-    </section>
+    <SettingsSection id="appearance" label="Appearance">
+      <SettingRow label="Theme">
+        <Picker<ThemeChoice>
+          label={
+            <>
+              <Swatch colour={theme().swatch} /> {theme().label}
+            </>
+          }
+          ariaLabel="Theme"
+          size="sm"
+          placement="bottom-end"
+          placeholder="Filter themes"
+          emptyText="No theme matches."
+          results={(query) =>
+            THEME_CHOICES.filter((choice) => choice.label.toLowerCase().includes(query.trim().toLowerCase()))
+          }
+          rowLabel={(choice) => choice.label}
+          isActive={(choice) => choice.id === appearance().theme}
+          leading={(choice) => <Swatch colour={choice.swatch} />}
+          onSelect={(choice) => change({ theme: choice.id })}
+        />
+      </SettingRow>
+      <SettingRow label="Style">
+        <SegmentedControl
+          options={STYLES.map(([value, label]) => ({ value, label }))}
+          value={appearance().style}
+          onChange={(style) => change({ style })}
+          size="sm"
+          ariaLabel="Style"
+        />
+      </SettingRow>
+    </SettingsSection>
   )
 }

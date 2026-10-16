@@ -29,7 +29,7 @@ export function bridgeClient(
     requests(nodeId: string | null, requests: BridgePendingRequest[]): void
     open(target: RequestTarget): void
     notice(notice: string): void
-    taskPages(nodeId: string | null, tasks: BridgePageTask[]): void
+    taskPages(nodeId: string | null, tasks: BridgePageTask[] | null): void
     showTask(chat: { url: string; title: string } | null): void
   },
 ): BridgeClient {

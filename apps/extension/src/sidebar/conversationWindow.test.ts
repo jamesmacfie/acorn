@@ -21,9 +21,9 @@ describe('conversation items', () => {
         record(6, { type: 'error', message: 'Out of credit' }),
       ]),
     ).toEqual([
-      { key: 'e1', kind: 'you', text: 'Fix the test', attachments: [] },
+      { key: 'e1', kind: 'you', text: 'Fix the test', attachments: [], at: 1, workflow: false },
       { key: 'e2', kind: 'tool', title: 'Run tests', status: 'completed' },
-      { key: 'e3', kind: 'agent', text: 'Looking.' },
+      { key: 'e3', kind: 'agent', text: 'Looking.', at: 3 },
       { key: 'e6', kind: 'error', text: 'Out of credit' },
     ])
   })
@@ -34,6 +34,50 @@ describe('conversation items', () => {
       record(3, { type: 'tool', toolId: 'a', status: 'running' }),
     ])
     expect(items).toEqual([{ key: 'e1', kind: 'tool', title: 'Build', status: 'completed' }])
+  })
+
+  it("marks a workflow step's prompt", () => {
+    expect(conversationItems([record(1, { type: 'user_message', text: 'Review', workflow: true })])).toMatchObject([
+      { kind: 'you', workflow: true },
+    ])
+  })
+
+  const tool = (seq: number, toolId: string, status = 'completed') =>
+    record(seq, { type: 'tool', toolId, title: `Tool ${toolId}`, status })
+
+  it('groups three or more tool lines in a row, and leaves two alone', () => {
+    const items = conversationItems([
+      tool(1, 'a'),
+      tool(2, 'b'),
+      record(3, { type: 'assistant_message', text: 'Next' }),
+      tool(4, 'c'),
+      tool(5, 'd', 'failed'),
+      tool(6, 'e'),
+    ])
+    expect(items.map((item) => item.kind)).toEqual(['tool', 'tool', 'agent', 'tools'])
+    expect(items[3]).toEqual({
+      key: 'e4',
+      kind: 'tools',
+      lines: [
+        { key: 'e4', kind: 'tool', title: 'Tool c', status: 'completed' },
+        { key: 'e5', kind: 'tool', title: 'Tool d', status: 'failed' },
+        { key: 'e6', kind: 'tool', title: 'Tool e', status: 'completed' },
+      ],
+    })
+  })
+
+  it("keeps a growing run under its first line's key, with updates applied", () => {
+    const run = [tool(1, 'a'), tool(2, 'b'), tool(3, 'c', 'running')]
+    expect(conversationItems(run)).toMatchObject([{ key: 'e1', kind: 'tools' }])
+    const grown = conversationItems([...run, record(4, { type: 'tool', toolId: 'c', status: 'failed' }), tool(5, 'd')])
+    expect(grown).toHaveLength(1)
+    expect(grown[0]).toMatchObject({ key: 'e1', kind: 'tools' })
+    expect(grown[0]!.kind === 'tools' && grown[0]!.lines.map((line) => line.status)).toEqual([
+      'completed',
+      'completed',
+      'failed',
+      'completed',
+    ])
   })
 })
 
