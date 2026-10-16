@@ -72,7 +72,8 @@ it('reports a staged rename and an unresolved merge conflict from Git', async ()
   git(dir, 'add', 'conflict.txt')
   git(dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'main')
   try {
-    git(dir, 'merge', '--no-commit', 'other')
+    // An identity even with --no-commit: on Linux Git can't guess an email, and refuses to merge at all.
+    git(dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'merge', '--no-commit', 'other')
   } catch {
     /* Git exits one for the expected conflict. */
   }

@@ -6,7 +6,7 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { custody } from '@acorn/custody/local'
+import { custody, desktopDataRootDir } from '@acorn/custody/local'
 import { ensureCert } from '@acorn/node-core/server/transport'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
@@ -605,8 +605,12 @@ describe('browser bridge local discovery', () => {
     const node = await fakeNode(nodeId)
     // The desktop app's root, under a stand-in home folder, holds a running Node.
     const home = dataRoot({}, mkdtempSync(join(tmpdir(), 'acorn-bridge-home-')))
-    dataRoot({ nodeId, port: portOf(node.endpoint) }, join(home, 'Library/Application Support/com.acorn.desktop/node'))
+    // Every variable the platform's app data folder reads, so no run touches the real desktop root.
     vi.stubEnv('HOME', home)
+    vi.stubEnv('USERPROFILE', home)
+    vi.stubEnv('XDG_CONFIG_HOME', '')
+    vi.stubEnv('APPDATA', '')
+    dataRoot({ nodeId, port: portOf(node.endpoint) }, desktopDataRootDir())
     const { call } = bridge()
 
     vi.stubEnv('ACORN_DATA_DIR', mkdtempSync(join(tmpdir(), 'acorn-bridge-empty-')))

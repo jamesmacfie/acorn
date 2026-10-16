@@ -13,9 +13,12 @@ function appDataDir(): string {
 
 export const configDir = (): string => process.env.ACORN_TUI_CONFIG_DIR || join(appDataDir(), 'acorn')
 
+/** Where the installed desktop app keeps its Node's data root on this platform. */
+export const desktopDataRootDir = (): string => join(appDataDir(), DESKTOP_BUNDLE_ID, 'node')
+
 export function dataRootDir(): string {
   if (process.env.ACORN_DATA_DIR) return process.env.ACORN_DATA_DIR
-  const desktop = join(appDataDir(), DESKTOP_BUNDLE_ID, 'node')
+  const desktop = desktopDataRootDir()
   if (existsSync(join(desktop, 'node.json'))) return desktop
   return devDataDir()
 }
