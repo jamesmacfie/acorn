@@ -9,6 +9,7 @@ import type { CiSettledValue, PolicyContribution, PolicyVerdict } from '@acorn/p
 import { checkFailed, checkPending, mirroredTaskPull, reviewActivitySince, taskChecks } from './mirrorQueries'
 import { refreshPullDetail } from './routes/pulls/pullRefresh'
 import type { GithubEmit } from './events'
+import { ciSettledDescription, reviewReceivedDescription, validateReviewReceived } from './policyDescriptions'
 
 type PolicyCore = Pick<CoreServices, 'tasks' | 'projects' | 'identity'>
 type ProviderAccess = {
@@ -19,7 +20,6 @@ type ProviderAccess = {
   ): Promise<T | undefined>
 }
 
-const MIN_INTERVAL_MS = 30_000
 const NO_PULL: PolicyVerdict = {
   verdict: 'fail',
   detail: 'This task has no pull request in a GitHub repository Acorn has listed.',
@@ -57,24 +57,7 @@ export function githubWorkflowPolicies(
   }
 
   const ciSettled: PolicyContribution = {
-    describe: {
-      label: 'CI finished',
-      description: 'Wait for every check on the pull request to finish. Passes when they all passed.',
-      icon: 'brand:github',
-      minIntervalMs: MIN_INTERVAL_MS,
-      fields: [
-        {
-          id: 'missing',
-          label: 'When there are no checks',
-          type: 'select',
-          options: [
-            { value: 'fail', label: 'Fail' },
-            { value: 'wait', label: 'Wait for them to appear' },
-          ],
-          hint: 'Defaults to fail. Choose wait when checks take a minute to start after a push.',
-        },
-      ],
-    },
+    describe: ciSettledDescription,
     evaluate: async (ctx) => {
       const read = await refreshed(ctx.taskId)
       if ('verdict' in read) return read.verdict
@@ -107,18 +90,8 @@ export function githubWorkflowPolicies(
   }
 
   const reviewReceived: PolicyContribution = {
-    describe: {
-      label: 'Review received',
-      description:
-        'Wait for someone other than the author to review or comment on the pull request after the wait started.',
-      icon: 'brand:github',
-      minIntervalMs: MIN_INTERVAL_MS,
-      fields: [{ id: 'include_bots', label: 'Count bots', type: 'boolean', hint: 'Off by default.' }],
-    },
-    validate: (settings) =>
-      settings.include_bots === undefined || typeof settings.include_bots === 'boolean'
-        ? []
-        : ['include_bots must be true or false'],
+    describe: reviewReceivedDescription,
+    validate: validateReviewReceived,
     evaluate: async (ctx) => {
       const read = await refreshed(ctx.taskId)
       if ('verdict' in read) return read.verdict

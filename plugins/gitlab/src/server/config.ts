@@ -8,3 +8,5 @@ export const gitlabClientId = (): string => process.env.GITLAB_CLIENT_ID?.trim()
 // declares. A company server's host is claimed while its connection exists (./servers.ts).
 export const GITLAB_ORIGIN = 'https://gitlab.com'
 export const GITLAB_HOST = 'gitlab.com'
+
+export const GITLAB_PROVIDER = 'gitlab'

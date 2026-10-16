@@ -1,5 +1,6 @@
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
-import { changeRequestLineMarkers, type EditorLineMarkerProvider } from '@acorn/plugin-editor/contract/lineMarkers.ts'
+import type { EditorLineMarkerProvider } from '@acorn/plugin-editor/contract/lineMarkers.ts'
+import { changeRequestLineMarkers } from '@acorn/plugin-editor/contract/changeRequestLineMarkers.ts'
 import { mirroredMergeRequest } from './mirror/detail'
 import { taskMergeRequest } from './taskMergeRequest'
 import type { GitlabServers } from './servers'

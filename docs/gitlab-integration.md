@@ -33,7 +33,7 @@ A company server signs in with a personal access token and its address, such as
 browser button and the host claim match a page by its host alone. A loopback or private address, such
 as `https://10.0.0.5`, also needs **Connect to a private address** ticked. The check reads the literal
 address only, so a name that resolves to a private address passes. `gitlabOrigin` in
-`plugins/gitlab/src/server/servers.ts` holds these rules, and the connection's config keeps the
+`plugins/gitlab/src/server/serverAddress.ts` holds these rules, and the connection's config keeps the
 address as `baseUrl`. A connection with no address, a device sign-in included, is gitlab.com's.
 
 The device flow stays on gitlab.com. A company server would need its own OAuth application, which

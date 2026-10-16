@@ -6,9 +6,10 @@ import {
   type RouteFailure,
   type RouteResult,
 } from '@acorn/plugin-api/node'
+import { GITLAB_PROVIDER } from './config'
 import type { GitlabServer } from './servers'
 
-export const GITLAB_PROVIDER = 'gitlab'
+export { GITLAB_PROVIDER }
 
 // Every call out to GitLab needs a deadline shorter than the client's 5 seconds, for the reason
 // GitHub's client gives (`REQUEST_TIMEOUT_MS` in plugins/github/src/server/githubApi.ts). A caller's own

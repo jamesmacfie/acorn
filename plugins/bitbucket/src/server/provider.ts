@@ -1,5 +1,6 @@
 import { defaultBudgets, externalIdsFor, ProviderOperationError, publicProvider } from '@acorn/plugin-api/node'
-import { bb, bitbucketMessage, BITBUCKET_PROVIDER, type BitbucketSession } from './bitbucketApi'
+import type { BitbucketSession } from './bitbucketApi'
+import { BITBUCKET_PROVIDER } from './config'
 
 type BitbucketViewer = { nickname?: string | null; display_name?: string | null }
 type BitbucketValidated = { secret: string; viewer: BitbucketViewer }
@@ -20,6 +21,8 @@ const SCOPES = [
 async function viewer(
   session: BitbucketSession,
 ): Promise<{ ok: true; viewer: BitbucketViewer } | { ok: false; reason: string }> {
+  // The API client loads on the first sign-in check, so a Node that never connects Bitbucket doesn't read it.
+  const { bb, bitbucketMessage } = await import('./bitbucketApi')
   const response = await bb(session, '/user')
   if (response.ok) return { ok: true, viewer: (await response.json()) as BitbucketViewer }
   const message = await bitbucketMessage(response)

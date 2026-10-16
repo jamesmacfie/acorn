@@ -1,7 +1,8 @@
 import type { Context } from 'hono'
 import { type AppEnv, providerCredential, type RouteFailure, type RouteResult } from '@acorn/plugin-api/node'
+import { BITBUCKET_PROVIDER } from './config'
 
-export const BITBUCKET_PROVIDER = 'bitbucket'
+export { BITBUCKET_PROVIDER }
 
 const API_ORIGIN = 'https://api.bitbucket.org'
 

@@ -11,7 +11,7 @@ import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.t
 import { CODE_HOST_POLICY, WORKFLOW_POLICY } from '@acorn/plugin-workflows/contract/extensions.ts'
 import { bitbucketEmitter } from '../server/events'
 import { bitbucketProvider } from '../server/provider'
-import { BITBUCKET_PROVIDER } from '../server/bitbucketApi'
+import { BITBUCKET_PROVIDER } from '../server/config'
 import { createBitbucketAccount } from '../server/account'
 import { ciSettledDescription, reviewReceivedDescription, validateReviewReceived } from '../server/policyDescriptions'
 import { BITBUCKET_HOST, PULL_REQUEST_PAGES } from '../shared/pullRequestRef'

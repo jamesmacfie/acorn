@@ -1,7 +1,6 @@
 import { defaultBudgets, externalIdsFor, ProviderOperationError, publicProvider } from '@acorn/plugin-api/node'
-import { GITLAB_HOST, GITLAB_ORIGIN } from './config'
-import { gitlabOrigin, originOf } from './servers'
-import { gl, GITLAB_PROVIDER } from './gitlabApi'
+import { GITLAB_HOST, GITLAB_ORIGIN, GITLAB_PROVIDER } from './config'
+import { originOf } from './servers'
 
 type GitlabViewer = { username: string; name: string | null }
 type GitlabValidated = {
@@ -29,7 +28,9 @@ export function oauthTokens(body: {
   }
 }
 
+// The API client loads on the first sign-in check, so a Node that never connects GitLab doesn't read it.
 const viewer = async (origin: string, secret: string): Promise<GitlabViewer | null> => {
+  const { gl } = await import('./gitlabApi')
   const response = await gl({ origin, token: secret }, '/user')
   return response.ok ? ((await response.json()) as GitlabViewer) : null
 }
@@ -87,6 +88,7 @@ export const createGitlabProvider = (options: { clientId: () => string }) =>
         const typed = credentials.token?.trim()
         const secret = typed || credentials.accessToken?.trim()
         if (!secret) throw new ProviderOperationError('provider_bad_config', 400)
+        const { gitlabOrigin } = await import('./serverAddress')
         const origin = gitlabOrigin(credentials.baseUrl, credentials.allowPrivate === 'true')
         const found = await viewer(origin, secret)
         if (!found) throw new ProviderOperationError('provider_needs_auth', 401)

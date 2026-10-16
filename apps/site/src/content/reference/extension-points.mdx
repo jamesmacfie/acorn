@@ -569,6 +569,90 @@ Badges beside a pull request's state.
 }
 ```
 
+### Points `bitbucket` opens
+
+#### `bitbucket:diff-line`
+
+Marks on lines of a Bitbucket pull request's diff.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "bitbucket-diff-line",
+        "point": "bitbucket:diff-line",
+        "label": "Acme review marks",
+        "items": "/v1/p/acme/marks/bitbucket-diff"
+      }
+    ]
+  }
+}
+```
+
+#### `bitbucket:summary-badges`
+
+Badges beside a Bitbucket pull request's state.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "bitbucket-summary-badges",
+        "point": "bitbucket:summary-badges",
+        "label": "Acme checks",
+        "remote": "summaryBadges"
+      }
+    ]
+  }
+}
+```
+
+### Points `gitlab` opens
+
+#### `gitlab:diff-line`
+
+Marks on lines of a merge request's diff.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "gitlab-diff-line",
+        "point": "gitlab:diff-line",
+        "label": "Acme review marks",
+        "items": "/v1/p/acme/marks/merge-request-diff"
+      }
+    ]
+  }
+}
+```
+
+#### `gitlab:summary-badges`
+
+Badges beside a merge request's state.
+
+```json manifest
+{
+  "client": "./client.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "gitlab-summary-badges",
+        "point": "gitlab:summary-badges",
+        "label": "Acme checks",
+        "remote": "summaryBadges"
+      }
+    ]
+  }
+}
+```
+
 ### Points `preview` opens
 
 #### `preview:toolbar-actions`

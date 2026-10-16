@@ -6,7 +6,6 @@ import {
   type PluginDatabase,
   type StoredConnection,
 } from '@acorn/plugin-api/node'
-import { createPullRequest } from './createPull'
 import { type GithubEmit, NO_EMIT } from './events'
 
 type GithubToolCore = Pick<CoreServices, 'projects' | 'tasks'>
@@ -58,6 +57,7 @@ export function githubAgentTools(
         if (!project?.github) throw new ToolError('bad_request', 'This task project is not connected to GitHub.')
 
         const { owner, name: repo } = project.github
+        const { createPullRequest } = await import('./createPull')
         const created = await providers.withConnection(ctx.userLogin, 'github', async (_connection, token) =>
           createPullRequest(
             token,

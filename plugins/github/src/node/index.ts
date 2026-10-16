@@ -3,21 +3,17 @@ import { GITHUB_MIRROR } from '../contract/mirror'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/repos/import'
 import { createGithubProvider } from '../server/provider'
-import { mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
-import { githubWorkflowPolicies } from '../server/workflowPolicies'
+import { ciSettledDescription, reviewReceivedDescription, validateReviewReceived } from '../server/policyDescriptions'
 import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
 import { githubClientId } from '../server/config'
 import { githubAgentTools } from '../server/agentTools'
 import { taskPulls } from '../server/routes/pulls/taskPulls'
-import { changeRequestRoutes } from '../server/routes/changeRequests'
 import { githubEmitter } from '../server/events'
-import { readCachedRepos, toPublicRepo } from '../server/routes/mirror/repoMirror'
 import { pullSource } from '../shared/pullSource'
 import { actionsSource } from '../shared/actionsRegistration'
 import { branchSource } from '../shared/branchSource'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
 import { CODE_HOST_POLICY, WORKFLOW_POLICY } from '@acorn/plugin-workflows/contract/extensions.ts'
-import { pullRequestEditorLineMarkers } from '../server/editorLineMarkers'
 import { startPullDiscovery } from '../server/pullDiscovery'
 import { setGithubApiTelemetry } from '../server/githubApi'
 
@@ -79,9 +75,12 @@ export const githubPlugin = (): NodePlugin => {
       // than reading one off the request environment (docs/data-layer/plugin-databases.md § Plugin databases).
       const store = ctx.storage.open()
       setGithubApiTelemetry(ctx.telemetry)
+      const markers = once(async () =>
+        (await import('../server/editorLineMarkers')).pullRequestEditorLineMarkers(store, ctx.core),
+      )
       ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
         id: 'pull-request',
-        value: pullRequestEditorLineMarkers(store, ctx.core),
+        value: { kind: 'pull-request', read: async (...args) => (await markers()).read(...args) },
       })
       // github's own `plugin:github:<verb>` channel (docs/plugins/events.md § Hearing another plugin).
       // Only the routers that write the PR mirror take it.
@@ -127,10 +126,12 @@ export const githubPlugin = (): NodePlugin => {
         { prefix: '/repos', note: 'repository and pull request mirror' },
       )
       ctx.routes.register(taskPulls(ctx.core), { prefix: '/tasks', note: '/:taskId/pulls — durable task PR relations' })
-      ctx.routes.register(changeRequestRoutes(store, ctx.core, emit), {
-        prefix: '/change-requests',
-        note: "a task's pull request for core's agent tools and `pr` context section",
-      })
+      ctx.routes.register(
+        lazyRouter(async () =>
+          (await import('../server/routes/changeRequests')).changeRequestRoutes(store, ctx.core, emit),
+        ),
+        { prefix: '/change-requests', note: "a task's pull request for core's agent tools and `pr` context section" },
+      )
       // The device-flow connect writes core's own `integrations` row through connectProvider
       // (docs/github-integration.md § Connecting). It touches none of this plugin's tables, so it
       // takes no handle.
@@ -167,23 +168,44 @@ export const githubPlugin = (): NodePlugin => {
 
       // Two `gate-policy` verdict sources, `github:ci-settled` and `github:review-received`. Their entry
       // ids are the ones `checks-green`, `ci-loop`, and `review-received` ask a task's code host for.
-      const policies = githubWorkflowPolicies(store, ctx.core, ctx.providers, emit)
-      ctx.extensionPoints.handle(WORKFLOW_POLICY, { id: CODE_HOST_POLICY.ciSettled, value: policies.ciSettled })
+      // Each evaluation reads and refreshes the PR mirror, so that code loads on the first poll.
+      const policies = once(async () =>
+        (await import('../server/workflowPolicies')).githubWorkflowPolicies(store, ctx.core, ctx.providers, emit),
+      )
+      ctx.extensionPoints.handle(WORKFLOW_POLICY, {
+        id: CODE_HOST_POLICY.ciSettled,
+        value: { describe: ciSettledDescription, evaluate: async (run) => (await policies()).ciSettled.evaluate(run) },
+      })
       ctx.extensionPoints.handle(WORKFLOW_POLICY, {
         id: CODE_HOST_POLICY.reviewReceived,
-        value: policies.reviewReceived,
+        value: {
+          describe: reviewReceivedDescription,
+          validate: validateReviewReceived,
+          evaluate: async (run) => (await policies()).reviewReceived.evaluate(run),
+        },
       })
 
       ctx.capabilities.provide(GITHUB_MIRROR, {
-        repositories: async (userId) => (await readCachedRepos(store, userId)).map(toPublicRepo),
-        pullRequest: (userId, repoOwner, repoName, pullNumber) =>
-          mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
+        repositories: async (userId) => {
+          const { readCachedRepos, toPublicRepo } = await import('../server/routes/mirror/repoMirror')
+          return (await readCachedRepos(store, userId)).map(toPublicRepo)
+        },
+        pullRequest: async (userId, repoOwner, repoName, pullNumber) =>
+          (await import('../server/mirrorQueries')).mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
       })
-      ctx.capabilities.provide(mirrorFootprintCapability(ctx.name), { footprint: () => mirrorFootprint(store) })
+      ctx.capabilities.provide(mirrorFootprintCapability(ctx.name), {
+        footprint: async () => (await import('../server/mirrorQueries')).mirrorFootprint(store),
+      })
     },
     dispose: async () => {
       await discovery?.dispose()
       discovery = null
     },
   }
+}
+
+/** A loader that runs once and hands every caller the same answer. */
+const once = <T>(load: () => Promise<T>) => {
+  let held: Promise<T> | undefined
+  return () => (held ??= load())
 }
