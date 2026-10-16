@@ -117,6 +117,9 @@ a usage limit, the wait reads the quota of the session's own account. For more i
   skills and settings file are linked in. Linking the rest, as T3 Code does, needs a list of private files per
   CLI release. Wait until someone misses them. Acorn's own server isn't one of them either. A session on an account gets it
   when it starts, and again in a terminal handoff ([MCP](../mcp.md#configuration)).
+- The servers in Settings → MCP reach every account. One
+  [sign-in to a remote server](../mcp/sign-in.md) on the Node serves them all, so no
+  account needs a `claude mcp add` of its own.
 - A contributed harness can't declare `accounts`. The field would let a plugin choose a variable that
   Acorn sets to a path in its data root, so it needs its own review before it joins the manifest.
 - Acorn doesn't offer to start a session on another account when one runs out of quota.

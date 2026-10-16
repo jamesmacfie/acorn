@@ -3,58 +3,53 @@
 // Device only, reads included, for the reason project config is: a stdio server is a command this
 // node runs in every session that switches it on. A task-scoped agent that could add one would be
 // choosing what runs in the next session, and one that could read them would see every command line.
-import { Hono } from 'hono'
-import {
-  BridgeError,
-  type AppEnv,
-  requireDevice,
-  respondError,
-  routeCapability,
-  setRouteTestCapability,
-  viaBridge,
-} from '@acorn/plugin-api/node'
+import { Hono, type Context } from 'hono'
+import { z } from 'zod'
+import { BridgeError, type AppEnv, requireDevice, respondError, viaBridge } from '@acorn/plugin-api/node'
 import {
   agentMcpServerInputSchema,
   agentMcpPackageActivateInputSchema,
   agentMcpPackagePlanInputSchema,
   validateAgentMcpServerName,
-  type AgentMcpProbeResult,
   type AgentMcpServer,
-  type AgentMcpServerInput,
-  type AgentMcpPackagePlan,
-  type AgentMcpPackageTest,
-  type AgentMcpPendingReview,
 } from '../../shared/mcpServers'
+import { AGENT_MCP_SERVERS } from './mcpServersBridge'
 
-export type AgentMcpServersBridge = {
-  list(): Promise<AgentMcpServer[]>
-  save(name: string, input: AgentMcpServerInput): Promise<AgentMcpServer>
-  remove(name: string): Promise<boolean>
-  test(name: string): Promise<AgentMcpProbeResult | null>
-  consent(name: string, revision: string): Promise<AgentMcpServer | null>
-  planPackage(
-    coordinate: string,
-    targetName: string,
-    expectedRevision: string | null,
-    exceptions: Array<{ coordinate: string; reason: string }>,
-    signal: AbortSignal,
-  ): Promise<AgentMcpPackagePlan>
-  testPackagePlan(name: string, planId: string, bin: string, signal: AbortSignal): Promise<AgentMcpPackageTest>
-  activatePackage(
-    name: string,
-    planId: string,
-    bin: string,
-    enabled: boolean,
-    signal: AbortSignal,
-  ): Promise<AgentMcpServer>
-  pendingReviews(): Promise<AgentMcpPendingReview[]>
-  approveReview(name: string, sessionId: string, revision: string, digest: string): Promise<AgentMcpServer>
+// The browser returns to this address on the person's own machine. Loopback only, so the code in it
+// never leaves that machine, and plain http, because no certificate exists for a loopback port.
+function redirectUriProblem(value: string): string | null {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return 'The return address is not a URL.'
+  }
+  if (url.protocol !== 'http:' || !['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname))
+    return 'The return address must be http on 127.0.0.1, [::1], or localhost.'
+  if (url.username || url.password || url.hash) return 'The return address cannot carry credentials or a fragment.'
+  return null
 }
 
-export const AGENT_MCP_SERVERS = routeCapability<AgentMcpServersBridge>('agents.mcpServersRoute')
-/** @internal test compatibility; production providers use CapabilityRegistry.provide. */
-export const setAgentMcpServersBridge = (bridge: AgentMcpServersBridge | null): void =>
-  setRouteTestCapability(AGENT_MCP_SERVERS, bridge)
+const signInStartSchema = z.object({
+  redirectUri: z
+    .string()
+    .max(4_096)
+    .superRefine((value, ctx) => {
+      const problem = redirectUriProblem(value)
+      if (problem) ctx.addIssue({ code: 'custom', message: problem })
+    }),
+})
+
+const signInFinishSchema = z.union([
+  z.strictObject({ code: z.string().min(1).max(4_096), state: z.string().min(1).max(4_096) }),
+  z.strictObject({ address: z.string().min(1).max(4_096) }),
+])
+
+// A sign-in attempt belongs to the device that started it, so another device cannot finish or cancel it.
+const deviceOf = (c: Context<AppEnv>): string | null => c.get('principal')?.deviceId ?? null
+
+const badRequest = (error: unknown, fallback: string) =>
+  new BridgeError(400, 'bad_request', error instanceof Error ? error.message : fallback)
 
 export const agentMcpServers = new Hono<AppEnv>()
   // Both mount forms, so the bare list route doesn't depend on how a Hono version matches `/*`.
@@ -229,3 +224,56 @@ export const agentMcpServers = new Hono<AppEnv>()
       }
     })
   })
+  // Sign-in (docs/mcp/sign-in.md). The client opens the browser and carries the code
+  // back; everything else happens on the node.
+  .post('/mcp-servers/:name/sign-in', async (c) => {
+    const deviceId = deviceOf(c)
+    if (!deviceId) return respondError(c, 403, 'interactive_user_required')
+    const parsed = signInStartSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success)
+      return respondError(
+        c,
+        400,
+        'bad_request',
+        parsed.error.issues.map((issue) => issue.message),
+      )
+    return viaBridge(c, AGENT_MCP_SERVERS, async (bridge) => {
+      try {
+        return await bridge.startSignIn(c.req.param('name'), parsed.data.redirectUri, deviceId)
+      } catch (error) {
+        throw badRequest(error, 'The sign-in could not start.')
+      }
+    })
+  })
+  .post('/mcp-servers/:name/sign-in/:attemptId/finish', async (c) => {
+    const deviceId = deviceOf(c)
+    if (!deviceId) return respondError(c, 403, 'interactive_user_required')
+    const parsed = signInFinishSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request', ['Send the code and state, or the whole address.'])
+    return viaBridge(c, AGENT_MCP_SERVERS, async (bridge) => {
+      let server: AgentMcpServer | null
+      try {
+        server = await bridge.finishSignIn(c.req.param('name'), c.req.param('attemptId'), deviceId, parsed.data)
+      } catch (error) {
+        throw badRequest(error, 'The sign-in could not finish.')
+      }
+      if (!server) throw new BridgeError(404, 'not_found', 'No MCP server has that name.')
+      return server
+    })
+  })
+  .delete('/mcp-servers/:name/sign-in/:attemptId', (c) => {
+    const deviceId = deviceOf(c)
+    if (!deviceId) return respondError(c, 403, 'interactive_user_required')
+    return viaBridge(c, AGENT_MCP_SERVERS, async (bridge) => {
+      if (!(await bridge.cancelSignIn(c.req.param('name'), c.req.param('attemptId'), deviceId)))
+        throw new BridgeError(404, 'not_found', 'No sign-in is waiting for this server.')
+      return { ok: true }
+    })
+  })
+  .post('/mcp-servers/:name/sign-out', (c) =>
+    viaBridge(c, AGENT_MCP_SERVERS, async (bridge) => {
+      const server = await bridge.signOut(c.req.param('name'))
+      if (!server) throw new BridgeError(404, 'not_found', 'No MCP server has that name.')
+      return server
+    }),
+  )

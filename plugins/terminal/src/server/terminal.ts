@@ -157,6 +157,10 @@ export const sessionControl = {
   create: (opts: CreateOpts): Promise<TerminalSession> => create(opts),
   list: async (): Promise<TerminalSession[]> =>
     [...sessions.values()].filter((s) => s.admitted && !s.retired).map((s) => s.meta),
+  onStopped: (listener: (sessionId: string) => void): (() => void) => {
+    stoppedListeners.add(listener)
+    return () => stoppedListeners.delete(listener)
+  },
 }
 
 let launchContextText: ((taskId: string) => Promise<string | null>) | null = null
@@ -167,6 +171,9 @@ let internalEnv: InternalEnvFactory = () => ({})
 let statusBroadcast: () => void = () => {}
 let worktreeBroadcast: (taskId: string) => void = () => {}
 const runSessionExitListeners = new Set<(sessionId: string, exitCode: number | null) => void>()
+// `sessionControl.onStopped`. Unlike the run listeners above, these also hear a running terminal that
+// was removed, because removal retires the session before its PTY exit arrives.
+const stoppedListeners = new Set<(sessionId: string) => void>()
 
 type EngineOwner = {
   token: object
@@ -227,10 +234,12 @@ function retireSession(s: Session, reason: 'terminal_removed' | 'shutdown' = 'te
   if (s.retired) return
   if (s.script && s.meta.status === 'running' && !(reason === 'shutdown' && s.meta.backend === 'tmux'))
     s.evidence.report(s.script, { type: 'interrupted', reason })
+  const wasRunning = s.meta.status === 'running'
   s.retired = true
   releaseCallbacks(s)
   s.pendingOut = ''
   drain([
+    ...(wasRunning ? [...stoppedListeners].map((listener) => () => listener(s.meta.id)) : []),
     () => settleSession(s, null),
     () => s.display.dispose(),
     () => agentSender.clear(s.meta.id),
@@ -484,6 +493,7 @@ function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner, scri
           },
           () => worktreeSettled(s),
           ...[...runSessionExitListeners].map((listener) => () => listener(s.meta.id, exitCode)),
+          ...[...stoppedListeners].map((listener) => () => listener(s.meta.id)),
           () => {
             if (s.meta.kind !== 'agent' || s.meta.title === 'Teardown') return
             const event = { taskId: s.meta.taskId, sessionId: s.meta.id, exitCode, completedAt: Date.now() }
@@ -929,6 +939,7 @@ export function disposeTerminal(): void {
   statusBroadcast = () => {}
   worktreeBroadcast = () => {}
   runSessionExitListeners.clear()
+  stoppedListeners.clear()
 }
 
 export type TerminalChannelRegistrations = {

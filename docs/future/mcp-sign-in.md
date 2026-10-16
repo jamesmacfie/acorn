@@ -1,10 +1,47 @@
 # Sign in to remote MCP servers
 
-Date: October 16, 2026. Status: proposed. Starting point: `main` at 495c42499.
+Date: October 16, 2026. Status: implemented October 16, 2026, except the checks against real
+servers under "Done when". Starting point: `main` at 495c42499.
 
 This plan lets a person sign in to a remote MCP server from Settings → MCP, once per Node, and have
 every agent session on that Node use the sign-in. Read it before you change how the agents plugin
-declares MCP servers to a harness.
+declares MCP servers to a harness. The behavior as built is in
+[Signing in to a server](../mcp/sign-in.md).
+
+## Spike findings
+
+Read from the public metadata on October 16, 2026, without signing in:
+
+| Question | Sentry `mcp.sentry.dev` | Linear `mcp.linear.app` |
+| --- | --- | --- |
+| Revocation endpoint | Yes, `/oauth/token` | Yes, `/token` |
+| Client ID metadata documents | Advertised | Advertised |
+| Dynamic registration | Yes | Yes |
+| Client authentication `none` | Supported | Supported |
+
+Still open, because each needs a browser sign-in: how long an access token lasts, whether a refresh
+rotates the refresh token, and whether a loopback redirect on a different port from the registered
+one is accepted. The build doesn't depend on the last answer. It registers again whenever the stored
+registration doesn't list the attempt's return address, which works either way.
+
+## How the build differs from this plan
+
+- **Refresh.** The relay's upstream doesn't take the library's `authProvider`. The library refreshes
+  inside its transport, where two relays can't be made to wait for each other. The upstream gets a
+  `fetch` from `McpSignIns.fetchFor()` instead, which adds the token and refreshes once per server at a
+  time with `refreshAuthorization()`. Only a refusal (`invalid_grant`, `invalid_client`,
+  `unauthorized_client`) marks a sign-in expired. A network or server error fails the one request.
+- **Attempts.** The `OAuthClientProvider` belongs to one attempt and keeps everything in memory. The
+  table is written once, when the code exchange succeeds, so `redirectToAuthorization()` never has
+  to behave differently by caller.
+- **Fake server.** The tests use a small fake on `node:http`
+  (`plugins/agents/src/server/fakeOauthMcp.helper.ts`), because the library's `mcpAuthRouter` needs
+  Express, which the agents plugin doesn't depend on.
+- **Names.** `McpReviewProxy` and `McpReviewManager` keep their names.
+- **Terminal stop signal.** The terminal plugin had none that covers a removed terminal, so
+  `TerminalSessions` gained `onStopped`.
+- **The owner's question.** Reviewed servers still skip the relay in a terminal handoff. Only
+  signed-in servers go through one.
 
 ## Why
 

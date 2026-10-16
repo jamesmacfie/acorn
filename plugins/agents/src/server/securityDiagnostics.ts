@@ -438,16 +438,28 @@ export async function collectSecurityDiagnostics(
           ? 'catalogue approved for saved revision; live connection rechecks remain unknown here'
           : 'catalogue review enabled; no approval for saved revision'
         : 'catalogue review off'
+      // The mode and state only: never a token, and never the client ID.
+      const signIn = !server.signIn
+        ? null
+        : server.signIn.status === 'signed_in'
+          ? 'signed in'
+          : server.signIn.status === 'expired'
+            ? 'sign-in expired'
+            : 'not signed in'
       add(
         `mcp.managed.${stableId}`,
         'agents',
         'configured_only',
         server.enabled &&
-          (unpinned || shellDownload || !server.consented || (server.reviewTools && !server.approvedCatalogueDigest))
+          (unpinned ||
+            shellDownload ||
+            !server.consented ||
+            (server.reviewTools && !server.approvedCatalogueDigest) ||
+            (signIn !== null && server.signIn?.status !== 'signed_in'))
           ? 'warning'
           : 'info',
         'Acorn managed MCP store',
-        `Server ${index + 1}: ${server.enabled ? 'enabled' : 'disabled'}; ${management}; ${server.consented ? 'device consent recorded' : 'consent pending'}; ${review}; ${server.transport === 'stdio' ? `command ${knownCommand}` : endpoint}${unpinned ? '; package runner has no detected version pin' : ''}${shellDownload ? '; shell or download command requires review' : ''}.`,
+        `Server ${index + 1}: ${server.enabled ? 'enabled' : 'disabled'}; ${management}; ${server.consented ? 'device consent recorded' : 'consent pending'}; ${review}; ${server.transport === 'stdio' ? `command ${knownCommand}` : endpoint}${signIn ? `; node sign-in, ${signIn}` : ''}${unpinned ? '; package runner has no detected version pin' : ''}${shellDownload ? '; shell or download command requires review' : ''}.`,
         'Passive saved-state check. No installation, secret reveal, server start, or catalogue probe ran. Arguments, headers, credentials, and URL paths are excluded.',
         'Settings > MCP servers.',
         {
@@ -462,7 +474,9 @@ export async function collectSecurityDiagnostics(
                   ? 'This server runs a shell or download command. Review what it runs before using it.'
                   : server.reviewTools && !server.approvedCatalogueDigest
                     ? 'This server is waiting for you to approve its tool definitions.'
-                    : 'These are the saved settings for this server. This check did not connect to it.',
+                    : signIn && server.signIn?.status !== 'signed_in'
+                      ? 'Sessions start without this server until you sign in to it.'
+                      : 'These are the saved settings for this server. This check did not connect to it.',
           facts: [
             { label: 'For new agents', value: server.enabled ? 'On' : 'Off' },
             {
@@ -474,6 +488,7 @@ export async function collectSecurityDiagnostics(
                   : 'Remote server',
             },
             { label: 'Your consent', value: server.consented ? 'Recorded' : 'Required' },
+            ...(signIn ? [{ label: 'Sign-in', value: signIn[0]!.toUpperCase() + signIn.slice(1) }] : []),
             {
               label: 'Tool changes',
               value: !server.reviewTools

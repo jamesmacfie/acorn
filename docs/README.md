@@ -115,6 +115,7 @@ the whole plugin system in one page.
 | [database.md](./database.md) | The database plugin: the Postgres browser and SQL editor. |
 | [mcp.md](./mcp.md) | The MCP server: a stdio child that calls the node over loopback. |
 | [mcp/managed-servers.md](./mcp/managed-servers.md) | Exact npm MCP installation, consent, and live tool catalogue review. |
+| [mcp/sign-in.md](./mcp/sign-in.md) | Signing in to a remote MCP server once per Node, the token relay, and the browser's return trip. |
 
 ## Plugins
 

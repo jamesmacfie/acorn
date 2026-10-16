@@ -106,6 +106,10 @@ it('statically flags an unpinned runner and never returns credential-shaped inpu
     consented: true,
     reviewTools: false,
     approvedCatalogueDigest: null,
+    auth: 'headers',
+    signIn: null,
+    clientId: null,
+    clientSecretStored: false,
   }
   const http: AgentMcpServer = {
     name: 'remote',
@@ -120,6 +124,10 @@ it('statically flags an unpinned runner and never returns credential-shaped inpu
     consented: true,
     reviewTools: false,
     approvedCatalogueDigest: null,
+    auth: 'headers',
+    signIn: null,
+    clientId: null,
+    clientSecretStored: false,
   }
   const report = await collectSecurityDiagnostics(
     ports({ managedMcp: async () => [server, http] }),
@@ -132,6 +140,39 @@ it('statically flags an unpinned runner and never returns credential-shaped inpu
     severity: 'warning',
   })
   expect(JSON.stringify(report)).not.toContain(secret)
+})
+
+it('reports a sign-in mode and state, never the client ID', async () => {
+  root = await mkdtemp(join(tmpdir(), 'acorn-diagnostics-'))
+  const server: AgentMcpServer = {
+    name: 'sentry',
+    transport: 'http',
+    command: null,
+    args: [],
+    url: 'https://mcp.example.test/mcp',
+    values: [],
+    enabled: true,
+    updatedAt: 0,
+    revision: 'c'.repeat(64),
+    consented: true,
+    reviewTools: false,
+    approvedCatalogueDigest: null,
+    auth: 'oauth',
+    signIn: { status: 'expired', signedInAt: 1 },
+    clientId: 'client-id-not-for-reports',
+    clientSecretStored: true,
+  }
+  const report = await collectSecurityDiagnostics(
+    ports({ managedMcp: async () => [server] }),
+    'node-1',
+    'owner',
+    { projectId: 'project-1' },
+    new AbortController().signal,
+  )
+  const finding = report.findings.find((each) => each.id.startsWith('mcp.managed.'))
+  expect(finding).toMatchObject({ severity: 'warning' })
+  expect(JSON.stringify(finding)).toContain('node sign-in, sign-in expired')
+  expect(JSON.stringify(report)).not.toContain('client-id-not-for-reports')
 })
 
 it('refuses a policy file symlink outside the canonical project root', async () => {

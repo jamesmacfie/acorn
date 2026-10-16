@@ -3,6 +3,7 @@ import { createMemo, createSignal, For, Index, onCleanup, onMount, Show } from '
 import { createSettingSave, useSettingsDetail, useUnsavedChanges } from '@acorn/plugin-api/client'
 import {
   Alert,
+  Badge,
   Button,
   Checkbox,
   CodeBlock,
@@ -50,6 +51,7 @@ import {
   type AgentMcpPairDraft,
   type AgentMcpServerDraft,
 } from './mcpServerDraft'
+import { McpSignInPanel, signInWord } from './McpSignInPanel'
 
 type TestState = { testing: true } | { testing: false; result: AgentMcpProbeResult }
 
@@ -117,36 +119,44 @@ export default function AgentMcpServersSettings() {
     edit({ values: before.values.map((pair, i) => (i === index ? { ...pair, ...patch } : pair)) })
   }
 
+  const replaceServer = (server: AgentMcpServer) =>
+    replaceList(current().map((item) => (item.name === server.name ? server : item)))
+
+  // Consent to this exact saved configuration, asked for before anything contacts the server. Answers
+  // the consented server, or null when the person declined. Throws when the server changed meanwhile.
+  const consented = async (server: AgentMcpServer, actionLabel: string, does: string) => {
+    if (server.consented) return server
+    const approved = await confirmAction({
+      title: `Use ${server.name}`,
+      actionLabel,
+      goes: `${server.transport === 'stdio' ? 'Execute local code' : 'Contact the HTTP server'}: ${consentSource(server)}. Declared credential names: ${
+        server.values
+          .filter((value) => value.secret)
+          .map((value) => value.name)
+          .join(', ') || 'none'
+      }. ${does}`,
+      stays: 'The server can be edited again; any change requires fresh consent.',
+    })
+    if (!approved) return null
+    const next = await consentAgentMcpServer(server.name, server.revision)
+    replaceServer(next)
+    return next
+  }
+
   const test = async (name: string) => {
     const server = current().find((item) => item.name === name)
     if (!server) return
-    if (!server.consented) {
-      const source = consentSource(server)
-      const approved = await confirmAction({
-        title: `Use ${name}`,
-        actionLabel: 'Consent and test',
-        goes: `${server.transport === 'stdio' ? 'Execute local code' : 'Contact the HTTP server'}: ${source}. Declared credential names: ${
-          server.values
-            .filter((value) => value.secret)
-            .map((value) => value.name)
-            .join(', ') || 'none'
-        }. The test connects and lists tools.`,
-        stays: 'The server can be edited again; any change requires fresh consent.',
-      })
-      if (!approved) return
-      try {
-        const consented = await consentAgentMcpServer(name, server.revision)
-        replaceList(current().map((item) => (item.name === name ? consented : item)))
-      } catch (cause) {
-        setTests((all) => ({
-          ...all,
-          [name]: {
-            testing: false,
-            result: { ok: false, error: cause instanceof Error ? cause.message : 'The server changed before consent.' },
-          },
-        }))
-        return
-      }
+    try {
+      if (!(await consented(server, 'Consent and test', 'The test connects and lists tools.'))) return
+    } catch (cause) {
+      setTests((all) => ({
+        ...all,
+        [name]: {
+          testing: false,
+          result: { ok: false, error: cause instanceof Error ? cause.message : 'The server changed before consent.' },
+        },
+      }))
+      return
     }
     setTests((all) => ({ ...all, [name]: { testing: true } }))
     try {
@@ -302,6 +312,15 @@ export default function AgentMcpServersSettings() {
           <ServerEditor
             draft={working()}
             opened={opened()}
+            saved={current().find((server) => server.name === working().existing) ?? null}
+            consented={(server) =>
+              consented(
+                server,
+                'Consent and sign in',
+                'Signing in contacts the server and opens its sign-in page in your browser.',
+              )
+            }
+            onServer={replaceServer}
             saving={saving()}
             error={error()}
             onEdit={edit}
@@ -679,6 +698,13 @@ function ServerRow(props: {
     <>
       <SettingRow label={server().name} description={consentSource(server())} error={enabled.error()}>
         <Inline>
+          <Show when={server().signIn}>
+            {(signIn) => (
+              <Badge size="xs" tone={signIn().status === 'signed_in' ? 'ok' : 'warn'}>
+                {signInWord(signIn())}
+              </Badge>
+            )}
+          </Show>
           <Checkbox
             switch
             size="sm"
@@ -745,6 +771,10 @@ function TestLine(props: { state: TestState | undefined }) {
 function ServerEditor(props: {
   draft: AgentMcpServerDraft
   opened: AgentMcpServerDraft | null
+  /** The server as last saved, for its sign-in. Null while adding one. */
+  saved: AgentMcpServer | null
+  consented: (server: AgentMcpServer) => Promise<AgentMcpServer | null>
+  onServer: (server: AgentMcpServer) => void
   saving: boolean
   error: string
   onEdit: (patch: Partial<AgentMcpServerDraft>) => void
@@ -813,14 +843,60 @@ function ServerEditor(props: {
           <Show
             when={props.draft.transport === 'stdio'}
             fallback={
-              <Field label="URL">
-                <Input
-                  type="url"
-                  value={props.draft.url}
-                  placeholder="https://mcp.example.com/mcp"
-                  onInput={(url) => props.onEdit({ url })}
-                />
-              </Field>
+              <>
+                <Field label="URL">
+                  <Input
+                    type="url"
+                    value={props.draft.url}
+                    placeholder="https://mcp.example.com/mcp"
+                    onInput={(url) => props.onEdit({ url })}
+                  />
+                </Field>
+                <Field
+                  label="Sign-in"
+                  group
+                  hint="Headers send fixed values. Signing in with the server opens its sign-in page once, and every session on this node then uses that sign-in."
+                >
+                  <SegmentedControl
+                    ariaLabel="Sign-in"
+                    value={props.draft.auth}
+                    options={[
+                      { value: 'headers', label: 'Headers' },
+                      { value: 'oauth', label: 'Sign in with the server' },
+                    ]}
+                    onChange={(auth) => props.onEdit({ auth })}
+                  />
+                </Field>
+                <Show when={props.draft.auth === 'oauth'}>
+                  <Show
+                    when={!dirty() && props.saved?.auth === 'oauth' && props.saved}
+                    fallback={<Text emphasis="muted">Save the server, then sign in.</Text>}
+                  >
+                    {(saved) => (
+                      <McpSignInPanel server={saved()} consented={props.consented} onServer={props.onServer} />
+                    )}
+                  </Show>
+                  <Fold label="Advanced" defaultOpen={!!props.draft.clientId}>
+                    <Stack gap="stack">
+                      <Field
+                        label="Client ID"
+                        hint="For a server that doesn't let Acorn register itself. Leave it empty to register automatically."
+                      >
+                        <Input value={props.draft.clientId} onInput={(clientId) => props.onEdit({ clientId })} />
+                      </Field>
+                      <Field label="Client secret" hint="Stored encrypted and never shown again.">
+                        <Input
+                          type="password"
+                          value={props.draft.clientSecret}
+                          disabled={!props.draft.clientId.trim()}
+                          placeholder={props.draft.clientSecretStored ? 'Stored. Leave empty to keep it.' : 'Optional'}
+                          onInput={(clientSecret) => props.onEdit({ clientSecret })}
+                        />
+                      </Field>
+                    </Stack>
+                  </Fold>
+                </Show>
+              </>
             }
           >
             <Field

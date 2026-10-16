@@ -2998,8 +2998,8 @@ describe('managed agent runtime conformance', () => {
     const startsBefore = starts.length
     const view = await runtime.setSessionMcpServers(session.id, ['docs'])
     expect(view.servers).toEqual([
-      { name: 'docs', transport: 'http', enabled: true },
-      { name: 'linear', transport: 'stdio', enabled: false },
+      { name: 'docs', transport: 'http', enabled: true, signIn: null },
+      { name: 'linear', transport: 'stdio', enabled: false, signIn: null },
     ])
     await vi.waitFor(() => expect(starts.length).toBe(startsBefore + 1))
     expect(starts.at(-1)!.mcpServers.map((server) => server.name)).toEqual(['docs'])

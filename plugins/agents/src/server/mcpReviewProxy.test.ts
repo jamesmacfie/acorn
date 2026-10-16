@@ -101,9 +101,11 @@ it('keeps an A/B/A silent catalogue drift refused until a new device approval', 
     'session-drift',
     'revision-drift',
     {
-      approved: async () => approved,
-      observed: (catalogue) => {
-        seen = catalogue
+      review: {
+        approved: async () => approved,
+        observed: (catalogue) => {
+          seen = catalogue
+        },
       },
       closed: () => undefined,
     },
@@ -155,8 +157,10 @@ it('does not forward a cancelled tool call after its held catalogue is released'
     'session-cancel-gate',
     'revision-cancel-gate',
     {
-      approved: async () => ({ revision: 'revision-cancel-gate', ...catalogue }),
-      observed: () => undefined,
+      review: {
+        approved: async () => ({ revision: 'revision-cancel-gate', ...catalogue }),
+        observed: () => undefined,
+      },
       closed: () => undefined,
     },
   )
@@ -205,9 +209,11 @@ it('keeps a notification during a held list or approval quarantined', async () =
     'session-2',
     'revision-2',
     {
-      approved: async () => approved,
-      observed: (catalogue) => {
-        observed = catalogue
+      review: {
+        approved: async () => approved,
+        observed: (catalogue) => {
+          observed = catalogue
+        },
       },
       closed: () => undefined,
     },
@@ -257,9 +263,11 @@ it('holds tools on the connection the harness uses and admits the approved catal
     'session-1',
     'revision-1',
     {
-      approved: async () => approved,
-      observed: (catalogue) => {
-        seen = catalogue
+      review: {
+        approved: async () => approved,
+        observed: (catalogue) => {
+          seen = catalogue
+        },
       },
       closed: () => undefined,
     },
@@ -306,8 +314,10 @@ it('refuses unsupported event replay and starts a fresh quarantined connection a
       'session-reconnect',
       'revision-reconnect',
       {
-        approved: async () => null,
-        observed: () => undefined,
+        review: {
+          approved: async () => null,
+          observed: () => undefined,
+        },
         closed: () => undefined,
       },
     )
@@ -372,11 +382,13 @@ it('bounds the complete catalogue read and leaves an interrupted list quarantine
     'session-timeout',
     'revision-timeout',
     {
-      approved: async () => null,
-      observed: () => undefined,
+      review: {
+        approved: async () => null,
+        observed: () => undefined,
+      },
       closed: () => undefined,
     },
-    500,
+    { deadlineMs: 500 },
   )
   const declared = await proxy.listen()
   if (declared.transport !== 'http') throw new Error('The proxy did not offer HTTP.')
@@ -415,8 +427,10 @@ it('refuses an excess of simultaneous upstream requests and relays their cancell
     'session-bounds',
     'revision-bounds',
     {
-      approved: async () => null,
-      observed: () => undefined,
+      review: {
+        approved: async () => null,
+        observed: () => undefined,
+      },
       closed: () => undefined,
     },
   )
@@ -477,7 +491,7 @@ it('revokes a stored approval when a list change interrupts the approval write',
       env: { LIST_STARTED: join(dir, 'approval-list-started'), LIST_RELEASE: release, LIST_NOTIFY: notify },
     },
     'session-approval',
-    'revision-approval',
+    { revision: 'revision-approval', review: true },
   )
   if (declared.transport !== 'http') throw new Error('The proxy did not offer HTTP.')
   const client = new Client({ name: 'harness', version: '1' })

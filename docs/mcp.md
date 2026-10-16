@@ -190,5 +190,8 @@ forwards a stdio server's environment by name, so only secrets go that way. Two 
 secrets under one name are refused. With the tmux backend, the environment passes through
 `tmux new-session -e`.
 
-OAuth sign-in stays with each CLI. Servers from a CLI's own config can't be switched off from acorn,
-because nothing in either protocol removes a server.
+Servers from a CLI's own config can't be switched off from acorn, because nothing in either protocol
+removes a server. Their OAuth sign-in stays with that CLI.
+
+A remote server that wants a browser sign-in (OAuth) can have Acorn sign in once for every session. See
+[signing in to a server](./mcp/sign-in.md).

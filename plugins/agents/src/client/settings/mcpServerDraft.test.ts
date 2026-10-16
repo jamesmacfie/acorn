@@ -18,6 +18,10 @@ describe('the MCP server form', () => {
     consented: true,
     reviewTools: false,
     approvedCatalogueDigest: null,
+    auth: 'headers' as const,
+    signIn: null,
+    clientId: null,
+    clientSecretStored: false,
   }
 
   // The form never holds a stored secret, so an untouched one has to go back as "keep it" rather than
@@ -39,5 +43,27 @@ describe('the MCP server form', () => {
     const input = agentMcpServerInput(draft)
     expect(input.args).toEqual(['-y', '@example/linear-mcp', '--flag with spaces'])
     expect(input.values).toHaveLength(2)
+  })
+
+  it('sends the sign-in choice and keeps a stored client secret the reader left empty', () => {
+    const draft = agentMcpServerDraft({
+      ...stored,
+      transport: 'http',
+      command: null,
+      args: [],
+      url: 'https://mcp.example.com/mcp',
+      values: [],
+      auth: 'oauth',
+      signIn: { status: 'signed_in', signedInAt: 1 },
+      clientId: 'acorn-app',
+      clientSecretStored: true,
+    })
+    expect(agentMcpServerInput(draft)).toMatchObject({ auth: 'oauth', clientId: 'acorn-app' })
+    expect(agentMcpServerInput(draft)).not.toHaveProperty('clientSecret')
+    draft.clientSecret = 'rotated'
+    expect(agentMcpServerInput(draft).clientSecret).toBe('rotated')
+    draft.clientId = ''
+    expect(agentMcpServerInput(draft)).toMatchObject({ auth: 'oauth', clientSecret: null })
+    expect(agentMcpServerInput({ ...draft, auth: 'headers' })).not.toHaveProperty('auth')
   })
 })

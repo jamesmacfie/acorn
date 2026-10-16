@@ -1,3 +1,4 @@
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { AgentDriverMcpServer } from './drivers/types'
 import type { AgentMcpServer } from '../shared/mcpServers'
 import { McpReviewProxy } from './mcpReviewProxy'
@@ -27,19 +28,42 @@ export class McpReviewManager {
     this.#secrets = secrets
   }
 
-  async prepare(server: AgentDriverMcpServer, sessionId: string, revision: string): Promise<AgentDriverMcpServer> {
-    const key = `${sessionId}/${server.name}`
+  /**
+   * Starts a relay in front of one server and returns what the harness is given instead of it.
+   * `owner` is the session it serves, or a terminal handoff's own key, and `closeSession(owner)` closes
+   * it. `review` gates the tools on device approval; `signedFetch` signs requests for a server with
+   * sign-in. A server can have both on one relay.
+   */
+  async prepare(
+    server: AgentDriverMcpServer,
+    owner: string,
+    options: { revision: string; review: boolean; signedFetch?: FetchLike },
+  ): Promise<AgentDriverMcpServer> {
+    const { revision } = options
+    const key = `${owner}/${server.name}`
     await this.#live.get(key)?.close()
-    const proxy = new McpReviewProxy(server, sessionId, revision, {
-      approved: () => this.#store.approvedCatalogue(server.name, revision),
-      observed: (catalogue) => {
-        this.#seen.set(key, catalogue)
+    const proxy = new McpReviewProxy(
+      server,
+      owner,
+      revision,
+      {
+        ...(options.review
+          ? {
+              review: {
+                approved: () => this.#store.approvedCatalogue(server.name, revision),
+                observed: (catalogue: McpCatalogue) => {
+                  this.#seen.set(key, catalogue)
+                },
+              },
+            }
+          : {}),
+        closed: () => {
+          if (this.#live.get(key) === proxy) this.#live.delete(key)
+          this.#seen.delete(key)
+        },
       },
-      closed: () => {
-        if (this.#live.get(key) === proxy) this.#live.delete(key)
-        this.#seen.delete(key)
-      },
-    })
+      { signedFetch: options.signedFetch },
+    )
     try {
       const declared = await proxy.listen()
       this.#live.set(key, proxy)

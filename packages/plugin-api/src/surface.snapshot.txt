@@ -121,6 +121,7 @@ client: modelPickLabel
 client: nodeReady
 client: nodeState
 client: nodes
+client: oauthCallback
 client: observeAttention
 client: observeNativePage
 client: onClosePaneWhen

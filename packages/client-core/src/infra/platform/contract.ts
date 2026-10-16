@@ -9,6 +9,7 @@ import {
   isDesktopHost,
   nodeTransport,
   notifyHost,
+  oauthCallback,
   pluginCustody,
   deviceConfigBridge,
   pluginWebviews,
@@ -22,6 +23,7 @@ import {
   type FleetBridge,
   type NodeTransport,
   type Notify,
+  type OauthCallback,
   type PluginCustody,
   type DeviceConfigBridge,
   type PluginWebviews,
@@ -125,6 +127,8 @@ const GROUPS = {
     resolve: recoveryActions,
     members: members<RecoveryActions>()(['openDataFolder', 'quit']),
   },
+  // Checked by its members alone: calling `listen` would open a port on a real host.
+  oauthCallback: { resolve: oauthCallback, members: members<OauthCallback>()(['listen']) },
   rendererLayer: { resolve: rendererLayer, members: members<RendererLayer>()(['update']) },
   preview: {
     resolve: previewViews,

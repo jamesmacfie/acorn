@@ -389,6 +389,18 @@ const acorn = {
     quit: () => void invoke('force_quit'),
   },
 
+  // An MCP server's sign-in comes back to a loopback port the helper opens, because a window cannot.
+  oauthCallback: {
+    listen: async () => {
+      const { id, redirectUri } = await call<{ id: string; redirectUri: string }>('oauth-listen')
+      return {
+        redirectUri,
+        result: call<string>('oauth-result', { id }).then((query) => new URLSearchParams(query)),
+        close: () => tell('oauth-close', { id }),
+      }
+    },
+  },
+
   folderPath: { pick: () => invoke<string | null>('pick_folder') },
 
   // The native file dialogs. Bytes ride base64 in both directions, the same spelling the helper

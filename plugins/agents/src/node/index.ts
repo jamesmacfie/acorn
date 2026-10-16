@@ -7,6 +7,7 @@ import {
   AGENTS_CUSTOM_AGENT_REGISTRY,
   AGENTS_HARNESS_REGISTRY,
   getProfile,
+  lazyRouter,
   registerDeletedTaskPurge,
   type InternalEnvFactory,
   type NodePlugin,
@@ -14,6 +15,7 @@ import {
 } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { NOTES_SPAWN_SNAPSHOT } from '@acorn/plugin-notes/contract/spawnSnapshot.ts'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type { McpPackageManager } from '../server/mcpPackageManager'
 import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
@@ -61,7 +63,7 @@ import { AgentAccounts, agentAccountsRoot } from '../server/accounts'
 import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
-import { agentMcpServers, AGENT_MCP_SERVERS } from '../server/routes/mcpServers'
+import { AGENT_MCP_SERVERS } from '../server/routes/mcpServersBridge'
 import { agentLoopHooks, AGENT_LOOP_HOOKS } from '../server/routes/loopHook'
 import { agentInstructionReview, AGENT_INSTRUCTION_REVIEW } from '../server/routes/instructionReview'
 import { agentSecurityDiagnostics, AGENT_SECURITY_DIAGNOSTICS } from '../server/routes/securityDiagnostics'
@@ -194,6 +196,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       ctx.audit.declare({ id: 'mcp-publication-exception', label: 'Reviewed MCP package publication exception' })
       ctx.audit.declare({ id: 'mcp-package-activation', label: 'Activated managed MCP package' })
       ctx.audit.declare({ id: 'mcp-catalogue-approval', label: 'Approved MCP tool catalogue' })
+      ctx.audit.declare({ id: 'mcp-sign-in', label: 'Signed in to an MCP server' })
+      ctx.audit.declare({ id: 'mcp-sign-out', label: 'Signed out of an MCP server' })
       registerBuiltInProfiles()
       registerBuiltInDrivers()
       // Migrated before init returns, so no request or provider spawn reaches an unmigrated database.
@@ -295,25 +299,41 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
             sessionMcpSelection(session.config),
             'agent MCP server: continue in a terminal',
           )
-          // A Claude session on an account also needs acorn's own server, which its folder doesn't have. It
-          // carries no login of its own: Claude passes the terminal's environment to every server it
-          // starts, and the terminal holds its own task login.
-          const handoff =
-            profile.id === claudeCodeProfile.id
-              ? claudeHandoffMcp([...acornMcpServers(acornMcp(), session, {}), ...mcp.servers])
-              : profile.id === codexProfile.id
-                ? codexHandoffMcp(mcp.servers, mcp.secrets)
-                : { args: [], env: {} }
-          const terminal = await sessions.create({
-            taskId: session.taskId,
-            profileId: session.profileId,
-            title: `${session.title} · terminal`,
-            command: [resume.file, ...resume.args, ...handoff.args].map(shellQuote).join(' '),
-            // The CLI finds the session only in the folder of the account it started under.
-            env: { ...handoff.env, ...(await runtime!.accountEnv(session)) },
-            agentSessionId: session.id,
-          })
-          return terminal.id
+          // Signed-in servers reach the terminal through relays of its own (relayHandoffServers).
+          const { closeWhenStopped, relayHandoffServers } = await import('../server/terminalHandoffRelays')
+          const relayOwner = `terminal-handoff-${randomUUID()}`
+          const closeRelays = async () => (await runtime!.mcpReviews.built())?.closeSession(relayOwner)
+          try {
+            const servers = await relayHandoffServers(
+              mcp,
+              relayOwner,
+              () => runtime!.mcpReviews.get(),
+              (name, url) => runtime!.mcpServers.signedFetch(name, url),
+            )
+            // A Claude session on an account also needs acorn's own server, which its folder doesn't have. It
+            // carries no login of its own: Claude passes the terminal's environment to every server it
+            // starts, and the terminal holds its own task login.
+            const handoff =
+              profile.id === claudeCodeProfile.id
+                ? claudeHandoffMcp([...acornMcpServers(acornMcp(), session, {}), ...servers])
+                : profile.id === codexProfile.id
+                  ? codexHandoffMcp(servers, mcp.secrets)
+                  : { args: [], env: {} }
+            const terminal = await sessions.create({
+              taskId: session.taskId,
+              profileId: session.profileId,
+              title: `${session.title} · terminal`,
+              command: [resume.file, ...resume.args, ...handoff.args].map(shellQuote).join(' '),
+              // The CLI finds the session only in the folder of the account it started under.
+              env: { ...handoff.env, ...(await runtime!.accountEnv(session)) },
+              agentSessionId: session.id,
+            })
+            await closeWhenStopped(sessions, terminal.id, closeRelays)
+            return terminal.id
+          } catch (error) {
+            await closeRelays()
+            throw error
+          }
         },
         // The return path of the same handoff. `false` with no terminal plugin is correct, not a
         // degradation: with no PTY engine, no shell holds the session, so control can return to acorn.
@@ -523,15 +543,21 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           const configured = await runtime!.mcpServers.get(name)
           if (configured && !configured.consented)
             return { ok: false, error: 'Review and consent to this exact server configuration before testing it.' }
+          if (configured?.signIn && configured.signIn.status !== 'signed_in')
+            return { ok: false, error: 'Sign in first.' }
           const resolved = await runtime!.mcpServers.resolve([name], 'agent MCP server: test the connection')
           if (resolved.unavailable.length)
             return { ok: false, error: 'A stored secret could not be opened. Enter it again and save.' }
           const [server] = resolved.servers
           if (!server) return null
+          const signedFetch =
+            resolved.revisions[name]?.signIn && server.transport === 'http'
+              ? await runtime!.mcpServers.signedFetch(name, server.url)
+              : undefined
           // Loaded on first use: the MCP client and its transports are a large part of a boot graph that
           // only this button needs (apps/node/scripts/check-service-budget.mjs).
           const { probeMcpServer } = await import('../server/mcpProbe')
-          return probeMcpServer(server, resolved.secrets)
+          return probeMcpServer(server, resolved.secrets, signedFetch)
         },
         planPackage: async (coordinate, targetName, expectedRevision, exceptions, signal) => {
           const plan = await (
@@ -560,11 +586,27 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           ctx.audit.record('mcp-catalogue-approval', { subject: name, details: { sessionId, digest } })
           return server
         },
+        startSignIn: (name, redirectUri, deviceId) => runtime!.mcpServers.startSignIn(name, redirectUri, deviceId),
+        finishSignIn: async (name, attemptId, deviceId, input) => {
+          const server = await runtime!.mcpServers.finishSignIn(name, attemptId, deviceId, input)
+          ctx.audit.record('mcp-sign-in', { subject: name, details: {} })
+          return server
+        },
+        cancelSignIn: (name, attemptId, deviceId) => runtime!.mcpServers.cancelSignIn(name, attemptId, deviceId),
+        signOut: async (name) => {
+          const server = await runtime!.mcpServers.signOut(name)
+          ctx.audit.record('mcp-sign-out', { subject: name, details: {} })
+          return server
+        },
       })
-      ctx.routes.register(agentMcpServers, {
-        prefix: '',
-        note: '/mcp-servers — the MCP servers acorn declares to agent sessions',
-      })
+      // Loaded on its first request: Settings is the only caller, and nothing at boot needs it.
+      ctx.routes.register(
+        lazyRouter(async () => (await import('../server/routes/mcpServers')).agentMcpServers),
+        {
+          prefix: '',
+          note: '/mcp-servers — the MCP servers acorn declares to agent sessions',
+        },
+      )
 
       // Harness bridges (docs/managed-agents/loop-hooks.md): a bridged harness's tool calls, and which
       // harnesses a plugin's tool hooks reach. Coverage is loaded on first use, like each bridge call.

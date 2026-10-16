@@ -6,12 +6,12 @@
 // running session has connected to.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { homedir } from 'node:os'
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js'
 import { safeProviderMessage } from './drivers/diagnostics'
 import type { AgentDriverMcpServer } from './drivers/types'
 import type { AgentMcpProbeResult } from '../shared/mcpServers'
 import { mcpCatalogue, type McpCatalogue } from './mcpCatalogue'
+import { mcpUpstream } from './mcpUpstream'
 
 // Long enough for `npx` to fetch a package on a cold cache, which is the usual slow first start.
 const PROBE_TIMEOUT_MS = 30_000
@@ -19,23 +19,15 @@ const PROBE_TIMEOUT_MS = 30_000
 // often a banner.
 const MAX_STDERR = 2_000
 
+/** `signedFetch` is set for a server with sign-in. The caller answers "Sign in first" without calling
+ *  this when there are no tokens. */
 export async function probeMcpServer(
   server: AgentDriverMcpServer,
   secrets: readonly string[],
+  signedFetch?: FetchLike,
 ): Promise<AgentMcpProbeResult> {
   let stderr = ''
-  const transport =
-    server.transport === 'stdio'
-      ? new StdioClientTransport({
-          command: server.command,
-          args: server.args,
-          // The SDK adds PATH, HOME and the rest of a minimal login environment underneath this.
-          env: server.env,
-          // No task is in reach from Settings, so the server starts where a new terminal would.
-          cwd: homedir(),
-          stderr: 'pipe',
-        })
-      : new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers: server.headers } })
+  const transport = mcpUpstream(server, signedFetch)
   if (transport instanceof StdioClientTransport) {
     transport.stderr?.on('data', (chunk: Buffer) => {
       stderr = (stderr + chunk.toString('utf8')).slice(-MAX_STDERR)
@@ -72,16 +64,7 @@ export async function probeMcpCatalogue(
   secrets: readonly string[],
   signal?: AbortSignal,
 ): Promise<McpCatalogue> {
-  const transport =
-    server.transport === 'stdio'
-      ? new StdioClientTransport({
-          command: server.command,
-          args: server.args,
-          env: server.env,
-          cwd: homedir(),
-          stderr: 'pipe',
-        })
-      : new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers: server.headers } })
+  const transport = mcpUpstream(server)
   const client = new Client({ name: 'acorn-package-review', version: '1.0.0' })
   let timer: NodeJS.Timeout | undefined
   let onAbort: (() => void) | undefined

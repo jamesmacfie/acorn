@@ -403,7 +403,14 @@ export class ManagedAgentEngine {
     // accumulates them and the materializer holds a live reference to the same array.
     this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
-    this.mcpServers = new AgentMcpServerStore(options.db, options.secrets, join(options.dataDir, 'managed-mcp'))
+    this.mcpServers = new AgentMcpServerStore(
+      options.db,
+      options.secrets,
+      join(options.dataDir, 'managed-mcp'),
+      (value) => {
+        if (!this.mintedSecrets.includes(value)) this.mintedSecrets.push(value)
+      },
+    )
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
     this.frames = new SessionFrames({
       publish,
@@ -735,19 +742,28 @@ export class ManagedAgentEngine {
       for (const server of userMcp.servers) {
         signal.throwIfAborted()
         const identity = userMcp.revisions[server.name]
-        if (!identity?.reviewTools) {
+        // A signed-in server always goes through the relay, because the relay is what holds its token.
+        if (!identity?.reviewTools && !identity?.signIn) {
           servers.push(server)
           continue
         }
         try {
-          const reviewed = await (await this.mcpReviews.get()).prepare(server, session.id, identity.revision)
-          if (reviewed.transport === 'http') {
-            const bearer = reviewed.headers.Authorization
+          const relayed = await (
+            await this.mcpReviews.get()
+          ).prepare(server, session.id, {
+            revision: identity.revision,
+            review: identity.reviewTools,
+            ...(identity.signIn && server.transport === 'http'
+              ? { signedFetch: await this.mcpServers.signedFetch(server.name, server.url) }
+              : {}),
+          })
+          if (relayed.transport === 'http') {
+            const bearer = relayed.headers.Authorization
             if (bearer && !this.mintedSecrets.includes(bearer)) this.mintedSecrets.push(bearer)
           }
-          servers.push(reviewed)
+          servers.push(relayed)
         } catch {
-          unavailable.push(`${server.name} (review proxy unavailable)`)
+          unavailable.push(`${server.name} (relay unavailable)`)
         }
       }
       signal.throwIfAborted()

@@ -335,6 +335,19 @@ export const agentMcpServers = sqliteTable('agent_mcp_servers', {
   updatedAt: integer('updated_at').notNull(),
 })
 
+// One sign-in per MCP server that has one (docs/mcp/sign-in.md). Kept out of
+// `agent_mcp_servers.config_json` because that config's digest keys consent and tool approval, and a
+// token refresh every hour would void both. `state_json` is sealed: tokens, the client registration,
+// and the discovered endpoints. `url` is the server the tokens were issued for.
+export const agentMcpOauth = sqliteTable('agent_mcp_oauth', {
+  name: text('name').primaryKey(),
+  url: text('url').notNull(),
+  stateJson: text('state_json').notNull(),
+  status: text('status').notNull(), // signed_in | expired
+  signedInAt: integer('signed_in_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
 // One project owns its review history. Metadata remains queryable without opening instruction bodies.
 // A second row is retained for the previous approved version, never more than two per project.
 export const agentInstructionSnapshots = sqliteTable(

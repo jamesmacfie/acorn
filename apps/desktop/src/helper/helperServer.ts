@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http'
-import { timingSafeEqual } from 'node:crypto'
+import { randomUUID, timingSafeEqual } from 'node:crypto'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { z } from 'zod'
 import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
@@ -19,6 +19,7 @@ import { encodeIdFrame, wsFrameSchema, wsSubscriptionIntentSchema } from '@acorn
 import type { Helper } from '@acorn/custody/runtime'
 import { toNodeRecord } from '@acorn/custody/broker'
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
+import { listenForOauthCallback, type OauthCallbackListener } from '@acorn/custody/oauthCallback'
 import {
   MAX_HELPER_REQUEST_BYTES,
   decodeBytes,
@@ -159,12 +160,32 @@ export function startHelperServer(
   // fingerprint confirmation to be a step instead of a parameter the renderer could skip.
   let pending: Awaited<ReturnType<typeof probeNode>> | null = null
 
+  // Sign-in return trips (docs/mcp/sign-in.md). A window cannot open a port, so the
+  // listener lives here and the renderer waits on its result by id.
+  const oauthListeners = new Map<string, OauthCallbackListener>()
+  const oauthListenerId = (raw: unknown): string => z.strictObject({ id: z.uuid() }).parse(raw).id
+
   const handlers: Record<HelperMethod, (params: unknown, owner: RendererConnection) => unknown | Promise<unknown>> = {
     'config-read': () => helper.config.read(),
     // DeviceConfigStore validates the merged document, including the schema's refinement. Zod
     // cannot derive .partial() from a refined object, so only assert the patch's wire shape here.
     'config-write': (raw) => helper.config.write(z.record(z.string(), z.unknown()).parse(raw) as Partial<DeviceConfig>),
     'config-location': () => helper.config.path,
+    'oauth-listen': async () => {
+      const listener = await listenForOauthCallback()
+      const id = randomUUID()
+      oauthListeners.set(id, listener)
+      void listener.result.catch(() => undefined).finally(() => oauthListeners.delete(id))
+      return { id, redirectUri: listener.redirectUri }
+    },
+    'oauth-result': async (raw) => {
+      const listener = oauthListeners.get(oauthListenerId(raw))
+      if (!listener) throw new Error('That sign-in listener has closed.')
+      return (await listener.result).toString()
+    },
+    'oauth-close': (raw) => {
+      oauthListeners.get(oauthListenerId(raw))?.close()
+    },
     'renderer-pulse': () => undefined,
     'node-interest': (raw, owner) => {
       const { nodeId } = z.strictObject({ nodeId: z.string().min(1).nullable() }).parse(raw)
@@ -443,6 +464,7 @@ export function startHelperServer(
 
   const http = createServer((_request, response) => response.writeHead(426).end())
   http.on('close', () => {
+    for (const listener of oauthListeners.values()) listener.close()
     stopConfigWatch()
     clearInterval(watchdogTimer)
     watchdogs.clear()
