@@ -194,8 +194,8 @@ export type TaskSeed = {
   worktreePath?: string
   skipSetup?: boolean
   // A change request on the project's repository, which becomes the task's primary one. `pullNumber`
-  // is the same thing under its GitHub name.
-  changeRequest?: { number: number; sourceBranch?: string }
+  // is the same thing under its GitHub name. `sourceRepository` is a fork's path on the same host.
+  changeRequest?: { number: number; sourceBranch?: string; sourceRepository?: string }
   pullNumber?: number
   links?: TaskLinkSeed[]
 }

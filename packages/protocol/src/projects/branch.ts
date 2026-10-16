@@ -15,6 +15,17 @@ export function isValidBranch(branch: string): boolean {
   )
 }
 
+// Whether a lowercased repository path on the project's own host, such as a fork's `alice/api`, can
+// be swapped into origin's address for `git fetch`. Each segment holds only the characters GitHub,
+// GitLab, and Bitbucket all allow in names, and none is empty, `.`, `..`, or starts with `-`.
+export function isValidRepositoryPath(path: string): boolean {
+  const segments = path.split('/')
+  return (
+    segments.length >= 2 &&
+    segments.every((part) => /^[a-z0-9._-]+$/.test(part) && part !== '.' && part !== '..' && !part.startsWith('-'))
+  )
+}
+
 export function slugifyBranch(input: string): string {
   const slug = input
     .toLowerCase()

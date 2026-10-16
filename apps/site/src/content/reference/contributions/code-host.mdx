@@ -91,5 +91,6 @@ acorn reads the claim on the Node, so it applies in every client.
   help, and neither does claiming it at runtime.
 - `ctx.codeHosts.claim` throws unless your `codeHost` declares `selfHosted`. Claim your hosts again in
   `init`, because a claim ends when your plugin stops.
-- Without a `ref`, acorn fetches the source branch by name, so a change request from a fork can't be
-  checked out.
+- Without a `ref`, acorn fetches the source branch by name from origin. For a change request from a
+  fork, pass the fork's path on the same host, such as `alice/api`, as `sourceRepository` beside
+  `sourceBranch`. It's a path, not an address, and a host that declares a `ref` ignores it.

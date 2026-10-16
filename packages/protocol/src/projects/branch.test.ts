@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { dedupeBranch, isValidBranch, normalizeBranchPrefix, slugifyBranch, withBranchPrefix } from './branch'
+import {
+  dedupeBranch,
+  isValidBranch,
+  isValidRepositoryPath,
+  normalizeBranchPrefix,
+  slugifyBranch,
+  withBranchPrefix,
+} from './branch'
 
 describe('slugifyBranch', () => {
   it('lowercases and strips illegal chars to [a-z0-9/-]', () => {
@@ -72,5 +79,28 @@ describe('withBranchPrefix', () => {
   it('is a no-op without a prefix or without a branch', () => {
     expect(withBranchPrefix(null, 'fix-login')).toBe('fix-login')
     expect(withBranchPrefix('me/', '')).toBe('')
+  })
+})
+
+describe('isValidRepositoryPath', () => {
+  it('takes a path on any of the three hosts', () => {
+    for (const path of ['alice/api', 'group/sub/api', 'my_team/.github', 'a-b/c.d'])
+      expect(isValidRepositoryPath(path)).toBe(true)
+  })
+  it('refuses a path git could misread or that leaves the host', () => {
+    for (const path of [
+      'api',
+      'alice//api',
+      '/alice/api',
+      'alice/..',
+      'alice/./api',
+      '-x/api',
+      'alice/--upload-pack=x',
+      'alice/api?x',
+      'Alice/api',
+      'alice/a pi',
+      'alice/api:x',
+    ])
+      expect(isValidRepositoryPath(path)).toBe(false)
   })
 })

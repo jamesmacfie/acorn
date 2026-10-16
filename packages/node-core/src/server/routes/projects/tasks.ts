@@ -30,7 +30,7 @@ import {
   toWireChangeRequest,
   type ChangeRequestRow,
 } from '../../core/changeRequests'
-import { isValidBranch } from '@acorn/protocol/branch.ts'
+import { isValidBranch, isValidRepositoryPath } from '@acorn/protocol/branch.ts'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
@@ -40,11 +40,16 @@ import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 
 type Row = typeof schema.tasks.$inferSelect
 
-// A change request on the task project's repository. The source branch reaches `git fetch` when the
-// code host declares no ref, so it's held to the branch rule.
+// A change request on the task project's repository. The source branch and a fork's repository path
+// reach `git fetch` when the code host declares no ref, so they're held to the branch and path rules.
 const changeRequestBody = z.object({
   number: z.int().positive(),
   sourceBranch: z.string().refine(isValidBranch).optional(),
+  sourceRepository: z
+    .string()
+    .transform((path) => path.toLowerCase())
+    .refine(isValidRepositoryPath)
+    .optional(),
 })
 
 // Zod at the mutation boundary (docs/architecture/node-api.md § Wire validation). Getting the
@@ -261,6 +266,7 @@ export const tasks = new Hono<AppEnv>()
       number: requested.number,
       provenance: 'task' as const,
       sourceBranch: requested.sourceBranch,
+      sourceRepository: requested.sourceRepository,
     }
     const linkInputs = (seed.links ?? []) as LinkInput[]
     let links: TaskLink[]
@@ -414,6 +420,7 @@ export const tasks = new Hono<AppEnv>()
       number: requested.number,
       provenance: 'task' as const,
       sourceBranch: requested.sourceBranch,
+      sourceRepository: requested.sourceRepository,
     }
     const patch: Partial<Row> = { updatedAt: Date.now() }
     if (body.title !== undefined && body.title.trim()) patch.title = body.title.trim()

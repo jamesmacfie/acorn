@@ -9,6 +9,7 @@ import { setWorktreesRoot } from '@acorn/node-core/server/worktrees'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
+import { declareCodeHost } from '@acorn/node-core/server/pluginHost'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { loadExternalPlugins, loadedPluginBinding, pluginDir } from '@acorn/node-core/server/plugins'
@@ -164,6 +165,62 @@ describe('a loaded code host', () => {
     })
     expect(task).toMatchObject({ title: '#3 plain', changeRequest: { provider: null, number: 3 } })
     expect(git(project.path!, 'branch', '--list', 'feat/source')).toBe('')
+    expect(git((await services.tasks.root(task.id))!, 'rev-parse', 'HEAD')).toBe(head)
+  }, 30_000)
+
+  // A fork's change request on a host that serves no change request ref, as Bitbucket Cloud does. Both
+  // repositories sit in one folder that `insteadOf` maps the host to, so the fork's address, derived
+  // from origin's, reaches the local fork over a file URL.
+  it("checks out a fork's branch on a host that declares no ref", async () => {
+    const undeclare = declareCodeHost('bitbucket-test', { label: 'Bitbucket test', hosts: ['bitbucket.test'] }, false)
+    try {
+      const hosted = join(dataRoot, 'bitbucket.test')
+      const upstream = join(hosted, 'acme', 'api.git')
+      const fork = join(hosted, 'alice', 'api.git')
+      mkdirSync(upstream, { recursive: true })
+      git(upstream, 'init', '-q', '-b', 'main')
+      git(upstream, 'commit', '-q', '--allow-empty', '-m', 'base')
+      git(dataRoot, 'clone', '-q', upstream, fork)
+      git(fork, 'switch', '-q', '-c', 'fix')
+      git(fork, 'commit', '-q', '--allow-empty', '-m', 'fork change')
+      const head = git(fork, 'rev-parse', 'HEAD')
+      const path = join(dataRoot, 'checkouts', 'forked')
+      git(dataRoot, 'clone', '-q', upstream, path)
+      git(path, 'remote', 'set-url', 'origin', 'https://bitbucket.test/acme/api.git')
+      const project = await postProject(path)
+      expect(project.repository).toMatchObject({ provider: 'bitbucket-test', path: 'acme/api' })
+      git(path, 'config', `url.file://${hosted}/.insteadOf`, 'https://bitbucket.test/')
+
+      const task = await createTask({
+        projectId: project.id,
+        branch: 'fix',
+        changeRequest: { number: 7, sourceBranch: 'fix', sourceRepository: 'Alice/API' },
+      })
+      const root = await services.tasks.root(task.id)
+      expect(git(root!, 'rev-parse', 'HEAD')).toBe(head)
+      expect(git(root!, 'branch', '--show-current')).toBe('fix')
+      expect(await services.tasks.changeRequests(task.id)).toEqual([
+        expect.objectContaining({ number: 7, sourceRepository: 'alice/api' }),
+      ])
+
+      const refused = await post('/v1/core/tasks', {
+        origin: 'local',
+        projectId: project.id,
+        changeRequest: { number: 8, sourceRepository: 'alice/..' },
+      })
+      expect(refused.status).toBe(400)
+    } finally {
+      undeclare()
+    }
+  }, 30_000)
+
+  it('ignores a source repository on a host that declares a ref', async () => {
+    const { project, head } = await cloneProject('mr-fork', 'git@gitlab.test:group/mr-fork.git')
+    const task = await createTask({
+      projectId: project.id,
+      branch: 'mr-fork-12',
+      changeRequest: { number: 12, sourceRepository: 'alice/mr-fork' },
+    })
     expect(git((await services.tasks.root(task.id))!, 'rev-parse', 'HEAD')).toBe(head)
   }, 30_000)
 

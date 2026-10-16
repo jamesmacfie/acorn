@@ -238,6 +238,7 @@ export const taskChangeRequests = sqliteTable(
     role: text('role').notNull(), // 'primary' | 'related'
     provenance: text('provenance').notNull(), // 'task' | 'adopted' | 'agent'
     sourceBranch: text('source_branch'), // fetched by name when the code host declares no ref
+    sourceRepoPath: text('source_repo_path'), // a fork on the same host, such as 'alice/api'. Null is this repository
     sessionId: text('session_id'), // the agent session that attached it
     requestId: text('request_id'),
     createdAt: integer('created_at').notNull(),

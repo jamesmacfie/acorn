@@ -1,5 +1,56 @@
 # Phase 7: check out a fork's change request from the fork
 
+## Completion note
+
+October 17, 2026. Done, verified against local repositories over file URLs only.
+
+What landed:
+
+- `task_change_requests.source_repo_path`, migration `0012_change_request_source_repo`. Null means
+  the base repository.
+- `isValidRepositoryPath` in `packages/protocol/src/projects/branch.ts`, beside `isValidBranch`. It
+  takes a lowercased path of two or more segments of `[a-z0-9._-]`, none empty, `.`, `..`, or starting
+  with `-`.
+- `sourceRepository` beside `sourceBranch` on `attachChangeRequest`, the task create and patch bodies,
+  the wire seed, and the browser handoff seed. The handoff seed also gained `sourceBranch`, which it
+  lacked, because a fork's checkout needs both. `TaskChangeRequest` carries `sourceRepository` back.
+- `adoptChangeRequests` takes a map value of a number or `{ number, sourceRepository }`.
+- `changeRequestFetch` in `packages/node-core/src/server/core/changeRequests.ts` replaces
+  `changeRequestRef`. With no declared `ref` and a fork, it answers `refs/heads/<branch>` and the fork.
+  `ensureWorktree` then builds the address with `forkRemoteUrl` and fetches after `--`.
+- [Code hosts](../../plugins/code-hosts.md#forks-without-a-ref) documents it, and the site's `codeHost`
+  reference page no longer says a fork can't be checked out.
+
+Decisions and deviations:
+
+- The address comes from `git config --get remote.origin.url`, not `git remote get-url`, so git applies
+  the person's `insteadOf` rules to the fork's address as it does to origin's.
+- `forkRemoteUrl` swaps the base repository's path at the end of origin's address, compared without
+  case, and keeps the prefix and any `.git` suffix. That keeps https, ssh, scp-like, and file forms, a
+  GitLab under a subpath, and credentials in the address. An origin that doesn't end in the base path
+  fails with a message that says so.
+- A fork path equal to the base path is treated as no fork.
+- The failure says "Could not fetch pull request #12 from alice/api. The fork may be private or gone."
+  Git's own message isn't forwarded, because its stderr can hold credentials, which is the existing
+  rule for every fetch here.
+- An invalid fork path is refused at attach and on the routes, and skipped by adoption, which already
+  skips a bad number.
+- The acceptance test declares a `bitbucket-test` code host with no `ref` in
+  `apps/node/test/integration/plugins/codeHosts.test.ts`, rather than a second fixture folder. The
+  same file proves the `gitlab-test` fixture, which declares a `ref`, ignores a source path.
+- Fixed a test bug that went red on this branch: the upload helper in
+  `packages/node-core/src/server/routes/projects/workspaces.test.ts` sent `bytes.slice().buffer`, which
+  is Node's whole shared buffer pool, so its `<svg/>` upload could carry an earlier PNG's bytes.
+
+For later phases:
+
+- Phase 8: Bitbucket declares no `ref` and passes the fork's `full_name`, lowercased, as
+  `sourceRepository`, with `sourceBranch`, from the pull request's `source.repository` when it differs
+  from the destination.
+- Already red at the base and untouched: the `pluginDisable` and `routeRegistry` goldens in
+  `apps/node`, three `docPaths` entries for `dist` files, knip's `proposalChanges`, and three site unit
+  tests.
+
 Date: October 16, 2026. Status: proposed. Independent of phases 1 to 6. Must land before
 [phase 8](./08-bitbucket-plugin.md).
 

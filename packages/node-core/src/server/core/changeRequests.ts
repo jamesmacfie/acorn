@@ -22,6 +22,7 @@ type Transaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0]
 export type ChangeRequestLink = Pick<ChangeRequestRow, 'provider' | 'repoHost' | 'repoPath' | 'number'> & {
   provenance: 'task' | 'adopted' | 'agent'
   sourceBranch?: string | null
+  sourceRepository?: string | null
   sessionId?: string | null
   requestId?: string | null
 }
@@ -43,11 +44,18 @@ export const changeRequestProvider = (row: Pick<ChangeRequestRow, 'provider' | '
 export const changeRequestPrefix = (provider: string | null): string =>
   (provider && changeRequestDeclaration(provider)?.prefix) || '#'
 
-/** What core fetches from origin to check `row` out: the code host's ref, or the source branch by name. */
-export function changeRequestRef(row: ChangeRequestRow, taskBranch: string): string {
+/** What core fetches to check `row` out: the code host's ref from origin, or else the source branch by
+ *  name, from the fork when the link names one. A declared ref serves forks too, so it ignores the fork. */
+export function changeRequestFetch(
+  row: ChangeRequestRow,
+  taskBranch: string,
+): { ref: string; fork?: { base: string; path: string } } {
   const provider = changeRequestProvider(row)
   const pattern = provider && changeRequestDeclaration(provider)?.ref
-  return pattern ? pattern.replace('{number}', String(row.number)) : (row.sourceBranch ?? taskBranch)
+  if (pattern) return { ref: pattern.replace('{number}', String(row.number)) }
+  const branch = row.sourceBranch ?? taskBranch
+  const fork = row.sourceRepoPath && row.sourceRepoPath !== row.repoPath ? row.sourceRepoPath : null
+  return fork ? { ref: `refs/heads/${branch}`, fork: { base: row.repoPath, path: fork } } : { ref: branch }
 }
 
 /** How a person names `row`, such as `merge request !12`. */
@@ -98,6 +106,7 @@ export function setPrimaryChangeRequest(tx: Transaction, taskId: string, link: C
       role: 'primary',
       provenance: link.provenance,
       sourceBranch: link.sourceBranch ?? null,
+      sourceRepoPath: link.sourceRepository ?? null,
       sessionId: link.sessionId ?? null,
       requestId: link.requestId ?? null,
       createdAt: Date.now(),

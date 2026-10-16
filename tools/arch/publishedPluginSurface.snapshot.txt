@@ -408,6 +408,7 @@ acorn-plugin-types: member AttachChangeRequestInput.provider
 acorn-plugin-types: member AttachChangeRequestInput.requestId
 acorn-plugin-types: member AttachChangeRequestInput.sessionId
 acorn-plugin-types: member AttachChangeRequestInput.sourceBranch
+acorn-plugin-types: member AttachChangeRequestInput.sourceRepository
 acorn-plugin-types: member AttachTaskPullInput.pullNumber
 acorn-plugin-types: member AttachTaskPullInput.repoName
 acorn-plugin-types: member AttachTaskPullInput.repoOwner
@@ -1107,6 +1108,7 @@ acorn-plugin-types: member TaskChangeRequest.requestId
 acorn-plugin-types: member TaskChangeRequest.role
 acorn-plugin-types: member TaskChangeRequest.sessionId
 acorn-plugin-types: member TaskChangeRequest.sourceBranch
+acorn-plugin-types: member TaskChangeRequest.sourceRepository
 acorn-plugin-types: member TaskChangeRequest.taskId
 acorn-plugin-types: member TaskLinkRef.identifier
 acorn-plugin-types: member TaskLinkRef.integrationId

@@ -4,7 +4,7 @@ import { taskScripts } from '../taskScripts/service'
 // so database handles stay private to their owning layer.
 import { and, eq, isNull, lt, max, or } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { dedupeBranch, isValidBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
+import { dedupeBranch, isValidBranch, isValidRepositoryPath, slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { ProjectRepository } from '@acorn/protocol/api.ts'
 import type { LayoutRecipe, RunTarget } from '../projects/runConfig'
 import type { AppDatabase } from '../db'
@@ -77,15 +77,20 @@ type TaskChangeRequest = {
   role: 'primary' | 'related'
   provenance: 'task' | 'adopted' | 'agent'
   sourceBranch?: string
+  sourceRepository?: string
   sessionId?: string
   requestId?: string
 }
+
+// A number alone, or with the fork its source branch lives on.
+type AdoptedChangeRequest = number | { number: number; sourceRepository?: string }
 
 type AttachChangeRequestInput = {
   provider: string
   path: string
   number: number
   sourceBranch?: string
+  sourceRepository?: string
   sessionId: string
   requestId?: string
 }
@@ -156,7 +161,11 @@ export type TaskService = {
   attachChangeRequest(taskId: string, input: AttachChangeRequestInput): Promise<TaskChangeRequest>
   // Give every active task on the repository with no primary the change request whose source branch is
   // the task's branch. Every local clone of the repository takes part, not only the oldest project.
-  adoptChangeRequests(provider: string, path: string, branchToNumber: ReadonlyMap<string, number>): Promise<number>
+  adoptChangeRequests(
+    provider: string,
+    path: string,
+    branchToNumber: ReadonlyMap<string, AdoptedChangeRequest>,
+  ): Promise<number>
   // The three above under their GitHub names, for a github.com repository, until the next plugin API
   // major. `pulls` keeps its old meaning: agent attachments only.
   pulls(taskId: string): Promise<TaskPullRelation[]>
@@ -202,6 +211,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
     role: row.role as TaskChangeRequest['role'],
     provenance: row.provenance as TaskChangeRequest['provenance'],
     ...(row.sourceBranch ? { sourceBranch: row.sourceBranch } : {}),
+    ...(row.sourceRepoPath ? { sourceRepository: row.sourceRepoPath } : {}),
     ...(row.sessionId ? { sessionId: row.sessionId } : {}),
     ...(row.requestId ? { requestId: row.requestId } : {}),
   })
@@ -234,6 +244,9 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
     if (!input.sessionId.trim()) throw new Error('A managed agent session is required to attach a change request.')
     if (input.sourceBranch !== undefined && !isValidBranch(input.sourceBranch))
       throw new Error(`'${input.sourceBranch}' is not a valid source branch.`)
+    const sourceRepository = input.sourceRepository?.toLowerCase()
+    if (sourceRepository !== undefined && !isValidRepositoryPath(sourceRepository))
+      throw new Error(`'${input.sourceRepository}' is not a valid source repository.`)
     const result = db.transaction((tx) => {
       const task = tx
         .select({ projectId: schema.tasks.projectId })
@@ -268,6 +281,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
           number: input.number,
           provenance: 'agent' as const,
           sourceBranch: input.sourceBranch ?? null,
+          sourceRepository: sourceRepository ?? null,
           sessionId: input.sessionId,
           requestId: input.requestId ?? null,
         }
@@ -291,7 +305,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
   const adopt = (
     path: string,
     matches: (repository: ProjectRepository) => boolean,
-    branchToNumber: ReadonlyMap<string, number>,
+    branchToNumber: ReadonlyMap<string, AdoptedChangeRequest>,
   ): number => {
     if (!branchToNumber.size) return 0
     const adopted = db.transaction((tx) => {
@@ -310,9 +324,12 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         .all()
       let count = 0
       for (const task of candidates) {
-        const number = task.branch ? branchToNumber.get(task.branch) : undefined
+        const adopted = task.branch ? branchToNumber.get(task.branch) : undefined
+        const { number, sourceRepository } = typeof adopted === 'object' ? adopted : { number: adopted }
+        const fork = sourceRepository?.toLowerCase()
         const repository = projectRepository(task.project)
         if (!number || !Number.isSafeInteger(number) || number <= 0 || !repository || !matches(repository)) continue
+        if (fork !== undefined && !isValidRepositoryPath(fork)) continue
         setPrimaryChangeRequest(tx, task.id, {
           provider: repository.provider ?? '',
           repoHost: repository.host,
@@ -320,6 +337,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
           number,
           provenance: 'adopted',
           sourceBranch: task.branch,
+          sourceRepository: fork ?? null,
         })
         count++
       }

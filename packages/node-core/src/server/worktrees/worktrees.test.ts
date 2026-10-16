@@ -14,7 +14,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { copyWorktreeFiles, ensureWorktree } from './worktrees'
+import { copyWorktreeFiles, ensureWorktree, forkRemoteUrl } from './worktrees'
 
 // Real git subprocesses per test and hook: the defaults (5s test, 10s hook) are too tight under a fully
 // parallel run.
@@ -132,6 +132,37 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
     })
   })
 
+  it('fetches the source branch from a fork beside origin', async () => {
+    const fork = join(dir, 'alice', 'widget.git')
+    execFileSync('git', ['clone', '-q', '--bare', join(template, 'origin'), fork])
+    git(fork, 'update-ref', 'refs/heads/fix', localMainSha)
+    git(checkout, 'remote', 'set-url', 'origin', `file://${join(dir, 'acme', 'widget.git')}`)
+    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'fix', {
+      number: 12,
+      ref: 'refs/heads/fix',
+      name: 'pull request #12',
+      fork: { base: 'acme/widget', path: 'alice/widget' },
+    })
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    expect(git(res.path, 'rev-parse', 'HEAD').trim()).toBe(localMainSha)
+    expect(git(res.path, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('fix')
+  })
+
+  it('names the fork when its branch cannot be fetched', async () => {
+    git(checkout, 'remote', 'set-url', 'origin', `file://${join(dir, 'acme', 'widget.git')}`)
+    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'fix', {
+      number: 12,
+      ref: 'refs/heads/fix',
+      name: 'pull request #12',
+      fork: { base: 'acme/widget', path: 'alice/widget' },
+    })
+    expect(res).toEqual({
+      ok: false,
+      reason: 'Could not fetch pull request #12 from alice/widget. The fork may be private or gone.',
+    })
+  })
+
   it('reuses an existing branch untouched', async () => {
     git(checkout, 'branch', 'feat/existing', originMainSha)
     const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/existing', null)
@@ -230,5 +261,32 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
       expect(readFileSync(join(destination, 'actual', 'existing.txt'), 'utf8')).toBe('unchanged')
       expect(lstatSync(join(destination, 'existing.txt')).isSymbolicLink()).toBe(true)
     })
+  })
+})
+
+describe('forkRemoteUrl', () => {
+  it("keeps origin's form for https, ssh, scp-like, and file addresses", () => {
+    expect(forkRemoteUrl('https://bitbucket.org/acme/api.git', 'acme/api', 'alice/api')).toBe(
+      'https://bitbucket.org/alice/api.git',
+    )
+    expect(forkRemoteUrl('https://x-token-auth:t@bitbucket.org/Acme/API', 'acme/api', 'alice/api')).toBe(
+      'https://x-token-auth:t@bitbucket.org/alice/api',
+    )
+    expect(forkRemoteUrl('ssh://git@bitbucket.org:22/acme/api.git', 'acme/api', 'alice/api')).toBe(
+      'ssh://git@bitbucket.org:22/alice/api.git',
+    )
+    expect(forkRemoteUrl('git@bitbucket.org:acme/api.git', 'acme/api', 'alice/api')).toBe(
+      'git@bitbucket.org:alice/api.git',
+    )
+    expect(forkRemoteUrl('https://git.corp.test/gitlab/group/sub/api/', 'group/sub/api', 'alice/api')).toBe(
+      'https://git.corp.test/gitlab/alice/api',
+    )
+    expect(forkRemoteUrl('file:///srv/acme/api.git', 'acme/api', 'alice/api')).toBe('file:///srv/alice/api.git')
+  })
+
+  it("refuses an origin that doesn't end in the base repository", () => {
+    expect(forkRemoteUrl('https://bitbucket.org/acme/api.git', 'acme/other', 'alice/api')).toBeNull()
+    expect(forkRemoteUrl('https://bitbucket.org/xacme/api.git', 'acme/api', 'alice/api')).toBeNull()
+    expect(forkRemoteUrl('https://bitbucket.org/acme/api.git', '', 'alice/api')).toBeNull()
   })
 })

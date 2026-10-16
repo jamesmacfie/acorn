@@ -27,12 +27,14 @@ export type TaskPullRelation = AttachTaskPullInput & {
   provenance: 'agent'
 }
 /** A change request your code host owns, on the repository `provider` and `path` name. `sourceBranch`
- *  is the branch it merges from. Core fetches it by name when your code host declares no ref. */
+ *  is the branch it merges from. Core fetches it by name when your code host declares no ref, from
+ *  `sourceRepository` when set: a fork's path on the same host, such as `alice/api`. */
 export type AttachChangeRequestInput = {
   provider: string
   path: string
   number: number
   sourceBranch?: string
+  sourceRepository?: string
   sessionId: string
   requestId?: string
 }
@@ -48,6 +50,7 @@ export type TaskChangeRequest = {
   role: 'primary' | 'related'
   provenance: 'task' | 'adopted' | 'agent'
   sourceBranch?: string
+  sourceRepository?: string
   sessionId?: string
   requestId?: string
 }
@@ -111,8 +114,13 @@ export type CoreTaskService = {
    *  slot, and later ones are related. Throws when the repository isn't the task project's. */
   attachChangeRequest(taskId: string, input: AttachChangeRequestInput): Promise<TaskChangeRequest>
   /** Give each active task on the repository with no primary change request the one whose source branch
-   *  is the task's branch. Returns how many tasks took one. */
-  adoptChangeRequests(provider: string, path: string, branchToNumber: ReadonlyMap<string, number>): Promise<number>
+   *  is the task's branch. A value may name the fork the branch lives on, as `sourceRepository` does on
+   *  `attachChangeRequest`. Returns how many tasks took one. */
+  adoptChangeRequests(
+    provider: string,
+    path: string,
+    branchToNumber: ReadonlyMap<string, number | { number: number; sourceRepository?: string }>,
+  ): Promise<number>
   /** The agent-attached change requests on github.com. Use `changeRequests`. */
   pulls(taskId: string): Promise<TaskPullRelation[]>
   /** `attachChangeRequest` for a github.com repository. */

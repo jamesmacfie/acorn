@@ -98,19 +98,33 @@ A code host tells core how to treat its change requests with an optional `change
 
 | Field | What core does with it |
 | --- | --- |
-| `ref` | Fetches it from origin to check a change request out. Without one, core fetches the source branch by name, so a fork's change request on such a host can't be checked out. |
+| `ref` | Fetches it from origin to check a change request out. Without one, core fetches the source branch by name, from the fork when the link names one, as described in [forks without a ref](#forks-without-a-ref). |
 | `label` | Names a change request in an error, such as "Could not fetch merge request !12". Defaults to `change request`. |
 | `prefix` | Goes before the number in a task title, as in `!12 api`. Defaults to `#`. |
 | `pane` | Opens when a task with a primary change request on the host is first shown. A task without one opens on the first pane it offers. |
 | `api` | A route on the plugin's own Node half. Core's agent tools and `pr` context section ask it about a task's change request, as described in [agent context](#agent-context). |
 
-A plugin links one in one of three ways. A task created with `changeRequest: { number, sourceBranch? }`
-on `POST /v1/core/tasks` takes it as its primary, and `PATCH` sets or clears the primary the same
-way. `ctx.core.tasks.attachChangeRequest` records one an agent opened, with its session. The first
-takes an empty primary slot and later ones are related. `adoptChangeRequests(provider, path,
-branchToNumber)` gives a primary to every active task on that branch that has none. The provider and
-path must name the task project's repository. `changeRequests(taskId)` lists them all. The wire task
-carries the primary as `changeRequest`, with the provider and the declared pane.
+A plugin links one in one of three ways. A task created with `changeRequest: { number, sourceBranch?,
+sourceRepository? }` on `POST /v1/core/tasks` takes it as its primary, and `PATCH` sets or clears the
+primary the same way. A browser handoff's seed takes the same fields. `ctx.core.tasks.attachChangeRequest`
+records one an agent opened, with its session. The first takes an empty primary slot and later ones
+are related. `adoptChangeRequests(provider, path, branchToNumber)` gives a primary to every active task
+on that branch that has none. A value in the map is a number, or `{ number, sourceRepository }`. The
+provider and path must name the task project's repository. `changeRequests(taskId)` lists them all. The
+wire task carries the primary as `changeRequest`, with the provider and the declared pane.
+
+### Forks without a ref
+
+Bitbucket Cloud serves no change request ref, and a fork's branch isn't on origin. A link names the
+fork with `sourceRepository`, its path on the same host, such as `alice/api` for a fork of `acme/api`.
+A path rather than an address keeps a plugin from pointing core's git at another host. When the code
+host declares no `ref`, core swaps the path at the end of origin's configured address for the fork's
+and fetches `refs/heads/<sourceBranch>` from it, so `git@bitbucket.org:acme/api.git` becomes
+`git@bitbucket.org:alice/api.git` with origin's transport, credentials, and `insteadOf` rules. A host
+that declares a `ref` ignores the fork. Core lowercases the path and refuses an empty, `.`, or `..`
+segment, one that starts with `-`, and any character but a lowercase letter, a digit, `.`, `_`, or `-`.
+An unreadable fork fails with "Could not fetch pull request #12 from alice/api. The fork may be private
+or gone." Pushing still goes to origin.
 
 ## Agent context
 

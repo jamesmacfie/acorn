@@ -90,7 +90,7 @@ describe('workspace identity', () => {
   const upload = async (id: string, bytes: Uint8Array, crop = { x: 0.5, y: 0.5, size: 1 }) => {
     const form = new FormData()
     // Deliberately untrustworthy filename and MIME: the Node must inspect content.
-    form.append('image', new Blob([bytes.slice().buffer], { type: 'application/octet-stream' }), 'icon.dat')
+    form.append('image', new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' }), 'icon.dat')
     form.append('crop', JSON.stringify(crop))
     return app.fetch(
       new Request(`http://acorn.test/api/workspaces/${id}/icon-image`, { method: 'POST', body: form }),

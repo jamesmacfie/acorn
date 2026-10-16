@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { browserPanelView, taskAddressList } from './handoffs.ts'
+import { browserHandoffResolution, browserPanelView, taskAddressList } from './handoffs.ts'
 
 const address = (origin: string) => ({
   addresses: [{ taskId: 't1', origin, label: 'Runn stack', state: 'running', severity: 'info' }],
@@ -61,5 +61,28 @@ describe('browser panel views', () => {
     expect(accepts(logs(Array.from({ length: 201 }, () => 'x')))).toBe(false)
     expect(accepts(logs(['x'.repeat(1_001)]))).toBe(false)
     expect(accepts({ ...logs([]), source: '../web' })).toBe(false)
+  })
+})
+
+describe('browser handoff seeds', () => {
+  const accepts = (changeRequest: Record<string, unknown>) =>
+    browserHandoffResolution.safeParse({
+      items: [
+        {
+          identifier: 'acme/api#7',
+          url: 'https://bitbucket.org/acme/api/pull-requests/7',
+          title: 'Fix',
+          connection: { id: 'c1', label: 'Bitbucket' },
+          projects: ['p1'],
+          seed: { origin: 'bitbucket', changeRequest },
+        },
+      ],
+    }).success
+
+  it("takes a fork's source branch and path, and refuses ones git could misread", () => {
+    expect(accepts({ number: 7, sourceBranch: 'fix', sourceRepository: 'Alice/API' })).toBe(true)
+    expect(accepts({ number: 7, sourceRepository: '-alice/api' })).toBe(false)
+    expect(accepts({ number: 7, sourceRepository: 'alice/..' })).toBe(false)
+    expect(accepts({ number: 7, sourceBranch: '--upload-pack=x' })).toBe(false)
   })
 })

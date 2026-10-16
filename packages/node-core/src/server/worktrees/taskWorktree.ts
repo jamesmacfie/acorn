@@ -14,7 +14,7 @@ import type { ProjectWorktree } from '@acorn/protocol/api.ts'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../projects/runConfig'
 import { getProject, githubFacet, projectRepository, type ProjectRow } from '../projects/projects'
-import { changeRequestName, changeRequestRef, primaryChangeRequest } from '../core/changeRequests'
+import { changeRequestFetch, changeRequestName, primaryChangeRequest } from '../core/changeRequests'
 import { gitText } from '../core/git'
 import { getProjectConfig } from '../projects/projectConfig'
 import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../projects/repoConfigSnapshot'
@@ -388,7 +388,7 @@ export async function resolveTaskCwd(
       const changeRequest = await primaryChangeRequest(db, t.id)
       const head = changeRequest && {
         number: changeRequest.number,
-        ref: changeRequestRef(changeRequest, branch),
+        ...changeRequestFetch(changeRequest, branch),
         name: changeRequestName(changeRequest),
       }
       const wt = await ensureWorktree(worktreesRoot, checkout, owner, repo, branch, head ?? null)

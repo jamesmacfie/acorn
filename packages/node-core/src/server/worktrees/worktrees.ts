@@ -108,14 +108,27 @@ async function worktreeCreationFailure(
   return gitFailure(summary, error)
 }
 
+// Origin's address with the repository at its end, `base`, swapped for `fork`, a path on the same host.
+// The prefix stays as origin has it, so the fetch keeps origin's transport, host, and credentials, and
+// can't reach a host origin doesn't name. Null when origin's address doesn't end in `base`.
+export function forkRemoteUrl(origin: string, base: string, fork: string): string | null {
+  const url = origin.trim().replace(/\/$/, '')
+  const suffix = /\.git$/i.test(url) ? url.slice(-4) : ''
+  const stem = url.slice(0, url.length - suffix.length)
+  const prefix = stem.slice(0, stem.length - base.length)
+  if (!base || stem.slice(prefix.length).toLowerCase() !== base || !/[/:]$/.test(prefix)) return null
+  return `${prefix}${fork}${suffix}`
+}
+
 export async function ensureWorktree(
   worktreesRoot: string,
   checkout: string,
   owner: string,
   repo: string,
   branch: string,
-  // The task's primary change request: what to fetch from origin, and how a person names it.
-  changeRequest: { number: number; ref: string; name: string } | null,
+  // The task's primary change request: what to fetch, from a fork on origin's host when `fork` names
+  // one and from origin otherwise, and how a person names it.
+  changeRequest: { number: number; ref: string; name: string; fork?: { base: string; path: string } } | null,
 ): Promise<EnsureWorktreeResult> {
   if (!isValidBranch(branch)) return { ok: false, reason: 'Invalid branch name.' }
   const path = join(worktreesRoot, worktreeBranchDirName(owner, repo, branch))
@@ -134,7 +147,8 @@ export async function ensureWorktree(
   mkdirSync(worktreesRoot, { recursive: true })
 
   if (changeRequest) {
-    // Change request workspace. Fetch its head with the checkout's git credentials, then check it out
+    // Change request workspace. Fetch its head with the checkout's git credentials, from origin or from a
+    // fork's address derived from origin's (docs/plugins/code-hosts.md § Change requests), then check it out
     // on its source branch, where `branch` equals that branch, so the worktree tracks a real branch and
     // not a detached commit. `--` ends option parsing before positionals.
     //
@@ -144,18 +158,33 @@ export async function ensureWorktree(
     // name, clean status, no diff, wrong tree. The ref is kept afterwards, since it costs 41 bytes and
     // records what the branch came from.
     const head = `refs/acorn/change-request/${changeRequest.number}`
+    const { fork } = changeRequest
+    const failure = fork
+      ? `Could not fetch ${changeRequest.name} from ${fork.path}. The fork may be private or gone.`
+      : `Could not fetch ${changeRequest.name} from ${changeRequest.ref}.`
     try {
+      // Origin's address as configured, not as `remote get-url` rewrites it, so git applies the same
+      // `insteadOf` rules to the fork's address.
+      const remote = fork
+        ? forkRemoteUrl(
+            await gitText(['config', '--get', 'remote.origin.url'], { cwd: checkout }),
+            fork.base,
+            fork.path,
+          )
+        : 'origin'
+      if (!remote)
+        return {
+          ok: false,
+          reason: `Could not fetch ${changeRequest.name}, because origin's address doesn't end in ${fork!.base}.`,
+        }
       await prepareWorktreePhase('git.fetch', () =>
-        gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+${changeRequest.ref}:${head}`], {
+        gitOrThrow(['fetch', '--no-tags', '--quiet', '--', remote, `+${changeRequest.ref}:${head}`], {
           cwd: checkout,
           timeoutMs: 60_000,
         }),
       )
     } catch (error) {
-      return {
-        ok: false,
-        reason: gitFailure(`Could not fetch ${changeRequest.name} from ${changeRequest.ref}.`, error),
-      }
+      return { ok: false, reason: gitFailure(failure, error) }
     }
     const exists = await branchExists(checkout, branch)
     const args = exists ? ['worktree', 'add', '--', path, branch] : ['worktree', 'add', '-b', branch, '--', path, head]

@@ -727,7 +727,24 @@ describe('change requests on another code host', () => {
     await expect(
       tasks.attachChangeRequest('one', { ...input, provider: 'gitlab-test', sourceBranch: '--upload-pack=x' }),
     ).rejects.toThrow(/not a valid source branch/)
+    for (const sourceRepository of ['alice/..', '-alice/api', 'alice//api', 'alice/--upload-pack=x'])
+      await expect(
+        tasks.attachChangeRequest('one', { ...input, provider: 'gitlab-test', sourceRepository }),
+      ).rejects.toThrow(/not a valid source repository/)
     expect(await tasks.changeRequests('one')).toEqual([])
+  })
+
+  it("keeps a fork's path, lowercased, on attach and adoption", async () => {
+    const tasks = createTaskService(t.db)
+    const input = { provider: 'gitlab-test', path: 'group/sub/api', sessionId: 'session' }
+    expect(
+      await tasks.attachChangeRequest('one', { ...input, number: 12, sourceRepository: 'Alice/API' }),
+    ).toMatchObject({ sourceRepository: 'alice/api' })
+    const forks = new Map([['feat/two', { number: 13, sourceRepository: 'bob/api' }]])
+    expect(await tasks.adoptChangeRequests('gitlab-test', 'group/sub/api', forks)).toBe(1)
+    expect(await tasks.changeRequests('two')).toEqual([
+      expect.objectContaining({ number: 13, sourceRepository: 'bob/api' }),
+    ])
   })
 })
 

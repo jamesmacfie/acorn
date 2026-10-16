@@ -4,6 +4,7 @@ import {
   compileContentLinkPattern,
   CONTENT_LINK_PATTERN_MAX_LENGTH,
 } from '../content/contentLinkPattern.ts'
+import { isValidBranch, isValidRepositoryPath } from '../projects/branch.ts'
 import { parseSiteAddress } from '../projects/siteAssociations.ts'
 import { pluginRoute } from './manifest/manifestFields.ts'
 
@@ -103,8 +104,19 @@ const handoffTaskSeed = z.strictObject({
   branch: z.string().min(1).max(250).optional(),
   pullNumber: z.int().positive().optional(),
   // A change request on the project's repository, which becomes the task's primary one. `pullNumber`
-  // is the same thing under its GitHub name.
-  changeRequest: z.strictObject({ number: z.int().positive() }).optional(),
+  // is the same thing under its GitHub name. The source branch and a fork's path on the same host are
+  // what core fetches when the code host declares no ref.
+  changeRequest: z
+    .strictObject({
+      number: z.int().positive(),
+      sourceBranch: z.string().refine(isValidBranch).optional(),
+      // Lowercased by the task route it reaches.
+      sourceRepository: z
+        .string()
+        .refine((path) => isValidRepositoryPath(path.toLowerCase()))
+        .optional(),
+    })
+    .optional(),
   // Connection-stamped links, as the task route takes them. Core stamps the provider from the
   // connection and refuses one the caller doesn't own.
   links: z
