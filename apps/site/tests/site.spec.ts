@@ -1,6 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 const dist = new URL('../dist/', import.meta.url)
 const docsDir = new URL('../src/content/docs/', import.meta.url)
@@ -27,10 +27,11 @@ for (const route of routes) {
   })
 }
 
+const drafts = filesUnder(docsDir)
+  .filter((file) => /\.mdx?$/.test(file) && /^draft: true$/m.test(readFileSync(new URL(file, docsDir), 'utf8')))
+  .map((file) => `/${file.replace(/(index)?\.mdx?$/, '')}`.replace(/([^/])$/, '$1/'))
+
 test('drafts and the lab build only for preview deploys', () => {
-  const drafts = filesUnder(docsDir)
-    .filter((file) => /\.mdx?$/.test(file) && /^draft: true$/m.test(readFileSync(new URL(file, docsDir), 'utf8')))
-    .map((file) => `/${file.replace(/(index)?\.mdx?$/, '')}`.replace(/([^/])$/, '$1/'))
   const built = new Set(routes)
   for (const route of [...drafts, '/lab/']) expect(built.has(route), route).toBe(previewBuild)
 })
@@ -256,5 +257,124 @@ for (const file of schemaFiles) {
     const response = await request.get(`/schemas/${file}`)
     expect(response.status()).toBe(200)
     expect((await response.json()).$id).toBe(`https://acorn.sh/schemas/${file}`)
+  })
+}
+
+// What a page tells a search engine, a chat app, and an agent (docs/site/agent-outputs.md), read from the
+// files the build wrote. The lab is left out, because it's never published.
+const publishedHtml = filesUnder(dist).filter((file) => file.endsWith('.html') && !file.startsWith('lab/'))
+const docsRoutes = routes.filter((route) => route.startsWith('/docs/'))
+
+test('every page has a title and a description no other page has, and a card the build wrote', () => {
+  const seen = { title: new Map<string, string>(), description: new Map<string, string>() }
+  const problems: string[] = []
+  for (const file of publishedHtml) {
+    const html = readFileSync(new URL(file, dist), 'utf8')
+    const found = {
+      title: html.match(/<title>([^<]*)<\/title>/)?.[1],
+      description: html.match(/<meta name="description" content="([^"]*)"/)?.[1],
+    }
+    for (const key of ['title', 'description'] as const) {
+      const value = found[key]
+      if (!value) problems.push(`${file} has no ${key}`)
+      else if (seen[key].has(value)) problems.push(`${file} has the same ${key} as ${seen[key].get(value)}: ${value}`)
+      else seen[key].set(value, file)
+    }
+    const card = html.match(/<meta property="og:image" content="https:\/\/acorn\.sh\/([^"]+)"/)?.[1]
+    if (!card) problems.push(`${file} has no og:image`)
+    else if (!existsSync(new URL(card, dist)))
+      problems.push(`${file} points og:image at ${card}, which the build didn't write`)
+  }
+  expect(problems).toEqual([])
+})
+
+test('every docs page is Markdown at its URL plus .md, and in /llms-full.txt', () => {
+  const full = readFileSync(new URL('llms-full.txt', dist), 'utf8')
+  for (const route of docsRoutes) {
+    const markdown = readFileSync(new URL(`.${route.replace(/\/$/, '')}.md`, dist), 'utf8').trimEnd()
+    expect(markdown, route).toMatch(/^# .+\n\n> .+\n\n/)
+    expect(full.includes(markdown), `${route} isn't in /llms-full.txt as its .md copy has it`).toBe(true)
+  }
+})
+
+test('/llms-small.txt leaves out the generated component pages', () => {
+  const small = readFileSync(new URL('llms-small.txt', dist), 'utf8')
+  expect(small).toContain('# One kit, two hosts')
+  expect(small).not.toContain('# IconButton')
+})
+
+test('every acorn.sh link in the agent guide goes to a file the build wrote', () => {
+  const guide = readFileSync(new URL('agent-guide.md', dist), 'utf8')
+  const paths = [...guide.matchAll(/https:\/\/acorn\.sh(\/[^)\s]*)/g)].map(([, path]) => path)
+  expect(paths.length).toBeGreaterThan(0)
+  for (const path of paths) expect(existsSync(new URL(`.${path.replace(/\/$/, '/index.html')}`, dist)), path).toBe(true)
+})
+
+// Pagefind indexes a page only when Starlight marks its body, so this counts what search can find.
+test('search indexes every published docs page, and no draft or lab page', () => {
+  const entry = JSON.parse(readFileSync(new URL('pagefind/pagefind-entry.json', dist), 'utf8'))
+  const unpublished = new Set(drafts)
+  expect(entry.languages.en.page_count).toBe(docsRoutes.filter((route) => !unpublished.has(route)).length)
+})
+
+// The search script is a module, so it runs after the page loads, and a key pressed before then does nothing.
+const searchReady = (page: Page) => page.waitForFunction(() => customElements.get('site-search'))
+
+// A contribution key, a component, a setting's label, and a command, each searched for by name.
+const searches = {
+  contentLinks: '/docs/build-plugins/reference/contributions/content-links/',
+  IconButton: '/docs/components/inputs/icon-button/',
+  'Show workspace rail': '/docs/settings/general/',
+  'acorn task list': '/docs/reference/command-line-reference/',
+}
+for (const [query, route] of Object.entries(searches)) {
+  test(`searching for ${query} puts ${route} first`, async ({ page }) => {
+    await page.goto('/docs/')
+    await searchReady(page)
+    await page.keyboard.press('/')
+    await page.getByRole('combobox', { name: 'Search the docs' }).fill(query)
+    await expect(page.locator('#search-results [role="option"]').first()).toHaveAttribute('href', route)
+  })
+}
+
+test('search opens from the keyboard, groups its results, and goes to the selected one', async ({ page }) => {
+  await page.goto('/download/')
+  await searchReady(page)
+  const dialog = page.getByRole('dialog', { name: 'Search the docs' })
+  await page.keyboard.press('Control+k')
+  await expect(dialog).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await page.keyboard.press('/')
+  await page.keyboard.type('contentLinks')
+  await expect(dialog.getByRole('group').first()).toHaveAccessibleName('Build plugins · Reference')
+  await expect(dialog.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
+  const { violations } = await new AxeBuilder({ page })
+    .include('site-search dialog')
+    .withTags(['wcag2a', 'wcag2aa'])
+    .analyze()
+  expect(violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([])
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/content-links\/$/)
+})
+
+test('/ types into a text field instead of opening search', async ({ page }) => {
+  await page.goto('/docs/')
+  await searchReady(page)
+  await page.keyboard.press('Control+k')
+  await page.keyboard.type('a/b')
+  await expect(page.getByRole('combobox', { name: 'Search the docs' })).toHaveValue('a/b')
+})
+
+// The landing and download pages describe acorn as an app, for search engines.
+for (const route of ['/', '/download/']) {
+  test(`${route} carries acorn's structured data`, async ({ request }) => {
+    const html = await (await request.get(route)).text()
+    const data = JSON.parse(html.match(/<script type="application\/ld\+json">([^<]+)<\/script>/)![1]!)
+    expect(data).toMatchObject({
+      '@type': 'SoftwareApplication',
+      name: 'acorn',
+      operatingSystem: 'macOS, Windows, Linux',
+    })
   })
 }

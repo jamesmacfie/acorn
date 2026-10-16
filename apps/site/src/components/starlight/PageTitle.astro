@@ -1,13 +1,16 @@
 ---
 // The page title. A Build plugins page names its section and the plugin API it describes above it.
+// Search reads the page's sidebar group from here, to group its results.
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
-import { isBuildPath } from '../../nav'
+import { docsSection, isBuildPath } from '../../nav'
 
 const { title } = Astro.locals.starlightRoute.entry.data
+const path = Astro.url.pathname
+const section = docsSection(Astro.locals.starlightRoute.sidebar, path)
 ---
 
-<div class="docs-title">
-  {isBuildPath(Astro.url.pathname) && <p class="eyebrow">Build plugins · plugin API {PLUGIN_API_MAJOR}</p>}
+<div class="docs-title" data-pagefind-meta={section && `section:${section.label}`}>
+  {isBuildPath(path) && <p class="eyebrow">Build plugins · plugin API {PLUGIN_API_MAJOR}</p>}
   {/* Starlight's table of contents links its first entry to #_top. */}
   <h1 id="_top">{title}</h1>
 </div>

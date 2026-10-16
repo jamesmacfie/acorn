@@ -11,6 +11,9 @@ interface Props {
 }
 
 const { head, rows } = Astro.props
+// Search ranks the name a row describes, such as a field or a variable, near a heading, so a search for
+// it lands here before the pages that mention it. A heading's weight is 6 or 7.
+const KEY_WEIGHT = 5
 
 const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const withCode = (text: string) =>
@@ -28,7 +31,7 @@ const withCode = (text: string) =>
       {
         rows.map((row) => (
           <tr id={row.id}>
-            <th scope="row">
+            <th scope="row" data-pagefind-weight={KEY_WEIGHT}>
               <a href={row.href ?? `#${row.id}`}>
                 <code>{row.cells[0]}</code>
               </a>

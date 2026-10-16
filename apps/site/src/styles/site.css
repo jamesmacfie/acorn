@@ -367,9 +367,12 @@ select {
   }
 }
 
-/* Starlight's search button, as a control in the bar. */
-site-search button[data-open-modal] {
+/* The search button, as a control in the bar. */
+.search-open {
+  display: flex;
+  align-items: center;
   gap: var(--space-4);
+  cursor: pointer;
   font-family: inherit;
   min-block-size: var(--control-h);
   padding: var(--pad-control);
@@ -379,11 +382,12 @@ site-search button[data-open-modal] {
   border: var(--control-border);
   border-radius: var(--radius-control);
 }
-site-search button[data-open-modal]:hover {
+.search-open:hover {
   color: var(--text);
   border-color: var(--accent);
 }
-site-search button > kbd {
+.search-open > kbd {
+  padding-inline: var(--space-3);
   font-family: var(--font-ui);
   font-size: var(--fs-xs);
   color: var(--text);
@@ -986,39 +990,49 @@ starlight-toc a[aria-current='true'] {
   text-align: end;
 }
 
-/* Search, drawn as acorn's command palette: a centered panel, a filter field over the list, and rows
-   grouped under their page. */
+/* Search, drawn with acorn's command palette markup (Search.astro): the kit's overlay, bare field,
+   and rows, from the specimen stylesheet. The site marks the selected row with an accent rule, because
+   text on --bg-selected fails contrast in some themes, and labels each group of rows. */
 site-search dialog {
   margin: 12vh auto auto;
-  color: var(--text);
-  background: var(--popover-bg);
-  border: var(--surface-border);
-  border-radius: var(--radius-popover);
-  box-shadow: var(--elev-modal);
-}
-@media (min-width: 50rem) {
-  site-search dialog {
-    max-inline-size: 40rem;
-  }
-}
-#starlight__search {
-  --pagefind-ui-border-radius: var(--radius-control);
-  --sl-search-corners: var(--radius-control);
-  font-size: var(--fs);
-}
-#starlight__search .pagefind-ui__search-input {
-  font-size: var(--fs-lg);
+  padding: 0;
   background: transparent;
   border: 0;
-  border-block-end: var(--chrome-divider);
-  border-radius: 0;
 }
-#starlight__search .pagefind-ui__result-title:not(:where(.pagefind-ui__result-nested *)):hover,
-#starlight__search .pagefind-ui__result-title:not(:where(.pagefind-ui__result-nested *)):focus-within,
-#starlight__search .pagefind-ui__result-nested:hover,
-#starlight__search .pagefind-ui__result-nested:focus-within {
-  outline: 0;
+site-search dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: var(--scrim-filter);
+}
+site-search .overlay.palette {
+  width: min(40rem, 92vw);
+}
+site-search .palette-list {
+  max-height: 60vh;
+}
+site-search .palette-row {
+  text-decoration: none;
+}
+site-search .acorn-ui .palette-row.selected {
+  background: transparent;
   box-shadow: inset var(--stripe-w) 0 var(--accent);
+}
+site-search .palette-label {
+  font-weight: var(--fw-semibold);
+}
+site-search .palette-row:hover .palette-label {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+site-search .palette-hint mark {
+  font-weight: var(--fw-semibold);
+  color: inherit;
+  background: none;
+}
+site-search .search-group {
+  padding: var(--space-4) var(--space-6) var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
 }
 
 /* ── Social card ─────────────────────────────────────────────────────────────────────────────── */

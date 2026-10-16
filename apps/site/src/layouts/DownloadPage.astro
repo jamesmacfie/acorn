@@ -4,6 +4,7 @@
 // release, Build from source comes first, because it's the one way that works.
 import BuildFromSource from '../components/BuildFromSource.astro'
 import InstallBlock from '../components/InstallBlock.astro'
+import SoftwareApplication from '../components/SoftwareApplication.astro'
 import { installMethods } from '../install'
 import type { Release } from '../lib/github'
 import { sortAssets } from '../lib/releaseAssets'
@@ -29,6 +30,7 @@ const released = release && new Date(release.publishedAt).toLocaleDateString('en
 ---
 
 <Marketing title="Download acorn" meta={meta}>
+  <SoftwareApplication slot="head" release={release} />
   {
     release ? (
       <p>

@@ -28,3 +28,11 @@ declare module 'virtual:acorn-cli-help' {
   const help: { overview: string; commands: { command: string; text: string }[] }
   export default help
 }
+
+// starlight-llms-txt's page renderer, which astro.config.mjs aliases by file path.
+declare module 'starlight-llms-txt/render' {
+  import type { APIContext } from 'astro'
+  import type { CollectionEntry } from 'astro:content'
+  /** Renders a page and converts the HTML back to Markdown, as /llms-full.txt does. */
+  export function entryToSimpleMarkdown(entry: CollectionEntry<'docs'>, context: APIContext): Promise<string>
+}

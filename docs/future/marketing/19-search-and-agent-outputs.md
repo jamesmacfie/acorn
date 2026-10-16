@@ -1,6 +1,83 @@
 # Phase 19: add search, agent outputs, and page metadata
 
-Date: October 15, 2026. Status: proposed. Run it once most pages have content.
+Date: October 15, 2026. Status: done. Run it once most pages have content.
+
+## Completion note
+
+October 16, 2026. Search, page metadata, social cards, the Markdown copies, `llms.txt`, and the agent
+guide are built. [Search and agent outputs](../../site/agent-outputs.md) is the reference for each.
+
+What landed:
+
+- **Search.** `apps/site/src/components/Search.astro` replaces Starlight's search in the header on
+  every page. It opens with Command+K or Control+K, and with `/` outside a text field. It draws with the
+  command palette's own markup, kept in the specimen stylesheet by `SITE_KIT` in `acornUi.mjs`, and
+  queries Pagefind's index directly. Results are grouped by sidebar group, which `PageTitle.astro`
+  writes into the index from `docsSection` in `nav.ts`. Preview drafts and the lab's Starlight pages
+  set `pagefind: false`.
+- **Metadata.** Docs titles read `<Page> · acorn docs`, and marketing titles `<Page> · acorn`.
+  `apps/site/src/routeData.ts`, Starlight's route middleware, adds each docs page's social card.
+  `Marketing.astro` writes the canonical URL and the `og:` and `twitter:` tags. The landing and
+  download pages carry a schema.org `SoftwareApplication`. `robots.txt` already allowed everything.
+- **Social cards.** `apps/site/src/og.ts` lists 31 cards: 15 marketing pages and 16 sidebar groups.
+  `/lab/og/<card>/` draws one, and `pnpm --filter @acorn/site og` screenshots them into
+  `apps/site/public/og/`, about 950 KB in all. The lab page `/lab/design/social-card/` is gone, because
+  `/lab/og/home/` replaces it.
+- **Markdown and `llms.txt`.** `starlight-llms-txt` 0.12 writes the three files. The 277 published docs
+  pages each answer at their URL plus `.md`, from `apps/site/src/pages/[...slug].md.ts`.
+- **The agent guide**, at `apps/site/public/agent-guide.md`, and a one-line prompt under the docs home's
+  two doors. The docs home cites the guide in its `sources` and is marked checked.
+- **Tests**, in `apps/site/tests/site.spec.ts`: unique titles and descriptions, an `og:image` the build
+  wrote, a `.md` copy of every docs page that matches `/llms-full.txt`, the small file's exclusions, the
+  agent guide's links, the index's page count, the four acceptance searches, the palette's keys and
+  axe, and the structured data. A production build passes 334 Playwright tests, with 24 skipped, and a
+  preview build passes 422. `astro check`, knip, and the budget check pass.
+
+### Decisions
+
+- **No `starlight-dot-md`.** It serves each page's source file, and the reference and component pages
+  draw their facts with components, so their sources hold no facts. The `.md` route calls
+  `starlight-llms-txt`'s own renderer instead, so a page's `.md` copy and its part of `/llms-full.txt`
+  are the same Markdown. The plugin doesn't export the renderer, so `astro.config.mjs` reaches it by
+  file path, behind a `shortcut:` comment.
+- **A picture keeps only its caption** in every Markdown output. The window's labels read as noise.
+- **Phrase first.** Pagefind ranks words, so `acorn task list` ranked every page about tasks above the
+  command line reference. For a query of more than one word, pages holding the exact phrase come first,
+  each group in Pagefind's order.
+- **A title word weighs 1.** Pagefind's default put "Workspaces and projects" ahead of Settings >
+  General for "Show workspace rail", because one word matched a title. Across 25 test queries, this
+  changed only that one.
+- **Which headings weigh more.** A command's heading on the command line reference weighs 10, and the
+  first column of any table, which names a setting, field, or variable, weighs 5. A weight on the
+  generated contribution and component titles changed no result, because those names already rank
+  first, so there isn't one.
+- **Duplicate titles name their group.** Six pairs of pages share a title, such as Settings > Agents
+  and the Agents plugin. Rather than renaming other phases' pages, a docs page whose title another page
+  shares gets `<Page> · <Group> · acorn docs`, and a feature page gets `<Feature> · Features · acorn`.
+- **Search covers the docs only.** Starlight marks only docs bodies for Pagefind, and each feature page
+  links to the docs page that owns its detail.
+
+### Deviations
+
+- **No generated-heading weight on reference pages**, as the decision above explains. `contentLinks`
+  lands on its contribution page first without one.
+- **`/llms-full.txt` is 1.9 MB, and `/llms-small.txt` 1.1 MB.** About a third of each is padding the
+  plugin's converter adds to line up table columns. It has no option to turn that off.
+- **Preview builds put drafts in `/llms-full.txt` and the `.md` copies**, because a preview publishes
+  drafts. Production holds no draft.
+
+### What later phases need to know
+
+- Phase 20: check that a pasted `acorn.sh` link shows its card in a chat app, which needs the live
+  site. Read the 31 cards and the agent guide in the content review.
+- Redraw the cards after a page's headline, a sidebar group's title, or a card's sentence changes. A
+  new marketing page or sidebar group needs an entry in `og.ts`, and the tests fail until its card is
+  drawn.
+- A new docs page whose title matches another's gets its group in its `<title>` with no edit.
+- When Install, the quick start, Desktop and terminal, or the pairing pages change, read the agent
+  guide again. `stale` lists the docs home when the guide changes, not the other way round.
+- The architecture suite fails the same six checks phase 18 recorded, none on a file this phase
+  touched. `docs/site.md` stays at 201 lines, as on the base commit.
 
 ## Goal
 

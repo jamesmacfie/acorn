@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { unified } from '@astrojs/markdown-remark'
 import starlight from '@astrojs/starlight'
 import { defineConfig } from 'astro/config'
 import starlightLinksValidator from 'starlight-links-validator'
+import starlightLlmsTxt from 'starlight-llms-txt'
 import { acornUi } from './scripts/acornUi.mjs'
 import { cliHelpModule } from './scripts/cliHelp.mjs'
 import { keybindingsModule } from './scripts/keybindings.mjs'
@@ -49,6 +51,19 @@ function group({ label, items }) {
   return kept.length > 0 ? [{ label, items: kept }] : []
 }
 
+// Search ranks a Markdown table's first column, which names the setting, field, or variable each row
+// describes, near a heading, as ReferenceTable does for its rows. A heading's weight is 6 or 7.
+function rehypeWeightTableKeys() {
+  const walk = (node) => {
+    if (node.tagName === 'tr') {
+      const first = node.children.find((child) => child.type === 'element')
+      if (first?.tagName === 'td') first.properties.dataPagefindWeight = '5'
+    }
+    node.children?.forEach(walk)
+  }
+  return walk
+}
+
 // Lab pages live outside src/pages so a production build never sees them. A file whose name starts
 // with `_` is a component, not a page, as in src/pages.
 const lab = {
@@ -73,12 +88,52 @@ export default defineConfig({
   integrations: [
     lab,
     starlight({
-      title: 'acorn',
+      // A docs page's title reads "<Page> · acorn docs". A marketing page's reads "<Page> · acorn" (Marketing.astro).
+      title: 'acorn docs',
+      titleDelimiter: '·',
       description: 'An agent workspace for developers who work with coding agents.',
       favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/jamesmacfie/acorn' }],
-      // The validator sees only Starlight's pages, so it can't check a docs page's link to a marketing page.
-      plugins: [starlightLinksValidator({ exclude: ['/download/', '/download/#*', '/changelog/', '/features/**'] })],
+      plugins: [
+        // The validator sees only Starlight's pages, so it can't check a docs page's link to a marketing page.
+        starlightLinksValidator({ exclude: ['/download/', '/download/#*', '/changelog/', '/features/**'] }),
+        // /llms.txt, /llms-small.txt, and /llms-full.txt, so an agent can read the docs without scraping HTML.
+        // The plugin renders each page and converts the HTML back to Markdown, so the facts the generated
+        // reference and component pages draw with components come through. src/pages/[...slug].md.ts serves
+        // the same Markdown for one page.
+        starlightLlmsTxt({
+          projectName: 'acorn',
+          description: 'A workspace for working with coding agents, one task at a time.',
+          // Only rules no page states. A fact a page owns would be a copy here that goes stale unseen.
+          details: [
+            '## Notes for agents',
+            '',
+            "- This site describes the newest acorn release. The person you're helping may run another build. For the exact plugin vocabulary their build accepts, such as manifest keys, contribution kinds, and kit components, call the `plugin_authoring` tool on their own Node.",
+            '- Every docs page is also served as Markdown at its URL plus `.md`, such as https://acorn.sh/docs/start/install.md.',
+            '- To help someone install acorn, pair a device, and open their first task, start from https://acorn.sh/agent-guide.md.',
+          ].join('\n'),
+          optionalLinks: [
+            {
+              label: 'Agent guide',
+              url: 'https://acorn.sh/agent-guide.md',
+              description: 'How to help a person install acorn, pair a device, and open their first task.',
+            },
+            { label: 'Download', url: 'https://acorn.sh/download/', description: 'Every way to get acorn.' },
+            { label: 'Changelog', url: 'https://acorn.sh/changelog/', description: 'What changed, newest first.' },
+            { label: 'GitHub repository', url: 'https://github.com/jamesmacfie/acorn', description: 'Source and issues.' },
+          ],
+          // Heading anchors would come through as "Section titled ..." on every heading, and a picture of acorn
+          // as every label in the window, so a picture keeps only its caption. The object form applies to
+          // every output, where a bare array would apply only to llms-small.txt.
+          customSelectors: { all: ['a.sl-anchor-link', '.frame-bar', '.views', '.snapshot-body'] },
+          promote: ['docs', 'docs/start/**'],
+          // The generated component pages stay in llms-full.txt and leave the small one. The changelog
+          // isn't a docs page, so it's in neither.
+          exclude: ['docs/components/*/**'],
+        }),
+      ],
+      // Each page's social card, and a title that names its group when another page has the same title.
+      routeMiddleware: './src/routeData.ts',
       editLink: { baseUrl: 'https://github.com/jamesmacfie/acorn/edit/main/apps/site/' },
       lastUpdated: true,
       pagination: true,
@@ -353,9 +408,20 @@ export default defineConfig({
   // The specimen stylesheet, `virtual:acorn-ui.css`, built from the app's own sheets, the command
   // line's help, `virtual:acorn-cli-help`, read from the built binary, and the default shortcuts,
   // `virtual:acorn-keybindings`, read from the code that registers them.
-  vite: { plugins: [acornUi(), cliHelpModule(), keybindingsModule()] },
+  vite: {
+    plugins: [acornUi(), cliHelpModule(), keybindingsModule()],
+    resolve: {
+      alias: {
+        // shortcut: starlight-llms-txt exports only its plugin, so this reaches its page renderer by file
+        // path. An upgrade that moves the file fails the build here; copy the renderer into the site then.
+        'starlight-llms-txt/render': fileURLToPath(
+          new URL('./node_modules/starlight-llms-txt/entryToSimpleMarkdown.ts', import.meta.url),
+        ),
+      },
+    },
+  },
   markdown: {
     // The docs are full of `--flags`, which smart typography turns into dashes.
-    processor: unified({ smartypants: false }),
+    processor: unified({ smartypants: false, rehypePlugins: [rehypeWeightTableKeys] }),
   },
 })

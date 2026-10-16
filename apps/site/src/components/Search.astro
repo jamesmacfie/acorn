@@ -1,0 +1,190 @@
+---
+// Search, in the header on every page: a button that opens a palette drawn with acorn's own command
+// palette markup, over the Pagefind index a build writes of the docs. Command+K or Control+K opens it
+// anywhere, and `/` does when focus isn't in a text field. Results are grouped by the sidebar group
+// each page names (PageTitle.astro), in the order of each group's best result.
+---
+
+<site-search>
+  <button type="button" class="search-open" aria-label="Search" aria-keyshortcuts="Meta+K Control+K /">
+    <span aria-hidden="true">Search</span>
+    <kbd aria-hidden="true">/</kbd>
+  </button>
+  <dialog aria-label="Search the docs">
+    <div class="acorn-ui">
+      <div class="overlay palette">
+        <input
+          class="ui-input"
+          data-kind="bare"
+          data-width="full"
+          type="text"
+          placeholder="Search the docs…"
+          aria-label="Search the docs"
+          role="combobox"
+          aria-expanded="true"
+          aria-controls="search-results"
+          aria-autocomplete="list"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="sr-only" role="status" aria-live="polite"></div>
+        <ul class="palette-list" id="search-results" role="listbox" aria-label="Results"></ul>
+      </div>
+    </div>
+  </dialog>
+</site-search>
+
+<script>
+  interface Result {
+    url: string
+    meta: { title: string; section?: string }
+    excerpt: string
+  }
+  interface Search {
+    results: { id: string; data(): Promise<Result> }[]
+  }
+  interface Pagefind {
+    options(options: { ranking: typeof RANKING }): Promise<void>
+    search(query: string): Promise<Search>
+    debouncedSearch(query: string): Promise<Search | null>
+  }
+
+  // Written by Pagefind after the build, so Vite mustn't try to bundle it.
+  const PAGEFIND = '/pagefind/pagefind.js'
+  const SHOWN = 20
+  // Pagefind ranks a word in a page's title far above the same word anywhere else, so a settings label
+  // such as "Show workspace rail" lands on a page titled "Workspaces and projects" that mentions it,
+  // not the General page whose table defines it. A title still weighs as much as its heading.
+  const RANKING = { metaWeights: { title: 1 } }
+
+  const element = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]>, ...children: (Node | string)[]) => {
+    const node = Object.assign(document.createElement(tag), props)
+    node.append(...children)
+    return node
+  }
+
+  class SiteSearch extends HTMLElement {
+    connectedCallback() {
+      const dialog = this.querySelector('dialog')!
+      const input = this.querySelector('input')!
+      const list = this.querySelector('ul')!
+      const status = this.querySelector('[role="status"]')!
+      let pagefind: Promise<Pagefind> | undefined
+      let rows: HTMLAnchorElement[] = []
+      let selected = -1
+      let latest = 0
+
+      const open = () => {
+        if (dialog.open) return
+        dialog.showModal()
+        input.select()
+        pagefind ??= import(/* @vite-ignore */ PAGEFIND).then(async (index: Pagefind) => {
+          await index.options({ ranking: RANKING })
+          return index
+        })
+      }
+      this.querySelector('button')!.addEventListener('click', open)
+      window.addEventListener('keydown', (event) => {
+        const target = event.target as HTMLElement
+        // Just after the palette closes, focus can still be on its own field for a moment.
+        const typing =
+          !dialog.contains(target) && (target.isContentEditable || /^(?:INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+        if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+          event.preventDefault()
+          if (dialog.open) dialog.close()
+          else open()
+        } else if (event.key === '/' && !dialog.open && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
+          event.preventDefault()
+          open()
+        }
+      })
+      // A click on the backdrop lands on the dialog itself.
+      dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) dialog.close()
+      })
+
+      const select = (index: number) => {
+        rows[selected]?.classList.remove('selected')
+        rows[selected]?.setAttribute('aria-selected', 'false')
+        selected = index
+        const row = rows[index]
+        if (!row) return input.removeAttribute('aria-activedescendant')
+        row.classList.add('selected')
+        row.setAttribute('aria-selected', 'true')
+        input.setAttribute('aria-activedescendant', row.id)
+        row.scrollIntoView({ block: 'nearest' })
+      }
+      input.addEventListener('keydown', (event) => {
+        const step = { ArrowDown: 1, ArrowUp: -1 }[event.key]
+        if (step && rows.length > 0) {
+          event.preventDefault()
+          select((selected + step + rows.length) % rows.length)
+        } else if (event.key === 'Enter' && rows[selected]) {
+          event.preventDefault()
+          rows[selected].click()
+        }
+      })
+
+      const show = (items: Node[], message: string) => {
+        list.replaceChildren(...items)
+        rows = [...list.querySelectorAll('a')]
+        selected = -1
+        select(0)
+        status.textContent = message
+      }
+
+      // One row per page, under its group's label.
+      const render = (results: Result[]) => {
+        const groups = Map.groupBy(results, (result) => result.meta.section ?? 'Docs')
+        let id = 0
+        return [...groups].map(([section, pages]) =>
+          element(
+            'li',
+            { role: 'group', ariaLabel: section },
+            element('div', { className: 'search-group', ariaHidden: 'true' }, section),
+            ...pages.map((page) => {
+              const hint = element('span', { className: 'palette-hint' })
+              // Pagefind escapes the page's text and marks the matched words with <mark>.
+              hint.innerHTML = page.excerpt
+              return element(
+                'a',
+                { className: 'palette-row', href: page.url, id: `search-row-${id++}`, role: 'option', tabIndex: -1 },
+                element('span', { className: 'palette-label' }, page.meta.title),
+                hint,
+              )
+            }),
+          ),
+        )
+      }
+
+      input.addEventListener('input', async () => {
+        const query = input.value.trim()
+        const mine = ++latest
+        if (!query) return show([], '')
+        try {
+          const index = await pagefind!
+          const search = await index.debouncedSearch(query)
+          if (!search) return
+          // Pagefind ranks words, not phrases, so `acorn task list` would rank every page about tasks above
+          // the command. Pages holding the exact phrase come first, each group in Pagefind's order.
+          const exact = /\s/.test(query) ? await index.search(`"${query.replaceAll('"', '')}"`) : undefined
+          const phrase = new Set(exact?.results.map(({ id }) => id))
+          const ranked = [
+            ...search.results.filter(({ id }) => phrase.has(id)),
+            ...search.results.filter(({ id }) => !phrase.has(id)),
+          ]
+          const results = await Promise.all(ranked.slice(0, SHOWN).map((result) => result.data()))
+          if (mine !== latest) return
+          if (results.length === 0) {
+            return show([element('li', { className: 'palette-empty' }, `No page matches “${query}”.`)], 'No results')
+          }
+          show(render(results), `${results.length} results`)
+        } catch {
+          // `astro dev` writes no index.
+          show([element('li', { className: 'palette-empty' }, 'Search needs a build. Run astro build, then astro preview.')], '')
+        }
+      })
+    }
+  }
+  customElements.define('site-search', SiteSearch)
+</script>

@@ -41,9 +41,9 @@ function appSheets() {
   return [...imported, ...features].map((url) => readFileSync(url, 'utf8'))
 }
 
-// Kit components the site draws with the kit's own markup, outside any specimen: badges and key caps.
-// Their rules stay whether or not a specimen uses them.
-const SITE_KIT = /\.ui-(?:badge|kbd)\b/
+// Kit components the site draws with the kit's own markup, outside any specimen: badges, key caps, and
+// the command palette search draws as. Their rules stay whether or not a specimen uses them.
+const SITE_KIT = /\.ui-(?:badge|kbd|input)\b|\.overlay(?![\w-])|\.palette-(?:list|row|label|hint|empty)\b/
 
 // What may qualify the root element, such as `[data-style='cozy']` or `:not([data-theme="light"])`.
 const QUALIFIERS = String.raw`(?:\[[^\]]*\]|:not\([^)]*\))*`

@@ -110,7 +110,8 @@ The components are in `apps/site/src/components/`. Each has a comment that says 
 | `FeaturePage` | The layout of a feature page, in `apps/site/src/layouts/`: the title and sentence from `apps/site/src/features.ts`, a picture, the page's sections, **In the terminal**, related features, and **Get started**. A new feature page needs an entry in `features.ts`, which the features index reads too. |
 | `Badge`, `Keys` | The kit's own `Badge` and `Kbd` markup, with the text kept in `--text`. |
 | `ReferenceTable`, `Checkpoint` | A table with a sticky header and an anchor per row, and a step's check. |
-| `SocialCard` | The 1200 by 630 picture a shared link shows. |
+| `SocialCard` | The 1200 by 630 picture a shared link shows ([social cards](./agent-outputs.md#social-cards)). |
+| `Search` | The header's search, drawn with the command palette's markup ([search](./agent-outputs.md#search)). |
 
 Callouts are Starlight's asides, restyled in `site.css` as the kit's banner `Alert`. A marketing page
 writes `class="callout"` for the same look. Steps are
@@ -120,8 +121,8 @@ Starlight's `<Steps>`. Tabs and copy buttons share two small scripts in `apps/si
 
 `apps/site/src/components/starlight/` replaces Starlight's `Header`, `Sidebar`, `PageTitle`, `Footer`,
 `ThemeProvider`, and `ThemeSelect`. The `Footer` draws previous and next with the site's own
-`Pagination`. Search, the table of contents, and the prose column keep Starlight's markup and take
-the site's look from `site.css`.
+`Pagination`. The table of contents and the prose column keep Starlight's markup and take the site's
+look from `site.css`. Search is the site's own `Search` component.
 
 There are two sidebars. A page under `/docs/build-plugins/` or `/docs/components/` sees the Build
 plugins groups, and every other docs page sees the rest (`isBuildPath` in `apps/site/src/nav.ts`).
@@ -165,6 +166,6 @@ These pages build in `pnpm dev:site` and in preview builds only:
 | `/lab/design/` | Every marketing component. |
 | `/lab/design/docs/` | Every docs component, inside Starlight's chrome. |
 | `/lab/design/landing/` | The landing page wireframe, restyled with the components. |
-| `/lab/design/social-card/` | The social card alone, at 1200 by 630, for a screenshot. |
+| `/lab/og/<card>/` | One social card alone, at 1200 by 630, for a screenshot. |
 
 Pick a theme and a style pack under **Appearance** on any of them.

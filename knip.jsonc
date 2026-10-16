@@ -33,6 +33,10 @@
       ],
       "includeEntryExports": false
     },
+    "apps/site": {
+      // Starlight loads the route middleware by path (`routeMiddleware` in apps/site/astro.config.mjs).
+      "entry": ["src/routeData.ts"]
+    },
     "packages/client-core": {
       // Type-level checks that nothing imports.
       "entry": ["src/host/frames/verbs.ts"]
@@ -74,6 +78,8 @@
     "**/*.test-d.ts": ["exports", "types"],
     // `acorn-plugin.config.mjs` names the factory as a string (`factory: 'httpPlugin'`).
     "plugins/{database,http,linear,model-providers,nodes-file,rollbar,sentry-telemetry}/src/node/index.ts": ["exports"],
+    // Starlight imports the route middleware's `onRequest` by path.
+    "apps/site/src/routeData.ts": ["exports"],
     // JSX runtimes. Solid's compiler emits calls to these names, set by `moduleName` in the build.
     "apps/tui/src/tree/renderer.ts": ["exports", "types"],
     "packages/client-core/src/host/frames/remoteSolid.ts": ["exports", "types"],

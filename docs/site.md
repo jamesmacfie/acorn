@@ -53,25 +53,25 @@ anything from another origin:
 | Any other marketing page | 10 KB of JavaScript |
 | A docs page, and the 404 page | 100 KB in total |
 
-The Playwright tests in `apps/site/tests/` load every page the build wrote and fail on a console error. They run
-axe on the landing page, the docs home, and the 404 page, one page for each template, and on every
-feature page, the download page, and the changelog, and check that drafts and `/lab/` appear only in a
-preview build. On a preview build, they
-also check that the specimen gallery draws the site's header, sidebar, and text exactly as `/docs/` does,
-and run axe on the frames around its specimens and around the shell snapshots, and check that every
-link on the landing page, the feature pages, and the download page goes to a page the build wrote. That link check runs on a
-preview build only, because most of the docs pages those pages link to are drafts. They use the Chrome installed on the machine, so install Chrome
-before you run them. `ACORN_SITE_PREVIEW` must match the build you're testing.
+The Playwright tests in `apps/site/tests/` load every page the build wrote and fail on a console error.
+They run axe on one page of each template, every feature page, the download page, and the changelog, and
+check that drafts and `/lab/` appear only in a preview build. A preview build also checks that the
+specimen gallery draws the site's header, sidebar, and text as `/docs/` does, runs axe around its
+specimens and shell snapshots, and checks every link on the landing, feature, and download pages, because
+most docs pages they link to are drafts. The tests use the installed Chrome. `ACORN_SITE_PREVIEW` must
+match the build you're testing.
 
 The landing page also has a Lighthouse target, checked by hand. [The site's design](./site/design.md#lighthouse)
 has the command and the scores.
 
 ## Specimens
 
-Pictures of plugin UI and of the browser extension's panel are _specimens_, committed and checked on
-every change ([specimens](./site/specimens.md)). Reference pages that list commands, shortcuts, files,
-variables, and the plugin API read them from the code at build ([generated references](./site/references.md)).
-The plugin guides show code and pictures from tested example plugins ([plugin guides](./site/plugin-guides.md)).
+Pictures of plugin UI and of the browser extension's panel are _specimens_, committed and checked on every
+change ([specimens](./site/specimens.md)). Reference pages that list commands, shortcuts, files, variables,
+and the plugin API read them from the code at build ([generated references](./site/references.md)). The
+plugin guides show code and pictures from tested example plugins ([plugin guides](./site/plugin-guides.md)).
+[Search and agent outputs](./site/agent-outputs.md) covers search, page metadata, social cards, the Markdown
+copies, and `llms.txt`.
 
 ## Shell snapshots
 

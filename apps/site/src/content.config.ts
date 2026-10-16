@@ -7,10 +7,17 @@ import { pageMeta } from './meta'
 const previewBuild = process.env.ACORN_SITE_PREVIEW === '1'
 
 // Starlight leaves a draft out of every production build. A preview deploy is a production build that
-// should still show drafts, so there a draft is published with a banner instead.
-const showDraftOnPreview = <T extends { draft: boolean; banner?: { content: string } }>(page: T): T =>
+// should still show drafts, so there a draft is published with a banner instead, and kept out of search.
+const showDraftOnPreview = <T extends { draft: boolean; pagefind: boolean; banner?: { content: string } }>(
+  page: T,
+): T =>
   previewBuild && page.draft
-    ? { ...page, draft: false, banner: { content: 'Draft: this page is not published to acorn.sh yet.' } }
+    ? {
+        ...page,
+        draft: false,
+        pagefind: false,
+        banner: { content: 'Draft: this page is not published to acorn.sh yet.' },
+      }
     : page
 
 export const collections = {

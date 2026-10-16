@@ -1,7 +1,8 @@
 ---
 // The command line's help, as the built binary prints it (scripts/cliHelp.mjs): the overview, then the
 // usage lines for each command. Each command's help ends with the same options and exit codes as the
-// overview, so only the overview shows them.
+// overview, so only the overview shows them. Search ranks a command's heading above the pages that
+// mention the command.
 import { Code } from '@astrojs/starlight/components'
 import help from 'virtual:acorn-cli-help'
 
@@ -13,7 +14,7 @@ const usage = (text: string) => text.split('\n\n')[0]!
 {
   help.commands.map(({ command, text }) => (
     <>
-      <h2 id={command}>
+      <h2 id={command} data-pagefind-weight="10">
         <code>acorn {command}</code>
       </h2>
       <Code code={usage(text)} lang="text" title={`acorn ${command} --help`} />

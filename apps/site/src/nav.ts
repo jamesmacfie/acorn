@@ -58,3 +58,21 @@ export function sectionOf(path: string) {
   if (isBuildPath(path)) return 'build'
   return headerLinks.find(({ href }) => path.startsWith(href))?.id
 }
+
+type SidebarEntry = { type: 'link'; isCurrent: boolean } | { type: 'group'; label: string; entries: SidebarEntry[] }
+const holdsCurrent = (entry: SidebarEntry): boolean =>
+  entry.type === 'link' ? entry.isCurrent : entry.entries.some(holdsCurrent)
+
+/** The top-level sidebar group a docs page sits in: the label search groups its results under, and the
+ *  name of the social card in public/og/. Both halves have a Reference group, so a Build plugins group
+ *  carries the half's name in both. */
+export function docsSection(sidebar: SidebarEntry[], path: string) {
+  const group = sidebar.find(holdsCurrent)
+  if (group?.type !== 'group') return undefined
+  const build = isBuildPath(path)
+  const slug = group.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+  return {
+    label: build ? `Build plugins · ${group.label}` : group.label,
+    card: `${build ? 'build-plugins' : 'docs'}-${slug}`,
+  }
+}

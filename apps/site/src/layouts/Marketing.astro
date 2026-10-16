@@ -5,6 +5,7 @@ import AppearanceScript from '../components/AppearanceScript.astro'
 import SiteFooter from '../components/SiteFooter.astro'
 import SiteHeader from '../components/SiteHeader.astro'
 import { pageMeta, type PageMeta } from '../meta'
+import { marketingCard } from '../og'
 
 interface Props {
   title: string
@@ -14,6 +15,8 @@ interface Props {
 const { title, meta } = Astro.props
 // A marketing page with a missing or malformed field fails the build, as a docs page does.
 pageMeta.parse(meta)
+const canonical = new URL(Astro.url.pathname, Astro.site)
+const card = new URL(`/og/${marketingCard(Astro.url.pathname)}.png`, Astro.site)
 ---
 
 <!doctype html>
@@ -28,7 +31,18 @@ pageMeta.parse(meta)
     <title>{title} · acorn</title>
     <meta name="description" content={meta.description} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:title" content={title} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:description" content={meta.description} />
+    <meta property="og:site_name" content="acorn" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:image" content={card} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:image" content={card} />
+    <slot name="head" />
   </head>
   <body>
     <header class="site-bar"><SiteHeader /></header>

@@ -1,5 +1,6 @@
 ---
 // Built only in development and on preview deploys. See the `lab` integration in astro.config.mjs.
+import { CARDS } from '../og'
 ---
 
 <!doctype html>
@@ -13,12 +14,16 @@
   <body>
     <main>
       <h1>Lab</h1>
-      <p>Wireframes, the design gallery, the specimen gallery, and the shell snapshots. Nothing here is published to acorn.sh.</p>
+      <p>
+        Wireframes, the design gallery, the specimen gallery, the shell snapshots, and the social cards. Nothing here is
+        published to acorn.sh.
+      </p>
       <ul>
         <li><a href="/lab/wireframes/">Wireframes</a></li>
         <li><a href="/lab/design/">Design gallery</a></li>
         <li><a href="/lab/specimens/">Specimens</a></li>
         <li><a href="/lab/snapshots/">Shell snapshots</a></li>
+        {Object.keys(CARDS).map((card) => <li><a href={`/lab/og/${card}/`}>Social card: {card}</a></li>)}
       </ul>
     </main>
   </body>

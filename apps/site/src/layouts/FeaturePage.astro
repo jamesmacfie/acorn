@@ -23,7 +23,7 @@ const { title, sentence } = FEATURES[feature]
 const getAcorn = (await readGithub()).release ? 'Download' : 'Get acorn'
 ---
 
-<Marketing title={title} meta={meta}>
+<Marketing title={`${title} · Features`} meta={meta}>
   <Hero slot="hero" eyebrow="Features" title={title}>
     <p>{sentence}</p>
     <slot name="picture" slot="picture" />
