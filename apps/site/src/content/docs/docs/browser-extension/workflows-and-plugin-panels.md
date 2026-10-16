@@ -16,16 +16,14 @@ covers both.
 
 ## Start a workflow on an item
 
-1. On the item's page, open the chip's **Start task** menu and choose **Start workflow…**.
-
-   The panel opens on the handoff card, with the workflow form.
-
-2. Pick the project, then the workflow. The list has the workflows a task in that project can run:
-   files in the repository or yours, and workflows made in the app that are published. A workflow with
-   problems isn't listed.
-3. Fill in its inputs. Inputs named `issue`, `item`, or `context` start with the item's title and
-   description, and `link` or `url` with its address.
-4. Click **Start workflow**.
+1. On the item's page, open the handoff card under **This page** on Home, or choose **Start
+   workflow…** from the chip's **Start task** menu.
+2. Pick the project if several track the item, then click **Run workflow** and pick the workflow. The
+   list has the workflows a task in that project can run: files in the repository or yours, and
+   workflows made in the app that are published. A workflow with problems isn't listed.
+3. Check its inputs. Inputs named `issue`, `item`, or `context` start with the item's title and
+   description, and `link` or `url` with its address. A required input is marked with a red asterisk.
+4. Click **Start run**, or **Cancel** to go back to **Create task**.
 
    acorn makes a task linked to the item, starts the run on it, and opens the task's **Runs** tab on the
    run.

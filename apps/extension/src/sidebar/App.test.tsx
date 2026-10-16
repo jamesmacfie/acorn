@@ -137,8 +137,10 @@ describe('sidebar', () => {
     await settle()
     expect(shownNode(root)).toContain('Node b')
     // The page is on b's project's site, which This page suggests only from b's project list.
-    const options = [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
-    expect(options).toEqual(['Choose a project', 'b project'])
+    button(root.querySelector('[aria-label="This page"]')!, 'Project')!.click()
+    await settle()
+    const options = [...document.querySelectorAll('.repo-picker-popover .repo-picker-name > span')]
+    expect(options.map((option) => option.textContent)).toEqual(['b project'])
   })
 
   it('keeps Nodes off Home, behind the gear, and says when the selected Node is offline', async () => {

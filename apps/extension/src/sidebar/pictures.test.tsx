@@ -169,12 +169,6 @@ function mount(options: { url: string; title: string; paired?: boolean; waiting?
           projects: [{ id: 'p1', name: 'billing-api', path: null, hidden: false, workspaceId: 'w1' }],
           workspaces: [{ id: 'w1', name: 'Fernwood' }],
         }
-      case 'tasks.list':
-        return {
-          nodeId: 'n1',
-          projectId: 'p1',
-          tasks: pageTasks.map(({ id, title, branch }) => ({ id, title, branch })),
-        }
       case 'tasks.pages':
         // With the panel, the task's app also answers at its own address.
         return {
@@ -240,6 +234,12 @@ function mount(options: { url: string; title: string; paired?: boolean; waiting?
                 },
               ]
             : [],
+        }
+      case 'workflows.list':
+        return {
+          nodeId: 'n1',
+          projectId: request.projectId,
+          workflows: [{ id: 'fix', name: 'Fix an issue', inputs: [{ name: 'issue', label: 'Issue', required: true }] }],
         }
       case 'workflow.runs':
         return { nodeId: 'n1', taskId: request.taskId, runs: [] }

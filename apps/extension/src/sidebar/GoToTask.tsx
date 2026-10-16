@@ -132,7 +132,7 @@ function Palette(props: Parameters<typeof GoToTask>[0]) {
             {(group) => (
               <>
                 <Show when={group.label}>
-                  <li class="go-to-task-group" role="presentation">
+                  <li class="repo-picker-group" role="presentation">
                     {group.label}
                   </li>
                 </Show>

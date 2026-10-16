@@ -64,14 +64,16 @@ states:
    running**. When the person hid the branch marker on that origin, the section offers **Show the
    branch marker on this site**.
 2. **An item no task holds.** The page matches a handoff and no task: Home looks the item up and
-   opens the handoff card, once for each page and Node, while the Node is online. That's the same for
-   a site whose layout has no anchor, for a handoff that declares no anchors, such as Linear's and
-   Rollbar's, and for Firefox. Home leaves the lookup to **Look up in Acorn** after the person
-   dismisses the card, when several handoffs match the page, and while the Node is offline. The
-   lookup runs only on Home. Under a task, the strip's **Start task** goes Home for it, and a chip's
-   click goes Home with the card.
-3. **A project site with no item.** The project its [site associations](./project-sites.md) suggest,
-   that project's open tasks, and **New task in Acorn**, which opens the project in the desktop app.
+   opens the [handoff card](./handoffs.md#the-handoff-card) while the Node is online. That's the
+   same for a site whose layout has no anchor, for a handoff that declares no anchors, such as
+   Linear's and Rollbar's, and for Firefox. Home leaves the lookup to **Look up in Acorn** when
+   several handoffs match the page, and while the Node is offline. The lookup runs only on Home.
+   Under a task, the strip's **Start task** goes Home for it, and a chip's click goes Home with the
+   card.
+3. **A project site with no item.** A **Project** picker that lists the projects its
+   [site associations](./project-sites.md) suggest first, that project's open tasks as
+   [Home's task rows](#homes-task-list), and **New task in Acorn**, which opens the project in the
+   desktop app.
 
 A page that matches none of these has no **This page** section, and Home shows only its task list.
 The sidebar reads the page again when the tab finishes loading, so the section follows the tab.
@@ -93,7 +95,7 @@ rules in order (`followPage` in `apps/extension/src/sidebar/location.ts`):
 
 The panel applies the same rules once more when the selected Node's task list first arrives, so a
 panel that opens beside a pull request shows its task. A later list moves nothing, such as one with a
-task just made for the page, so Home's handoff card stays where it is.
+task just made for the page. **Create task** and **Start run** open their new task themselves.
 
 The tab you pick under a task is kept per task in `taskViews:<nodeId>`, and the task or conversation
 the panel last showed in `destination:<nodeId>` ([browser storage](./conversations.md#browser-storage)).
@@ -101,7 +103,8 @@ When the panel opens, it returns to that task or conversation, then follows the 
 above. A task the Node no longer lists sends the panel Home.
 
 The task chip's **Show in side panel** opens the page's task, and its new chat about the page opens
-the task's **Agents** tab, with the page waiting for the conversation you start or open next. An OS
+the task's **Agents** tab, with the page waiting for the task's next conversation
+([the item waiting for the first chat](./handoffs.md#the-item-waiting-for-the-first-chat)). An OS
 notification, a request's **Open** on Home, and **Add to Acorn chat** open their conversation.
 
 ## Home's task list

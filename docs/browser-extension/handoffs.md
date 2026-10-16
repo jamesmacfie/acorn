@@ -45,12 +45,12 @@ plugin's `label` stays in the chip's accessible name.
   conversations. A conversation is waiting while the Node holds a request from it. A click opens the
   panel on the task. The arrow beside it opens a menu: **Show in side panel**, **Open in
   Acorn** (a plain `acorn://` link to the task, on its item's pane), **New chat about this page**
-  (the task's **Agents** tab, with the page's link waiting for the draft), **Ask about an
+  (the task's **Agents** tab, with the page's link waiting for the task's first chat), **Ask about an
   element** (the [element picker](./element-picker.md)), and **Copy Acorn link**. A development
   build leaves out Open in Acorn, as the panel does.
 - **A page no task holds** reads **Start task**. A click opens a menu with the desktop row menu's two
   choices: **Create task** and **Start workflow…**. Either one opens the panel on the handoff card,
-  which resolves the page and shows that choice's form.
+  which resolves the page. **Start workflow…** opens it with the project's first workflow chosen.
 
 Firefox opens its sidebar only from the extension's own controls, so there the chip's click opens
 the menu, with a line saying to click Acorn in the toolbar for the panel. A task's menu has Open in
@@ -80,38 +80,40 @@ gets the click at once, and one that opens later gets the latest of each kind as
 ## The handoff card
 
 The card shows in Home's [**This page**](./task-pages.md#this-page) section, in place of its state. Home
-opens it for a page a handoff matches and no task holds, and a chip's click brings it forward from
-Settings or an open conversation. It resolves the page through `handoff.resolve` and shows what came
-back:
+opens it for a page a handoff matches and no task holds, and a chip's click brings it forward. It
+resolves the page through `handoff.resolve` and draws the item in the kit's `Card`:
 
-1. Several items, such as one per connection, mean a choice. Nothing picks the first.
-2. **Linked tasks** lists the active tasks that already hold the item. **Chat** opens that task's
-   newest conversation, or the new-chat picker when it has none. **Open in Acorn** opens the task in
-   the desktop app ([Open in Acorn](#the-panels-verbs)).
-3. An item no task holds says so, with **Open in Acorn** for the item itself, and the chip's choice,
-   which a select changes, in a project: the plugin's, plus any whose
-   [site associations](./project-sites.md#handoffs) cover the page, unless the item carries a pull
-   number. **Create task** creates the linked task with `handoff.create` and shows it on Home, with
-   the item's context waiting. **Start workflow** also starts a run in it
-   ([workflows](./workflows.md#starting-a-workflow)).
+1. The head: the plugin's logo (only the kit's own, such as GitHub's; others show a document), the
+   item's key and connection, its title, and **Open in Acorn** as an arrow, through `open?url=`.
+   Several items, such as one per connection, put a kit `Picker` in place of the key.
+2. An item a task already holds shows that task as This page's task row, which opens it.
+3. Otherwise, the project: its name, or a **Project** picker under **Tracks this issue** when several
+   track the item. They're the plugin's, plus any whose [site associations](./project-sites.md#handoffs)
+   cover the page, unless the item carries a pull number. **Create task** creates the linked task
+   with `handoff.create` and opens it on **Agents**. **Run workflow** picks one of the project's
+   workflows.
 
-The card closes when the tab leaves the item. A page still shows the item when it matches the same
-handoff and every capture the two addresses share is equal, so a pull request's **Files** tab keeps
-the card and another pull request closes it. The card stays when the person has typed a workflow
-input, or a start is under way, and then says the page it's about was left.
+A chosen workflow adds a **Workflow** picker, a field per input with a red asterisk when required
+and its description as the placeholder, filled from the item, then **Start run** and **Cancel**.
+**Start run** creates the task, starts the run, and opens **Runs** with the run chosen
+([workflows](./workflows.md#starting-a-workflow)). **Cancel** removes the part and what was typed.
 
-The card's writes keep their keys, so pressing it again after one went unconfirmed makes no second
-task or run. A repeated create, with the same key or after the task exists, answers the existing
-task.
+The card has no **Dismiss**. It closes when the tab leaves the item, and Home looks the item up again
+each time it shows the page. A page still shows the item when it matches the same handoff and every
+capture the two addresses share is equal, so a pull request's **Files** tab keeps the card. A typed
+workflow input or a start under way keeps it open, saying the page was left. Its writes keep their
+keys, so pressing again after one went unconfirmed makes no second task or run. A Node switch clears
+the card, as it clears the page buttons.
 
-After **Chat** or **Create task**, whichever conversation the person opens next gets the item's
-context in its draft, as an **Item** capture beside any links, selections, and screenshots. The same
-item handed off twice is one capture. Until then the sidebar says the context is waiting, with
-**Leave it out**. Nothing goes to an agent until the person sends; the
-capture becomes a `context` part with `source: 'browser-extension'`, as page captures do
-([page capture](./page-capture.md#what-a-capture-is)).
+### The item waiting for the first chat
 
-A Node switch clears the card, as it clears the page buttons.
+After **Create task**, the task's **Agents** tab shows the item as a chip, such as **Item · Fix the
+flaky test**, with ×. It belongs to that task alone, under `pendingItem:<nodeId>:<taskId>` in
+`storage.local`, as does the page link the chip's **New chat about this page** leaves. The next
+conversation opened or started in the task takes it into its draft as a capture, once however often
+it's handed off. × drops it, as does the task leaving the Node's list while the panel is open.
+Nothing goes to an agent until the person sends: the capture becomes a `context` part with
+`source: 'browser-extension'` ([page capture](./page-capture.md#what-a-capture-is)).
 
 ## The panel's verbs
 
@@ -119,15 +121,15 @@ Each verb means one thing wherever it shows:
 
 | Verb | What it does |
 | --- | --- |
-| **Open in Acorn** | Opens the desktop app through an [`acorn://` link](../frontend/acorn-links.md): a handed-off item's task on the pane that shows it (GitHub's for a pull request), a conversation on the agents pane, or an item no task holds through `open?url=`. |
+| **Open in Acorn** | Opens the desktop app through an [`acorn://` link](../frontend/acorn-links.md): a task on its item's pane (GitHub's for a pull request), a conversation on the agents pane, a project, or a handed-off item through `open?url=`. |
 | **Copy Acorn link** | Copies that link. |
-| **Create task** | Creates the item's linked task and shows it on Home, with the item waiting for its first conversation ([the handoff card](#the-handoff-card)). |
-| **Start workflow** | Creates the item's linked task and starts a workflow run in it ([workflows](./workflows.md)). |
-| **Chat** and **New chat** | Open a task's newest conversation, or start one with a chosen agent. |
+| **Create task** | Creates the item's linked task and opens it on **Agents**, with the item waiting for its first conversation ([the handoff card](#the-handoff-card)). |
+| **Start run** | Creates the item's linked task, starts the chosen workflow in it, and opens its **Runs** ([workflows](./workflows.md)). |
+| **New chat** | Starts a conversation in the task with a chosen agent. |
 | **Add to chat** | Captures the page link, a selection, or a screenshot into the draft. |
 
-Open in Acorn is a plain link, which both browsers hand to the app registered for `acorn://`, with no
-extension permission. Only a release desktop registers the scheme, and it opens only a Node that
+Open in Acorn follows its link as a plain link does, which both browsers hand to the app registered
+for `acorn://`, with no extension permission. Only a release desktop registers the scheme, and it opens only a Node that
 desktop is paired with, as the bridge's Node ID names it. A development build, one that talks to the
 development bridge, shows Copy Acorn link in its place. `src/acornLinks.ts` builds the links with
 client-core's `buildLink` for the panel and the task chip, and holds the table of item panes by plugin.

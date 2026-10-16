@@ -341,6 +341,10 @@ describe('architecture boundaries', () => {
       ],
       ['apps/extension/src/sidebar/main.tsx -> plugins/agents/src/contract/providerMarks.ts', 'harness brand marks'],
       [
+        'apps/extension/src/sidebar/TaskRow.tsx -> plugins/agents/src/contract/runtimeState.ts',
+        "marks a task row with its agents' state",
+      ],
+      [
         'apps/extension/src/sidebar/Workspace.tsx -> plugins/agents/src/contract/runtimeState.ts',
         'marks the Agents tab while agents work',
       ],

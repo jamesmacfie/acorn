@@ -165,6 +165,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-field[data-layout='split'] > .ui-field-hint,
 .ui-field[data-layout='split'] > .ui-field-error { grid-column: 2; }
 .ui-field-label { font-size: var(--fs-sm); color: var(--text); }
+.ui-field-required { color: var(--danger); }
 .ui-field-hint { font-size: var(--fs-sm); color: var(--text-muted); }
 .ui-field-error { font-size: var(--fs-sm); color: var(--danger); }
 
@@ -2267,6 +2268,15 @@ a.ui-row:hover { background: var(--bg-hover); }
    too, so long branch names get a horizontal scrollbar instead of ellipsizing (.repo-picker-name
    already clips). max-height tracks the viewport so the list runs near-full-height before scrolling. */
 .repo-picker-list { list-style: none; margin: 0; padding: var(--space-2) 0; max-height: min(50vh, 420px); overflow-y: auto; overflow-x: hidden; }
+/* A group's label over its rows, in the section-label type, inset to the rows' text. */
+.repo-picker-group {
+  padding: var(--space-4) var(--space-6) var(--space-1);
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  font-weight: var(--label-weight);
+}
 .repo-picker-row {
   display: flex;
   align-items: center;

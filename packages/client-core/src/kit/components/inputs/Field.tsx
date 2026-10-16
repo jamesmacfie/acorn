@@ -18,6 +18,9 @@ export function Field(props: {
   error?: string
   /** How it works or why it is there, behind a "?" after the caption. `hint` is for what to type. */
   help?: string
+  /** Marks the caption with an asterisk. The control says it to a screen reader through its own
+   *  `required`, so the mark is hidden from one. */
+  required?: boolean
   /** `stack` is label over control. See docs/ui-design.md for `row` and `split`. */
   layout?: 'stack' | 'row' | 'split'
   group?: boolean
@@ -30,6 +33,13 @@ export function Field(props: {
   const described = () =>
     [props.hint && hintId, props.error && errorId, props.help && helpId].filter(Boolean).join(' ') || undefined
   const slot = createFieldSlot(described)
+  const mark = (
+    <Show when={props.required}>
+      <span class="ui-field-required" aria-hidden="true">
+        {' *'}
+      </span>
+    </Show>
+  )
   const caption = (
     <Show when={props.label}>
       <Show
@@ -37,6 +47,7 @@ export function Field(props: {
         fallback={
           <label class="ui-field-label" id={labelId} for={slot.target()}>
             {props.label}
+            {mark}
           </label>
         }
       >
@@ -44,6 +55,7 @@ export function Field(props: {
           <span class="ui-titled">
             <label class="ui-field-label" id={labelId} for={slot.target()}>
               {props.label}
+              {mark}
             </label>
             <HelpMark text={help()} titleId={labelId} textId={helpId} />
           </span>

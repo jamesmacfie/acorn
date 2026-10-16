@@ -4,13 +4,10 @@ import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import { Menu } from '@acorn/client-core/kit/components/overlays'
 import type { BrowserApi } from '../browser'
 import { pageMatches } from '../taskPages'
+import { followAcornLink } from './OpenInAcorn'
 import { openTabs, showPage, tabFor } from './openTabs'
 
 type MenuContext = Parameters<Parameters<typeof Menu>[0]['children']>[0]
-
-// Follows an `acorn://` link as a plain link does, which both browsers hand to the app that registered
-// the scheme.
-const follow = (href: string) => Object.assign(document.createElement('a'), { href }).click()
 
 // The ⋯ button and its menu, at the bar's right edge.
 function More(props: { label: string; children(context: MenuContext): JSX.Element }) {
@@ -43,7 +40,11 @@ function LinkItems(props: { context: MenuContext; href: string | null; opensLink
       {(href) => (
         <>
           <Show when={props.opensLinks}>
-            <Menu.Item context={props.context} leading={<Icon name="arrow-up-right" />} onSelect={() => follow(href())}>
+            <Menu.Item
+              context={props.context}
+              leading={<Icon name="arrow-up-right" />}
+              onSelect={() => followAcornLink(href())}
+            >
               Open in Acorn
             </Menu.Item>
           </Show>

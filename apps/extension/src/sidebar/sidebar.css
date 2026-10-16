@@ -71,7 +71,6 @@ button.heading:hover { background: var(--bg-hover); }
 .go-to-task { width: calc(100vw - 2 * 4px); max-width: none; }
 .go-to-task .repo-picker-tools { padding-inline: var(--space-5) var(--space-3); }
 .go-to-task .repo-picker-name > small { font-family: var(--font-mono); }
-.go-to-task-group { padding: var(--space-4) var(--space-6) var(--space-1); font-size: var(--fs-2xs); color: var(--text-muted); text-transform: var(--label-transform); letter-spacing: var(--label-tracking); font-weight: var(--label-weight); }
 .go-to-task-lead { flex: none; display: inline-flex; width: 1em; padding-inline-start: var(--space-2); color: var(--text-muted); }
 .go-to-task .repo-picker-footer { gap: var(--space-3); padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6); font-size: var(--fs-sm); }
 .go-to-task .repo-picker-footer .dot { width: 7px; height: 7px; }
@@ -259,7 +258,24 @@ fieldset { border: var(--surface-border); border-radius: var(--radius-surface); 
 /* A short label beside a name, such as the Node on this Mac. */
 .tag { padding: 0 var(--space-2); border: var(--control-border); border-radius: var(--radius-chip); font-size: var(--fs-xs); color: var(--text-muted); }
 ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
-.handoff, .sites { display: grid; gap: var(--gap-row); }
+.sites { display: grid; gap: var(--gap-row); }
+
+/* ── This page ──────────────────────────────────────────────────────────────────────────────── */
+/* A field's caption beside its picker, small and muted, as one column of labels. */
+.this-page .ui-field[data-layout='row'] > .ui-field-label { flex: none; width: 74px; }
+.this-page .ui-field-label { font-size: var(--fs-xs); color: var(--text-muted); }
+/* The issue card: the item's logo, key, and title, then its project and what to do with it. */
+.handoff .ui-card { display: grid; gap: var(--space-5); }
+.item-head { display: flex; align-items: flex-start; gap: var(--space-4); }
+.item-head > .ui-icon { flex: none; margin-top: var(--space-1); }
+.item-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.item-id { display: flex; align-items: center; gap: var(--space-3); min-width: 0; font-size: var(--fs-xs); color: var(--text-muted); }
+.item-id b { font-family: var(--font-mono); font-weight: var(--fw-semibold); color: var(--text); }
+.item-title { line-height: 1.35; }
+.hint { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); color: var(--text-muted); }
+.handoff .divider { margin: 0; border: 0; border-top: var(--divider); }
+/* The item waiting for a task's first chat, on its Agents tab. */
+.pending-item { display: grid; justify-items: start; gap: var(--space-2); }
 
 /* ── Needs you ──────────────────────────────────────────────────────────────────────────────── */
 /* The top bar's amber button, with the count of requests waiting. */

@@ -64,8 +64,6 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
     pending: [] as Record<string, unknown>[],
     // Projects another client adds after the sidebar opened.
     addedProjects: [] as { id: string; name: string; path: null; hidden: boolean; workspaceId: string }[],
-    // Open tasks in p1 besides Fix login.
-    addedTasks: [] as { id: string; title: string; branch: string | null }[],
     // Each Node's tasks with their page addresses, and its handoffs.
     taskPages: [{ id: 't1', title: 'Fix login', branch: null, projectId: 'p1', pages: [] }] as BridgePageTask[],
     handoffs: [] as BridgeHandoff[],
@@ -117,13 +115,6 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
             { id: 'w2', name: 'Other' },
           ],
         }
-      case 'tasks.list':
-        return {
-          nodeId,
-          projectId: request.projectId,
-          tasks:
-            request.projectId === 'p1' ? [{ id: 't1', title: 'Fix login', branch: null }, ...state.addedTasks] : [],
-        }
       case 'sessions.list': {
         const rows = state.sessions.filter((row) => !state.archived.includes(row.id))
         return request.workspaceId
@@ -159,10 +150,27 @@ const fill = (root: ParentNode, selector: string, value: string) => {
   field.value = value
   field.dispatchEvent(new Event('input', { bubbles: true }))
 }
-const suggestedOptions = (root: HTMLElement) =>
-  [...root.querySelectorAll('select[name="project"] optgroup[label="Suggested for this page"] option')].map(
-    (option) => option.textContent,
-  )
+const thisPage = (root: HTMLElement) => root.querySelector('[aria-label="This page"]')!
+// This page's project picker, by the name it shows, and its rows by group, each its name and
+// workspace, read by opening it and closing it again. A page on no project's site has no picker.
+const siteProject = (root: HTMLElement) => chosen(thisPage(root), 'Project')
+async function projectGroups(root: HTMLElement): Promise<Record<string, string[]>> {
+  const trigger = thisPage(root) && button(thisPage(root), 'Project')
+  if (!trigger) return {}
+  trigger.click()
+  await settle()
+  const groups: Record<string, string[]> = {}
+  let group = ''
+  for (const row of document.querySelectorAll('.repo-picker-popover :is(.repo-picker-group, .repo-picker-name)')) {
+    if (row.classList.contains('repo-picker-group')) group = row.textContent!
+    else (groups[group] ??= []).push([...row.children].map((part) => part.textContent).join(' · '))
+  }
+  trigger.click()
+  await settle()
+  return groups
+}
+const suggestedOptions = async (root: HTMLElement) =>
+  ((await projectGroups(root))['Suggested for this page'] ?? []).map((row) => row.split(' · ')[0])
 const siteAccess = (root: HTMLElement) =>
   [...root.querySelectorAll('[aria-label="Site access"] li')].map(
     (row) => `${row.querySelector('strong')!.textContent}: ${row.querySelector('.quiet')!.textContent}`,
@@ -174,14 +182,14 @@ describe('project suggestions for a site', () => {
   it('reads the project list again when the Node says a project changed', async () => {
     const { fake, state, root } = mount({ url: 'https://example.com/', sites: [site('p1', 'https://example.com')] })
     await settle(30)
-    const options = () =>
-      [...root.querySelectorAll('select[name="project"] option')].map((option) => option.textContent)
-    expect(options()).not.toContain('Admin')
+    const options = async () =>
+      (await projectGroups(root))['Suggested for this page']!.concat((await projectGroups(root))['Other projects']!)
+    expect(await options()).not.toContain('Admin · Main')
 
     state.addedProjects.push({ id: 'p4', name: 'Admin', path: null, hidden: false, workspaceId: 'w1' })
     fake.hosts[0]!.send({ v: 1, event: 'projects', nodeId: 'n1' })
     await settle(20)
-    expect(options()).toContain('Admin')
+    expect(await options()).toContain('Admin · Main')
   })
 
   it('chooses the project of each path, and leaves overlapping matches to the picker', async () => {
@@ -190,34 +198,39 @@ describe('project suggestions for a site', () => {
       sites: [site('p1', 'https://example.com', '/app'), site('p2', 'https://example.com', '/docs')],
     })
     await settle(30)
-    expect(selected(root, 'project')).toBe('p1')
-    expect(suggestedOptions(root)).toEqual(['Web'])
+    expect(siteProject(root)).toBe('Web')
+    expect(await suggestedOptions(root)).toEqual(['Web'])
     // Matching happens here: no page address went to the Node.
     expect(JSON.stringify(state.requests)).not.toContain('/app/login')
 
     fake.navigate('https://example.com/docs/intro')
     await settle(20)
-    expect(selected(root, 'project')).toBe('p2')
+    expect(siteProject(root)).toBe('Docs')
 
     // Another client associates a third project with the whole site, and the Node says projects changed.
     state.sites.n1!.push(site('p3', 'https://example.com'))
     fake.hosts[0]!.send({ v: 1, event: 'projects', nodeId: 'n1' })
     await settle(20)
     // Docs is still one of the page's candidates, so it stays chosen.
-    expect(selected(root, 'project')).toBe('p2')
-    expect(suggestedOptions(root)).toEqual(['Docs', 'Everything'])
+    expect(siteProject(root)).toBe('Docs')
+    expect(await suggestedOptions(root)).toEqual(['Docs', 'Everything'])
     // Overlapping prefixes are both candidates, and a project they leave out is cleared.
     fake.navigate('https://example.com/app/login')
     await settle(20)
-    expect(selected(root, 'project')).toBe('')
-    expect(suggestedOptions(root)).toEqual(['Web', 'Everything'])
-    expect(root.textContent).toContain('Several projects match this page. Choose one.')
+    expect(siteProject(root)).toBe('Choose a project')
+    expect(await suggestedOptions(root)).toEqual(['Web', 'Everything'])
+    // The picker says it, with no sentence asking the person to choose.
+    expect(await projectGroups(root)).toEqual({
+      'Suggested for this page': ['Web · Main', 'Everything · Other'],
+      'Other projects': ['Docs · Main'],
+    })
+    expect(root.textContent).not.toContain('Several projects')
 
     // An unmatched page shows only the task list.
-    await pick(root, 'project', 'p3')
+    await pickFrom(thisPage(root), 'Project', 'Everything')
     fake.navigate('https://elsewhere.example/')
     await settle(20)
-    expect(suggestedOptions(root)).toEqual([])
+    expect(await suggestedOptions(root)).toEqual([])
     expect(idle(root)).toBe(true)
   })
 
@@ -227,19 +240,19 @@ describe('project suggestions for a site', () => {
       sites: [site('p1', 'https://example.com', '/app'), site('p2', 'https://example.com', '/docs')],
     })
     await settle(30)
-    expect(selected(root, 'project')).toBe('p1')
-    await pick(root, 'project', 'p3')
+    expect(siteProject(root)).toBe('Web')
+    await pickFrom(thisPage(root), 'Project', 'Everything')
     expect(fake.storage.get('siteChoices:n1')).toEqual({ 'https://example.com p1': 'p3' })
 
     fake.navigate('https://example.com/docs')
     await settle(20)
-    expect(selected(root, 'project')).toBe('p2')
+    expect(siteProject(root)).toBe('Docs')
     fake.navigate('https://example.com/app/settings')
     await settle(20)
-    expect(selected(root, 'project')).toBe('p3')
+    expect(siteProject(root)).toBe('Everything')
 
     // Choosing the suggestion again forgets the override.
-    await pick(root, 'project', 'p1')
+    await pickFrom(thisPage(root), 'Project', 'Web')
     expect(fake.storage.get('siteChoices:n1')).toEqual({})
   })
 
@@ -249,7 +262,7 @@ describe('project suggestions for a site', () => {
       sites: [site('p1', 'http://localhost:5173', '/shop'), site('p2', 'http://localhost:5173', '/admin')],
     })
     await settle(30)
-    expect(selected(root, 'project')).toBe('p1')
+    expect(siteProject(root)).toBe('Web')
     await openSiteTask(root, 'Fix login')
     expect(shownTask(root)).toBe('Fix login')
     await openChat(root, 'Chat s1')
@@ -262,7 +275,7 @@ describe('project suggestions for a site', () => {
     expect(conversationTitle(root)).toBe('Chat s1')
     // This page follows the page.
     await goHome(root)
-    expect(selected(root, 'project')).toBe('p2')
+    expect(siteProject(root)).toBe('Docs')
     // Another port on localhost is another site, which matches nothing and moves nothing.
     fake.navigate('http://localhost:5174/admin')
     await settle(20)
@@ -281,7 +294,7 @@ describe('project suggestions for a site', () => {
     state.held.splice(0).forEach((reply) => reply())
     await settle(20)
     expect(state.active).toBe('n2')
-    expect(root.querySelector('select[name="project"]')).toBeNull()
+    expect(root.querySelector('[aria-label="This page"]')).toBeNull()
     expect(idle(root)).toBe(true)
     await openSettings(root)
     expect(siteAccess(root)).toEqual([])
@@ -453,7 +466,6 @@ describe('This page', () => {
     match: ['https://github.com/{owner}/{repo}/pull/{number}'],
     anchors: [],
   }
-  const thisPage = (root: HTMLElement) => root.querySelector('[aria-label="This page"]')!
   const agentRows = (root: HTMLElement) =>
     [...root.querySelectorAll('[aria-label="Agents"] .row-button strong')].map((row) => row.textContent)
 
@@ -498,7 +510,6 @@ describe('This page', () => {
       pages: [{ origin: 'https://github.com', pathPrefix: '/acme/web/pull/9', source: 'github' }],
     }
     state.taskPages = [pullTask, otherTask]
-    state.addedTasks.push({ id: 't2', title: 'Speed up search', branch: null })
     await settle(30)
     await openChat(root, 'Chat s1')
     expect(conversationTitle(root)).toBe('Chat s1')
@@ -568,7 +579,6 @@ describe('This page', () => {
         pages: [{ origin: 'https://github.com', pathPrefix: '/acme/web/pull/9', source: 'github' }],
       },
     ]
-    state.addedTasks.push({ id: 't2', title: 'Speed up search', branch: null })
     await settle(30)
     expect(shownTask(root)).toBe('Speed up search')
     await goHome(root)
@@ -619,12 +629,13 @@ describe('This page', () => {
   it("shows a project site's project, its tasks, and New task", async () => {
     const { root } = mount({ url: 'https://example.com/', sites: [site('p1', 'https://example.com')] })
     await settle(30)
-    expect(selected(root, 'project')).toBe('p1')
-    expect([...thisPage(root).querySelectorAll('[aria-label="Tasks"] strong')].map((row) => row.textContent)).toEqual([
-      'Fix login',
+    expect(siteProject(root)).toBe('Web')
+    // Home's task rows, from the Node's task list.
+    expect([...thisPage(root).querySelectorAll('[aria-label="Tasks"] .ui-row')].map((row) => row.textContent)).toEqual([
+      'Fix loginProject checkout',
     ])
     // New task opens the project in the desktop app; a development build copies that link.
-    expect(button(thisPage(root), 'Copy Acorn link')!.title).toBe('acorn://n1/p/p1')
+    expect(button(thisPage(root), 'Copy Acorn link')!.getAttribute('data-tip')).toBe('acorn://n1/p/p1')
   })
 
   it("opens on the page's task from a chip, with a new chat about the page when asked", async () => {
@@ -636,12 +647,16 @@ describe('This page', () => {
     fake.sendFromPage({ type: 'acorn:chip', key: 'github:pull', action: 'chat' })
     await settle(30)
     expect(root.querySelector('.view[aria-label="Settings"]')).toBeNull()
-    // The new-chat picker is the task's Agents tab; Home names the page waiting for the chat.
+    // The new-chat picker is the task's Agents tab, with the page waiting for the task's first chat.
     expect(shownTask(root)).toBe('Fix login')
     expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'New chat')).toBeDefined()
-    await goHome(root)
-    expect(thisPage(root).querySelector('strong')!.textContent).toBe('Fix login')
-    expect(root.querySelector('[aria-label="Waiting context"]')!.textContent).toContain('Page goes into the draft')
+    expect(root.querySelector('[aria-label="Pending item"]')!.textContent).toBe(
+      'Page · PageGoes with your first message.',
+    )
+    expect(fake.storage.get('pendingItem:n1:t1')).toMatchObject({
+      kind: 'link',
+      url: 'https://github.com/acme/web/pull/7',
+    })
   })
 
   it("shows a local app's task and stack, and asks for its site", async () => {
@@ -846,8 +861,8 @@ const choose = async (label: string) => {
 const palette = () => document.querySelector<HTMLElement>('[role="dialog"][aria-label="Go to task"]')
 // The palette's group labels, marked with #, and its rows' titles, in order.
 const paletteRows = () =>
-  [...palette()!.querySelectorAll('.go-to-task-group, .repo-picker-row')].map((item) =>
-    item.classList.contains('go-to-task-group')
+  [...palette()!.querySelectorAll('.repo-picker-group, .repo-picker-row')].map((item) =>
+    item.classList.contains('repo-picker-group')
       ? `# ${item.textContent}`
       : item.querySelector('.repo-picker-name > span')!.textContent,
   )

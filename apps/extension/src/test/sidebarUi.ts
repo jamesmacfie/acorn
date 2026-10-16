@@ -88,9 +88,9 @@ export async function openTask(root: ParentNode, title: string) {
 
 // Opens a task from the project's list on This page.
 export async function openSiteTask(root: ParentNode, title: string) {
-  const rows = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="This page"] [aria-label="Tasks"] button')]
+  const rows = [...root.querySelectorAll<HTMLElement>('[aria-label="This page"] [aria-label="Tasks"] .ui-row')]
   await click(
-    rows.find((row) => row.querySelector('strong')?.textContent === title),
+    rows.find((row) => row.querySelector('.row-title')?.textContent === title),
     `This page task row ${title}`,
   )
 }

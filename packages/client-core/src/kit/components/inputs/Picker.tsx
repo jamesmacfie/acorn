@@ -34,6 +34,9 @@ export type PickerItem = {
   disabled?: boolean
   /** Draws the row's own remove control, which reports through `onRemove`. */
   removable?: boolean
+  /** A label over the rows of one group, such as "Suggested for this page". The rows of a group come
+   *  together in `items`, and the label shows above the first of them that the filter keeps. */
+  group?: string
 }
 
 export type PickerProps<T> = {
@@ -178,30 +181,37 @@ export default function Picker<T>(props: PickerProps<T>) {
                 <ul class="repo-picker-list">
                   <For each={rows()}>
                     {(row, index) => (
-                      <PickerRow
-                        label={row.label}
-                        description={row.note}
-                        active={row.active}
-                        disabled={row.disabled}
-                        leading={
-                          row.removable ? (
-                            <ConfirmButton
-                              variant="bare"
-                              size="xs"
-                              iconOnly
-                              label={props.removeLabel ?? 'Remove'}
-                              tip={props.removeLabel ?? 'Remove'}
-                              confirmLabel={`${props.removeLabel ?? 'Remove'}?`}
-                              onConfirm={() => props.onRemove?.(row.id)}
-                            >
-                              <Icon name="x" />
-                            </ConfirmButton>
-                          ) : (
-                            props.leading?.((props.results?.(filter()) ?? [])[index()] as T)
-                          )
-                        }
-                        onSelect={() => choose(row)}
-                      />
+                      <>
+                        <Show when={row.group && row.group !== rows()[index() - 1]?.group}>
+                          <li class="repo-picker-group" role="presentation">
+                            {row.group}
+                          </li>
+                        </Show>
+                        <PickerRow
+                          label={row.label}
+                          description={row.note}
+                          active={row.active}
+                          disabled={row.disabled}
+                          leading={
+                            row.removable ? (
+                              <ConfirmButton
+                                variant="bare"
+                                size="xs"
+                                iconOnly
+                                label={props.removeLabel ?? 'Remove'}
+                                tip={props.removeLabel ?? 'Remove'}
+                                confirmLabel={`${props.removeLabel ?? 'Remove'}?`}
+                                onConfirm={() => props.onRemove?.(row.id)}
+                              >
+                                <Icon name="x" />
+                              </ConfirmButton>
+                            ) : (
+                              props.leading?.((props.results?.(filter()) ?? [])[index()] as T)
+                            )
+                          }
+                          onSelect={() => choose(row)}
+                        />
+                      </>
                     )}
                   </For>
                 </ul>

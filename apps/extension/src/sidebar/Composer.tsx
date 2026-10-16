@@ -17,7 +17,7 @@ import {
   type DraftTarget,
 } from '../localState'
 
-const CAPTURE_NAMES: Record<PageCapture['kind'], string> = {
+export const CAPTURE_NAMES: Record<PageCapture['kind'], string> = {
   link: 'Page',
   selection: 'Selected text',
   screenshot: 'Screenshot',

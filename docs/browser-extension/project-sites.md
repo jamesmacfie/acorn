@@ -61,16 +61,19 @@ sidebar the page's address on any site.
 Every project with an association covering the page is a candidate. Overlapping prefixes and several
 projects are all candidates, and none outranks another. A page that belongs to a task, or matches a
 handoff, shows that first ([This page](./task-pages.md#this-page)); otherwise a page with a candidate
-shows the project picker in Home's **This page** section:
+shows the kit's project `Picker` in Home's **This page** section. Its rows show each project's
+workspace:
 
 - **One candidate** is chosen in the picker, under **Suggested for this page**.
-- **Several candidates** are listed first in the picker. A project they leave out is cleared, and the
-  sidebar asks the person to choose one.
+- **Several candidates** are listed first in the picker, under **Suggested for this page**, and the
+  rest under **Other projects**. A project they leave out is cleared, and the picker reads **Choose a
+  project**.
 - **No candidate** shows no picker, and Home shows only its task list. To tie the page's site to a
   project, add it under Settings → **Projects**.
 
-Under the picker, **This page** lists the chosen project's open tasks, and clicking one opens it.
-**New task in Acorn** opens the project in the desktop app. A page on a project's site that belongs
+Under the picker, **This page** lists the chosen project's open tasks as
+[Home's task rows](./task-pages.md#homes-task-list), from the Node's task list, and clicking one opens
+it. **New task in Acorn** opens the project in the desktop app. A page on a project's site that belongs
 to no task moves nothing by itself: the task or conversation the panel shows, and its draft, stay put
 when the page changes, and only **This page** follows it.
 
@@ -83,7 +86,7 @@ Choosing a project in the picker that the page didn't suggest is an override. Th
 `storage.local` under `siteChoices:<nodeId>`, keyed by the page's origin and the projects it
 suggested. A later page on the same origin that suggests the same projects gets the person's choice
 again. A page on that origin that suggests other projects gets its own suggestion. Choosing the
-suggestion again forgets the override. Choosing no project is remembered as an override too.
+suggestion again forgets the override.
 
 ## The editor
 

@@ -32,14 +32,16 @@ panel opens and says so in one line, and adds nothing.
 
 On a page that belongs to a task, open the task chip's menu and choose **New chat about this page**
 ([Task chips and handoffs](/docs/browser-extension/task-chips-and-handoffs/#the-task-chip)). The panel
-opens on the task, and says the page **goes into the draft of the conversation you open next**. Open
-or start a conversation, and the link is in its draft as a **Page** chip. **Leave it out** drops it.
+opens on the task's **Agents** tab, with the page as a chip that **goes with your first message**.
+Open or start a conversation in that task, and the link is in its draft as a **Page** chip. The ×
+on the chip drops it.
 
 ## Add an item from a site
 
-After **Chat** or **Create task** on the handoff card, the item, such as the pull request with its
-description, waits in the same way and joins the next conversation's draft as an **Item** chip. The
-same item added twice is one chip.
+After **Create task** on the handoff card, the item, such as the pull request with its description,
+waits on the new task's **Agents** tab in the same way and joins its first conversation's draft as an
+**Item** chip. It waits only in that task, even after you close the panel. The same item added twice
+is one chip.
 
 ## Send a screenshot
 

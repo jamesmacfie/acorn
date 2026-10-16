@@ -37,11 +37,12 @@ project on the Node, so every browser paired with that Node sees them. A reposit
 
 ## What a site does
 
-On a page a project's site covers, Home's **This page** suggests the project under **Suggested for this
-page**, and lists its open tasks. Click one to open it. **New task in Acorn** opens the
-project in the desktop app.
+On a page a project's site covers, Home's **This page** picks the project in its **Project** picker,
+under **Suggested for this page**, and lists its open tasks. Click one to open it. **New task in
+Acorn** opens the project in the desktop app.
 
-- Several projects' sites can cover one page. Then the panel lists them first and asks you to choose.
+- Several projects' sites can cover one page. Then the picker lists them first, under **Suggested for
+  this page**, and the rest under **Other projects**, until you pick one.
 - A page that belongs to a task, or that a plugin can bring into a task, shows that first.
 - A site is only a suggestion. It grants the extension no access, and any task can still be chosen on
   any page.

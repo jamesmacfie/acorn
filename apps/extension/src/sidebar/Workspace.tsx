@@ -9,7 +9,6 @@ import type {
   BridgePanel,
   BridgePendingRequest,
   BridgeProject,
-  BridgeTask,
   BridgeWorkflowRun,
   BridgeWorkflowStep,
   BridgeWorkspace,
@@ -28,7 +27,16 @@ import { Conversation } from './Conversation'
 import { errorGuidance } from './guidance'
 import { GoToTask } from './GoToTask'
 import { Agents, Tasks, ThisPage } from './Home'
-import { changeDraft, loadHomeWorkspace, saveHomeWorkspace, type TaskTab } from '../localState'
+import {
+  changeDraft,
+  changedPendingItem,
+  dropPendingItems,
+  loadHomeWorkspace,
+  loadPendingItem,
+  savePendingItem,
+  saveHomeWorkspace,
+  type TaskTab,
+} from '../localState'
 import { locationTask, type Navigation } from './location'
 import { NeedsYou } from './NeedsYou'
 import { PluginPanel } from './PluginPanel'
@@ -81,10 +89,6 @@ export function Workspace(props: {
   handoff: PageHandoff | null
   startHandoff(handoff: PageHandoff): void
   dismissHandoff(): void
-  // A handed-off item's context, waiting for the person to open a conversation. It goes into that
-  // conversation's draft for review, never straight to an agent.
-  waitingContext: PageCapture | null
-  setWaitingContext(capture: PageCapture | null): void
   // Every request the Node's agents are waiting on.
   requests: readonly BridgePendingRequest[]
 }) {
@@ -95,8 +99,6 @@ export function Workspace(props: {
   const [workspaces, setWorkspaces] = createSignal<BridgeWorkspace[] | null>(null)
   // The workspace the person chose for Home's task list, if any.
   const [workspaceChoice, setWorkspaceChoice] = createSignal<string | null>(null)
-  // The open tasks of each project This page has shown.
-  const [taskLists, setTaskLists] = createSignal<Record<string, BridgeTask[]>>({})
   // Each task's conversations and workflow runs, as last read.
   const [sessionLists, setSessionLists] = createSignal<Record<string, BridgeAgentSession[]>>({})
   // Each workspace's conversations, as Home last read them, for its task rows' agent marks.
@@ -120,6 +122,8 @@ export function Workspace(props: {
   const [panelViews, setPanelViews] = createSignal<Record<string, BrowserPanelView | null>>({})
   const [panelProblems, setPanelProblems] = createSignal<Record<string, string>>({})
   const [panelSources, setPanelSources] = createSignal<Record<string, string>>({})
+  // The item waiting for the shown task's first conversation, as storage holds it.
+  const [pendingItem, setPendingItem] = createSignal<PageCapture | null>(null)
   const [problem, setProblem] = createSignal<string | null>(null)
 
   // The task the location shows. A memo, so a move within the task reads nothing again.
@@ -131,6 +135,10 @@ export function Workspace(props: {
   const task = () => props.tasks?.find((row) => row.id === taskId()) ?? null
   const pageTask = () => props.pageTasks[0] ?? null
   const projectName = (id: string) => projects()?.find((row) => row.id === id)?.name ?? id
+  const projectWorkspace = (id: string) => {
+    const workspaceId = projects()?.find((row) => row.id === id)?.workspaceId
+    return workspaces()?.find((workspace) => workspace.id === workspaceId)?.name
+  }
 
   const report = (error: unknown) => {
     // A reply refused because the Node changed under it is expected, and a missing bridge has its banner.
@@ -147,15 +155,6 @@ export function Workspace(props: {
     } catch (error) {
       setProjects(null)
       setWorkspaces(null)
-      report(error)
-    }
-  }
-
-  const loadTasks = async (projectId: string) => {
-    try {
-      const result = await props.client.call({ op: 'tasks.list', nodeId, projectId })
-      setTaskLists((lists) => ({ ...lists, [projectId]: result.tasks }))
-    } catch (error) {
       report(error)
     }
   }
@@ -223,20 +222,21 @@ export function Workspace(props: {
     if (pluginId && forTask) void loadPanel(pluginId, forTask)
   }
 
-  // The person opened a conversation. Waiting context joins its stored draft first, through the same
-  // helper a send that finished elsewhere uses, so the composer finds it when it mounts.
+  // The person opened a conversation. The item waiting in its task joins its stored draft first,
+  // through the same helper a send that finished elsewhere uses, so the composer finds it when it mounts.
   async function openSession(forTask: string, id: string) {
     const started = location()
-    const capture = props.waitingContext
-    if (capture) {
+    const storage = props.api.storage.local
+    const item = await loadPendingItem(storage, nodeId, forTask)
+    if (item) {
       try {
-        await changeDraft(props.api.storage.local, { nodeId, taskId: forTask, sessionId: id }, (draft) => {
+        await changeDraft(storage, { nodeId, taskId: forTask, sessionId: id }, (draft) => {
           const captures = draft.captures ?? []
           // The same item handed off twice is one capture.
-          if (captures.some((other) => other.kind === 'context' && other.url === capture.url)) return draft
-          return { ...draft, captures: withCapture(captures, capture) }
+          if (captures.some((other) => other.kind === item.kind && other.url === item.url)) return draft
+          return { ...draft, captures: withCapture(captures, item) }
         })
-        props.setWaitingContext(null)
+        await dropPendingItems(storage, nodeId, [forTask])
       } catch (error) {
         setProblem(
           error instanceof CaptureFailure
@@ -248,43 +248,43 @@ export function Workspace(props: {
     if (location() === started) nav.openConversation(forTask, id)
   }
 
-  // A task's newest conversation opens, or its Agents tab with the new-chat picker when it has none.
-  const chatInTask = async (forTask: string) => {
+  // Create task made the item's task: it opens on Agents, with the item waiting for its first chat.
+  const createdHandoffTask = async (_projectId: string, forTask: string, item: PageCapture) => {
+    props.dismissHandoff()
+    try {
+      await savePendingItem(props.api.storage.local, nodeId, forTask, item)
+    } catch {
+      setProblem('Browser storage is full, so the item will not go with the first message.')
+    }
     nav.openTask(forTask, 'agents')
-    const opened = location()
-    const newest = (await loadSessions(forTask))?.[0]
-    if (newest && location() === opened) void openSession(forTask, newest.id)
   }
 
-  // A handoff's linked or new task, with the item's context waiting for the conversation.
-  const openHandoffTask = (_projectId: string, forTask: string, capture: PageCapture) => {
-    props.setWaitingContext(capture)
-    props.dismissHandoff()
-    void chatInTask(forTask)
-  }
-
-  // Create task made the item's task, which This page shows once the task list catches up, with the
-  // item's context waiting for the first conversation the person opens.
-  const createdHandoffTask = (_projectId: string, _taskId: string, capture: PageCapture) => {
-    props.setWaitingContext(capture)
-    props.dismissHandoff()
-  }
-
-  // Start workflow made the item's task and started a run in it, which Runs shows.
+  // Start run made the item's task and started a run in it, which Runs shows expanded.
   const startedHandoffWorkflow = (_projectId: string, forTask: string, runId: string) => {
     props.dismissHandoff()
     setSelectedRun({ taskId: forTask, runId })
     nav.openTask(forTask, 'runs')
   }
 
-  // The task changed: read its conversations and runs.
+  // The task changed: read its conversations, its runs, and the item waiting for its first chat.
   createEffect(
-    on(taskId, (id) => {
+    on(taskId, async (id) => {
+      setPendingItem(null)
       if (!id) return
       void loadSessions(id)
       void loadRuns(id)
+      const item = await loadPendingItem(props.api.storage.local, nodeId, id)
+      if (taskId() === id) setPendingItem(item)
     }),
   )
+  // The item is added and removed in storage, by this view, by Create task, and by the task chip.
+  const onStorage = (changes: Record<string, { newValue?: unknown }>, area: string) => {
+    const id = taskId()
+    const item = area === 'local' && id ? changedPendingItem(nodeId, id, changes) : undefined
+    if (item !== undefined) setPendingItem(item)
+  }
+  props.api.storage.onChanged.addListener(onStorage)
+  onCleanup(() => props.api.storage.onChanged.removeListener(onStorage))
   // The task, or the Node's panels, changed: read every panel, which also says which tabs show. A
   // plugin answering no panel for the task has no tab.
   createEffect(
@@ -311,14 +311,19 @@ export function Workspace(props: {
     if (missing) nav.openTask(here.taskId, 'agents')
   })
 
-  // The task was archived or deleted: the Node's list had it, and the next one doesn't. A list without
-  // a task it never had says nothing, because the background sends an empty list before its first read.
+  // Tasks were archived or deleted: the Node's list had them, and the next one doesn't. The shown one
+  // gives way to Home, and none keeps a waiting item. A list without a task it never had says nothing,
+  // because the background sends an empty list before its first read.
   createEffect(
     on(
       () => props.tasks,
       (tasks, previous) => {
+        if (!tasks || !previous) return
+        const gone = previous.filter((row) => !tasks.some((next) => next.id === row.id)).map((row) => row.id)
+        if (!gone.length) return
+        void dropPendingItems(props.api.storage.local, nodeId, gone)
         const id = taskId()
-        if (id && tasks && previous?.some((row) => row.id === id) && !tasks.some((row) => row.id === id)) nav.goHome()
+        if (id && gone.includes(id)) nav.goHome()
       },
     ),
   )
@@ -432,10 +437,7 @@ export function Workspace(props: {
   // The page belongs to a task, carries an item a handoff can look up, or is on a project's site.
   const pageMatched = () =>
     Boolean(props.handoff || pageTask() || pageHandoffs(props.handoffs, props.pageUrl).length || onSite())
-  const showProject = (id: string | null) => {
-    setPageProject(id)
-    if (id) void loadTasks(id)
-  }
+  const showProject = (id: string | null) => setPageProject(id)
   // One candidate is shown, and a project the page's candidates leave out is cleared so the person
   // picks one. An unmatched page changes nothing.
   createEffect(
@@ -633,6 +635,7 @@ export function Workspace(props: {
               <Show when={pageMatched()}>
                 <ThisPage
                   client={props.client}
+                  api={props.api}
                   nodeId={nodeId}
                   online={props.online}
                   opensLinks={props.opensLinks}
@@ -642,23 +645,21 @@ export function Workspace(props: {
                   markerHidden={props.markerHidden}
                   showMarker={props.showMarker}
                   projectName={projectName}
+                  projectWorkspace={projectWorkspace}
                   agents={taskAgents}
                   openTask={(id) => nav.openTask(id)}
                   handoff={props.handoff}
                   startHandoff={props.startHandoff}
                   dismissHandoff={props.dismissHandoff}
-                  openHandoffTask={openHandoffTask}
-                  createdHandoffTask={createdHandoffTask}
+                  createdHandoffTask={(projectId, forTask, item) => void createdHandoffTask(projectId, forTask, item)}
                   startedHandoffWorkflow={startedHandoffWorkflow}
-                  waitingContext={props.waitingContext}
-                  dropWaitingContext={() => props.setWaitingContext(null)}
                   projects={projects()}
                   suggested={scope().suggested}
                   onSite={onSite()}
-                  several={!pageProject() && pageProjects().length > 1}
                   project={pageProject()}
                   pickProject={pickProject}
-                  tasks={pageProject() ? (taskLists()[pageProject()!] ?? null) : null}
+                  tasks={(props.tasks ?? []).filter((row) => row.projectId === pageProject())}
+                  pageTaskIds={props.pageTasks.map(({ task }) => task.id)}
                 />
               </Show>
               <Tasks
@@ -684,6 +685,8 @@ export function Workspace(props: {
                   online={props.online}
                   sessions={sessionLists()[id] ?? null}
                   requests={props.requests}
+                  pendingItem={pendingItem()}
+                  dropPendingItem={() => void dropPendingItems(props.api.storage.local, nodeId, [id])}
                   open={(sessionId) => void openSession(id, sessionId)}
                   started={(started) => {
                     setSessionLists((lists) => ({

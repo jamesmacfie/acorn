@@ -9,8 +9,9 @@ operations behind them. The code is in `apps/extension/src/sidebar/Handoff.tsx`,
 
 ## Starting a workflow
 
-The task chip's **Start workflow…** opens the [handoff card](./handoffs.md#the-handoff-card) with
-the workflow form. The person picks the project, then one of its workflows, and answers its inputs.
+The handoff card's **Run workflow** picker lists the project's workflows, and the task chip's
+**Start workflow…** opens the [handoff card](./handoffs.md#the-handoff-card) on the first of them.
+A chosen workflow shows its inputs, filled from the item, with **Start run** and **Cancel**.
 
 The list is what a task in that project can run, by the desktop's rule for its own **Start
 workflow…** box. The host reads the workflows plugin's merged list for the project's workspace and
@@ -22,11 +23,11 @@ keeps a definition only when:
 
 An input starts with the definition's default, then what the item fills in, through
 `plugins/workflows/src/contract/itemInputs.ts`. The item's title and context fill `issue`, `item`,
-and `context`, and its address fills `link` and `url` ([starting a run](../workflows/starting-runs.md#starting-a-run)). The
-start button waits until every required input has a value and each typed value parses for its
+and `context`, and its address fills `link` and `url` ([starting a run](../workflows/starting-runs.md#starting-a-run)). **Start
+run** waits until every required input has a value and each typed value parses for its
 schema.
 
-**Start workflow** creates the item's linked task with `handoff.create`, then starts the run with
+**Start run** creates the item's linked task with `handoff.create`, then starts the run with
 `workflow.start`. Both writes keep their keys, so pressing it again after one went unconfirmed makes
 no second task or run. A workflow from the repository's own config that Acorn doesn't trust yet is
 refused, with a message to start it once in the desktop app, where the trust prompt is. Once the run

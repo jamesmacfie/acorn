@@ -14,6 +14,7 @@ import { conversationLink, taskLink } from '../acornLinks'
 import type { BrowserApi } from '../browser'
 import { HIDDEN_MARKERS_KEY, type PageHandoff } from '../handoffs'
 import { CallFailure, type CallError, type HostState, type RequestTarget } from '../messages'
+import { savePendingItem } from '../localState'
 import { pageTasks } from '../taskPages'
 import { activePageUrl } from './activePage'
 import { bridgeClient } from './bridgeClient'
@@ -78,8 +79,6 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
   // The tasks the page beside the panel belongs to, and the first of them, which the panel follows.
   const pageTaskList = createMemo(() => pageTasks(nodeTasks() ?? [], pageUrl()))
   const pageTaskId = createMemo(() => pageTaskList()[0]?.task.id ?? null)
-  // A handed-off item's context, waiting for the conversation the person opens next.
-  const [waitingContext, setWaitingContext] = createSignal<PageCapture | null>(null)
   // Where the sidebar is, and what the top bar names under a task or in a conversation.
   const nav = createLocation({
     storage: props.api.storage.local,
@@ -136,21 +135,19 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     },
     notice: setNotice,
     taskPages: (nodeId, tasks) => setTaskPages({ nodeId, tasks }),
-    // A task chip was clicked: its task opens, on Agents with the page's link waiting for the
-    // conversation the person starts or opens next when they asked for a new chat about the page.
-    showTask: (chat) => {
+    // A task chip was clicked: its task opens, on Agents with the page's link waiting for the task's
+    // first conversation when they asked for a new chat about the page.
+    showTask: async (chat) => {
       setPairing(false)
       const taskId = pageTaskId()
-      if (taskId) nav.openTask(taskId, chat ? 'agents' : undefined)
-      else nav.goHome()
-      if (chat)
-        setWaitingContext({
-          kind: 'link',
-          id: crypto.randomUUID(),
-          url: chat.url,
-          title: chat.title,
-          capturedAt: Date.now(),
-        })
+      const nodeId = fleet()?.activeNodeId
+      if (!taskId || !nodeId) return nav.goHome()
+      if (chat) {
+        const link: PageCapture = { kind: 'link', id: crypto.randomUUID(), ...chat, capturedAt: Date.now() }
+        // Without room for it, the task still opens; the person can add the page from the composer.
+        await savePendingItem(props.api.storage.local, nodeId, taskId, link).catch(() => {})
+      }
+      nav.openTask(taskId, chat ? 'agents' : undefined)
     },
   })
   const selected = () => fleet()?.nodes.find((node) => node.nodeId === fleet()?.activeNodeId) ?? null
@@ -206,7 +203,6 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
     setHandoffs([])
     setPanels(null)
     setHandoff(null)
-    setWaitingContext(null)
     setSites([])
     if (next.activeNodeId) {
       void loadHandoffs(next.activeNodeId)
@@ -459,8 +455,6 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
               handoff={handoff()}
               startHandoff={setHandoff}
               dismissHandoff={() => setHandoff(null)}
-              waitingContext={waitingContext()}
-              setWaitingContext={setWaitingContext}
               requests={requests().nodeId === nodeId ? requests().requests : []}
             />
           )}

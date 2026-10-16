@@ -1,8 +1,9 @@
 import type { BrowserApi } from './browser'
 import type { PageCapture } from './capture'
 
-// What the sidebar keeps in this browser profile's storage: unsent drafts, the destination it last
-// showed on each Node, the tab last picked in each task, and the workspace Home lists. None of it
+// What the sidebar keeps in this browser profile's storage: unsent drafts, the item waiting for each
+// task's first conversation, the destination it last showed on each Node, the tab last picked in each
+// task, and the workspace Home lists. None of it
 // leaves the browser until the person sends.
 
 type Storage = BrowserApi['storage']['local']
@@ -77,6 +78,33 @@ export const acknowledged =
         ? { captures: draft.captures }
         : {}),
   })
+
+// An item waiting for a task's first conversation: a handed-off issue, or the page the task chip asked
+// a new chat about. One per task, so it never joins a chat in another task, and kept in storage, so it
+// outlives the panel. It joins the draft of the next conversation opened in its task.
+const pendingItemKey = (nodeId: string, taskId: string) => `pendingItem:${nodeId}:${taskId}`
+
+export async function loadPendingItem(storage: Storage, nodeId: string, taskId: string): Promise<PageCapture | null> {
+  const stored = (await storage.get([pendingItemKey(nodeId, taskId)]))[pendingItemKey(nodeId, taskId)]
+  return stored && typeof stored === 'object' ? (stored as PageCapture) : null
+}
+
+export const savePendingItem = (storage: Storage, nodeId: string, taskId: string, item: PageCapture): Promise<void> =>
+  storage.set({ [pendingItemKey(nodeId, taskId)]: item })
+
+export const dropPendingItems = (storage: Storage, nodeId: string, taskIds: readonly string[]): Promise<void> =>
+  storage.remove(taskIds.map((taskId) => pendingItemKey(nodeId, taskId)))
+
+// The task's item as a storage change left it, null when it went, or undefined when it wasn't touched.
+export function changedPendingItem(
+  nodeId: string,
+  taskId: string,
+  changes: Record<string, { newValue?: unknown }>,
+): PageCapture | null | undefined {
+  if (!(pendingItemKey(nodeId, taskId) in changes)) return undefined
+  const item = changes[pendingItemKey(nodeId, taskId)]?.newValue
+  return item && typeof item === 'object' ? (item as PageCapture) : null
+}
 
 // The task and conversation the sidebar last showed on a Node, which a selection added from the page's
 // menu goes to.

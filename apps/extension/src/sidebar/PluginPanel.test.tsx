@@ -169,9 +169,12 @@ describe('plugin panels', () => {
     expect(shown.querySelector('[aria-label="Services"] .dot[data-tone="bad"]')).not.toBeNull()
     expect(shown.querySelector('[aria-label="Services"] .dot[data-tone="active"]')).not.toBeNull()
     expect(shown.querySelectorAll('pre')[1]!.textContent).toBe('web started\nweb ready')
-    expect(shown.querySelector<HTMLAnchorElement>('a.button[href^="acorn:"]')!.getAttribute('href')).toBe(
-      taskPaneLink('n1', 't1', 'runn'),
-    )
+    const followed: string[] = []
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      followed.push(this.href)
+    })
+    button(shown, 'Open in Acorn')!.click()
+    expect(followed).toEqual([taskPaneLink('n1', 't1', 'runn')])
   })
 
   it('opens only a web address that answers in a new tab, and copies any address', async () => {

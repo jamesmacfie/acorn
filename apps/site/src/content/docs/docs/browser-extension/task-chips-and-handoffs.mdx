@@ -48,20 +48,21 @@ light or dark theme.
 
 On a page no task holds, such as a pull request you haven't started on, the chip reads **Start task**.
 Its menu has **Create task** and **Start workflow…**, as the desktop app's row menu does. Either opens
-the panel on the handoff card.
+the panel on the handoff card, which Home also shows on its own for a page no task holds.
 
 <SidebarPicture id="sidebar-handoff" />
 
-The card shows the item the page is, as the plugin reads it:
+The card shows the item the page is, as the plugin reads it: its key, the connection, and its title,
+with an arrow that opens the item in the desktop app.
 
-1. If the page is more than one item, such as one per GitHub account, choose one.
-2. **Linked tasks** lists tasks that already hold it, with **Chat** and **Open in Acorn**.
-3. Otherwise, pick the project, and click **Create task**. acorn makes a task linked to the item, and the
-   item waits for the first conversation you open, as an **Item** in its draft.
+1. If the page is more than one item, such as one per GitHub account, pick one from the key's list.
+2. A task that already holds the item shows as its row. Click it to open the task.
+3. Otherwise, the card names the project that tracks the item, or lets you pick one when several do.
+   Click **Create task**. acorn makes a task linked to the item and opens it on **Agents**, with the
+   item as a chip that goes with your first message. It waits only in that task.
 
-**Start workflow** makes the task and starts a workflow run on it
-([Workflows and plugin panels](/docs/browser-extension/workflows-and-plugin-panels/)). **Open in Acorn**
-opens the item in the desktop app instead.
+**Run workflow** picks a workflow to start on the item instead
+([Workflows and plugin panels](/docs/browser-extension/workflows-and-plugin-panels/)).
 
 Pressing **Create task** again after a slow answer doesn't make a second task: acorn answers with the
 one it made. The card closes when you leave the item's page, unless you've started filling it in.
@@ -84,8 +85,10 @@ section says what acorn knows about the page beside the panel:
 <SidebarPicture id="sidebar-home" />
 
 - **A task holds it.** One row with the task's agents, its project, and its branch. Click it to open the task.
-- **An item no task holds.** The handoff card. After you dismiss it, **Look up in Acorn** brings it back.
-- **A project's site.** The project its sites suggest, with its open tasks and **New task in Acorn**
+- **An item no task holds.** The handoff card. When several plugins match the page, or the Node is
+  offline, **Look up in Acorn** opens it.
+- **A project's site.** A project picker with the projects its sites suggest first, the project's open
+  tasks, and **New task in Acorn**
   ([Project sites](/docs/browser-extension/project-sites/)).
 
 A page that's none of these has no **This page** section.

@@ -162,13 +162,13 @@ paint containment would clip a card's focus ring.
 | `Checkbox` | stop | `[x] label`; Space toggles |
 | `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets. An option's `detail` picture is desktop-only, so the labels carry the choice |
 | `ToggleButton` | stop | `[x] label` |
-| `Picker` | stop | A field that opens a `Menu` filtered by typing. It draws no remove control, so it ignores `removable` and `removeLabel`, which name a row's remove button and arm it on the first press in the window |
+| `Picker` | stop | A field that opens a `Menu` filtered by typing. It draws no remove control, so it ignores `removable` and `removeLabel`, which name a row's remove button and arm it on the first press in the window. A `group` is a grey line over its rows |
 | `PickerRow` | item | One line in that menu: label and grey hint. A leading icon is omitted |
 | `Composer` | stop | A boxed field with a `> ` prompt. Commit submits |
 | `MentionTextarea` | stop | Reduced: a `Textarea` with the mention menu below it. No inline highlight of the token |
 | `KeyValueEditor` | none | A two-column table with editable cells, each cell a stop |
 | `FindBar` | stop | `/ query  3/12` on one line |
-| `Field` | none | The label above its child, the hint under it, then `help` as a grey line, because this host has no hover |
+| `Field` | none | The label above its child, with ` *` after it when `required`, the hint under it, then `help` as a grey line, because this host has no hover |
 | `CopyButton` | stop | A labeled Copy control sends OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
 | `ModelBackendPicker` | stop | Two `Select`s over the backends a Generate control can spend: a stored key, or an installed agent CLI |
 

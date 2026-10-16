@@ -315,7 +315,7 @@ export type BridgeProject = { id: string; name: string; path: string | null; hid
 export type BridgeWorkspace = { id: string; name: string }
 export type BridgeNodes = { nodes: NodeRecord[]; activeNodeId: string | null; status: NodeStatus | null }
 
-export type BridgeTask = { id: string; title: string; branch: string | null }
+type BridgeTask = { id: string; title: string; branch: string | null }
 
 // An address a task is known by, in the project sites' grammar: an exact origin and a path prefix
 // matched by whole segments, so a pull request's address covers its tabs and one at `/` covers the
