@@ -40,7 +40,7 @@ import {
 } from '../localState'
 import { locationTask, type Navigation } from './location'
 import { NeedsYou } from './NeedsYou'
-import { PluginPanel } from './PluginPanel'
+import { PluginPanel, panelMarker } from './PluginPanel'
 import type { Heading } from './TopBar'
 import { Runs, runsLive } from './Runs'
 
@@ -432,7 +432,12 @@ export function Workspace(props: {
         : []),
       ...(props.panels ?? [])
         .filter((panel) => panelViews()[panel.pluginId] || open === `panel:${panel.pluginId}`)
-        .map((panel) => ({ id: `panel:${panel.pluginId}`, label: panel.label, icon: panel.glyph ?? PANEL_GLYPH })),
+        .map((panel) => ({
+          id: `panel:${panel.pluginId}`,
+          label: panel.label,
+          icon: panel.glyph ?? PANEL_GLYPH,
+          marker: panelMarker(panelViews()[panel.pluginId]),
+        })),
     ]
   }
 
@@ -755,10 +760,10 @@ export function Workspace(props: {
                     view={panelViews()[panel().pluginId]}
                     problem={panelProblems()[panel().pluginId] ?? null}
                     opensLinks={props.opensLinks}
-                    refresh={() => void loadPanel(panel().pluginId, id)}
+                    refresh={() => loadPanel(panel().pluginId, id)}
                     pickSource={(source) => {
                       setPanelSources((sources) => ({ ...sources, [panel().pluginId]: source }))
-                      void loadPanel(panel().pluginId, id)
+                      return loadPanel(panel().pluginId, id)
                     }}
                   />
                 )}

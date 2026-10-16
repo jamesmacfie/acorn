@@ -65,15 +65,20 @@ When the task has one, its name and icon join the task's tabs, after **Runs**.
 
 A panel can show:
 
-- A state line, with detail.
-- Links, each with **Copy**, and **Open** for a web address.
-- Rows, each with a state.
+- A header with the state as a badge and a few lines under it.
+- Rows, each with an icon for its state: a green check, an amber alert, a red cross, or a dashed
+  circle for one still on its way.
+- Links. Click a web address to open it in a new tab. Every link has a copy button, so you can copy a
+  database address too.
 - Logs, with a choice of source.
 
-**Refresh** reads it again, and **Open in Acorn** opens the task in the desktop app on the plugin's pane.
-Anything that changes something happens there, not in the panel.
+When the header is red, so is the mark on the panel's tab.
 
-None of the plugins acorn ships has a browser panel. A plugin you install can add one.
+The refresh icon in the header reads it again, and the arrow beside it opens the task in the desktop
+app on the plugin's pane. Anything that changes something happens there, not in the panel.
+
+The GitHub plugin shows the task's pull request, and the Docker plugin shows its containers, ports,
+and logs. A plugin you install can add one too.
 
 ## Limits
 

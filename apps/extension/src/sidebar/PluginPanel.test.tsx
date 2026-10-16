@@ -5,7 +5,7 @@ import type { BrowserPanelView } from '@acorn/protocol/plugin/handoffs.ts'
 import { taskPaneLink } from '../acornLinks'
 import { startBackground } from '../background/background'
 import { fakeBrowser, settle } from '../test/fakeBrowser'
-import { button, goHome, pick, shownTask, tab, taskTabs } from '../test/sidebarUi'
+import { button, chosen, goHome, pickFrom, shownTask, tab, taskTabs } from '../test/sidebarUi'
 import { App } from './App'
 
 let dispose: (() => void) | undefined
@@ -26,9 +26,15 @@ const pageTask = (id: string, origin = 'https://app.example'): BridgePageTask =>
   pages: [{ origin, pathPrefix: '/', source: 'runn' }],
 })
 
-const view = (source = 'web'): BrowserPanelView => ({
+const view = (source = 'web', severity: 'info' | 'danger' = 'info'): BrowserPanelView => ({
   blocks: [
-    { kind: 'status', label: 'Stack', state: 'running', severity: 'info', detail: '<b>Up</b> 3 minutes' },
+    {
+      kind: 'status',
+      label: 'Stack',
+      state: 'running',
+      severity,
+      detail: '<b>Up</b> 3 minutes\nfix/flake → main\n1 unresolved thread',
+    },
     {
       kind: 'links',
       title: 'Links',
@@ -47,6 +53,7 @@ const view = (source = 'web'): BrowserPanelView => ({
         { label: 'admin', state: 'starting', severity: 'pending' },
       ],
     },
+    { kind: 'status', label: 'Backups', state: 'stale', severity: 'warn', detail: 'Last ran yesterday' },
     {
       kind: 'logs',
       title: 'Logs',
@@ -132,6 +139,18 @@ const openTab = (root: HTMLElement) =>
 const panelReads = (state: ReturnType<typeof mount>['state']) =>
   state.requests.filter((request) => request.op === 'plugin.panel')
 const openPanel = (root: HTMLElement) => tab(root, 'Runn')
+// The header's label, state badge, and detail lines.
+const header = (root: HTMLElement) =>
+  [...panel(root)!.querySelectorAll('.panel-head :is(.ui-heading-title, .ui-badge, .ui-text)')].map(
+    (element) => element.textContent,
+  )
+const rows = (root: HTMLElement, section: string) => [
+  ...panel(root)!.querySelectorAll<HTMLElement>(`[aria-label="${section}"] .ui-row`),
+]
+// A row's leading icon, read through `firstElementChild` because jsdom can miss `> *` on an SVG.
+const mark = (row: HTMLElement) => row.querySelector('.ui-row-leading')!.firstElementChild!
+const logLines = (root: HTMLElement) =>
+  [...panel(root)!.querySelectorAll('[role="log"] .ui-log-line')].map((line) => line.textContent)
 // The Node says its tasks changed, as it does when a plugin with a panel reports a new state.
 async function tasksChanged(fake: ReturnType<typeof fakeBrowser>) {
   fake.hosts[0]!.send({ v: 1, event: 'tasks', nodeId: 'n1' })
@@ -153,28 +172,53 @@ describe('plugin panels', () => {
     expect(taskTabs(root)).toEqual(['Agents', 'Runs'])
   })
 
-  it('draws every block as text, under the plugin name', async () => {
+  it('draws every block with the kit, under a header with Refresh and Open in Acorn', async () => {
     const { root } = mount()
     await settle(30)
     await openPanel(root)
     expect(shownTask(root)).toBe('Task t1')
     expect(openTab(root)).toBe('Runn')
-    const shown = panel(root)!
-    expect(shown.querySelector('.state')!.textContent).toBe('Stack running')
-    // The detail is the plugin's text, never markup.
-    expect(shown.querySelector('pre')!.textContent).toBe('<b>Up</b> 3 minutes')
-    expect(shown.querySelector('b')).toBeNull()
-    const services = [...shown.querySelectorAll('[aria-label="Services"] .ui-row')].map((row) => row.textContent)
-    expect(services).toEqual(['webhealthy', 'workerexited', 'adminstarting'])
-    expect(shown.querySelector('[aria-label="Services"] .dot[data-tone="bad"]')).not.toBeNull()
-    expect(shown.querySelector('[aria-label="Services"] .dot[data-tone="active"]')).not.toBeNull()
-    expect(shown.querySelectorAll('pre')[1]!.textContent).toBe('web started\nweb ready')
+    // The first status block is the header. Its detail is the plugin's text, never markup: the first
+    // line bold, a line with "→" second in monospace, and the rest muted.
+    expect(header(root)).toEqual(['Stack', 'running', '<b>Up</b> 3 minutes', 'fix/flake → main', '1 unresolved thread'])
+    expect(panel(root)!.querySelector('b')).toBeNull()
+    const lines = [...panel(root)!.querySelectorAll('.panel-head .ui-text')]
+    expect(lines.map((line) => line.getAttribute('data-emphasis'))).toEqual(['strong', 'mono', 'muted'])
+    expect(panel(root)!.querySelector('.panel-head .ui-badge')!.getAttribute('data-tone')).toBe('ok')
+
+    const services = rows(root, 'Services')
+    expect(services.map((row) => row.textContent)).toEqual(['webhealthy', 'workerexited', 'adminstarting'])
+    expect(services.map((row) => [mark(row).getAttribute('data-tone'), row.querySelector('svg') !== null])).toEqual([
+      ['ok', true],
+      ['danger', true],
+      ['muted', true],
+    ])
+    expect(panel(root)!.querySelector('[aria-label="Services"] .ui-section-header-count')!.textContent).toBe('3')
+    // A later status block is a row, with its detail as the row's tip.
+    const backups = [...panel(root)!.querySelectorAll<HTMLElement>('.panel-blocks > .ui-row')]
+    expect(backups.map((row) => [row.textContent, mark(row).getAttribute('data-tone'), row.dataset.tip])).toEqual([
+      ['Backupsstale', 'warn', 'Last ran yesterday'],
+    ])
+    expect(logLines(root)).toEqual(['web started', 'web ready'])
+
     const followed: string[] = []
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       followed.push(this.href)
     })
-    button(shown, 'Open in Acorn')!.click()
+    button(panel(root)!.querySelector('.panel-head')!, 'Open in Acorn')!.click()
     expect(followed).toEqual([taskPaneLink('n1', 't1', 'runn')])
+  })
+
+  it('marks the tab while the header says something is wrong', async () => {
+    const { fake, state, root } = mount()
+    await settle(30)
+    const runnTab = () => [...root.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent === 'Runn')!
+    expect(runnTab().querySelector('[aria-label="Needs attention"]')).toBeNull()
+    state.views.t1 = view('web', 'danger')
+    await openPanel(root)
+    await tasksChanged(fake)
+    expect(runnTab().querySelector('[aria-label="Needs attention"]')!.getAttribute('data-tone')).toBe('danger')
+    expect(panel(root)!.querySelector('.panel-head .ui-badge')!.getAttribute('data-tone')).toBe('danger')
   })
 
   it('opens only a web address that answers in a new tab, and copies any address', async () => {
@@ -183,24 +227,46 @@ describe('plugin panels', () => {
     const { root } = mount()
     await settle(30)
     await openPanel(root)
-    const [app, database, admin] = [...panel(root)!.querySelectorAll<HTMLElement>('[aria-label="Links"] .ui-row')]
-    const open = app!.querySelector<HTMLAnchorElement>('a')!
-    expect(open.getAttribute('href')).toBe('https://app.example/')
-    expect(open.getAttribute('target')).toBe('_blank')
-    expect(database!.querySelector('a')).toBeNull()
-    expect(admin!.querySelector('a')).toBeNull()
+    const [app, database, admin] = rows(root, 'Links')
+    // The address shows without its scheme.
+    expect([app, database, admin].map((row) => row!.querySelectorAll('.ui-text')[1]!.textContent)).toEqual([
+      'app.example/',
+      'postgres://localhost:5432/app',
+      'admin.example/',
+    ])
+    // The row that opens is the link itself, with the arrow that says so.
+    expect(app!.tagName).toBe('A')
+    expect(app!.getAttribute('href')).toBe('https://app.example/')
+    expect(app!.getAttribute('target')).toBe('_blank')
+    expect(app!.querySelector('.ui-row-trailing')!.children).toHaveLength(2)
+    for (const row of [database!, admin!]) {
+      expect(row.tagName).not.toBe('A')
+      expect(row.querySelector('a')).toBeNull()
+      expect(row.querySelector('.ui-row-trailing')!.children).toHaveLength(1)
+    }
     button(database!, 'Copy')!.click()
     await settle()
     expect(writeText).toHaveBeenCalledWith('postgres://localhost:5432/app')
+    expect(button(database!, 'Copied')).toBeDefined()
+    // Copying from the row that opens doesn't follow its link. The window hears the click after the
+    // row's handler, which Solid delegates to the document.
+    const prevented = vi.fn((event: Event) => event.defaultPrevented)
+    window.addEventListener('click', prevented, { once: true })
+    button(app!, 'Copy')!.click()
+    await settle()
+    expect(writeText).toHaveBeenLastCalledWith('https://app.example/')
+    expect(prevented).toHaveReturnedWith(true)
   })
 
   it('reads the view again for the log source the person picks', async () => {
     const { state, root } = mount()
     await settle(30)
     await openPanel(root)
-    await pick(panel(root)!, 'log-source', 'worker')
+    expect(chosen(panel(root)!, 'Log source')).toBe('web')
+    await pickFrom(panel(root)!, 'Log source', 'worker')
     expect(panelReads(state).at(-1)).toMatchObject({ pluginId: 'runn', taskId: 't1', source: 'worker' })
-    expect(panel(root)!.querySelectorAll('pre')[1]!.textContent).toBe('worker started\nworker ready')
+    expect(chosen(panel(root)!, 'Log source')).toBe('worker')
+    expect(logLines(root)).toEqual(['worker started', 'worker ready'])
   })
 
   it('reads again on Refresh and when the Node reports a change, keeping the last view through a failure', async () => {
@@ -211,11 +277,16 @@ describe('plugin panels', () => {
     await tasksChanged(fake)
     expect(panelReads(state).length).toBe(before + 1)
     state.views.t1 = new Error("The runn plugin answered with something the extension can't use.")
-    button(panel(root)!, 'Refresh')!.click()
+    const refresh = button(panel(root)!, 'Refresh')!
+    expect(refresh.querySelector('[data-spin]')).toBeNull()
+    refresh.click()
+    // The icon turns while the read is out.
+    expect(refresh.querySelector('[data-spin]')).not.toBeNull()
     await settle(30)
+    expect(refresh.querySelector('[data-spin]')).toBeNull()
     expect(panelReads(state).length).toBe(before + 2)
     expect(panel(root)!.querySelector('[role="alert"]')!.textContent).toContain("can't use")
-    expect(panel(root)!.querySelector('.state')!.textContent).toBe('Stack running')
+    expect(header(root).slice(0, 2)).toEqual(['Stack', 'running'])
     // The sidebar still works around it.
     await goHome(root)
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
@@ -230,7 +301,7 @@ describe('plugin panels', () => {
     await settle(30)
     expect(shownTask(root)).toBe('Task t1')
     expect(openTab(root)).toBe('Runn')
-    expect(panel(root)!.querySelector('.state')!.textContent).toBe('Stack running')
+    expect(header(root).slice(0, 2)).toEqual(['Stack', 'running'])
     expect(panelReads(state).length).toBe(reads)
   })
 
@@ -249,7 +320,7 @@ describe('plugin panels', () => {
     await settle(30)
     expect(shownTask(root)).toBe('Task t1')
     expect(openTab(root)).toBe('Runn')
-    expect(panel(root)!.querySelector('.state')!.textContent).toBe('Stack running')
+    expect(header(root).slice(0, 2)).toEqual(['Stack', 'running'])
 
     // The panel closes and opens again beside the same page.
     dispose?.()
@@ -258,7 +329,7 @@ describe('plugin panels', () => {
     await settle(30)
     expect(shownTask(reopened.root)).toBe('Task t1')
     expect(openTab(reopened.root)).toBe('Runn')
-    expect(panel(reopened.root)!.querySelector('.state')!.textContent).toBe('Stack running')
+    expect(header(reopened.root).slice(0, 2)).toEqual(['Stack', 'running'])
   })
 
   it("gives way to Agents when the task's panel goes", async () => {

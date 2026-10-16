@@ -43,7 +43,7 @@ caller whose credential is bound to one task.
 
 | Block | Fields |
 | --- | --- |
-| `status` | `label`, `state`, `severity`, and an optional `detail`, shown as preformatted text |
+| `status` | `label`, `state`, `severity`, and an optional `detail`. The first block, when it's a `status` block, heads the panel |
 | `links` | `title`, and `links`, at most 16, each `{ label, url }` with an optional `ready` |
 | `rows` | `title`, and `rows`, at most 64, each `{ label, state, severity }` |
 | `logs` | `title`, `sources`, at most 32, each `{ id, label }`, the `source` the lines came from or `null`, and `lines`, at most 200 |
@@ -62,6 +62,12 @@ answer over 512 KiB. The panel then shows an error and keeps the last view it ha
 has to ship in Acorn before a plugin can send it.
 
 The extension draws everything as plain text, never as markup.
+
+Put a `status` block first to head the panel. Its `state` shows as a badge in the severity's colour,
+and its `detail` as lines under the label: the first line in bold, a second line that holds "→" in
+monospace, such as `fix/retry → main`, and the rest muted. Any other `status` block draws as a row.
+A `danger` header marks the panel's tab. Rows and statuses get an icon by severity, so send `info`
+for a passing state. [Plugin panels](../browser-extension/plugin-panels.md#the-panel) has the table.
 
 ## When the panel is read
 

@@ -18,17 +18,41 @@ the plugin stops. A page that belongs to no task leaves it open.
 
 ## The panel
 
-The panel draws the plugin's blocks with the kit's rows and section headers, as plain text:
+The panel draws the plugin's blocks with the kit's parts, as plain text. A block's severity picks an
+icon and a tone in one table, `SEVERITY` in `PluginPanel.tsx`:
 
-- `status` is a state line, with its detail as preformatted text.
-- `links` lists each link with **Copy**, and **Open** for an `http` or `https` address only, which
-  opens in a new tab.
-- `rows` lists each row with its state dot.
-- `logs` has a source picker and the lines. Picking a source reads the panel again with that
-  source, which the sidebar remembers for the plugin until it closes.
+| Severity | Icon | Tone |
+| --- | --- | --- |
+| `info` | `circle-check` | ok |
+| `warn` | `circle-alert` | warn |
+| `danger` | `circle-x` | danger |
+| `pending` | `circle-dashed` | muted |
 
-**Open in Acorn** opens the task in the desktop app on the plugin's declared pane. Anything that
+A panel has no "ok" severity. A plugin sends `info` for a passing check or an approving review.
+
+- The view's first block, when it's a `status` block, is the header: the label in large type and the
+  state as a `Badge` in the severity's tone. Each line of `detail` follows. The first line is bold, a
+  second line that holds "→" is monospace, and the rest are muted. That reads the GitHub plugin's
+  lines out of free text, and an optional field on the block would replace it.
+- A later `status` block is a row with its severity's icon, its state at the right, and its detail as
+  the row's tip.
+- `rows` is a section with its title and count, and a kit `Row` for each row: the severity's icon,
+  the label, and the state at the right.
+- `links` is a section of rows, each with a link icon, the label, and the address under it without
+  `https://` or `http://`. Every row has a **Copy** icon button, which shows a check for a moment
+  after copying. An `http` or `https` address without `ready: false` makes the whole row a link that
+  opens in a new tab, with a faint arrow at the right. Any other address opens nothing.
+- `logs` is a section with the source in a ghost `Picker` in its header and the lines in the kit's
+  `Log`. Picking a source reads the panel again with that source, which the sidebar remembers for the
+  plugin until it closes.
+
+**Refresh** and **Open in Acorn** are icon buttons at the right of the header, drawn even when the
+view has no `status` block first. **Refresh** turns while a read it started, or the first read, is
+out. **Open in Acorn** opens the task in the desktop app on the plugin's declared pane. Anything that
 changes state happens there.
+
+While the header's severity is `danger`, the panel's tab carries a red `circle-x`, named "Needs
+attention".
 
 An open panel is read again when the Node's tasks change, which includes the plugin reporting a new
 state, when the connection comes back, and on **Refresh**. A failed read keeps the last view and
@@ -54,6 +78,9 @@ for a plugin with task addresses. The sidebar's task list is read again, and an 
 
 ## Gaps
 
+- Only the extension draws a panel. The desktop and the terminal client have no view of
+  `browserPanelView`, so the drawing isn't shared with them, though every part it uses is a kit part
+  both of them have.
 - The nav item, the panel, and the operation were checked in unit tests only, not in a browser against
   a Node running a plugin with a panel.
 - Changing the sidebar's task reads every declared panel, even when none is open, because the answer

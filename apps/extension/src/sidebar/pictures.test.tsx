@@ -332,7 +332,9 @@ describe('the sidebar pictures on the site', () => {
     const { root } = mount({ url: `${ACME_APP}/`, title: 'Acme', paired: true, panel: true })
     await settle(40)
     await tab(root, 'Acme app')
-    expect(root.querySelector('.view[aria-label="Acme app"] .state')?.textContent).toBe('Acme app running')
+    expect(root.querySelector('.view[aria-label="Acme app"] .panel-head .ui-heading-title')?.textContent).toBe(
+      'Acme app',
+    )
     picture('sidebar-plugin-panel', root)
   })
 })
