@@ -1,6 +1,7 @@
 # Give GitLab and Bitbucket the same experience as GitHub
 
-Date: October 16, 2026. Status: proposed. Implementation not started.
+Date: October 16, 2026. Status: implemented October 17, 2026. Each phase doc has a completion note at
+its top. GitLab and Bitbucket are checked against fake APIs only; a check with real accounts remains open.
 
 This programme lists what stands between acorn and a GitLab or Bitbucket plugin that matches the
 GitHub plugin, and the order to fix it in. Read this page before you pick up a phase.
