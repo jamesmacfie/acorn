@@ -103,7 +103,8 @@ advertises the destinations the host can offer. The host stamps the plugin ident
 cannot point at another plugin's panel. URL recognizers continue to work as before.
 
 A `contentLinks` entry uses a bounded `https://` host and path grammar and delivers one captured path
-segment to one of three destinations:
+segment to one of three destinations. A code host can write `{codeHost}` as the host, which stands for
+each host it holds ([hosts claimed at runtime](./self-hosted-code-hosts.md)):
 
 - A task-scoped `openPane` from the same manifest, which receives it as a `plugin:select` intent in
   the active task.

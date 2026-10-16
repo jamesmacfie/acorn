@@ -13,10 +13,11 @@ import type { MergeRequestDetail, MergeRequestDiff, MergeRequestRow } from '../.
 import { makeFakeGitlab, makeMergeRequest, type FakeProject } from '../fakeGitlab.helper'
 import { projectReads } from './projectReads'
 import { projectWrites } from './projectWrites'
+import { createGitlabServers } from '../servers'
 
 vi.mock('../gitlabApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../gitlabApi')>()),
-  gitlabSession: async () => ({ token: 'token' }),
+  gitlabSession: async (_c: unknown, server: { origin: string }) => ({ origin: server.origin, token: 'token' }),
 }))
 
 const DEVICE: Principal = { kind: 'device', userId: 'owner' } as Principal
@@ -29,6 +30,13 @@ const core = {
     },
   },
 } as unknown as Pick<CoreServices, 'tasks'>
+
+// One gitlab.com connection.
+const servers = createGitlabServers({
+  connections: async () => [{ id: 'conn-1', config: '{}' }],
+  claim: () => ({ dispose: () => {} }),
+  forgetOthers: async () => {},
+})
 
 const blobs = new Map<string, string>()
 const env = {
@@ -43,13 +51,14 @@ describe('the GitLab project routes, against a fake gitlab.com', () => {
   let fake: ReturnType<typeof makeFakeGitlab>
   let project: FakeProject
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDb = makeTestPluginDb('gitlab')
     blobs.clear()
     adopted.length = 0
     project = { id: 42, path: 'Group/Sub/API', defaultBranch: 'main', mergeRequests: [makeMergeRequest()] }
     fake = makeFakeGitlab([project])
     vi.stubGlobal('fetch', fake.fetch)
+    await servers.sync()
   })
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -59,8 +68,8 @@ describe('the GitLab project routes, against a fake gitlab.com', () => {
   const app = () =>
     new Hono<AppEnv>()
       .use('/api/*', ...testGate(DEVICE))
-      .route('/api/projects', projectReads(testDb.db, { core, maxPages: 5 }))
-      .route('/api/projects', projectWrites(testDb.db))
+      .route('/api/projects', projectReads(testDb.db, servers, { core, maxPages: 5 }))
+      .route('/api/projects', projectWrites(testDb.db, servers))
   const call = async <T>(path: string, init: RequestInit = {}) => {
     const response = await app().fetch(new Request(`http://acorn.test/api/projects${path}`, init), env)
     return { status: response.status, body: (await response.json()) as T }
@@ -70,7 +79,7 @@ describe('the GitLab project routes, against a fake gitlab.com', () => {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const at = (path: string) => `/${encodeURIComponent(path)}`
+  const at = (path: string) => `/gitlab.com/${encodeURIComponent(path)}`
 
   it("lists the person's projects, in GitLab's spelling", async () => {
     const { status, body } = await call<{ path: string; id: number }[]>('')

@@ -31,7 +31,7 @@ route. This is one array element:
 | --- | --- |
 | `id` | Lowercase letters, digits, and hyphens, at most 64 characters, unique among this plugin's contributions. |
 | `label` | 1 to 40 characters. The chip shows the task's name or **Start task**, and keeps the label in its accessible name. The extension uses it as text, never as markup. |
-| `match` | 1 to 8 page addresses in the [content-link grammar](../plugins/descriptors.md#content-links): `https://` only, a literal host or one `*.` level, and literal, `{capture}`, or one `{capture+}` path segments. A `{capture+}` takes one or more segments and comes right before a literal, as in `https://gitlab.com/{path+}/-/merge_requests/{number}`. Otherwise the page must have exactly as many segments as the pattern, and one trailing slash is allowed. Declare one pattern per arity. |
+| `match` | 1 to 8 page addresses in the [content-link grammar](../plugins/descriptors.md#content-links): `https://` only, a literal host or one `*.` level, and literal, `{capture}`, or one `{capture+}` path segments. A `{capture+}` takes one or more segments and comes right before a literal, as in `https://gitlab.com/{path+}/-/merge_requests/{number}`. Otherwise the page must have exactly as many segments as the pattern, and one trailing slash is allowed. Declare one pattern per arity. A [self-hosted code host](../plugins/self-hosted-code-hosts.md) can write `{codeHost}` as the host, which discovery expands into one pattern per host it holds. |
 | `anchors` | Up to 4 CSS selectors, each at most 200 characters. The chip goes at the end of the first element that matches and is drawn. A selector can't contain `{`, `}`, `;`, `<`, or a control character. Leave it empty to offer the handoff in the sidebar only. |
 | `resolve` | A route inside this plugin's own `/v1/p/<pluginId>/` namespace. |
 
@@ -170,7 +170,7 @@ for it, and the person still decides which sites the extension may read.
 `GET /v1/core/browser-handoffs` lists every running plugin's handoffs, each with its `pluginId`, its
 task address routes as `taskAddresses: [{ pluginId, route }]`, and its [sidebar panel](./browser-panel.md) under `panels`.
 `codeHosts` lists the ids of the running [code hosts](../plugins/code-hosts.md), whose task addresses match in any case. It is device-only. A package waiting for review isn't listed until it runs, a disabled or failed plugin isn't listed,
-and a reload replaces the list with the new version's. The host broadcasts `plugins:changed` on each of these, and the extension reads the list again.
+and a reload replaces the list with the new version's. A `{codeHost}` pattern is expanded on each read, so a host a code host claims or releases is in or out of the list at once. The host broadcasts `plugins:changed` on each of these, and the extension reads the list again. A company server's pages still need the person to grant the extension that site.
 
 ## Ship a handoff
 

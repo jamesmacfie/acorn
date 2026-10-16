@@ -21,11 +21,11 @@ export default function MergeRequestDetail() {
   const scope = createBrowseScope()
   const number = () => params.number ?? ''
   const ready = () => scope.linked() && !!number()
-  const model = createMemo(() => (ready() ? mrModel({ ...splitPath(scope.path()), number: number() }) : null))
+  const model = createMemo(() => (ready() ? mrModel({ ...splitPath(scope.address()), number: number() }) : null))
   const changedFiles = useChangedFiles(() => model()?.files() ?? [])
   // Keyed, because the diff reads its route once: a new merge request gets a new diff.
   const route = createMemo<MergeRequestRoute | null>(
-    () => (ready() ? { path: scope.path(), number: number(), key: `${scope.path()}!${number()}` } : null),
+    () => (ready() ? { address: scope.address(), number: number(), key: `${scope.address()}!${number()}` } : null),
     null,
     { equals: (a, b) => a?.key === b?.key },
   )
@@ -42,11 +42,11 @@ export default function MergeRequestDetail() {
     if (!at) return
     setRefreshing(true)
     try {
-      const [detail, diff] = await forceRefresh(at.path, at.number)
-      queryClient.setQueryData(mergeRequestKey(at.path, at.number), detail)
-      queryClient.setQueryData(diffKey(at.path, at.number), diff)
+      const [detail, diff] = await forceRefresh(at.address, at.number)
+      queryClient.setQueryData(mergeRequestKey(at.address, at.number), detail)
+      queryClient.setQueryData(diffKey(at.address, at.number), diff)
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: mergeRequestsPrefixKey(at.path) }),
+        queryClient.invalidateQueries({ queryKey: mergeRequestsPrefixKey(at.address) }),
         queryClient.invalidateQueries({ queryKey: ['plugin-ref-resolutions'] }),
       ])
     } finally {
@@ -93,7 +93,9 @@ export default function MergeRequestDetail() {
                   {(at) => <DiffForMergeRequest route={at} router />}
                 </Show>
               )}
-              checkPanel={(check, close) => <GitlabChecksPanel path={scope.path()} check={check} onClose={close} />}
+              checkPanel={(check, close) => (
+                <GitlabChecksPanel address={scope.address()} check={check} onClose={close} />
+              )}
             />
           </Show>
         )}

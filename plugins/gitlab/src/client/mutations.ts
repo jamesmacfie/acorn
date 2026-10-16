@@ -6,8 +6,8 @@ import { jobRetryRoute, mergeRequestRoute } from '../shared/api'
 const remove = (route: string, body: unknown) =>
   writeJson(route, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
-export const mergeRequestWrites = (path: string, number: string) => {
-  const at = (child: string) => mergeRequestRoute(path, number, child)
+export const mergeRequestWrites = (address: string, number: string) => {
+  const at = (child: string) => mergeRequestRoute(address, number, child)
   return {
     comment: (body: string) => postJson(at('comments'), { body }),
     approve: () => postJson(at('approve')),
@@ -27,4 +27,4 @@ export const mergeRequestWrites = (path: string, number: string) => {
   }
 }
 
-export const retryJob = (path: string, jobId: number) => postJson(jobRetryRoute(path, jobId))
+export const retryJob = (address: string, jobId: number) => postJson(jobRetryRoute(address, jobId))

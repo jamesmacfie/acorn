@@ -16,13 +16,13 @@ export function MrPane(props: { task: Task }) {
   const target = () => taskMergeRequest(props.task)
   const model = createMemo(() => {
     const at = target()
-    return at ? mrModel({ ...splitPath(at.path), number: String(at.number), taskId: props.task.id }) : null
+    return at ? mrModel({ ...splitPath(at.address), number: String(at.number), taskId: props.task.id }) : null
   })
   const changedFiles = useChangedFiles(() => model()?.files() ?? [], { router: false })
   const route = createMemo<MergeRequestRoute | null>(
     () => {
       const at = target()
-      return at ? { path: at.path, number: String(at.number), key: `${at.path}!${at.number}` } : null
+      return at ? { address: at.address, number: String(at.number), key: `${at.address}!${at.number}` } : null
     },
     null,
     { equals: (a, b) => a?.key === b?.key },
@@ -56,7 +56,7 @@ export function MrPane(props: { task: Task }) {
               {(at) => <DiffForMergeRequest route={at} router={false} taskId={props.task.id} />}
             </Show>
           )}
-          checkPanel={(check, close) => <GitlabChecksPanel path={target()!.path} check={check} onClose={close} />}
+          checkPanel={(check, close) => <GitlabChecksPanel address={target()!.address} check={check} onClose={close} />}
         />
       )}
     </Show>

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../../content/contentLinkPattern.ts'
+import { checkDeclaredContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../../content/contentLinkPattern.ts'
 import { isThemeColorValue, THEME_COLOR_VALUE_MAX, THEME_PALETTE_TOKENS } from '../../appearance/themeTokens.ts'
 import { styleValueProblem } from '../../appearance/styleValues.ts'
 import { refresh } from './chromeDescriptors.ts'
@@ -47,7 +47,7 @@ const contentLinkPattern = z
   .max(CONTENT_LINK_PATTERN_MAX_LENGTH)
   .superRefine((value, ctx) => {
     try {
-      compileContentLinkPattern(value)
+      checkDeclaredContentLinkPattern(value)
     } catch (error) {
       ctx.addIssue({ code: 'custom', message: error instanceof Error ? error.message : String(error) })
     }
@@ -95,7 +95,7 @@ export const contentLinkDescriptor = z
     match: contentLinkPattern
       .optional()
       .describe(
-        'The URLs this link claims, such as `https://linear.app/{team}/issue/{id}`: `https`, a literal host, and literal or `{capture}` path parts. Needs `item`.',
+        "The URLs this link claims, such as `https://linear.app/{team}/issue/{id}`: `https`, a literal host or a code host's `{codeHost}`, and literal or `{capture}` path parts. Needs `item`.",
       ),
     // A task-scoped pane this manifest declares, checked by the node. Optional, because the host can instead
     // open the plugin's reference panel for the matched item, which needs no task and no pane. Which of

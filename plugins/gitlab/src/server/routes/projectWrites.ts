@@ -10,6 +10,7 @@ import { mirroredMergeRequest, refreshMergeRequest, type MirrorKey } from '../mi
 import { mirroredProject } from '../mirror/projects'
 import { createMergeRequest } from '../createMergeRequest'
 import { fail, mergeRequestKey, projectRequest } from './context'
+import type { GitlabServers } from '../servers'
 
 // Everything under /v1/p/gitlab/projects that writes. Each verb is one GitLab call, then a read of the
 // merge request's detail into the mirror, so the reader's next fetch already shows what changed.
@@ -75,13 +76,13 @@ const SET_REVIEWERS = `mutation SetReviewers($projectPath: ID!, $iid: String!, $
   mergeRequestSetReviewers(input: { projectPath: $projectPath, iid: $iid, reviewerUsernames: $logins, operationMode: $mode }) { errors }
 }`
 
-export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) => {
+export const projectWrites = (db: PluginDatabase, servers: GitlabServers, emit: GitlabEmit = NO_EMIT) => {
   async function run(c: Context<AppEnv>, schema: z.ZodType<Record<string, unknown>> | null, write: Write) {
     const parsed = schema
       ? schema.safeParse(await c.req.json().catch(() => null))
       : { success: true as const, data: {} }
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    const request = await projectRequest(c, db)
+    const request = await projectRequest(c, db, servers)
     if (!request.ok) return request.response
     const key = mergeRequestKey(c, request.value)
     if (!key) return respondError(c, 400, 'bad_number')
@@ -100,7 +101,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
       .from(notes)
       .where(
         and(
-          eq(notes.userId, key.userId),
+          eq(notes.connectionId, key.connectionId),
           eq(notes.projectId, key.projectId),
           eq(notes.iid, key.iid),
           eq(notes.id, noteId),
@@ -111,12 +112,12 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
 
   return (
     new Hono<AppEnv>()
-      .post('/:path/merge-requests', async (c) => {
+      .post('/:host/:path/merge-requests', async (c) => {
         const parsed = create.safeParse(await c.req.json().catch(() => null))
         if (!parsed.success) return respondError(c, 400, 'bad_request')
-        const request = await projectRequest(c, db)
+        const request = await projectRequest(c, db, servers)
         if (!request.ok) return request.response
-        const project = await mirroredProject(db, request.value.userId, request.value.project.path)
+        const project = await mirroredProject(db, request.value.server.connectionId, request.value.project.path)
         const created = await createMergeRequest(
           request.value.session,
           { path: request.value.project.path, defaultBranch: project?.defaultBranch ?? null },
@@ -124,7 +125,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
         )
         return created.ok ? c.json(created.value) : fail(c, created.failure)
       })
-      .post('/:path/merge-requests/:number/comments', (c) =>
+      .post('/:host/:path/merge-requests/:number/comments', (c) =>
         run(
           c,
           text,
@@ -134,7 +135,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           ),
         ),
       )
-      .post('/:path/merge-requests/:number/approve', (c) =>
+      .post('/:host/:path/merge-requests/:number/approve', (c) =>
         run(
           c,
           null,
@@ -144,7 +145,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           ),
         ),
       )
-      .post('/:path/merge-requests/:number/merge', (c) =>
+      .post('/:host/:path/merge-requests/:number/merge', (c) =>
         run(c, merge, async ({ session, base, input }) => {
           const response = await gl(session, `${base}/merge`, put({ squash: input.method === 'squash' }))
           // GitLab says 405, 406, 409 or 422 when the merge request can't merge as it stands.
@@ -154,7 +155,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           return failure ? { ok: false, failure } : { ok: true, value: null }
         }),
       )
-      .post('/:path/merge-requests/:number/close', (c) =>
+      .post('/:host/:path/merge-requests/:number/close', (c) =>
         run(
           c,
           null,
@@ -164,7 +165,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           ),
         ),
       )
-      .post('/:path/merge-requests/:number/reopen', (c) =>
+      .post('/:host/:path/merge-requests/:number/reopen', (c) =>
         run(
           c,
           null,
@@ -174,7 +175,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           ),
         ),
       )
-      .post('/:path/merge-requests/:number/draft', (c) =>
+      .post('/:host/:path/merge-requests/:number/draft', (c) =>
         run(
           c,
           draft,
@@ -185,7 +186,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           })),
         ),
       )
-      .post('/:path/merge-requests/:number/labels', (c) =>
+      .post('/:host/:path/merge-requests/:number/labels', (c) =>
         run(
           c,
           name,
@@ -195,7 +196,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           ),
         ),
       )
-      .delete('/:path/merge-requests/:number/labels', (c) =>
+      .delete('/:host/:path/merge-requests/:number/labels', (c) =>
         run(
           c,
           name,
@@ -205,7 +206,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           ),
         ),
       )
-      .post('/:path/merge-requests/:number/reviewers', (c) =>
+      .post('/:host/:path/merge-requests/:number/reviewers', (c) =>
         run(
           c,
           login,
@@ -217,7 +218,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           })),
         ),
       )
-      .delete('/:path/merge-requests/:number/reviewers', (c) =>
+      .delete('/:host/:path/merge-requests/:number/reviewers', (c) =>
         run(
           c,
           login,
@@ -231,7 +232,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
       )
       // A new thread on a line. GitLab places it by the merge request's three diff commits, from the
       // mirror, and by the line on each side: both for an unchanged line, one for an added or a deleted one.
-      .post('/:path/merge-requests/:number/notes', (c) =>
+      .post('/:host/:path/merge-requests/:number/notes', (c) =>
         run(c, diffNote, async ({ session, key, base, input }) => {
           const row = await mirroredMergeRequest(db, key)
           if (!row?.headSha || !row.baseSha || !row.startSha)
@@ -255,7 +256,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           )
         }),
       )
-      .post('/:path/merge-requests/:number/notes/:noteId/replies', async (c) => {
+      .post('/:host/:path/merge-requests/:number/notes/:noteId/replies', async (c) => {
         const noteId = Number(c.req.param('noteId'))
         if (!Number.isSafeInteger(noteId)) return respondError(c, 400, 'bad_request')
         return run(c, text, async ({ session, key, base, input }) => {
@@ -264,7 +265,7 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           return glJson(session, `${base}/discussions/${discussion}/notes`, json({ body: input.body }))
         })
       })
-      .post('/:path/merge-requests/:number/discussions/:discussionId/resolve', (c) =>
+      .post('/:host/:path/merge-requests/:number/discussions/:discussionId/resolve', (c) =>
         run(c, resolved, ({ session, base, input }) =>
           glJson(
             session,
@@ -273,10 +274,10 @@ export const projectWrites = (db: PluginDatabase, emit: GitlabEmit = NO_EMIT) =>
           ),
         ),
       )
-      .post('/:path/jobs/:jobId/retry', async (c) => {
+      .post('/:host/:path/jobs/:jobId/retry', async (c) => {
         const jobId = Number(c.req.param('jobId'))
         if (!Number.isSafeInteger(jobId) || jobId <= 0) return respondError(c, 400, 'bad_request')
-        const request = await projectRequest(c, db)
+        const request = await projectRequest(c, db, servers)
         if (!request.ok) return request.response
         const retried = await glJson(
           request.value.session,

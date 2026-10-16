@@ -21,6 +21,8 @@ export const registrationSnapshot = (entry: EligiblePlugin): string => {
       hash: entry.hash,
       trusted: entry.trusted,
       inactive: entry.inactive === true,
+      // A host the plugin claims or releases changes what its `{codeHost}` content links match.
+      codeHosts: entry.row.codeHosts ?? [],
       installed: {
         version,
         apiVersion,

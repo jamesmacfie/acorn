@@ -19,6 +19,7 @@ import { checkFailed, checkPending } from './mirror/vocabulary'
 import { taskMergeRequest } from './taskMergeRequest'
 import { ciSettledDescription, reviewReceivedDescription, validateReviewReceived } from './policyDescriptions'
 import type { GitlabEmit } from './events'
+import type { GitlabServers } from './servers'
 
 type PolicyCore = Pick<CoreServices, 'tasks' | 'projects' | 'identity'>
 type ProviderAccess = {
@@ -26,6 +27,7 @@ type ProviderAccess = {
     userId: string,
     providerId: string,
     visit: (connection: StoredConnection, secret: string) => Promise<T | undefined>,
+    connectionId?: string,
   ): Promise<T | undefined>
 }
 
@@ -38,15 +40,23 @@ export function gitlabWorkflowPolicies(
   db: PluginDatabase,
   core: PolicyCore,
   providers: ProviderAccess,
+  servers: GitlabServers,
   emit: GitlabEmit,
 ): { ciSettled: PolicyContribution; reviewReceived: PolicyContribution } {
   /** The task's merge request, read again from GitLab. A throw is a failed poll, which the gate retries. */
   async function refreshed(taskId: string): Promise<MirrorKey | { verdict: PolicyVerdict }> {
-    const key = await taskMergeRequest(db, core, core.identity.active(), taskId)
-    if (!key) return { verdict: NO_MERGE_REQUEST }
-    const result = await providers.withConnection(key.userId, GITLAB_PROVIDER, (_connection, token) =>
-      refreshMergeRequest({ token }, db, key, emit),
-    )
+    const key = await taskMergeRequest(db, core, servers, taskId)
+    const owner = core.identity.active()
+    if (!key || !owner) return { verdict: NO_MERGE_REQUEST }
+    const server = servers.byConnection(key.connectionId)
+    const result =
+      server &&
+      (await providers.withConnection(
+        owner,
+        GITLAB_PROVIDER,
+        (_connection, token) => refreshMergeRequest({ origin: server.origin, token }, db, key, emit),
+        server.connectionId,
+      ))
     if (!result) throw new Error('GitLab is not connected.')
     if (!result.ok) throw new Error(`GitLab refresh failed: ${result.failure.detail?.[0] ?? result.failure.error}`)
     return key

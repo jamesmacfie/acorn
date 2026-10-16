@@ -1,5 +1,6 @@
 import type { PluginBroadcast } from '@acorn/plugin-api/node'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
+import { projectAddress } from '../shared/mergeRequestRef'
 
 // What gitlab announces on its own channel (docs/plugins/events.md § Hearing another plugin). Every
 // verb means "re-read the mirror". workflows hears `checks-changed`.
@@ -11,8 +12,16 @@ export const gitlabEmitter =
   (verb, payload = {}) =>
     send({ channel: pluginChannel('gitlab', verb), ...payload })
 
-/** A merge request's identity on the channel: its project's path in GitLab's spelling and its number. */
-export const mergeRequestPayload = (path: string, iid: number) => ({ projectPath: path, number: iid })
+/** A project's identity on the channel: its address on the server at `origin`. */
+export const projectPayload = (origin: string, path: string) => ({
+  projectAddress: projectAddress(new URL(origin).hostname, path),
+})
+
+/** A merge request's identity on the channel: its project's address and its number. */
+export const mergeRequestPayload = (origin: string, path: string, iid: number) => ({
+  ...projectPayload(origin, path),
+  number: iid,
+})
 
 /** For tests and any caller with nobody listening. */
 export const NO_EMIT: GitlabEmit = () => {}

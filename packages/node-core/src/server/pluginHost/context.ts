@@ -59,11 +59,13 @@ import { isNodeEventChannel } from '@acorn/protocol/nodeEvents.ts'
 import { assertSubscribableVerb } from './emits'
 import {
   broadcastNotice,
+  broadcastPluginsChanged,
   broadcastRepoConfigTrustNotice,
   broadcastStatus,
   broadcastWorktreeStatusChanged,
 } from '../notify'
 import { buildPluginRequestContext } from './requestContext'
+import { claimCodeHost } from './codeHosts'
 import { telemetryFor } from '../telemetry/collector'
 import { telemetryServiceFor } from '../core/telemetry'
 import { createLogger } from '../telemetry/logger'
@@ -482,7 +484,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       // A node provider holds a closure over this plugin's context and, for a cloud one, its credential
       // scope, so a survivor would keep listing nodes through an instance whose dispose already ran.
       nodes: (provider) => recordUndo(registerNodeProvider(plugin, provider).dispose),
-      withConnection: async (userId, providerId, visit) => {
+      withConnection: async (userId, providerId, visit, connectionId) => {
         if (!options.env) throw new Error(`Plugin '${plugin}' requested a provider credential without host bindings.`)
         let visited = false
         const values = await buildPluginRequestContext(
@@ -492,12 +494,38 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         ).providers.withConnections(providerId, async (connection, secret) => {
           // `withConnections` intentionally walks every connection for provider-resource fan-out.
           // A write must choose one or it could perform the action twice, so take the first usable row
-          // in the host's stable connection order.
-          if (visited) return undefined
+          // in the host's stable connection order, or the one the caller named.
+          if (visited || (connectionId !== undefined && connection.id !== connectionId)) return undefined
           visited = true
           return visit(connection, secret)
         })
         return values[0]
+      },
+      connections: async (userId, providerId) => {
+        if (!options.env) throw new Error(`Plugin '${plugin}' listed provider connections without host bindings.`)
+        return buildPluginRequestContext(
+          options.env,
+          { kind: 'internal', scope: 'service', userId },
+          plugin,
+        ).providers.connections(providerId)
+      },
+    },
+    // A claim changes which plugin serves the projects on that host, and which pages its browser
+    // handoffs match, so clients and the extension re-read both. The host takes every claim back with
+    // the plugin's code host declaration, so no undo is recorded here.
+    codeHosts: {
+      claim: (host) => {
+        const release = claimCodeHost(plugin, host)
+        broadcastPluginsChanged()
+        let released = false
+        return {
+          dispose: () => {
+            if (released) return
+            released = true
+            release()
+            broadcastPluginsChanged()
+          },
+        }
       },
     },
     // Rung 1 of the containment ladder for a loaded plugin: only the capability ids and CoreServices

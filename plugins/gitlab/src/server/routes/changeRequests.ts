@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono'
 import { changeRequestCreateInput, type ChangeRequestFeedback } from '@acorn/protocol/plugin/contract.ts'
-import { type AppEnv, mayActOnTask, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
+import { type AppEnv, mayActOnTask, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { gitlabSession, GITLAB_PROVIDER } from '../gitlabApi'
 import { readDetail, readFilePaths } from '../mirror/detail'
 import { mirroredProject, resolveProject } from '../mirror/projects'
@@ -8,6 +8,7 @@ import { checkFailed, checkPending } from '../mirror/vocabulary'
 import { createMergeRequest } from '../createMergeRequest'
 import { taskMergeRequest, type TaskCore } from '../taskMergeRequest'
 import { fail } from './context'
+import type { GitlabServers } from '../servers'
 
 // How many of each kind of feedback an agent gets, for the reason GitHub caps its own.
 const FEEDBACK_LIMIT = 100
@@ -15,12 +16,12 @@ const FEEDBACK_LIMIT = 100
 // The routes under this plugin's `codeHost.changeRequest.api`, which core's `pr` context section and
 // `pr_*` agent tools call (docs/plugins/code-hosts.md § Agent context). The reads answer from the
 // mirror, so none spends a credential, and a 404 means nothing is mirrored for that merge request.
-export const changeRequestRoutes = (db: PluginDatabase, core: TaskCore) => {
+export const changeRequestRoutes = (db: PluginDatabase, core: TaskCore, servers: GitlabServers) => {
   const mirrored = async (c: Context<AppEnv>) => {
     const taskId = c.req.query('taskId')
     const number = Number(c.req.param('number'))
     if (!taskId || !mayActOnTask(c, taskId) || !Number.isSafeInteger(number)) return null
-    const key = await taskMergeRequest(db, core, ownerId(c), taskId, number)
+    const key = await taskMergeRequest(db, core, servers, taskId, number)
     const detail = key && (await readDetail(db, key))
     return key && detail ? { key, detail } : null
   }
@@ -93,10 +94,12 @@ export const changeRequestRoutes = (db: PluginDatabase, core: TaskCore) => {
         const repository = task && (await core.projects.byId(task.projectId))?.repository
         if (repository?.provider !== GITLAB_PROVIDER)
           return respondError(c, 400, 'bad_request', ['This task project is not on GitLab.'])
-        const session = await gitlabSession(c)
-        const resolved = await resolveProject(session, db, ownerId(c), repository.path)
+        const server = servers.byHost(repository.host)
+        const session = server && (await gitlabSession(c, server))
+        if (!server || !session?.token) return respondError(c, 401, 'reauth')
+        const resolved = await resolveProject(session, db, server.connectionId, repository.path)
         if (!resolved.ok) return fail(c, resolved.failure)
-        const project = await mirroredProject(db, ownerId(c), resolved.value.path)
+        const project = await mirroredProject(db, server.connectionId, resolved.value.path)
         const created = await createMergeRequest(
           session,
           { path: resolved.value.path, defaultBranch: project?.defaultBranch ?? null },

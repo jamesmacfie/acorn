@@ -1,41 +1,60 @@
 import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
 
-// How a merge request is named outside its own pane: `group/sub/api!12`, GitLab's own spelling. The
-// source rows, the content link recogniser, the reference panel, and the task link all use it.
+// How a project and a merge request are named outside their own pane. A project's address is its
+// server's host and its path, such as `gitlab.com/group/sub/api`, because the same path can name two
+// projects on two servers. A merge request is its address and number in GitLab's spelling,
+// `gitlab.com/group/sub/api!12`. The source rows, the content link recogniser, the reference panel, the
+// task link, and the routes all use these.
 
-export type MergeRequestRef = { path: string; number: string }
+export type MergeRequestRef = { address: string; number: string }
 
-export const formatMergeRequestRef = (path: string, number: string | number): string => `${path}!${number}`
+/** A project's address on the server at `host`. */
+export const projectAddress = (host: string, path: string): string => `${host}/${path}`
 
-const REF = /^([^!\s]+(?:\/[^!\s]+)+)!(\d+)$/
+/** An address's host and project path. */
+export function splitAddress(address: string): { host: string; path: string } {
+  const at = address.indexOf('/')
+  return { host: address.slice(0, at), path: address.slice(at + 1) }
+}
+
+export const formatMergeRequestRef = (address: string, number: string | number): string => `${address}!${number}`
+
+// A host, then a project path of at least two segments: a project always sits in a group or a user.
+const REF = /^([^!\s/]+(?:\/[^!\s/]+){2,})!(\d+)$/
 
 export function parseMergeRequestRef(value: string): MergeRequestRef | null {
   const match = REF.exec(value)
-  return match ? { path: match[1]!, number: match[2]! } : null
+  return match ? { address: match[1]!, number: match[2]! } : null
 }
 
-/** A merge request's page on gitlab.com. */
-export const mergeRequestUrl = (path: string, number: string | number) =>
-  `https://gitlab.com/${path}/-/merge_requests/${number}`
+/** A merge request's page. */
+export const mergeRequestUrl = (address: string, number: string | number) =>
+  `https://${address}/-/merge_requests/${number}`
 
-// The same grammar the browser handoff declares, so the pane, a content link, and the extension agree
-// on which pages are merge requests. A project path nests groups to any depth.
-const MERGE_REQUEST_PAGES = [
-  compileContentLinkPattern('https://gitlab.com/{path+}/-/merge_requests/{number}'),
-  compileContentLinkPattern('https://gitlab.com/{path+}/-/merge_requests/{number}/{tab}'),
-]
-
-/** The merge request a gitlab.com address names, or null. */
+/** The merge request an address names, or null, on any host: the caller says which hosts are GitLab's.
+ *  The grammar is the browser handoff's, so the pane, a content link, and the extension agree on which
+ *  pages are merge requests. A project path nests groups to any depth. */
 export function parseMergeRequestUrl(href: string): MergeRequestRef | null {
   // A content link can carry a query or fragment, which the page grammar leaves out.
   const bare = href.split(/[?#]/)[0]!
-  for (const pattern of MERGE_REQUEST_PAGES) {
-    const captures = pattern.match(bare)
+  let host: string
+  try {
+    host = new URL(bare).hostname
+  } catch {
+    return null
+  }
+  for (const page of ['{path+}/-/merge_requests/{number}', '{path+}/-/merge_requests/{number}/{tab}']) {
+    let captures: Record<string, string> | null
+    try {
+      captures = compileContentLinkPattern(`https://${host}/${page}`).match(bare)
+    } catch {
+      return null
+    }
     if (captures?.path && captures.number && /^\d+$/.test(captures.number))
-      return { path: captures.path, number: captures.number }
+      return { address: projectAddress(host, captures.path), number: captures.number }
   }
   return null
 }
 
-/** Paths are case-insensitive on GitLab, and core stores them folded. */
+/** Paths are case-insensitive on GitLab, and core stores them folded. Hosts are lowercase already. */
 export const samePath = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()

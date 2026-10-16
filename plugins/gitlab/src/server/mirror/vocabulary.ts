@@ -1,5 +1,4 @@
 import type { ChangeRequestState } from '@acorn/change-request-ui/model'
-import { GITLAB_ORIGIN } from '../config'
 
 // GitLab's words in the shared views' vocabulary (docs/plugins/change-request-ui.md § The neutral model).
 
@@ -42,17 +41,17 @@ export const checkPending = (status: string | null): boolean => !status || PENDI
 export const checkFailed = (status: string | null): boolean => !checkPending(status) && !PASSED.has(status!)
 
 /**
- * GitLab's rendered HTML, made to stand on its own: links and images are root-relative on gitlab.com,
- * and images load lazily from `data-src` behind a placeholder `src`.
+ * GitLab's rendered HTML, made to stand on its own: links and images are root-relative on the server at
+ * `origin`, and images load lazily from `data-src` behind a placeholder `src`.
  */
-export const standaloneHtml = (html: string | null | undefined): string | null =>
+export const standaloneHtml = (origin: string, html: string | null | undefined): string | null =>
   html
     ? html
         .replace(/\ssrc="data:[^"]*"/g, '')
         .replace(/\sdata-src="/g, ' src="')
-        .replace(/\s(href|src)="\/(?!\/)/g, ` $1="${GITLAB_ORIGIN}/`)
+        .replace(/\s(href|src)="\/(?!\/)/g, ` $1="${origin}/`)
     : null
 
-/** An avatar URL GitLab may send root-relative. */
-export const absoluteUrl = (url: string | null | undefined): string | null =>
-  url ? (url.startsWith('/') ? `${GITLAB_ORIGIN}${url}` : url) : null
+/** An avatar URL GitLab may send root-relative to the server at `origin`. */
+export const absoluteUrl = (origin: string, url: string | null | undefined): string | null =>
+  url ? (url.startsWith('/') ? `${origin}${url}` : url) : null

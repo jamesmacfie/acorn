@@ -2,13 +2,16 @@
 // query keys that address them. Both halves of this plugin read it.
 //
 // A merge request's detail answers the shared review views' neutral model directly
-// (docs/plugins/change-request-ui.md), so the client maps nothing. A project is addressed by its full
-// path, URL-encoded into one segment, which GitLab's own API also takes.
+// (docs/plugins/change-request-ui.md), so the client maps nothing. A project is addressed by its
+// server's host, then its full path URL-encoded into one segment, which GitLab's own API also takes.
 import type { DiffDocumentTopology, DiffSearchRequest, DiffSegmentRequest } from '@acorn/diff-document/document'
 import type { ChangedFile, ChangeRequestDetail, ChangeRequestSummary, Label } from '@acorn/change-request-ui/model'
+import { splitAddress } from './mergeRequestRef'
 
 export type GitlabProject = {
   id: number
+  /** The server it's on, such as `gitlab.com`. */
+  host: string
   /** The full path in GitLab's spelling, such as `group/sub/api`. */
   path: string
   name: string
@@ -18,8 +21,8 @@ export type GitlabProject = {
 }
 
 export type GitlabImportItem =
-  | { projectId: number; action: 'map'; path: string }
-  | { projectId: number; action: 'clone'; parentDir: string }
+  | { host: string; projectId: number; action: 'map'; path: string }
+  | { host: string; projectId: number; action: 'clone'; parentDir: string }
 export type GitlabImportResult = {
   projectId: number
   path: string
@@ -50,35 +53,42 @@ export type JobLog = { text: string }
 export type ProjectLabel = Label
 export type Member = { login: string; avatarUrl: string | null }
 
+/** A server this Node has a connection to, and the connection that serves it. */
+export type GitlabServerSummary = { host: string; connectionId: string }
+export const serversRoute = '/v1/p/gitlab/servers'
+
 export const projectsRoute = '/v1/p/gitlab/projects'
 export const importRoute = '/v1/p/gitlab/import'
-const projectRoute = (path: string, child = '') =>
-  `${projectsRoute}/${encodeURIComponent(path)}${child ? `/${child}` : ''}`
-export const mergeRequestsRoute = (path: string, state: 'open' | 'closed') =>
-  projectRoute(path, `merge-requests?state=${state}`)
-export const mergeRequestRoute = (path: string, number: string | number, child = '') =>
-  projectRoute(path, `merge-requests/${number}${child ? `/${child}` : ''}`)
-export const filesRoute = (path: string, number: string | number) => mergeRequestRoute(path, number, 'files')
-export const diffRoute = (path: string, number: string | number) => mergeRequestRoute(path, number, 'diff')
-export const diffSegmentsRoute = (path: string) => projectRoute(path, 'diff/segments')
-export const diffSearchRoute = (path: string) => projectRoute(path, 'diff/search')
+const projectRoute = (address: string, child = '') => {
+  const { host, path } = splitAddress(address)
+  return `${projectsRoute}/${host}/${encodeURIComponent(path)}${child ? `/${child}` : ''}`
+}
+export const mergeRequestsRoute = (address: string, state: 'open' | 'closed') =>
+  projectRoute(address, `merge-requests?state=${state}`)
+export const mergeRequestRoute = (address: string, number: string | number, child = '') =>
+  projectRoute(address, `merge-requests/${number}${child ? `/${child}` : ''}`)
+export const filesRoute = (address: string, number: string | number) => mergeRequestRoute(address, number, 'files')
+export const diffRoute = (address: string, number: string | number) => mergeRequestRoute(address, number, 'diff')
+export const diffSegmentsRoute = (address: string) => projectRoute(address, 'diff/segments')
+export const diffSearchRoute = (address: string) => projectRoute(address, 'diff/search')
 /** A file's whole text at a commit, for expanding the context around a hunk. */
-export const fileTextRoute = (path: string, commit: string, file: string) =>
-  projectRoute(path, `files/${commit}?path=${encodeURIComponent(file)}`)
-export const labelsRoute = (path: string) => projectRoute(path, 'labels')
-export const membersRoute = (path: string) => projectRoute(path, 'members')
-export const jobLogRoute = (path: string, jobId: number) => projectRoute(path, `jobs/${jobId}/log`)
-export const jobRetryRoute = (path: string, jobId: number) => projectRoute(path, `jobs/${jobId}/retry`)
+export const fileTextRoute = (address: string, commit: string, file: string) =>
+  projectRoute(address, `files/${commit}?path=${encodeURIComponent(file)}`)
+export const labelsRoute = (address: string) => projectRoute(address, 'labels')
+export const membersRoute = (address: string) => projectRoute(address, 'members')
+export const jobLogRoute = (address: string, jobId: number) => projectRoute(address, `jobs/${jobId}/log`)
+export const jobRetryRoute = (address: string, jobId: number) => projectRoute(address, `jobs/${jobId}/retry`)
 
 export const projectsKey = ['gitlab-projects'] as const
-export const mergeRequestsKey = (path: string, state: 'open' | 'closed') => ['gitlab-mrs', path, state] as const
-export const mergeRequestsPrefixKey = (path: string) => ['gitlab-mrs', path] as const
-export const mergeRequestKey = (path: string, number: string) => ['gitlab-mr', path, number] as const
-export const mergeRequestPrefixKey = (path: string) => ['gitlab-mr', path] as const
-export const filesKey = (path: string, number: string) => ['gitlab-mr-files', path, number] as const
+export const mergeRequestsKey = (address: string, state: 'open' | 'closed') => ['gitlab-mrs', address, state] as const
+export const mergeRequestsPrefixKey = (address: string) => ['gitlab-mrs', address] as const
+export const mergeRequestKey = (address: string, number: string) => ['gitlab-mr', address, number] as const
+export const mergeRequestPrefixKey = (address: string) => ['gitlab-mr', address] as const
+export const filesKey = (address: string, number: string) => ['gitlab-mr-files', address, number] as const
 // Not persisted: a document can be large, and the node rebuilds it from its own blobs in one read.
-export const diffKey = (path: string, number: string) => ['gitlab-mr-files', path, number, 'diff'] as const
-export const fileTextKey = (path: string, commit: string, file: string) => ['gitlab-file', path, commit, file] as const
-export const labelsKey = (path: string) => ['gitlab-labels', path] as const
-export const membersKey = (path: string) => ['gitlab-members', path] as const
-export const jobLogKey = (path: string, jobId: number) => ['gitlab-job-log', path, jobId] as const
+export const diffKey = (address: string, number: string) => ['gitlab-mr-files', address, number, 'diff'] as const
+export const fileTextKey = (address: string, commit: string, file: string) =>
+  ['gitlab-file', address, commit, file] as const
+export const labelsKey = (address: string) => ['gitlab-labels', address] as const
+export const membersKey = (address: string) => ['gitlab-members', address] as const
+export const jobLogKey = (address: string, jobId: number) => ['gitlab-job-log', address, jobId] as const

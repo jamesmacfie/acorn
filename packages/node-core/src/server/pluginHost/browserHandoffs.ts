@@ -13,6 +13,8 @@ import {
   type BrowserPanelDescriptor,
   type TaskAddressesRoute,
 } from '@acorn/protocol/plugin/handoffs.ts'
+import { expandCodeHostPattern } from '@acorn/protocol/contentLinkPattern.ts'
+import { heldHosts } from './codeHosts'
 
 type Declaration = {
   handoffs: readonly BrowserHandoff[]
@@ -78,9 +80,17 @@ export function declareBrowserHandoffs(
   }
 }
 
-/** Every running plugin's handoffs, ordered by plugin and then declaration. */
+/** Every running plugin's handoffs, ordered by plugin and then declaration. A `{codeHost}` pattern is
+ *  expanded here, on each read, into one pattern per host the plugin holds right now, so a host claimed
+ *  or released since the plugin started is already in or out. A handoff left with no pattern is dropped. */
 export const browserHandoffs = (): BrowserHandoff[] =>
-  [...declared.keys()].sort().flatMap((pluginId) => declared.get(pluginId)!.handoffs)
+  [...declared.keys()].sort().flatMap((pluginId) => {
+    const hosts = heldHosts(pluginId)
+    return declared.get(pluginId)!.handoffs.flatMap((handoff) => {
+      const match = handoff.match.flatMap((pattern) => expandCodeHostPattern(pattern, hosts))
+      return match.length ? [{ ...handoff, match }] : []
+    })
+  })
 
 /** Every running plugin's task address route, ordered by plugin. */
 export const taskAddressRoutes = (): TaskAddressesRoute[] =>

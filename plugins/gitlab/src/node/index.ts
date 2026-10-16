@@ -1,15 +1,26 @@
 import { Hono } from 'hono'
-import { lazyFetch, lazyRouter, mirrorFootprintCapability, type AppEnv, type NodePlugin } from '@acorn/plugin-api/node'
+import {
+  describeError,
+  lazyFetch,
+  lazyRouter,
+  mirrorFootprintCapability,
+  requireDevice,
+  type AppEnv,
+  type NodePlugin,
+} from '@acorn/plugin-api/node'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
 import { CODE_HOST_POLICY, WORKFLOW_POLICY } from '@acorn/plugin-workflows/contract/extensions.ts'
 import { gitlabClientId, GITLAB_HOST } from '../server/config'
 import { gitlabEmitter } from '../server/events'
 import { createGitlabProvider } from '../server/provider'
+import { GITLAB_PROVIDER } from '../server/gitlabApi'
+import { createGitlabServers } from '../server/servers'
 import { ciSettledDescription, reviewReceivedDescription, validateReviewReceived } from '../server/policyDescriptions'
 import { branchSource, jobSource, mergeRequestSource } from '../shared/sources'
+import type { GitlabServerSummary } from '../shared/api'
 
-// GitLab for gitlab.com (docs/gitlab-integration.md): merge requests as tasks, their review views,
-// agent context, workflow CI, and the browser button, on the seams GitHub uses.
+// GitLab for gitlab.com and company servers (docs/gitlab-integration.md): merge requests as tasks,
+// their review views, agent context, workflow CI, and the browser button, on the seams GitHub uses.
 //
 // Everything past the declarations loads on first use, routes and policy evaluations alike, so a
 // Node that never talks to GitLab reads none of it at boot
@@ -27,11 +38,14 @@ export const gitlabPlugin = (): NodePlugin => ({
     { verb: 'repos-changed', description: 'The project mirror changed' },
   ],
   migrationsModule: import.meta.url,
-  // Projects whose remote is on gitlab.com are GitLab's (docs/plugins/code-hosts.md). GitLab serves every
-  // merge request's head at `merge-requests/<n>/head`, a fork's included, and the `mr` pane shows one.
+  // Projects whose remote is on gitlab.com are GitLab's (docs/plugins/code-hosts.md), and so are those on
+  // each company server a person connects, whose host the plugin claims while the connection exists.
+  // GitLab serves every merge request's head at `merge-requests/<n>/head`, a fork's included, and the
+  // `mr` pane shows one.
   codeHost: {
     label: 'GitLab',
     hosts: [GITLAB_HOST],
+    selfHosted: true,
     changeRequest: {
       ref: 'merge-requests/{number}/head',
       label: 'merge request',
@@ -40,14 +54,15 @@ export const gitlabPlugin = (): NodePlugin => ({
       api: '/v1/p/gitlab/change-requests',
     },
   },
-  // The merge request button on gitlab.com. `{path+}` takes a project path at any group depth.
+  // The merge request button on every GitLab server this plugin holds. `{path+}` takes a project path
+  // at any group depth.
   browserHandoffs: [
     {
       id: 'merge-request',
       label: 'Open in Acorn',
       match: [
-        'https://gitlab.com/{path+}/-/merge_requests/{number}',
-        'https://gitlab.com/{path+}/-/merge_requests/{number}/{tab}',
+        'https://{codeHost}/{path+}/-/merge_requests/{number}',
+        'https://{codeHost}/{path+}/-/merge_requests/{number}/{tab}',
       ],
       // The header's actions on the merge request page. None matching after a redesign is normal: the
       // sidebar still offers the handoff.
@@ -62,8 +77,29 @@ export const gitlabPlugin = (): NodePlugin => ({
     ctx.providers.integration(provider)
     const maxPages = provider.budgets.maxPages
 
+    // Which servers there are and the host each claims, read again whenever a GitLab connection
+    // changes. A failed read keeps the last list and is logged.
+    const servers = createGitlabServers({
+      connections: async () => {
+        const owner = ctx.core.identity.active()
+        return owner ? ctx.providers.connections(owner, GITLAB_PROVIDER) : []
+      },
+      claim: (host) => ctx.codeHosts.claim(host),
+      forgetOthers: async (ids) => (await import('../server/mirror/projects')).forgetOtherConnections(store, ids),
+    })
+    const syncServers = () =>
+      servers
+        .sync()
+        .catch((error: unknown) =>
+          ctx.log.warn(`could not read the GitLab connections: ${describeError(error).message}`),
+        )
+    await syncServers()
+    ctx.events.on('connection:changed', (frame) => {
+      if ((frame as { providerId?: unknown }).providerId === GITLAB_PROVIDER) void syncServers()
+    })
+
     const markers = once(async () =>
-      (await import('../server/editorLineMarkers')).mergeRequestEditorLineMarkers(store, ctx.core),
+      (await import('../server/editorLineMarkers')).mergeRequestEditorLineMarkers(store, ctx.core, servers),
     )
     ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
       id: 'merge-request',
@@ -91,6 +127,13 @@ export const gitlabPlugin = (): NodePlugin => ({
     )
     ctx.dataSources.register(branchSource)
 
+    ctx.routes.register(
+      new Hono<AppEnv>().get('/', requireDevice, (c) =>
+        c.json(servers.all().map(({ host, connectionId }) => ({ host, connectionId })) satisfies GitlabServerSummary[]),
+      ),
+      { prefix: '/servers', note: 'GET, device only — the connected servers, one per host' },
+    )
+
     // /v1/p/gitlab/projects/* is the mirror, loaded on the first request to it. The reads come before
     // the writes because both declare `/:path/merge-requests/:number/...` paths.
     ctx.routes.register(
@@ -100,13 +143,15 @@ export const gitlabPlugin = (): NodePlugin => ({
           import('../server/routes/projectWrites'),
         ])
         return new Hono<AppEnv>()
-          .route('/', projectReads(store, { core: ctx.core, emit, maxPages }))
-          .route('/', projectWrites(store, emit))
+          .route('/', projectReads(store, servers, { core: ctx.core, emit, maxPages }))
+          .route('/', projectWrites(store, servers, emit))
       }),
-      { prefix: '/projects', note: 'project and merge request mirror' },
+      { prefix: '/projects', note: 'project and merge request mirror, by server host' },
     )
     ctx.routes.register(
-      lazyRouter(async () => (await import('../server/routes/changeRequests')).changeRequestRoutes(store, ctx.core)),
+      lazyRouter(async () =>
+        (await import('../server/routes/changeRequests')).changeRequestRoutes(store, ctx.core, servers),
+      ),
       { prefix: '/change-requests', note: "a task's merge request for core's agent tools and `pr` context section" },
     )
     ctx.routes.register(
@@ -114,12 +159,12 @@ export const gitlabPlugin = (): NodePlugin => ({
       { prefix: '/auth', note: '/device/* — OAuth device-flow connect' },
     )
     ctx.routes.register(
-      lazyRouter(async () => (await import('../server/routes/import')).gitlabImport(store, ctx.core)),
+      lazyRouter(async () => (await import('../server/routes/import')).gitlabImport(store, ctx.core, servers)),
       { prefix: '/import', note: 'POST — import mirrored projects into core projects' },
     )
     ctx.routes.fetch(
       lazyFetch(async () =>
-        (await import('../server/browserHandoff')).createBrowserHandoffHandler(store, ctx.core, emit),
+        (await import('../server/browserHandoff')).createBrowserHandoffHandler(store, ctx.core, servers, emit),
       ),
       { prefix: '/browser' },
     )
@@ -127,7 +172,13 @@ export const gitlabPlugin = (): NodePlugin => ({
     // `gitlab:ci-settled` and `gitlab:review-received`, the entry ids `checks-green`, `ci-loop`, and
     // `review-received` ask a task's code host for.
     const policies = once(async () =>
-      (await import('../server/workflowPolicies')).gitlabWorkflowPolicies(store, ctx.core, ctx.providers, emit),
+      (await import('../server/workflowPolicies')).gitlabWorkflowPolicies(
+        store,
+        ctx.core,
+        ctx.providers,
+        servers,
+        emit,
+      ),
     )
     ctx.extensionPoints.handle(WORKFLOW_POLICY, {
       id: CODE_HOST_POLICY.ciSettled,

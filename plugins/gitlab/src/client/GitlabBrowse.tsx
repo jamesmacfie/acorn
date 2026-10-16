@@ -36,11 +36,11 @@ export function GitlabBrowseList() {
   const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = createSignal(false)
   async function refresh() {
-    if (!scope.path()) return
+    if (!scope.address()) return
     setRefreshing(true)
     try {
-      const rows = await readJson<MergeRequestRow[]>(`${mergeRequestsRoute(scope.path(), 'open')}&force=true`)
-      queryClient.setQueryData(mergeRequestsKey(scope.path(), 'open'), rows)
+      const rows = await readJson<MergeRequestRow[]>(`${mergeRequestsRoute(scope.address(), 'open')}&force=true`)
+      queryClient.setQueryData(mergeRequestsKey(scope.address(), 'open'), rows)
     } finally {
       setRefreshing(false)
     }
@@ -51,7 +51,7 @@ export function GitlabBrowseList() {
         actions={
           <>
             {/* GitLab's own form, which compares the branches and picks the target. */}
-            <Button tip="New merge request on gitlab.com" href={newMergeRequestUrl(scope.path())}>
+            <Button tip="New merge request on GitLab" href={newMergeRequestUrl(scope.address())}>
               <Icon name="plus" /> New
             </Button>
             <IconButton
@@ -66,7 +66,7 @@ export function GitlabBrowseList() {
       >
         Merge requests
       </SectionHeader>
-      <MergeRequestList path={scope.path()} />
+      <MergeRequestList address={scope.address()} />
     </WhenLinked>
   )
 }

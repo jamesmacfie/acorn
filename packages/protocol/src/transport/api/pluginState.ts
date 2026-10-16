@@ -15,6 +15,9 @@ export type NodePluginRow = {
    * to the id (client-core's `pluginLabel`). A loaded plugin writes its own, so trust
    * prompts keep showing the id. Mixed-version path until 2026-12-30. */
   label?: string
+  /** The hosts this running code host holds, declared and claimed, without any another plugin wins.
+   *  A content link's `{codeHost}` pattern expands to these. Absent for a plugin that holds none. */
+  codeHosts?: string[]
   /** Events this running or installed plugin declares for cross-plugin subscribers. */
   emits?: readonly import('../../plugin/contract.ts').PluginEmit[]
   required: boolean

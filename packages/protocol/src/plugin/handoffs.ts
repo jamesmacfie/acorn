@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../content/contentLinkPattern.ts'
+import {
+  checkDeclaredContentLinkPattern,
+  compileContentLinkPattern,
+  CONTENT_LINK_PATTERN_MAX_LENGTH,
+} from '../content/contentLinkPattern.ts'
 import { parseSiteAddress } from '../projects/siteAssociations.ts'
 import { pluginRoute } from './manifest/manifestFields.ts'
 
@@ -12,14 +16,15 @@ import { pluginRoute } from './manifest/manifestFields.ts'
 // Named for the action rather than the browser: `browser` is a plugin's ID.
 
 // A page the button appears on, in the content-link grammar: https only, literal host (or `*.` one
-// level), literal and `{capture}` path segments, matched without regular expressions.
+// level), literal and `{capture}` path segments, matched without regular expressions. A code host may
+// name `{codeHost}` as the host, which discovery expands into one pattern per host it holds.
 const pagePattern = z
   .string()
   .min(1)
   .max(CONTENT_LINK_PATTERN_MAX_LENGTH)
   .superRefine((value, ctx) => {
     try {
-      compileContentLinkPattern(value)
+      checkDeclaredContentLinkPattern(value)
     } catch (error) {
       ctx.addIssue({ code: 'custom', message: error instanceof Error ? error.message : String(error) })
     }
@@ -48,7 +53,7 @@ export const browserHandoffDescriptor = z.object({
     .min(1)
     .max(8)
     .describe(
-      'The pages the button appears on, such as `https://github.com/{owner}/{repo}/pull/{number}`: `https`, a literal host, and literal or `{capture}` path parts.',
+      "The pages the button appears on, such as `https://github.com/{owner}/{repo}/pull/{number}`: `https`, a literal host or a code host's `{codeHost}`, and literal or `{capture}` path parts.",
     ),
   // Tried in order; the button goes at the end of the first element that matches. None matching is
   // normal after a site redesign: the sidebar still offers the handoff.

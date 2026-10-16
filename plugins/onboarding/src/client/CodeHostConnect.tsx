@@ -12,6 +12,7 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
   CopyButton,
   Field,
   Heading,
@@ -21,7 +22,7 @@ import {
   Text,
   Toolbar,
 } from '@acorn/plugin-api/ui'
-import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
+import type { CredentialField, PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import { safeVerificationUrl } from '@acorn/protocol/externalUrl.ts'
 import { AddedTally } from './AddedTally'
 
@@ -77,16 +78,28 @@ export default function CodeHostConnect(props: {
                       written down here. */}
                   <Index each={form.fields()}>
                     {(field) => (
-                      <Field label={field().label} hint={field().hint}>
-                        <Input
-                          width="auto"
-                          type={field().type}
-                          placeholder={field().placeholder}
-                          value={form.value(field().id)}
-                          onInput={(value) => form.setValue(field().id, value)}
-                          onSubmit={() => void form.submit()}
+                      <Show
+                        when={field().type === 'checkbox'}
+                        fallback={
+                          <Field label={field().label} hint={field().hint}>
+                            <Input
+                              width="auto"
+                              type={field().type as Exclude<CredentialField['type'], 'checkbox'>}
+                              placeholder={field().placeholder}
+                              value={form.value(field().id)}
+                              onInput={(value) => form.setValue(field().id, value)}
+                              onSubmit={() => void form.submit()}
+                            />
+                          </Field>
+                        }
+                      >
+                        <Checkbox
+                          label={field().label}
+                          hint={field().hint}
+                          checked={form.value(field().id) === 'true'}
+                          onChange={(checked) => form.setValue(field().id, checked ? 'true' : '')}
                         />
-                      </Field>
+                      </Show>
                     )}
                   </Index>
                   <Toolbar variant="actions" size="sm">

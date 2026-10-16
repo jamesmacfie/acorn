@@ -53,10 +53,10 @@ afterEach(() => dispose?.())
 
 it("draws the task's merge request with the shared review views", () => {
   const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } })
-  client.setQueryData(mergeRequestKey('group/sub/api', '12'), detail)
-  client.setQueryData(filesKey('group/sub/api', '12'), { files: [], warning: null })
-  client.setQueryData(membersKey('group/sub/api'), [])
-  client.setQueryData(labelsKey('group/sub/api'), [])
+  client.setQueryData(mergeRequestKey('gitlab.com/group/sub/api', '12'), detail)
+  client.setQueryData(filesKey('gitlab.com/group/sub/api', '12'), { files: [], warning: null })
+  client.setQueryData(membersKey('gitlab.com/group/sub/api'), [])
+  client.setQueryData(labelsKey('gitlab.com/group/sub/api'), [])
   const task = {
     id: 't1',
     projectId: 'p1',
@@ -81,6 +81,6 @@ it("draws the task's merge request with the shared review views", () => {
   expect(text).toContain('1 check failing')
   expect(text).toContain('Squash and merge')
   expect(text).toContain('bug')
-  expect(host.querySelector('[data-diff]')?.getAttribute('data-diff')).toBe('group/sub/api!12')
+  expect(host.querySelector('[data-diff]')?.getAttribute('data-diff')).toBe('gitlab.com/group/sub/api!12')
   host.remove()
 })

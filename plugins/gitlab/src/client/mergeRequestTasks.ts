@@ -1,16 +1,15 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { integrationsRoute, tasksRoute, type IntegrationsResponse } from '@acorn/protocol/api.ts'
+import { tasksRoute } from '@acorn/protocol/api.ts'
 import {
   createTask,
-  integrationsOptions,
   readJson,
   tasksKey,
   tasksOptions,
   type SourceContribution,
   type Task,
 } from '@acorn/plugin-api/client'
-import { mergeRequestRoute, type MergeRequestDetail } from '../shared/api'
-import { formatMergeRequestRef, mergeRequestUrl, parseMergeRequestRef } from '../shared/mergeRequestRef'
+import { mergeRequestRoute, serversRoute, type GitlabServerSummary, type MergeRequestDetail } from '../shared/api'
+import { formatMergeRequestRef, mergeRequestUrl, parseMergeRequestRef, splitAddress } from '../shared/mergeRequestRef'
 
 // A merge request becomes a task: its source branch is the task's branch, it is the task's primary
 // change request, so core checks out `merge-requests/<n>/head` and opens the `mr` pane, and the task
@@ -25,13 +24,13 @@ export const activeTaskForMergeRequest = (tasks: readonly Task[], projectId: str
       task.changeRequest.number === number,
   )
 
-type Target = { projectId: string; path: string; number: number; headRef: string; title?: string }
+type Target = { projectId: string; address: string; number: number; headRef: string; title?: string }
 
-// The task's link to its merge request, under the GitLab connection. None without one.
-const selfLink = (connectionId: string | undefined, path: string, number: number) => {
+// The task's link to its merge request, under the connection on its server. None without one.
+const selfLink = (connectionId: string | undefined, address: string, number: number) => {
   if (!connectionId) return []
-  const identifier = formatMergeRequestRef(path, number)
-  return [{ connectionId, identifier, ref: { displayId: identifier, url: mergeRequestUrl(path, number) } }]
+  const identifier = formatMergeRequestRef(address, number)
+  return [{ connectionId, identifier, ref: { displayId: identifier, url: mergeRequestUrl(address, number) } }]
 }
 
 const seedFor = (target: Target, connectionId: string | undefined) => ({
@@ -40,23 +39,25 @@ const seedFor = (target: Target, connectionId: string | undefined) => ({
   ...(target.title ? { title: target.title } : {}),
   branch: target.headRef,
   changeRequest: { number: target.number, sourceBranch: target.headRef },
-  links: selfLink(connectionId, target.path, target.number),
+  links: selfLink(connectionId, target.address, target.number),
 })
 
-const gitlabConnection = (integrations: IntegrationsResponse | null) =>
-  integrations?.integrations.find((entry) => entry.providerId === 'gitlab' && entry.status === 'connected')?.id
+/** The connection on the server an address is on. */
+const connectionFor = async (address: string): Promise<string | undefined> => {
+  const servers = await readJson<GitlabServerSummary[]>(serversRoute).catch(() => [])
+  return servers.find((server) => server.host === splitAddress(address).host)?.connectionId
+}
 
 export async function promoteMergeRequestToTask(queryClient: QueryClient, target: Target): Promise<Task> {
   const tasks = await queryClient.ensureQueryData(tasksOptions(true)).catch(() => [] as Task[])
   const existing = activeTaskForMergeRequest(tasks, target.projectId, target.number)
   if (existing) return existing
-  const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
-  const task = await createTask(seedFor(target, gitlabConnection(integrations)))
+  const task = await createTask(seedFor(target, await connectionFor(target.address)))
   await queryClient.invalidateQueries({ queryKey: tasksKey })
   return task
 }
 
-type Resolved = NonNullable<MergeRequestDetail['request']> & { path: string }
+type Resolved = NonNullable<MergeRequestDetail['request']> & { address: string }
 
 /** How a merge request becomes a task from a content link or a dashboard row, through the shared
  *  promote-to-task modal. */
@@ -64,8 +65,8 @@ export const gitlabMergeRequestPromotion: NonNullable<SourceContribution<Resolve
   fromContentLink: async (target) => {
     const ref = typeof target.item === 'string' ? parseMergeRequestRef(target.item) : null
     if (!ref) return null
-    const detail = await readJson<MergeRequestDetail>(mergeRequestRoute(ref.path, ref.number))
-    return detail.request ? { ...detail.request, path: ref.path } : null
+    const detail = await readJson<MergeRequestDetail>(mergeRequestRoute(ref.address, ref.number))
+    return detail.request ? { ...detail.request, address: ref.address } : null
   },
   existingTask: async (target, projectId) => {
     const ref = typeof target.item === 'string' ? parseMergeRequestRef(target.item) : null
@@ -78,12 +79,12 @@ export const gitlabMergeRequestPromotion: NonNullable<SourceContribution<Resolve
     seedFor(
       {
         projectId: context.projectId,
-        path: request.path,
+        address: request.address,
         number: request.number,
         headRef: request.headRef ?? context.branch ?? '',
         title: request.title,
       },
-      gitlabConnection(await readJson<IntegrationsResponse>(integrationsRoute).catch(() => null)),
+      await connectionFor(request.address),
     ),
   create: async (seed) => {
     const tasks = await readJson<Task[]>(tasksRoute).catch(() => [] as Task[])

@@ -2,9 +2,9 @@ import { z } from 'zod'
 import type { PluginFetchHandler } from '@acorn/plugin-api/node'
 import { dataRecordRefSchema } from '@acorn/protocol/dataSources.ts'
 import { jobSourceDescription, mergeRequestSourceDescription } from './sourceDescriptions'
-import { formatMergeRequestRef, mergeRequestUrl } from '../../shared/mergeRequestRef'
-import { GITLAB_HOST } from '../config'
-import { gl, glError, GITLAB_PROVIDER, projectRef } from '../gitlabApi'
+import { formatMergeRequestRef, mergeRequestUrl, projectAddress } from '../../shared/mergeRequestRef'
+import { gl, glError, GITLAB_PROVIDER, projectRef, type GitlabSession } from '../gitlabApi'
+import { serverOf } from '../servers'
 import { createProjectSourceHandler } from './projectSource'
 
 // GitLab's two read sources over the projects a panel names. 100 records a project: past that the
@@ -13,8 +13,8 @@ const PER_PROJECT = 100
 
 const time = (value: string | null | undefined): number | null => (value ? Date.parse(value) : null)
 
-async function list<T>(token: string, path: string, signal: AbortSignal): Promise<T[]> {
-  const response = await gl({ token }, path, { signal })
+async function list<T>(session: GitlabSession, path: string, signal: AbortSignal): Promise<T[]> {
+  const response = await gl(session, path, { signal })
   if (glError(response)) throw new Error('gitlab_unavailable')
   return (await response.json()) as T[]
 }
@@ -37,21 +37,22 @@ type RestMergeRequest = {
 export const createMergeRequestSourceHandler = () =>
   createProjectSourceHandler({
     description: mergeRequestSourceDescription,
-    read: async ({ token }, project, connectionId, signal) => {
+    read: async (session, project, connectionId, signal) => {
+      const address = projectAddress(new URL(session.origin).hostname, project)
       const rows = await list<RestMergeRequest>(
-        token,
+        session,
         `/projects/${projectRef(project)}/merge_requests?state=all&order_by=updated_at&per_page=${PER_PROJECT}`,
         signal,
       )
       return {
         truncated: rows.length >= PER_PROJECT,
         records: rows.map((row) => {
-          const url = row.web_url || mergeRequestUrl(project, row.iid)
+          const url = row.web_url || mergeRequestUrl(address, row.iid)
           return {
-            recordId: formatMergeRequestRef(project, row.iid),
+            recordId: formatMergeRequestRef(address, row.iid),
             data: {
               project,
-              remoteRepository: `${GITLAB_HOST}/${project}`,
+              remoteRepository: address,
               number: row.iid,
               title: row.title,
               state: row.state === 'opened' ? 'open' : row.state === 'merged' ? 'merged' : 'closed',
@@ -127,11 +128,12 @@ const retryJob: PluginFetchHandler = async (request, context) => {
   if (!job) return Response.json({ error: 'invalid_request' }, { status: 400 })
   const answers = await context.providers.withConnections(GITLAB_PROVIDER, async (connection, token) => {
     if (connection.id !== parsed.data.ref.connectionId) return undefined
+    const session = { origin: serverOf(connection).origin, token }
     const path = `/projects/${projectRef(job.project)}/jobs/${job.jobId}`
-    const current = await gl({ token }, path, { signal: request.signal })
+    const current = await gl(session, path, { signal: request.signal })
     if (!current.ok) return { status: current.status }
     if (!RETRYABLE.has(((await current.json()) as RestJob).status)) return { status: 409 }
-    const retried = await gl({ token }, `${path}/retry`, { method: 'POST', signal: request.signal })
+    const retried = await gl(session, `${path}/retry`, { method: 'POST', signal: request.signal })
     return { status: retried.ok ? 200 : retried.status }
   })
   const answer = answers[0]
@@ -145,8 +147,8 @@ const retryJob: PluginFetchHandler = async (request, context) => {
 export const createJobSourceHandler = () =>
   createProjectSourceHandler({
     description: jobSourceDescription,
-    read: async ({ token }, project, _connectionId, signal) => {
-      const rows = await list<RestJob>(token, `/projects/${projectRef(project)}/jobs?per_page=${PER_PROJECT}`, signal)
+    read: async (session, project, _connectionId, signal) => {
+      const rows = await list<RestJob>(session, `/projects/${projectRef(project)}/jobs?per_page=${PER_PROJECT}`, signal)
       return {
         truncated: rows.length >= PER_PROJECT,
         records: rows.map((job) => ({

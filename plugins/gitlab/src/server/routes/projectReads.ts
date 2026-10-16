@@ -5,7 +5,6 @@ import {
   type AppEnv,
   type Cached,
   type CoreServices,
-  ownerId,
   type PluginDatabase,
   respondError,
   serveThenRevalidate,
@@ -32,6 +31,7 @@ import {
 } from '../mirror/mergeRequests'
 import { mergeRequestDetail, mergeRequestDiff, mergeRequestFiles } from '../mirror/detail'
 import { fail, mergeRequestKey, projectRequest } from './context'
+import type { GitlabServers } from '../servers'
 
 const PROJECTS_STALE_AFTER_MS = 300_000
 const LIST_STALE_AFTER_MS = 45_000
@@ -59,39 +59,51 @@ type Reads = { core: Pick<CoreServices, 'tasks'>; emit?: GitlabEmit; maxPages: n
 // Everything under /v1/p/gitlab/projects that reads: the project list, a project's merge requests,
 // one merge request's detail, files and diff, and the project's labels, members, file text and job
 // logs. The mirror answers what it holds; GitLab answers the rest.
-export const projectReads = (db: PluginDatabase, { core, emit = NO_EMIT, maxPages }: Reads) =>
+export const projectReads = (db: PluginDatabase, servers: GitlabServers, { core, emit = NO_EMIT, maxPages }: Reads) =>
   new Hono<AppEnv>()
+    // Every connected server's projects. A server whose read fails is left out, so one that's down
+    // doesn't hide the rest. With every one failing, the first failure answers.
     .get('/', async (c) => {
-      const session = await gitlabSession(c)
-      if (!session.token) return respondError(c, 401, 'reauth')
-      const userId = ownerId(c)
-      const result = await serveThenRevalidate({
-        resource: PROJECTS_RESOURCE,
-        userId,
-        ttlMs: PROJECTS_STALE_AFTER_MS,
-        read: async (): Promise<Cached<GitlabProject[]> | null> => {
-          const [[sync], rows] = await Promise.all([
-            db
-              .select()
-              .from(syncState)
-              .where(and(eq(syncState.userId, userId), eq(syncState.resource, PROJECTS_RESOURCE))),
-            readCachedProjects(db, userId),
-          ])
-          return sync ? { data: rows.map(toPublicProject), fetchedAt: sync.fetchedAt } : null
-        },
-        refresh: () => refreshProjects(session, db, userId, maxPages, emit),
-      })
-      return result.ok ? c.json(result.value) : fail(c, result.failure)
+      const reads = await Promise.all(
+        servers.all().map(async (server) => {
+          const session = await gitlabSession(c, server)
+          if (!session.token) return { ok: false as const, failure: { error: 'reauth', status: 401 as const } }
+          const scope = server.connectionId
+          return serveThenRevalidate({
+            resource: PROJECTS_RESOURCE,
+            userId: scope,
+            ttlMs: PROJECTS_STALE_AFTER_MS,
+            read: async (): Promise<Cached<GitlabProject[]> | null> => {
+              const [[sync], rows] = await Promise.all([
+                db
+                  .select()
+                  .from(syncState)
+                  .where(and(eq(syncState.connectionId, scope), eq(syncState.resource, PROJECTS_RESOURCE))),
+                readCachedProjects(db, scope),
+              ])
+              return sync
+                ? { data: rows.map((row) => toPublicProject(server.host, row)), fetchedAt: sync.fetchedAt }
+                : null
+            },
+            refresh: () => refreshProjects(session, db, scope, maxPages, emit),
+          })
+        }),
+      )
+      const read = reads.flatMap((result) => (result.ok ? [result.value] : []))
+      const failed = reads.find((result) => !result.ok)
+      if (!read.length) return fail(c, failed && !failed.ok ? failed.failure : { error: 'reauth', status: 401 })
+      return c.json(read.flat())
     })
     .post('/refresh', async (c) => {
-      await db
-        .update(syncState)
-        .set({ fetchedAt: 0 })
-        .where(and(eq(syncState.userId, ownerId(c)), eq(syncState.resource, PROJECTS_RESOURCE)))
+      for (const server of servers.all())
+        await db
+          .update(syncState)
+          .set({ fetchedAt: 0 })
+          .where(and(eq(syncState.connectionId, server.connectionId), eq(syncState.resource, PROJECTS_RESOURCE)))
       return c.body(null, 204)
     })
-    .get('/:path/merge-requests', async (c) => {
-      const request = await projectRequest(c, db)
+    .get('/:host/:path/merge-requests', async (c) => {
+      const request = await projectRequest(c, db, servers)
       if (!request.ok) return request.response
       const { session, project } = request.value
       if (c.req.query('state') === 'closed') {
@@ -109,24 +121,24 @@ export const projectReads = (db: PluginDatabase, { core, emit = NO_EMIT, maxPage
       const resource = openListResource(project.id)
       const result = await serveThenRevalidate({
         resource,
-        userId: project.userId,
+        userId: project.connectionId,
         ttlMs: LIST_STALE_AFTER_MS,
         force: c.req.query('force') === 'true',
         read: async (): Promise<Cached<MergeRequestRow[]> | null> => {
           const [sync] = await db
             .select()
             .from(syncState)
-            .where(and(eq(syncState.userId, project.userId), eq(syncState.resource, resource)))
+            .where(and(eq(syncState.connectionId, project.connectionId), eq(syncState.resource, resource)))
           return sync
-            ? { data: await readOpenMergeRequests(db, project.userId, project.id), fetchedAt: sync.fetchedAt }
+            ? { data: await readOpenMergeRequests(db, project.connectionId, project.id), fetchedAt: sync.fetchedAt }
             : null
         },
         refresh: () => refreshOpenMergeRequests(session, db, core, project, maxPages, emit),
       })
       return result.ok ? c.json(result.value) : fail(c, result.failure)
     })
-    .get('/:path/merge-requests/:number', async (c) => {
-      const request = await projectRequest(c, db)
+    .get('/:host/:path/merge-requests/:number', async (c) => {
+      const request = await projectRequest(c, db, servers)
       if (!request.ok) return request.response
       const key = mergeRequestKey(c, request.value)
       if (!key) return respondError(c, 400, 'bad_number')
@@ -136,8 +148,8 @@ export const projectReads = (db: PluginDatabase, { core, emit = NO_EMIT, maxPage
       })
       return result.ok ? c.json(result.value) : fail(c, result.failure)
     })
-    .get('/:path/merge-requests/:number/files', async (c) => {
-      const request = await projectRequest(c, db)
+    .get('/:host/:path/merge-requests/:number/files', async (c) => {
+      const request = await projectRequest(c, db, servers)
       if (!request.ok) return request.response
       const key = mergeRequestKey(c, request.value)
       if (!key) return respondError(c, 400, 'bad_number')
@@ -147,8 +159,8 @@ export const projectReads = (db: PluginDatabase, { core, emit = NO_EMIT, maxPage
       })
       return result.ok ? c.json(result.value) : fail(c, result.failure)
     })
-    .get('/:path/merge-requests/:number/diff', async (c) => {
-      const request = await projectRequest(c, db)
+    .get('/:host/:path/merge-requests/:number/diff', async (c) => {
+      const request = await projectRequest(c, db, servers)
       if (!request.ok) return request.response
       const key = mergeRequestKey(c, request.value)
       if (!key) return respondError(c, 400, 'bad_number')
@@ -161,28 +173,28 @@ export const projectReads = (db: PluginDatabase, { core, emit = NO_EMIT, maxPage
     // A segment is addressed by its patch's digest, which the request checks before it becomes part of
     // a blob key, so a request can't address any other kind of blob. The project access is the
     // owner's, checked by resolving the project.
-    .post('/:path/diff/segments', async (c) => {
+    .post('/:host/:path/diff/segments', async (c) => {
       const parsed = segmentsBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request')
-      const request = await projectRequest(c, db)
+      const request = await projectRequest(c, db, servers)
       if (!request.ok) return request.response
       const result = await segmentsOf(request.value.blobs, parsed.data.requests)
       return result.ok ? c.json(result.segments) : respondError(c, result.status, result.error)
     })
-    .post('/:path/diff/search', async (c) => {
+    .post('/:host/:path/diff/search', async (c) => {
       const parsed = searchBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request')
-      const request = await projectRequest(c, db)
+      const request = await projectRequest(c, db, servers)
       if (!request.ok) return request.response
       const { files, ...search } = parsed.data
       const page = await searchPatches(request.value.blobs, files, search)
       return page ? c.json(page) : respondError(c, 400, 'bad_cursor')
     })
-    .get('/:path/files/:commit', async (c) => {
+    .get('/:host/:path/files/:commit', async (c) => {
       const file = c.req.query('path')
       const commit = c.req.param('commit')
       if (!file || !/^[0-9a-f]{7,64}$/i.test(commit)) return respondError(c, 400, 'bad_request')
-      const request = await projectRequest(c, db)
+      const request = await projectRequest(c, db, servers)
       if (!request.ok) return request.response
       const response = await gl(
         request.value.session,
@@ -191,8 +203,8 @@ export const projectReads = (db: PluginDatabase, { core, emit = NO_EMIT, maxPage
       const failure = glError(response)
       return failure ? fail(c, failure) : c.json({ text: await response.text() })
     })
-    .get('/:path/labels', async (c) => {
-      const request = await projectRequest(c, db)
+    .get('/:host/:path/labels', async (c) => {
+      const request = await projectRequest(c, db, servers)
       if (!request.ok) return request.response
       const labels = await glJson<{ name: string; color: string | null }[]>(
         request.value.session,
@@ -201,8 +213,8 @@ export const projectReads = (db: PluginDatabase, { core, emit = NO_EMIT, maxPage
       if (!labels.ok) return fail(c, labels.failure)
       return c.json(labels.value.map((label): ProjectLabel => ({ name: label.name, color: label.color })))
     })
-    .get('/:path/members', async (c) => {
-      const request = await projectRequest(c, db)
+    .get('/:host/:path/members', async (c) => {
+      const request = await projectRequest(c, db, servers)
       if (!request.ok) return request.response
       const members = await glJson<{ username: string; avatar_url: string | null; state?: string }[]>(
         request.value.session,
@@ -215,10 +227,10 @@ export const projectReads = (db: PluginDatabase, { core, emit = NO_EMIT, maxPage
           .map((member): Member => ({ login: member.username, avatarUrl: member.avatar_url })),
       )
     })
-    .get('/:path/jobs/:jobId/log', async (c) => {
+    .get('/:host/:path/jobs/:jobId/log', async (c) => {
       const jobId = Number(c.req.param('jobId'))
       if (!Number.isSafeInteger(jobId) || jobId <= 0) return respondError(c, 400, 'bad_request')
-      const request = await projectRequest(c, db)
+      const request = await projectRequest(c, db, servers)
       if (!request.ok) return request.response
       const response = await gl(
         request.value.session,

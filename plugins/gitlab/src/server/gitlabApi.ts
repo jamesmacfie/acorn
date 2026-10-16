@@ -6,7 +6,7 @@ import {
   type RouteFailure,
   type RouteResult,
 } from '@acorn/plugin-api/node'
-import { GITLAB_ORIGIN } from './config'
+import type { GitlabServer } from './servers'
 
 export const GITLAB_PROVIDER = 'gitlab'
 
@@ -16,16 +16,19 @@ export const GITLAB_PROVIDER = 'gitlab'
 const REQUEST_TIMEOUT_MS = 4_000
 
 /**
- * A credential and the way to renew it. An access token from the device flow lasts two hours. The host
- * renews it before it expires, and `refresh` is for a `401` that comes first: the call is retried once
- * with the renewed token. A personal access token and a background read have no `refresh`.
+ * The server to call, a credential for it, and the way to renew that. An access token from the device
+ * flow lasts two hours. The host renews it before it expires, and `refresh` is for a `401` that comes
+ * first: the call is retried once with the renewed token. A personal access token and a background read
+ * have no `refresh`.
  */
-export type GitlabSession = { token: string; refresh?: () => Promise<string> }
+export type GitlabSession = { origin: string; token: string; refresh?: () => Promise<string> }
 
-/** The owner's GitLab credential for a route. An empty token means GitLab isn't connected. */
-export const gitlabSession = async (c: Context<AppEnv>): Promise<GitlabSession> => ({
-  token: await providerCredential(c, GITLAB_PROVIDER),
-  refresh: () => refreshProviderCredential(c, GITLAB_PROVIDER),
+/** The owner's credential for a route, on the connection that serves `server`. An empty token means
+ *  that connection is gone or can't be used. */
+export const gitlabSession = async (c: Context<AppEnv>, server: GitlabServer): Promise<GitlabSession> => ({
+  origin: server.origin,
+  token: await providerCredential(c, GITLAB_PROVIDER, server.connectionId),
+  refresh: () => refreshProviderCredential(c, GITLAB_PROVIDER, server.connectionId),
 })
 
 // No credential answers the way GitLab would, so "never connected" and "revoked" both reach the
@@ -54,7 +57,7 @@ async function call(session: GitlabSession, url: string, init: RequestInit = {})
 
 /** REST, under `/api/v4`. `path` starts with `/`. */
 export const gl = (session: GitlabSession, path: string, init?: RequestInit) =>
-  call(session, `${GITLAB_ORIGIN}/api/v4${path}`, init)
+  call(session, `${session.origin}/api/v4${path}`, init)
 
 /** A project's id in a REST path: GitLab takes the URL-encoded full path in its place. */
 export const projectRef = (path: string) => encodeURIComponent(path)
@@ -95,7 +98,7 @@ export async function glGraphQL<T>(
   variables: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<RouteResult<T>> {
-  const response = await call(session, `${GITLAB_ORIGIN}/api/graphql`, {
+  const response = await call(session, `${session.origin}/api/graphql`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ query, variables }),

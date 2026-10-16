@@ -521,6 +521,24 @@ export const skillPermissionLines = (
   ]
 }
 
+/** A code host: Acorn hands it the projects whose remote is on its hosts, paths included. A
+ *  `selfHosted` one can add hosts while it runs, so the line says the list can grow. */
+export const codeHostLines = (contributions: PluginContributions): PermissionLine[] => {
+  const codeHost = contributions.codeHost
+  if (!codeHost) return []
+  return [
+    {
+      key: `code-host:${[...codeHost.hosts].sort().join(',')}${codeHost.selfHosted ? ':self-hosted' : ''}`,
+      text: `The code host for projects on ${codeHost.hosts.join(', ')}`,
+      detail: codeHost.selfHosted
+        ? 'It receives the paths of those projects. It can add hosts while it runs, such as a server you connect, and then receives the paths of projects on those too.'
+        : 'It receives the paths of those projects.',
+      icon: 'git-branch',
+      high: false,
+    },
+  ]
+}
+
 /** Each data source the plugin registers. Its name is the plugin's own, which is what a person picks it by. */
 export const providedSourceLines = (contributions: PluginContributions): PermissionLine[] =>
   (contributions.dataSources ?? []).map((source) => ({

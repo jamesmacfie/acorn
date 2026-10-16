@@ -50,7 +50,7 @@ export const gitlabClientPlugin: ClientPlugin = {
       tracksRef: (task, ref) => {
         const at = taskMergeRequest(task)
         const named = ref.providerId === 'gitlab' ? parseMergeRequestRef(ref.displayId) : null
-        return !!at && !!named && samePath(named.path, at.path) && named.number === String(at.number)
+        return !!at && !!named && samePath(named.address, at.address) && named.number === String(at.number)
       },
       promotion: gitlabMergeRequestPromotion,
     })

@@ -184,7 +184,7 @@ async function fetchDiffs(
   return { ok: true, value: { diffs, capped: true } }
 }
 
-export type MirrorKey = { userId: string; projectId: number; path: string; iid: number }
+export type MirrorKey = { connectionId: string; projectId: number; path: string; iid: number }
 
 /**
  * Read one merge request's files from GitLab into the mirror. Patch bodies go to the blob cache first,
@@ -203,7 +203,7 @@ export async function refreshFiles(
   if (!refs.ok) return refs
   const diffs = await fetchDiffs(session, key.path, key.iid)
   if (!diffs.ok) return diffs
-  const scope = { userId: key.userId, projectId: key.projectId, iid: key.iid }
+  const scope = { connectionId: key.connectionId, projectId: key.projectId, iid: key.iid }
   const fileRows = []
   for (const [position, diff] of diffs.value.diffs.entries()) {
     const available = diff.diff.trim().length > 0
@@ -234,17 +234,17 @@ export async function refreshFiles(
       .set({ filesCapped: diffs.value.capped })
       .where(
         and(
-          eq(mergeRequests.userId, key.userId),
+          eq(mergeRequests.connectionId, key.connectionId),
           eq(mergeRequests.projectId, key.projectId),
           eq(mergeRequests.iid, key.iid),
         ),
       ),
     db
       .insert(syncState)
-      .values({ userId: key.userId, resource, revision, fetchedAt: now })
-      .onConflictDoUpdate({ target: [syncState.userId, syncState.resource], set: { revision, fetchedAt: now } }),
+      .values({ connectionId: key.connectionId, resource, revision, fetchedAt: now })
+      .onConflictDoUpdate({ target: [syncState.connectionId, syncState.resource], set: { revision, fetchedAt: now } }),
   ])
-  emit('pr-synced', mergeRequestPayload(key.path, key.iid))
+  emit('pr-synced', mergeRequestPayload(session.origin, key.path, key.iid))
   return { ok: true }
 }
 
@@ -261,7 +261,7 @@ export async function refreshMergeRequest(
   const detail = await fetchDetail(session, key.path, key.iid)
   if (!detail.ok) return detail
   const node = detail.value
-  const scope = { userId: key.userId, projectId: key.projectId, iid: key.iid }
+  const scope = { connectionId: key.connectionId, projectId: key.projectId, iid: key.iid }
   const now = Date.now()
   const headSha = node.diffRefs?.headSha ?? null
 
@@ -281,7 +281,7 @@ export async function refreshMergeRequest(
     ...scope,
     role,
     login: person.username,
-    avatarUrl: absoluteUrl(person.avatarUrl),
+    avatarUrl: absoluteUrl(session.origin, person.avatarUrl),
     at: role === 'approver' ? (approvedAt.get(person.username) ?? null) : null,
     position,
   }))
@@ -304,9 +304,9 @@ export async function refreshMergeRequest(
           outdated: !!at?.diffRefs && !!headSha && at.diffRefs.headSha !== headSha,
           resolved: discussion.resolved,
           author: note.author?.username ?? null,
-          authorAvatar: absoluteUrl(note.author?.avatarUrl),
+          authorAvatar: absoluteUrl(session.origin, note.author?.avatarUrl),
           authorIsBot: note.author?.bot === true,
-          body: standaloneHtml(note.bodyHtml),
+          body: standaloneHtml(session.origin, note.bodyHtml),
           createdAt: note.createdAt ? Date.parse(note.createdAt) : null,
           position: notePosition++,
         }
@@ -318,7 +318,7 @@ export async function refreshMergeRequest(
     name: job.name,
     stage: job.stage?.name ?? null,
     status: checkStatus(job.status, job.allowFailure),
-    url: job.webPath ? absoluteUrl(job.webPath) : null,
+    url: job.webPath ? absoluteUrl(session.origin, job.webPath) : null,
     pipelineSha: node.headPipeline?.sha ?? null,
     position,
   }))
@@ -334,33 +334,33 @@ export async function refreshMergeRequest(
         state: mergeRequestState(node.state),
         draft: node.draft,
         title: node.title,
-        body: standaloneHtml(node.descriptionHtml),
+        body: standaloneHtml(session.origin, node.descriptionHtml),
         headRef: node.sourceBranch,
         baseRef: node.targetBranch,
         headSha,
         baseSha: node.diffRefs?.baseSha ?? null,
         startSha: node.diffRefs?.startSha ?? null,
         author: node.author?.username ?? null,
-        authorAvatar: absoluteUrl(node.author?.avatarUrl),
+        authorAvatar: absoluteUrl(session.origin, node.author?.avatarUrl),
         updatedAt: node.updatedAt ? Date.parse(node.updatedAt) : null,
         conflicting: node.conflicts,
         pipelineStatus: null,
         fetchedAt: now,
       })
       .onConflictDoUpdate({
-        target: [mergeRequests.userId, mergeRequests.projectId, mergeRequests.iid],
+        target: [mergeRequests.connectionId, mergeRequests.projectId, mergeRequests.iid],
         set: {
           state: mergeRequestState(node.state),
           draft: node.draft,
           title: node.title,
-          body: standaloneHtml(node.descriptionHtml),
+          body: standaloneHtml(session.origin, node.descriptionHtml),
           headRef: node.sourceBranch,
           baseRef: node.targetBranch,
           headSha,
           baseSha: node.diffRefs?.baseSha ?? null,
           startSha: node.diffRefs?.startSha ?? null,
           author: node.author?.username ?? null,
-          authorAvatar: absoluteUrl(node.author?.avatarUrl),
+          authorAvatar: absoluteUrl(session.origin, node.author?.avatarUrl),
           updatedAt: node.updatedAt ? Date.parse(node.updatedAt) : null,
           conflicting: node.conflicts,
           fetchedAt: now,
@@ -390,24 +390,40 @@ export async function refreshMergeRequest(
     ...chunkRowsByColumnBudget(jobRows).map((part) => db.insert(jobs).values(part)),
     db
       .insert(syncState)
-      .values({ userId: key.userId, resource: detailResource(key.projectId, key.iid), fetchedAt: now })
-      .onConflictDoUpdate({ target: [syncState.userId, syncState.resource], set: { fetchedAt: now } }),
+      .values({ connectionId: key.connectionId, resource: detailResource(key.projectId, key.iid), fetchedAt: now })
+      .onConflictDoUpdate({ target: [syncState.connectionId, syncState.resource], set: { fetchedAt: now } }),
   ])
 
-  emit('pr-synced', mergeRequestPayload(key.path, key.iid))
+  emit('pr-synced', mergeRequestPayload(session.origin, key.path, key.iid))
   const before = new Map(previousJobs.map((job) => [job.jobId, job.status]))
   if (jobRows.length !== before.size || jobRows.some((job) => before.get(job.jobId) !== job.status))
-    emit('checks-changed', mergeRequestPayload(key.path, key.iid))
+    emit('checks-changed', mergeRequestPayload(session.origin, key.path, key.iid))
   return { ok: true }
 }
 
 const ownRows = (key: Omit<MirrorKey, 'path'>) => ({
-  files: and(eq(mrFiles.userId, key.userId), eq(mrFiles.projectId, key.projectId), eq(mrFiles.iid, key.iid)),
-  people: and(eq(mrPeople.userId, key.userId), eq(mrPeople.projectId, key.projectId), eq(mrPeople.iid, key.iid)),
-  labels: and(eq(mrLabels.userId, key.userId), eq(mrLabels.projectId, key.projectId), eq(mrLabels.iid, key.iid)),
-  notes: and(eq(notes.userId, key.userId), eq(notes.projectId, key.projectId), eq(notes.iid, key.iid)),
-  commits: and(eq(mrCommits.userId, key.userId), eq(mrCommits.projectId, key.projectId), eq(mrCommits.iid, key.iid)),
-  jobs: and(eq(jobs.userId, key.userId), eq(jobs.projectId, key.projectId), eq(jobs.iid, key.iid)),
+  files: and(
+    eq(mrFiles.connectionId, key.connectionId),
+    eq(mrFiles.projectId, key.projectId),
+    eq(mrFiles.iid, key.iid),
+  ),
+  people: and(
+    eq(mrPeople.connectionId, key.connectionId),
+    eq(mrPeople.projectId, key.projectId),
+    eq(mrPeople.iid, key.iid),
+  ),
+  labels: and(
+    eq(mrLabels.connectionId, key.connectionId),
+    eq(mrLabels.projectId, key.projectId),
+    eq(mrLabels.iid, key.iid),
+  ),
+  notes: and(eq(notes.connectionId, key.connectionId), eq(notes.projectId, key.projectId), eq(notes.iid, key.iid)),
+  commits: and(
+    eq(mrCommits.connectionId, key.connectionId),
+    eq(mrCommits.projectId, key.projectId),
+    eq(mrCommits.iid, key.iid),
+  ),
+  jobs: and(eq(jobs.connectionId, key.connectionId), eq(jobs.projectId, key.projectId), eq(jobs.iid, key.iid)),
 })
 
 export async function mirroredMergeRequest(db: PluginDatabase, key: Omit<MirrorKey, 'path'>) {
@@ -416,7 +432,7 @@ export async function mirroredMergeRequest(db: PluginDatabase, key: Omit<MirrorK
     .from(mergeRequests)
     .where(
       and(
-        eq(mergeRequests.userId, key.userId),
+        eq(mergeRequests.connectionId, key.connectionId),
         eq(mergeRequests.projectId, key.projectId),
         eq(mergeRequests.iid, key.iid),
       ),
@@ -430,7 +446,9 @@ async function detailFetchedAt(db: PluginDatabase, key: Omit<MirrorKey, 'path'>)
   const [sync] = await db
     .select()
     .from(syncState)
-    .where(and(eq(syncState.userId, key.userId), eq(syncState.resource, detailResource(key.projectId, key.iid))))
+    .where(
+      and(eq(syncState.connectionId, key.connectionId), eq(syncState.resource, detailResource(key.projectId, key.iid))),
+    )
   return sync?.fetchedAt ?? null
 }
 
@@ -535,7 +553,9 @@ async function filesSync(db: PluginDatabase, key: Omit<MirrorKey, 'path'>) {
   const [sync] = await db
     .select()
     .from(syncState)
-    .where(and(eq(syncState.userId, key.userId), eq(syncState.resource, filesResource(key.projectId, key.iid))))
+    .where(
+      and(eq(syncState.connectionId, key.connectionId), eq(syncState.resource, filesResource(key.projectId, key.iid))),
+    )
   return sync ?? null
 }
 
@@ -557,7 +577,7 @@ export function mergeRequestFiles(
 ): Promise<RouteResult<MergeRequestFiles>> {
   return serveThenRevalidate({
     resource: filesResource(key.projectId, key.iid),
-    userId: key.userId,
+    userId: key.connectionId,
     ttlMs: DETAIL_STALE_AFTER_MS,
     force: options.force === true,
     read: async (): Promise<Cached<MergeRequestFiles> | null> => {
@@ -634,7 +654,7 @@ export function mergeRequestDetail(
 ): Promise<RouteResult<MergeRequestDetail>> {
   return serveThenRevalidate({
     resource: detailResource(key.projectId, key.iid),
-    userId: key.userId,
+    userId: key.connectionId,
     ttlMs: DETAIL_STALE_AFTER_MS,
     force: options.force === true,
     read: async (): Promise<Cached<MergeRequestDetail> | null> => {

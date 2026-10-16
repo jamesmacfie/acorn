@@ -17,7 +17,7 @@ export const mrPaneContribution: PaneLayoutContribution = {
   when: (task) => !!taskMergeRequest(task),
   url: (task) => {
     const at = taskMergeRequest(task)
-    return at ? mergeRequestUrl(at.path, at.number) : undefined
+    return at ? mergeRequestUrl(at.address, at.number) : undefined
   },
   minWidth: 520,
   layout: 'single',

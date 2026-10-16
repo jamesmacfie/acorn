@@ -263,6 +263,7 @@ function facetCopy() {
 // until it's described.
 const GRANT_SOURCES = {
   input: "A derived data source's `inputs`: the sources your plugin reads",
+  codeHost: 'Your `codeHost`: the hosts whose projects acorn hands your plugin, and whether it can add more',
   providedSource: 'Your `dataSources`: what your plugin provides to others',
   ui: '`permissions.api` scopes and `permissions.events` channels',
   node: '`permissions.node`: core facets, capabilities, and the worker grants',

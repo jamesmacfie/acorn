@@ -46,6 +46,8 @@ const errorCopy = (cause: unknown, label: string): string => {
   const failure = cause instanceof ApiError ? cause : undefined
   const code = failure?.code ?? (cause as Error)?.message
   if (code === 'provider_needs_auth') return `Those credentials were rejected by ${label}.`
+  // A provider that refuses on purpose may say which check failed, in words for the person.
+  if (failure?.code && failure.message !== failure.code) return failure.message
   const trail = [code, failure?.requestId].filter(Boolean).join(' · ')
   return trail ? `Could not connect this provider. (${trail})` : 'Could not connect this provider.'
 }

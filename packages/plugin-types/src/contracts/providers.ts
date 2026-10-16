@@ -11,11 +11,17 @@ export type PluginProviderRegistry = {
   /** A provider that knows about nodes, and optionally can make and remove them
    *  (docs/plugins/node-providers.md § Node providers). */
   nodes(provider: HostOwned<'node-core/server/nodeProviders/registry.NodeProviderContribution'>): void
+  /** One connection's credential for one callback: the first usable one, or the one `connectionId`
+   *  names. */
   withConnection<T>(
     userId: string,
     providerId: string,
     visit: PluginProviderConnectionVisitor<T>,
+    connectionId?: string,
   ): Promise<T | undefined>
+  /** Every connection `userId` has to a provider this plugin owns, whatever its status, with no
+   *  credential. */
+  connections(userId: string, providerId: string): Promise<unknown[]>
 }
 
 export type GenerateTextInput = {

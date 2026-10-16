@@ -9,7 +9,7 @@ import {
 import type { MergeRequestRow } from '../../shared/api'
 import { mergeRequests, syncState } from '../../node/schema'
 import { glGraphQL, GITLAB_PROVIDER, type GitlabSession } from '../gitlabApi'
-import { type GitlabEmit, NO_EMIT } from '../events'
+import { type GitlabEmit, NO_EMIT, projectPayload } from '../events'
 import { absoluteUrl, checkStatus, mergeRequestState } from './vocabulary'
 
 // A project's merge requests. The open list is mirrored and refreshed on a short clock, because it's
@@ -45,13 +45,13 @@ type ListNode = {
 type ListPage = { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: ListNode[] }
 type ListAnswer = { project: { mergeRequests: ListPage } | null }
 
-const toRow = (node: ListNode): MergeRequestRow => ({
+const toRow = (origin: string, node: ListNode): MergeRequestRow => ({
   number: Number(node.iid),
   title: node.title,
   state: mergeRequestState(node.state),
   draft: node.draft,
   author: node.author?.username ?? null,
-  authorAvatar: absoluteUrl(node.author?.avatarUrl),
+  authorAvatar: absoluteUrl(origin, node.author?.avatarUrl),
   headRef: node.sourceBranch,
   baseRef: node.targetBranch,
   updatedAt: node.updatedAt ? Date.parse(node.updatedAt) : null,
@@ -78,20 +78,24 @@ export async function fetchMergeRequests(
     if (!answer.ok) return answer
     const list: ListPage | undefined = answer.value.project?.mergeRequests
     if (!list) return { ok: false, failure: { error: 'not_found', status: 404 } }
-    rows.push(...list.nodes.map(toRow))
+    rows.push(...list.nodes.map((node) => toRow(session.origin, node)))
     if (!list.pageInfo.hasNextPage) break
     after = list.pageInfo.endCursor
   }
   return { ok: true, value: rows }
 }
 
-export const readOpenMergeRequests = async (db: PluginDatabase, userId: string, projectId: number) =>
+export const readOpenMergeRequests = async (db: PluginDatabase, connectionId: string, projectId: number) =>
   (
     await db
       .select()
       .from(mergeRequests)
       .where(
-        and(eq(mergeRequests.userId, userId), eq(mergeRequests.projectId, projectId), eq(mergeRequests.state, 'open')),
+        and(
+          eq(mergeRequests.connectionId, connectionId),
+          eq(mergeRequests.projectId, projectId),
+          eq(mergeRequests.state, 'open'),
+        ),
       )
       .orderBy(desc(mergeRequests.updatedAt))
   ).map((row): MergeRequestRow => ({
@@ -116,16 +120,16 @@ export async function refreshOpenMergeRequests(
   session: GitlabSession,
   db: PluginDatabase,
   core: Pick<CoreServices, 'tasks'>,
-  project: { userId: string; id: number; path: string },
+  project: { connectionId: string; id: number; path: string },
   pages: number,
   emit: GitlabEmit = NO_EMIT,
 ): Promise<RefreshResult> {
   const listed = await fetchMergeRequests(session, project.path, 'opened', pages)
   if (!listed.ok) return listed
   const now = Date.now()
-  const scope = and(eq(mergeRequests.userId, project.userId), eq(mergeRequests.projectId, project.id))
+  const scope = and(eq(mergeRequests.connectionId, project.connectionId), eq(mergeRequests.projectId, project.id))
   const rows = listed.value.map((row) => ({
-    userId: project.userId,
+    connectionId: project.connectionId,
     projectId: project.id,
     iid: row.number,
     state: 'open',
@@ -149,7 +153,7 @@ export async function refreshOpenMergeRequests(
         .insert(mergeRequests)
         .values(part)
         .onConflictDoUpdate({
-          target: [mergeRequests.userId, mergeRequests.projectId, mergeRequests.iid],
+          target: [mergeRequests.connectionId, mergeRequests.projectId, mergeRequests.iid],
           set: {
             state: 'open',
             draft: sqlExcluded('draft'),
@@ -163,12 +167,12 @@ export async function refreshOpenMergeRequests(
     ),
     db
       .insert(syncState)
-      .values({ userId: project.userId, resource: openListResource(project.id), fetchedAt: now })
-      .onConflictDoUpdate({ target: [syncState.userId, syncState.resource], set: { fetchedAt: now } }),
+      .values({ connectionId: project.connectionId, resource: openListResource(project.id), fetchedAt: now })
+      .onConflictDoUpdate({ target: [syncState.connectionId, syncState.resource], set: { fetchedAt: now } }),
   ])
   const byBranch = new Map(listed.value.flatMap((row) => (row.headRef ? [[row.headRef, row.number] as const] : [])))
   await core.tasks.adoptChangeRequests(GITLAB_PROVIDER, project.path.toLowerCase(), byBranch)
-  emit('pulls-changed', { projectPath: project.path })
+  emit('pulls-changed', projectPayload(session.origin, project.path))
   return { ok: true }
 }
 

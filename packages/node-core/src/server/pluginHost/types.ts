@@ -326,12 +326,25 @@ type PluginProviderRegistry = {
   nodes(provider: NodeProviderContribution): void
   // Node-side work such as an agent tool has no HTTP request context, but may still need the
   // credential of a provider this plugin owns. The host lends the first usable connection for one
-  // callback and keeps decryption/redaction inside the same scoped runtime used by routes.
+  // callback, or the one `connectionId` names, and keeps decryption/redaction inside the same scoped
+  // runtime used by routes.
   withConnection<T>(
     userId: string,
     providerId: string,
     visit: PluginProviderConnectionVisitor<T>,
+    connectionId?: string,
   ): Promise<T | undefined>
+  // Every connection `userId` has to a provider this plugin owns, whatever its status, with no
+  // credential. For node-side work that needs each connection's settings, such as a self-hosted code
+  // host claiming each server's host at init.
+  connections(userId: string, providerId: string): Promise<StoredConnection[]>
+}
+
+// A code host's runtime claims (./codeHosts.ts, docs/plugins/self-hosted-code-hosts.md). Only a plugin
+// whose code host declares `selfHosted` may claim, and a claim follows a declared host's tie rules.
+// Disposing it releases the host, and the host releases every claim when the plugin stops.
+type PluginCodeHostRegistry = {
+  claim(host: string): Disposable
 }
 
 // The client-notification surface, and the only one there is.
@@ -468,6 +481,8 @@ export type NodePluginContext = {
   // directly. `run` is the owner's side and is bound to this plugin's own points.
   hooks: PluginHookRegistry
   providers: PluginProviderRegistry
+  // Both tiers. A loaded code host declares `selfHosted` in its manifest's `contributions.codeHost`.
+  codeHosts: PluginCodeHostRegistry
   capabilities: PluginCapabilities
   // Present for a loaded plugin, and for a built-in that declared `migrationsModule`. A plugin that owns
   // no tables never receives this projection, so reaching for it is an immediate "not a function".

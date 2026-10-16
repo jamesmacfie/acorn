@@ -103,24 +103,28 @@ const customAgentDescriptor = z.object({
     .describe("The riskiest of acorn's own tools the agent may call: `read`, `write`, or `execute`."),
 })
 
+// A host a code host holds, declared or claimed at runtime: a bare lowercase name, with no scheme or
+// port, because core compares it with the host it parses from a remote.
+export const codeHostName = z
+  .string()
+  .max(253)
+  .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/, 'a host is a bare lowercase name')
+
 // The Git hosts whose repositories this plugin names, such as `gitlab.com` (docs/plugins/code-hosts.md).
-// The provider is the plugin's own id, so two providers can't collide. Hosts are bare lowercase names,
-// with no scheme or port, because core compares them with the host it parses from a remote.
+// The provider is the plugin's own id, so two providers can't collide.
 export const codeHostDescriptor = z.object({
   label: z.string().min(1).max(64).describe("The host's name as a person reads it, such as `GitLab`."),
   hosts: z
-    .array(
-      z
-        .string()
-        .max(253)
-        .regex(
-          /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/,
-          'a host is a bare lowercase name',
-        ),
-    )
+    .array(codeHostName)
     .min(1)
     .max(16)
     .describe('Bare lowercase host names, such as `gitlab.com`, with no scheme or port.'),
+  // A plugin for a product people run on their own servers claims each server's host while it runs,
+  // through `ctx.codeHosts.claim`. Without this, a claim throws.
+  selfHosted: z
+    .boolean()
+    .optional()
+    .describe('Whether this plugin may claim more hosts while it runs, such as a company server a person connects.'),
   // How core treats this host's change requests, its pull or merge requests. Every field is optional.
   changeRequest: z
     .object({

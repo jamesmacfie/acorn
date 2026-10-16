@@ -431,23 +431,32 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
                 fallback={
                   <box flexDirection="column" gap={1}>
                     <For each={credential.fields()}>
-                      {(field) => (
-                        <box flexDirection="column">
-                          <Line>
-                            {field.label}
-                            {field.required ? ' · required' : ''}
-                          </Line>
-                          <Input
-                            type={field.type}
-                            value={credential.value(field.id)}
-                            placeholder={field.placeholder ?? field.label}
-                            onInput={(value) => credential.setValue(field.id, value)}
+                      {(field) =>
+                        field.type === 'checkbox' ? (
+                          <Checkbox
+                            label={field.label}
+                            hint={field.hint}
+                            checked={credential.value(field.id) === 'true'}
+                            onChange={(checked) => credential.setValue(field.id, checked ? 'true' : '')}
                           />
-                          <Show when={field.hint}>
-                            <Line role="muted">{field.hint}</Line>
-                          </Show>
-                        </box>
-                      )}
+                        ) : (
+                          <box flexDirection="column">
+                            <Line>
+                              {field.label}
+                              {field.required ? ' · required' : ''}
+                            </Line>
+                            <Input
+                              type={field.type}
+                              value={credential.value(field.id)}
+                              placeholder={field.placeholder ?? field.label}
+                              onInput={(value) => credential.setValue(field.id, value)}
+                            />
+                            <Show when={field.hint}>
+                              <Line role="muted">{field.hint}</Line>
+                            </Show>
+                          </box>
+                        )
+                      }
                     </For>
                     <Show when={credential.error()}>
                       <Alert tone="danger">{credential.error()}</Alert>

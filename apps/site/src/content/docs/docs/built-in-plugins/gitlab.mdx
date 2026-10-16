@@ -1,6 +1,6 @@
 ---
 title: GitLab
-description: Connect gitlab.com, import projects, review merge requests with their discussions and pipelines, merge one, and start a task from one.
+description: Connect gitlab.com or your company's GitLab server, import projects, review merge requests with their discussions and pipelines, merge one, and start a task from one.
 sources:
   - docs/gitlab-integration.md
   - docs/plugins/change-request-ui.md
@@ -15,13 +15,14 @@ import { Steps } from '@astrojs/starlight/components'
 import Checkpoint from '../../../../components/Checkpoint.astro'
 import PluginFacts from '../../../../components/PluginFacts.astro'
 
-The GitLab plugin connects your gitlab.com account and brings your projects' merge requests into acorn:
+The GitLab plugin connects your gitlab.com account, your company's GitLab server, or both, and brings
+your projects' merge requests into acorn:
 the list, each merge request's diff, discussions, and pipeline, and the controls to review and merge one.
 It draws them with the same views as the GitHub plugin.
 
 <PluginFacts id="gitlab">
   <Fragment slot="adds">**GitLab** in the left rail, the **Merge request** pane on a task with a merge request, a panel for a merge request a link points to, **Import from GitLab** on **Settings** > **Overview**, and the merge request behind acorn's pull request tools for agents.</Fragment>
-  <Fragment slot="needs">A gitlab.com account, connected with a sign-in code or a personal access token with the `api` scope.</Fragment>
+  <Fragment slot="needs">A gitlab.com account, connected with a sign-in code or a personal access token with the `api` scope. A company server takes a personal access token and the server's address.</Fragment>
   <Fragment slot="reach">GitLab's API, with your connection's token, and the projects on the Node. The token is stored encrypted on the Node, and agents never see it.</Fragment>
 </PluginFacts>
 
@@ -35,9 +36,13 @@ It draws them with the same views as the GitHub plugin.
    with the `api` scope under **Or use a token**. Sign-in with a code needs the Node to have an OAuth
    application, in `GITLAB_CLIENT_ID`. Without one, the token form is the way in.
 
+   For your company's server, paste a token from that server and enter its address, such as
+   `https://gitlab.example.com`, in **GitLab address**. A server on a private address, such as
+   `https://10.0.0.5`, also needs **Connect to a private address**. Add one connection for each server.
+
 3. Add a project, if it isn't one already. In **Settings** > **Overview**, click **Import from GitLab**,
-   and choose **Clone** or **Link folder** for a project. A project in a nested group is listed by its
-   full path.
+   and choose **Clone** or **Link folder** for a project. Each project is listed by its server and full
+   path, such as `gitlab.com/group/api`.
 
 4. Click **GitLab** in the left rail.
 
@@ -66,9 +71,10 @@ review** on a draft, and **Close**. A merge request with conflicts says **This b
 
 Right-click a merge request in the list and choose **Create task**. The task checks out the merge
 request, a fork's included, and opens on the **Merge request** pane, ⌘⇧M. The browser extension offers
-**Open in Acorn** on a merge request's page on gitlab.com.
+**Open in Acorn** on a merge request's page on gitlab.com and on each server you connected, once you
+allow the extension that site.
 
-**Open merge request** under a task's **Changes** tab opens gitlab.com's own form for the task's branch.
+**Open merge request** under a task's **Changes** tab opens GitLab's own form for the task's branch.
 An agent opens one with `pr_create`.
 
 ## For agents
@@ -79,7 +85,8 @@ request's pipeline.
 
 ## Limits
 
-- gitlab.com only, and one GitLab account per Node.
+- One account per server. A company server signs in with a token only, and must be on the standard
+  https port with no path in its address.
 - No merge trains or merging on its own when the pipeline passes.
 - GitLab has no "changes requested" review, so a merge request is approved or not.
 - **Search** narrows the loaded list. It doesn't ask GitLab.

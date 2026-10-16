@@ -43,6 +43,7 @@
       "gitlab/data/merge-requests",
       "gitlab/import",
       "gitlab/projects",
+      "gitlab/servers",
       "memory",
       "notes",
       "preview",
@@ -255,7 +256,8 @@
         "gitlab/data/jobs",
         "gitlab/data/merge-requests",
         "gitlab/import",
-        "gitlab/projects"
+        "gitlab/projects",
+        "gitlab/servers"
       ],
       "connectionProviders": [
         "gitlab"

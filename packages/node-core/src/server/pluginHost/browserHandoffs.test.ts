@@ -1,5 +1,9 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
-import type { BrowserHandoffDescriptor, BrowserHandoffsResponse } from '@acorn/protocol/plugin/handoffs.ts'
+import {
+  matchHandoffPage,
+  type BrowserHandoffDescriptor,
+  type BrowserHandoffsResponse,
+} from '@acorn/protocol/plugin/handoffs.ts'
 import { memoryIdentityStore } from '../activeIdentity'
 import { createCoreServices, SecretService } from '../core'
 import { makeTestDb, testCoreSeams } from '../../testkit/db'
@@ -101,6 +105,46 @@ describe('browser handoff declarations', () => {
     ])
     const response = (await (await browserHandoffsRoute.request('/')).json()) as BrowserHandoffsResponse
     expect(response.codeHosts).toEqual(['gitlab-test'])
+    await result.dispose()
+  })
+
+  it('expands {codeHost} into each host the plugin holds, and follows its claims', async () => {
+    const merge = handoff('forge', { match: ['https://{codeHost}/{path+}/-/merge_requests/{number}'] })
+    let claim: { dispose(): void } | undefined
+    const refused: string[] = []
+    const result = await host([
+      {
+        name: 'forge',
+        codeHost: { label: 'Forge', hosts: ['forge.test'], selfHosted: true },
+        browserHandoffs: [merge],
+        init: (ctx) => {
+          claim = ctx.codeHosts.claim('git.example.test')
+        },
+      },
+      {
+        name: 'plain',
+        codeHost: { label: 'Plain', hosts: ['plain.test'] },
+        init: (ctx) => {
+          try {
+            ctx.codeHosts.claim('git.example.test')
+          } catch (error) {
+            refused.push((error as Error).message)
+          }
+        },
+      },
+    ])
+    expect(refused).toEqual([expect.stringContaining("doesn't declare selfHosted")])
+    const matched = () => browserHandoffs().find((entry) => entry.pluginId === 'forge')
+    expect(matched()?.match).toEqual([
+      'https://forge.test/{path+}/-/merge_requests/{number}',
+      'https://git.example.test/{path+}/-/merge_requests/{number}',
+    ])
+    expect(matchHandoffPage(matched()!, 'https://git.example.test/group/api/-/merge_requests/3')).toEqual({
+      path: 'group/api',
+      number: '3',
+    })
+    claim!.dispose()
+    expect(matched()?.match).toEqual(['https://forge.test/{path+}/-/merge_requests/{number}'])
     await result.dispose()
   })
 

@@ -42,7 +42,11 @@ import { registerPluginContextMenu } from './chromeContextMenus'
 import { registerPluginExtension, registerPluginExtensionPoint } from './chromeExtensionPoints'
 import { registerPluginTheme } from './chromeThemes'
 import { registerPluginStyle } from './chromeStyles'
-import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
+import {
+  checkDeclaredContentLinkPattern,
+  compileContentLinkPattern,
+  expandCodeHostPattern,
+} from '@acorn/protocol/contentLinkPattern.ts'
 import { contentLinkRegistry } from '../registries/panes/contentLinks'
 import { refResolverRegistry } from '../registries/panes/refResolvers'
 import { documentServiceRegistry } from '../registries/panes/documentServices'
@@ -247,8 +251,14 @@ function registerChrome(
     }
     if (overlay !== undefined && !surfaces.overlays.has(overlay)) continue
     add('content link', descriptor.id, () => {
-      const pattern = descriptor.match ? compileContentLinkPattern(descriptor.match) : undefined
-      if (pattern && (!descriptor.item || !pattern.captures.includes(descriptor.item))) {
+      // A `{codeHost}` pattern stands for each host this plugin holds, which the roster row lists.
+      const patterns = descriptor.match
+        ? expandCodeHostPattern(descriptor.match, row.codeHosts ?? []).map(compileContentLinkPattern)
+        : []
+      if (
+        descriptor.match &&
+        !checkDeclaredContentLinkPattern(descriptor.match).captures.includes(descriptor.item ?? '')
+      ) {
         throw new Error(`item '${descriptor.item}' is not captured by its pattern`)
       }
       return own(contentLinkRegistry, {
@@ -261,7 +271,10 @@ function registerChrome(
         // point a link at another plugin's panel.
         providerId: pluginId,
         parse: (href) => {
-          const captures = pattern?.match(href)
+          const captures = patterns.reduce<Record<string, string> | null>(
+            (found, pattern) => found ?? pattern.match(href),
+            null,
+          )
           if (!captures) return null
           return {
             ...captures,

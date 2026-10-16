@@ -15,12 +15,12 @@ const STATE_WORD: Record<string, string> = { open: 'Open', closed: 'Closed', mer
 export default function MergeRequestRefPanel(props: RefPanelProps) {
   const navigate = useNavigate()
   const ref = createMemo(() => parseMergeRequestRef(props.target.displayId))
-  const detail = createQuery(() => mergeRequestOptions(ref()?.path ?? '', ref()?.number ?? '', !!ref()))
+  const detail = createQuery(() => mergeRequestOptions(ref()?.address ?? '', ref()?.number ?? '', !!ref()))
   const request = () => detail.data?.request
   const checks = () => detail.data?.checks ?? []
   const openFull = () => {
     const at = ref()
-    if (at) openInAppUrl(mergeRequestUrl(at.path, at.number), { prefer: 'route', navigate })
+    if (at) openInAppUrl(mergeRequestUrl(at.address, at.number), { prefer: 'route', navigate })
     props.onClose()
   }
   return (

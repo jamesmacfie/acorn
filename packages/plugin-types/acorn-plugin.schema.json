@@ -2403,7 +2403,7 @@
                 "description": "The link's ID, unique in this manifest."
               },
               "match": {
-                "description": "The URLs this link claims, such as `https://linear.app/{team}/issue/{id}`: `https`, a literal host, and literal or `{capture}` path parts. Needs `item`.",
+                "description": "The URLs this link claims, such as `https://linear.app/{team}/issue/{id}`: `https`, a literal host or a code host's `{codeHost}`, and literal or `{capture}` path parts. Needs `item`.",
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 512
@@ -4494,7 +4494,7 @@
                   "minLength": 1,
                   "maxLength": 512
                 },
-                "description": "The pages the button appears on, such as `https://github.com/{owner}/{repo}/pull/{number}`: `https`, a literal host, and literal or `{capture}` path parts."
+                "description": "The pages the button appears on, such as `https://github.com/{owner}/{repo}/pull/{number}`: `https`, a literal host or a code host's `{codeHost}`, and literal or `{capture}` path parts."
               },
               "anchors": {
                 "default": [],
@@ -4582,6 +4582,10 @@
                 "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$"
               },
               "description": "Bare lowercase host names, such as `gitlab.com`, with no scheme or port."
+            },
+            "selfHosted": {
+              "description": "Whether this plugin may claim more hosts while it runs, such as a company server a person connects.",
+              "type": "boolean"
             },
             "changeRequest": {
               "description": "How acorn treats this host's pull or merge requests. Every field is optional.",

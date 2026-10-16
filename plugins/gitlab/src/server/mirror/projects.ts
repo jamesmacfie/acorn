@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, notInArray, sql } from 'drizzle-orm'
 import {
   chunkRowsByColumnBudget,
   type PluginDatabase,
@@ -6,7 +6,17 @@ import {
   type RouteResult,
 } from '@acorn/plugin-api/node'
 import type { GitlabProject } from '../../shared/api'
-import { projects, syncState } from '../../node/schema'
+import {
+  jobs,
+  mergeRequests,
+  mrCommits,
+  mrFiles,
+  mrLabels,
+  mrPeople,
+  notes,
+  projects,
+  syncState,
+} from '../../node/schema'
 import { gl, glError, glJson, projectRef, type GitlabSession } from '../gitlabApi'
 import { type GitlabEmit, NO_EMIT } from '../events'
 
@@ -25,8 +35,8 @@ type RestProject = {
 export const PROJECTS_RESOURCE = 'projects'
 const PAGE_SIZE = 100
 
-const projectRow = (userId: string, project: RestProject, fetchedAt: number) => ({
-  userId,
+const projectRow = (connectionId: string, project: RestProject, fetchedAt: number) => ({
+  connectionId,
   id: project.id,
   path: project.path_with_namespace,
   name: project.name,
@@ -36,8 +46,9 @@ const projectRow = (userId: string, project: RestProject, fetchedAt: number) => 
   fetchedAt,
 })
 
-export const toPublicProject = (row: typeof projects.$inferSelect): GitlabProject => ({
+export const toPublicProject = (host: string, row: typeof projects.$inferSelect): GitlabProject => ({
   id: row.id,
+  host,
   path: row.path,
   name: row.name,
   private: row.private,
@@ -45,14 +56,14 @@ export const toPublicProject = (row: typeof projects.$inferSelect): GitlabProjec
   lastActivityAt: row.lastActivityAt,
 })
 
-export const readCachedProjects = (db: PluginDatabase, userId: string) =>
-  db.select().from(projects).where(eq(projects.userId, userId)).orderBy(desc(projects.lastActivityAt))
+export const readCachedProjects = (db: PluginDatabase, connectionId: string) =>
+  db.select().from(projects).where(eq(projects.connectionId, connectionId)).orderBy(desc(projects.lastActivityAt))
 
 /** Replace the owner's project mirror with GitLab's list, `maxPages` pages of 100 at most. */
 export async function refreshProjects(
   session: GitlabSession,
   db: PluginDatabase,
-  userId: string,
+  connectionId: string,
   maxPages: number,
   emit: GitlabEmit = NO_EMIT,
 ): Promise<RefreshResult> {
@@ -69,14 +80,14 @@ export async function refreshProjects(
     if (batch.length < PAGE_SIZE) break
   }
   const now = Date.now()
-  const rows = listed.map((project) => projectRow(userId, project, now))
+  const rows = listed.map((project) => projectRow(connectionId, project, now))
   await db.batch([
-    db.delete(projects).where(eq(projects.userId, userId)),
+    db.delete(projects).where(eq(projects.connectionId, connectionId)),
     ...chunkRowsByColumnBudget(rows).map((part) => db.insert(projects).values(part)),
     db
       .insert(syncState)
-      .values({ userId, resource: PROJECTS_RESOURCE, fetchedAt: now })
-      .onConflictDoUpdate({ target: [syncState.userId, syncState.resource], set: { fetchedAt: now } }),
+      .values({ connectionId, resource: PROJECTS_RESOURCE, fetchedAt: now })
+      .onConflictDoUpdate({ target: [syncState.connectionId, syncState.resource], set: { fetchedAt: now } }),
   ])
   emit('repos-changed')
   return { ok: true }
@@ -86,29 +97,35 @@ export async function refreshProjects(
 export async function resolveProject(
   session: GitlabSession,
   db: PluginDatabase,
-  userId: string,
+  connectionId: string,
   path: string,
 ): Promise<RouteResult<typeof projects.$inferSelect>> {
   const [cached] = await db
     .select()
     .from(projects)
-    .where(and(eq(projects.userId, userId), eq(sql`lower(${projects.path})`, path.toLowerCase())))
+    .where(and(eq(projects.connectionId, connectionId), eq(sql`lower(${projects.path})`, path.toLowerCase())))
   if (cached) return { ok: true, value: cached }
   const fetched = await glJson<RestProject>(session, `/projects/${projectRef(path)}`)
   if (!fetched.ok) return fetched
-  const row = projectRow(userId, fetched.value, Date.now())
+  const row = projectRow(connectionId, fetched.value, Date.now())
   await db
     .insert(projects)
     .values(row)
-    .onConflictDoUpdate({ target: [projects.userId, projects.id], set: row })
+    .onConflictDoUpdate({ target: [projects.connectionId, projects.id], set: row })
   return { ok: true, value: row }
 }
 
 /** A mirrored project by path, with no call to GitLab. For the routes that read the mirror only. */
-export async function mirroredProject(db: PluginDatabase, userId: string, path: string) {
+export async function mirroredProject(db: PluginDatabase, connectionId: string, path: string) {
   const [row] = await db
     .select()
     .from(projects)
-    .where(and(eq(projects.userId, userId), eq(sql`lower(${projects.path})`, path.toLowerCase())))
+    .where(and(eq(projects.connectionId, connectionId), eq(sql`lower(${projects.path})`, path.toLowerCase())))
   return row ?? null
+}
+
+/** Drop every mirror row that belongs to none of `connectionIds`, such as a disconnected server's. */
+export async function forgetOtherConnections(db: PluginDatabase, connectionIds: string[]): Promise<void> {
+  for (const table of [projects, mergeRequests, mrFiles, mrPeople, mrLabels, notes, mrCommits, jobs, syncState])
+    await db.delete(table).where(connectionIds.length ? notInArray(table.connectionId, connectionIds) : undefined)
 }

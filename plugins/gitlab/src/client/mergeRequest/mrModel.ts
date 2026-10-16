@@ -52,43 +52,47 @@ onScopeEvicted((event) => {
 })
 
 function build(scope: ChangeRequestScope) {
-  const path = `${scope.owner}/${scope.repo}`
+  const address = `${scope.owner}/${scope.repo}`
   const number = scope.number
   const queryClient = useQueryClient()
 
   // The Node announces `pr-synced` when it replaces the mirror, which is how a stale read the route
   // answered first turns fresh here.
   const offSynced = onPluginFrame('gitlab', 'plugin:gitlab:pr-synced', (payload) => {
-    const event = (payload ?? {}) as { projectPath?: unknown; number?: unknown }
-    if (typeof event.projectPath !== 'string' || event.number !== Number(number) || !samePath(event.projectPath, path))
+    const event = (payload ?? {}) as { projectAddress?: unknown; number?: unknown }
+    if (
+      typeof event.projectAddress !== 'string' ||
+      event.number !== Number(number) ||
+      !samePath(event.projectAddress, address)
+    )
       return
-    void queryClient.invalidateQueries({ queryKey: mergeRequestKey(path, number) })
-    void queryClient.invalidateQueries({ queryKey: filesKey(path, number) })
+    void queryClient.invalidateQueries({ queryKey: mergeRequestKey(address, number) })
+    void queryClient.invalidateQueries({ queryKey: filesKey(address, number) })
   })
   onCleanup(offSynced)
 
-  const detail = createQuery(() => mergeRequestOptions(path, number, true))
-  const files = createQuery(() => filesOptions(path, number, true))
-  const members = createQuery(() => membersOptions(path, true))
-  const labels = createQuery(() => labelsOptions(path, true))
+  const detail = createQuery(() => mergeRequestOptions(address, number, true))
+  const files = createQuery(() => filesOptions(address, number, true))
+  const members = createQuery(() => membersOptions(address, true))
+  const labels = createQuery(() => labelsOptions(address, true))
   const [diffWanted, setDiffWanted] = createSignal(false)
-  const diff = createQuery(() => diffOptions(path, number, diffWanted()))
+  const diff = createQuery(() => diffOptions(address, number, diffWanted()))
   createEffect(() => {
     if (detail.data) rememberAvatars(detail.data.avatars)
     rememberAvatars(Object.fromEntries((members.data ?? []).map((member) => [member.login, member.avatarUrl])))
   })
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: mergeRequestPrefixKey(path) })
-    void queryClient.invalidateQueries({ queryKey: mergeRequestsPrefixKey(path) })
-    void queryClient.invalidateQueries({ queryKey: diffKey(path, number) })
+    void queryClient.invalidateQueries({ queryKey: mergeRequestPrefixKey(address) })
+    void queryClient.invalidateQueries({ queryKey: mergeRequestsPrefixKey(address) })
+    void queryClient.invalidateQueries({ queryKey: diffKey(address, number) })
   }
-  const writes = mergeRequestWrites(path, number)
+  const writes = mergeRequestWrites(address, number)
 
   return createChangeRequestModel({
     scope,
     host: gitlabHost,
-    draftKey: `gitlab:${path}/${number}`,
+    draftKey: `gitlab:${address}/${number}`,
     detail: () => detail.data,
     detailFailed: () => detail.isError,
     files: () => files.data?.files ?? [],
@@ -101,7 +105,7 @@ function build(scope: ChangeRequestScope) {
     diff: {
       data: () => diff.data,
       want: () => setDiffWanted(true),
-      loadSegments: (requests, signal) => fetchDiffSegments(path, requests, signal),
+      loadSegments: (requests, signal) => fetchDiffSegments(address, requests, signal),
     },
     refresh,
     actions: {
@@ -116,7 +120,7 @@ function build(scope: ChangeRequestScope) {
       setDraft: writes.setDraft,
       close: writes.close,
       reopen: writes.reopen,
-      rerun: (jobId) => retryJob(path, jobId),
+      rerun: (jobId) => retryJob(address, jobId),
     },
   })
 }

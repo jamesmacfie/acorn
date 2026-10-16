@@ -49,73 +49,73 @@ export const projectsOptions = (enabled: boolean) => ({
   queryFn: ({ signal }: QueryContext) => readJson<GitlabProject[]>(projectsRoute, { signal }),
 })
 
-export const mergeRequestsOptions = (path: string, state: 'open' | 'closed', enabled: boolean) => ({
-  queryKey: mergeRequestsKey(path, state),
+export const mergeRequestsOptions = (address: string, state: 'open' | 'closed', enabled: boolean) => ({
+  queryKey: mergeRequestsKey(address, state),
   enabled,
   refetchInterval: 60_000,
   refetchIntervalInBackground: false,
-  queryFn: ({ signal }: QueryContext) => readJson<MergeRequestRow[]>(mergeRequestsRoute(path, state), { signal }),
+  queryFn: ({ signal }: QueryContext) => readJson<MergeRequestRow[]>(mergeRequestsRoute(address, state), { signal }),
 })
 
-export const mergeRequestOptions = (path: string, number: string, enabled: boolean) => ({
-  queryKey: mergeRequestKey(path, number),
+export const mergeRequestOptions = (address: string, number: string, enabled: boolean) => ({
+  queryKey: mergeRequestKey(address, number),
   enabled,
-  queryFn: ({ signal }: QueryContext) => readJson<MergeRequestDetail>(mergeRequestRoute(path, number), { signal }),
+  queryFn: ({ signal }: QueryContext) => readJson<MergeRequestDetail>(mergeRequestRoute(address, number), { signal }),
 })
 
-export const filesOptions = (path: string, number: string, enabled: boolean) => ({
-  queryKey: filesKey(path, number),
+export const filesOptions = (address: string, number: string, enabled: boolean) => ({
+  queryKey: filesKey(address, number),
   enabled,
-  queryFn: ({ signal }: QueryContext) => readJson<MergeRequestFiles>(filesRoute(path, number), { signal }),
+  queryFn: ({ signal }: QueryContext) => readJson<MergeRequestFiles>(filesRoute(address, number), { signal }),
 })
 
-export const diffOptions = (path: string, number: string, enabled: boolean) => ({
-  queryKey: diffKey(path, number),
+export const diffOptions = (address: string, number: string, enabled: boolean) => ({
+  queryKey: diffKey(address, number),
   enabled,
-  queryFn: ({ signal }: QueryContext) => readJson<MergeRequestDiff>(diffRoute(path, number), { signal }),
+  queryFn: ({ signal }: QueryContext) => readJson<MergeRequestDiff>(diffRoute(address, number), { signal }),
 })
 
 /** The merge request and its files again from GitLab, past the mirror's window. */
-export const forceRefresh = (path: string, number: string) =>
+export const forceRefresh = (address: string, number: string) =>
   Promise.all([
-    readJson<MergeRequestDetail>(`${mergeRequestRoute(path, number)}?force=true`),
-    readJson<MergeRequestDiff>(`${diffRoute(path, number)}?force=true`),
+    readJson<MergeRequestDetail>(`${mergeRequestRoute(address, number)}?force=true`),
+    readJson<MergeRequestDiff>(`${diffRoute(address, number)}?force=true`),
   ])
 
-export const labelsOptions = (path: string, enabled: boolean) => ({
-  queryKey: labelsKey(path),
+export const labelsOptions = (address: string, enabled: boolean) => ({
+  queryKey: labelsKey(address),
   enabled,
   staleTime: 5 * 60_000,
-  queryFn: ({ signal }: QueryContext) => readJson<ProjectLabel[]>(labelsRoute(path), { signal }),
+  queryFn: ({ signal }: QueryContext) => readJson<ProjectLabel[]>(labelsRoute(address), { signal }),
 })
 
-export const membersOptions = (path: string, enabled: boolean) => ({
-  queryKey: membersKey(path),
+export const membersOptions = (address: string, enabled: boolean) => ({
+  queryKey: membersKey(address),
   enabled,
   staleTime: 5 * 60_000,
-  queryFn: ({ signal }: QueryContext) => readJson<Member[]>(membersRoute(path), { signal }),
+  queryFn: ({ signal }: QueryContext) => readJson<Member[]>(membersRoute(address), { signal }),
 })
 
 // A whole job log, kept in memory only and for a few minutes after the panel closes.
-export const jobLogOptions = (path: string, jobId: number, enabled: boolean) => ({
-  queryKey: jobLogKey(path, jobId),
+export const jobLogOptions = (address: string, jobId: number, enabled: boolean) => ({
+  queryKey: jobLogKey(address, jobId),
   enabled,
   staleTime: 15_000,
   gcTime: 5 * 60_000,
   meta: { persist: false },
-  queryFn: ({ signal }: QueryContext) => readJson<JobLog>(jobLogRoute(path, jobId), { signal }),
+  queryFn: ({ signal }: QueryContext) => readJson<JobLog>(jobLogRoute(address, jobId), { signal }),
 })
 
 // A file at a commit never changes, so one read serves every gap in it.
-export const fileTextOptions = (path: string, commit: string, file: string) => ({
-  queryKey: fileTextKey(path, commit, file),
+export const fileTextOptions = (address: string, commit: string, file: string) => ({
+  queryKey: fileTextKey(address, commit, file),
   staleTime: Infinity,
-  queryFn: ({ signal }: QueryContext) => readJson<FileText>(fileTextRoute(path, commit, file), { signal }),
+  queryFn: ({ signal }: QueryContext) => readJson<FileText>(fileTextRoute(address, commit, file), { signal }),
 })
 
-export const fetchDiffSegments = (path: string, requests: DiffSegmentRequest[], signal?: AbortSignal) =>
+export const fetchDiffSegments = (address: string, requests: DiffSegmentRequest[], signal?: AbortSignal) =>
   writeJson<DiffSegmentPayload[]>(
-    diffSegmentsRoute(path),
+    diffSegmentsRoute(address),
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -126,13 +126,13 @@ export const fetchDiffSegments = (path: string, requests: DiffSegmentRequest[], 
   )
 
 export const searchDiff = (
-  path: string,
+  address: string,
   document: DiffDocumentTopology,
   request: DiffSearchRequest,
   signal?: AbortSignal,
 ) =>
   writeJson<DiffSearchPage>(
-    diffSearchRoute(path),
+    diffSearchRoute(address),
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

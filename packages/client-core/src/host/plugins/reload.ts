@@ -13,6 +13,7 @@ import {
 } from './distribution'
 import { syncPluginContributions, syncPluginContributionsInBackground } from './syncContributions'
 import { createLogger } from '../../infra/telemetry/logger'
+import { projectsKey } from '../../infra/queries'
 import { invalidateDataSources } from '../../features/dataSources/queries'
 import { invalidatePublishedPanels } from '../../features/dashboards/dashboardClient'
 
@@ -23,6 +24,8 @@ async function reconcilePluginChange(nodeId: string = activeNodeId() ?? ''): Pro
   if (!nodeId) return
   if (nodeId === activeNodeId()) {
     await refreshNodePlugins(nodeId)
+    // A code host that starts, stops, or claims a host changes the provider its projects read.
+    void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: projectsKey })
     void invalidateDataSources(clientFor(activeCacheId()).client, activeCacheId())
     // The plugin frame names only the Node, so every placed panel on it refetches.
     void invalidatePublishedPanels(clientFor(activeCacheId()).client, activeCacheId())

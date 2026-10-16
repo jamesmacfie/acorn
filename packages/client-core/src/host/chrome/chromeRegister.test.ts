@@ -367,6 +367,41 @@ describe('syncChromeContributions', () => {
     })
   })
 
+  it('expands a {codeHost} content link into the hosts the plugin holds, and again when they change', () => {
+    const forge = (codeHosts: string[]) => {
+      const declared = row(
+        'forge',
+        {},
+        {
+          frames: [
+            { target: 'pane', id: 'forge-pane', label: 'Forge', glyph: 'puzzle', order: 500, formFactor: ['desktop'] },
+          ],
+          contentLinks: [
+            {
+              id: 'forge.mr',
+              match: 'https://{codeHost}/{path+}/-/merge_requests/{number}',
+              openPane: 'forge-pane',
+              item: 'number',
+            },
+          ],
+        },
+      )
+      return { ...declared, codeHosts }
+    }
+    _seedPluginDistribution([['node-a', [forge(['forge.test'])]]])
+    syncChromeContributions()
+    expect(parseInAppTarget('https://forge.test/group/api/-/merge_requests/3')).toMatchObject({ path: 'group/api' })
+    expect(parseInAppTarget('https://git.example.test/group/api/-/merge_requests/3')).toBeNull()
+
+    _seedPluginDistribution([['node-a', [forge(['forge.test', 'git.example.test'])]]])
+    syncChromeContributions()
+    expect(parseInAppTarget('https://git.example.test/group/api/-/merge_requests/3')).toMatchObject({
+      kind: 'forge.mr',
+      path: 'group/api',
+      item: '3',
+    })
+  })
+
   it('contributes no content recogniser when this device rejected the plugin bundle', () => {
     const declared: Partial<PluginContributions> = {
       frames: [{ target: 'pane', id: 'board', label: 'Board', glyph: 'puzzle', order: 500, formFactor: ['desktop'] }],

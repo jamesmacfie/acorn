@@ -131,3 +131,34 @@ export function compileContentLinkPattern(pattern: string): CompiledContentLinkP
     },
   }
 }
+
+// A declared pattern may name `{codeHost}` as its host, such as
+// `https://{codeHost}/{path+}/-/merge_requests/{number}`. It stands for every host the declaring code
+// host holds, declared or claimed while it runs, so a company server matches without a new manifest
+// (docs/plugins/self-hosted-code-hosts.md). Core expands it before compiling.
+const CODE_HOST_PREFIX = 'https://{codeHost}/'
+
+/** One pattern per host for a `{codeHost}` pattern, or the pattern alone when it names none. A host the
+ *  grammar can't take, such as one with no dot, gives no pattern, so every result compiles. */
+export function expandCodeHostPattern(pattern: string, hosts: readonly string[]): string[] {
+  if (!pattern.startsWith(CODE_HOST_PREFIX)) return [pattern]
+  return hosts
+    .map((host) => `https://${host}/${pattern.slice(CODE_HOST_PREFIX.length)}`)
+    .filter((expanded) => {
+      try {
+        compileContentLinkPattern(expanded)
+        return true
+      } catch {
+        return false
+      }
+    })
+}
+
+/** Check a declared pattern, `{codeHost}` included. Throws what `compileContentLinkPattern` throws. */
+export function checkDeclaredContentLinkPattern(pattern: string): CompiledContentLinkPattern {
+  return compileContentLinkPattern(
+    pattern.startsWith(CODE_HOST_PREFIX)
+      ? `https://code-host.invalid/${pattern.slice(CODE_HOST_PREFIX.length)}`
+      : pattern,
+  )
+}

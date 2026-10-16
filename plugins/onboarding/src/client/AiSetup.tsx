@@ -2,13 +2,14 @@ import { createMemo, createSignal, Index, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createCredentialForm, integrationsOptions, modelBackendsOptions } from '@acorn/plugin-api/client'
 import { integrationsKey, modelBackendsKey } from '@acorn/protocol/api.ts'
-import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
+import type { CredentialField, PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import {
   Alert,
   Badge,
   Button,
   Card,
+  Checkbox,
   DescriptionList,
   Field,
   Heading,
@@ -146,16 +147,28 @@ export default function AiSetup() {
                   are all the descriptor's. */}
               <Index each={form.fields()}>
                 {(field) => (
-                  <Field label={field().label} hint={field().hint}>
-                    <Input
-                      width="auto"
-                      type={field().type}
-                      placeholder={field().placeholder}
-                      value={form.value(field().id)}
-                      onInput={(value) => form.setValue(field().id, value)}
-                      onSubmit={() => void form.submit()}
+                  <Show
+                    when={field().type === 'checkbox'}
+                    fallback={
+                      <Field label={field().label} hint={field().hint}>
+                        <Input
+                          width="auto"
+                          type={field().type as Exclude<CredentialField['type'], 'checkbox'>}
+                          placeholder={field().placeholder}
+                          value={form.value(field().id)}
+                          onInput={(value) => form.setValue(field().id, value)}
+                          onSubmit={() => void form.submit()}
+                        />
+                      </Field>
+                    }
+                  >
+                    <Checkbox
+                      label={field().label}
+                      hint={field().hint}
+                      checked={form.value(field().id) === 'true'}
+                      onChange={(checked) => form.setValue(field().id, checked ? 'true' : '')}
                     />
-                  </Field>
+                  </Show>
                 )}
               </Index>
               <Inline gap="inline">

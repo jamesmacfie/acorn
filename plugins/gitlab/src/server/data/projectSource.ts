@@ -8,6 +8,7 @@ import {
 } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS, MISSING, readDataPointer } from '@acorn/protocol/dataValues.ts'
 import { gl, glError, GITLAB_PROVIDER, type GitlabSession } from '../gitlabApi'
+import { serverOf } from '../servers'
 
 // One handler shape for both GitLab sources: a read over the projects a panel names, then the
 // query's filter, sort, `take`, and pages over the result. Each source says how it reads one project.
@@ -111,7 +112,7 @@ export function createProjectSourceHandler(source: ProjectSource): PluginFetchHa
 
       const answers = await context.providers.withConnections(GITLAB_PROVIDER, async (connection, token) => {
         if (connection.id !== scope.connectionId) return undefined
-        const session = { token }
+        const session = { origin: serverOf(connection).origin, token }
         if (input.operation === 'options')
           return { options: await projectOptions(session, input.search, input.pageSize, request.signal) }
         if (held) return { page: held.page }

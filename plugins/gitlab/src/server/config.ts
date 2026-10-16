@@ -4,6 +4,7 @@
 // authorization grant on and the `api` scope.
 export const gitlabClientId = (): string => process.env.GITLAB_CLIENT_ID?.trim() ?? ''
 
-// gitlab.com only. Self-hosted servers add their hosts at runtime (docs/future/github/06-self-hosted-hosts.md).
+// gitlab.com, the server a connection with no address of its own is on, and the host the plugin
+// declares. A company server's host is claimed while its connection exists (./servers.ts).
 export const GITLAB_ORIGIN = 'https://gitlab.com'
 export const GITLAB_HOST = 'gitlab.com'

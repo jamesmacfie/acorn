@@ -3,6 +3,7 @@ title: codeHost
 description: 'The Git hosts whose repositories your plugin understands, such as gitlab.com.'
 sources:
   - docs/plugins/code-hosts.md
+  - docs/plugins/self-hosted-code-hosts.md
 checked: 'dd67cf0fd'
 ---
 
@@ -11,6 +12,10 @@ origin remote is on one of them, and your data sources get the paths of those pr
 `changeRequest` block tells acorn how to check out, name, and show your host's pull or merge requests.
 Its `api` names the routes acorn's pull request tools, such as `pr_checks`, read a task's change
 request from. One per plugin.
+
+A product people run on their own servers declares `selfHosted: true`, and claims each server's host
+while it runs with `ctx.codeHosts.claim(host)`. Your browser handoffs and content links can then name
+`{codeHost}` as their host, and acorn expands it to every host you hold.
 
 To let workflows wait for your host's CI, file a `ci-settled` workflow policy, and a `review-received`
 one for reviews. A workflow's `checks-green`, `review-received`, and `ci-loop` steps ask yours when the
@@ -83,6 +88,8 @@ acorn reads the claim on the Node, so it applies in every client.
 - A host is a bare lowercase name. A scheme, a port, or a capital letter is refused.
 - The claim needs a `node` entry and the `projects:read` grant, or a grant that implies it.
 - When two plugins claim one host, a built-in wins, and then the lower plugin ID. Loading first doesn't
-  help.
+  help, and neither does claiming it at runtime.
+- `ctx.codeHosts.claim` throws unless your `codeHost` declares `selfHosted`. Claim your hosts again in
+  `init`, because a claim ends when your plugin stops.
 - Without a `ref`, acorn fetches the source branch by name, so a change request from a fork can't be
   checked out.

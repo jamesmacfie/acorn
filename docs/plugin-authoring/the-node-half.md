@@ -73,6 +73,8 @@ Declare in the manifest when you can, because that's the copy the owner reads at
 readers. Use it to check that a task-scoped record names a project in the same workspace. It also
 exposes `ctx.core.codeHosts()`, the ids of the running plugins that declare a
 [code host](../plugins/code-hosts.md), and `ctx.core.codeHostLabel(id)`, the name one of them declared.
+A code host that declares `selfHosted` claims hosts while it runs with `ctx.codeHosts.claim(host)`
+([hosts claimed at runtime](../plugins/self-hosted-code-hosts.md)).
 
 To serve a derived source, build its handler with `defineDerivedSource` from `acorn-plugin-sdk/data`
 and register it with `ctx.routes.fetch(source.fetch)`. The SDK answers every source operation from

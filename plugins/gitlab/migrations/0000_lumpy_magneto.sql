@@ -1,5 +1,5 @@
 CREATE TABLE `jobs` (
-	`user_id` text NOT NULL,
+	`connection_id` text NOT NULL,
 	`project_id` integer NOT NULL,
 	`iid` integer NOT NULL,
 	`job_id` integer NOT NULL,
@@ -9,11 +9,11 @@ CREATE TABLE `jobs` (
 	`url` text,
 	`pipeline_sha` text,
 	`position` integer NOT NULL,
-	PRIMARY KEY(`user_id`, `project_id`, `iid`, `job_id`)
+	PRIMARY KEY(`connection_id`, `project_id`, `iid`, `job_id`)
 );
 --> statement-breakpoint
 CREATE TABLE `merge_requests` (
-	`user_id` text NOT NULL,
+	`connection_id` text NOT NULL,
 	`project_id` integer NOT NULL,
 	`iid` integer NOT NULL,
 	`state` text NOT NULL,
@@ -32,12 +32,12 @@ CREATE TABLE `merge_requests` (
 	`pipeline_status` text,
 	`files_capped` integer DEFAULT false NOT NULL,
 	`fetched_at` integer NOT NULL,
-	PRIMARY KEY(`user_id`, `project_id`, `iid`)
+	PRIMARY KEY(`connection_id`, `project_id`, `iid`)
 );
 --> statement-breakpoint
-CREATE INDEX `merge_requests_user_project_state_updated_idx` ON `merge_requests` (`user_id`,`project_id`,`state`,`updated_at`);--> statement-breakpoint
+CREATE INDEX `merge_requests_connection_project_state_updated_idx` ON `merge_requests` (`connection_id`,`project_id`,`state`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `mr_commits` (
-	`user_id` text NOT NULL,
+	`connection_id` text NOT NULL,
 	`project_id` integer NOT NULL,
 	`iid` integer NOT NULL,
 	`sha` text NOT NULL,
@@ -46,11 +46,11 @@ CREATE TABLE `mr_commits` (
 	`author_login` text,
 	`committed_at` integer,
 	`position` integer NOT NULL,
-	PRIMARY KEY(`user_id`, `project_id`, `iid`, `sha`)
+	PRIMARY KEY(`connection_id`, `project_id`, `iid`, `sha`)
 );
 --> statement-breakpoint
 CREATE TABLE `mr_files` (
-	`user_id` text NOT NULL,
+	`connection_id` text NOT NULL,
 	`project_id` integer NOT NULL,
 	`iid` integer NOT NULL,
 	`path` text NOT NULL,
@@ -60,21 +60,21 @@ CREATE TABLE `mr_files` (
 	`position` integer NOT NULL,
 	`patch_state` text NOT NULL,
 	`patch_key` text,
-	PRIMARY KEY(`user_id`, `project_id`, `iid`, `path`)
+	PRIMARY KEY(`connection_id`, `project_id`, `iid`, `path`)
 );
 --> statement-breakpoint
 CREATE TABLE `mr_labels` (
-	`user_id` text NOT NULL,
+	`connection_id` text NOT NULL,
 	`project_id` integer NOT NULL,
 	`iid` integer NOT NULL,
 	`name` text NOT NULL,
 	`color` text,
 	`position` integer NOT NULL,
-	PRIMARY KEY(`user_id`, `project_id`, `iid`, `name`)
+	PRIMARY KEY(`connection_id`, `project_id`, `iid`, `name`)
 );
 --> statement-breakpoint
 CREATE TABLE `mr_people` (
-	`user_id` text NOT NULL,
+	`connection_id` text NOT NULL,
 	`project_id` integer NOT NULL,
 	`iid` integer NOT NULL,
 	`role` text NOT NULL,
@@ -82,11 +82,11 @@ CREATE TABLE `mr_people` (
 	`avatar_url` text,
 	`at` integer,
 	`position` integer NOT NULL,
-	PRIMARY KEY(`user_id`, `project_id`, `iid`, `role`, `login`)
+	PRIMARY KEY(`connection_id`, `project_id`, `iid`, `role`, `login`)
 );
 --> statement-breakpoint
 CREATE TABLE `notes` (
-	`user_id` text NOT NULL,
+	`connection_id` text NOT NULL,
 	`project_id` integer NOT NULL,
 	`iid` integer NOT NULL,
 	`id` integer NOT NULL,
@@ -103,11 +103,11 @@ CREATE TABLE `notes` (
 	`body` text,
 	`created_at` integer,
 	`position` integer NOT NULL,
-	PRIMARY KEY(`user_id`, `project_id`, `iid`, `id`)
+	PRIMARY KEY(`connection_id`, `project_id`, `iid`, `id`)
 );
 --> statement-breakpoint
 CREATE TABLE `projects` (
-	`user_id` text NOT NULL,
+	`connection_id` text NOT NULL,
 	`id` integer NOT NULL,
 	`path` text NOT NULL,
 	`name` text NOT NULL,
@@ -115,13 +115,13 @@ CREATE TABLE `projects` (
 	`private` integer DEFAULT false NOT NULL,
 	`last_activity_at` integer,
 	`fetched_at` integer NOT NULL,
-	PRIMARY KEY(`user_id`, `id`)
+	PRIMARY KEY(`connection_id`, `id`)
 );
 --> statement-breakpoint
 CREATE TABLE `sync_state` (
-	`user_id` text NOT NULL,
+	`connection_id` text NOT NULL,
 	`resource` text NOT NULL,
 	`revision` text,
 	`fetched_at` integer NOT NULL,
-	PRIMARY KEY(`user_id`, `resource`)
+	PRIMARY KEY(`connection_id`, `resource`)
 );

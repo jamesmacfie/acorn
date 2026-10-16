@@ -1,4 +1,4 @@
-import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
+import { checkDeclaredContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
 import { hasFrameRegion } from '@acorn/protocol/plugin/contract.ts'
 import type { ManifestReferences } from './references'
@@ -217,7 +217,7 @@ export function validateSurfaceDestinations(refs: ManifestReferences, ownPath: s
       })
     }
     try {
-      const compiled = entry.match ? compileContentLinkPattern(entry.match) : undefined
+      const compiled = entry.match ? checkDeclaredContentLinkPattern(entry.match) : undefined
       if (compiled && (!entry.item || !compiled.captures.includes(entry.item))) {
         ctx.addIssue({
           code: 'custom',

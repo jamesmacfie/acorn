@@ -29,7 +29,15 @@ const modes = {
     handlers: 'sync',
   },
   hooks: { declare: 'sync', handle: 'sync', run: 'async', handlers: 'async' },
-  providers: { integration: 'sync', connection: 'sync', model: 'sync', nodes: 'sync', withConnection: 'async' },
+  providers: {
+    integration: 'sync',
+    connection: 'sync',
+    model: 'sync',
+    nodes: 'sync',
+    withConnection: 'async',
+    connections: 'async',
+  },
+  codeHosts: { claim: 'sync' },
   capabilities: { provide: 'sync', get: 'sync', require: 'sync', ids: 'sync' },
   storage: { open: 'sync' },
   events: {
@@ -131,6 +139,7 @@ export function hostFunctionMode(path: string): Mode {
   if (method.includes('.result')) {
     if (
       method === 'events.on.result.dispose' ||
+      method === 'codeHosts.claim.result.dispose' ||
       method === 'capabilities.provide.result.dispose' ||
       method === 'core.telemetry.onBatch.result.dispose' ||
       method === 'telemetry.startSpan.result.end'

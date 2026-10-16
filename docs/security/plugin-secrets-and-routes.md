@@ -27,8 +27,10 @@ prefer a route the host fetches when one can do the job.
 
 A Node-side contribution with no request, such as GitHub's create-PR agent tool, uses
 `ctx.providers.withConnection(userId, providerId, callback)`. The host checks that the plugin owns the
-provider, picks only the first usable connection so a write can't fan out, lends the secret for that
-callback, and applies scrub-on-throw. A task-scoped child can't call provider-spending routes, so the
+provider, picks only the first usable connection, or the one a fourth `connectionId` argument names, so
+a write can't fan out, lends the secret for that callback, and applies scrub-on-throw.
+`ctx.providers.connections(userId, providerId)` lists that provider's connection rows with no secret,
+for Node-side work that reads each connection's settings. A task-scoped child can't call provider-spending routes, so the
 write-tier tool invocation is the authorization, and the trusted plugin makes the call.
 
 ### The credential-injecting broker

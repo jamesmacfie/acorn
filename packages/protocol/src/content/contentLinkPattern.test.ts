@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  checkDeclaredContentLinkPattern,
   compileContentLinkPattern,
+  expandCodeHostPattern,
   CONTENT_LINK_PATTERN_MAX_CAPTURES,
   CONTENT_LINK_PATTERN_MAX_LENGTH,
 } from './contentLinkPattern'
@@ -60,5 +62,19 @@ describe('content-link patterns', () => {
     expect(() => compileContentLinkPattern('https://gitlab.com/{path+}/{number}')).toThrow('before a literal')
     expect(() => compileContentLinkPattern('https://gitlab.com/{a+}/-/{b+}/x')).toThrow('one {capture+}')
     expect(() => compileContentLinkPattern('https://gitlab.com/{bad name+}/-')).toThrow('invalid name')
+  })
+
+  it('expands {codeHost} into one pattern per host the grammar can take', () => {
+    const page = 'https://{codeHost}/{path+}/-/merge_requests/{number}'
+    expect(checkDeclaredContentLinkPattern(page).captures).toEqual(['path', 'number'])
+    expect(() => checkDeclaredContentLinkPattern('https://{codeHost}/{path+}')).toThrow('before a literal')
+    expect(expandCodeHostPattern(page, ['gitlab.com', 'git.example.test', 'intranet'])).toEqual([
+      'https://gitlab.com/{path+}/-/merge_requests/{number}',
+      'https://git.example.test/{path+}/-/merge_requests/{number}',
+    ])
+    expect(expandCodeHostPattern(page, [])).toEqual([])
+    expect(expandCodeHostPattern('https://linear.app/{team}/issue/{id}', ['gitlab.com'])).toEqual([
+      'https://linear.app/{team}/issue/{id}',
+    ])
   })
 })

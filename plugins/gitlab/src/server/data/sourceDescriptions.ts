@@ -64,8 +64,8 @@ export const mergeRequestSourceDescription: DataSourceDescription = {
   },
   fields: [
     { pointer: '/project', label: 'Project', origin: 'declared' },
-    // `gitlab.com/<path>`, the shape core's local branches give their remote, so a branch finds its
-    // merge request.
+    // `<host>/<path>`, such as `gitlab.com/group/api`, the shape core's local branches give their
+    // remote, so a branch finds its merge request.
     { pointer: '/remoteRepository', label: 'Remote repository', origin: 'declared' },
     { pointer: '/number', label: 'Number', origin: 'declared', display: { kind: 'number' } },
     { pointer: '/title', label: 'Title', origin: 'declared', display: { kind: 'text', role: 'title' } },

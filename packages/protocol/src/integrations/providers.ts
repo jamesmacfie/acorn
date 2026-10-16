@@ -57,7 +57,9 @@ export type ProviderCapabilityName = keyof {
 export type CredentialField = {
   id: string
   label: string
-  type: 'password' | 'text' | 'url'
+  // A `checkbox` sends `true` when ticked and nothing otherwise, such as a confirmation the provider
+  // asks for before it connects.
+  type: 'password' | 'text' | 'url' | 'checkbox'
   placeholder?: string
   hint?: string
   required: boolean

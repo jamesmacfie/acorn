@@ -31,7 +31,7 @@ describe('the GitLab connection', () => {
   it('offers the token form alone when this build has no OAuth application', () => {
     expect(provider().kind).toBe('device-flow')
     expect(provider('').kind).toBe('fields')
-    expect(provider('').fields.map((field) => field.id)).toEqual(['token'])
+    expect(provider('').fields.map((field) => field.id)).toEqual(['token', 'baseUrl', 'allowPrivate'])
   })
 
   it('trades a refresh token for new tokens, and treats a refused one as needing sign-in', async () => {

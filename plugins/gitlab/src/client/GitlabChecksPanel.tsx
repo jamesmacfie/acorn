@@ -7,10 +7,10 @@ import { jobSections } from './jobLog'
 
 // One pipeline job's log, in the shared checks panel. GitLab sends a job's log as one text with its
 // sections marked, so each section is a step. A failed job opens its last section, where it stopped.
-export default function GitlabChecksPanel(props: { path: string; check: Check; onClose: () => void }) {
+export default function GitlabChecksPanel(props: { address: string; check: Check; onClose: () => void }) {
   const jobId = () => props.check.runId ?? 0
   // The log is the steps, so it's read when the panel opens rather than when a step does.
-  const log = createQuery(() => jobLogOptions(props.path, jobId(), true))
+  const log = createQuery(() => jobLogOptions(props.address, jobId(), true))
   const sections = createMemo(() => jobSections(log.data?.text ?? '', props.check.status))
   return (
     <ChecksPanel

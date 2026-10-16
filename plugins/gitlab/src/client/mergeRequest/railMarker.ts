@@ -68,7 +68,7 @@ export function mergeRequestMarkers(detail: ChangeRequestDetail): RailMarker[] {
   return markers
 }
 
-type Asked = { path: string; number: number; pushedAt: number; seq: number }
+type Asked = { address: string; number: number; pushedAt: number; seq: number }
 const asked = new Map<string, Asked>()
 const [details, setDetails] = createSignal<Record<string, ChangeRequestDetail>>({})
 
@@ -76,7 +76,7 @@ function read(taskId: string): void {
   const entry = asked.get(taskId)
   if (!entry) return
   const seq = ++entry.seq
-  readJson<ChangeRequestDetail>(mergeRequestRoute(entry.path, entry.number)).then(
+  readJson<ChangeRequestDetail>(mergeRequestRoute(entry.address, entry.number)).then(
     (detail) => {
       if (asked.get(taskId) === entry && entry.seq === seq) setDetails((current) => ({ ...current, [taskId]: detail }))
     },
@@ -99,10 +99,10 @@ function listen(): void {
   if (listening) return
   listening = true
   onPluginFrame('gitlab', 'plugin:gitlab:pr-synced', (payload) => {
-    const event = (payload ?? {}) as { projectPath?: unknown; number?: unknown }
-    if (typeof event.projectPath !== 'string') return
+    const event = (payload ?? {}) as { projectAddress?: unknown; number?: unknown }
+    if (typeof event.projectAddress !== 'string') return
     for (const [taskId, entry] of asked)
-      if (entry.number === event.number && samePath(entry.path, event.projectPath)) read(taskId)
+      if (entry.number === event.number && samePath(entry.address, event.projectAddress)) read(taskId)
   })
   clientEvents.on('head:changed', (event) => {
     const entry = asked.get(event.taskId)
@@ -132,7 +132,7 @@ export const mrRailMarkerContribution: RailMarkerContribution = {
     const at = task && taskMergeRequest(task)
     if (!at) return []
     const held = asked.get(target.taskId)
-    if (!held || held.path !== at.path || held.number !== at.number) {
+    if (!held || held.address !== at.address || held.number !== at.number) {
       listen()
       asked.set(target.taskId, { ...at, pushedAt: 0, seq: 0 })
       read(target.taskId)

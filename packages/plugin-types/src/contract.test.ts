@@ -219,7 +219,7 @@ it('leaves most of the surface compared, not substituted', () => {
   // These numbers are the budget. Raising one is a decision; lowering one is progress.
   expect(HOLES.context).toHaveLength(4)
   expect(Object.values(HOLES).flat()).toHaveLength(6)
-  // Twelve of the context's sixteen members are compared in full, `core` facet by facet above, and
+  // Thirteen of the context's seventeen members are compared in full, `core` facet by facet above, and
   // that is where most of the surface a plugin actually calls lives.
   const published: Array<keyof Published.NodePluginContext> = [
     'name',
@@ -232,6 +232,7 @@ it('leaves most of the surface compared, not substituted', () => {
     'extensionPoints',
     'hooks',
     'providers',
+    'codeHosts',
     'capabilities',
     'storage',
     'core',
@@ -239,7 +240,7 @@ it('leaves most of the surface compared, not substituted', () => {
     'telemetry',
     'log',
   ]
-  expect(published.length - HOLES.context.length).toBe(12)
+  expect(published.length - HOLES.context.length).toBe(13)
 })
 
 it('names every capability the first-party plugins publish', () => {

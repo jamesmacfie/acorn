@@ -284,7 +284,9 @@ const loadedContext = (ctx: NodePluginContext): Omit<NodePluginContext, 'storage
     model: ctx.providers.model,
     nodes: ctx.providers.nodes,
     withConnection: ctx.providers.withConnection,
+    connections: ctx.providers.connections,
   },
+  codeHosts: ctx.codeHosts,
   capabilities: ctx.capabilities,
   core: ctx.core,
   events: {

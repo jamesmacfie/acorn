@@ -19,7 +19,7 @@ import { splitPath } from './clientRoutes'
 
 // The merge request's diff: the shared change request diff, filled from GitLab's mirror. The document
 // is the Node's, cut into segments, with no patch text in it.
-export type MergeRequestRoute = { path: string; number: string; key: string }
+export type MergeRequestRoute = { address: string; number: string; key: string }
 
 export function DiffForMergeRequest(props: {
   route: MergeRequestRoute
@@ -29,17 +29,17 @@ export function DiffForMergeRequest(props: {
 }) {
   const searchParams = props.router ? useSearchParams()[0] : {}
   const queryClient = useQueryClient()
-  const { path, number } = props.route
-  const diff = createQuery(() => diffOptions(path, number, true))
-  const detail = createQuery(() => mergeRequestOptions(path, number, true))
-  const members = createQuery(() => membersOptions(path, true))
+  const { address, number } = props.route
+  const diff = createQuery(() => diffOptions(address, number, true))
+  const detail = createQuery(() => mergeRequestOptions(address, number, true))
+  const members = createQuery(() => membersOptions(address, true))
   const topology = () => diff.data?.document
-  const writes = mergeRequestWrites(path, number)
+  const writes = mergeRequestWrites(address, number)
 
   return (
     <ChangeRequestDiff
       taskId={props.taskId}
-      pull={{ ...splitPath(path), number }}
+      pull={{ ...splitPath(address), number }}
       inline={() => clientCapability(AGENTS_INLINE_DIFF)}
       warning={() => diff.data?.warning ?? null}
       annotations={changeRequestPointIds('gitlab').diffLine}
@@ -51,13 +51,13 @@ export function DiffForMergeRequest(props: {
         selectedPath: () => (typeof searchParams.file === 'string' ? searchParams.file : ''),
         threads: () => inlineReviewThreads(detail.data, diff.data, gitlabHost.avatar),
         mentions: () => (members.data ?? []).map((member) => member.login),
-        loadSegments: (requests, signal) => fetchDiffSegments(path, requests, signal),
+        loadSegments: (requests, signal) => fetchDiffSegments(address, requests, signal),
         search: async (request, signal) => {
           const document = topology()
-          return document ? searchDiff(path, document, request, signal) : { matches: [], nextCursor: null }
+          return document ? searchDiff(address, document, request, signal) : { matches: [], nextCursor: null }
         },
         // `sha` is the head commit, which the file is read at by its path.
-        fileText: async (file) => (await queryClient.fetchQuery(fileTextOptions(path, file.sha, file.path))).text,
+        fileText: async (file) => (await queryClient.fetchQuery(fileTextOptions(address, file.sha, file.path))).text,
         canComment: () => !props.readOnly && detail.data?.request?.headSha != null,
         ...(!props.readOnly
           ? {
@@ -73,8 +73,8 @@ export function DiffForMergeRequest(props: {
               resolveThread: (discussionId, resolved) => writes.resolve(discussionId, resolved),
             }
           : {}),
-        invalidate: () => void queryClient.invalidateQueries({ queryKey: mergeRequestKey(path, number) }),
-        draftPrefix: `gitlab:${path}/${number}`,
+        invalidate: () => void queryClient.invalidateQueries({ queryKey: mergeRequestKey(address, number) }),
+        draftPrefix: `gitlab:${address}/${number}`,
         find: {
           commandId: 'gitlab.diff.find',
           description: 'Find in diff',

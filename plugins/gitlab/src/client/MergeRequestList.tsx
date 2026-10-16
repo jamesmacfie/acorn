@@ -25,17 +25,17 @@ const [filters, setFilters] = createSignal<Record<string, { tab: 'open' | 'close
 // A project's merge requests, drawn by the shared change request list. This is GitLab's half: the
 // open mirror, one page of the closed ones, each row's checks, and the row menu. The filter narrows
 // what's loaded.
-export default function MergeRequestList(props: { path: string }) {
+export default function MergeRequestList(props: { address: string }) {
   const params = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const collapsed = sidebarCollapsed('gitlab')
-  const state = () => filters()[props.path] ?? { tab: 'open' as const, filter: '' }
+  const state = () => filters()[props.address] ?? { tab: 'open' as const, filter: '' }
   const update = (patch: Partial<{ tab: 'open' | 'closed'; filter: string }>) =>
-    setFilters((current) => ({ ...current, [props.path]: { ...state(), ...patch } }))
+    setFilters((current) => ({ ...current, [props.address]: { ...state(), ...patch } }))
   const tab = () => state().tab
 
-  const list = createQuery(() => mergeRequestsOptions(props.path, tab(), !!props.path))
+  const list = createQuery(() => mergeRequestsOptions(props.address, tab(), !!props.address))
   const integrations = createQuery(() => integrationsOptions(true))
   const connected = () =>
     (integrations.data?.integrations ?? []).some(
@@ -49,7 +49,7 @@ export default function MergeRequestList(props: { path: string }) {
 
   const status = (): ChangeRequestListStatus => {
     if (list.data) return { kind: 'ready' }
-    if (!connected() && (list.isError || !!props.path)) return { kind: 'disconnected' }
+    if (!connected() && (list.isError || !!props.address)) return { kind: 'disconnected' }
     if (list.isError) {
       const failure = describeFailure(list.error)
       return {
@@ -74,11 +74,11 @@ export default function MergeRequestList(props: { path: string }) {
     try {
       const headRef =
         row.headRef ??
-        (await queryClient.fetchQuery(mergeRequestOptions(props.path, String(row.number), true))).request?.headRef
+        (await queryClient.fetchQuery(mergeRequestOptions(props.address, String(row.number), true))).request?.headRef
       if (!headRef) throw new Error("This merge request's branch isn't available, so a task can't be created for it.")
       const task = await promoteMergeRequestToTask(queryClient, {
         projectId: params.projectId,
-        path: props.path,
+        address: props.address,
         number: row.number,
         headRef,
         title: row.title,
@@ -97,7 +97,7 @@ export default function MergeRequestList(props: { path: string }) {
     providerId: 'gitlab',
     projectId: params.projectId ?? '',
     ...(body ? { body } : {}),
-    link: mergeRequestUrl(props.path, row.number),
+    link: mergeRequestUrl(props.address, row.number),
     item: row,
   })
   const tasks = createQuery(() => tasksOptions(true))
@@ -150,13 +150,13 @@ export default function MergeRequestList(props: { path: string }) {
       taskError={taskError}
       status={status}
       rows={rows}
-      listKey={() => `${props.path}:${tab()}`}
+      listKey={() => `${props.address}:${tab()}`}
       selected={() => params.number ?? null}
       href={pathOf}
       onOpen={open}
       rowDetail={(number) => {
         // The warmed detail, when there is one; the list's own pipeline status otherwise.
-        const detail = createQuery(() => mergeRequestOptions(props.path, number, false))
+        const detail = createQuery(() => mergeRequestOptions(props.address, number, false))
         return {
           checks: () => {
             const known = detail.data?.checks

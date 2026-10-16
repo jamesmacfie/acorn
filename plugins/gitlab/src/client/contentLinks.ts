@@ -1,15 +1,29 @@
 import { allProjects, type ContentLinkContribution, type InAppTarget } from '@acorn/plugin-api/client'
-import { formatMergeRequestRef, parseMergeRequestRef, parseMergeRequestUrl, samePath } from '../shared/mergeRequestRef'
+import {
+  formatMergeRequestRef,
+  parseMergeRequestRef,
+  parseMergeRequestUrl,
+  projectAddress,
+  samePath,
+  splitAddress,
+} from '../shared/mergeRequestRef'
 import { gitlabBrowsePath } from './clientRoutes'
 
-// gitlab.com merge request links, resolved in acorn: the reference panel for a glance, the browse
-// route when the project is one acorn tracks, and the browser otherwise. The page grammar is the
-// browser handoff's, so a project nested in groups at any depth matches.
+// GitLab merge request links, resolved in acorn: the reference panel for a glance, the browse route
+// when the project is one acorn tracks, and the browser otherwise. The page grammar is the browser
+// handoff's, so a project nested in groups at any depth matches.
+const gitlabProjects = () => allProjects().filter((project) => project.repository?.provider === 'gitlab')
+
+// gitlab.com, and each company server a tracked project is on. A merge request page on a server no
+// project is on opens in the browser, as any other link does.
+const isGitlabHost = (host: string): boolean =>
+  host === 'gitlab.com' || gitlabProjects().some((project) => project.repository!.host === host)
+
 const projectIdFor = (target: InAppTarget): string | null => {
-  const path = typeof target.path === 'string' ? target.path : ''
+  const address = typeof target.address === 'string' ? target.address : ''
   return (
-    allProjects().find(
-      (project) => project.repository?.provider === 'gitlab' && samePath(project.repository.path, path),
+    gitlabProjects().find((project) =>
+      samePath(projectAddress(project.repository!.host, project.repository!.path), address),
     )?.id ?? null
   )
 }
@@ -25,9 +39,8 @@ export const gitlabContentLinkContributions: ContentLinkContribution[] = [
     presentations: ['route', 'refPanel', 'pane', 'external'],
     parse: (href) => {
       const ref = parseMergeRequestUrl(href)
-      return ref
-        ? { kind: 'mr', path: ref.path, number: ref.number, item: formatMergeRequestRef(ref.path, ref.number) }
-        : null
+      if (!ref || !isGitlabHost(splitAddress(ref.address).host)) return null
+      return { kind: 'mr', ...ref, item: formatMergeRequestRef(ref.address, ref.number) }
     },
     path: (target) => {
       const projectId = projectIdFor(target)

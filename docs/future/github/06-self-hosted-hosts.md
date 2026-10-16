@@ -1,5 +1,76 @@
 # Phase 6: let a code host claim hosts at runtime
 
+## Completion note
+
+October 17, 2026. Done, verified against the fake GitLab API served at `https://gitlab.example.test`.
+
+What landed:
+
+- `codeHost.selfHosted` in `packages/protocol/src/plugin/contract.ts`, with the host rule pulled out as
+  `codeHostName`. The manifest schema is regenerated.
+- `ctx.codeHosts.claim(host)` on both tiers, which returns a `Disposable`. `claimCodeHost` in
+  `packages/node-core/src/server/pluginHost/codeHosts.ts` keeps each claim on the plugin's code host
+  entry, so a claim goes with the declaration when the plugin stops. `heldHosts(pluginId)` lists the
+  declared and claimed hosts the plugin wins. A claim and a release broadcast `plugins:changed`.
+- `{codeHost}` patterns: `expandCodeHostPattern` and `checkDeclaredContentLinkPattern` in
+  `packages/protocol/src/content/contentLinkPattern.ts`. Discovery expands handoff patterns on each
+  read. The roster row carries `codeHosts`, and the client's chrome pass expands content links from it
+  and registers them again when it changes.
+- `ctx.providers.connections(userId, providerId)`, and an optional `connectionId` on
+  `ctx.providers.withConnection`, `providerCredential`, and `refreshProviderCredential`.
+- A `checkbox` credential field, drawn in Settings, the wizard, and the terminal client's setup. The
+  connect form shows a provider's refusal reason when it gives one.
+- The trust prompt's **Provides** group has a code host line, which says a `selfHosted` one can add
+  hosts and receives the paths of their projects.
+- The client refetches projects on `plugins:changed`, so a provider that a claim, a release, or a
+  disabled code host changes reaches the project list.
+- GitLab: a **GitLab address** field and a **Connect to a private address** checkbox on the token
+  form, `maxConnections` 8, `selfHosted`, `{codeHost}` handoff patterns, and `createGitlabServers` in
+  `plugins/gitlab/src/server/servers.ts`, which claims each company server's host at init and on every
+  `connection:changed`. The mirror is keyed by `connection_id`. The plugin never shipped, so its one
+  migration, `0000`, is regenerated to create that schema directly. Every call goes to the session's
+  `origin`.
+- [Self-hosted code hosts](../../plugins/self-hosted-code-hosts.md) is a new page, and
+  [code hosts](../../plugins/code-hosts.md), [browser handoffs](../../plugin-authoring/browser-handoffs.md),
+  [GitLab integration](../../gitlab-integration.md), and the site's GitLab and reference pages describe
+  it.
+
+Decisions and deviations:
+
+- One plugin with many connections, not one connection per host. Each connection is one account on one
+  server, and the plugin keeps one server per host in memory. The oldest connection to a host serves it,
+  and a second one to the same server is never used. Validation can't refuse it, because replacing a
+  key validates the same way.
+- The client threads a project address, `host/path`, instead of a bare path. Project routes are
+  `/v1/p/gitlab/projects/:host/:path/...`, and refs are `gitlab.com/group/api!12` on every server,
+  gitlab.com included, because a path alone can name projects on two servers. Event payloads carry
+  `projectAddress` in place of `projectPath`.
+- `GET /v1/p/gitlab/servers`, device only, lists each server's host and connection, so the client links
+  a new task under the connection on its merge request's server.
+- The device flow stays on gitlab.com. A company server signs in with a token only. Offering the device
+  flow with a person's own client id needs core's device code screen to collect fields first, which
+  nothing else needs yet.
+- The private address check reads the literal address only: `localhost`, `*.localhost`, and the
+  loopback, private, and link-local IPv4 ranges. A name isn't resolved. An address with a path, a port,
+  or an IPv6 literal is refused, because the browser button and the claim match by host alone.
+- A content link to a merge request on a company server opens in Acorn when a tracked project is on
+  that server. Otherwise it opens in the browser.
+- Replacing a company server's key without its address moves the connection to gitlab.com, and
+  validation refuses the company token there, so nothing is saved.
+
+For later phases:
+
+- Phase 8: a Bitbucket plugin for Bitbucket Cloud declares a fixed host and needs none of this. The same
+  claim, `{codeHost}`, and per-connection `origin` serve a Bitbucket Data Center plugin if one is wanted.
+- GitHub Enterprise needs the GitHub plugin's mirror keyed by connection, the same as GitLab's here.
+- The desktop's image policy allows gitlab.com avatars only, so it doesn't load a company server's.
+- Core's `byRepository(provider, path)` and `adoptChangeRequests(provider, path, ...)` don't take a
+  host, so two servers holding the same path can be confused there.
+- Already red at the base and untouched: the `pluginDisable` and `routeRegistry` goldens in `apps/node`
+  (the browser-panel and agents MCP routes), three `docPaths` entries for `dist` files, knip's
+  `proposalChanges`, two `cssHygiene` checks in client-core, and three site unit tests. The goldens
+  gained only `gitlab/servers`.
+
 Date: October 16, 2026. Status: proposed. Depends on [phase 5](./05-gitlab-plugin.md).
 
 ## Goal

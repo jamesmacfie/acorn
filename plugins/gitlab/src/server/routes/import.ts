@@ -5,22 +5,22 @@ import { z } from 'zod'
 import {
   type AppEnv,
   type CoreServices,
-  ownerId,
   type PluginDatabase,
   requireDevice,
   respondError,
 } from '@acorn/plugin-api/node'
 import type { GitlabImportItem, GitlabImportResult } from '../../shared/api'
 import { projects } from '../../node/schema'
-import { GITLAB_ORIGIN } from '../config'
 import { GITLAB_PROVIDER } from '../gitlabApi'
+import type { GitlabServers } from '../servers'
 
 // Import mirrored projects as acorn projects: link a folder that already holds a clone, or clone into
 // a parent folder. The shape of GitHub's importer (plugins/github/src/server/routes/repos/import.ts).
 
+const host = z.string().min(1).max(253)
 const item = z.discriminatedUnion('action', [
-  z.object({ projectId: z.number().int().positive(), action: z.literal('map'), path: z.string().min(1) }),
-  z.object({ projectId: z.number().int().positive(), action: z.literal('clone'), parentDir: z.string().min(1) }),
+  z.object({ host, projectId: z.number().int().positive(), action: z.literal('map'), path: z.string().min(1) }),
+  z.object({ host, projectId: z.number().int().positive(), action: z.literal('clone'), parentDir: z.string().min(1) }),
 ])
 const body = z.object({ projects: z.array(item).min(1).max(100) })
 
@@ -32,9 +32,12 @@ const failed = (entry: GitlabImportItem, path: string, error: unknown): GitlabIm
   error: error instanceof Error ? error.message : String(error),
 })
 
-export const gitlabImport = (db: PluginDatabase, core: Pick<CoreServices, 'projects' | 'git'>) =>
+export const gitlabImport = (
+  db: PluginDatabase,
+  core: Pick<CoreServices, 'projects' | 'git'>,
+  servers: GitlabServers,
+) =>
   new Hono<AppEnv>().post('/', requireDevice, async (c) => {
-    const userId = ownerId(c)
     const parsed = body.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success)
       return respondError(
@@ -46,11 +49,14 @@ export const gitlabImport = (db: PluginDatabase, core: Pick<CoreServices, 'proje
 
     const results: GitlabImportResult[] = []
     for (const entry of parsed.data.projects) {
-      const [project] = await db
-        .select()
-        .from(projects)
-        .where(and(eq(projects.userId, userId), eq(projects.id, entry.projectId)))
-      if (!project) {
+      const server = servers.byHost(entry.host)
+      const [project] = server
+        ? await db
+            .select()
+            .from(projects)
+            .where(and(eq(projects.connectionId, server.connectionId), eq(projects.id, entry.projectId)))
+        : []
+      if (!server || !project) {
         results.push(failed(entry, '', 'Project is not available in the GitLab mirror.'))
         continue
       }
@@ -63,7 +69,7 @@ export const gitlabImport = (db: PluginDatabase, core: Pick<CoreServices, 'proje
           if (!isAbsolute(entry.parentDir)) throw new Error('Clone parent directory must be absolute.')
           // The folder is the project's last path segment, as `git clone` would name it.
           const folder = project.path.split('/').pop()!
-          await core.git.gitOrThrow(['clone', `${GITLAB_ORIGIN}/${project.path}.git`, folder], {
+          await core.git.gitOrThrow(['clone', `${server.origin}/${project.path}.git`, folder], {
             cwd: entry.parentDir,
             env: { GIT_TERMINAL_PROMPT: '0' },
           })

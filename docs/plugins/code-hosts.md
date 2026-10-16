@@ -19,6 +19,9 @@ declares `contributions.codeHost` in its manifest:
 }
 ```
 
+A plugin that adds hosts while it runs declares `selfHosted` too, as described in
+[self-hosted code hosts](./self-hosted-code-hosts.md).
+
 A host is a bare lowercase name, with no scheme or port. The declaration needs a `node` entry,
 because only a running node half registers it. It also needs `projects:read`, or a grant that implies
 it, in `permissions.node.core`: a code host's data sources get the paths of the projects on its hosts,
@@ -31,6 +34,12 @@ The provider is the plugin's own id, so two plugins can't declare the same provi
 plugins claim one host, a built-in beats a loaded plugin, and between two of the same tier the lower
 plugin id wins. Registration order never decides it, so an installed package can't take `github.com`
 from GitHub by loading first or by outlasting a reload. The Node logs a warning for the losing claim.
+
+## Hosts claimed at runtime
+
+A `selfHosted` code host, such as GitLab, claims a company server's host while the person's connection
+to it exists, and its browser handoffs and content links can name `{codeHost}` as their host. For the
+rules, see [self-hosted code hosts](./self-hosted-code-hosts.md).
 
 ## The repository facet
 

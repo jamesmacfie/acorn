@@ -1,6 +1,6 @@
 import { For, type JSX } from 'solid-js'
 import type { createCredentialForm } from '../../integrations/credentialForm'
-import { Field, Input } from '../../../kit/components/primitives'
+import { Checkbox, Field, Input } from '../../../kit/components/primitives'
 import { Stack } from '../../../kit/components/layout/Stack'
 
 // The fields a provider asks for, as a page form: Add connection and Replace key draw the same ones,
@@ -10,18 +10,27 @@ export function CredentialFields(props: { form: ReturnType<typeof createCredenti
   return (
     <Stack gap="stack">
       <For each={props.form.fields()}>
-        {(field) => (
-          <Field label={field.label} hint={field.hint}>
-            <Input
-              type={field.type}
-              assist={false}
-              placeholder={field.placeholder}
-              value={props.form.value(field.id)}
-              onInput={(value) => props.form.setValue(field.id, value)}
-              onSubmit={() => void props.form.submit()}
+        {(field) =>
+          field.type === 'checkbox' ? (
+            <Checkbox
+              label={field.label}
+              hint={field.hint}
+              checked={props.form.value(field.id) === 'true'}
+              onChange={(checked) => props.form.setValue(field.id, checked ? 'true' : '')}
             />
-          </Field>
-        )}
+          ) : (
+            <Field label={field.label} hint={field.hint}>
+              <Input
+                type={field.type}
+                assist={false}
+                placeholder={field.placeholder}
+                value={props.form.value(field.id)}
+                onInput={(value) => props.form.setValue(field.id, value)}
+                onSubmit={() => void props.form.submit()}
+              />
+            </Field>
+          )
+        }
       </For>
       {props.children}
     </Stack>

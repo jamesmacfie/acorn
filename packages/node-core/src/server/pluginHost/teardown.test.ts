@@ -24,6 +24,7 @@ import { telemetrySummary } from '../telemetry/collector'
 import { wsBroadcast } from '../transport/wsHub'
 import { makeTestDb, testCoreSeams } from '../../testkit/db'
 import { CapabilityRegistry } from './capabilities'
+import { codeHostFor } from './codeHosts'
 import { AGENTS_CUSTOM_AGENT_REGISTRY } from './customAgents'
 import {
   extensionPointId,
@@ -104,6 +105,8 @@ const provider = (id: string, capabilities: { textGeneration?: true } = {}) =>
     budgets: defaultBudgets,
     memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none' as const, acceptedWrites: false },
   })
+
+const SELF_HOSTED = { label: 'Teardown', hosts: ['teardown.test'], selfHosted: true }
 
 let heard = false
 let searched = false
@@ -323,6 +326,11 @@ const PROBES: Record<string, Probe> = {
     register: (ctx) => void ctx.core.telemetry.onBatch(() => {}),
     present: () => telemetrySummary().sinks.includes(PLUGIN),
   },
+  // The claim goes with the plugin's code host declaration.
+  'codeHosts.claim': {
+    register: (ctx) => void ctx.codeHosts.claim('claimed.teardown.test'),
+    present: () => codeHostFor('claimed.teardown.test') === PLUGIN,
+  },
 }
 
 // Members that register nothing, so teardown has nothing to take back.
@@ -337,6 +345,7 @@ const NOT_REGISTRATIONS = new Set([
   'hooks.run',
   'hooks.handlers',
   'providers.withConnection',
+  'providers.connections',
   'capabilities.get',
   'capabilities.require',
   'capabilities.ids',
@@ -391,17 +400,20 @@ describe('plugin teardown', () => {
     capabilities.provide(AGENTS_HARNESS_REGISTRY, { register: (harness) => tracked(harnesses, harness.id) })
     capabilities.provide(AGENTS_CUSTOM_AGENT_REGISTRY, { register: (agent) => tracked(customAgents, agent.id) })
     let captured!: HostPluginContext
-    const host = await initPlugins([{ name: PLUGIN, init: (ctx) => void (captured = ctx as HostPluginContext) }], {
-      capabilities,
-      core: createCoreServices({
-        secrets: new SecretService('a'.repeat(64)),
-        db: db.db,
-        activeIdentity: memoryIdentityStore(),
-        ...testCoreSeams(),
-      }),
-      dataDir: '',
-      ...(loaded ? { loaded: new Map([[PLUGIN, loaded]]) } : {}),
-    })
+    const host = await initPlugins(
+      [{ name: PLUGIN, codeHost: SELF_HOSTED, init: (ctx) => void (captured = ctx as HostPluginContext) }],
+      {
+        capabilities,
+        core: createCoreServices({
+          secrets: new SecretService('a'.repeat(64)),
+          db: db.db,
+          activeIdentity: memoryIdentityStore(),
+          ...testCoreSeams(),
+        }),
+        dataDir: '',
+        ...(loaded ? { loaded: new Map([[PLUGIN, loaded]]) } : {}),
+      },
+    )
     return { ctx: captured, host }
   }
 
@@ -412,6 +424,7 @@ describe('plugin teardown', () => {
       {
         permissions: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
         events: ['plugins:changed'],
+        codeHost: SELF_HOSTED,
         storage: {
           open: () => {
             throw new Error('test storage is not configured')

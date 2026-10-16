@@ -276,6 +276,7 @@
     "GET /v1/p/github/change-requests/:number/checks",
     "GET /v1/p/github/change-requests/:number/feedback",
     "GET /v1/p/github/tasks/:taskId/pulls",
+    "GET /v1/p/gitlab/servers",
     "GET /v1/p/memory/memory",
     "GET /v1/p/memory/memory/search",
     "GET /v1/p/notes/tasks/:id/notes",

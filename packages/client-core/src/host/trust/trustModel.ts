@@ -33,6 +33,7 @@ import {
   webviewGrants,
   webviewPermissionLines,
   inputPermissionLines,
+  codeHostLines,
   providedSourceLines,
 } from './permissions'
 import { recordPluginTrust } from '../plugins/host'
@@ -88,7 +89,11 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       now: inputPermissionLines(inputs?.inputs ?? []),
       was: inputs?.granted ? inputPermissionLines(inputs.inputs.filter((input) => input.approved)) : null,
     },
-    { key: 'provides', now: providedSourceLines(installed.contributions), was: null },
+    {
+      key: 'provides',
+      now: [...codeHostLines(installed.contributions), ...providedSourceLines(installed.contributions)],
+      was: null,
+    },
     {
       key: 'enforced',
       now: [

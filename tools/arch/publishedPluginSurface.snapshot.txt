@@ -793,6 +793,8 @@ acorn-plugin-types: member NodePlugin.name
 acorn-plugin-types: member NodePlugin.ready
 acorn-plugin-types: member NodePluginContext.audit
 acorn-plugin-types: member NodePluginContext.capabilities
+acorn-plugin-types: member NodePluginContext.codeHosts
+acorn-plugin-types: member NodePluginContext.codeHosts.claim
 acorn-plugin-types: member NodePluginContext.core
 acorn-plugin-types: member NodePluginContext.dataSources
 acorn-plugin-types: member NodePluginContext.dataSources.discover
@@ -889,6 +891,7 @@ acorn-plugin-types: member PluginNotice.target.subresourceId
 acorn-plugin-types: member PluginNotice.taskId
 acorn-plugin-types: member PluginNotice.title
 acorn-plugin-types: member PluginProviderRegistry.connection
+acorn-plugin-types: member PluginProviderRegistry.connections
 acorn-plugin-types: member PluginProviderRegistry.integration
 acorn-plugin-types: member PluginProviderRegistry.model
 acorn-plugin-types: member PluginProviderRegistry.nodes

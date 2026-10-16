@@ -10,6 +10,7 @@ import type { SkillStateStore } from '../plugins/skillState'
 import { pluginSkills } from './skills'
 import type { PluginDevelopment } from '../plugins/development'
 import { registeredDataSource } from '../dataSources/registry'
+import { heldHosts } from './codeHosts'
 import { parseDataSourceInputRef } from '@acorn/protocol/dataSources.ts'
 import type {
   InstalledPluginRow,
@@ -244,6 +245,11 @@ export const pluginState = (
     const label = installed.get(id)?.label ?? compiled
     return label ? { label } : {}
   }
+  // What a `{codeHost}` content link pattern expands to on the client.
+  const codeHostsOf = (id: string): Pick<NodePluginRow, 'codeHosts'> => {
+    const hosts = heldHosts(id)
+    return hosts.length ? { codeHosts: hosts } : {}
+  }
   // `disabled` is what will be true after a restart; `running` is what is true now. A required plugin is
   // never disabled either way, whatever the file says.
   const rows: NodePluginRow[] = bridge.roster().map((entry) => {
@@ -276,6 +282,7 @@ export const pluginState = (
       ...(entry.stage === undefined ? {} : { stage: entry.stage }),
       ...declared(entry.name),
       ...review(entry.name),
+      ...codeHostsOf(entry.name),
     }
   })
   // Packages the plugin host never saw. Three kinds, and they are not the same answer:

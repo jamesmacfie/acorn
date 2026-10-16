@@ -15,10 +15,11 @@ import { resolveProject } from './mirror/projects'
 import { changeRequestRoutes } from './routes/changeRequests'
 import { gitlabWorkflowPolicies } from './workflowPolicies'
 import { createBrowserHandoffHandler } from './browserHandoff'
+import { createGitlabServers } from './servers'
 
 vi.mock('./gitlabApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./gitlabApi')>()),
-  gitlabSession: async () => ({ token: 'token' }),
+  gitlabSession: async (_c: unknown, server: { origin: string }) => ({ origin: server.origin, token: 'token' }),
 }))
 
 // A GitLab task end to end, below the UI: the routes core's agent tools ask, the CI policy a workflow
@@ -56,13 +57,20 @@ const core = {
   },
   identity: { active: () => USER },
 } as unknown as Pick<CoreServices, 'tasks' | 'projects' | 'identity'>
-const connection = { id: 'conn-1', status: 'connected', label: 'ada', name: null } as StoredConnection
+const connection = { id: 'conn-1', status: 'connected', label: 'ada', name: null, config: '{}' } as StoredConnection
+const servers = createGitlabServers({
+  connections: async () => [connection],
+  claim: () => ({ dispose: () => {} }),
+  forgetOthers: async () => {},
+})
+const session = { origin: 'https://gitlab.com', token: 'token' }
 const providers = {
   withConnection: async <T>(
     _userId: string,
     _provider: string,
     visit: (c: StoredConnection, secret: string) => Promise<T | undefined>,
-  ) => visit(connection, 'token'),
+    connectionId?: string,
+  ) => (connectionId === connection.id ? visit(connection, 'token') : undefined),
 }
 const blobs = new Map<string, string>()
 const blobStore = {
@@ -75,7 +83,8 @@ describe('a GitLab task', () => {
   let fake: ReturnType<typeof makeFakeGitlab>
   let project: FakeProject
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await servers.sync()
     testDb = makeTestPluginDb('gitlab')
     project = { id: 42, path: 'group/sub/api', defaultBranch: 'main', mergeRequests: [makeMergeRequest()] }
     fake = makeFakeGitlab([project])
@@ -87,16 +96,16 @@ describe('a GitLab task', () => {
   })
 
   const mirror = async () => {
-    await resolveProject({ token: 'token' }, testDb.db, USER, 'group/sub/api')
-    const key = { userId: USER, projectId: 42, path: 'group/sub/api', iid: 12 }
-    await refreshMergeRequest({ token: 'token' }, testDb.db, key)
-    await refreshFiles({ token: 'token' }, testDb.db, blobStore, key)
+    await resolveProject(session, testDb.db, connection.id, 'group/sub/api')
+    const key = { connectionId: connection.id, projectId: 42, path: 'group/sub/api', iid: 12 }
+    await refreshMergeRequest(session, testDb.db, key)
+    await refreshFiles(session, testDb.db, blobStore, key)
   }
   const TASK: Principal = { kind: 'internal', scope: 'task', userId: USER, taskId: task.id } as Principal
   const call = async (path: string, init: RequestInit = {}, principal = TASK) => {
     const app = new Hono<AppEnv>()
       .use('/api/*', ...testGate(principal))
-      .route('/api/cr', changeRequestRoutes(testDb.db, core))
+      .route('/api/cr', changeRequestRoutes(testDb.db, core, servers))
     const response = await app.fetch(new Request(`http://acorn.test/api/cr${path}`, init), {} as Env)
     return { status: response.status, body: (await response.json()) as Record<string, unknown> }
   }
@@ -175,7 +184,7 @@ describe('a GitLab task', () => {
 
   it('makes checks-green wait for the pipeline, then fail on a failed job, then pass', async () => {
     await mirror()
-    const { ciSettled } = gitlabWorkflowPolicies(testDb.db, core, providers, () => {})
+    const { ciSettled } = gitlabWorkflowPolicies(testDb.db, core, providers, servers, () => {})
     const evaluate = () => ciSettled.evaluate({ taskId: task.id, with: {}, since: 0 } as never)
     const pipeline = project.mergeRequests[0]!.pipeline!
     pipeline.jobs = [
@@ -196,7 +205,7 @@ describe('a GitLab task', () => {
 
   it('makes review-received pass on an approval or a comment by someone else after the wait began', async () => {
     await mirror()
-    const { reviewReceived } = gitlabWorkflowPolicies(testDb.db, core, providers, () => {})
+    const { reviewReceived } = gitlabWorkflowPolicies(testDb.db, core, providers, servers, () => {})
     const evaluate = () =>
       reviewReceived.evaluate({ taskId: task.id, with: {}, since: Date.parse('2026-10-16T00:05:00Z') } as never)
     expect(await evaluate()).toMatchObject({ verdict: 'wait' })
@@ -219,7 +228,7 @@ describe('a GitLab task', () => {
   })
 
   it('resolves a merge request page into a task seed with the merge request as its primary', async () => {
-    const handler = createBrowserHandoffHandler(testDb.db, core, () => {})
+    const handler = createBrowserHandoffHandler(testDb.db, core, servers, () => {})
     const context = {
       userId: USER,
       principal: { kind: 'device', userId: USER },
@@ -246,7 +255,7 @@ describe('a GitLab task', () => {
     const { items } = (await response.json()) as { items: Record<string, unknown>[] }
     expect(items).toEqual([
       expect.objectContaining({
-        identifier: 'group/sub/api!12',
+        identifier: 'gitlab.com/group/sub/api!12',
         url: 'https://gitlab.com/group/sub/api/-/merge_requests/12',
         projects: ['project-1'],
         seed: {
@@ -257,8 +266,11 @@ describe('a GitLab task', () => {
           links: [
             {
               connectionId: 'conn-1',
-              identifier: 'group/sub/api!12',
-              ref: { displayId: 'group/sub/api!12', url: 'https://gitlab.com/group/sub/api/-/merge_requests/12' },
+              identifier: 'gitlab.com/group/sub/api!12',
+              ref: {
+                displayId: 'gitlab.com/group/sub/api!12',
+                url: 'https://gitlab.com/group/sub/api/-/merge_requests/12',
+              },
             },
           ],
         },

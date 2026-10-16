@@ -47,7 +47,7 @@ it('reads the merge requests of the projects a panel names', async () => {
   const page = dataSourcePageSchema.parse(await response.json())
   expect(page.records).toEqual([
     expect.objectContaining({
-      recordId: 'group/sub/api!12',
+      recordId: 'gitlab.com/group/sub/api!12',
       data: expect.objectContaining({
         project: 'group/sub/api',
         remoteRepository: 'gitlab.com/group/sub/api',

@@ -1,14 +1,14 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0f7d7d72-d465-494d-8ab0-25ee34a98b2a",
+  "id": "9e8ce4ee-faa8-43c7-b19f-dfcca58b8fb8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "jobs": {
       "name": "jobs",
       "columns": {
-        "user_id": {
-          "name": "user_id",
+        "connection_id": {
+          "name": "connection_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -81,14 +81,14 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "jobs_user_id_project_id_iid_job_id_pk": {
+        "jobs_connection_id_project_id_iid_job_id_pk": {
           "columns": [
-            "user_id",
+            "connection_id",
             "project_id",
             "iid",
             "job_id"
           ],
-          "name": "jobs_user_id_project_id_iid_job_id_pk"
+          "name": "jobs_connection_id_project_id_iid_job_id_pk"
         }
       },
       "uniqueConstraints": {},
@@ -97,8 +97,8 @@
     "merge_requests": {
       "name": "merge_requests",
       "columns": {
-        "user_id": {
-          "name": "user_id",
+        "connection_id": {
+          "name": "connection_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -235,10 +235,10 @@
         }
       },
       "indexes": {
-        "merge_requests_user_project_state_updated_idx": {
-          "name": "merge_requests_user_project_state_updated_idx",
+        "merge_requests_connection_project_state_updated_idx": {
+          "name": "merge_requests_connection_project_state_updated_idx",
           "columns": [
-            "user_id",
+            "connection_id",
             "project_id",
             "state",
             "updated_at"
@@ -248,13 +248,13 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "merge_requests_user_id_project_id_iid_pk": {
+        "merge_requests_connection_id_project_id_iid_pk": {
           "columns": [
-            "user_id",
+            "connection_id",
             "project_id",
             "iid"
           ],
-          "name": "merge_requests_user_id_project_id_iid_pk"
+          "name": "merge_requests_connection_id_project_id_iid_pk"
         }
       },
       "uniqueConstraints": {},
@@ -263,8 +263,8 @@
     "mr_commits": {
       "name": "mr_commits",
       "columns": {
-        "user_id": {
-          "name": "user_id",
+        "connection_id": {
+          "name": "connection_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -330,14 +330,14 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "mr_commits_user_id_project_id_iid_sha_pk": {
+        "mr_commits_connection_id_project_id_iid_sha_pk": {
           "columns": [
-            "user_id",
+            "connection_id",
             "project_id",
             "iid",
             "sha"
           ],
-          "name": "mr_commits_user_id_project_id_iid_sha_pk"
+          "name": "mr_commits_connection_id_project_id_iid_sha_pk"
         }
       },
       "uniqueConstraints": {},
@@ -346,8 +346,8 @@
     "mr_files": {
       "name": "mr_files",
       "columns": {
-        "user_id": {
-          "name": "user_id",
+        "connection_id": {
+          "name": "connection_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -420,14 +420,14 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "mr_files_user_id_project_id_iid_path_pk": {
+        "mr_files_connection_id_project_id_iid_path_pk": {
           "columns": [
-            "user_id",
+            "connection_id",
             "project_id",
             "iid",
             "path"
           ],
-          "name": "mr_files_user_id_project_id_iid_path_pk"
+          "name": "mr_files_connection_id_project_id_iid_path_pk"
         }
       },
       "uniqueConstraints": {},
@@ -436,8 +436,8 @@
     "mr_labels": {
       "name": "mr_labels",
       "columns": {
-        "user_id": {
-          "name": "user_id",
+        "connection_id": {
+          "name": "connection_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -482,14 +482,14 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "mr_labels_user_id_project_id_iid_name_pk": {
+        "mr_labels_connection_id_project_id_iid_name_pk": {
           "columns": [
-            "user_id",
+            "connection_id",
             "project_id",
             "iid",
             "name"
           ],
-          "name": "mr_labels_user_id_project_id_iid_name_pk"
+          "name": "mr_labels_connection_id_project_id_iid_name_pk"
         }
       },
       "uniqueConstraints": {},
@@ -498,8 +498,8 @@
     "mr_people": {
       "name": "mr_people",
       "columns": {
-        "user_id": {
-          "name": "user_id",
+        "connection_id": {
+          "name": "connection_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -558,15 +558,15 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "mr_people_user_id_project_id_iid_role_login_pk": {
+        "mr_people_connection_id_project_id_iid_role_login_pk": {
           "columns": [
-            "user_id",
+            "connection_id",
             "project_id",
             "iid",
             "role",
             "login"
           ],
-          "name": "mr_people_user_id_project_id_iid_role_login_pk"
+          "name": "mr_people_connection_id_project_id_iid_role_login_pk"
         }
       },
       "uniqueConstraints": {},
@@ -575,8 +575,8 @@
     "notes": {
       "name": "notes",
       "columns": {
-        "user_id": {
-          "name": "user_id",
+        "connection_id": {
+          "name": "connection_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -702,14 +702,14 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "notes_user_id_project_id_iid_id_pk": {
+        "notes_connection_id_project_id_iid_id_pk": {
           "columns": [
-            "user_id",
+            "connection_id",
             "project_id",
             "iid",
             "id"
           ],
-          "name": "notes_user_id_project_id_iid_id_pk"
+          "name": "notes_connection_id_project_id_iid_id_pk"
         }
       },
       "uniqueConstraints": {},
@@ -718,8 +718,8 @@
     "projects": {
       "name": "projects",
       "columns": {
-        "user_id": {
-          "name": "user_id",
+        "connection_id": {
+          "name": "connection_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -779,12 +779,12 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "projects_user_id_id_pk": {
+        "projects_connection_id_id_pk": {
           "columns": [
-            "user_id",
+            "connection_id",
             "id"
           ],
-          "name": "projects_user_id_id_pk"
+          "name": "projects_connection_id_id_pk"
         }
       },
       "uniqueConstraints": {},
@@ -793,8 +793,8 @@
     "sync_state": {
       "name": "sync_state",
       "columns": {
-        "user_id": {
-          "name": "user_id",
+        "connection_id": {
+          "name": "connection_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -825,12 +825,12 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "sync_state_user_id_resource_pk": {
+        "sync_state_connection_id_resource_pk": {
           "columns": [
-            "user_id",
+            "connection_id",
             "resource"
           ],
-          "name": "sync_state_user_id_resource_pk"
+          "name": "sync_state_connection_id_resource_pk"
         }
       },
       "uniqueConstraints": {},

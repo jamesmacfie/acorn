@@ -1,6 +1,6 @@
-// A deterministic gitlab.com for tests: the REST and GraphQL calls this plugin makes, over projects
-// and merge requests a test builds. Tests stub `fetch` with `fake.fetch` and read back `requests` to
-// see what was asked. Its answers follow GitLab's documented shapes, the way
+// A deterministic GitLab server for tests, gitlab.com unless a test names another origin: the REST and
+// GraphQL calls this plugin makes, over projects and merge requests a test builds. Tests stub `fetch`
+// with `fake.fetch` and read back `requests` to see what was asked. Its answers follow GitLab's documented shapes, the way
 // plugins/github/src/server/routes/mirror/fakeGithub.helper.ts follows GitHub's.
 
 type FakeNote = {
@@ -81,7 +81,7 @@ type FakeRequest = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
-export function makeFakeGitlab(projects: FakeProject[]) {
+export function makeFakeGitlab(projects: FakeProject[], origin = 'https://gitlab.com') {
   const requests: FakeRequest[] = []
   // Tokens the fake accepts. A test drops one to play a revoked or expired token.
   const tokens = new Set(['token'])
@@ -302,7 +302,7 @@ export function makeFakeGitlab(projects: FakeProject[]) {
           reviewers: mr.reviewers.map((username) => ({ username })),
           created_at: mr.updatedAt,
           updated_at: mr.updatedAt,
-          web_url: `https://gitlab.com/${project.path}/-/merge_requests/${mr.iid}`,
+          web_url: `${origin}/${project.path}/-/merge_requests/${mr.iid}`,
         })),
       )
     const job = /^\/jobs\/(\d+)(\/trace|\/retry)?$/.exec(rest)
@@ -331,7 +331,7 @@ export function makeFakeGitlab(projects: FakeProject[]) {
             created_at: mr.updatedAt,
             finished_at: null,
             duration: null,
-            web_url: `https://gitlab.com/${project.path}/-/jobs/${item.id}`,
+            web_url: `${origin}/${project.path}/-/jobs/${item.id}`,
             pipeline: { id: 900 },
           })),
         ),
@@ -438,13 +438,15 @@ export function makeFakeGitlab(projects: FakeProject[]) {
         ? Object.fromEntries(new URLSearchParams(raw))
         : undefined
     const body = form ?? (raw ? (JSON.parse(raw) as Record<string, unknown>) : undefined)
+    // A call meant for another server never reaches this one.
+    if (url.origin !== origin) return json({ message: `fake gitlab is at ${origin}, not ${url.origin}` }, 404)
 
     if (url.pathname === '/oauth/authorize_device') {
       requests.push({ method, path: url.pathname, body })
       return json({
         device_code: 'device-1',
         user_code: 'ABCD-EFGH',
-        verification_uri: 'https://gitlab.com/oauth/device',
+        verification_uri: `${origin}/oauth/device`,
         expires_in: 300,
         interval: 5,
       })

@@ -1,7 +1,8 @@
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-// The mirror: cached projections of gitlab.com data, revalidated and disposable. Every table is scoped
-// by the owner, because two people's connections see different private projects.
+// The mirror: cached projections of GitLab data, revalidated and disposable. Every table is scoped by
+// the connection, because each connection is one account on one server: two servers number their
+// projects independently, and two accounts see different private projects.
 //
 // A merge request's child rows are replaced together on each refresh, and `sync_state` says when.
 // Each child table has a `position`, its place in the order GitLab returned it, and reads order by it.
@@ -9,7 +10,7 @@ import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlit
 export const projects = sqliteTable(
   'projects',
   {
-    userId: text('user_id').notNull(),
+    connectionId: text('connection_id').notNull(),
     id: integer('id').notNull(), // GitLab's project id
     path: text('path').notNull(), // path_with_namespace in GitLab's spelling, such as `group/sub/api`
     name: text('name').notNull(),
@@ -18,13 +19,13 @@ export const projects = sqliteTable(
     lastActivityAt: integer('last_activity_at'), // epoch ms, the importer's order
     fetchedAt: integer('fetched_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.id] })],
+  (t) => [primaryKey({ columns: [t.connectionId, t.id] })],
 )
 
 export const mergeRequests = sqliteTable(
   'merge_requests',
   {
-    userId: text('user_id').notNull(),
+    connectionId: text('connection_id').notNull(),
     projectId: integer('project_id').notNull(),
     iid: integer('iid').notNull(),
     state: text('state').notNull(), // open | closed | merged
@@ -48,15 +49,15 @@ export const mergeRequests = sqliteTable(
     fetchedAt: integer('fetched_at').notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.userId, t.projectId, t.iid] }),
-    index('merge_requests_user_project_state_updated_idx').on(t.userId, t.projectId, t.state, t.updatedAt),
+    primaryKey({ columns: [t.connectionId, t.projectId, t.iid] }),
+    index('merge_requests_connection_project_state_updated_idx').on(t.connectionId, t.projectId, t.state, t.updatedAt),
   ],
 )
 
 export const mrFiles = sqliteTable(
   'mr_files',
   {
-    userId: text('user_id').notNull(),
+    connectionId: text('connection_id').notNull(),
     projectId: integer('project_id').notNull(),
     iid: integer('iid').notNull(),
     path: text('path').notNull(),
@@ -69,14 +70,14 @@ export const mrFiles = sqliteTable(
     patchState: text('patch_state').notNull(),
     patchKey: text('patch_key'),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.projectId, t.iid, t.path] })],
+  (t) => [primaryKey({ columns: [t.connectionId, t.projectId, t.iid, t.path] })],
 )
 
 // People on a merge request: its approvers and the reviewers asked. One table, told apart by `role`.
 export const mrPeople = sqliteTable(
   'mr_people',
   {
-    userId: text('user_id').notNull(),
+    connectionId: text('connection_id').notNull(),
     projectId: integer('project_id').notNull(),
     iid: integer('iid').notNull(),
     role: text('role').notNull(), // approver | reviewer
@@ -86,20 +87,20 @@ export const mrPeople = sqliteTable(
     at: integer('at'),
     position: integer('position').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.projectId, t.iid, t.role, t.login] })],
+  (t) => [primaryKey({ columns: [t.connectionId, t.projectId, t.iid, t.role, t.login] })],
 )
 
 export const mrLabels = sqliteTable(
   'mr_labels',
   {
-    userId: text('user_id').notNull(),
+    connectionId: text('connection_id').notNull(),
     projectId: integer('project_id').notNull(),
     iid: integer('iid').notNull(),
     name: text('name').notNull(),
     color: text('color'), // `#rrggbb`, as GitLab sends it
     position: integer('position').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.projectId, t.iid, t.name] })],
+  (t) => [primaryKey({ columns: [t.connectionId, t.projectId, t.iid, t.name] })],
 )
 
 // Every note that isn't a system note. A note on the diff carries its discussion's position: GitLab
@@ -107,7 +108,7 @@ export const mrLabels = sqliteTable(
 export const notes = sqliteTable(
   'notes',
   {
-    userId: text('user_id').notNull(),
+    connectionId: text('connection_id').notNull(),
     projectId: integer('project_id').notNull(),
     iid: integer('iid').notNull(),
     id: integer('id').notNull(), // the note's numeric id
@@ -126,13 +127,13 @@ export const notes = sqliteTable(
     createdAt: integer('created_at'),
     position: integer('position').notNull(), // discussions in order, then each one's notes in theirs
   },
-  (t) => [primaryKey({ columns: [t.userId, t.projectId, t.iid, t.id] })],
+  (t) => [primaryKey({ columns: [t.connectionId, t.projectId, t.iid, t.id] })],
 )
 
 export const mrCommits = sqliteTable(
   'mr_commits',
   {
-    userId: text('user_id').notNull(),
+    connectionId: text('connection_id').notNull(),
     projectId: integer('project_id').notNull(),
     iid: integer('iid').notNull(),
     sha: text('sha').notNull(),
@@ -142,14 +143,14 @@ export const mrCommits = sqliteTable(
     committedAt: integer('committed_at'),
     position: integer('position').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.projectId, t.iid, t.sha] })],
+  (t) => [primaryKey({ columns: [t.connectionId, t.projectId, t.iid, t.sha] })],
 )
 
 // The head pipeline's jobs, the merge request's checks.
 export const jobs = sqliteTable(
   'jobs',
   {
-    userId: text('user_id').notNull(),
+    connectionId: text('connection_id').notNull(),
     projectId: integer('project_id').notNull(),
     iid: integer('iid').notNull(),
     jobId: integer('job_id').notNull(),
@@ -160,17 +161,17 @@ export const jobs = sqliteTable(
     pipelineSha: text('pipeline_sha'),
     position: integer('position').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.projectId, t.iid, t.jobId] })],
+  (t) => [primaryKey({ columns: [t.connectionId, t.projectId, t.iid, t.jobId] })],
 )
 
 export const syncState = sqliteTable(
   'sync_state',
   {
-    userId: text('user_id').notNull(),
+    connectionId: text('connection_id').notNull(),
     resource: text('resource').notNull(),
     // A files resource's `<base sha>:<head sha>`, which its diff is cut against.
     revision: text('revision'),
     fetchedAt: integer('fetched_at').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.resource] })],
+  (t) => [primaryKey({ columns: [t.connectionId, t.resource] })],
 )

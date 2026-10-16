@@ -2,7 +2,7 @@ import type { PluginRequestContext, PluginRouteRegistry } from './routes.js'
 import type { PluginScheduleRegistry } from './schedules.js'
 import type { PluginTaskCheckRegistry } from './taskChecks.js'
 import type { PluginProviderRegistry } from './providers.js'
-import type { PluginCapabilities } from './capabilities.js'
+import type { Disposable, PluginCapabilities } from './capabilities.js'
 import type { PluginRunRegistry } from './runs.js'
 import type { PluginAuditRegistry } from './audit.js'
 import type { PluginExtensionPointRegistry } from './extensionPoints.js'
@@ -96,6 +96,10 @@ export type NodePluginContext<Conn = unknown, Items = unknown> = {
   extensionPoints: PluginExtensionPointRegistry
   hooks: PluginHookRegistry
   providers: PluginProviderRegistry
+  /** Hosts a code host that declares `selfHosted` claims while it runs, such as a company server a
+   *  person connects (docs/plugins/self-hosted-code-hosts.md). Disposing a claim releases the
+   *  host. */
+  codeHosts: { claim(host: string): Disposable }
   capabilities: PluginCapabilities
   storage: PluginStorage
   core: CoreServices
