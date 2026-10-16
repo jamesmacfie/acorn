@@ -7,7 +7,7 @@ sources:
   - apps/extension/src/sidebar/Sites.tsx
   - apps/extension/src/sidebar/AddSite.tsx
   - apps/extension/src/pageScope.ts
-checked: 97ab4d104
+checked: 3f99b39fc
 ---
 
 A project site is a web address you tie to a project, such as its staging app or its docs. On those
