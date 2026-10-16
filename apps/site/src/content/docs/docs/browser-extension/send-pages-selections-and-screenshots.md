@@ -10,7 +10,7 @@ sources:
   - apps/extension/src/sidebar/Workspace.tsx
   - apps/extension/src/sidebar/Home.tsx
   - apps/extension/src/sidebar/Agents.tsx
-checked: ac25bcb04
+checked: 64947a66d
 ---
 
 The extension can put what's on the page into an agent conversation: text you selected, the page's
