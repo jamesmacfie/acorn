@@ -23,10 +23,7 @@ export default function TrustModel() {
     <Graph
       id="trust-model"
       ariaLabel="Who reaches a Node"
-      nodes={[
-        ...callers,
-        { id: 'node', label: 'Node', detail: 'Your data and keys', tone: 'accent' as const },
-      ]}
+      nodes={[...callers, { id: 'node', label: 'Node', detail: 'Your data and keys', tone: 'accent' as const }]}
       edges={callers.map(({ id }) => ({ from: id, to: 'node' }))}
       positions={{
         ...Object.fromEntries(callers.map(({ id }, lane) => [id, { x: lane * 210, y: 0 }])),

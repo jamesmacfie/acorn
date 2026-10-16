@@ -6,7 +6,8 @@ export type FeatureId = keyof typeof FEATURES
 export const FEATURES = {
   tasks: {
     title: 'Tasks',
-    sentence: 'A task is one piece of work on one project, with its own branch, worktree, terminals, and agent sessions.',
+    sentence:
+      'A task is one piece of work on one project, with its own branch, worktree, terminals, and agent sessions.',
   },
   agents: {
     title: 'Agents',
@@ -18,11 +19,13 @@ export const FEATURES = {
   },
   'desktop-and-terminal': {
     title: 'Desktop and terminal',
-    sentence: 'The desktop app and the terminal client open the same workspace and draw the same panes from the same code.',
+    sentence:
+      'The desktop app and the terminal client open the same workspace and draw the same panes from the same code.',
   },
   'task-tools': {
     title: 'Task tools',
-    sentence: "Panes for the tools you'd otherwise open beside a task: an editor, a database client, an HTTP client, Docker, a preview, notes, and your Linear and Rollbar items.",
+    sentence:
+      "Panes for the tools you'd otherwise open beside a task: an editor, a database client, an HTTP client, Docker, a preview, notes, and your Linear and Rollbar items.",
   },
   plugins: {
     title: 'Plugins',
