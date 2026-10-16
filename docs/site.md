@@ -37,9 +37,11 @@ A build reads GitHub too, and the changelog reads a data file: see [releases](./
 
 | Command | What it checks |
 | --- | --- |
-| `pnpm --filter @acorn/site lint` | `astro check`: types in the `.astro` pages, the content config, and the tests. Then `tsc` on the specimens, which use Solid's JSX. Root `pnpm lint` runs it too. |
+| `pnpm --filter @acorn/site lint` | Builds the [plugin reference and component pages](./site/references.md), then `astro check`: types in the `.astro` pages, the content config, and the tests. Then `tsc` on the specimens, which use Solid's JSX. Root `pnpm lint` runs it too. |
 | `pnpm --filter @acorn/site specimens` | Regenerates every [specimen](./site/specimens.md) on both hosts and fails when a committed file differs. |
-| `pnpm --filter @acorn/site test` | The script tests, the release asset tests in `src/lib/`, the budget check, then the Playwright tests. Run a build first. |
+| `pnpm --filter @acorn/site test` | The script tests, the tests in `src/lib/`, the manifest example check, the budget check, then the Playwright tests. Run a build first. |
+| `pnpm --filter @acorn/site reference` | Rebuilds the generated reference and component pages. `dev`, `build`, and `lint` run it first. |
+| `pnpm --filter @acorn/site og` | Redraws the [social cards](./site/agent-outputs.md). It checks nothing. |
 | `pnpm --filter @acorn/site snapshots` | Recaptures the [shell snapshots](#shell-snapshots) from the running apps. It checks nothing, so nothing in CI runs it. |
 
 The budget check, `apps/site/scripts/budget.mjs`, reads `dist`. For each page it adds up the Brotli-compressed
@@ -107,7 +109,8 @@ components, Starlight's replaced parts, the contrast check, and the design galle
 
 Every written page names the internal docs and source files it was written from in `sources`, and the
 commit at which someone last confirmed it matched them in `checked`. `apps/site/scripts/stale.mjs`
-reads both, from docs frontmatter and from each marketing page's `meta` export:
+reads both, from docs frontmatter and from each marketing page's `meta` export. A generated page is
+traced back to the written half it was built from, through `BOOKS`:
 
 | Command | What it prints |
 | --- | --- |

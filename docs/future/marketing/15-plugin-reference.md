@@ -58,7 +58,7 @@ removing it took it away.
   `Snapshot`, and `Specimen` into every page, so moving a page can't break a path. `@API_MAJOR@` in a written
   half becomes the major, so no example holds the number.
 - **A link to a draft keeps its words and loses the link.** Every contribution page names its guide, and
-  the guides are phase 16 and 17 drafts. The links appear when those pages publish, with no edit here.
+  the guides were phase 16 and 17 drafts. Those phases published them, so the links resolve.
 - **Two export ceilings rose by one.** `@acorn/protocol` to 88 for `plugin/vocabulary.ts`, and
   `@acorn/node-core` to 67 for `server/plugins/manifest.ts` and `server/plugins/coreFacets.ts`, with the
   reasons in `tools/arch/boundaries.test.ts`. `@acorn/node-core` is a site dev dependency for those two.

@@ -45,7 +45,8 @@ The `<id>.tree.json` records the layout in place of batches, so `<Specimen>` dra
 
 An example plugin's tree is recorded by the examples package first, and then drawn like any other
 specimen ([pictures on a guide](./plugin-guides.md#pictures-on-a-guide)). For the specimens in
-`apps/site/specimens/`, `pnpm --filter @acorn/site specimens` runs two generators, in this order:
+`apps/site/specimens/`, `pnpm --filter @acorn/site specimens` runs two generators, in this order. Its
+bare `vitest run` also runs the plugin reference's manifest example check.
 
 1. `apps/site/scripts/specimens.test.ts` runs each specimen in-process with `solidTree` and a recording
    remote root, and writes the batches to `apps/site/src/generated/specimens/<id>.tree.json`. Those are
@@ -102,11 +103,12 @@ styles [shell snapshots](./snapshots.md#on-the-site).
   A style pack's `:root[data-style='…']` qualifier stays on the root.
 - A rule that matches nothing in the committed specimens', snapshots', and sidebar pictures' HTML is
   dropped. A rule for a state, such as
-  `:hover`, stays when the element it styles exists. The rules for `.ui-badge` and `.ui-kbd` always stay,
-  because the site's `Badge` and `Keys` components draw the kit's markup outside any specimen.
+  `:hover`, stays when the element it styles exists. The rules in `SITE_KIT` always stay, because the
+  site draws the kit's markup outside any specimen: `.ui-badge` and `.ui-kbd` for the `Badge` and `Keys`
+  components, and the input, overlay, and palette rules for [search](./agent-outputs.md).
 
 `apps/site/scripts/acornUi.test.mjs` fails if any rule applies outside `.acorn-ui`. On October 16, 2026,
-with the 97 committed specimens, the stylesheet was 100 KB, or 15 KB compressed with Brotli, and every
+with 95 committed specimens, the stylesheet was 100 KB, or 15 KB compressed with Brotli, and every
 docs page was inside the 100 KB docs budget that `apps/site/scripts/budget.mjs` checks.
 
 The terminal view colors each slot with the same theme token the terminal takes from a theme, so it

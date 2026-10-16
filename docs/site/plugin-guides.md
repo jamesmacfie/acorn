@@ -15,7 +15,7 @@ folder an author could install as it is:
 | --- | --- |
 | `hello-pane` | The tutorial's end state: the scaffold's output plus the tutorial's two edits |
 | `acme-tracker` | A rail source drawn from trees, a pane, a settings page, a reference panel, commands of all five kinds, a keybinding, menu rows, two slot badges, marks on `core:task`, `core:source`, and `core:pane`, an attention item, and a notice |
-| `acme-review` | Ten places in other plugins' views, written in JSX with the SDK. [An extension example](../plugin-authoring/extension-example.md) describes it |
+| `acme-review` | Eleven places in other plugins' views, written in JSX with the SDK. [An extension example](../plugin-authoring/extension-example.md) describes it |
 | `acme-points/acme-board`, `acme-points/acme-links` | A pair: one opens a `rows` point and a mounted `remote` point, the other fills both |
 | `acme-frame` | A frame that draws a canvas through the bridge and claims a chord, and a webview |
 | `acme-theme` | A theme, a style pack, and brand marks, with no code |
@@ -95,7 +95,7 @@ caption, and sizes. `examples/plugins/test/pictures.test.ts` mounts each against
 half and commits the batches as `apps/site/src/generated/specimens/<id>.tree.json`, by path, as the
 terminal generator writes cells. The site's generator then draws the HTML and the terminal client's
 draws the cells, as for any [specimen](./specimens.md). `pnpm --filter @acorn/site specimens` runs the
-three in order, and `UPDATE_SPECIMENS=1` rewrites them.
+examples' recording, then the site's, the terminal client's, and the extension's generators, in that order, and `UPDATE_SPECIMENS=1` rewrites them.
 
 A descriptor, such as a badge, has no tree of its own, so its guide shows the kit node the host draws
 it with, captioned so. A frame and a theme have no picture, and their guides say why.

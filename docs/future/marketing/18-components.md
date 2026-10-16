@@ -87,7 +87,8 @@ file this phase touched, the six phase 17 recorded.
 - **Pre-existing reds on this base**: `pnpm lint` stops at the format check on
   `apps/site/specimens/docs/trust-model.tsx` and `apps/site/src/features.ts`, and client-core's icon
   census wants `bug`, `coins`, and `square-kanban` added to the eager set. Neither comes from this
-  change.
+  change. Both were fixed on the branch afterwards: the two files are formatted, and the census no longer
+  scans `apps/site`.
 
 ### What later phases need to know
 
