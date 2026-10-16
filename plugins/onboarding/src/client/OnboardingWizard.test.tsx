@@ -12,7 +12,7 @@ import {
   type Workspace,
 } from '@acorn/protocol/api.ts'
 import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
-import { activeNodeId, setActiveNode } from '@acorn/plugin-api/client'
+import { activeNodeId, projectImporterRegistry, setActiveNode } from '@acorn/plugin-api/client'
 
 const platform = vi.hoisted(() => ({
   pickNodeFolder: vi.fn<() => Promise<string | null>>(),
@@ -335,5 +335,58 @@ describe('first-run workspace choice', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(onClose).not.toHaveBeenCalled()
     expect(navigation.navigate).not.toHaveBeenCalled()
+  })
+})
+
+describe('first-run code hosts', () => {
+  // A code host is a connectable provider whose plugin registered an importer under the provider's id.
+  const provider = (id: string, label: string) => ({
+    id,
+    label,
+    kind: 'issue-tracker',
+    glyph: `brand:${id}`,
+    connection: {
+      authKind: 'token',
+      kind: 'fields',
+      fields: [{ id: 'token', label: 'Access token', type: 'password', required: true }],
+      connectable: true,
+      disconnectable: true,
+    },
+    capabilities: {},
+  })
+  const cards = () => [...view().querySelectorAll<HTMLButtonElement>('button.ui-card')].map((card) => card.textContent)
+
+  it("offers the fixture's connection and then its importer", async () => {
+    const importer = projectImporterRegistry.register({
+      id: 'gitlab-test',
+      label: 'Import from GitLab',
+      glyph: 'brand:gitlab-test',
+      component: () => <p>GitLab repositories</p>,
+    })
+    try {
+      mount('off')
+      // Linear connects but registered no importer, so it isn't a code host.
+      const providers = [provider('gitlab-test', 'GitLab Test'), provider('linear', 'Linear')]
+      client.setQueryData(integrationsKey, { providers, integrations: [] })
+      click('Get started')
+      await waitForText('Add your first project')
+      expect(cards().some((text) => text?.includes('Connect GitLab Test'))).toBe(true)
+      expect(cards().some((text) => text?.includes('Linear'))).toBe(false)
+      expect(view().textContent).toContain('If you connect GitLab Test later')
+
+      ;[...view().querySelectorAll<HTMLButtonElement>('button.ui-card')]
+        .find((card) => card.textContent?.includes('Connect GitLab Test'))!
+        .click()
+      await vi.waitFor(() => expect(view().querySelector('h2')?.textContent).toBe('Connect GitLab Test'))
+      expect(view().textContent).toContain('Access token')
+
+      client.setQueryData(integrationsKey, {
+        providers,
+        integrations: [{ id: 'c1', providerId: 'gitlab-test', label: 'GitLab Test', status: 'connected' }],
+      })
+      await waitForText('GitLab repositories')
+    } finally {
+      importer.dispose()
+    }
   })
 })

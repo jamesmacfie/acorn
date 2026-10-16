@@ -623,7 +623,7 @@ function ThreadRow(props: {
           {(c) => (
             <div class="comment diff-thread-comment">
               <div class="comment-meta comment-meta-with-avatar">
-                <UserAvatar login={c.author} />
+                <UserAvatar login={c.author} src={c.avatarUrl} />
                 <strong>{c.author ?? 'unknown'}</strong>
               </div>
               <SanitizedHtml html={c.body ?? ''} />

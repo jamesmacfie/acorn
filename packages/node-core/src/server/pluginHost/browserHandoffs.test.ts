@@ -94,6 +94,16 @@ describe('browser handoff declarations', () => {
     await result.dispose()
   })
 
+  it('names the running code hosts, so the host can match their addresses in any case', async () => {
+    const result = await host([
+      { name: 'gitlab-test', codeHost: { label: 'GitLab', hosts: ['gitlab.test'] }, init: () => {} },
+      { name: 'board', init: () => {} },
+    ])
+    const response = (await (await browserHandoffsRoute.request('/')).json()) as BrowserHandoffsResponse
+    expect(response.codeHosts).toEqual(['gitlab-test'])
+    await result.dispose()
+  })
+
   it("advertises a built-in's panel, and ignores the field on a loaded plugin", async () => {
     const panel = { label: 'Tracker', pane: 'tracker', route: '/v1/p/tracker/browser-panel' }
     await host(

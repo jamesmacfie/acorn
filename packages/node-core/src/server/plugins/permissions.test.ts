@@ -31,6 +31,7 @@ const CORE = {
   agentToolProvenance: marker('agentToolProvenance'),
   telemetry: marker('telemetry'),
   codeHosts: marker('codeHosts'),
+  codeHostLabel: marker('codeHostLabel'),
   projects: {
     byId: marker('byId'),
     byGithub: marker('byGithub'),
@@ -184,9 +185,12 @@ describe('scopeCore', () => {
   })
 
   it('lists the running code hosts with any project grant, and not without one', () => {
-    for (const token of ['projects:read', 'projects:config', 'projects:write'])
+    for (const token of ['projects:read', 'projects:config', 'projects:write']) {
       expect(scoped({ core: [token] }).codeHosts).toBe(CORE.codeHosts)
+      expect(scoped({ core: [token] }).codeHostLabel).toBe(CORE.codeHostLabel)
+    }
     expect((scoped({ core: ['tasks'] }) as { codeHosts?: unknown }).codeHosts).toBeUndefined()
+    expect((scoped({ core: ['tasks'] }) as { codeHostLabel?: unknown }).codeHostLabel).toBeUndefined()
   })
 
   it('scopes external project mappings to providers registered by the loaded plugin', async () => {

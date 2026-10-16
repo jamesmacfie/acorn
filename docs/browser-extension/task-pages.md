@@ -32,10 +32,13 @@ same read and device authority `tasks.list` uses, so it costs no GitHub or other
 
 Each address is in the [project sites](./project-sites.md#what-an-association-is) grammar: an exact
 origin and a path prefix matched by whole segments. A pull request's address covers its tabs, such as
-`/files` and `/checks`, a trailing slash, a query, and a fragment, and not `/pull/4821`. GitHub reads
-owner and repository names in any case, so a `github` address matches its path without regard to case:
-`/Acme/Runn/pull/482` is the same pull request as `/acme/runn/pull/482`. Every other source matches
-its path exactly. An address at `/` covers a whole origin, port included, which is how a plugin's
+`/files` and `/checks`, a trailing slash, a query, and a fragment, and not `/pull/4821`. GitHub,
+GitLab, and Bitbucket read owner and repository names in any case, so the host sets
+`caseInsensitive` on an address whose source is a running [code host](../plugins/code-hosts.md), and
+that address matches its path without regard to case: `/Acme/Runn/pull/482` is the same pull request
+as `/acme/runn/pull/482`. The host learns the code hosts from the Node's `codeHosts` list. An older
+Node sends none, so the extension still matches a `github` address that way. Every other source
+matches its path exactly. An address at `/` covers a whole origin, port included, which is how a plugin's
 local app address matches.
 
 The background keeps the one copy of the list (`src/background/taskPages.ts`). It reads it again when

@@ -24,6 +24,8 @@ type DiffThreadComment = {
   id: string
   databaseId: number | null
   author: string | null
+  /** The author's picture. Without one the thread draws their initials. */
+  avatarUrl?: string | null
   body: string | null
   createdAt: number | null
 }

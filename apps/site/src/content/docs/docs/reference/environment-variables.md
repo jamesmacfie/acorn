@@ -59,7 +59,8 @@ Read them in a script, and don't set them yourself.
 | `ACORN_WORKTREE_PATH` | The folder the process runs in: the task's worktree, or the project folder for a task with no branch. |
 | `ACORN_PROJECT_ID` | The project's ID. |
 | `ACORN_PROJECT_NAME` | The project's name. |
-| `ACORN_REPO` | The GitHub repository as `owner/name`, when the project has one. |
+| `ACORN_REPO` | The repository's path on its code host, such as `owner/name` or `group/subgroup/name`, when the project has a remote. On GitHub it keeps the owner's and name's capital letters. |
+| `ACORN_REPO_HOST` | The repository's code host, such as `github.com` or `gitlab.com`, when the project has a remote. |
 | `ACORN_BRANCH` | The task's branch, when it has one. |
 | `ACORN_TASK_SLUG` | The branch as a short name that's safe in a file name or a container name, when the task has a branch. Use it to keep two tasks' ports, databases, or containers apart. |
 

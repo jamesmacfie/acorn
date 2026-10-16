@@ -34,6 +34,8 @@ const scriptUrl = async (
       ACORN_WORKTREE_PATH: cwd,
       ACORN_PROJECT_ID: project.id,
       ACORN_PROJECT_NAME: project.name,
+      ...(project.repository ? { ACORN_REPO: project.repository.path, ACORN_REPO_HOST: project.repository.host } : {}),
+      // GitHub's casing wins on github.com, as it does in core's buildSessionEnv.
       ...(project.github ? { ACORN_REPO: `${project.github.owner}/${project.github.name}` } : {}),
       ...(task.branch ? { ACORN_BRANCH: task.branch, ACORN_TASK_SLUG: taskSlug(task.branch) } : {}),
       ACORN_TASK_TITLE: task.title,

@@ -169,7 +169,7 @@ for it, and the person still decides which sites the extension may read.
 
 `GET /v1/core/browser-handoffs` lists every running plugin's handoffs, each with its `pluginId`, its
 task address routes as `taskAddresses: [{ pluginId, route }]`, and its [sidebar panel](./browser-panel.md) under `panels`.
-It is device-only. A package waiting for review isn't listed until it runs, a disabled or failed plugin isn't listed,
+`codeHosts` lists the ids of the running [code hosts](../plugins/code-hosts.md), whose task addresses match in any case. It is device-only. A package waiting for review isn't listed until it runs, a disabled or failed plugin isn't listed,
 and a reload replaces the list with the new version's. The host broadcasts `plugins:changed` on each of these, and the extension reads the list again.
 
 ## Ship a handoff

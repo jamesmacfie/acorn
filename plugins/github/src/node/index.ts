@@ -1,4 +1,4 @@
-import { lazyFetch, lazyRouter, type NodePlugin } from '@acorn/plugin-api/node'
+import { lazyFetch, lazyRouter, mirrorFootprintCapability, type NodePlugin } from '@acorn/plugin-api/node'
 import { GITHUB_MIRROR } from '../contract/mirror'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/repos/import'
@@ -178,8 +178,8 @@ export const githubPlugin = (): NodePlugin => {
         repositories: async (userId) => (await readCachedRepos(store, userId)).map(toPublicRepo),
         pullRequest: (userId, repoOwner, repoName, pullNumber) =>
           mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
-        footprint: () => mirrorFootprint(store),
       })
+      ctx.capabilities.provide(mirrorFootprintCapability(ctx.name), { footprint: () => mirrorFootprint(store) })
     },
     dispose: async () => {
       await discovery?.dispose()

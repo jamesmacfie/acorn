@@ -44,6 +44,7 @@ export function createRuntimeService(
           ? {
               projectId: project.id,
               projectName: project.name,
+              repository: project.repository,
               github: project.github,
               branch: t.branch,
               title: t.title,

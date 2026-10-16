@@ -1,5 +1,67 @@
 # Phase 3: remove the small GitHub assumptions outside the plugin
 
+## Completion note
+
+October 16, 2026. Done.
+
+What landed:
+
+- `UserAvatar` takes an optional `src` and draws two-letter initials without one. The terminal client's
+  avatar accepts `src` and ignores it. `githubAvatarUrl` moved to `plugins/github/src/client/avatar.ts`,
+  and every GitHub avatar passes it. Diff thread comments carry an optional `avatarUrl`, which GitHub's
+  `inlineReviewThreads` fills.
+- A remote tree's `UserAvatar` with a login and no `src` still gets the GitHub picture, through
+  `TreeUserAvatar` in `packages/client-core/src/host/tree/components.ts`. The tree prop check holds `src`
+  to HTTPS, the same rule as `href`.
+- `SessionTaskInfo.repository` sets `ACORN_REPO` to the facet's path and `ACORN_REPO_HOST` to its host.
+  Every `buildSessionEnv` caller passes it: workflows, the terminal's three, http, the archive teardown,
+  and the worktree setup script. Preview sets the same two variables itself.
+- `GET /v1/core/browser-handoffs` lists `codeHosts`. The browser bridge sets `caseInsensitive` on a task
+  page whose source is one, and `pageMatches` reads it, with the `github` test as the fallback.
+- The wizard's `github` step is a `host` step, drawn by `CodeHostConnect.tsx`. The add step shows one
+  card per provider that can connect, or already has a connection, and whose plugin registered an
+  importer under the provider's id. Each card opens that provider straight away.
+- Session search in the agent center matches the last segment of `task.repository.path`, then
+  `task.github.name` for a Node without the facet.
+- `ctx.core.codeHostLabel(id)` returns a running code host's declared `label`, granted with
+  `codeHosts()`. Linear's issue route sets `sourceLabel` on each attachment from it, and the tree draws
+  that instead of a fixed map.
+- `mirrorFootprintCapability(pluginId)` in node-core, exported from `@acorn/plugin-api/node`, mints
+  `<pluginId>.mirrorFootprint`. `reconcileNode` logs every one through `mirrorFootprints`. GitHub
+  provides it, `GithubMirrorCapability` lost `footprint`, and `apps/node` no longer imports the GitHub
+  contract.
+
+Decisions and deviations:
+
+- Change 4 offers each code host as its own card on the add step, not one card leading to a chooser.
+  With one code host that's GitHub's flow exactly. The connect screen handles device-flow providers
+  and providers with typed fields, so a Bitbucket token works too.
+- An importer pairs with a provider by sharing its id, which GitHub's `github` importer already did.
+  The `ProjectImporterContribution.id` comment says so.
+- The wizard checks a device-flow sign-in link with `safeVerificationUrl` alone, as Settings → Services
+  does. It no longer requires `github.com/login/device`.
+- The project badge on the wizard's naming step shows the code host's label from the integrations list,
+  not `GitHub` from `project.github`.
+- Change 6 needed a core read, because a remote tree can't see plugin labels. It names the source with
+  the code host's declared label, so a non-code-host source such as Slack stays unnamed, as before.
+- `caseInsensitive` is only ever set to true, so a page without it falls back to the `github` test.
+- The `pluginDisable` golden gains `github.mirrorFootprint`. Its two tests stay red only on the
+  `browser-panel` routes that were red at the base.
+
+For later phases:
+
+- A code host plugin passes its own avatar URL as `src`. The desktop's content security policy allows
+  remote images only from GitHub's avatar hosts (docs/shell/origins.md), so phase 5 must widen it for
+  GitLab's.
+- A code host gets case-insensitive extension matching, the wizard, Linear's source name, and session
+  search with no edit, once it declares `codeHost`, a connectable provider, and an importer with the
+  provider's id.
+- A plugin with a mirror provides `mirrorFootprintCapability(ctx.name)`.
+- The removals for the next major are listed in
+  [split phase 5](../split/05-repository-identity.md#removals-at-the-next-plugin-api-major).
+- Already red at the base and untouched: the `pluginDisable` and `routeRegistry` goldens in `apps/node`,
+  knip's `proposalChanges`, and three `docPaths` entries.
+
 Date: October 16, 2026. Status: proposed. Independent of phases 1 and 2.
 
 ## Goal
@@ -19,7 +81,7 @@ These places read GitHub directly, as of October 16, 2026:
 | `plugins/preview/src/server/previewUrls.ts` | The same `ACORN_REPO`, from `project.github`. |
 | `plugins/workflows/src/server/runs/activation.ts` and `plugins/terminal/src/server/workflowSteps.ts` | Both pass `project.github` to `buildSessionEnv`, the input behind `ACORN_REPO`. |
 | `apps/extension/src/taskPages.ts` | `pageMatches` ignores letter case only when `page.source === 'github'`. GitLab and Bitbucket paths are case-insensitive too, so `/Group/Repo/-/merge_requests/12` misses its task. |
-| `plugins/onboarding/src/client/OnboardingWizard.tsx` and `plugins/onboarding/src/client/GithubConnect.tsx` | The wizard has a `github` step that connects GitHub and opens GitHub's importer. Another code host has no place in first-run setup. |
+| `plugins/onboarding/src/client/OnboardingWizard.tsx` and its `GithubConnect` screen, which this phase renamed `plugins/onboarding/src/client/CodeHostConnect.tsx` | The wizard has a `github` step that connects GitHub and opens GitHub's importer. Another code host has no place in first-run setup. |
 | `plugins/agents/src/client/center/AgentCenter.tsx` | Session search matches `task.github.name`, so a GitLab task's repository name finds nothing. |
 | `plugins/linear/src/tree/LinearIssueView.tsx` | `SOURCE_NAME` maps only `github` to a display name for an attachment's source. |
 | `apps/node/src/composition/composition.ts` | The boot storage log counts mirror rows through the `GITHUB_MIRROR` capability only. |

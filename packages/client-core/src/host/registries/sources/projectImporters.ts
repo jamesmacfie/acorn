@@ -19,6 +19,8 @@ export type ProjectImporterProps = {
 }
 
 export type ProjectImporterContribution = {
+  /** The id of the connection provider it imports from, when it has one. The first-run wizard offers a
+   *  code host's connection and this importer together by that id. */
   id: string
   label: string
   glyph: string

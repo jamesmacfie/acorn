@@ -153,6 +153,7 @@ export { isDir, rendererBaseCheckout, taskContext } from '@acorn/node-core/serve
 export type { LayoutRecipe, RunTarget } from '@acorn/node-core/server/runConfig.ts'
 export { isRepoConfigTrustError } from '@acorn/node-core/server/repoConfigTrust.ts'
 export { TEARDOWN_TIMEOUT_MS } from '@acorn/node-core/server/storage'
+export { mirrorFootprintCapability } from '@acorn/node-core/server/storage'
 export { TASK_CREATED, TASK_SESSIONS } from '@acorn/node-core/server/routes'
 export type { TaskCreatedHook, TaskSessionsBridge } from '@acorn/node-core/server/routes'
 export { RUN_TARGETS } from '@acorn/node-core/server/routes'

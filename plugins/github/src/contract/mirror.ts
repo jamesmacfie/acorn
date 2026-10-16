@@ -35,12 +35,6 @@ export type GithubMirrorCapability = {
     repoName: string,
     pullNumber: number,
   ): Promise<MirroredPullRequest | null>
-
-  /**
-   * Row counts for the boot-time storage log. The GitHub plugin owns these tables, so it reports their
-   * counts through this capability instead of exposing its database handle.
-   */
-  footprint(): Promise<Record<string, number>>
 }
 
 export const GITHUB_MIRROR = capabilityId<GithubMirrorCapability>('github.mirror')

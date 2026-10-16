@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { codeHostFor, declareCodeHost, runningCodeHosts } from './codeHosts'
+import { codeHostFor, codeHostLabel, declareCodeHost, runningCodeHosts } from './codeHosts'
 
 const github = { label: 'GitHub', hosts: ['github.com'] }
 
@@ -32,6 +32,14 @@ describe('the code host registry', () => {
     expect(codeHostFor('git.example.org')).toBe('zeta')
     expect(codeHostFor('gitlab.com')).toBeNull()
     expect(runningCodeHosts()).toEqual(['zeta'])
+  })
+
+  it('names a running code host by its declared label, and nothing else', () => {
+    declare('gitlab-test', { label: 'GitLab', hosts: ['gitlab.test'] }, false)
+    expect(codeHostLabel('gitlab-test')).toBe('GitLab')
+    expect(codeHostLabel('linear')).toBeNull()
+    undos.pop()!()
+    expect(codeHostLabel('gitlab-test')).toBeNull()
   })
 
   it('refuses a host that is not a bare lowercase name', () => {

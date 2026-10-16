@@ -215,12 +215,13 @@ export default function AgentCenter() {
           if (stateFilter() === 'active' && !isActiveAgent(session)) return false
           if (stateFilter() === 'attention' && !needsAttention(session)) return false
           // Fleet search is client-side over the fetched rows. The server search takes a workspaceId, which
-          // only names a workspace on one node, so there is nothing to fan a server search out with.
+          // only names a workspace on one node, so there is nothing to fan a server search out with. A
+          // repository is found by its name, the last segment of its path on any code host. A Node older
+          // than the repository facet sends only GitHub's name.
+          const repository = task?.repository?.path.split('/').at(-1) ?? task?.github?.name ?? task?.projectId ?? ''
           if (
             needle &&
-            !`${session.title} ${session.providerId} ${task?.title ?? ''} ${task?.github?.name ?? task?.projectId ?? ''}`
-              .toLowerCase()
-              .includes(needle)
+            !`${session.title} ${session.providerId} ${task?.title ?? ''} ${repository}`.toLowerCase().includes(needle)
           )
             return false
           return true

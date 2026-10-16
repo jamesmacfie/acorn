@@ -1,7 +1,7 @@
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { drainWithDeadline } from '@acorn/node-core/server/transport/listener.ts'
 import { reconcileWorktrees } from '@acorn/node-core/server/worktrees'
-import { logStorageFootprint } from '@acorn/node-core/server/storage'
+import { logStorageFootprint, mirrorFootprints } from '@acorn/node-core/server/storage'
 import type { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import type { NodePlugin } from '@acorn/node-core/server/pluginHost'
 import type { LoadedPluginBinding } from '@acorn/node-core/server/pluginHost/host.ts'
@@ -14,7 +14,6 @@ import {
 import { adoptRenamedPluginDb, reconcileBundledPlugins } from '@acorn/node-core/server/plugins'
 import { bundledPluginStatePath, userManagedPluginIds } from '@acorn/node-core/server/plugins'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
-import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { TERMINAL_RUNTIME } from '@acorn/plugin-terminal/contract/runtime.ts'
 import { WORKFLOWS_RUNNER } from '@acorn/plugin-workflows/contract/runner.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
@@ -127,18 +126,15 @@ export function reconcileBundledPackages({ dataDir, bundledRoot, development }: 
 export type ReconcileOptions = {
   db: AppDatabase
   dataDir: string
-  capabilities: Pick<CapabilityRegistry, 'get' | 'require'>
+  capabilities: Pick<CapabilityRegistry, 'get' | 'require' | 'ids'>
   mark?(step: string): void
 }
 
 // The post-listener sequence bootNode runs (docs/node-distribution.md § Runtime).
 export async function reconcileNode({ db, dataDir, capabilities, mark = () => {} }: ReconcileOptions): Promise<void> {
-  const githubMirror = capabilities.get(GITHUB_MIRROR)
-  void logStorageFootprint(
-    db,
-    dataDir,
-    githubMirror ? [{ plugin: 'github', counts: () => githubMirror.footprint() }] : [],
-  ).catch((error) => storageLog.warn(`footprint failed: ${describeError(error).message}`))
+  void logStorageFootprint(db, dataDir, mirrorFootprints(capabilities)).catch((error) =>
+    storageLog.warn(`footprint failed: ${describeError(error).message}`),
+  )
 
   try {
     await capabilities.get(TERMINAL_RUNTIME)?.reconcile()

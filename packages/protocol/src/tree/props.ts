@@ -133,8 +133,12 @@ export function sanitizeProps(type: string, raw: unknown): SanitizedProps {
       continue
     }
     // A remote tree has no authority to navigate the privileged renderer. It may offer an HTTPS
-    // destination for an owner click; local routes use host actions, not an arbitrary href.
-    if (key === 'href' && (typeof value !== 'string' || !safeContentHref(value)?.startsWith('https://'))) {
+    // destination for an owner click; local routes use host actions, not an arbitrary href. An image
+    // `src`, such as an avatar's, is held to the same rule, so a tree can't load a local address.
+    if (
+      (key === 'href' || key === 'src') &&
+      (typeof value !== 'string' || !safeContentHref(value)?.startsWith('https://'))
+    ) {
       dropped.push(key)
       continue
     }

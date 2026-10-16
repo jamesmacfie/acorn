@@ -92,6 +92,8 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     // body, an Error for a 500, or a bare status.
     taskAddresses: [] as { pluginId: string; route: string }[],
     panels: [] as Record<string, unknown>[],
+    // Undefined models a Node older than the code host list.
+    codeHosts: undefined as string[] | undefined,
     pluginAnswers: new Map<string, unknown>(),
     createdTasks: [] as { key: string; body: Record<string, unknown> }[],
     projects: [{ id: 'p1', name: `${nodeId} project`, path: '/src/p1', workspaceId: 'w', sort: 0, hidden: false }],
@@ -170,7 +172,12 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     }
     if (url.pathname === '/v1/core/tasks') return reply(200, state.tasks)
     if (url.pathname === '/v1/core/browser-handoffs')
-      return reply(200, { handoffs: state.handoffs, taskAddresses: state.taskAddresses, panels: state.panels })
+      return reply(200, {
+        handoffs: state.handoffs,
+        taskAddresses: state.taskAddresses,
+        panels: state.panels,
+        codeHosts: state.codeHosts,
+      })
     if (state.pluginAnswers.has(url.pathname)) {
       const answer = state.pluginAnswers.get(url.pathname)
       if (answer instanceof Error) return reply(500, { error: { message: answer.message } })
@@ -951,6 +958,43 @@ describe('browser bridge agent operations', () => {
     ])
     await call({ op: 'node.select', nodeId: null })
     await expect(call({ op: 'tasks.pages', nodeId: 'node-a' })).rejects.toMatchObject({ code: 'not_selected' })
+  })
+
+  it("marks a code host's addresses to match in any case, when the Node names its code hosts", async () => {
+    const { call, node } = await selected()
+    const link = (providerId: string, url: string) => ({
+      connectionId: providerId,
+      providerId,
+      identifier: '1',
+      ref: { url },
+    })
+    node.state.codeHosts = ['github', 'gitlab-test']
+    node.state.tasks = [
+      {
+        id: 'mr',
+        title: 'Fix rounding',
+        branch: null,
+        status: 'active',
+        projectId: 'p1',
+        github: { owner: 'acme', name: 'runn' },
+        pullNumber: 482,
+        links: [
+          link('gitlab-test', 'https://gitlab.test/group/repo/-/merge_requests/12'),
+          link('linear', 'https://linear.app/acme/issue/ENG-42'),
+        ],
+      },
+    ]
+    const { tasks } = (await call({ op: 'tasks.pages', nodeId: 'node-a' })) as { tasks: { pages: unknown[] }[] }
+    expect(tasks[0]!.pages).toEqual([
+      { origin: 'https://github.com', pathPrefix: '/acme/runn/pull/482', source: 'github', caseInsensitive: true },
+      {
+        origin: 'https://gitlab.test',
+        pathPrefix: '/group/repo/-/merge_requests/12',
+        source: 'gitlab-test',
+        caseInsensitive: true,
+      },
+      { origin: 'https://linear.app', pathPrefix: '/acme/issue/ENG-42', source: 'linear' },
+    ])
   })
 
   it('adds the exact origins plugins publish for active tasks, and skips a plugin that fails', async () => {

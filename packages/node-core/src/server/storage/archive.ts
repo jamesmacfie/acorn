@@ -24,6 +24,7 @@ import {
   waitForTaskWorktreeCreation,
 } from '../worktrees/taskWorktree'
 import { buildSessionEnv } from '../taskEnv'
+import { projectRepository } from '../projects/projects'
 import { branchExists, discardWorktree, setWorktreeAside } from '../worktrees/worktrees'
 import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 import { broadcastTasksChanged } from '../notify'
@@ -240,6 +241,7 @@ async function archiveClaimedTask(
         task: {
           projectId: project.id,
           projectName: project.name,
+          repository: projectRepository(project),
           github:
             project.githubOwner && project.githubName ? { owner: project.githubOwner, name: project.githubName } : null,
           branch: t.branch,

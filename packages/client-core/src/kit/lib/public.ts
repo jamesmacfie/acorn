@@ -2,7 +2,7 @@ export { paneCollapseKey, sidebarCollapse, sidebarCollapsed } from './layout/col
 export { copyText } from './controls/clipboard.ts'
 export { debounce } from './state/debounce.ts'
 export { clearLocal, deviceStorage, readLocal, writeLocal } from './state/deviceStorage.ts'
-export { fileStatusMeta, githubAvatarUrl, railDotProps, summarizeFileStats } from './rendering/displayMeta.ts'
+export { fileStatusMeta, railDotProps, summarizeFileStats } from './rendering/displayMeta.ts'
 export { persistDraft } from './state/draftState.ts'
 export { formatRelativeTime } from './rendering/formatRelativeTime.ts'
 export { formatChord } from './rendering/formatChord.ts'

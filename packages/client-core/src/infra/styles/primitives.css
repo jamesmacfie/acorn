@@ -1525,6 +1525,13 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 }
 .user-avatar-md { width: 24px; height: 24px; }
 .user-avatar-empty { border-style: dashed; }
+.user-avatar-initials {
+  display: inline-grid;
+  place-items: center;
+  font-size: var(--fs-2xs);
+  line-height: 1;
+  color: var(--text-muted);
+}
 .comment-meta-with-avatar {
   display: inline-flex;
   align-items: center;

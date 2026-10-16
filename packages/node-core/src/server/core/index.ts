@@ -19,7 +19,7 @@ import type { SecretPublicationGate } from '../secretChecks/gate'
 import { createCheckoutAdmission, registerCheckoutAdmission, type CheckoutAdmission } from './checkoutAdmission'
 import { getProject } from '../projects/projects'
 import type { CapabilityRegistry } from '../pluginHost/capabilities'
-import { runningCodeHosts } from '../pluginHost/codeHosts'
+import { codeHostLabel, runningCodeHosts } from '../pluginHost/codeHosts'
 import type { NodeKeyCustody } from '../sessionKey'
 import { realpathSync } from 'node:fs'
 
@@ -89,8 +89,9 @@ export type CoreServices = {
   // Read this node's telemetry stream. The only read-everything facet on this object, which is why
   // its token draws high in the trust prompt (./telemetry.ts, docs/telemetry/plugins-and-sinks.md § Writing a sink).
   telemetry: TelemetryService
-  // The running code hosts' plugin ids (../pluginHost/codeHosts.ts).
+  // The running code hosts' plugin ids and labels (../pluginHost/codeHosts.ts).
   codeHosts(): string[]
+  codeHostLabel(pluginId: string): string | null
 }
 
 /** First-party orchestration seams that never cross the loaded-plugin boundary. */
@@ -211,6 +212,7 @@ export function createCoreServices(options: {
     projects,
     telemetry: createTelemetryService(),
     codeHosts: runningCodeHosts,
+    codeHostLabel,
     nodeKeys: options.nodeKeys,
     // Loaded on first use, so the snapshot's code stays out of the boot graph.
     pluginSecurity: {

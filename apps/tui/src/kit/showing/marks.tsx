@@ -89,9 +89,9 @@ export function StatusDot(props: {
   return <Line tone={props.tone}>{props.mixed ? '◐' : props.tone === 'muted' ? '○' : '●'}</Line>
 }
 
-/** Initials in brackets; no image. Two letters, because a login is a word and a terminal column is
- *  not a circle. */
-export function UserAvatar(props: { login: string | null | undefined; size?: 'sm' | 'md' }) {
+/** Initials in brackets; no image, so `src` draws nothing here. Two letters, because a login is a word
+ *  and a terminal column is not a circle. */
+export function UserAvatar(props: { login: string | null | undefined; src?: string | null; size?: 'sm' | 'md' }) {
   const initials = () => {
     const login = props.login?.trim() ?? ''
     if (!login) return '··'

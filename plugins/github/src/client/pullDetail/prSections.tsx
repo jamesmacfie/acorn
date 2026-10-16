@@ -25,6 +25,7 @@ import {
 } from '@acorn/plugin-api/ui'
 import { ProviderHtml } from '@acorn/plugin-api/ui/host'
 import type { Label } from '../../shared/api'
+import { githubAvatarUrl } from '../avatar'
 import { PrConversation } from './Conversation'
 import { PrFileList } from './PrFiles'
 import type { PrModel } from './prModel'
@@ -206,7 +207,7 @@ function Reviewers(props: { model: PrModel }) {
             {(login) => (
               <Chip
                 reveal
-                leading={<UserAvatar login={login} />}
+                leading={<UserAvatar login={login} src={githubAvatarUrl(login)} />}
                 {...(model().readOnly ? {} : { onRemove: () => model().removeReviewer(login) })}
               >
                 {login}
@@ -225,7 +226,7 @@ function Reviewers(props: { model: PrModel }) {
           rowLabel={(login) => login}
           isActive={() => false}
           onSelect={(login) => model().requestReviewer(login)}
-          leading={(login) => <UserAvatar login={login} />}
+          leading={(login) => <UserAvatar login={login} src={githubAvatarUrl(login)} />}
         />
       </Show>
     </Stack>

@@ -49,9 +49,6 @@ const ACTIVITY_ICON: Record<string, string> = {
   title: 'pencil',
 }
 
-// An attachment's source, named only when it is one people know by name.
-const SOURCE_NAME: Record<string, string> = { github: 'GitHub' }
-
 const isDone = (issue: LinearRelatedIssue) => issue.state?.type === 'completed' || issue.state?.type === 'canceled'
 
 export type LinearIssueViewProps = {
@@ -257,7 +254,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
             <Section label="Links">
               <For each={issue().attachments}>
                 {(attachment) => (
-                  <Row onPress={() => props.onLink(attachment.url)} meta={SOURCE_NAME[attachment.sourceType ?? '']}>
+                  <Row onPress={() => props.onLink(attachment.url)} meta={attachment.sourceLabel ?? undefined}>
                     <Inline>
                       <Text>{attachment.title}</Text>
                       {/* Alongside, because an attachment is what a reader most often pastes somewhere,

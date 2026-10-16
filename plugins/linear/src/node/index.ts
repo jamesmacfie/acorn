@@ -18,6 +18,9 @@ export const linearPlugin = (): NodePlugin => ({
     setLinearApiTelemetry(ctx.telemetry)
     ctx.routes.fetch(createIssueSourceHandler(), { prefix: '/data/issues' })
     ctx.dataSources.register(issueSource)
-    ctx.providers.integration(linearProvider, createLinearFetch(ctx.core.projects, ctx.events.send))
+    ctx.providers.integration(
+      linearProvider,
+      createLinearFetch(ctx.core.projects, ctx.events.send, ctx.core.codeHostLabel),
+    )
   },
 })

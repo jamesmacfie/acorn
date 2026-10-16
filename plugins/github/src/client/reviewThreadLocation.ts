@@ -1,4 +1,5 @@
 import type { PullDetail, PullDiffResponse, Thread } from '../shared/api'
+import { githubAvatarUrl } from './avatar'
 
 /** Provider status is the authority for location; historical and unknown locations stay in history. */
 export function reviewThreadLocation(thread: Thread): { path: string; side: 'old' | 'new'; line: number } | null {
@@ -20,5 +21,10 @@ export function reviewRevisionsMatch(detail: PullDetail | undefined, diff: PullD
 export function inlineReviewThreads(detail: PullDetail | undefined, diff: PullDiffResponse | undefined): Thread[] {
   if (!reviewRevisionsMatch(detail, diff)) return []
   const paths = new Set(diff?.document.files.filter((file) => file.patchKey).map((file) => file.path))
-  return (detail?.threads ?? []).filter((thread) => reviewThreadLocation(thread) && paths.has(thread.path!))
+  return (detail?.threads ?? [])
+    .filter((thread) => reviewThreadLocation(thread) && paths.has(thread.path!))
+    .map((thread) => ({
+      ...thread,
+      comments: thread.comments.map((comment) => ({ ...comment, avatarUrl: githubAvatarUrl(comment.author) })),
+    }))
 }

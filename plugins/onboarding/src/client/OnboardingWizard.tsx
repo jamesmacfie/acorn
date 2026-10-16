@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, Index, lazy, onCleanup, Show, Suspense } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Index, lazy, onCleanup, Show, Suspense } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
@@ -10,6 +10,7 @@ import {
   nodeReady,
   patchProject,
   pickNodeFolder,
+  projectImporterRegistry,
   projectPath,
   projectsOptions,
   savePref,
@@ -28,6 +29,7 @@ import {
   DescriptionList,
   Field,
   Heading,
+  Icon,
   Inline,
   Input,
   Kbd,
@@ -37,20 +39,21 @@ import {
   Stack,
   Text,
 } from '@acorn/plugin-api/ui'
+import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 
 import { AddedTally } from './AddedTally'
 import { GroupedProjects, SeparateProjects } from './ArrangementPictures'
 import { saveOnboardingCompletion } from './onboardingCompletion'
 
-const GithubConnect = lazy(() => import('./GithubConnect'))
+const CodeHostConnect = lazy(() => import('./CodeHostConnect'))
 const AiSetup = lazy(() => import('./AiSetup'))
 
-type Step = 'welcome' | 'arrange' | 'add' | 'github' | 'organize' | 'ai' | 'done'
+type Step = 'welcome' | 'arrange' | 'add' | 'host' | 'organize' | 'ai' | 'done'
 
-// The steps the host draws in its indicator. `github` is a detour on the way to `organize`, so it
-// shares `add`'s place in the strip rather than taking an entry of its own. `welcome` has a place of
-// its own, so the host draws Next on it and Back on the step after it, which is the GitHub detour's way
-// out. `arrange` asks how to arrange projects, and the wizard drops it when the Node already has an
+// The steps the host draws in its indicator. `host`, connecting a code host and importing from it, is
+// a detour on the way to `organize`, so it shares `add`'s place in the strip rather than taking an
+// entry of its own. `welcome` has a place of its own, so the host draws Next on it and Back on the step
+// after it, which is the code host detour's way out. `arrange` asks how to arrange projects, and the wizard drops it when the Node already has an
 // answer.
 export const STEPS = [
   { id: 'welcome', label: 'Welcome' },
@@ -70,12 +73,12 @@ export const STEPS = [
  * also holds while a name is blank, because saving would quietly keep the old name.
  */
 export const canAdvanceOn = (step: Step, addedCount: number, blankNames = 0): boolean => {
-  if (step === 'add' || step === 'github') return addedCount > 0
+  if (step === 'add' || step === 'host') return addedCount > 0
   if (step === 'organize') return blankNames === 0
   return true
 }
 
-const place = (step: Step): string => (step === 'github' ? 'add' : step)
+const place = (step: Step): string => (step === 'host' ? 'add' : step)
 
 /** Sentinel option: "put this project in a workspace that does not exist yet". */
 const NEW_WORKSPACE = '__new__'
@@ -99,6 +102,8 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   const integrations = createQuery(() => integrationsOptions(nodeReady()))
 
   const [step, setStep] = createSignal<Step>('welcome')
+  // The code host the `host` step connects.
+  const [host, setHost] = createSignal<PublicIntegrationProvider>()
   const [trail, setTrail] = createSignal<Step[]>([])
   // The ids of every project this run added, in the order they were added, reported by whatever did
   // the adding, never inferred. Importing is not a one-shot choice: an account has many repositories
@@ -145,17 +150,26 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   const nameOf = (project: Project): string => names()[project.id] ?? project.name
   const blankNames = () => added().filter((project) => !nameOf(project).trim()).length
 
-  // GitHub is offered only when this node can start a sign-in, or already holds one. A build without
-  // a GitHub client id reports the provider as not connectable, and offering the card there would
-  // lead to an error the reader can do nothing about.
-  const githubOffered = () => {
+  // A code host is a provider whose plugin registered a project importer under the provider's id. One
+  // is offered only when this node can connect it, or already holds a connection. A build without a
+  // GitHub client id reports GitHub as not connectable, and offering the card there would lead to an
+  // error the reader can do nothing about.
+  const codeHosts = createMemo(() => {
     const data = integrations.data
-    return (
-      !!data &&
-      (data.providers.some((provider) => provider.id === 'github' && provider.connection.connectable) ||
-        data.integrations.some((entry) => entry.providerId === 'github'))
+    if (!data) return []
+    return data.providers.filter(
+      (provider) =>
+        !!projectImporterRegistry.get(provider.id) &&
+        (provider.connection.connectable || data.integrations.some((entry) => entry.providerId === provider.id)),
     )
-  }
+  })
+  const codeHostNames = () =>
+    codeHosts()
+      .map((provider) => provider.label)
+      .join(' or ')
+  // The name of the code host a project's remote is on, when its plugin is running.
+  const codeHostOf = (project: Project) =>
+    integrations.data?.providers.find((provider) => provider.id === project.repository?.provider)?.label
 
   const go = (next: Step) => {
     setTrail((seen) => [...seen, step()])
@@ -295,7 +309,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   }
 
   // The host's Back and Next hand back the id of the step they landed on. Back is this wizard's own
-  // trail rather than the strip's previous entry, because `github` shares a place with `add` and the
+  // trail rather than the strip's previous entry, because `host` shares a place with `add` and the
   // strip cannot tell which of the two you came from. Forward off `organize` is the save.
   const onStep = (id: string) => {
     if (busy()) return
@@ -314,7 +328,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
         return 'Get started'
       case 'add':
         return canAdvance() ? 'Continue' : 'Add a project to continue'
-      case 'github':
+      case 'host':
         return canAdvance() ? 'Done adding' : 'Add a repository to continue'
       default:
         return 'Continue'
@@ -370,8 +384,8 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
           <Heading
             level={2}
             help={
-              githubOffered()
-                ? 'Not sure? Open a folder. If you connect GitHub later, acorn links it to the folders you already added.'
+              codeHosts().length
+                ? `Not sure? Open a folder. If you connect ${codeHostNames()} later, acorn links it to the folders you already added.`
                 : undefined
             }
           >
@@ -385,7 +399,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
           <Inline gap="stack" even>
             <Card interactive disabled={!canAddProjectFromFolder() || busy()} onPress={() => void openFolder()}>
               <Stack gap="row">
-                <Show when={githubOffered()}>
+                <Show when={codeHosts().length}>
                   <Text emphasis="eyebrow">Recommended</Text>
                 </Show>
                 <Text emphasis="strong">Open a folder</Text>
@@ -394,17 +408,29 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
                 </Text>
               </Stack>
             </Card>
-            <Show when={githubOffered()}>
-              <Card interactive onPress={() => go('github')}>
-                <Stack gap="row">
-                  <Text emphasis="eyebrow">Optional</Text>
-                  <Text emphasis="strong">Connect GitHub</Text>
-                  <Text emphasis="muted" wrap>
-                    Clone your repositories, or link ones you already have on this computer.
-                  </Text>
-                </Stack>
-              </Card>
-            </Show>
+            {/* One card per code host, each opening that host's own sign-in. */}
+            <For each={codeHosts()}>
+              {(provider) => (
+                <Card
+                  interactive
+                  onPress={() => {
+                    setHost(provider)
+                    go('host')
+                  }}
+                >
+                  <Stack gap="row">
+                    <Text emphasis="eyebrow">Optional</Text>
+                    <Inline gap="inline">
+                      <Icon name={provider.glyph} />
+                      <Text emphasis="strong">Connect {provider.label}</Text>
+                    </Inline>
+                    <Text emphasis="muted" wrap>
+                      Clone your repositories, or link ones you already have on this computer.
+                    </Text>
+                  </Stack>
+                </Card>
+              )}
+            </For>
           </Inline>
           <Show when={!canAddProjectFromFolder()}>
             <Text emphasis="muted">Choose the local Node in the desktop app to open a folder.</Text>
@@ -413,10 +439,17 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
         </Stack>
       </Show>
 
-      <Show when={step() === 'github'}>
-        <Suspense fallback={<Text emphasis="muted">Loading…</Text>}>
-          <GithubConnect onBack={back} onImported={(ids) => void afterImport(ids)} added={added()} />
-        </Suspense>
+      <Show when={step() === 'host' && host()}>
+        {(provider) => (
+          <Suspense fallback={<Text emphasis="muted">Loading…</Text>}>
+            <CodeHostConnect
+              provider={provider()}
+              onBack={back}
+              onImported={(ids) => void afterImport(ids)}
+              added={added()}
+            />
+          </Suspense>
+        )}
       </Show>
 
       <Show when={step() === 'organize'}>
@@ -456,9 +489,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
                       <Show when={current().vcs === 'git'}>
                         <Badge>Git</Badge>
                       </Show>
-                      <Show when={current().github}>
-                        <Badge>GitHub</Badge>
-                      </Show>
+                      <Show when={codeHostOf(current())}>{(label) => <Badge>{label()}</Badge>}</Show>
                     </Inline>
                     <Show when={!current().path}>
                       <Text emphasis="muted" wrap>
@@ -536,7 +567,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
       </Show>
 
       <Show when={step() === 'ai'}>
-        {/* Lazy for the same reason the GitHub screen is: it opens two queries of its own, and a run
+        {/* Lazy for the same reason the code host screen is: it opens two queries of its own, and a run
             that skips out before this step never pays for them. */}
         <Suspense fallback={<Text emphasis="muted">Loading…</Text>}>
           <AiSetup />

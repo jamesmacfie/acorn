@@ -28,11 +28,30 @@ describe('buildSessionEnv', () => {
     expect(env.ACORN_TASK_TITLE).toBe('Fix login')
   })
 
+  it('names the repository on any code host, with its host', () => {
+    const gitlab = { ...task, github: null, repository: { host: 'gitlab.test', path: 'group/sub/api' } }
+    const env = buildSessionEnv({ taskId: 't1', cwd: '/wt', task: gitlab, baseEnv })
+    expect(env.ACORN_REPO).toBe('group/sub/api')
+    expect(env.ACORN_REPO_HOST).toBe('gitlab.test')
+  })
+
+  it("keeps GitHub's owner and name as they were cased on github.com", () => {
+    const github = {
+      ...task,
+      github: { owner: 'Acme', name: 'Widget' },
+      repository: { host: 'github.com', path: 'acme/widget' },
+    }
+    const env = buildSessionEnv({ taskId: 't1', cwd: '/wt', task: github, baseEnv })
+    expect(env.ACORN_REPO).toBe('Acme/Widget')
+    expect(env.ACORN_REPO_HOST).toBe('github.com')
+  })
+
   it('omits task-derived vars when the task row is missing', () => {
     const env = buildSessionEnv({ taskId: 't1', cwd: '/home/x', task: null, baseEnv })
     expect(env.ACORN_TASK_ID).toBe('t1')
     expect(env.ACORN_WORKTREE_PATH).toBe('/home/x')
     expect(env.ACORN_REPO).toBeUndefined()
+    expect(env.ACORN_REPO_HOST).toBeUndefined()
     expect(env.ACORN_BRANCH).toBeUndefined()
     expect(env.ACORN_TASK_SLUG).toBeUndefined()
     expect(env.ACORN_TASK_TITLE).toBeUndefined()

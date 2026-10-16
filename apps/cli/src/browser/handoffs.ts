@@ -85,8 +85,13 @@ const TONES = { info: 'ok', warn: 'warn', danger: 'bad' } as const
 // item's address when the provider stamped one, and core records a pull request as the project's GitHub
 // repository and the task's pull number rather than as a link, so its address is built here, as the
 // GitHub plugin builds it. The rest are exact origins plugins published for their tasks, such as a
-// running local stack's app.
-export function taskPages(tasks: readonly Task[], published: readonly PublishedAddresses[] = []): BridgePageTask[] {
+// running local stack's app. An address a code host knows matches in any case, as GitHub, GitLab, and
+// Bitbucket read their paths.
+export function taskPages(
+  tasks: readonly Task[],
+  published: readonly PublishedAddresses[] = [],
+  codeHosts: readonly string[] = [],
+): BridgePageTask[] {
   return tasks.flatMap((task) => {
     if (task.status !== 'active') return []
     const addresses: { url: string | undefined; source: string }[] = [
@@ -102,7 +107,8 @@ export function taskPages(tasks: readonly Task[], published: readonly PublishedA
     ]
     const pages = addresses.flatMap(({ url, source }): BridgeTaskPage[] => {
       const parsed = url ? parseSiteAddress(url) : null
-      return parsed?.ok ? [{ ...parsed.site, source }] : []
+      if (!parsed?.ok) return []
+      return [{ ...parsed.site, source, ...(codeHosts.includes(source) ? { caseInsensitive: true } : {}) }]
     })
     for (const { pluginId, addresses: answered } of published)
       for (const address of answered)

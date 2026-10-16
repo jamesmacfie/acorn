@@ -1,13 +1,16 @@
 ---
 title: UserAvatar
-description: A person's avatar from their GitHub login.
+description: A person's avatar, from the picture their code host gives, or their initials.
 sources:
   - packages/client-core/src/kit/components/content/UserAvatar.tsx
   - docs/ui-design/every-node.md
 checked: afced2661
 ---
 
-Use `UserAvatar` beside a person's name. It takes a GitHub `login`, and the terminal draws their initials in brackets.
+Use `UserAvatar` beside a person's name. It takes their `login` and, in `src`, the HTTPS address of the
+picture their code host gives for them. Without `src` the desktop draws the login's initials, and the
+terminal always draws them in brackets. A tree that passes a login and no `src` gets that login's
+GitHub picture until the next plugin API major removes the fallback.
 
 <Specimen id="user-avatar" />
 

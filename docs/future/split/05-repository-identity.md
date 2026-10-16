@@ -108,6 +108,12 @@ Remove these together, after the readers above move to the repository facet:
   `remoteRepository`.
 - The `github_owner`, `github_name`, and `github_repo_id` columns and `projects_github_idx`, with the
   GitHub half of `repositoryColumns`, `projectByGithub`, and `normalizeGithubPart`.
+- `SessionTaskInfo.github`, so `ACORN_REPO` is the facet's path on github.com too, and the same
+  override in the preview plugin's `scriptUrl`.
+- The GitHub picture a remote tree's `UserAvatar` gets from a login with no `src` (`TreeUserAvatar` in
+  `packages/client-core/src/host/tree/components.ts`).
+- The extension's `page.source === 'github'` fallback in `pageMatches`, once every Node sends
+  `codeHosts`.
 
 Date: October 14, 2026. Status: proposed. Phase 6 depends on it.
 

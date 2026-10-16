@@ -20,6 +20,7 @@ import {
   UserAvatar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
+import { githubAvatarUrl } from '../avatar'
 import { SUMMARY_BADGES_POINT } from '../extensionPoints'
 import type { PrModel } from './prModel'
 
@@ -102,7 +103,16 @@ export function PrOverview(props: {
     return [
       { label: 'State', value: <Badge tone={stateTone()}>{STATE_WORD[state()]}</Badge> },
       ...(pull?.author
-        ? [{ label: 'Author', value: <Chip leading={<UserAvatar login={pull.author} />}>{pull.author}</Chip> }]
+        ? [
+            {
+              label: 'Author',
+              value: (
+                <Chip leading={<UserAvatar login={pull.author} src={githubAvatarUrl(pull.author)} />}>
+                  {pull.author}
+                </Chip>
+              ),
+            },
+          ]
         : []),
       {
         label: 'Branch',

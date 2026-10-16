@@ -307,7 +307,9 @@ export type BridgeTask = { id: string; title: string; branch: string | null }
 // matched by whole segments, so a pull request's address covers its tabs and one at `/` covers the
 // origin. `source` is the plugin or provider that knows the address, such as `github` or `linear`.
 // `status` is set on an address a plugin published for the task, such as its local stack's app.
-export type BridgeTaskPage = SiteAddress & { source: string; status?: BridgePageStatus }
+// `caseInsensitive` is set when `source` is a code host, whose owner and repository names match in any
+// case. An older Node never sets it.
+export type BridgeTaskPage = SiteAddress & { source: string; status?: BridgePageStatus; caseInsensitive?: boolean }
 // What a plugin says answers at an address it published, and its state, read together as one line
 // ("Runn stack running"), with the state's tone.
 type BridgePageStatus = { label: string; state: string; tone: 'ok' | 'warn' | 'bad' }

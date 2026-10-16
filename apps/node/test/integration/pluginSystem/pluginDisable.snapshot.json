@@ -134,6 +134,7 @@
       "git.localGit",
       "git.staticDependencyPolicy",
       "github.mirror",
+      "github.mirrorFootprint",
       "memory.knowledgeRoute",
       "memory.library",
       "notes.seedTask",
@@ -226,7 +227,8 @@
         "github"
       ],
       "capabilities": [
-        "github.mirror"
+        "github.mirror",
+        "github.mirrorFootprint"
       ],
       "databases": [
         "github.sqlite"

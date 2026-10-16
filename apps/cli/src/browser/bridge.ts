@@ -496,7 +496,8 @@ export function createBridge(options: {
   // Where each plugin that publishes task addresses says its tasks' apps answer now. A plugin whose
   // route fails or answers something unusable adds nothing, so one broken plugin can't take every
   // task's pages with it; the task list read beside this reports a Node that is gone.
-  async function publishedAddresses(nodeId: string): Promise<PublishedAddresses[]> {
+  // What plugins published for their tasks, and the code hosts the Node runs, from one discovery read.
+  async function publishedAddresses(nodeId: string): Promise<{ published: PublishedAddresses[]; codeHosts: string[] }> {
     const body = (await nodeRequest(nodeId, { method: 'GET', path: browserHandoffsRoute })) as BrowserHandoffsResponse
     const routes = (body?.taskAddresses ?? []).filter(({ pluginId, route }) => ownsRoute(pluginId, route))
     statusPlugins = new Set([...routes, ...declaredPanels(body)].map((entry) => entry.pluginId))
@@ -515,7 +516,7 @@ export function createBridge(options: {
         }
       }),
     )
-    return answers.flat()
+    return { published: answers.flat(), codeHosts: body?.codeHosts ?? [] }
   }
 
   // A plugin's sidebar view for one task, from the route the Node declares now, never one the browser
@@ -623,11 +624,11 @@ export function createBridge(options: {
       case 'tasks.list':
         return listTasks(request.nodeId, request.projectId)
       case 'tasks.pages': {
-        const [tasks, published] = await Promise.all([
+        const [tasks, { published, codeHosts }] = await Promise.all([
           readList<Task>(request.nodeId, tasksRoute, (body) => body),
           publishedAddresses(request.nodeId),
         ])
-        return { nodeId: request.nodeId, tasks: taskPages(tasks, published) }
+        return { nodeId: request.nodeId, tasks: taskPages(tasks, published, codeHosts) }
       }
       case 'agents.choices': {
         const [providers, agents] = await Promise.all([

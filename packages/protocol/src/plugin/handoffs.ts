@@ -69,13 +69,15 @@ export type BrowserHandoffDescriptor = z.input<typeof browserHandoffDescriptor>
 // One declared handoff as discovery advertises it: the descriptor, bound to the plugin that serves it.
 export type BrowserHandoff = z.output<typeof browserHandoffDescriptor> & { pluginId: string }
 
-// The Node's list of handoffs its active plugins declare, and the task address route and sidebar panel
-// each declares. Device-only: it describes the plugin surface.
+// The Node's list of handoffs its active plugins declare, the task address route and sidebar panel
+// each declares, and the ids of the running code hosts. Device-only: it describes the plugin surface.
 export const browserHandoffsRoute = '/v1/core/browser-handoffs'
 export type BrowserHandoffsResponse = {
   handoffs: BrowserHandoff[]
   taskAddresses: TaskAddressesRoute[]
   panels: BrowserPanel[]
+  // Absent from a Node older than it.
+  codeHosts?: string[]
 }
 
 // What the resolve route receives: the page address, and the captures the caller matched from one of

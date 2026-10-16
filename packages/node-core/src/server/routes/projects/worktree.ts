@@ -8,6 +8,7 @@ import { archiveTask, restoreTask, taskArchiveTree } from '../../storage/archive
 import { runProcess } from '../../core/proc'
 import { broadcastWorktreeStatusChanged } from '../../notify'
 import { buildSessionEnv } from '../../taskEnv'
+import { projectRepository } from '../../projects/projects'
 import {
   computeTaskStatuses,
   isDir,
@@ -95,6 +96,7 @@ async function capturePreviewUrl(
           ? {
               projectId: project.id,
               projectName: project.name,
+              repository: projectRepository(project),
               github:
                 project.githubOwner && project.githubName
                   ? { owner: project.githubOwner, name: project.githubName }

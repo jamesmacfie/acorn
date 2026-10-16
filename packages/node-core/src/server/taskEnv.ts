@@ -30,6 +30,9 @@ export function childEnv(env: NodeJS.ProcessEnv = process.env): Record<string, s
 export type SessionTaskInfo = {
   projectId: string
   projectName: string
+  // The project's repository on any code host. `github` is the same repository read as GitHub's owner
+  // and name, kept until the next plugin API major because it may hold capitals the facet's path lost.
+  repository?: { host: string; path: string } | null
   github?: { owner: string; name: string } | null
   branch?: string | null
   title: string
@@ -53,6 +56,11 @@ export function buildSessionEnv(opts: {
   if (opts.task) {
     out.ACORN_PROJECT_ID = opts.task.projectId
     out.ACORN_PROJECT_NAME = opts.task.projectName
+    if (opts.task.repository) {
+      out.ACORN_REPO = opts.task.repository.path
+      out.ACORN_REPO_HOST = opts.task.repository.host
+    }
+    // Scripts compare ACORN_REPO, so a github.com project keeps the value it always had.
     if (opts.task.github) out.ACORN_REPO = `${opts.task.github.owner}/${opts.task.github.name}`
     if (opts.task.branch) {
       out.ACORN_BRANCH = opts.task.branch

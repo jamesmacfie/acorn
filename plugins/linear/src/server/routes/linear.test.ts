@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeTestRequestContext } from '@acorn/plugin-api/testkit'
 import type { StoredConnection } from '@acorn/plugin-api/node'
-import { createLinearFetch } from './linear'
+import { createLinearFetch, nameAttachmentSources } from './linear'
 
 // The palette's Linear search, driven the way the host drives it: a request context whose connections
 // are canned, and Linear itself replaced by a stubbed `fetch`, because these routes spend the owner's
@@ -360,5 +360,36 @@ describe('Linear browser handoff route', () => {
     expect(await response.json()).toMatchObject({
       items: [{ identifier: 'ENG-42', connection: { id: 'linear-a' }, projects: ['project-1'] }],
     })
+  })
+})
+
+describe("an attachment's source", () => {
+  it('is named by the running code host with its id, and left unnamed otherwise', () => {
+    const attachment = (id: string, sourceType: string | null) => ({
+      id,
+      title: id,
+      subtitle: null,
+      url: 'https://x.test',
+      sourceType,
+    })
+    const labels: Record<string, string> = { github: 'GitHub', gitlab: 'GitLab' }
+    const detail = nameAttachmentSources(
+      {
+        id: 'uuid',
+        identifier: 'ENG-1',
+        title: 'Fix it',
+        url: 'https://linear.app/acme/issue/ENG-1',
+        state: null,
+        assignee: null,
+        attachments: [
+          attachment('a', 'github'),
+          attachment('b', 'gitlab'),
+          attachment('c', 'slack'),
+          attachment('d', null),
+        ],
+      } as never,
+      (id) => labels[id] ?? null,
+    )
+    expect(detail.attachments?.map((item) => item.sourceLabel)).toEqual(['GitHub', 'GitLab', null, null])
   })
 })

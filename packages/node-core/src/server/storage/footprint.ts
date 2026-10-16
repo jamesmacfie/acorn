@@ -7,6 +7,7 @@ import { schema } from '../db'
 import { PLUGIN_DB_DIR } from '../plugins/storage'
 import { resolveDatabasePath } from './paths'
 import { createLogger, describeError } from '../telemetry/logger'
+import { capabilityId, type CapabilityRegistry } from '../pluginHost/capabilities'
 
 const log = createLogger('storage')
 
@@ -86,6 +87,27 @@ export async function nodeStorageReport(dataDir: string, now = Date.now()): Prom
  * does not hide the other numbers.
  */
 export type FootprintContributor = { plugin: string; counts: () => Promise<Record<string, number>> }
+
+/** What a plugin with a mirror provides under `mirrorFootprintCapability(<its id>)`, for the log. The
+ *  plugin owns those tables, so it reports their counts instead of exposing its database handle. */
+type MirrorFootprint = { footprint(): Promise<Record<string, number>> }
+
+// One capability per plugin, because a capability has one provider. The suffix is how the log finds
+// them all without knowing which plugins have a mirror.
+const MIRROR_FOOTPRINT = '.mirrorFootprint'
+export const mirrorFootprintCapability = (pluginId: string) =>
+  capabilityId<MirrorFootprint>(`${pluginId}${MIRROR_FOOTPRINT}`)
+
+/** Every mirror footprint the running plugins provide, as log contributors. */
+export const mirrorFootprints = (capabilities: Pick<CapabilityRegistry, 'ids' | 'get'>): FootprintContributor[] =>
+  capabilities
+    .ids()
+    .filter((id) => id.endsWith(MIRROR_FOOTPRINT))
+    .map((id) => ({
+      plugin: id.slice(0, -MIRROR_FOOTPRINT.length),
+      // Async, so a plugin that stopped since the list was read fails its own counts and not the line.
+      counts: async () => capabilities.get(capabilityId<MirrorFootprint>(id))!.footprint(),
+    }))
 
 export async function logStorageFootprint(
   db: AppDatabase,

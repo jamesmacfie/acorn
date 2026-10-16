@@ -42,6 +42,15 @@ describe('pages matched to tasks', () => {
     expect(matched('https://linear.app/ACME/issue/ENG-42/fix-it')).toEqual([])
   })
 
+  it('matches any code host the Node marks, whatever the case of its path', () => {
+    const page = { origin: 'https://gitlab.test', pathPrefix: '/group/repo/-/merge_requests/12', source: 'gitlab-test' }
+    const mr: BridgePageTask = { ...issue, id: 't3', pages: [{ ...page, caseInsensitive: true }] }
+    const unmarked: BridgePageTask = { ...issue, id: 't4', pages: [page] }
+    const ids = (url: string) => pageTasks([mr, unmarked], url).map(({ task }) => task.id)
+    expect(ids('https://gitlab.test/Group/Repo/-/merge_requests/12')).toEqual(['t3'])
+    expect(ids('https://gitlab.test/group/repo/-/merge_requests/12/diffs')).toEqual(['t3', 't4'])
+  })
+
   it('needs the exact origin', () => {
     expect(matched('http://github.com/acme/runn/pull/482')).toEqual([])
     expect(matched('https://gist.github.com/acme/runn/pull/482')).toEqual([])

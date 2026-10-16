@@ -160,6 +160,21 @@ describe('preview URL runtime', () => {
       }),
     )
   })
+
+  it('names a repository on another code host, with its host', async () => {
+    const service = core('script', 'pnpm preview-url')
+    vi.mocked(service.projects.byId).mockResolvedValue({
+      ...project,
+      github: null,
+      repository: { provider: 'gitlab-test', host: 'gitlab.test', path: 'group/sub/api', externalId: null },
+    } as never)
+    await createPreviewUrlRuntime(service, () => undefined, vi.fn()).forTask(task.id)
+    expect(service.proc.runProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: expect.objectContaining({ ACORN_REPO: 'group/sub/api', ACORN_REPO_HOST: 'gitlab.test' }),
+      }),
+    )
+  })
 })
 
 const deferred = <T>() => {

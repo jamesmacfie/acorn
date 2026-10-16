@@ -46,10 +46,6 @@ export function summarizeFileStats(files: readonly Pick<DiffFile, 'additions' | 
   return { count: files?.length ?? 0, additions, deletions }
 }
 
-export function githubAvatarUrl(login: string, size = 40): string {
-  return `https://github.com/${encodeURIComponent(login)}.png?size=${size}`
-}
-
 /** Map a rail marker's dot state to the kit's StatusDot props. */
 export const railDotProps = (
   dot: RailMarkerDot,

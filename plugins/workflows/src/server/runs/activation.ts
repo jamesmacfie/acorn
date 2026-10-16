@@ -166,6 +166,7 @@ export const createWorkflowExecution = (
                 ? {
                     projectId: project.id,
                     projectName: project.name,
+                    repository: project.repository,
                     github: project.github,
                     branch: task.branch,
                     title: task.title,

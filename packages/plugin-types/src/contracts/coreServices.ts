@@ -33,4 +33,7 @@ export type CoreServices = {
   /** The ids of the running plugins that declare a code host, such as `github`. Available with
    *  `projects:read`. */
   codeHosts(): string[]
+  /** What a running code host is called as a person reads it, such as `GitLab`, or null when no running
+   *  plugin with that id declares one. Available with `projects:read`. */
+  codeHostLabel(pluginId: string): string | null
 }

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { canAdvanceOn } from './OnboardingWizard'
 
 describe('canAdvanceOn', () => {
-  it('holds the add step and the GitHub detour until a project is added', () => {
+  it('holds the add step and the code host detour until a project is added', () => {
     expect(canAdvanceOn('add', 0)).toBe(false)
-    expect(canAdvanceOn('github', 0)).toBe(false)
+    expect(canAdvanceOn('host', 0)).toBe(false)
     expect(canAdvanceOn('add', 1)).toBe(true)
   })
 

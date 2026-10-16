@@ -111,9 +111,8 @@ import missing from its list and on a listed import that's gone. Add the reason 
   tab with it, and registers the harness marks from `providerMarks`.
 - **Extension and workflows.** The sidebar prefills a workflow's inputs from the page's item with
   `itemInputs`, and draws runs and steps with `statusDisplay`.
-- **Node and four plugins.** `composition.ts` runs agents', terminal's, and workflows' startup
-  reconcile through their `runtime` and `runner` capabilities, and reads GitHub's `mirror` for the
-  storage footprint log.
+- **Node and three plugins.** `composition.ts` runs agents', terminal's, and workflows' startup
+  reconcile through their `runtime` and `runner` capabilities.
 - **Terminal client and terminal.** `Sessions.tsx` and `sessionPty.ts` draw the terminal drawer
   themselves, so they read `hostClient`, `wire`, and `toolbarActions`. The drawer stays in the shells
   for reason B above. Its open, maximized, and focus state is client-core's (`setTerminalOpen`,

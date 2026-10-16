@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fileStatusMeta, githubAvatarUrl, summarizeFileStats } from '@acorn/client-core/kit/lib'
+import { fileStatusMeta, summarizeFileStats } from '@acorn/client-core/kit/lib'
 import { routeKey } from '@acorn/plugin-github/testkit/client'
 
 describe('fileStatusMeta', () => {
@@ -24,13 +24,6 @@ describe('summarizeFileStats', () => {
         { additions: null, deletions: 4 },
       ]),
     ).toEqual({ count: 2, additions: 3, deletions: 5 })
-  })
-})
-
-describe('githubAvatarUrl', () => {
-  it('builds a deterministic GitHub avatar URL from a login', () => {
-    expect(githubAvatarUrl('jamesmacfie', 36)).toBe('https://github.com/jamesmacfie.png?size=36')
-    expect(githubAvatarUrl('space user', 18)).toBe('https://github.com/space%20user.png?size=18')
   })
 })
 

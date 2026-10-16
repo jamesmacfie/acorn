@@ -50,6 +50,7 @@ import { prFilterFor, setPrFilter } from './pullList/filterStore'
 import { githubBrowsePath } from './clientRoutes'
 import { activeTaskForPull, promotePullToTask } from './pullTasks'
 import { readFailure } from './actionErrors'
+import { githubAvatarUrl } from './avatar'
 
 // Draft / open / closed, as one glyph. The list route only ever reports `open` or `closed`: GitHub's
 // REST list calls a merged PR closed and the closed page carries no merged_at, so a merged PR wears
@@ -455,7 +456,7 @@ export default function PullList() {
                         collapsed() ? (
                           <>
                             <Inline gap="inline">
-                              <UserAvatar login={pull().author} />
+                              <UserAvatar login={pull().author} src={githubAvatarUrl(pull().author)} />
                               <Show when={checks().length}>
                                 <StatusDot
                                   {...railDotProps(CHECK_TONE[checksState(checks())])}
@@ -480,7 +481,7 @@ export default function PullList() {
                             {(mark) => <Icon name={mark().icon} title={mark().word} size={14} />}
                           </Show>
                           {/* The author column is gone, so the avatar carries the login on hover. */}
-                          <UserAvatar login={pull().author} />
+                          <UserAvatar login={pull().author} src={githubAvatarUrl(pull().author)} />
                         </>
                       }
                       meta={<Text emphasis="muted">{shortAge(pull().updatedAt)}</Text>}

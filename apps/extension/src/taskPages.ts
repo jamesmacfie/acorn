@@ -13,10 +13,11 @@ import { siteMatches } from '@acorn/protocol/siteAssociations.ts'
 // A task the page belongs to, and the address of the task's that it matched.
 export type PageTask = { task: BridgePageTask; page: BridgeTaskPage }
 
-// GitHub reads owner and repository names in any case, so `/Acme/Runn/pull/482` is the same pull
-// request as `/acme/runn/pull/482`. Other sites' paths are matched as they are.
+// A code host reads owner and repository names in any case, so `/Acme/Runn/pull/482` is the same pull
+// request as `/acme/runn/pull/482`. The Node says which addresses those are. An older Node doesn't, so
+// GitHub's are still matched that way. Other sites' paths are matched as they are.
 export const pageMatches = (page: BridgeTaskPage, url: string): boolean =>
-  page.source === 'github'
+  page.caseInsensitive || page.source === 'github'
     ? siteMatches({ origin: page.origin, pathPrefix: page.pathPrefix.toLowerCase() }, url.toLowerCase())
     : siteMatches(page, url)
 

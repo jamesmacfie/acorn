@@ -24,7 +24,8 @@ because only a running node half registers it. It also needs `projects:read`, or
 it, in `permissions.node.core`: a code host's data sources get the paths of the projects on its hosts,
 so the person consents to that in the trust prompt like any other project read. The registry is
 `packages/node-core/src/server/pluginHost/codeHosts.ts`, and it empties when the plugin stops. A
-plugin reads which code hosts are running with `ctx.core.codeHosts()`.
+plugin reads which code hosts are running with `ctx.core.codeHosts()`, and the `label` one declared
+with `ctx.core.codeHostLabel(id)`.
 
 The provider is the plugin's own id, so two plugins can't declare the same provider. When two running
 plugins claim one host, a built-in beats a loaded plugin, and between two of the same tier the lower
@@ -145,6 +146,21 @@ task's primary change request ([gate policies](../workflows/step-kinds.md#gate-p
 Emit `plugin:<id>:checks-changed`, and declare the verb in `emits`, when a change request's checks
 change. The workflow trigger sweep runs early on it for every running code host, and waits for its
 five-minute clock otherwise.
+
+## Outside the code host plugin
+
+Nothing else branches on github.com. These read the facet or a code host's declaration instead:
+
+- Task processes get `ACORN_REPO`, the facet's path, and `ACORN_REPO_HOST`, its host, from
+  `buildSessionEnv`. On github.com `ACORN_REPO` keeps GitHub's owner and name as before.
+- The browser extension's host marks a running code host's task addresses `caseInsensitive`, from the
+  `codeHosts` list in `GET /v1/core/browser-handoffs`.
+- The first-run wizard offers a code host when its provider can connect and its plugin registered a
+  project importer under the provider's id, as GitHub's `github` importer does.
+- `UserAvatar` draws `src`, or initials without one. A code host passes its own picture URL.
+- Linear names an attachment's source with `ctx.core.codeHostLabel(sourceType)`.
+- A plugin with a mirror provides `mirrorFootprintCapability(ctx.name)` from `@acorn/plugin-api/node`,
+  and the boot storage log prints its counts.
 
 ## The GitHub-named fields
 

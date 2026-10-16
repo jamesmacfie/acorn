@@ -35,6 +35,7 @@ import {
   type DiffSnippets,
 } from '@acorn/plugin-api/ui/diff'
 import { ProviderHtml } from '@acorn/plugin-api/ui/host'
+import { githubAvatarUrl } from '../avatar'
 import { reviewRevisionsMatch, reviewThreadLocation } from '../reviewThreadLocation'
 import type { PrModel } from './prModel'
 import type { PullCommit, Thread, ThreadComment } from '../../shared/api'
@@ -104,7 +105,7 @@ function ConversationEntryItem(props: {
 function Byline(props: { author: string | null | undefined; action: string; createdAt: number | null }) {
   return (
     <Inline>
-      <UserAvatar login={props.author ?? null} />
+      <UserAvatar login={props.author ?? null} src={githubAvatarUrl(props.author)} />
       <Text emphasis="strong">{props.author ?? 'unknown'}</Text>
       <Text emphasis="muted">{props.action}</Text>
       <Show when={formatRelativeTime(props.createdAt)}>{(age) => <Text emphasis="muted">{age()}</Text>}</Show>
@@ -118,7 +119,7 @@ function CommitItem(props: { commit: PullCommit }) {
     <Card pad="sm">
       <Stack gap="row">
         <Inline>
-          <UserAvatar login={props.commit.authorLogin} />
+          <UserAvatar login={props.commit.authorLogin} src={githubAvatarUrl(props.commit.authorLogin)} />
           <Badge size="xs" tone="accent">
             {props.commit.sha.slice(0, 7)}
           </Badge>

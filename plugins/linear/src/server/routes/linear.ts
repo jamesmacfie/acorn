@@ -141,6 +141,18 @@ const triageRow = (row: StoredConnection, node: LinearNode): LinearProjectIssue 
 }
 
 type LinearProjectScope = Pick<CoreServices['projects'], 'byId' | 'checkouts' | 'externalProjects'>
+type CodeHostLabel = CoreServices['codeHostLabel']
+
+// Linear names an attachment's source by its own integration id, such as `github` or `gitlab`. Where a
+// running code host plugin has that id, its label names the source. Read per request, so a code host
+// turned on or off is reflected without refreshing the cached issue.
+export const nameAttachmentSources = (detail: LinearIssueDetail, codeHostLabel: CodeHostLabel): LinearIssueDetail => ({
+  ...detail,
+  attachments: detail.attachments?.map((attachment) => ({
+    ...attachment,
+    sourceLabel: attachment.sourceType ? codeHostLabel(attachment.sourceType) : null,
+  })),
+})
 
 /**
  * Which Linear scopes this rail should show, keyed by connection. A scope is a Linear project, or a
@@ -252,6 +264,7 @@ function railRows(found: { row: StoredConnection; node: LinearNode }[]) {
 const createLinearRoutes = (
   projects?: LinearProjectScope,
   emit: (frame: { channel: string } & Record<string, unknown>) => void = () => {},
+  codeHostLabel: CodeHostLabel = () => null,
 ) =>
   new Hono<AppEnv>()
     // The browser extension's issue button, declared in the manifest's `browserHandoffs`. Served here,
@@ -461,7 +474,7 @@ const createLinearRoutes = (
           input: { kind: 'detail', identifier },
           force,
         })
-        if (result.ok) return c.json(result.value)
+        if (result.ok) return c.json(nameAttachmentSources(result.value, codeHostLabel))
         // "Not in this workspace" is the expected answer from every connection but one, so a real failure
         // from any of them is the more useful thing to report.
         if (!failure || failure.status === 404) failure = result.failure
@@ -537,4 +550,5 @@ const createLinearRoutes = (
 export const createLinearFetch = (
   projects?: LinearProjectScope,
   emit?: (frame: { channel: string } & Record<string, unknown>) => void,
-): PluginFetchHandler => portableFetch(createLinearRoutes(projects, emit))
+  codeHostLabel?: CodeHostLabel,
+): PluginFetchHandler => portableFetch(createLinearRoutes(projects, emit, codeHostLabel))

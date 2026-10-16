@@ -69,6 +69,13 @@ describe('props are sanitized before anything sees them', () => {
     }
   })
 
+  it('holds an avatar src to the same HTTPS rule', () => {
+    const src = 'https://gitlab.test/uploads/avatar.png'
+    expect(sanitizeProps('UserAvatar', { login: 'ada', src }).props).toEqual({ login: 'ada', src })
+    for (const bad of ['http://127.0.0.1/avatar.png', 'file:///tmp/a.png', 'data:image/png;base64,AA'])
+      expect(sanitizeProps('UserAvatar', { login: 'ada', src: bad }).props).toEqual({ login: 'ada' })
+  })
+
   it('keeps a handler id only under one of the kit events', () => {
     const { props, dropped } = sanitizeProps('Button', {
       onPress: { $handler: 3 },

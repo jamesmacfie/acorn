@@ -41,6 +41,9 @@ export type LinearAttachment = {
   subtitle: string | null
   url: string
   sourceType: string | null
+  // What to call the source, filled when the detail is served: the label of the running code host
+  // whose plugin id is `sourceType`, such as `GitHub`. Null for any other source.
+  sourceLabel?: string | null
 }
 // A lightweight reference to another issue (parent, sub-issue, or relation target).
 export type LinearRelatedIssue = { id: string; identifier: string; title: string; state: LinearIssueState }

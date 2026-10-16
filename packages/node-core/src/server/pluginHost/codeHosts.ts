@@ -44,5 +44,8 @@ export function changeRequestDeclaration(provider: string): CodeHostDescriptor['
   return declared.get(provider)?.declaration.changeRequest
 }
 
+/** The name a person reads for the running plugin `pluginId`'s code host, or null when it declares none. */
+export const codeHostLabel = (pluginId: string): string | null => declared.get(pluginId)?.declaration.label ?? null
+
 /** The ids of the running plugins that declare a code host. */
 export const runningCodeHosts = (): string[] => [...declared.keys()]

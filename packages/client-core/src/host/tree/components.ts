@@ -99,6 +99,23 @@ import { Rectangle } from '../../kit/components/content/Rectangle'
 // text: importing it there would pull a renderer into a node-env test.
 const load = (loader: () => Promise<{ default: AnyKitComponent }>): KitEntry => ({ load: loader })
 
+// A tree that sends a login and no `src` gets the GitHub picture for that login, which is what every
+// avatar drew before `src` existed. The next plugin API major removes this fallback.
+const TreeUserAvatar = (props: Parameters<typeof UserAvatar>[0]) =>
+  UserAvatar({
+    get login() {
+      return props.login
+    },
+    get size() {
+      return props.size
+    },
+    get src() {
+      const login = props.login?.trim()
+      if (props.src !== undefined || !login) return props.src
+      return `https://github.com/${encodeURIComponent(login)}.png?size=${props.size === 'md' ? 48 : 36}`
+    },
+  })
+
 export const KIT_COMPONENTS: KitTable = {
   Pane,
   Stack,
@@ -154,7 +171,7 @@ export const KIT_COMPONENTS: KitTable = {
   Alert,
   Spinner,
   Kbd,
-  UserAvatar,
+  UserAvatar: TreeUserAvatar,
   Icon,
   Button,
   IconButton,

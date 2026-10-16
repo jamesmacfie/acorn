@@ -14,7 +14,7 @@ sources:
   - apps/desktop/src/client/CliSettings.tsx
   - plugins/onboarding/src/client/OnboardingWizard.tsx
   - plugins/onboarding/src/client/AiSetup.tsx
-  - plugins/onboarding/src/client/GithubConnect.tsx
+  - plugins/onboarding/src/client/CodeHostConnect.tsx
   - packages/client-core/src/features/fleet/NodeChip.tsx
 checked: 90ded85ca
 ---
@@ -144,9 +144,9 @@ opens only once: finishing and skipping both mark it done. Everything it offers 
 
 3. **Add a project.** Click **Open a folder** and choose a folder on this computer. A project doesn't
    need Git or GitHub, but acorn uses them when they're there. When this Node can sign in to GitHub,
-   the step also offers **Connect GitHub**. Click **Get a code**, then **Open GitHub**, and enter the
-   code there. acorn never sees your password. Then pick repositories to clone or link, and click
-   **Done adding**.
+   the step also offers **Connect GitHub**, and the same for any other code host a plugin adds. Click
+   **Get a code**, then **Open GitHub**, and enter the code there. acorn never sees your password. Then
+   pick repositories to clone or link, and click **Done adding**.
 
    <Checkpoint>The step lists what you've added, and its button reads **Continue**.</Checkpoint>
 

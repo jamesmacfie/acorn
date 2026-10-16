@@ -363,10 +363,6 @@ describe('architecture boundaries', () => {
         'agents reconcile at boot',
       ],
       [
-        'apps/node/src/composition/composition.ts -> plugins/github/src/contract/mirror.ts',
-        'storage footprint at boot',
-      ],
-      [
         'apps/node/src/composition/composition.ts -> plugins/terminal/src/contract/runtime.ts',
         'tmux reconcile at boot',
       ],
