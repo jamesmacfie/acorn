@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkflowDef } from '../../shared/workflowContracts'
-import { branchLabel, referencingSteps, stepSummary } from './outlineModel'
+import { branchEdgeLabel, branchLabel, referencingSteps, stepSummary } from './outlineModel'
 
 const inlineQuery = (pluginId: string, sourceId: string) => ({
   kind: 'inline' as const,
@@ -57,6 +57,8 @@ describe('outline model', () => {
   it('labels branches and names affected references before deletion', () => {
     expect(branchLabel(def.steps[3]!, def)).toBe('If')
     expect(branchLabel(def.steps[4]!, def)).toBe('Otherwise')
+    expect(branchEdgeLabel(def.steps[2]!, 'finish')).toBe('Otherwise')
+    expect(branchEdgeLabel(def.steps[3]!, 'finish')).toBeUndefined()
     expect(referencingSteps('find', def)).toEqual(['For each issue'])
   })
 

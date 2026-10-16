@@ -298,7 +298,7 @@ export function Graph(props: {
                 type="button"
                 class="ui-graph-cut"
                 style={{ transform: place(edge().control.x - DOT, edge().control.y - DOT) }}
-                aria-label={`Remove the edge from ${labelOf(edge().from)} to ${labelOf(edge().to)}`}
+                aria-label={`Remove the ${edge().label ? `${edge().label} ` : ''}edge from ${labelOf(edge().from)} to ${labelOf(edge().to)}`}
                 onClick={() => props.onDisconnect?.(edge().from, edge().to)}
               >
                 <Icon name="x" />
@@ -306,6 +306,26 @@ export function Graph(props: {
             )}
           </Index>
         </Show>
+
+        {/* On the wire, where the layout puts it. Hidden like the wires: the cut button's name and the
+            caller's own list already say which branch an edge is. */}
+        <Index each={layout().edges}>
+          {(edge) => (
+            <Show when={edge().label}>
+              {(label) => (
+                <span
+                  class="ui-graph-edge-label"
+                  aria-hidden="true"
+                  style={{
+                    transform: `${place(edge().labelAt.x, edge().labelAt.y)} translate(-50%, -50%)`,
+                  }}
+                >
+                  {label()}
+                </span>
+              )}
+            </Show>
+          )}
+        </Index>
 
         <For each={cards()}>
           {(node) => {

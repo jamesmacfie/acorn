@@ -66,6 +66,25 @@ describe('the layout is deterministic from the edges', () => {
     const covered = control.y > 152 && control.y < 152 + GRAPH_CARD_H && control.x > 0 && control.x < GRAPH_CARD_W
     expect(covered).toBe(false)
   })
+
+  it('sends a wire that would run behind a card down the gutter instead', () => {
+    // An If whose "Otherwise" skips the steps of its other branch: the wire from `a` to `c` goes
+    // around `b`, so the skip is visible, while the wire from `a` to `b` stays straight.
+    const laid = layoutGraph(
+      ['a', 'b', 'c'],
+      [
+        { from: 'a', to: 'b' },
+        { from: 'b', to: 'c' },
+        { from: 'a', to: 'c', label: 'Otherwise' },
+      ],
+    )
+    const skip = laid.edges.find((edge) => edge.to === 'c' && edge.from === 'a')!
+    expect(skip.label).toBe('Otherwise')
+    expect(skip.control.x).toBeGreaterThan(GRAPH_CARD_W)
+    expect(skip.path).toContain(' L ')
+    expect(laid.edges.find((edge) => edge.to === 'b')!.path).not.toContain(' L ')
+    expect(laid.width).toBeGreaterThanOrEqual(skip.control.x)
+  })
 })
 
 let host: HTMLElement
@@ -131,6 +150,22 @@ describe('the graph a reader touches', () => {
     ))
     expect(host.querySelectorAll('.ui-graph-port')).toHaveLength(2)
     expect(host.querySelectorAll('.ui-graph-cut')).toHaveLength(1)
+  })
+
+  it('names a labelled edge beside its target and in its cut', () => {
+    mount(() => (
+      <Graph
+        id="g"
+        ariaLabel="Steps"
+        nodes={nodes}
+        edges={[{ from: 'a', to: 'b', label: 'Otherwise' }]}
+        onDisconnect={() => {}}
+      />
+    ))
+    expect(host.querySelector('.ui-graph-edge-label')!.textContent).toBe('Otherwise')
+    expect(host.querySelector('.ui-graph-cut')!.getAttribute('aria-label')).toBe(
+      'Remove the Otherwise edge from investigate to review',
+    )
   })
 
   it('removes the edge its cut belongs to', () => {
