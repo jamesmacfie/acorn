@@ -48,6 +48,8 @@ const EXCLUDED_METADATA = ['*.map', '.DS_Store', 'size-report.json', 'startup-gr
 const isMetadata = (name) => name.endsWith('.map') || EXCLUDED_METADATA.includes(name)
 const isJavaScript = (name) => /\.[cm]?js$/.test(name)
 const inside = (root, path) => path === root || path.startsWith(root + sep)
+// A relative path with forward slashes on every OS, so the report and its skip entries read the same on Windows.
+const relativePath = (from, to) => relative(from, to).split(sep).join('/')
 
 /**
  * Bytes under one directory. `seen` is shared across components, so a file reached twice, through a
@@ -59,8 +61,7 @@ export function inventory(root, { skip = [], seen = new Set() } = {}) {
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name)
-      // Forward slashes on every OS, so skip entries and the report's paths read the same on Windows.
-      const rel = relative(root, path).split(sep).join('/')
+      const rel = relativePath(root, path)
       if (skip.includes(rel)) continue
       if (entry.isSymbolicLink()) {
         let target = null
@@ -138,7 +139,7 @@ export async function buildSizeReport({ pkg = PKG, nodeDist, tuiDist, nativeRunt
     components.push({ component, path, bytes: counted.bytes, files: counted.files, javascriptBytes: counted.javascriptBytes, duplicates: counted.duplicates })
   }
   for (const [component, file] of [['native-runtime', nativeRuntime], ['shell', shellBinary]]) {
-    if (!file || !existsSync(file)) { missing.push(`${component}: ${file ? relative(pkg, file) : 'not located'}`); continue }
+    if (!file || !existsSync(file)) { missing.push(`${component}: ${file ? relativePath(pkg, file) : 'not located'}`); continue }
     components.push({ component, path: null, bytes: statSync(file).size, files: 1, javascriptBytes: 0, duplicates: 0 })
   }
 

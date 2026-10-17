@@ -18,9 +18,10 @@ the secret is refused, and a plain HTTP request gets 426.
 
 The test prints how long the Node took to start, from the helper's ready line to its `service.start`
 mark. That span covers spawning the Node, evaluating the service bundle, and booting to a bound
-listener. It fails above 10,000 ms on Windows and 1,500 ms on other hosts. On October 1, 2026, it
-measured about 270 ms on an M2 Pro and 2,705 to 5,126 ms on Windows CI. Compare the printed number
-between builds on the same host.
+listener. It fails above 10,000 ms on Windows and 3,000 ms on other hosts. On October 1, 2026, it
+measured about 270 ms on an M2 Pro and 2,705 to 5,126 ms on Windows CI. macOS CI took 635 to
+1,213 ms through October 17, 2026, and 1,924 and 2,573 ms on two slow runners on October 18, every
+boot step about twice as slow. Compare the printed number between builds on the same host.
 
 The desktop test command runs the boot test in its own Vitest run after the unit suites, so their Git,
 database, and transform work doesn't compete with the measured startup. Run
