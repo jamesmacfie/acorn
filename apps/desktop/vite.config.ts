@@ -1,5 +1,5 @@
 import { renameSync, rmSync, writeFileSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
 import { buildVersion } from '../../scripts/buildVersion.mts'
@@ -39,8 +39,11 @@ export default defineConfig({
       generateBundle(_options, bundle) {
         chunkModules = {}
         for (const [file, output] of Object.entries(bundle)) {
+          // Forward slashes on every OS: the check splits module paths on `/`, so Windows paths hid every leak.
           if (output.type === 'chunk')
-            chunkModules[file] = Object.keys(output.modules).map((id) => relative(repoRoot, id.replace(/\?.*$/, '')))
+            chunkModules[file] = Object.keys(output.modules).map((id) =>
+              relative(repoRoot, id.replace(/\?.*$/, '')).split(sep).join('/'),
+            )
         }
       },
       writeBundle({ dir }) {

@@ -113,10 +113,10 @@ describe('check-renderer-budget', () => {
   })
 
   it('fails, naming the chunk, when a denylisted name is preloaded', () => {
-    direct('viewState-cccc.js')
+    direct('prModel-cccc.js')
     const { code, output } = run(dir)
     expect(code).toBe(1)
-    expect(output).toContain('viewState-cccc.js')
+    expect(output).toContain('prModel-cccc.js')
   })
 
   it('fails on a denylisted module that merged into a chunk named after something else', () => {
@@ -170,11 +170,11 @@ describe('check-renderer-budget', () => {
     expect(output).toContain('shiki-eeee.js')
   })
 
-  it('excuses nothing', () => {
+  it('excuses only the two leaks main shipped v0.0.2 with', () => {
     // The allowance list is the one thing in the script that can turn a red build green, so it is
     // asserted rather than trusted. Adding a name to it is a deliberate act and this is where it
-    // argues for itself.
-    expect(readFileSync(SCRIPT, 'utf8')).toContain('const KNOWN = []')
+    // argues for itself: viewState and workerHost loaded at startup on main on October 17, 2026.
+    expect(readFileSync(SCRIPT, 'utf8')).toContain("const KNOWN = ['viewState', 'workerHost']")
   })
 
   it('fails over the byte budget', () => {
@@ -216,17 +216,17 @@ describe('check-renderer-budget', () => {
   })
 
   it('fails over the roster ceiling', () => {
-    withRoster('plugins-cccc.js', {}, { 'assets/plugins-cccc.js': 300_000 })
+    withRoster('plugins-cccc.js', {}, { 'assets/plugins-cccc.js': 400_000 })
     const { code, output } = run(dir)
     expect(code).toBe(1)
     expect(output).toContain('Compiled roster budget exceeded')
   })
 
   it('fails on a denylisted module in the roster', () => {
-    withRoster('plugins-cccc.js', { 'assets/plugins-cccc.js': ['packages/client-core/src/host/tree/workerHost.ts'] })
+    withRoster('plugins-cccc.js', { 'assets/plugins-cccc.js': ['packages/client-core/src/host/chromeRegister.ts'] })
     const { code, output } = run(dir)
     expect(code).toBe(1)
-    expect(output).toContain('workerHost.ts (in plugins-cccc.js)')
+    expect(output).toContain('chromeRegister.ts (in plugins-cccc.js)')
   })
 
   it('fails under the floor, because a startup set that small is the wrong graph', () => {
