@@ -472,6 +472,14 @@ Each plugin landing page above has topic pages in a folder of the same name:
   picker](./future/extension-ux/13-context-picker.md), then [plugin reuse
   passes](./future/extension-ux/plugin-reuse.md).
 
+## Mobile web app proposal
+
+- [Build a mobile web app](./future/mobile/README.md), with phases for [the
+  gateway](./future/mobile/01-gateway.md), [the shell](./future/mobile/02-shell.md), [narrow
+  mode](./future/mobile/03-narrow-mode.md), [narrow layouts](./future/mobile/04-narrow-layouts.md),
+  [Needs you and the conversation](./future/mobile/05-needs-you.md), and [running on a
+  phone](./future/mobile/06-on-a-phone.md), then [later work](./future/mobile/later.md).
+
 ## Lessons from OpenCode proposal
 
 - [Lessons from OpenCode](./future/opencode/README.md), with phases for [a tool result
