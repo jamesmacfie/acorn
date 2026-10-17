@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Removes files that no Acorn runtime loads from an installed dependency tree
 // (docs/shell/packaging.md § Runtime file policy).
 //
