@@ -59,7 +59,8 @@ export function inventory(root, { skip = [], seen = new Set() } = {}) {
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name)
-      const rel = relative(root, path)
+      // Forward slashes on every OS, so skip entries and the report's paths read the same on Windows.
+      const rel = relative(root, path).split(sep).join('/')
       if (skip.includes(rel)) continue
       if (entry.isSymbolicLink()) {
         let target = null

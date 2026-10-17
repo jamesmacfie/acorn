@@ -19,7 +19,8 @@ const filesUnder = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e
 })
 
 // Both installer formats must carry every staged resource, including runtime dependencies.
-export function verifyResources(pkg, resources, fail) {
+// `rewritten` names a packaged file the bundler is known to change, which only has to be there.
+export function verifyResources(pkg, resources, fail, rewritten = () => false) {
   for (const [sourceName, targetName] of trees) {
     const source = resolve(pkg, 'dist', sourceName)
     const target = join(resources, targetName)
@@ -30,7 +31,7 @@ export function verifyResources(pkg, resources, fail) {
     for (const file of staged) {
       const packaged = join(target, relative(source, file))
       if (!existsSync(packaged)) fail(`missing ${relative(resources, packaged)}.`)
-      else if (sha256(file) !== sha256(packaged)) fail(`packaged bytes differ: ${relative(resources, packaged)}.`)
+      else if (sha256(file) !== sha256(packaged) && !rewritten(packaged)) fail(`packaged bytes differ: ${relative(resources, packaged)}.`)
     }
     console.log(`[verify] ${targetName}: checked ${staged.length} files`)
   }

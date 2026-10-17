@@ -36,12 +36,13 @@ has no built-in x64 emulation. Nothing publishes them, and nothing signs them be
 `apps/desktop/src-tauri/tauri.linux.conf.json` selects AppImage only. The shell looks for its Node
 beside its own executable, so a `.deb` would install the runtime as `/usr/bin/node` over the system's
 Node. Inside the AppImage the runtime is `usr/bin/node` and the resources are under `usr/lib/acorn`.
-The bundle step sets `NO_STRIP` so the AppImage tool leaves the verified Node bytes alone.
+The bundle step sets `NO_STRIP` so the AppImage tool doesn't strip the binaries it packs. It still
+rewrites each ELF binary's library search path, Node's included, so none of them keep the staged bytes.
 
 The target needs Git on `PATH`, WebKitGTK 4.1, and a running Secret Service such as GNOME Keyring for
 the keychain. A desktop Ubuntu install has all three except Git.
 
 Linux distribution verification extracts the AppImage into a temporary directory, compares its
-resources with staging, checks the Node version and digest, and runs the helper boot test against the
-extracted copy. Like the Windows check, it doesn't drive the window or test connections between
+resources with staging byte for byte except for ELF binaries, checks the Node version, and runs the
+helper boot test against the extracted copy. Like the Windows check, it doesn't drive the window or test connections between
 machines. Child webviews on WebKitGTK are unmeasured ([webviews](webviews.md)).

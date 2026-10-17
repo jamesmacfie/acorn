@@ -111,8 +111,8 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Linux only: stops the AppImage tool stripping the bundled Node, which the verify step
-          # compares byte for byte against the download it checked.
+          # Linux only: stops the AppImage tool stripping the binaries it packs. It still rewrites
+          # their library search path, so the verify step checks Node by version, not by digest.
           NO_STRIP: 'true'
         run: pnpm --filter @acorn/desktop run dist --prebuilt
 
