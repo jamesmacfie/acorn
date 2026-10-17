@@ -335,21 +335,16 @@ describe('resident segments', () => {
     const again = mount(largeDiffSource(files), first.client)
     await vi.waitFor(() => expect(tokenizer.calls).toBeGreaterThan(stalled), { timeout: 5_000 })
     const cache = segmentCacheFor(again.client)
-    // Waited for rather than read after one settle: under a loaded test run, the segments the
-    // fallback coloured are still being re-tokenized when the first new call lands.
+    // The segment at the top, which every visit draws. A pane colours only what is on screen or near
+    // it, so a segment the first pane reached further down keeps its fallback until someone scrolls
+    // to it, and under a loaded test run the first pane can reach further than the second.
+    const [file] = largeDiffSource(files).topology()!.files
+    const top = residentKey(segmentContentKey(file!.patchKey!, 0), file!.path, file!.sha)
     await vi.waitFor(
       () => {
-        const coloured = largeDiffSource(files)
-          .topology()!
-          .files.flatMap((file) =>
-            file.segments
-              .map((_, ordinal) =>
-                cache.peek(residentKey(segmentContentKey(file.patchKey!, ordinal), file.path, file.sha)),
-              )
-              .filter((entry) => entry?.enriched),
-          )
-        expect(coloured.length).toBeGreaterThan(0)
-        expect(coloured.every((entry) => entry!.provisional === false)).toBe(true)
+        const entry = cache.peek(top)
+        expect(entry?.enriched).toBeTruthy()
+        expect(entry?.provisional).toBe(false)
       },
       { timeout: 10_000 },
     )

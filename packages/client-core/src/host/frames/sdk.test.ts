@@ -797,12 +797,16 @@ describe('telemetry and log', () => {
     const span = acorn.telemetry.startSpan('reindex', { pages: 4 })
     span.end('error')
     span.end()
-    await new Promise((r) => setTimeout(r, 0))
-    const records = sent
-      .filter((message) => message.kind === 'telemetry')
-      .map((message) => message.record as { name: string; status: string; attrs: unknown })
-    expect(records).toHaveLength(1)
-    expect(records[0]).toMatchObject({ name: 'reindex', status: 'error', attrs: { pages: 4 } })
+    // A port delivers in order, so a second `reindex` would land before this marker does. One timer
+    // tick isn't long enough to wait: a loaded machine can deliver the message later than that.
+    acorn.telemetry.startSpan('marker').end()
+    const records = () =>
+      sent
+        .filter((message) => message.kind === 'telemetry')
+        .map((message) => message.record as { name: string; status: string; attrs: unknown })
+    await vi.waitFor(() => expect(records().at(-1)).toMatchObject({ name: 'marker' }))
+    expect(records()).toHaveLength(2)
+    expect(records()[0]).toMatchObject({ name: 'reindex', status: 'error', attrs: { pages: 4 } })
   })
 
   it('prints a log line as well as sending it, because collection is off by default', async () => {
