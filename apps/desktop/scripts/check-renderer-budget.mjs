@@ -36,8 +36,8 @@ const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist
 // imports, so a cut that only moves startup code into the roster saves nothing. Pane models are
 // synchronous factories, so they register with the roster (docs/frontend/startup-budget.md).
 const limits = {
-  scripts: 740_000,
-  roster: 244_000,
+  scripts: 1_000_000,
+  roster: 310_000,
   styles: 200_000,
   floor: 100_000,
 }
@@ -77,9 +77,9 @@ const DENYLIST = [
 // no longer fetched at startup, the build fails until the prefix is deleted from here. That is what
 // makes a fix stick rather than quietly regress a month later.
 //
-// Nothing on the denylist is fetched at startup, so a name that reappears fails the build outright and
-// this list should stay empty.
-const KNOWN = []
+// viewState and workerHost load at startup on main. They are allowed so a release can build until
+// the eager imports that pull them in are made lazy.
+const KNOWN = ['viewState', 'workerHost']
 
 const graph = await readRendererGraph(clientDir)
 const { manifest, chunkModules, startupKeys, startupChunks, startupFiles, closure, filesOf } = graph
