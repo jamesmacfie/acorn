@@ -1,4 +1,4 @@
-import { Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
+import { Index, Match, Show, Switch, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
 import type { ProjectSite } from '@acorn/protocol/siteAssociations.ts'
 import type {
@@ -14,7 +14,8 @@ import type {
   BridgeWorkspace,
 } from '@acorn/protocol/extensionBridge.ts'
 import type { BrowserPanelView } from '@acorn/protocol/plugin/handoffs.ts'
-import { Tabs, type TabDef } from '@acorn/client-core/kit/components/layout'
+import type { RailMarker } from '@acorn/client-core/features/tabs'
+import { RailTab } from '@acorn/client-core/features/tabs/RailTab.tsx'
 import { Button } from '@acorn/client-core/kit/components/primitives.tsx'
 import { agentRailMarkers } from '@acorn/plugin-agents/contract/runtimeState.ts'
 import type { BrowserApi } from '../browser'
@@ -397,34 +398,37 @@ export function Workspace(props: {
   })
   onCleanup(() => props.heading(null))
 
-  // The task's tabs: Agents always, Runs while the Node runs workflows, and each plugin with a panel
-  // for the task. The open tab stays drawn while its view loads, so it doesn't vanish under the person.
-  const taskTabs = (): TabDef[] => {
+  // The task's tabs, as the desktop's pane rail draws them: Agents always, Runs while the Node runs
+  // workflows, and each plugin with a panel for the task. The open tab stays drawn while its view
+  // loads, so it doesn't vanish under the person. A conversation marks the tab it came from.
+  const railTab = (): TaskTab | null => {
+    const here = location()
+    return here.level === 'conversation' ? here.from : tab()
+  }
+  const taskTabs = (): { id: TaskTab; label: string; glyph: string; markers?: RailMarker[] }[] => {
     const id = taskId()
-    const open = tab()
+    const open = railTab()
     if (!id) return []
     const { waiting, working } = agentCounts(id, sessionLists()[id], props.requests)
-    const agentMarker = agentRailMarkers({ working, attention: waiting })[0]
     return [
-      {
-        id: 'agents',
-        label: 'Agents',
-        icon: 'bot',
-        marker: agentMarker && {
-          icon: agentMarker.icon!,
-          tone: agentMarker.tone,
-          spin: agentMarker.busy,
-          label: agentMarker.label,
-        },
-      },
+      { id: 'agents', label: 'Agents', glyph: 'bot', markers: agentRailMarkers({ working, attention: waiting }) },
       ...(runsAvailable() || open === 'runs'
         ? [
             {
-              id: 'runs',
+              id: 'runs' as const,
               label: 'Runs',
-              icon: 'workflow',
-              marker: runsLive(runLists()[id])
-                ? { icon: 'loader-circle', tone: 'accent' as const, spin: true, label: 'A run is running' }
+              glyph: 'workflow',
+              markers: runsLive(runLists()[id])
+                ? [
+                    {
+                      id: 'running',
+                      icon: 'loader-circle',
+                      tone: 'accent' as const,
+                      busy: true,
+                      label: 'A run is running',
+                      placements: ['top-end' as const],
+                    },
+                  ]
                 : undefined,
             },
           ]
@@ -432,10 +436,10 @@ export function Workspace(props: {
       ...(props.panels ?? [])
         .filter((panel) => panelViews()[panel.pluginId] || open === `panel:${panel.pluginId}`)
         .map((panel) => ({
-          id: `panel:${panel.pluginId}`,
+          id: `panel:${panel.pluginId}` as const,
           label: panel.label,
-          icon: panel.glyph ?? PANEL_GLYPH,
-          marker: panelMarker(panelViews()[panel.pluginId]),
+          glyph: panel.glyph ?? PANEL_GLYPH,
+          markers: panelMarker(panelViews()[panel.pluginId]),
         })),
     ]
   }
@@ -610,15 +614,6 @@ export function Workspace(props: {
         switchNode={nav.openSettings}
       />
       <Show when={location().level !== 'settings'}>
-        <Show when={location().level === 'task'}>
-          <Tabs
-            idPrefix="task"
-            ariaLabel="Task"
-            tabs={taskTabs()}
-            active={tab() ?? 'agents'}
-            onChange={(id) => nav.pickTab(id as TaskTab)}
-          />
-        </Show>
         <Show when={pageStrip()}>
           {(strip) => {
             const shown = strip()
@@ -800,6 +795,24 @@ export function Workspace(props: {
             )}
           </Match>
         </Switch>
+        {/* The desktop's pane rail, laid along the bottom edge. Last, so the view comes first in tab order. */}
+        <Show when={taskId()}>
+          <nav class="rail" aria-label="Task">
+            {/* By position, so a tab whose marker changes keeps its button rather than redrawing it. */}
+            <Index each={taskTabs()}>
+              {(each) => (
+                <RailTab
+                  glyph={each().glyph}
+                  label={each().label}
+                  active={railTab() === each().id}
+                  markers={each().markers}
+                  aria-current={railTab() === each().id ? 'page' : undefined}
+                  onClick={() => nav.pickTab(each().id)}
+                />
+              )}
+            </Index>
+          </nav>
+        </Show>
       </Show>
     </>
   )

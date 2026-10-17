@@ -775,6 +775,18 @@ describe('moving between task pages', () => {
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 
+  it("keeps the task's rail under a conversation, marking the tab it came from", async () => {
+    const { fake, root } = twoTasks()
+    await switchTo(fake, PAGE)
+    await openChat(root, 'Chat s2')
+    expect(shownTab(root)).toBe('Agents')
+    await tab(root, 'Runs')
+    expect(conversationTitle(root)).toBeNull()
+    expect(shownTask(root)).toBe('Fix the flaky test')
+    expect(shownTab(root)).toBe('Runs')
+    expect(fake.storage.get('taskViews:n1')).toEqual({ 't-new': { tab: 'runs' } })
+  })
+
   it.each([
     ['its own task', ITEM_1, null],
     ["another task's", PAGE, 'This page is in Fix the flaky testSwitch'],

@@ -30,17 +30,23 @@ export async function openSettings(root: ParentNode) {
   await click(button(header(root), 'Settings'), 'Settings button')
 }
 
-// Picks a tab under the open task: Agents, Runs, or a plugin's panel.
-export const tab = (root: ParentNode, label: string) =>
-  click(button(root.querySelector('[role="tablist"][aria-label="Task"]') ?? root, label), `${label} tab`)
+// The open task's rail along the bottom edge.
+const rail = (root: ParentNode) => root.querySelector('nav[aria-label="Task"]')
 
-// The tabs under the open task, by label.
+// Picks one of the open task's tabs on the rail: Agents, Runs, or a plugin's panel.
+export const tab = (root: ParentNode, label: string) => click(button(rail(root) ?? root, label), `${label} tab`)
+
+// The open task's tabs on the rail, by label.
 export const taskTabs = (root: ParentNode) =>
-  [...root.querySelectorAll('[role="tablist"][aria-label="Task"] [role="tab"]')].map((tab) => tab.textContent)
+  [...(rail(root)?.querySelectorAll('button') ?? [])].map((tab) => tab.getAttribute('aria-label'))
 
 // The open task's selected tab, by label.
 export const shownTab = (root: ParentNode) =>
-  root.querySelector('[role="tablist"][aria-label="Task"] [aria-selected="true"]')?.textContent ?? null
+  rail(root)?.querySelector('[aria-current="page"]')?.getAttribute('aria-label') ?? null
+
+// What a tab's markers say, in words, or null when it has none.
+export const tabMarker = (root: ParentNode, label: string) =>
+  button(rail(root) ?? root, label)?.querySelector('.sr-only')?.textContent ?? null
 
 // Settings' row for a paired Node, by its name.
 export const nodeRow = (root: ParentNode, label: string) =>
@@ -119,7 +125,7 @@ export const chatRows = (root: ParentNode) => [
 // Opens a conversation from the open task's Agents tab, going back to it first when one is open.
 export async function openChat(root: ParentNode, title: string) {
   if (root.querySelector('[aria-label="Conversation"]')) await back(root)
-  if (!root.querySelector('[aria-label="Agents"]')) await tab(root, 'Agents')
+  if (!root.querySelector('.view[aria-label="Agents"]')) await tab(root, 'Agents')
   await click(
     chatRows(root).find((row) => row.querySelector('.row-title')?.textContent === title),
     `conversation row ${title}`,
@@ -140,9 +146,9 @@ export const stepRows = (root: ParentNode, run?: string) => [
 export const idle = (root: ParentNode) =>
   root.querySelector('[aria-label="Home"] [aria-label="Tasks"]') !== null &&
   root.querySelector('[aria-label="This page"]') === null
-// The task the top bar names, with its tabs under it.
+// The task the top bar names, with its rail under it.
 export const shownTask = (root: ParentNode) =>
-  root.querySelector('[role="tablist"][aria-label="Task"]')
+  rail(root) && !root.querySelector('[aria-label="Conversation"]')
     ? (header(root).querySelector('.heading .title')?.textContent ?? null)
     : null
 // An open conversation's title, as the top bar names it.

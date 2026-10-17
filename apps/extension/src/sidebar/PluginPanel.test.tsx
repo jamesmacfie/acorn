@@ -173,8 +173,8 @@ describe('plugin panels', () => {
   it("draws the plugin's logo on its tab when the glyph names it", async () => {
     const { root } = mount(undefined, 'M2 2h20v20H2z')
     await settle(30)
-    const runn = root.querySelector('[role="tablist"][aria-label="Task"] [role="tab"]:last-child')!
-    expect(runn.textContent).toBe('Runn')
+    const runn = root.querySelector('nav[aria-label="Task"] button:last-child')!
+    expect(runn.getAttribute('aria-label')).toBe('Runn')
     expect(runn.querySelector('path')?.getAttribute('d')).toBe('M2 2h20v20H2z')
   })
 
@@ -218,12 +218,13 @@ describe('plugin panels', () => {
   it('marks the tab while the header says something is wrong', async () => {
     const { fake, state, root } = mount()
     await settle(30)
-    const runnTab = () => [...root.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent === 'Runn')!
-    expect(runnTab().querySelector('[aria-label="Needs attention"]')).toBeNull()
+    const runnTab = () => root.querySelector('nav[aria-label="Task"] [aria-label="Runn"]')!
+    expect(runnTab().querySelector('.tabrail-marker')).toBeNull()
     state.views.t1 = view('web', 'danger')
     await openPanel(root)
     await tasksChanged(fake)
-    expect(runnTab().querySelector('[aria-label="Needs attention"]')!.getAttribute('data-tone')).toBe('danger')
+    expect(runnTab().querySelector('.tabrail-marker')!.getAttribute('data-tone')).toBe('danger')
+    expect(runnTab().querySelector('.sr-only')!.textContent).toBe('Needs attention')
     expect(panel(root)!.querySelector('.panel-head .ui-badge')!.getAttribute('data-tone')).toBe('danger')
   })
 

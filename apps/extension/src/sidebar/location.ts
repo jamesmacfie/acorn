@@ -91,13 +91,14 @@ export function createLocation(options: {
     followPage,
     openSettings: () => go({ level: 'settings' }),
 
-    // The person picked a tab under the task, which the task opens on next time.
+    // The person picked one of the task's tabs, from the task or a conversation in it. The task opens
+    // on that tab next time.
     pickTab(tab: TaskTab) {
       const here = location()
-      if (here.level !== 'task' || !nodeId) return
+      if ((here.level !== 'task' && here.level !== 'conversation') || !nodeId) return
       taskViews = rememberTaskView(taskViews, here.taskId, { tab })
       void saveTaskViews(storage, nodeId, taskViews)
-      go({ ...here, tab })
+      go(taskAt(here.taskId, tab))
     },
 
     // Up one level: a conversation to the tab it came from, a task or Settings to Home.

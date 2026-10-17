@@ -80,8 +80,31 @@ ul { list-style: none; margin: 0; padding: 0; }
 .go-to-task-lead { flex: none; display: inline-flex; width: 1em; padding-inline-start: var(--space-2); color: var(--text-muted); }
 .go-to-task .repo-picker-footer { gap: var(--space-3); padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6); font-size: var(--fs-sm); }
 .go-to-task .repo-picker-footer .dot { width: 7px; height: 7px; }
-/* A task's tabs stay under the bar as the view scrolls. */
-main > .ui-tabs { position: sticky; top: var(--pane-head-h); z-index: var(--z-sticky); background: var(--bg-subtle); }
+/* A task's tabs: the desktop's pane rail on its side, pinned to the bottom edge, with the same square
+ * boxes, a divider after each, and the active stripe on top. The body leaves room for the rail, and
+ * the composer sticks just above it. */
+body:has(.rail) { padding-bottom: var(--pane-head-h); }
+body:has(.rail) .composer { bottom: var(--pane-head-h); }
+.rail {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  height: var(--pane-head-h);
+  border-top: var(--chrome-divider);
+  background: var(--bg-subtle);
+}
+.rail .tabrail-tab {
+  width: var(--tabrail-w);
+  height: 100%;
+  padding: 0;
+  border-radius: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-right: var(--divider);
+  border-top: var(--stripe-w) solid transparent;
+}
+.rail .tabrail-tab.active { border-top-color: var(--rail-accent, var(--accent)); }
 
 /* One line under the bars when the page isn't what the panel shows, or the Node is offline. */
 .strip { display: flex; align-items: center; gap: var(--space-3); min-height: 38px; padding: var(--space-2) var(--space-4) var(--space-2) var(--space-6); border-bottom: var(--chrome-divider); font-size: var(--fs-sm); }
