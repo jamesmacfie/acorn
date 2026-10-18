@@ -11,7 +11,7 @@ sources:
   - packages/client-core/src/features/settings/nodes/NodePairingCode.tsx
   - packages/client-core/src/host/trust/PairingRequestDialog.tsx
   - packages/custody/src/local/pair.ts
-checked: 07aa959a0
+checked: '6d26989c5'
 ---
 
 Pairing gives a client, such as the desktop app on your laptop, a token for a Node on another machine.
