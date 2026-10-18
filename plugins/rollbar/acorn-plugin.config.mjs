@@ -109,16 +109,20 @@ export default {
       onSelect: { verb: 'navigate', surface: 'rollbar-item' },
     }],
     // The browser extension's "Open in Acorn" on an item (docs/integrations/rollbar.md § Browser
-    // handoff). Only Rollbar's permalink, which names the item by its system-wide id, the same address
-    // normalize.ts gives every item. The route asks each connection for that id and takes the project
-    // counter from Rollbar's answer, never from the address. The grammar allows the trailing slash.
+    // handoff). Rollbar's permalink names the item by its system-wide id, the address normalize.ts
+    // gives every item. The signed-in account address, where the permalink lands, names it by a
+    // project's name and that project's counter, so the route asks only the connection for that
+    // project. The grammar allows the trailing slash.
     //
     // No anchors: the item view needs a signed-in session, and no selector has been checked against
     // it, so the extension offers the handoff in its sidebar instead of guessing where a button goes.
     browserHandoffs: [{
       id: 'item',
       label: 'Open in Acorn',
-      match: ['https://rollbar.com/item/{itemId}'],
+      match: [
+        'https://rollbar.com/item/{itemId}',
+        'https://app.rollbar.com/a/{account}/fix/item/{project}/{counter}',
+      ],
       anchors: [],
       resolve: '/v1/p/rollbar/browser/item',
     }],

@@ -64,26 +64,33 @@ an error. [From the command palette](../integrations.md#from-the-command-palette
 ## Browser handoff
 
 Rollbar declares an item handoff for the [browser extension](../browser-extension/handoffs.md) in its
-manifest's `browserHandoffs`. It matches only Rollbar's permalink, `rollbar.com/item/<id>/`, with or
-without the trailing slash. That address names the item by Rollbar's system-wide id, the same
-address the plugin gives every item. The number isn't the project counter (`#142`) that the rail and
-task links use. The two differ, and the route never treats one as the other. The handoff has no
-anchors, so the extension offers it in the sidebar beside the page. Rollbar's item view needs a
-signed-in session, and no selector has been checked against it.
+manifest's `browserHandoffs`. It matches two addresses, each with or without the trailing slash:
 
-Signed out, Rollbar redirects the permalink to its login page, so the tab never stays on the item.
-Signed in, the permalink probably moves to an account address like
-`app.rollbar.com/a/<account>/fix/item/<project>/<counter>`. That form names a project slug and a
-counter, which the plugin can't map to a connection, so it isn't matched. Adding it needs a
-fixture-backed way to resolve the slug, not a guess.
+- Rollbar's permalink, `rollbar.com/item/<id>/`. It names the item by Rollbar's system-wide id, the
+  same address the plugin gives every item.
+- The signed-in account address the permalink lands on,
+  `app.rollbar.com/a/<account>/fix/item/<project>/<counter>`. It names the item by the project's
+  name and the project counter (`#142`) that the rail and task links use.
+
+The id and the counter differ, and the route never treats one as the other. The handoff has no
+anchors, so the extension offers it in the sidebar beside the page. Rollbar's item view needs a
+signed-in session, and no selector has been checked against it. Signed out, Rollbar redirects both
+addresses to its login page.
 
 `POST /v1/p/rollbar/browser/item`, in `plugins/rollbar/src/server/browserHandoff.ts`, reads the item
-through the `rollbar.items` resource with `{ kind: 'item', itemId }`, which asks Rollbar's
-`/item/<id>`. The provider router in `plugins/rollbar/src/server/routes/rollbar.ts` serves it, because
-that router answers every path under `/v1/p/rollbar` over HTTP. A connection is one project, so the
-route asks every connection that isn't disabled, with a fresh read. A deleted item or a rejected token
-then isn't hidden by the cache. A connection counts only when Rollbar's id for the answer is the
-page's. Each connection that counts is one item, and the person picks one. The read stores the item
+through the `rollbar.items` resource. The provider router in `plugins/rollbar/src/server/routes/rollbar.ts`
+serves it, because that router answers every path under `/v1/p/rollbar` over HTTP. Every read is
+fresh, so a deleted item or a rejected token isn't hidden by the cache.
+
+- For a permalink, the route reads `{ kind: 'item', itemId }`, which asks Rollbar's `/item/<id>`. A
+  connection is one project, so the route asks every connection that isn't disabled. A connection
+  counts only when Rollbar's id for the answer is the page's.
+- For an account address, the route reads `{ kind: 'detail', identifier: counter }`, which asks
+  Rollbar's `/item_by_counter/<counter>`. A counter means something only inside its project, so the
+  route asks only connections whose project name, recorded from Rollbar when the token was checked,
+  is the address's project. When none is, it answers 404 and names the project.
+
+Each connection that counts is one item, and the person picks one. The read stores the item
 under the counter Rollbar answered with, in the one item cache, so the occurrence reads that follow
 find its id there.
 

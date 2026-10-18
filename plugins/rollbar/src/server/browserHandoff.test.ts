@@ -8,7 +8,13 @@ import { createBrowserHandoffHandler, projectsMappingConnection } from './browse
 import { normalizeOccurrence } from './normalize'
 
 const connection = (id: string, project: string, status = 'connected') =>
-  ({ id, label: `Rollbar · ${project}`, name: null, status }) as StoredConnection
+  ({
+    id,
+    label: `Rollbar · ${project}`,
+    name: null,
+    status,
+    account: JSON.stringify({ id: '7', label: project, type: 'project' }),
+  }) as StoredConnection
 
 // The system id and the project counter differ on purpose, so a swap of one for the other shows.
 const item = (overrides: Partial<RollbarItemMetadata> = {}): RollbarItemMetadata => ({
@@ -128,6 +134,40 @@ describe('the Rollbar item handoff', () => {
     expect(matchHandoffPage(handoff, 'https://rollbar.com/item/999')).toEqual({ itemId: '999' })
     expect(matchHandoffPage(handoff, 'https://rollbar.com/item/999/occurrences/')).toBeNull()
     expect(matchHandoffPage(handoff, 'https://rollbar.com/acme/web/items/142/')).toBeNull()
+  })
+
+  it('declares the signed-in account address, by project name and counter', () => {
+    expect(matchHandoffPage(handoff, 'https://app.rollbar.com/a/acme/fix/item/web/142#detail')).toEqual({
+      account: 'acme',
+      project: 'web',
+      counter: '142',
+    })
+    expect(matchHandoffPage(handoff, 'https://app.rollbar.com/a/acme/fix/items')).toBeNull()
+  })
+
+  it('reads an account address by counter from the named project only', async () => {
+    const { response, asked } = await resolve({
+      connections: [connection('c-api', 'api'), connection('c-web', 'web')],
+      reads: { 'c-web': found(item()) },
+      url: 'https://app.rollbar.com/a/acme/fix/item/web/142',
+    })
+    expect(response.status).toBe(200)
+    const { items } = browserHandoffResolution.parse(await response.json())
+    expect(items.map((candidate) => [candidate.connection.id, candidate.identifier])).toEqual([['c-web', '#142']])
+    expect(asked.filter((request) => request.resourceId === 'rollbar.items')).toEqual([
+      expect.objectContaining({ connectionId: 'c-web', input: { kind: 'detail', identifier: '142' } }),
+    ])
+  })
+
+  it("says so when an account address names a project Acorn isn't connected to", async () => {
+    const { response, asked } = await resolve({
+      connections: [connection('c-web', 'web')],
+      reads: { 'c-web': found(item()) },
+      url: 'https://app.rollbar.com/a/acme/fix/item/api/142',
+    })
+    expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ error: { message: expect.stringContaining('api') } })
+    expect(asked).toEqual([])
   })
 
   it('answers the item with its own counter, its connection, mapped projects, the rail seed, and context', async () => {
