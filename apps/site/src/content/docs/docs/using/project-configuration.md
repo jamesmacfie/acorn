@@ -7,7 +7,7 @@ sources:
   - docs/frontend/settings-groups.md
   - packages/node-core/src/server/projects/runConfig.ts
   - packages/client-core/src/features/settings/trust/ConfigTrustDialog.tsx
-checked: 90ded85ca
+checked: '1d9bd200d'
 ---
 
 This page covers `.acorn/config.toml`: what a repository can set for acorn, how it combines with the

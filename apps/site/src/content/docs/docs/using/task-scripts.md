@@ -10,7 +10,7 @@ sources:
   - packages/client-core/src/features/settings/ProjectConfigTabs.tsx
   - packages/client-core/src/features/tasks/taskScripts.ts
   - apps/desktop/src/client/TaskView.tsx
-checked: 90ded85ca
+checked: '1d9bd200d'
 ---
 
 This page covers a project's setup and teardown scripts: what they're for, where you set them, how to
