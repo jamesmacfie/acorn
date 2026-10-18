@@ -27,7 +27,7 @@ covers:
   - agent-tools
   - agent-mcp-servers
   - agent-limits
-checked: 52225e24f
+checked: '252cc2937'
 ---
 
 This page lists every setting in **Settings** > **Agents**. Every page here is stored on the Node, so

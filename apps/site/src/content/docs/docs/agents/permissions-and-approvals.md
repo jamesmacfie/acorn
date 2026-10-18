@@ -10,7 +10,7 @@ sources:
   - plugins/agents/src/client/sessions/AgentRequestCard.tsx
   - plugins/agents/src/server/drivers/codexConfiguration.ts
   - packages/protocol/src/agents/toolPermissions.ts
-checked: 52225e24f
+checked: '252cc2937'
 ---
 
 This page covers what decides whether an agent may act on its own: the harness's permission mode,
