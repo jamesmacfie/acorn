@@ -3,8 +3,8 @@
 // to a file the agent can read with its own file tool.
 import { lstatSync, mkdirSync, writeFileSync } from 'node:fs'
 import { lstat, readdir, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { toolOutputRoot } from './toolOutputDir'
 
 // 32 KiB is about 8,000 tokens, well under the 25,000 past which Claude Code cuts a result's end.
 const HEAD_BYTES = 24 * 1024
@@ -16,12 +16,6 @@ const KEEP_MS = 7 * 24 * 60 * 60 * 1000
 const NEWLINE = 0x0a
 // A UTF-8 continuation byte, which a cut must not start or end on.
 const isContinuation = (byte: number | undefined) => byte !== undefined && (byte & 0xc0) === 0x80
-
-const toolOutputRoot = () => join(tmpdir(), 'acorn-tool-output')
-
-/** Where a task's full tool results go. The node and the MCP child share `TMPDIR` through the task
- *  environment, so both name the same folder. */
-export const toolOutputDir = (taskId: string) => join(toolOutputRoot(), taskId)
 
 /** Creates the folder if it's missing, and throws unless it's a real folder, not a link, that this
  *  user owns and nobody else can open. Linux's temp folder is shared, so another user could create a

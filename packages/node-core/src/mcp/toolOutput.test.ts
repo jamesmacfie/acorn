@@ -11,7 +11,8 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { capToolText, sweepToolOutput, toolOutputDir } from './toolOutput'
+import { capToolText, sweepToolOutput } from './toolOutput'
+import { toolOutputDir } from './toolOutputDir'
 
 // `os.tmpdir()` reads TMPDIR on every call, so pointing it at a scratch folder keeps these tests out of
 // the real temp folder.

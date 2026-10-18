@@ -192,7 +192,7 @@ export {
   serverName,
 } from '@acorn/node-core/server/mcpRegister.ts'
 export { encodeFileGuardPolicy, FILE_GUARD_MATCHER, type FileGuardPolicy } from '@acorn/node-core/mcp/fileGuard.ts'
-export { toolOutputDir } from '@acorn/node-core/mcp/toolOutput.ts'
+export { toolOutputDir } from '@acorn/node-core/mcp/toolOutputDir.ts'
 export type { Argv, Launcher, McpCommands } from '@acorn/node-core/server/mcpRegister.ts'
 
 // ── Agent tools ───────────────────────────────────────────────────────────────────────────────
