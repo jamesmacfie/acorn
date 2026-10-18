@@ -497,13 +497,9 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [keeping the machine awake](./future/node-tray/07-keep-awake.md), and [acceptance on real
   machines](./future/node-tray/08-acceptance.md).
 
-## Lessons from OpenCode proposal
+## OpenCode harness proposal
 
-- [Lessons from OpenCode](./future/opencode/README.md), with phases for [a tool result
-  cap](./future/opencode/01-tool-result-cap.md), [memory updates](./future/opencode/02-memory-updates.md),
-  [the script tool spike](./future/opencode/03-script-tool-spike.md), [the script
-  tool](./future/opencode/04-script-tool.md), and [the OpenCode
-  harness](./future/opencode/05-opencode-harness.md).
+- [OpenCode as a contributed harness](./future/opencode.md), postponed.
 
 ## Performance measurement proposal
 
