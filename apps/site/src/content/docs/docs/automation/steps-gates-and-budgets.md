@@ -12,7 +12,7 @@ sources:
   - plugins/terminal/src/server/workflowSteps.ts
   - plugins/database/src/server/workflowSteps.ts
   - plugins/http/src/server/workflowStep.ts
-checked: dd67cf0fd
+checked: '56e2dcf53'
 ---
 
 This page covers what each kind of step does, and how steps fit together: the order they run in,
