@@ -7,7 +7,7 @@ sources:
   - docs/integrations/sentry.md
   - plugins/sentry-telemetry/src/tree/settings.tsx
   - plugins/sentry-telemetry/src/shared/settings.ts
-checked: 52225e24f
+checked: 'c69c132e2'
 ---
 
 This page covers acorn's telemetry: the timings, logs, and errors it can collect about itself, the
