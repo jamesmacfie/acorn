@@ -33,7 +33,6 @@ or writing a [task script](/docs/using/task-scripts/).
 | `ACORN_ADVERTISE_HOST` | The addresses other machines reach the Node at, separated by commas, such as `192.168.1.20,build.local`. With it set, the Node listens on every interface and answers those names and loopback. It wins over the answer the Node recorded on its first start ([Pair a device or a remote Node](/docs/nodes/pair-a-device-or-a-remote-node/#let-other-machines-reach-the-node)). |
 | `ACORN_BUNDLED_PLUGINS_DIR` | A folder of built plugin packages a standalone Node installs and keeps up to date at every start, the way the desktop app does with the plugins it ships. For running from a checkout. |
 | `ACORN_PERF` | `1` prints each request's timing, and timing tables for Git and the databases, to the Node's error output. `kill -USR2 <pid>` prints the tables again. |
-| `ACORN_DEVICE_TOKEN` | A device token a launcher already holds. A standalone Node started in a terminal prints it back in its first line while it's still valid, instead of making a new one. |
 | `SESSION_ENC_KEY` | The 64-character hexadecimal key the Node encrypts stored credentials with. Without it, a standalone Node makes one and keeps it in `session.key` in its data folder. |
 | `GITHUB_CLIENT_ID` | The GitHub OAuth app the Node signs in with, in place of acorn's own. |
 | `GITLAB_CLIENT_ID` | The gitlab.com OAuth application the Node signs in with a code through. Without it, GitLab connects with a personal access token only. |

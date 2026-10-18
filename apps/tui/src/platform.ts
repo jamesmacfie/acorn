@@ -191,8 +191,8 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
           label: fleet.get(handshake.nodeId)?.label ?? 'This computer',
           endpoint: handshake.endpoint,
           local: true,
-          ...(handshake.fingerprint ? { fingerprint: handshake.fingerprint } : {}),
-          ...(handshake.certPem ? { certPem: handshake.certPem } : {}),
+          fingerprint: handshake.fingerprint,
+          certPem: handshake.certPem,
         },
         handshake.deviceToken,
       )

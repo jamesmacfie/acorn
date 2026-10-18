@@ -21,12 +21,15 @@ The script does the following:
 1. Runs `pnpm pack:node` and builds the `acorn-node` image from `apps/node/Dockerfile`.
 2. Starts the `acorn-remote-node` container on `https://localhost:4317` with a throwaway data volume
    and `ACORN_ADVERTISE_HOST=localhost`. A container left from an earlier run is replaced.
-3. Creates a Git repository at `/srv/projects/sample` inside the container, a path no Mac has, and
-   adds it as a project. It uses the launcher token from the container's handshake line.
-4. Starts `pnpm dev:agent -- --session remote-check` and pairs that window to the container Node,
-   through the same probe and pair calls that Settings > Nodes makes. It checks that the certificate
-   the window reached is the one the container's handshake named.
-5. Prints one JSON line with `nodeId`, `label` (`Container Node`), `endpoint`, `projectId`, and
+3. Pairs itself as a device named `remote rig` with the code from the container's pairing banner. The
+   container's output carries no device token.
+4. Creates a Git repository at `/srv/projects/sample` inside the container, a path no Mac has, and
+   adds it as a project with the `remote rig` token.
+5. Starts `pnpm dev:agent -- --session remote-check`, opens a new pairing code with the `remote rig`
+   token, and pairs that window to the container Node through the same probe and pair calls that
+   Settings > Nodes makes. It checks that the certificate the window reached is the one the
+   container's handshake named.
+6. Prints one JSON line with `nodeId`, `label` (`Container Node`), `endpoint`, `projectId`, and
    `projectPath`, for a driver script to select the Node and project.
 
 Then drive the window with `pnpm dev:agent:ui -- --session remote-check`, as

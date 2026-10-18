@@ -1,10 +1,10 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { startControlPlaneStub, type ControlPlaneStub } from '@acorn/node-core/testkit'
+import { startStandalone, stopStandalone } from '../../helpers/standalone'
 
 // A real node, booted with the two environment variables set, enrolling with the fifty-line stub
 // (docs/node-enrollment.md).
@@ -17,66 +17,6 @@ import { startControlPlaneStub, type ControlPlaneStub } from '@acorn/node-core/t
 // the node appears in the stub's inventory, and with neither it writes nothing about a control plane at
 // all.
 
-const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
-const READY_BUDGET_MS = 90_000
-
-type Handshake = { nodeId: string; endpoint: string; fingerprint: string; deviceToken: string }
-
-function startNode(
-  dataDir: string,
-  extra: Record<string, string> = {},
-): { child: ChildProcess; ready: Promise<Handshake> } {
-  const child = spawn(process.execPath, ['--import', 'tsx', 'src/entries/standalone.ts'], {
-    cwd: appRoot,
-    env: {
-      ...process.env,
-      ACORN_DATA_DIR: dataDir,
-      SESSION_ENC_KEY: '0'.repeat(64),
-      GITHUB_CLIENT_ID: 'test-client',
-      ACORN_PORT: '',
-      ...extra,
-    },
-    stdio: ['ignore', 'pipe', 'pipe', 'ignore'],
-  })
-  child.stderr?.on('data', (chunk: Buffer) => console.error(`[standalone] ${chunk.toString().trimEnd()}`))
-  const ready = new Promise<Handshake>((resolveReady, reject) => {
-    const timer = setTimeout(() => reject(new Error('standalone printed no handshake line')), READY_BUDGET_MS)
-    timer.unref?.()
-    let buffered = ''
-    child.stdout?.on('data', (chunk: Buffer) => {
-      buffered += chunk.toString()
-      // The handshake is one line of JSON among free-form logging, so scan lines rather than assuming it
-      // arrives first or alone (standaloneShutdown.test.ts says the same).
-      for (const line of buffered.split('\n')) {
-        try {
-          const parsed = JSON.parse(line) as Partial<Handshake>
-          if (parsed.nodeId && parsed.endpoint && parsed.deviceToken) {
-            clearTimeout(timer)
-            resolveReady(parsed as Handshake)
-            return
-          }
-        } catch {
-          // not the contract line
-        }
-      }
-      buffered = buffered.slice(buffered.lastIndexOf('\n') + 1)
-    })
-    child.once('exit', (code) => reject(new Error(`standalone exited (${code}) before it was listening`)))
-  })
-  return { child, ready }
-}
-
-const stop = (child: ChildProcess): Promise<void> =>
-  new Promise((done) => {
-    const timer = setTimeout(() => done(), 25_000)
-    timer.unref?.()
-    child.once('exit', () => {
-      clearTimeout(timer)
-      done()
-    })
-    child.kill('SIGTERM')
-  })
-
 const identityOf = (dataDir: string) =>
   JSON.parse(readFileSync(join(dataDir, 'node.json'), 'utf8')) as Record<string, unknown>
 
@@ -86,7 +26,7 @@ describe('a standalone node enrolling with a control plane', () => {
   let stub: ControlPlaneStub | null = null
 
   afterEach(async () => {
-    if (child) await stop(child)
+    if (child) await stopStandalone(child, 25_000)
     child?.kill('SIGKILL')
     child = null
     await stub?.close()
@@ -98,7 +38,10 @@ describe('a standalone node enrolling with a control plane', () => {
   it('appears in the inventory, and records what it is attached to', async () => {
     stub = await startControlPlaneStub({ tokens: ['provisioned-once'], name: 'Stub Cloud' })
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-enrolled-'))
-    const node = startNode(dataDir, { ACORN_ENROLLMENT_TOKEN: 'provisioned-once', ACORN_CONTROL_PLANE_URL: stub.url })
+    const node = startStandalone(dataDir, {
+      ACORN_ENROLLMENT_TOKEN: 'provisioned-once',
+      ACORN_CONTROL_PLANE_URL: stub.url,
+    })
     child = node.child
     const handshake = await node.ready
 
@@ -121,7 +64,7 @@ describe('a standalone node enrolling with a control plane', () => {
   it('writes nothing about a control plane when nobody provisioned it', async () => {
     stub = await startControlPlaneStub({ tokens: ['unused'] })
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-unenrolled-'))
-    const node = startNode(dataDir)
+    const node = startStandalone(dataDir)
     child = node.child
     await node.ready
 

@@ -9,14 +9,20 @@ terminal client under one `acorn` launcher, shared chunks with the pure-JavaScri
 in, migrations, and a `package.json` naming the packages installed beside them: native modules and
 packages loaded at run time (`apps/node/externals.ts`). The tarball isn't an npm package, because native
 dependencies make a platform-specific artifact the safer unit.
+[Dependency security](./node-distribution/dependency-security.md) covers how those are pinned and checked.
 
 ## Runtime
 
 `apps/node/src/entries/` holds the three build entries, `standalone.ts`, `service.ts`, and `mcp.ts`, and
 `apps/node/src/composition/` holds what they share. The standalone entry uses `ACORN_DATA_DIR` or a local
-`.acorn` root, binds HTTPS with TLS 1.3, and prints one JSON handshake line with the `nodeId`, endpoint,
-certificate fingerprint and PEM, and a device token for the launcher or first client. It runs plugin
-initialization, reconciliation, the WebSocket listener, and a bounded shutdown.
+`.acorn` root, binds HTTPS with TLS 1.3, and runs plugin initialization, reconciliation, the WebSocket
+listener, and a bounded shutdown. Once it's listening, it prints one JSON handshake line on stdout with
+the `nodeId`, endpoint, and certificate fingerprint and PEM. A service manager keeps stdout in a log, so
+the handshake carries a device token only when a launcher sets `ACORN_LAUNCHER_PIPES=1`. The Node then
+reads the launcher's saved token from file descriptor 4, reuses it while it authenticates or issues a new
+device, and writes the handshake with `deviceToken` to file descriptor 3 instead of stdout.
+`acorn node start --background` and the terminal client launch this way, through `launchNode` in
+`@acorn/custody/local`. A Node started without the pipes issues no launcher device.
 
 Standalone and desktop-supervised Nodes boot through one function, `bootNode` in
 `apps/node/src/composition/boot.ts`, so they share the plugin graph, the reconcile sequence, and the
@@ -29,7 +35,8 @@ enrollment, the pairing banner, the handshake, and signals.
 
 After the handshake it prints a pairing banner: the address, the certificate fingerprint as six words,
 and a live pairing code. Compare those words with the ones acorn shows on its pairing screen, because
-that comparison is what makes pairing safe. A code opens automatically only while no device is paired.
+that comparison is what makes pairing safe. A code opens automatically only while no device is paired,
+lasts ten minutes, and allows five attempts, so a copy in a log exposes far less than a token would.
 `kill -USR1 <pid>` opens another without a restart. Windows has no `SIGUSR1`, so pairing a second device
 there means a restart.
 
@@ -175,26 +182,3 @@ POSIX permissions. On Windows they're advisory, so restrict the data root with a
 for a graceful drain: open task script waits abort, the listener closes, plugins dispose, SQLite closes,
 and the lock releases, within a 30-second deadline. A setup script that was waiting to start is recorded
 as interrupted by `shutdown`.
-
-## Dependency security policy
-
-The root `package.json` owns runtime dependency security overrides. `pnpm-workspace.yaml` repeats them,
-and `tools/arch/dependencySecurity.test.ts` rejects disagreement. The packer copies the policy into the
-generated npm manifest, because npm doesn't read pnpm's settings. For a direct dependency, npm's `$name`
-reference uses that dependency's declared patched range. Hono's catalog floor and other direct runtime
-floors move with the policy.
-
-`pnpm audit --prod` reports no advisories. When an advisory has no fixed release and Acorn doesn't call
-the affected code, `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml` lists it beside a comment that
-gives the reason and says when to remove it. A fix that ships replaces the entry.
-
-The root manifest's `acornStandalone` policy pins the keymap provider to the release tested in the
-workspace, and its optional Solid adapter peer follows the standalone Solid dependency through a
-package-specific override. The test checks the pin against the source declaration and the lockfile.
-
-The workspace lockfile pins exact versions and integrity hashes. npm can't read it, so the packer
-resolves an npm `package-lock.json` from the generated manifest and ships it in the archive. Every
-operator who runs `npm ci` gets the same versions, and npm checks each download against the recorded
-hash. The packer passes `--before` with the `minimumReleaseAge` from `pnpm-workspace.yaml`, so a version
-published within that window can't enter the lockfile. The npm lockfile is resolved when you pack,
-not copied from the pnpm one, so a range can pick a newer compatible version than the workspace tested.

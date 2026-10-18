@@ -80,5 +80,5 @@ draws the result.
 
 Runtime dependency security floors live in the root `package.json` overrides. The standalone packer
 carries them into npm's manifest, and `tools/arch/dependencySecurity.test.ts` checks that pnpm's
-runtime overrides agree. [Node distribution](../node-distribution.md#dependency-security-policy)
+runtime overrides agree. [Node distribution dependency security](../node-distribution/dependency-security.md)
 covers direct dependency references and the limits of a reproducible standalone install.

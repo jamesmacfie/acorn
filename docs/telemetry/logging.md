@@ -19,7 +19,8 @@ isn't.
 Everything else in the baseline writes something that isn't a log line:
 
 - `apps/node/src/entries/standalone.ts` and `apps/desktop/src/helper/helperMain.ts` write handshake
-  JSON a launcher parses off stdout.
+  JSON on stdout: the standalone Node's for a script when no launcher holds pipes, and the helper's for
+  the shell.
 - `apps/node/src/entries/standalone.ts`, `packages/custody/src/local/pair.ts`, and `apps/tui/src/node/open.ts`
   print a pairing banner for the person at that terminal.
 - `apps/tui/src/platform.ts` prints the data-root path, which is what "open the data folder" means in

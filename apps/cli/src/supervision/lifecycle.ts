@@ -1,15 +1,19 @@
 import { randomUUID } from 'node:crypto'
-import { spawn, type ChildProcess } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 import { chmodSync, closeSync, existsSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { createInterface } from 'node:readline'
-import type { Readable, Writable } from 'node:stream'
 import { setTimeout as delay } from 'node:timers/promises'
 import { NodeBroker } from '@acorn/custody/broker'
 import { probeNode } from '@acorn/custody/broker/nodePairing.ts'
-import { custody, dataRootDir, runningNode } from '@acorn/custody/local'
+import {
+  custody,
+  dataRootDir,
+  launchNode,
+  NodeStartTimeout,
+  runningNode,
+  type LaunchedNode,
+} from '@acorn/custody/local'
 import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { lockedBy } from '@acorn/node-core/server/storage'
-import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { NODE_PROTOCOL_VERSION, nodeInfoSchema } from '@acorn/protocol/node.ts'
 import { CliError } from '../error'
 import { standaloneEntry } from './entry'
@@ -27,15 +31,6 @@ const START_TIMEOUT_MS = 120_000
 const STOP_TIMEOUT_MS = 40_000 // Node drain is bounded at 30 seconds.
 const POLL_MS = 150
 
-type Handshake = {
-  baseline: string
-  protocolVersion: number
-  nodeId: string
-  endpoint: string
-  fingerprint: string
-  certPem: string
-  deviceToken: string
-}
 export type ServiceStatus = {
   apiVersion: 'acorn.cli/v1'
   kind: 'NodeService'
@@ -200,66 +195,29 @@ function launch(
   logFd: number,
   instanceId: string,
   previousToken?: string,
-): { child: ChildProcess; handshake: Promise<Handshake> } {
-  const entry = standaloneEntry()
-  const child = spawn(entry.command, entry.args, {
-    ...(entry.cwd ? { cwd: entry.cwd } : {}),
-    detached: true,
+): LaunchedNode {
+  const launched = launchNode({
+    entry: standaloneEntry(),
+    dataDir: root,
+    previousToken,
     env: {
-      ...process.env,
-      ACORN_DATA_DIR: root,
       ACORN_CLI_BACKGROUND: '1',
       ACORN_CLI_SERVICE_ID: instanceId,
       ACORN_CLI_LOG_PATH: logPath,
-      ACORN_DEVICE_TOKEN: undefined,
       ACORN_ADVERTISE_HOST: undefined,
     },
     // The inherited fd captures module-load failures before the entry can install its bounded
     // logger. Normal logs are intercepted by that logger after imports finish.
-    stdio: ['ignore', logFd, logFd, 'pipe', 'pipe'],
+    stdout: logFd,
+    stderr: logFd,
+    detached: true,
   })
-  child.unref()
-  // fd 4 carries the prior credential into the child. Empty means mint a new device. It is never
-  // an argument, environment variable, or log line. A child that dies before reading it leaves the
-  // bytes unread, and Linux then resets this pipe under us. The exit and timeout handlers below
-  // already report that death, so the reset needs a listener only to stop it crashing the CLI.
-  ;(child.stdio[4] as Writable | null)?.on('error', () => {}).end(`${previousToken ?? ''}\n`)
-  const handshake = new Promise<Handshake>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new CliError('node_start_timeout', 'The Node did not become ready before the startup deadline.', 5)),
-      START_TIMEOUT_MS,
-    )
-    const lines = createInterface({ input: child.stdio[3] as Readable })
-    lines.once('line', (line) => {
-      clearTimeout(timer)
-      try {
-        const parsed = JSON.parse(line) as Partial<Handshake>
-        if (
-          parsed.baseline !== ACORN_BASELINE ||
-          parsed.protocolVersion !== NODE_PROTOCOL_VERSION ||
-          !parsed.nodeId ||
-          !parsed.endpoint ||
-          !parsed.fingerprint ||
-          !parsed.certPem ||
-          !parsed.deviceToken
-        )
-          throw new Error('Invalid private Node handshake')
-        resolve(parsed as Handshake)
-      } catch (error) {
-        reject(error)
-      }
-      lines.close()
-    })
-    child.once('exit', (code) => {
-      clearTimeout(timer)
-      reject(new Error(`Node exited before readiness (code ${code}); see ${logPath}.`))
-    })
-    child.once('error', (error) => {
-      clearTimeout(timer)
-      reject(error)
-    })
+  launched.child.unref()
+  const handshake = launched.handshake.catch((error: unknown) => {
+    if (error instanceof NodeStartTimeout) throw new CliError('node_start_timeout', error.message, 5)
+    throw new Error(`${error instanceof Error ? error.message : String(error)} See ${logPath}.`)
   })
-  return { child, handshake }
+  return { child: launched.child, handshake }
 }
 
 async function discardFailedLaunch(child: ChildProcess): Promise<void> {

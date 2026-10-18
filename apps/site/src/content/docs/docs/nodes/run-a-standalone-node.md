@@ -118,8 +118,9 @@ WantedBy=multi-user.target
 
 When the service stops, the Node gets SIGTERM and finishes within 30 seconds: it stops waiting on task
 scripts, closes its connections and databases, and releases its data folder. The pairing banner goes to
-the service's log. Once a device is paired, the banner shows the command that opens a new pairing code,
-`kill -USR1 <pid>`. Run it, and read the code from the log.
+the service's log. The Node never writes a device token to its output, so the log holds at most a pairing
+code, which lasts ten minutes. Once a device is paired, the banner shows the command that opens a new
+pairing code, `kill -USR1 <pid>`. Run it, and read the code from the log.
 
 ## Which plugins it has
 

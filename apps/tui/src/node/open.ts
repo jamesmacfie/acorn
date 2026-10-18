@@ -9,8 +9,9 @@ import {
   runningNode,
   usableLocalToken,
   type Custody,
+  type NodeHandshake,
 } from '@acorn/custody/local'
-import { startNode, type Handshake } from './supervise'
+import { startNode } from './supervise'
 
 // The `acorn` command's one decision: which node this run talks to, and whether it owns that node's
 // lifetime (docs/tui/process.md § Attach or start).
@@ -39,7 +40,7 @@ export type OpenedNode = {
    *
    *  Absent on the attach path, and absent on a first-ever start, where there is no id on disk to
    *  draw with and nothing cached to draw. */
-  starting?: Promise<Handshake>
+  starting?: Promise<NodeHandshake>
   /** The started child's stderr, held for printing after the renderer hands the terminal back
    *  (./supervise.ts). */
   held?: readonly string[]
@@ -100,15 +101,15 @@ export async function openNode(
   // checkout), and the shell has a persisted cache it can draw from meanwhile
   // (docs/tui/process.md § Attach or start).
   const node = startNode(dataDir, tokens.read(LOCAL_TOKEN_SCOPE))
-  const remember = (handshake: Handshake): Handshake => {
+  const remember = (handshake: NodeHandshake): NodeHandshake => {
     fleet.remember(
       {
         nodeId: handshake.nodeId,
         label: label(handshake.nodeId),
         endpoint: handshake.endpoint,
         local: true,
-        ...(handshake.fingerprint ? { fingerprint: handshake.fingerprint } : {}),
-        ...(handshake.certPem ? { certPem: handshake.certPem } : {}),
+        fingerprint: handshake.fingerprint,
+        certPem: handshake.certPem,
       },
       handshake.deviceToken,
     )

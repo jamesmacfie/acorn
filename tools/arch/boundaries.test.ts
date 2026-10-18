@@ -447,6 +447,7 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/server/telemetry/runtimePressure.ts', // sysctl swap read, once a minute; the broker imports the collector this feeds
       // The supervised node's own child.
       'packages/custody/src/supervision/serviceHost.ts',
+      'packages/custody/src/local/launch.ts', // starts a standalone Node on launcher pipes for the two below
       'apps/tui/src/node/supervise.ts', // `acorn` supervising the node it started, when it started one
       'apps/cli/src/supervision/lifecycle.ts', // explicit background Node lifecycle commands
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.

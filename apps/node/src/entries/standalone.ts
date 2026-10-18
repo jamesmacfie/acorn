@@ -16,8 +16,8 @@ import { installBackgroundLog } from './background'
 
 // This file is the one place under `apps/node/src` that still calls `console.log`, and it is in the
 // console rule's baseline on purpose (tools/arch/boundaries.test.ts). Two things it writes are not
-// log lines: the handshake JSON, which a launcher parses off stdout and the lifecycle tests read,
-// and the pairing banner, which is what a person standing at this terminal is here to read.
+// log lines: the handshake JSON, which a script reads off stdout when no launcher holds pipes, and
+// the pairing banner, which is what a person standing at this terminal is here to read.
 // Everything else in the file goes through the logger like the rest of the node.
 import { installCrashHandlers } from '../composition/crash'
 import { createLogger } from '@acorn/node-core/server/telemetry'
@@ -31,6 +31,11 @@ if (background) {
   installBackgroundLog(process.env.ACORN_CLI_LOG_PATH)
 }
 installCrashHandlers()
+
+// fd 3 and fd 4 are this process's pipes to its launcher, so a Node started from one of this Node's
+// terminals must not inherit the setting.
+const launcherPipes = process.env.ACORN_LAUNCHER_PIPES === '1'
+delete process.env.ACORN_LAUNCHER_PIPES
 
 const log = createLogger('node')
 const pluginLog = createLogger('plugins')
@@ -105,8 +110,8 @@ await enrollNode({
   db: runtime.DB,
 })
 
-// Counted before the handshake below, which issues a launcher device of its own when
-// ACORN_DEVICE_TOKEN is unset. After that, every node looks paired.
+// Counted before the handshake below, which issues a piped launcher a device of its own when it
+// brings no working token. After that, every node looks paired.
 const alreadyPaired = (await runtime.DEVICES.list()).filter((device) => device.revokedAt === null).length
 
 // SIGINT and SIGTERM run the same bounded drain as a desktop-supervised node
@@ -130,8 +135,7 @@ if (!background) process.on('SIGUSR1', () => printPairingBanner(runtime.PAIRING_
 process.once('SIGINT', (signal) => void shutdown(signal))
 process.once('SIGTERM', (signal) => void shutdown(signal))
 
-const previousToken = background ? readPrivateToken() : process.env.ACORN_DEVICE_TOKEN
-const handshake = JSON.stringify({
+const handshake = {
   baseline: ACORN_BASELINE,
   nodeId: root.nodeId,
   // The handshake's protocol number (docs/api-reference/versioning.md § Versioning): a launcher can refuse a
@@ -140,12 +144,19 @@ const handshake = JSON.stringify({
   endpoint: listener.endpoint.origin,
   fingerprint: listener.fingerprint,
   certPem: listener.certPem,
-  deviceToken: await resolveDeviceToken(runtime.DEVICES, previousToken || undefined, 'Standalone node launcher'),
-})
-if (background) {
-  writeSync(3, `${handshake}\n`)
+}
+// The device token has full owner authority, so only a launcher's private pipe carries it
+// (docs/node-distribution.md § Runtime). A service manager keeps stdout in a log, and a Node nobody
+// launched with pipes issues no launcher device at all.
+if (launcherPipes) {
+  const deviceToken = await resolveDeviceToken(
+    runtime.DEVICES,
+    readPrivateToken() || undefined,
+    'Standalone node launcher',
+  )
+  writeSync(3, `${JSON.stringify({ ...handshake, deviceToken })}\n`)
   closeSync(3)
-} else console.log(handshake)
+} else console.log(JSON.stringify(handshake))
 
 function readPrivateToken(): string {
   try {

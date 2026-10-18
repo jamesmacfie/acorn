@@ -90,7 +90,7 @@ describe('CLI-owned local Node', () => {
       const lines = createInterface({ input: manual!.stdout! })
       lines.on('line', (line) => {
         try {
-          if ((JSON.parse(line) as { deviceToken?: unknown }).deviceToken) {
+          if ((JSON.parse(line) as { nodeId?: unknown }).nodeId) {
             lines.close()
             resolve()
           }

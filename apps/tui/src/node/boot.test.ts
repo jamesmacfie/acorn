@@ -226,6 +226,7 @@ describe('acorn starting a node it has started before', () => {
     async () => {
       // The root above has been opened and drained, so `node.json` names its node and nothing holds it.
       expect(lockedBy(dataDir())).toBeNull()
+      const saved = custody(join(root, 'config')).tokens.read(LOCAL_TOKEN_SCOPE)
       const second = await openNode(undefined)
       try {
         expect(second.supervised).toBe(true)
@@ -240,6 +241,9 @@ describe('acorn starting a node it has started before', () => {
         const handshake = await second.starting!
         expect(handshake.nodeId).toBe(opened.nodeId)
         expect(second.fleet.get(opened.nodeId)?.endpoint).toBe(handshake.endpoint)
+        // The saved token crossed the launcher pipe and still authenticated, so the node reused this
+        // client's device rather than adding another.
+        expect(handshake.deviceToken).toBe(saved)
       } finally {
         await second.stop()
       }

@@ -27,9 +27,10 @@ root at boot:
    root if the app is installed, else the development checkout's.
 2. If the root is locked, a Node is running. Read its endpoint from `node.json` and the certificate
    to pin from `tls/cert.pem`, authenticate with this client's device token, and attach.
-3. If the root isn't locked, spawn `standalone.js`, read its one JSON handshake line (`nodeId`,
-   `endpoint`, `fingerprint`, `certPem`, `deviceToken`), and keep the child for the client's
-   lifetime.
+3. If the root isn't locked, spawn `standalone.js` on launcher pipes, pass it this client's saved
+   token, read its handshake (`nodeId`, `endpoint`, `fingerprint`, `certPem`, `deviceToken`), and keep
+   the child for the client's lifetime. The Node reuses a token that still authenticates, so a restart
+   keeps the same device ([Node distribution](../node-distribution.md#runtime)).
 
 The renderer doesn't wait for step 3. `openNode` returns as soon as the child spawns and hands back
 the handshake as a promise, because a Node's boot has a 120-second budget. The Node's ID is already in
@@ -45,12 +46,12 @@ completed fleet and refreshes active queries.
 Two cases still wait, because there's nothing to draw: a first start has no `node.json`, and pairing
 asks a question on stdin.
 
-A started child's stdout is read until the handshake and drained after. Its stderr is piped and held,
-because the renderer draws on the same terminal. The held lines print after `renderer.destroy()`.
+A started child's stdout is dropped. Its stderr is piped and held, because the renderer draws on the
+same terminal. The held lines print after `renderer.destroy()`.
 
 `apps/tui/src/node/open.ts` holds the decision, and `apps/tui/src/node/supervise.ts` owns a started
 child: SIGTERM, then SIGKILL after five seconds. It isn't the desktop helper's supervisor, because a
-standalone Node prints one line and speaks no service RPC.
+standalone Node writes one handshake line and speaks no service RPC.
 
 A second `acorn` finds the lock, attaches, and leaves the Node running when it quits. The one that
 started the Node owns its lifetime, as on the desktop.

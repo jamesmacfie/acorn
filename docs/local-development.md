@@ -46,7 +46,7 @@ Other ways to run it:
 | Command | What it does |
 | --- | --- |
 | `pnpm dev:no-watch` | The same run with the Rust watcher off. |
-| `pnpm dev:node` | Runs the standalone Node and prints one JSON handshake line with the endpoint, fingerprint, certificate, Node ID, and device token. |
+| `pnpm dev:node` | Runs the standalone Node and prints one JSON handshake line with the endpoint, fingerprint, certificate, and Node ID, then its pairing banner. |
 | `pnpm dev:plugin <id>` | Rebuilds one loaded plugin's package on every save. [Plugins](./plugins.md) § The dev loop has the whole loop. |
 | `pnpm dev:agent -- --session <name>` | Starts an isolated desktop session you can drive. See [agent drivers](./local-development/agent-drivers.md). |
 | `pnpm dev:tui:agent -- --session <name>` | Starts an isolated terminal client you can drive. |

@@ -1,6 +1,57 @@
 # Phase 1: keep the device token out of logs
 
-Date: October 18, 2026. Status: proposed.
+Date: October 18, 2026. Status: done.
+
+## Completion note
+
+Landed on October 18, 2026, on the `phase-1-token-out-of-logs` branch.
+
+What landed:
+
+- `apps/node/src/entries/standalone.ts` runs the file descriptor exchange only when
+  `ACORN_LAUNCHER_PIPES=1`. `ACORN_CLI_BACKGROUND` keeps the log file and the service ID. Without
+  pipes, the Node prints the handshake with no `deviceToken`, skips `resolveDeviceToken`, and issues no
+  launcher device. The Node deletes `ACORN_LAUNCHER_PIPES` from its own environment, so a Node started
+  from one of its terminals doesn't try to read pipes it doesn't have.
+- `launchNode` in `packages/custody/src/local/launch.ts` owns the spawn, the token write on fd 4, the
+  handshake parse on fd 3, and the 120-second deadline. The CLI and the terminal client both call it.
+  `ACORN_DEVICE_TOKEN` is gone from the code and from the site's environment variable page.
+- The terminal client drops the Node's stdout instead of reading and draining it.
+- `scripts/remote-node.mjs` pairs as `remote rig` with the banner's code, seeds the project with that
+  token, and opens a fresh code for the development window once the window is up.
+- The tarball README drops the `openssl` line, names `ACORN_DATA_DIR`, and points at
+  `docs/node-distribution.md`.
+- Tests: `apps/node/test/integration/lifecycle/standaloneHandshake.test.ts` covers the first two
+  acceptance points. It fails against the old entry. The terminal client's boot test asserts that a
+  restart reuses its token.
+
+Decisions and deviations:
+
+- The integration tests had no shared spawn helper, so this phase adds
+  `apps/node/test/helpers/standalone.ts`. It writes its own side of the pipe exchange instead of
+  importing `launchNode`, because `@acorn/node` doesn't depend on custody, and an independent copy
+  checks the Node's half of the contract. Only `standaloneShutdown.test.ts` and `enrollment.test.ts`
+  spawn the standalone entry. `serviceSpawn`, `audit`, `pairing`, and `nodeProviders` don't, so they
+  needed no change.
+- The CLI turns `NodeStartTimeout` into its `node_start_timeout` error with exit code 5, and adds its
+  log path to every other start failure. `launchNode` stops a child whose handshake it can't use,
+  because that child still holds the data root's lock.
+- The pairing banner and the `SIGUSR1` handler stay gated on `ACORN_CLI_BACKGROUND`. A Node the
+  terminal client starts still prints its banner into stdout the client drops.
+- `docs/node-distribution.md` was at the 200-line limit, so its dependency security section moved to
+  `docs/node-distribution/dependency-security.md`.
+- `pnpm dev:remote` wasn't run end to end. It needs Docker and a `dev:agent` window. Every route it
+  calls is covered by an integration test.
+
+For later phases:
+
+- The stdout handshake has no token. A smoke test or an installer that needs one either starts the
+  Node through `launchNode` or pairs with the banner's code.
+- `launchNode` takes `stdout` and `stderr` as `'ignore'`, `'pipe'`, or a file descriptor. Phase 2's
+  `acorn node start --foreground` can pass `1` and `2` to keep the Node's output in the terminal.
+- Phase 2 should add `acorn node start --foreground` to the tarball README in `scripts/pack-node.mjs`.
+- `ACORN_CLI_BACKGROUND`, `ACORN_CLI_SERVICE_ID`, and `ACORN_CLI_LOG_PATH` still reach the Node's own
+  children. This phase didn't change that.
 
 ## Goal
 

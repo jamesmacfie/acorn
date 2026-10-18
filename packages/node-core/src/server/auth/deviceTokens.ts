@@ -61,7 +61,7 @@ export type DeviceService = {
 // authenticates, and issue a fresh one otherwise (first run, a reset data root, or a device the owner
 // revoked). Shared by the two things that boot a node: the desktop supervisor, which passes the token
 // back from the OS keychain (apps/node/src/composition/runtime.ts), and the standalone entry, which
-// takes it from ACORN_DEVICE_TOKEN. Without the reuse each launch would add a device row.
+// reads it from its launcher's private pipe. Without the reuse each launch would add a device row.
 export async function resolveDeviceToken(
   devices: DeviceService,
   remembered: string | undefined,

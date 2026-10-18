@@ -17,6 +17,7 @@ const INTERNAL = {
   ACORN_PIN_MISMATCH: 'An error code, not a variable.',
   'ACORN_FIXTURE_*': "Switches for the terminal client's test fixture.",
   'ACORN_CLI_*': 'The command line sets these for the Node it starts with `node start --background`.',
+  ACORN_LAUNCHER_PIPES: 'The command line and the terminal client set this for the Node they start, to get its device token over a private pipe.',
   ACORN_TUI_NODE_ENTRY: 'Points a development terminal client at a Node build.',
   ACORN_MCP_NAME: 'The Node sets this for the MCP server it registers with each harness.',
   ACORN_SKIP_MCP_REGISTRATION: 'Set by `pnpm dev:agent`, so a throwaway session leaves the MCP registration alone.',

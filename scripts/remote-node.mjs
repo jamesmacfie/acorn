@@ -51,7 +51,8 @@ function parseArgs(argv) {
   return validateSessionName(session)
 }
 
-// The container prints its handshake as one JSON line, then a banner with the pairing code.
+// The container prints its handshake as one JSON line, then a banner with the pairing code. The
+// handshake carries no device token, because a log is no place for one.
 async function waitForBanner() {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const logs = docker('logs', CONTAINER)
@@ -63,9 +64,9 @@ async function waitForBanner() {
   throw new Error(`The container printed no pairing code within a minute. Read it with: docker logs ${CONTAINER}`)
 }
 
-// The handshake's launcher token can call the Node's API. The certificate is pinned to the one the
-// handshake names, which is self-signed for the container's own name.
-function postJson(handshake, path, body) {
+// The certificate is pinned to the one the handshake names, which is self-signed for the container's
+// own name.
+function postJson(handshake, token, path, body) {
   const payload = JSON.stringify(body)
   return new Promise((resolve, reject) => {
     const req = request(
@@ -75,7 +76,7 @@ function postJson(handshake, path, body) {
         ca: [handshake.certPem],
         checkServerIdentity: () => undefined,
         headers: {
-          authorization: `Bearer ${handshake.deviceToken}`,
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
           'content-type': 'application/json',
           'idempotency-key': randomUUID(),
         },
@@ -93,8 +94,14 @@ function postJson(handshake, path, body) {
   })
 }
 
+// Pairs the rig itself with the banner's code, the way a person pairs a client, and returns its token.
+async function pairRig(handshake, code) {
+  const { deviceToken } = await postJson(handshake, null, '/v1/pair', { code, deviceName: 'remote rig' })
+  return deviceToken
+}
+
 // A small Git repository at a path no Mac has, so a client path sent to this Node fails visibly.
-async function seedProject(handshake) {
+async function seedProject(handshake, token) {
   docker('exec', '-u', 'root', CONTAINER, 'install', '-d', '-o', 'acorn', PROJECT_PATH)
   const script = [
     `cd ${PROJECT_PATH}`,
@@ -104,7 +111,7 @@ async function seedProject(handshake) {
     'git -c user.name=acorn -c user.email=acorn@localhost commit -q -m "Initial commit"',
   ].join(' && ')
   docker('exec', CONTAINER, 'sh', '-c', script)
-  const { project } = await postJson(handshake, '/v1/core/projects', { path: PROJECT_PATH })
+  const { project } = await postJson(handshake, token, '/v1/core/projects', { path: PROJECT_PATH })
   return project
 }
 
@@ -166,13 +173,16 @@ async function main() {
   process.once('SIGTERM', () => agent?.kill('SIGTERM'))
   try {
     const { handshake, code } = await waitForBanner()
-    const project = await seedProject(handshake)
+    const token = await pairRig(handshake, code)
+    const project = await seedProject(handshake, token)
     log(`seeded ${PROJECT_PATH} as project ${project.id}`)
 
     const since = Date.now()
     agent = spawn('pnpm', ['dev:agent', '--', '--session', session], { cwd: ROOT, stdio: 'inherit' })
     const manifest = await waitForSession(session, agent, since)
-    const node = await pairWindow(manifest, handshake, code)
+    // Opened only now, because a code lasts ten minutes and the window can take a while to start.
+    const opened = await postJson(handshake, token, '/v1/core/pair/start')
+    const node = await pairWindow(manifest, handshake, opened.code)
     log(`paired ${node.label} (${node.nodeId}) at ${ENDPOINT}`)
     console.log(JSON.stringify({ nodeId: node.nodeId, label: node.label, endpoint: ENDPOINT, projectId: project.id, projectPath: PROJECT_PATH }))
 
