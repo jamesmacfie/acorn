@@ -95,6 +95,9 @@ The conventional keys, set by the seam that has the fact: `seam`, `route`, `meth
 `request.id`, `task.id`, `schedule.key`, `schedule.reason`, `hook.point`, `hook.handler`,
 `hook.outcome`, `error.name`, and `error.code`.
 
+`node.waited` is on the renderer's startup milestones. It's true when the window drew its tree before
+the Node could answer ([startup milestones](./renderer.md#startup-milestones)).
+
 An id is always an attribute, never part of a name. A span named `http.request` with a hundred `route`
 values is one row in a vendor's list. A hundred span names is a hundred rows nobody can read.
 

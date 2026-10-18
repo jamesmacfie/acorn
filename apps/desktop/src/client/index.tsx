@@ -17,7 +17,7 @@ import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes'
 import { startClientRuntime } from '@acorn/client-core/host/clientRuntime.ts'
 import { emitError, flushTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { bootMark, emitBootSpans } from './boot'
-import { markFirstFrame } from './startupMilestones'
+import { markFirstFrame, markNodeWaited } from './startupMilestones'
 import { startDesktopLinks } from './links'
 import { setRegionPlaceholder } from '@acorn/client-core/host/layouts'
 import { RegionLoading } from '@acorn/client-core/host/layouts/RegionLoading.tsx'
@@ -156,8 +156,10 @@ render(
 
 // The tree the first frame will draw, finished. `render` returns once Solid has built it, so this is
 // the last mark the renderer's own work is responsible for, and it is the one to read when a launch is
-// watched from a terminal: a background window never records `first paint` below.
+// watched from a terminal: a background window never records `first paint` below. A Node that could
+// not answer yet makes this a launch that waited for it, which every startup milestone says.
 bootMark('tree built')
+markNodeWaited(!nodeReady())
 
 // After the frame the tree above produced, which is the first thing the owner sees, and separately the
 // moment the node could answer. The two are far apart on purpose: nothing between `script start` and

@@ -75,6 +75,7 @@ nanoseconds, measured on September 11, 2026.
 | Every audit row | `server/audit.ts` | Event `audit.<action>` with the actor and none of the row's details |
 | Uncaught exception or rejection | `apps/node/src/composition/crash.ts` | A fatal error with its stack, then exit 1 |
 | Runtime pressure | `server/telemetry/runtimePressure.ts` | Event loop, CPU, and memory gauges every five seconds, with the host's `host.load.1m`, `host.memory.free`, and, on macOS once a minute, `host.swap.used` ([diagnosis](./diagnosis.md#is-it-acorn-or-the-mac)) |
+| The Node's boot, once per launch | `apps/node/src/composition/bootTimer.ts` | Span `node.boot` with a `node.boot.mark` child per boot mark, carrying `mark` ([Node boot](./node-boot.md)) |
 | The app's shipped bytes, once per launch | `server/telemetry/installedBytes.ts` | Gauges `app.startup.bytes` and `app.bundle.bytes` ([shipped bytes](#shipped-bytes)) |
 | Console lines | Everywhere under `packages/node-core/src` and `apps/node/src` | Log records ([logging](./logging.md)) |
 

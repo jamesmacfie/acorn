@@ -20,6 +20,9 @@ frame, writing a sink, and the Sentry sink.
 [Telemetry runtimes](./telemetry/runtimes.md) covers the collector, ambient attribution, every Node
 seam, the crash handler, and how the terminal client, helper, and shell post.
 
+[Node boot](./telemetry/node-boot.md) covers the Node's boot as `node.boot` spans, its marks, and
+when they're sent.
+
 [Renderer telemetry](./telemetry/renderer.md) covers the renderer's emitter, one trace per
 interaction, contribution owners, and every renderer seam.
 

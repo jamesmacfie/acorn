@@ -25,6 +25,18 @@ it('samples only while collecting and releases its timer on disposal', () => {
   expect(vi.getTimerCount()).toBe(0)
 })
 
+it('reports the first window after it starts, so a boot that arms it is measured', () => {
+  vi.useFakeTimers()
+  const duration = vi.fn()
+  const stop = startRuntimePressure({ enabled: () => true, duration, suspended: duration, gauge: () => {} })
+  try {
+    vi.advanceTimersByTime(5_000)
+    expect(duration).toHaveBeenCalledWith('runtime.event_loop.max', expect.any(Number))
+  } finally {
+    stop()
+  }
+})
+
 describe('a window the process spent suspended', () => {
   // A fake clock, loop and histogram. Each window says how long it took, how much of that the loop
   // was busy or idle, and the longest gap the delay timer saw, all in milliseconds.
@@ -62,7 +74,7 @@ describe('a window the process spent suspended', () => {
       max = w.max
       vi.advanceTimersByTime(5000)
     }
-    // The first tick only switches the histogram on.
+    // The first window's numbers are whatever the fake started with.
     window({ gap: 5000, active: 5, max: 20 })
     durations.clear()
     return { window, durations, stop }

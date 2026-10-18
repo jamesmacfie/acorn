@@ -20,7 +20,9 @@ anyone asking. The steps, in order:
    whatever is installed in the data root.
 2. One line per plugin per pass, such as `plugin github init` and `plugin x ready`.
 3. `install`, `cert`, `bind`, `listener-up`, and `scheduler`.
-4. The four `reconcile.*` steps, then `teardown`.
+4. The four `reconcile.*` steps, then `teardown`. The agents cleanup also prints one
+   `reconcile.agents.<step>` line per step before its `reconcile.agents` line, which still reports the
+   whole cleanup.
 
 The per-plugin lines exist because `install` alone can't say which plugin was slow.
 
@@ -29,7 +31,8 @@ Read three labels with care:
 - **`login-shell`** marks when the `PATH` probe started, not when it finished. The probe runs behind
   the boot, and the first process the Node spawns waits for it. [Node distribution](../node-distribution.md)
   § Boot order explains why. The step takes a fraction of a millisecond even when the probe takes half
-  a second.
+  a second. A packaged macOS build also prints `login-shell.settled` wherever the probe finishes,
+  which is when spawns were released.
 - **The per-plugin lines** are wall-clock slices, not per-plugin costs, because the whole `init` pass
   runs at once. A plugin's line says when it finished. If a plugin awaits something, the plugin that
   finishes next takes the credit for the gap.
@@ -39,7 +42,8 @@ Read three labels with care:
 
 The Node's clock starts inside `bootNode`. Spawning the process and evaluating the service
 bundle happen before `+0ms`. On an M2 Pro that gap is about 100 ms, mostly evaluating the service
-chunk. Calling `bootNode` under `tsx` instead of launching the app inflates `graph` about
+chunk. The printed lines leave it out, and the `node.boot` span reports it as its first mark,
+`process` ([Node boot](../telemetry/node-boot.md)). Calling `bootNode` under `tsx` instead of launching the app inflates `graph` about
 sevenfold, because the loader then transpiles as it imports.
 
 `graph` also depends on the data root. A fresh root, like the one `apps/desktop/test/boot.test.ts`

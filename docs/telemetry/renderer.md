@@ -130,6 +130,10 @@ the milestone. macOS runs no animation frames for an occluded window, so a hidde
 lands when the owner uncovers it. Filter on `visibility: visible` before you quote a launch time. The
 roster's 250 ms fallback timer in `apps/desktop/src/client/index.tsx` never counts as a frame.
 
+Every milestone also carries `node.waited`, read once at the `tree built` boot mark. It's true when
+the window drew its tree before the Node could answer, which is a cold launch or a Node restart, and
+false for a reload against a running Node. Split launch times by it before you compare them.
+
 `usable` carries `features`, the number of features it waited for, `proxy`, true when any of them
 closed on mount, and `outcome`, the worst of `usable`, `cancelled`, and `timeout`. When the launch
 stopped before restoring, `outcome` is `error` or `offline`, `startup.step` names what stopped it

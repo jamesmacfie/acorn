@@ -123,9 +123,10 @@ export class ManagedAgentRuntime {
   /**
    * Recovers what the last process left: sessions it was running are stopped, children it never heard
    * finish go idle, and turns it queued start draining. Called from the composition root after the
-   * listener binds, because it interrupts every unsettled session (AGENTS_RUNTIME).
+   * listener binds, because it interrupts every unsettled session (AGENTS_RUNTIME). `mark` names each
+   * step as it finishes, for the boot account.
    */
-  async reconcile(): Promise<void> {
+  async reconcile(mark: (step: string) => void = () => {}): Promise<void> {
     // The settle below reads only events written since the last start's settle began. Taken before any
     // read, and the margin covers a clock set back between starts. See `agentCommandSettle`.
     const settleStartedAt = Date.now() - COMMAND_SETTLE_CLOCK_MARGIN_MS
@@ -139,6 +140,7 @@ export class ManagedAgentRuntime {
         detail: 'The provider process stopped when Acorn last exited. Send a prompt to resume.',
       })
     }
+    mark('unsettled')
     // Nothing is streaming into a roster the previous process left behind, so any child still marked
     // active is one whose ending we will never hear. These sessions are not in `unsettledSessions`:
     // a backgrounded child leaves its parent `ready`, which is exactly why the row was stranded.
@@ -147,8 +149,11 @@ export class ManagedAgentRuntime {
         await this.engine.record(session.id, null, { type: 'subagent', subagent: { id, status: 'idle' } })
       }
     }
+    mark('subagents')
     await this.store.requeueSteeringTurns()
+    mark('steering')
     await this.engine.settleCommands(settleScope)
+    mark('commands')
     // No harness outlives the Node, so a background command still marked running lost the process that
     // would have reported its exit. Its session can be `ready`, which the rule above leaves running.
     for (const record of await this.store.unfinishedCommands(settleScope)) {
@@ -166,15 +171,21 @@ export class ManagedAgentRuntime {
     }
     // Only once both passes finish, so a start that dies partway reads the same events again next time.
     this.store.markCommandsSettled(settleStartedAt)
+    mark('background')
     await this.store.cancelWorkflowFollowUps()
+    mark('followups')
     await this.attachments.collectGarbage()
+    mark('attachments')
     // A start's skill folder goes when its process stops. One left by a Node that died is removed here,
     // unless a session that started since is using it.
     await (
       await import('../drivers/skillFolder')
     ).sweepSkillFolders(this.engine.skillFolders, (sessionId) => this.engine.hasLiveSession(sessionId))
+    mark('skills')
     await this.engine.webhooks.reconcile()
+    mark('webhooks')
     await (await this.engine.goals.get()).recover()
+    mark('goals')
     // Turns queued when the process last exited have nothing else to wake them: pump() runs on enqueue,
     // on a provider start, and when a turn settles, none of which happen on their own after a restart.
     // Not awaited, because draining spawns a provider child per session and boot waits on reconcile().

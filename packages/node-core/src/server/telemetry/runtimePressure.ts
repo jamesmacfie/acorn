@@ -68,7 +68,11 @@ export function startRuntimePressure(options: {
     loop: () => performance.eventLoopUtilization(),
     delay: monitorEventLoopDelay({ resolution: 20 }),
   }
-  let observing = false
+  // Observing from the start rather than from the first tick, so the first window covers the five
+  // seconds after a sink subscribes. On a Node that is its boot and the start of its cleanup, which a
+  // window opened a tick later would miss. The first tick turns it off again if nothing is collecting.
+  delay.enable()
+  let observing = true
   let previous = loop()
   let cpu = process.cpuUsage()
   let at = now()

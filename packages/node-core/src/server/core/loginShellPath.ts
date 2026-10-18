@@ -18,11 +18,14 @@ const PROBE_TIMEOUT_MS = 5_000
 
 let pending: Promise<unknown> | null = null
 
-/** Start the probe and hold spawns on it. A no-op anywhere but a packaged macOS build, where the
- *  inherited PATH is already the shell's. */
-export function beginLoginShellPath(isPackaged: boolean): void {
-  if (process.platform !== 'darwin' || !isPackaged) return
-  holdSpawnsUntil(readLoginShellPath())
+/** Start the probe and hold spawns on it. Answers the probe, which never rejects, so the boot can
+ *  time when spawns were released. A no-op answering null anywhere but a packaged macOS build, where
+ *  the inherited PATH is already the shell's. */
+export function beginLoginShellPath(isPackaged: boolean): Promise<void> | null {
+  if (process.platform !== 'darwin' || !isPackaged) return null
+  const probe = readLoginShellPath()
+  holdSpawnsUntil(probe)
+  return probe
 }
 
 /** Hold every process this node spawns until `work` settles. The probe above is the one caller in

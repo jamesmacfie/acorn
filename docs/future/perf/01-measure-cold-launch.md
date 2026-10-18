@@ -1,6 +1,82 @@
 # Phase 1: measure every cold launch
 
-Date: October 19, 2026. Status: proposed.
+## Completion note
+
+The code landed on October 19, 2026. The baseline isn't recorded. The owner records it, because it
+needs a day of use on the dev app, a release build opened from Finder, and Sentry environments set in
+the app. See [what the baseline must capture](#what-the-baseline-must-capture).
+
+What changed:
+
+- `bootTimer()` moved to `apps/node/src/composition/bootTimer.ts`. It keeps each mark and still
+  prints the same `[service:boot]` line. Its first mark, `process`, runs from process start, read
+  from `performance.now()`. `finish()` sends one `node.boot` span with a `node.boot.mark` child per
+  mark, the shape of `helperBootSpans`.
+- The collector has a one-shot hook, `whenTelemetryEnabled(run)`. It runs `run` the first time the
+  preference and a sink are both on, or at once if they already are. `applyPreference` and
+  `onTelemetryBatch` call it. A second `startTelemetry` forgets what's waiting.
+- `beginLoginShellPath` returns the probe's promise, or null when no probe runs. `bootNode` marks
+  `login-shell.settled` when it settles.
+- `AGENTS_RUNTIME.reconcile` takes an optional `mark`. `ManagedAgentRuntime.reconcile` calls it after
+  each of the 10 steps the plan names, and `reconcileNode` prefixes them with `reconcile.agents.`.
+- The renderer reads `nodeReady()` at `tree built` and passes it to `markNodeWaited`. All four
+  startup milestones carry `node.waited` when they're sent.
+- The event-loop reading was in Sentry all along, under other names. A histogram reaches Sentry as
+  four series, so `runtime.event_loop.max` is stored as `runtime.event_loop.max.max`, `.p95`, `.p50`,
+  and `.count`. Each had about 43,690 rows over the two days before October 19. The sampler did
+  start late, though. It turned the delay histogram on at its first five-second tick, so its first
+  reading covered 5 to 10 seconds after the first sink subscribed. It starts the histogram at once,
+  so the first window covers the boot and the start of the cleanup.
+- Docs: a new [Node boot](../../telemetry/node-boot.md) page, a row in
+  [Node seams](../../telemetry/runtimes.md#node-seams), `node.waited` in
+  [the attribute vocabulary](../../telemetry/model.md#the-attribute-vocabulary) and
+  [startup milestones](../../telemetry/renderer.md#startup-milestones), the Sentry names in
+  [diagnosis](../../telemetry/diagnosis.md), and the new lines in
+  [profiling](../../local-development/profiling.md#timing-a-cold-start).
+
+Decisions and deviations:
+
+- `reconcile.agents` keeps its total. A step's own time runs from the mark before its first
+  sub-step, so the printed `(Nms)` and the span's duration both cover the whole cleanup. Its
+  sub-steps are found by the `reconcile.agents.` prefix.
+- The spans wait for the probe as well as the cleanup. On a small release root the cleanup can end
+  before the probe settles, and `login-shell.settled` would then be missing in the one environment
+  that runs the probe.
+- Spans start from `performance.timeOrigin`, not from `Date.now()` at send time as the helper's do,
+  so a late send doesn't shift them.
+- The Node seams detail went to its own page because `runtimes.md` passed 200 lines.
+- `reconcile.agents` also covers the delegation service's reconcile, which runs after `goals` and
+  has no mark of its own. The gap between `reconcile.agents.goals` and `reconcile.agents` is that
+  step.
+- `pnpm --filter @acorn/node build` fails its service budget. It already failed on the base commit,
+  6c099093c, at 1,885,773 B against a 1,884,400 B ceiling. This change adds 1,268 B, to 1,887,041 B,
+  all of it code the boot has to load. The ceiling wasn't raised here.
+
+For later phases:
+
+- Phase 3 can read the cleanup's stalls from `runtime.event_loop.max.max` in Sentry, with the first
+  window starting when the Sentry sink subscribes. It still has to line that window up with the
+  cleanup, because the window is five seconds wide.
+- Phase 3 reads each agents step as `node.boot.mark` with `mark:reconcile.agents.<step>`.
+- Phase 2 compares where `login-shell.settled` lands before and after.
+
+### What the baseline must capture
+
+Follow [record the baseline](#record-the-baseline) below. It needs:
+
+- Each `helper.boot.mark` and `node.boot.mark`, and where `login-shell.settled` lands.
+- Each `reconcile.agents.<step>`.
+- `renderer.boot.mark` for `script start`.
+- The four startup milestones, split by `node.waited`.
+- `ui.feature.open` with `first:true`, by `feature.id`, for the Agents and Git panes.
+- For one cold launch per build, every `api.request` and `agents.session.open` span in its first ten
+  seconds.
+
+Record each as a median and a maximum over the runs, with the release numbers and the development
+numbers kept apart. Set the Sentry **Environment** to `development` on the dev app and to
+`release-local` on the release app first.
+
+Date: October 19, 2026. Status: code landed, baseline not recorded.
 
 This phase makes each launch report where its time went, then records a release-build baseline that
 the later phases compare against. It changes measurement only. Read [the programme](./README.md)

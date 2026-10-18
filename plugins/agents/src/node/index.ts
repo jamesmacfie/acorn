@@ -701,8 +701,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
       // and it interrupts every unsettled session. Same reason as workflows (`AGENTS_RUNTIME`).
       ctx.capabilities.provide(AGENTS_RUNTIME, {
-        reconcile: async () => {
-          await runtime!.reconcile()
+        reconcile: async (mark) => {
+          await runtime!.reconcile(mark)
           await delegation!.reconcile()
         },
       })

@@ -6,11 +6,14 @@ export {
   emitSpan,
   flushTelemetry,
   measure,
+  newSpanId,
+  newTraceId,
   onTelemetryBatch,
   setTelemetryPref,
   startTelemetry,
   stopTelemetry,
   telemetryEnabled,
+  whenTelemetryEnabled,
 } from './collector.ts'
 export type { Disposable, PluginTelemetry, SpanHandle } from './collector.ts'
 export { createLogger, describeError, installPerfSink } from './logger.ts'

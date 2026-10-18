@@ -155,7 +155,7 @@ export async function reconcileNode({ db, dataDir, capabilities, mark = () => {}
     reconcileLog.warn(`workflow reconcile failed: ${describeError(error).message}`)
   }
   try {
-    await capabilities.require(AGENTS_RUNTIME).reconcile()
+    await capabilities.require(AGENTS_RUNTIME).reconcile((step) => mark(`reconcile.agents.${step}`))
     mark('reconcile.agents')
   } catch (error) {
     reconcileLog.warn(`managed agents reconcile failed: ${describeError(error).message}`)

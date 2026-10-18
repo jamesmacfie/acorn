@@ -13,6 +13,7 @@ import {
   claimStartupAccount,
   emitStartupMilestones,
   markFirstFrame,
+  markNodeWaited,
   markShellDrawn,
 } from './startupMilestones'
 
@@ -84,6 +85,24 @@ it('records each milestone once and emits them when consent arrives later, in th
   consent(true)
   markFirstFrame()
   expect(await spans()).toHaveLength(all.length)
+})
+
+it('says on every milestone that the launch waited for a Node that could not answer at tree built', async () => {
+  markShellDrawn()
+  markNodeWaited(true)
+  markNodeWaited(false)
+  markFirstFrame()
+  claimStartupAccount('node-a').restored()
+  await settle()
+  consent(true)
+  const milestones = (await spans()).filter((span) => span.name !== 'renderer.startup.phase')
+  expect(milestones.map((span) => span.name).sort()).toEqual([
+    'renderer.startup.first_frame',
+    'renderer.startup.restored',
+    'renderer.startup.shell',
+    'renderer.startup.usable',
+  ])
+  for (const span of milestones) expect(span.attrs['node.waited']).toBe(true)
 })
 
 it('waits for every feature open at the landing before the usable milestone', async () => {

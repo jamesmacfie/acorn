@@ -21,6 +21,9 @@ import { startupTraceId } from './boot'
 // runs a hidden or occluded window at background priority, so those numbers describe a launch nobody
 // watched and are not comparable with a visible one. The roster's 250 ms fallback in ./index.tsx is
 // never counted as a frame.
+//
+// Every milestone says `node.waited`: true when this document drew its tree before the Node could
+// answer, which is a cold launch or a Node restart, and false for a reload against a running Node.
 
 type Milestone = 'first_frame' | 'shell' | 'restored' | 'usable'
 type Recorded = { at: number; attrs: TelemetryAttrs }
@@ -31,6 +34,8 @@ let hiddenAt: number | null = null
 /** The Node the restored and usable milestones belong to. Undefined until a shell restores. */
 let accountNode: string | undefined
 let abandoned = false
+/** Whether the Node could not answer yet when the tree was built. Undefined until then. */
+let nodeWaited: boolean | undefined
 
 function watchVisibility(): void {
   if (typeof document === 'undefined') return
@@ -80,6 +85,11 @@ watch()
  */
 export function markFirstFrame(): void {
   if (!paintObserved) record('first_frame', performance.now(), { method: 'frame', proxy: true })
+}
+
+/** Called once, at the `tree built` mark, with whether the Node could answer yet. */
+export function markNodeWaited(waited: boolean): void {
+  nodeWaited ??= waited
 }
 
 /** The first time this document drew the shell, whichever Node it was for. */
@@ -166,7 +176,11 @@ function emitReady(): void {
       start: origin,
       durationMs: milestone.at,
       status: milestone.attrs.outcome === 'timeout' || milestone.attrs.outcome === 'error' ? 'error' : 'ok',
-      attrs: { seam: `renderer.startup.${name}`, ...milestone.attrs },
+      attrs: {
+        seam: `renderer.startup.${name}`,
+        ...milestone.attrs,
+        ...(nodeWaited === undefined ? {} : { 'node.waited': nodeWaited }),
+      },
     })
     // The usable span carries its two phases as children, so a slow launch says whether the time
     // went into restoring or into the features' own content.
@@ -197,5 +211,6 @@ export function _resetStartupMilestones(): void {
   hiddenAt = null
   accountNode = undefined
   abandoned = false
+  nodeWaited = undefined
   watch()
 }

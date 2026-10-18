@@ -194,6 +194,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [telemetry/model.md](./telemetry/model.md) | The switch, the five kinds, span admission, attributes, privacy, and traces. |
 | [telemetry/plugins-and-sinks.md](./telemetry/plugins-and-sinks.md) | Writing telemetry from a plugin or frame, writing a sink, and the Sentry sink. |
 | [telemetry/runtimes.md](./telemetry/runtimes.md) | The collector, ambient attribution, Node seams, and the terminal client, helper, and shell. |
+| [telemetry/node-boot.md](./telemetry/node-boot.md) | The Node's boot as `node.boot` spans, and when they're sent. |
 | [telemetry/renderer.md](./telemetry/renderer.md) | The renderer emitter, one trace per interaction, and every renderer seam. |
 | [telemetry/logging.md](./telemetry/logging.md) | The two loggers and the `console.*` rule. |
 | [telemetry/surface-health.md](./telemetry/surface-health.md) | The numbers a large diff or timeline keeps about itself. |

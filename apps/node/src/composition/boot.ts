@@ -21,6 +21,7 @@ import { wireAgentTools } from '@acorn/node-core/server/agentTools'
 import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry'
 import { createLogger, describeError, installPerfSink } from '@acorn/node-core/server/telemetry'
 import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry'
+import { bootTimer } from './bootTimer'
 import { buildPluginDeps } from './pluginDeps'
 import { buildPluginStateBridge, effectiveDisabled } from './pluginState'
 import {
@@ -77,34 +78,10 @@ export type BootedNode = {
   stop(): Promise<void>
 }
 
-// Two tags rather than one, so the lines keep the `[service:boot]` and `[service:stop]` prefixes a
-// person greps for and docs/local-development/profiling.md § Timing a cold start names.
+// The boot's own lines share the boot account's `[service:boot]` tag (./bootTimer.ts), and teardown
+// keeps `[service:stop]`, the prefixes docs/local-development/profiling.md § Timing a cold start names.
 const bootLog = createLogger('service:boot')
 const stopLog = createLogger('service:stop')
-
-// The node's cold-start account, one line per step, and unconditional: a node that took eleven seconds
-// to bind should say so without anyone having asked for it. Per-request timing is the opposite and sits
-// behind ACORN_PERF=1 (node-core server/telemetry/collector.ts).
-//
-// On stderr, like every other line the node writes. Stdout is a wire in the standalone entry and in
-// the helper, and the desktop boot test reads the helper's `[helper:boot]` lines rather than these.
-//
-// Two numbers per line, because both questions get asked. `+Nms` is the offset from the first line, so
-// a person can read the shape of a boot down the column; `(Nms)` is this step alone, so the one step
-// that cost the boot is the one wide number. The plugin passes are named per plugin because `install`
-// alone cannot say which plugin was the slow one. Those lines are wall-clock slices rather than
-// per-plugin costs, because the passes overlap: a plugin's line says when it finished
-// (docs/local-development/profiling.md § Timing a cold start).
-function bootTimer(): (label: string) => void {
-  const started = process.hrtime.bigint()
-  let previous = started
-  return (label) => {
-    const now = process.hrtime.bigint()
-    const ms = (from: bigint) => (Number(now - from) / 1e6).toFixed(0)
-    bootLog.info(`${label} +${ms(started)}ms (${ms(previous)}ms)`)
-    previous = now
-  }
-}
 
 // The one boot sequence both Node hosts run (docs/node-distribution.md § Runtime). It takes no native
 // surface, so importing this module in a plain Node test loads no shell. Each host adds only its own
@@ -113,13 +90,17 @@ function bootTimer(): (label: string) => void {
 export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
   const { root } = options
   const dataDir = root.dir
-  const mark = bootTimer()
+  const timer = bootTimer()
+  const { mark } = timer
   // Started, not awaited. On a packaged macOS build this spawns a login shell to recover the owner's
   // PATH, which takes half a second to two seconds on a profile with a version manager in it. The
   // PATH is for spawning agents and build commands later, so the first spawn waits on it instead of
   // the whole boot (node-core server/core/loginShellPath.ts, docs/node-distribution.md § Boot order).
-  beginLoginShellPath(options.loginShellPath)
+  // `login-shell.settled` lands among the other marks wherever the probe finishes, which shows how far
+  // into the boot spawns were held.
+  const loginShell = beginLoginShellPath(options.loginShellPath)
   mark('login-shell')
+  void loginShell?.then(() => mark('login-shell.settled'))
   if (options.mcp) configureAcornMcp(options.mcp.name, options.mcp.launcher)
 
   // Each step starts as a no-op and is replaced once the boot builds what it closes, so a boot that
@@ -318,6 +299,8 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
       finishReconcile()
     })
     drain.reconciliation = () => reconcileTask
+    // The account ends at the cleanup's last mark, or at the probe's if a fast cleanup beat it.
+    void Promise.allSettled([reconcileTask, loginShell]).then(() => timer.finish())
 
     return { runtime, core, listener, keyCheck, reconciled, stop }
   } catch (error) {

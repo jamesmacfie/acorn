@@ -16,6 +16,7 @@ import {
   telemetrySummary,
   telemetryEnabled,
   telemetryFor,
+  whenTelemetryEnabled,
 } from './collector'
 
 // The real sampler, with a handle on the suspend callback the collector gives it, because a test
@@ -100,6 +101,28 @@ describe('when nothing is collecting', () => {
   })
 })
 
+describe('whenTelemetryEnabled', () => {
+  it('waits for the preference and a sink, then runs once', async () => {
+    const run = vi.fn()
+    startTelemetry({ node: 'node-1', version: '9', readPref: async () => '1' })
+    whenTelemetryEnabled(run)
+    await settle()
+    expect(run).not.toHaveBeenCalled()
+    collect()
+    expect(run).toHaveBeenCalledTimes(1)
+    setTelemetryPref(false)
+    setTelemetryPref(true)
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  it('forgets what was waiting when telemetry starts again', async () => {
+    const run = vi.fn()
+    whenTelemetryEnabled(run)
+    await enable()
+    expect(run).not.toHaveBeenCalled()
+  })
+})
+
 describe('when a sink is subscribed and the preference is on', () => {
   it('collects a record and hands it over on flush', async () => {
     const sink = await enable()
@@ -122,7 +145,8 @@ describe('when a sink is subscribed and the preference is on', () => {
     emitEvent('core', 'tick')
     expect(sink.records()).toHaveLength(0)
     await vi.advanceTimersByTimeAsync(5_000)
-    expect(sink.records()).toHaveLength(1)
+    // The runtime sampler's first readings land in the same window.
+    expect(sink.records().filter((record) => record.kind === 'event')).toHaveLength(1)
   })
 
   it('flushes at 500 records without waiting for the timer', async () => {

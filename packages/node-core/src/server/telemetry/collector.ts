@@ -547,6 +547,7 @@ export function onTelemetryBatch(sink: TelemetrySink, owner = 'core'): Disposabl
   // Settings can say who is reading the stream.
   state.sinks.set(sink, owner)
   arm()
+  announceEnabled()
   return {
     dispose: () => {
       state.sinks.delete(sink)
@@ -736,6 +737,31 @@ function disarm(): void {
   state.timer = null
 }
 
+// ── The first moment collection is on ───────────────────────────────────────────────────────────
+
+let whenEnabled: (() => void)[] = []
+
+/**
+ * Run `run` once, the first time collection is on, or now if it already is. For an account of time
+ * that passed before the switch could be read, such as the Node's own boot (`bootTimer`), which is
+ * otherwise built while collection is still off and dropped.
+ *
+ * Collection turns on in two places, the preference and the first sink, and both call
+ * `announceEnabled`. A second `startTelemetry` forgets what is waiting, so one boot's account never
+ * lands in the next one's.
+ */
+export function whenTelemetryEnabled(run: () => void): void {
+  whenEnabled.push(run)
+  announceEnabled()
+}
+
+function announceEnabled(): void {
+  if (!telemetryEnabled() || whenEnabled.length === 0) return
+  const waiting = whenEnabled
+  whenEnabled = []
+  for (const run of waiting) safely(run)
+}
+
 // ── Lifecycle ─────────────────────────────────────────────────────────────────────────────────────
 
 export type StartTelemetryOptions = {
@@ -766,6 +792,7 @@ export function setTelemetryPref(on: boolean): void {
 
 function applyPreference(on: boolean): void {
   state.prefEnabled = on
+  announceEnabled()
   if (!on && !PERF) {
     state.ring = []
     state.histograms.clear()
@@ -785,6 +812,7 @@ function applyPreference(on: boolean): void {
  */
 export function startTelemetry(options: StartTelemetryOptions): Disposable {
   invalidatePreference()
+  whenEnabled = []
   state.ring = []
   state.histograms.clear()
   state.node = options.node
@@ -826,6 +854,7 @@ export function stopTelemetry(): void {
  *  `startTelemetry` is the reset. */
 export function resetTelemetryForTest(): void {
   state.sinks.clear()
+  whenEnabled = []
   state.ring = []
   state.histograms.clear()
   state.prefEnabled = false

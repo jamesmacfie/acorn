@@ -42,7 +42,7 @@ file path. Workload sizes are histogram values, never labels.
 | Is the client cache responsible? | `cache.read`, `cache.deserialize`, `cache.serialize`, `cache.write`, `cache.dehydrate`, and `cache.restore_to_hydrated`. `cache.updates` labels only the query-cache action, never a key. |
 | Is a plugin flooding the UI? | `tree.apply`, `tree.queue.wait`, `tree.batch.operations`, `tree.batch.merged`, `tree.nodes`, and `tree.batch.refused`, by owning plugin. |
 | Is terminal output flooding its parser? | `terminal.output.size`, `terminal.pending.size`, `terminal.write`, and `terminal.fit`. |
-| Is the Node or helper under pressure? | `runtime.event_loop.p95`, `.max`, and `.utilization`, `runtime.cpu`, `runtime.memory.rss`, `runtime.memory.heap`, and `runtime.suspended`. |
+| Is the Node or helper under pressure? | `runtime.event_loop.p95`, `.max`, and `.utilization`, `runtime.cpu`, `runtime.memory.rss`, `runtime.memory.heap`, and `runtime.suspended`. The first two are histograms, so Sentry stores them as `runtime.event_loop.max.max`, `.p95`, `.p50`, and `.count`. |
 | Is it Acorn or the Mac? | `host.load.1m`, `host.memory.free`, and `host.swap.used` ([is it Acorn or the Mac?](#is-it-acorn-or-the-mac)). |
 | What held a slow Node request? | Its child spans: slow `git.*`, `proc.spawn`, and `sql.*` samples, `checkout.admission.wait`, `tool.availability`, `task.archive.phase`, and the plugins' `*.api` spans. |
 | Where is the memory going? | [Memory over a day](#memory-over-a-day). |

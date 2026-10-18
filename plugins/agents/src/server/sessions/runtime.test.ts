@@ -2136,6 +2136,32 @@ describe('managed agent runtime conformance', () => {
     expect(snapshot.turns.find((candidate) => candidate.id === turn.id)?.status).toBe('completed')
   })
 
+  it('names each reconcile step as it finishes, in order', async () => {
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry: new AgentDriverRegistry(),
+    })
+    const steps: string[] = []
+    await runtime.reconcile((step) => steps.push(step))
+    expect(steps).toEqual([
+      'unsettled',
+      'subagents',
+      'steering',
+      'commands',
+      'background',
+      'followups',
+      'attachments',
+      'skills',
+      'webhooks',
+      'goals',
+    ])
+  })
+
   it('reconciles an active turn and continues a durable queued turn after restart', async () => {
     const seed = await seedTask(testDb, dataDir)
     const beforeRestart = new ManagedAgentRuntime({
