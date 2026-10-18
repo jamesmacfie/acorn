@@ -4,7 +4,13 @@ import { runCommand, validateCommand } from './commands'
 import { CliError, reportError } from './error'
 import { openCliNode } from './node'
 import { writeOutput } from './output'
-import { nodeServiceStatus, startNodeService, stopNodeService } from './supervision/lifecycle'
+import {
+  nodeServiceStatus,
+  restartNodeService,
+  runNodeForeground,
+  startNodeService,
+  stopNodeService,
+} from './supervision/lifecycle'
 import { pluginCommandHelp } from './pluginCommands'
 import { hostTargets, installNativeHost, nativeHostStatus, uninstallNativeHost } from './browser/hostInstall'
 
@@ -37,19 +43,26 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         'Task launch credentials permit task scripts commands only; run other CLI commands outside this session.',
         4,
       )
-    if (args.positionals[0] === 'node' && args.positionals[1] !== 'info') {
-      const verb = args.positionals[1]
+    const verb = args.positionals[1]
+    if (args.positionals[0] === 'node' && ['start', 'status', 'stop', 'restart'].includes(verb!)) {
+      if (verb === 'start' && args.options.foreground) {
+        const outcome = await runNodeForeground(args.options.log)
+        if (typeof outcome === 'number') return outcome
+        writeOutput(outcome, args)
+        return 0
+      }
       const result =
         verb === 'start'
           ? await startNodeService()
           : verb === 'status'
             ? await nodeServiceStatus()
-            : await stopNodeService(args.options.force === 'true')
+            : verb === 'restart'
+              ? await restartNodeService()
+              : await stopNodeService(args.options.force === 'true')
       writeOutput(result, args)
       return 0
     }
     if (args.positionals[0] === 'browser') {
-      const verb = args.positionals[1]
       const targets = hostTargets({
         browser: args.options.browser,
         development: args.options.development === 'true',

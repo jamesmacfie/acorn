@@ -159,3 +159,57 @@ describe('CLI read projections', () => {
     ).rejects.toMatchObject({ code: 'usage', exitCode: 2 })
   })
 })
+
+describe('pairing and devices', () => {
+  const launcher = { id: 'device-cli', name: 'Standalone node launcher', createdAt: 1, lastSeenAt: 2, revokedAt: null }
+  const phone = { id: 'device-other', name: 'laptop', createdAt: 3, lastSeenAt: null, revokedAt: null }
+  function pairingNode() {
+    const mutations: [string, string][] = []
+    const node: CliNode = {
+      ...fakeNode({ '/v1/core/devices': { devices: [phone, launcher] } }),
+      endpoint: 'https://127.0.0.1:4317',
+      fingerprint: 'ab'.repeat(32),
+      deviceId: 'device-cli',
+      async mutate(method, path) {
+        mutations.push([method, path])
+        return path === '/v1/core/pair/start' ? { code: 'pairing-code', expiresInMs: 600_000 } : null
+      },
+    }
+    return { node, mutations }
+  }
+
+  it('opens a window with the identity words and closes it', async () => {
+    const { node, mutations } = pairingNode()
+    const window = await runCommand(node, parseCliArgs(['node', 'pair']))
+    expect(window).toMatchObject({
+      kind: 'PairingWindow',
+      nodeId: 'node-one',
+      endpoints: ['https://127.0.0.1:4317'],
+      code: 'pairing-code',
+    })
+    expect((window as { identity: string }).identity.split(' ')).toHaveLength(6)
+    expect(await runCommand(node, parseCliArgs(['node', 'pair', '--close']))).toBeUndefined()
+    expect(mutations).toEqual([
+      ['POST', '/v1/core/pair/start'],
+      ['DELETE', '/v1/core/pair'],
+    ])
+  })
+
+  it('marks this terminal and refuses to revoke it without --force', async () => {
+    const { node, mutations } = pairingNode()
+    expect(await runCommand(node, parseCliArgs(['node', 'devices']))).toMatchObject([
+      { id: 'device-other', thisTerminal: false },
+      { id: 'device-cli', thisTerminal: true },
+    ])
+    await expect(runCommand(node, parseCliArgs(['node', 'revoke', 'device-cli']))).rejects.toMatchObject({
+      code: 'revoke_self',
+    })
+    expect(mutations).toEqual([])
+    await runCommand(node, parseCliArgs(['node', 'revoke', 'device-other']))
+    await runCommand(node, parseCliArgs(['node', 'revoke', 'device-cli', '--force']))
+    expect(mutations).toEqual([
+      ['DELETE', '/v1/core/devices/device-other'],
+      ['DELETE', '/v1/core/devices/device-cli'],
+    ])
+  })
+})

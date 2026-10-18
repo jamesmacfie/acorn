@@ -80,4 +80,8 @@ describe('Node HTTP errors', () => {
       })
     }
   })
+
+  it('reads a 204 as no body', () => {
+    expect(decodeNodeResponse({ status: 204, body: new Uint8Array() }, 'DELETE', '/v1/core/devices/one')).toBeNull()
+  })
 })

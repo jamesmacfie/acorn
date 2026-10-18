@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { ChildProcess } from 'node:child_process'
 import { chmodSync, closeSync, existsSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { NodeBroker } from '@acorn/custody/broker'
 import { probeNode } from '@acorn/custody/broker/nodePairing.ts'
@@ -9,12 +10,14 @@ import {
   dataRootDir,
   launchNode,
   NodeStartTimeout,
+  requestNodeStop,
   runningNode,
   type LaunchedNode,
+  type NodeHandshake,
 } from '@acorn/custody/local'
 import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { lockedBy } from '@acorn/node-core/server/storage'
-import { NODE_PROTOCOL_VERSION, nodeInfoSchema } from '@acorn/protocol/node.ts'
+import { NODE_PROTOCOL_VERSION, NODE_RESTART_EXIT_CODE, nodeInfoSchema } from '@acorn/protocol/node.ts'
 import { CliError } from '../error'
 import { standaloneEntry } from './entry'
 import {
@@ -189,33 +192,34 @@ async function acquireClaim(path: string): Promise<void> {
   }
 }
 
+// Without `log`, the Node writes to this process's own stdout and stderr, as a foreground Node does.
 function launch(
   root: string,
-  logPath: string,
-  logFd: number,
   instanceId: string,
-  previousToken?: string,
+  detached: boolean,
+  previousToken: string | undefined,
+  log?: { path: string; fd: number },
 ): LaunchedNode {
   const launched = launchNode({
     entry: standaloneEntry(),
     dataDir: root,
     previousToken,
     env: {
-      ACORN_CLI_BACKGROUND: '1',
       ACORN_CLI_SERVICE_ID: instanceId,
-      ACORN_CLI_LOG_PATH: logPath,
+      ACORN_CLI_LOG_PATH: log?.path,
       ACORN_ADVERTISE_HOST: undefined,
     },
-    // The inherited fd captures module-load failures before the entry can install its bounded
-    // logger. Normal logs are intercepted by that logger after imports finish.
-    stdout: logFd,
-    stderr: logFd,
-    detached: true,
+    // The log's fd captures module-load failures before the entry can install its bounded logger.
+    // Normal logs are intercepted by that logger after imports finish.
+    stdout: log?.fd ?? 1,
+    stderr: log?.fd ?? 2,
+    detached,
   })
-  launched.child.unref()
+  if (detached) launched.child.unref()
   const handshake = launched.handshake.catch((error: unknown) => {
     if (error instanceof NodeStartTimeout) throw new CliError('node_start_timeout', error.message, 5)
-    throw new Error(`${error instanceof Error ? error.message : String(error)} See ${logPath}.`)
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(log ? `${message} See ${log.path}.` : message)
   })
   return { child: launched.child, handshake }
 }
@@ -232,28 +236,47 @@ async function discardFailedLaunch(child: ChildProcess): Promise<void> {
 }
 
 export async function startNodeService(root = dataRootDir()): Promise<ServiceStatus> {
-  root = canonicalRoot(root)
+  return (await startService(canonicalRoot(root), { foreground: false, logPath: servicePaths(root).log })).status
+}
+
+type ServiceStart = {
+  foreground: boolean
+  // Background mode always logs to the service's file. Foreground mode logs to one only with --log.
+  logPath?: string
+  // Called once the child exists, before its handshake, so a foreground launcher can forward a stop.
+  onSpawn?: (child: ChildProcess) => void
+}
+
+// Only the status when another Node already holds the root.
+type Started =
+  | { status: ServiceStatus }
+  | { status: ServiceStatus; child: ChildProcess; handshake: NodeHandshake; instanceId: string }
+
+async function startService(root: string, start: ServiceStart): Promise<Started> {
   const paths = servicePaths(root)
   prepareServiceDir(paths.dir)
   await acquireClaim(paths.claim)
   let child: ChildProcess | undefined
   try {
     const existing = await nodeServiceStatus(root)
-    if (existing.state === 'running' || existing.state === 'running-unowned') return existing
+    if (existing.state === 'running' || existing.state === 'running-unowned') return { status: existing }
     if (existing.state === 'starting' && existing.pid !== process.pid)
       throw new CliError('node_starting', `A Node is starting for ${root}.`, 4)
     const instanceId = randomUUID()
     const previousToken = custody().tokens.read(LOCAL_TOKEN_SCOPE)
-    // Create the restricted log before spawning; early boot errors have somewhere to go.
-    const logFd = openSync(paths.log, 'a', 0o600)
-    chmodSync(paths.log, 0o600)
     let launched: ReturnType<typeof launch>
-    try {
-      launched = launch(root, paths.log, logFd, instanceId, previousToken)
-    } finally {
-      closeSync(logFd)
-    }
+    if (start.logPath) {
+      // Create the restricted log before spawning; early boot errors have somewhere to go.
+      const logFd = openSync(start.logPath, 'a', 0o600)
+      chmodSync(start.logPath, 0o600)
+      try {
+        launched = launch(root, instanceId, !start.foreground, previousToken, { path: start.logPath, fd: logFd })
+      } finally {
+        closeSync(logFd)
+      }
+    } else launched = launch(root, instanceId, !start.foreground, previousToken)
     child = launched.child
+    start.onSpawn?.(child)
     const handshake = await launched.handshake
     const probe = await probeNode(handshake.endpoint)
     if (
@@ -297,12 +320,13 @@ export async function startNodeService(root = dataRootDir()): Promise<ServiceSta
       nodeId: handshake.nodeId,
       endpoint: handshake.endpoint,
       fingerprint: handshake.fingerprint,
-      logPath: paths.log,
+      logPath: start.logPath ?? null,
       startedAt: Date.now(),
+      ...(start.foreground ? { foreground: true } : {}),
     }
     writeServiceRecord(paths.record, record)
     child.stdio[3]?.destroy()
-    return status('running', {
+    const running = status('running', {
       nodeId: record.nodeId,
       pid: record.pid,
       endpoint: record.endpoint,
@@ -310,6 +334,7 @@ export async function startNodeService(root = dataRootDir()): Promise<ServiceSta
       healthy: true,
       logPath: record.logPath,
     })
+    return { status: running, child, handshake, instanceId }
   } catch (error) {
     if (child) await discardFailedLaunch(child)
     throw error
@@ -318,7 +343,7 @@ export async function startNodeService(root = dataRootDir()): Promise<ServiceSta
   }
 }
 
-export async function stopNodeService(force = false, root = dataRootDir()): Promise<ServiceStatus> {
+export async function stopNodeService(force = false, root = dataRootDir(), restart = false): Promise<ServiceStatus> {
   root = canonicalRoot(root)
   const current = await nodeServiceStatus(root)
   if (current.state === 'stopped') return current
@@ -328,7 +353,18 @@ export async function stopNodeService(force = false, root = dataRootDir()): Prom
   const record = readServiceRecord(paths.record, root)
   if (!record || record.pid !== current.pid || lockedBy(root) !== current.pid)
     throw new CliError('node_not_owned', 'Node ownership changed before stop.', 4)
-  process.kill(current.pid, force ? 'SIGKILL' : 'SIGTERM')
+  if (force) process.kill(current.pid, 'SIGKILL')
+  else if (!(await askToDrain(root, restart))) {
+    // A signal can't ask for a restart, and Windows ends a process outright for SIGTERM, skipping the drain.
+    if (restart) throw new CliError('node_restart_refused', `Node ${current.pid} did not take the restart request.`, 4)
+    if (process.platform === 'win32')
+      throw new CliError(
+        'node_stop_refused',
+        `Node ${current.pid} did not take the stop request. Run acorn node stop --force to end it without a drain.`,
+        4,
+      )
+    process.kill(current.pid, 'SIGTERM')
+  }
   const deadline = Date.now() + STOP_TIMEOUT_MS
   while (Date.now() < deadline) {
     if (lockedBy(root) !== current.pid || !processAlive(current.pid)) {
@@ -337,5 +373,74 @@ export async function stopNodeService(force = false, root = dataRootDir()): Prom
     }
     await delay(POLL_MS)
   }
-  throw new CliError('node_stop_timeout', `Node ${current.pid} did not finish draining; see ${record.logPath}.`, 5)
+  const see = record.logPath ? `see ${record.logPath}` : "see the Node's output"
+  throw new CliError('node_stop_timeout', `Node ${current.pid} did not finish draining; ${see}.`, 5)
+}
+
+async function askToDrain(root: string, restart: boolean): Promise<boolean> {
+  const token = custody().tokens.read(LOCAL_TOKEN_SCOPE)
+  const running = runningNode(root)
+  return Boolean(token && running && (await requestNodeStop(running, token, restart)))
+}
+
+/** A foreground Node restarts inside its launcher, so a service manager sees no exit. A background one
+ *  has no launcher left, so it's stopped and started again. */
+export async function restartNodeService(root = dataRootDir()): Promise<ServiceStatus> {
+  root = canonicalRoot(root)
+  if (!readServiceRecord(servicePaths(root).record, root)?.foreground) {
+    await stopNodeService(false, root)
+    return startNodeService(root)
+  }
+  await stopNodeService(false, root, true)
+  const deadline = Date.now() + START_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    const restarted = await nodeServiceStatus(root)
+    if (restarted.state === 'running') return restarted
+    await delay(POLL_MS)
+  }
+  throw new CliError('node_start_timeout', 'The Node stopped but its launcher did not start it again.', 5)
+}
+
+/** `acorn node start --foreground`: the background start, attached. The Node writes to this process's
+ *  stdout and stderr, or to `logPath`, and this process exits with the Node's exit code. Answers the
+ *  running Node's status instead when one already holds the root. */
+export async function runNodeForeground(logPath?: string, root = dataRootDir()): Promise<ServiceStatus | number> {
+  root = canonicalRoot(root)
+  let child: ChildProcess | undefined
+  let handshake: NodeHandshake | undefined
+  let stopping = false
+  // The Node drains on either signal and ignores a repeat, so this is safe when a terminal or systemd
+  // also signalled it directly. Windows ends a process outright for a signal, so there the drain is
+  // asked for over the route.
+  const forward = (signal: NodeJS.Signals): void => {
+    stopping = true
+    if (process.platform === 'win32' && handshake) void requestNodeStop(handshake, handshake.deviceToken)
+    else child?.kill(signal)
+  }
+  process.on('SIGINT', forward)
+  process.on('SIGTERM', forward)
+  try {
+    for (;;) {
+      let exited: Promise<number> | undefined
+      const started = await startService(root, {
+        foreground: true,
+        logPath: logPath && resolve(logPath),
+        onSpawn(spawned) {
+          child = spawned
+          exited = new Promise((done) => spawned.once('exit', (code) => done(code ?? 1)))
+          // A stop that arrived before the spawn.
+          if (stopping) spawned.kill('SIGTERM')
+        },
+      })
+      if (!('child' in started)) return started.status
+      handshake = started.handshake
+      const code = await exited!
+      clearServiceRecord(servicePaths(root).record, started.instanceId)
+      // Restart on request only. A crash is the service manager's to restart.
+      if (code !== NODE_RESTART_EXIT_CODE || stopping) return code
+    }
+  } finally {
+    process.off('SIGINT', forward)
+    process.off('SIGTERM', forward)
+  }
 }

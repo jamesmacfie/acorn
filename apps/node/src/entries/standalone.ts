@@ -9,7 +9,7 @@ import { advertisedHosts, confirmAdvertiseHost } from '@acorn/node-core/server/t
 import { openDataRoot } from '@acorn/node-core/server/storage'
 import { enrollNode } from '@acorn/node-core/server/enrollment.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
-import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
+import { NODE_PROTOCOL_VERSION, NODE_RESTART_EXIT_CODE } from '@acorn/protocol/node.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth'
 import { bootNode } from '../composition/boot'
 import { installBackgroundLog } from './background'
@@ -22,14 +22,16 @@ import { installBackgroundLog } from './background'
 import { installCrashHandlers } from '../composition/crash'
 import { createLogger } from '@acorn/node-core/server/telemetry'
 
+// Set when the CLI runs this Node, in the background or the foreground. The CLI holds its token and
+// opens codes with `acorn node pair`, so this Node prints no banner and ignores SIGUSR1. Deleted, like
+// ACORN_LAUNCHER_PIPES below, so a Node started from one of this Node's terminals is not mistaken for it.
+const serviceInstanceId = process.env.ACORN_CLI_SERVICE_ID
+const logPath = process.env.ACORN_CLI_LOG_PATH
+delete process.env.ACORN_CLI_SERVICE_ID
+delete process.env.ACORN_CLI_LOG_PATH
 // Before anything can throw. A crash during boot is otherwise a silent death with no record
 // (../composition/crash.ts).
-const background = process.env.ACORN_CLI_BACKGROUND === '1'
-if (background) {
-  if (!process.env.ACORN_CLI_LOG_PATH || !process.env.ACORN_CLI_SERVICE_ID)
-    throw new Error('Missing background service configuration')
-  installBackgroundLog(process.env.ACORN_CLI_LOG_PATH)
-}
+if (logPath) installBackgroundLog(logPath)
 installCrashHandlers()
 
 // fd 3 and fd 4 are this process's pipes to its launcher, so a Node started from one of this Node's
@@ -70,16 +72,34 @@ if (development && !bundledRoot) {
   )
 }
 
+// SIGINT, SIGTERM, and POST /v1/core/node/stop run the same bounded drain as a desktop-supervised
+// node (docs/node-distribution.md § Operations). The first request decides the exit code, and a repeat
+// is ignored: `acorn node start --foreground` forwards a signal that a terminal or systemd may also
+// have sent here, and a second one must not cut the drain short.
+//
+// Above the boot, because the stop route can call it as soon as the listener binds, before `node`
+// exists. That is well after bootNode has returned `booting`.
+let stopping = false
+async function shutdown(reason: string, restart = false): Promise<void> {
+  if (stopping) return
+  stopping = true
+  log.info(`${reason} — draining`)
+  await (await booting).stop()
+  process.exit(restart ? NODE_RESTART_EXIT_CODE : 0)
+}
+
 // The shared boot (../composition/boot.ts). This host has no start config: no app version, no
 // delivered keys, no disabled-plugin override, and no staged MCP entry. It was started from a shell or
 // a service manager, so it skips the login shell PATH probe.
-const node = await bootNode({
+const booting = bootNode({
   root,
-  serviceInstanceId: background ? process.env.ACORN_CLI_SERVICE_ID : undefined,
+  serviceInstanceId,
   bundledPluginsDir: bundledRoot,
   development,
   loginShellPath: false,
+  requestStop: (restart) => void shutdown(restart ? 'restart requested' : 'stop requested', restart),
 })
+const node = await booting
 const { runtime, listener } = node
 // Awaited, unlike the supervised host: a launcher acts on the handshake below, so the node finishes
 // re-attaching sessions and repairing worktrees before it prints it.
@@ -114,16 +134,8 @@ await enrollNode({
 // brings no working token. After that, every node looks paired.
 const alreadyPaired = (await runtime.DEVICES.list()).filter((device) => device.revokedAt === null).length
 
-// SIGINT and SIGTERM run the same bounded drain as a desktop-supervised node
-// (docs/node-distribution.md § Operations).
-const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
-  log.info(`${signal} — draining`)
-  await node.stop()
-  process.exit(0)
-}
-
-// Signals are wired before anything announces readiness, and the order matters: until
-// `process.once('SIGTERM')` runs, SIGTERM keeps its default disposition, so the kernel kills the
+// Signals are wired before anything announces readiness, and the order matters: until the SIGTERM
+// listener below is added, SIGTERM keeps its default disposition, so the kernel kills the
 // process outright, with no drain and no lock release. A supervisor, or the shutdown integration
 // test, acts the instant it sees the handshake line, so anything printed before this point risks
 // being killed mid-boot.
@@ -131,9 +143,9 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
 // SIGUSR1 reopens the pairing window (docs/node-distribution.md § Runtime): no token, no second
 // port, and it needs shell access on this machine, the same "the owner is present" property pairing
 // itself relies on.
-if (!background) process.on('SIGUSR1', () => printPairingBanner(runtime.PAIRING_CODES.issue()))
-process.once('SIGINT', (signal) => void shutdown(signal))
-process.once('SIGTERM', (signal) => void shutdown(signal))
+if (!serviceInstanceId) process.on('SIGUSR1', () => printPairingBanner(runtime.PAIRING_CODES.issue()))
+process.on('SIGINT', (signal) => void shutdown(signal))
+process.on('SIGTERM', (signal) => void shutdown(signal))
 
 const handshake = {
   baseline: ACORN_BASELINE,
@@ -191,7 +203,9 @@ function printPairingBanner(code: string | null): void {
     console.log('  In acorn: Settings → Nodes → add a node. Paste the address, check the identity')
     console.log('  words match what acorn shows you, then paste the code.')
   } else {
-    console.log(`  ${alreadyPaired} device(s) already paired. For another, run:  kill -USR1 ${process.pid}`)
+    console.log(`  ${alreadyPaired} device(s) already paired. For another, run:  acorn node pair`)
+    if (process.platform !== 'win32')
+      console.log(`  or, from a terminal acorn hasn't paired:  kill -USR1 ${process.pid}`)
   }
   if (reachable.length === 0) {
     console.log("  To reach this node from another machine, set advertiseHost in this data root's")
@@ -200,4 +214,4 @@ function printPairingBanner(code: string | null): void {
   console.log('')
 }
 
-if (!background) printPairingBanner(alreadyPaired === 0 ? runtime.PAIRING_CODES.issue() : null)
+if (!serviceInstanceId) printPairingBanner(alreadyPaired === 0 ? runtime.PAIRING_CODES.issue() : null)

@@ -18,6 +18,7 @@ Every route in this table is device-only.
 | `POST` | `/v1/core/pair/requests/:id` | Allow or deny that request |
 | `GET` | `/v1/core/devices` | List paired devices, without token material |
 | `DELETE` | `/v1/core/devices/:id` | Revoke a device and close its sockets |
+| `POST` | `/v1/core/node/stop` | Answer `202`, then drain and exit. `{ "restart": true }` exits with code 75 for a foreground launcher to start it again. A loopback peer only, and the desktop's Node refuses it ([stop and restart](../cli/local-service.md#stop-and-restart)) |
 | `GET` | `/v1/core/plugins` | The plugin roster, install state, and pending agent install requests |
 | `PUT` | `/v1/core/plugins` | Replace the disabled list with `{ disabled }` |
 | `POST` | `/v1/core/plugins/install` | Install a package from GitHub, npm, a URL, or a folder. Needs `Idempotency-Key` |

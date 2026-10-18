@@ -17,6 +17,9 @@ import { CliError } from './error'
 export type CliNode = {
   nodeId: string
   endpoint: string
+  /** The pinned certificate and this terminal's device row. Absent on a task connection. */
+  fingerprint?: string
+  deviceId?: string
   taskId?: string
   get(path: string, signal?: AbortSignal): Promise<unknown>
   mutate(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body: unknown, key: string): Promise<unknown>
@@ -38,6 +41,7 @@ export function decodeNodeResponse(
   path: string,
   key?: string,
 ): unknown {
+  if (response.status === 204) return null
   let result: unknown
   try {
     result = JSON.parse(new TextDecoder().decode(response.body))
@@ -242,6 +246,9 @@ export async function openCliNode(target?: string): Promise<CliNode> {
   return {
     nodeId: selected.nodeId,
     endpoint: selected.endpoint,
+    fingerprint: selected.fingerprint,
+    // A device token names its own row (docs/authentication.md § Device tokens).
+    deviceId: /^acorn_dt_([0-9a-f-]{36})_/.exec(token)?.[1],
     get: (path, signal) => request('GET', path, undefined, undefined, signal),
     mutate: (method, path, body, key) => request(method, path, body, key),
     waitForHint(sessionId, timeoutMs) {

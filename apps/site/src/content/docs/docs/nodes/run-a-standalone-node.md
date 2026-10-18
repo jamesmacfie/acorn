@@ -75,6 +75,7 @@ The command line can run a Node for this machine in the background, from the arc
 ```sh
 node bin/acorn.mjs node start --background
 node bin/acorn.mjs node status
+node bin/acorn.mjs node restart
 node bin/acorn.mjs node stop
 ```
 
@@ -82,15 +83,20 @@ node bin/acorn.mjs node stop
 - `node status` says **running**, **starting**, **stopped**, or **running-unowned**, with the Node's ID,
   address, process ID, and log file. **running-unowned** is a Node something else started, such as the
   desktop app or a terminal.
-- `node stop` asks the Node to finish what it's doing, and waits up to 40 seconds. It won't stop a Node
-  it didn't start. `node stop --force` kills a Node it started that won't stop.
+- `node stop` asks the Node to finish what it's doing, and waits up to 40 seconds, on Windows too. It
+  won't stop a Node it didn't start. `node stop --force` kills a Node it started that won't stop.
+- `node restart` stops the Node and starts it again.
+- `node start --foreground` runs the Node the same way, but stays attached and writes the Node's output
+  to the terminal, for a service manager. `--log <file>` writes it to a file that starts over at 8 MB
+  instead.
 
-These three always use this machine's data folder, and refuse `--node`. The command line keeps the
-Node's log in its config folder, under `services/`, and starts a new log file at 8 MB.
+These always use this machine's data folder, and refuse `--node`. The command line keeps the Node's log
+in its config folder, under `services/`, and starts a new log file at 8 MB.
 
-A Node started this way prints no pairing banner. The command line and the terminal client on that
-machine already have its token. To pair a client on another machine, run the Node in a terminal or as a
-service instead, where it prints a pairing code.
+A Node started this way prints no pairing banner, because the command line on that machine already has
+its token. To pair a client on another machine, run `node bin/acorn.mjs node pair`. It prints the
+Node's address, its identity, and a pairing code. `node devices` lists the paired devices, and
+`node revoke <id>` revokes one.
 
 ## Run it as a service
 
@@ -119,8 +125,9 @@ WantedBy=multi-user.target
 When the service stops, the Node gets SIGTERM and finishes within 30 seconds: it stops waiting on task
 scripts, closes its connections and databases, and releases its data folder. The pairing banner goes to
 the service's log. The Node never writes a device token to its output, so the log holds at most a pairing
-code, which lasts ten minutes. Once a device is paired, the banner shows the command that opens a new
-pairing code, `kill -USR1 <pid>`. Run it, and read the code from the log.
+code, which lasts ten minutes. Once a device is paired, the banner shows the commands that open a new
+pairing code: `acorn node pair`, from a terminal acorn has paired with the Node, or `kill -USR1 <pid>`,
+which writes the code to the log.
 
 ## Which plugins it has
 
@@ -139,7 +146,7 @@ and keeps up to date the way the desktop app does.
 - What needs a window doesn't work: folder pickers, native dialogs, and the Preview pane, which acorn
   refuses for a Node on another machine.
 - Add a project by typing its path on the Node's machine.
-- On Windows there's no `SIGUSR1`. Restart the Node for a new pairing code.
+- On Windows there's no `SIGUSR1`. Run `acorn node pair` for a new pairing code.
 - Agents on a standalone Node run as the Node's user, so they can read its keys, from its data folder or
   its environment. The Node warns about this when it starts. The desktop app's Node keeps its keys
   sealed instead ([Credentials and secrets](/docs/security/credentials-and-secrets/)).

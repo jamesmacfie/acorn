@@ -43,11 +43,14 @@ const valueOptions = new Set([
   'browser',
   'bridge-dir',
   'registry-dir',
+  'log',
 ])
 const flagOptions = new Set([
   'help',
   'no-header',
   'background',
+  'foreground',
+  'close',
   'force',
   'skip-setup',
   'include-hidden',
@@ -138,7 +141,13 @@ export function helpFor(positionals: string[]): string {
                       'plugin ID COMMAND --help',
                     ]
                   : section === 'node'
-                    ? ['node info', 'node start --background', 'node status', 'node stop [--force]']
+                    ? [
+                        'node info|status',
+                        'node start --background|--foreground [--log FILE]',
+                        'node stop [--force]|restart',
+                        'node pair [--close]|devices|revoke ID [--force]',
+                        'stop and restart drain the Node; pair, devices, and revoke also take --node',
+                      ]
                     : section === 'browser'
                       ? [
                           'browser install|status|uninstall [--browser chrome|firefox]',
@@ -146,7 +155,7 @@ export function helpFor(positionals: string[]): string {
                           'uninstall removes the registrations and keeps pairings; status names the folder that holds them',
                         ]
                       : [
-                          'node info|start|status|stop',
+                          'node info|start|status|stop|restart|pair|devices|revoke',
                           'workspace list|show|create|rename|remove|external-projects',
                           'project list|show|add|rename|move|hide|unhide|detect|remove|config',
                           'task list|show|create|scripts status|scripts wait|scripts logs',

@@ -35,7 +35,7 @@ export function runningNode(dataDir: string): RunningNode | null {
   }
 }
 
-const TOKEN_CHECK_TIMEOUT_MS = 5_000
+const LOCAL_REQUEST_TIMEOUT_MS = 5_000
 
 /** The saved token for the Node on this computer, or nothing when that Node refuses it.
  *
@@ -54,7 +54,7 @@ export async function usableLocalToken(running: RunningNode, tokens: DeviceToken
       method: 'GET',
       headers: { authorization: `Bearer ${token}` },
       agent,
-      signal: AbortSignal.timeout(TOKEN_CHECK_TIMEOUT_MS),
+      signal: AbortSignal.timeout(LOCAL_REQUEST_TIMEOUT_MS),
       maxResponseBytes: 16 * 1024,
     })
     if (response.status !== 200) return token
@@ -64,6 +64,33 @@ export async function usableLocalToken(running: RunningNode, tokens: DeviceToken
     return undefined
   } catch {
     return token
+  } finally {
+    agent.destroy()
+  }
+}
+
+/** Asks a Node on this computer to drain and exit over `POST /v1/core/node/stop`. With `restart`, it
+ *  exits with NODE_RESTART_EXIT_CODE so a foreground launcher starts it again. False when the Node
+ *  didn't take the request, so the caller can fall back to a signal. */
+export async function requestNodeStop(
+  node: Pick<RunningNode, 'endpoint' | 'fingerprint' | 'certPem'>,
+  token: string,
+  restart = false,
+): Promise<boolean> {
+  const agent = new HttpsAgent(pinnedTlsOptions(node.fingerprint, node.certPem))
+  try {
+    const response = await nodeRequest({
+      url: new URL('/v1/core/node/stop', node.endpoint),
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify({ restart })) },
+      agent,
+      signal: AbortSignal.timeout(LOCAL_REQUEST_TIMEOUT_MS),
+      maxResponseBytes: 16 * 1024,
+    })
+    return response.status === 202
+  } catch {
+    return false
   } finally {
     agent.destroy()
   }

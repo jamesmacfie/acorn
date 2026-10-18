@@ -16,7 +16,7 @@ source is `apps/cli/src/`, and `apps/cli/src/args.ts` holds the parser and the h
 | [Workspaces, projects, and tasks](./cli/workspaces-projects-tasks.md) | Core writes, request IDs, stdin piping, and task script reads |
 | [Agents and workflows](./cli/agents-and-workflows.md) | Managed agent sessions, workflow runs, and the merged run list |
 | [Plugin commands](./cli/plugin-commands.md) | Discovering and invoking a plugin's CLI commands |
-| [The local service](./cli/local-service.md) | `node start --background`, `status`, and `stop` |
+| [The local service](./cli/local-service.md) | `node start`, `status`, `stop`, `restart`, `pair`, `devices`, and `revoke` |
 | [The browser host](./cli/browser-host.md) | `browser install`, `status`, and `uninstall` for the browser extension |
 
 ## Choosing a Node
@@ -32,13 +32,15 @@ follows them.
 To pair with a local Node, run the command in an interactive terminal. It prints three words, and the
 desktop that started the Node opens a dialog with the same words. Click **Allow** there
 ([pairing by approval](./api-reference/transport.md#pairing-by-approval)). To use a code instead, get
-one from **Settings → Nodes → Pair another client**, or for a standalone Node, run `kill -USR1 PID` and
-read it from its terminal. Then type it at the prompt.
+one from **Settings → Nodes → Pair another client**, or run `acorn node pair` in a terminal already paired
+with the Node ([pair from the terminal](./cli/local-service.md#pair-from-the-terminal)). Then type it at
+the prompt.
 
 ## Commands
 
 ```text
-acorn [--node NODE] node info|start --background|status|stop [--force]
+acorn node start --background|--foreground [--log FILE]|status|stop [--force]|restart
+acorn [--node NODE] node info|pair [--close]|devices|revoke ID [--force]
 acorn [--node NODE] workspace list|show ID|create --name NAME|rename ID --name NAME|remove ID
 acorn [--node NODE] workspace external-projects list ID|replace ID --file FILE|-
 acorn [--node NODE] project list [--workspace ID] [--include-hidden]|show ID

@@ -77,7 +77,10 @@ In the desktop, **Settings → Nodes → Pair another client** calls the start r
 the code beside its pinned identity words, and **Close pairing** closes the window early. **Pair a
 browser** opens the same window and words the code for the [browser extension](./browser-extension.md)'s
 panel. A standalone
-Node prints its code in its terminal and opens a window again on `SIGUSR1`.
+Node started by hand prints a code in its terminal while nothing is paired. On the Node's machine,
+`acorn node pair` opens a window and prints its code beside the identity words, and `acorn node devices`
+and `acorn node revoke` list and revoke devices ([the local service](./cli/local-service.md)). On macOS
+and Linux, `SIGUSR1` also opens a window on a Node started by hand.
 
 Ordinary failures get one `401 pairing_failed` with no detail. The 4 KiB body ceiling returns
 `413 payload_too_large`, and the 20-a-minute ceiling returns `429 rate_limited`. Neither spends the code

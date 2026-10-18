@@ -1,8 +1,8 @@
 # The local service
 
-This page covers the CLI commands that own a background Node on this machine: `node start
---background`, `node status`, and `node stop`. It's part of the [command-line client](../cli.md). The
-code is in `apps/cli/src/supervision/`.
+This page covers the CLI commands that run and administer a Node on this machine: `node start`,
+`status`, `stop`, `restart`, `pair`, `devices`, and `revoke`. It's part of the
+[command-line client](../cli.md). The service code is in `apps/cli/src/supervision/`.
 
 ## Start, check, and stop
 
@@ -13,25 +13,73 @@ acorn workspace list --output json
 acorn node stop --output json
 ```
 
-These commands select only this machine's data root, and `--node` is refused. `start` runs the
-standalone entry from the extracted archive and returns after the Node answers an authenticated health
-request. A second `start` returns the same `running` service.
+`start`, `status`, `stop`, and `restart` select only this machine's data root, and `--node` is refused.
+`start` takes exactly one of `--background` and `--foreground`, and runs the standalone entry from the
+extracted archive. `--background` returns after the Node answers an authenticated health request. A
+second `start` returns the same `running` service.
 
 `status` reports `running`, `starting`, `stopped`, or `running-unowned`, plus the Node ID, PID, endpoint,
 protocol, health, and log path when known. A desktop or hand-started Node is `running-unowned`: the CLI
 can read through it when paired, but `stop` refuses it.
 
-`stop` sends SIGTERM and waits up to 40 seconds for the Node's 30-second drain and lock release.
-`stop --force` kills a service only after the same ownership proof, and never targets an unknown PID. An
-already stopped service returns `stopped`.
-
 A clean root starts without stdin or a pairing prompt. Creating a workspace is a separate Node operation,
 so `workspace list` may return an empty array at first. Ordinary reads never create a service.
+
+## Run under a service manager
+
+`acorn node start --foreground` is the background start, attached. It uses the same launcher pipes,
+service record, and token custody, so the CLI holds the Node's token afterward. The Node writes to the
+command's stdout and stderr, which systemd keeps in its journal. `--log FILE` writes them to a log that
+rotates at 8 MiB instead, for launchd and Windows, which don't rotate. Neither carries a credential.
+
+The command forwards SIGTERM and SIGINT to the Node and exits with the Node's exit code. The Node treats
+a repeated signal as the same stop, so a terminal or systemd that also signals it directly can't cut its
+drain short. A crash is the service manager's to restart. Like `--background`, it drops
+`ACORN_ADVERTISE_HOST` from the Node's environment, so set `advertiseHost` in `node.json` instead.
+
+## Stop and restart
+
+`stop` asks the Node over `POST /v1/core/node/stop` with its device token, then waits up to 40 seconds
+for the 30-second drain and the lock release. The route answers only a device on this computer, so a
+paired client on another machine can't stop the Node, and it writes a `node.stop.requested` audit row.
+When the Node doesn't take the request, `stop` sends SIGTERM on macOS and Linux. Windows ends a process
+outright for SIGTERM, so there it reports `node_stop_refused` instead. `stop --force` kills a service
+only after the same ownership proof, and never targets an unknown PID. An already stopped service
+returns `stopped`.
+
+`restart` sends `{ "restart": true }`, and the Node exits with code 75 after its drain. A foreground
+launcher starts it again in the same process, so a service manager sees no exit. A background Node has
+no launcher left, so `restart` stops it and starts it with `--background`. A desktop's Node refuses the
+route, because the desktop owns its lifetime.
+
+## Pair from the terminal
+
+`acorn node pair` opens a pairing window and prints what a person on the other machine needs: the
+address, the certificate fingerprint as six identity words, and a code valid for ten minutes. With
+`--output json` it writes one `PairingWindow` resource with `endpoints`, `identity`, `code`, and
+`expiresAt`. The code is meant to be read, so it's printed. No device token is. `--close` closes the
+window early.
+
+The address is the one the CLI reached the Node on, which for the local Node is loopback. To reach it
+from another machine, set `advertiseHost` in the data root's `node.json` and run `acorn node restart`
+([reaching a node from another machine](../node-distribution.md#reaching-a-node-from-another-machine)).
+
+`pair` uses the CLI's device token, and with none it pairs the CLI first, as every command does. It
+also takes `--node`, because opening a code needs no authority a paired device lacks. A Node that runs
+as another operating system user is paired by that user, such as `sudo -u acorn acorn node pair`.
+
+## List and revoke devices
+
+`acorn node devices` lists each paired device: its ID, name, `pairedAt`, `lastSeenAt`, `revokedAt`, and
+`thisTerminal` for the CLI's own row. `acorn node revoke ID` revokes one and closes its sockets.
+Revoking the CLI's own device needs `--force`, because the CLI must pair again afterward. Both take
+`--node`.
 
 ## Records and logs
 
 The CLI keeps a mode-`0600` service record and a mode-`0600` log in its custody directory's `services/`
-subdirectory, at mode `0700`, keyed by the canonical data-root path. The log rotates to `.log.1` at 8 MiB.
+subdirectory, at mode `0700`, keyed by the canonical data-root path. A foreground Node records `foreground: true` and logs only with
+`--log`. The log rotates to `.log.1` at 8 MiB.
 If Windows can't rename an open log, the CLI truncates it at that limit instead. On Windows, restrict the
 custody directory with an NTFS ACL, because POSIX modes are advisory there.
 

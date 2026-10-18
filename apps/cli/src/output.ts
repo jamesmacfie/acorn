@@ -77,6 +77,28 @@ export function writeOutput(value: unknown, args: ParsedArgs): void {
     process.stdout.write(output + (output && !output.endsWith('\n') ? '\n' : ''))
     return
   }
+  if (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (value as { kind?: string }).kind === 'PairingWindow'
+  ) {
+    const window = value as { endpoints: string[]; identity: string; code: string; expiresAt: string }
+    const minutes = Math.round((Date.parse(window.expiresAt) - Date.now()) / 60_000)
+    const lines = [
+      `Connect to    ${window.endpoints.join('\n              ')}`,
+      `Identity      ${window.identity}`,
+      `Pairing code  ${window.code}   (valid ${minutes} minutes)`,
+      '',
+      'On the other machine, open Settings → Nodes, add a node, and check that the identity words match.',
+    ]
+    if (window.endpoints.every((endpoint) => /^https:\/\/(127\.0\.0\.1|\[::1\]|localhost)[:/]/.test(endpoint)))
+      lines.push(
+        "That address works on this computer only. To reach the Node from another machine, set advertiseHost in its data root's node.json, then run acorn node restart.",
+      )
+    process.stdout.write(`${lines.join('\n')}\n`)
+    return
+  }
   const rows = Array.isArray(value) ? value : [value]
   if (!rows.length) return
   const objects = rows as Record<string, unknown>[]

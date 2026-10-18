@@ -42,8 +42,11 @@ export type BootNodeOptions = {
   // Delivered in the desktop helper's start message. Without them the Node reads its keys from files in
   // the data root or from SESSION_ENC_KEY (docs/security/credentials.md § Node keys).
   keys?: NodeKeys
-  // Set when the CLI runs this Node as a background service.
+  // Set when the CLI runs this Node, in the background or the foreground.
   serviceInstanceId?: string
+  // What POST /v1/core/node/stop calls. Only the standalone host passes one: the desktop owns its Node's
+  // lifetime, so the route refuses there.
+  requestStop?: (restart: boolean) => void
   // The app's own read-only plugin packages. Absent on a service-managed standalone Node, which has
   // nothing to reconcile from (docs/node-distribution.md § Plugins).
   bundledPluginsDir?: string
@@ -154,7 +157,10 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
     reconcileBundledPackages({ dataDir, bundledRoot: options.bundledPluginsDir, development: options.development })
     mark('bundled-packages')
     const capabilities = new CapabilityRegistry()
-    const runtime = makeRuntime(root, capabilities, options.serviceInstanceId, options.keys)
+    const runtime = {
+      ...makeRuntime(root, capabilities, options.serviceInstanceId, options.keys),
+      ...(options.requestStop ? { REQUEST_STOP: options.requestStop } : {}),
+    }
     const db = runtime.DB
     drain.sqlite = async () => db.close()
     // Audit retention and the idempotency sweep run as node-owned schedules, not boot-time calls

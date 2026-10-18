@@ -19,8 +19,11 @@ export type ServiceRecord = {
   nodeId: string
   endpoint: string
   fingerprint: string
-  logPath: string
+  // Null for a foreground Node writing to its launcher's stdout and stderr.
+  logPath: string | null
   startedAt: number
+  // Set by `acorn node start --foreground`, whose launcher restarts the Node in place.
+  foreground?: boolean
 }
 
 export function canonicalRoot(root: string): string {
@@ -56,8 +59,9 @@ export function readServiceRecord(path: string, root: string): ServiceRecord | n
       typeof row.nodeId !== 'string' ||
       typeof row.endpoint !== 'string' ||
       typeof row.fingerprint !== 'string' ||
-      typeof row.logPath !== 'string' ||
-      !Number.isSafeInteger(row.startedAt)
+      (row.logPath !== null && typeof row.logPath !== 'string') ||
+      !Number.isSafeInteger(row.startedAt) ||
+      (row.foreground !== undefined && typeof row.foreground !== 'boolean')
     )
       return null
     return row as ServiceRecord

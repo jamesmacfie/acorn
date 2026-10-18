@@ -2,7 +2,15 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import Ajv from 'ajv'
 import { describe, expect, it } from 'vitest'
-import { nodeResource, pluginResources, projectResource, taskResource, workspaceResource } from './projection'
+import {
+  deviceResource,
+  nodeResource,
+  pairingWindowResource,
+  pluginResources,
+  projectResource,
+  taskResource,
+  workspaceResource,
+} from './projection'
 
 const read = (name: string): unknown =>
   JSON.parse(readFileSync(resolve(import.meta.dirname, '../schemas', name), 'utf8'))
@@ -74,5 +82,36 @@ describe('versioned resource contract', () => {
     ]
     expect(projected).toEqual([node, workspace, project, task, plugin])
     for (const resource of projected) expect(validate(resource), JSON.stringify(validate.errors)).toBe(true)
+  })
+
+  it('projects a pairing window and a device without token material', () => {
+    const example = (kind: string) => examples.find((row) => row.kind === kind)
+    const window = pairingWindowResource('node-one', {
+      endpoints: ['https://127.0.0.1:4317'],
+      identity: 'maple orbit velvet canyon ember lantern',
+      code: 'Rk3vQ9mZt2LxWp8sYc4HbA',
+      expiresAt: Date.parse('2026-10-18T10:10:00.000Z'),
+    })
+    const device = deviceResource(
+      'node-one',
+      {
+        id: 'device-one',
+        name: 'Standalone node launcher',
+        createdAt: Date.parse('2026-10-18T10:00:00.000Z'),
+        lastSeenAt: null,
+        revokedAt: null,
+      },
+      'device-one',
+    )
+    expect(window).toEqual(example('PairingWindow'))
+    expect(device).toEqual(example('Device'))
+    expect(deviceResource('node-one', { ...device, createdAt: 0, lastSeenAt: 0, revokedAt: 0 }, 'other')).toMatchObject(
+      {
+        lastSeenAt: '1970-01-01T00:00:00.000Z',
+        revokedAt: '1970-01-01T00:00:00.000Z',
+        thisTerminal: false,
+      },
+    )
+    for (const resource of [window, device]) expect(validate(resource), JSON.stringify(validate.errors)).toBe(true)
   })
 })

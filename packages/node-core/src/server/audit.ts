@@ -45,6 +45,9 @@ type CoreAuditAction =
   // provisioned node that never reached its control plane is the failure nobody notices.
   | 'node.enrolled'
   | 'node.detached'
+  // A paired client on this computer asked the Node to stop or restart (docs/cli/local-service.md § Stop
+  // and restart). A signal leaves no row, because it carries no principal.
+  | 'node.stop.requested'
   // Third-party code arriving on, changing on, or leaving this node. The versions and the archive hash
   // ride along in `details` so "what exactly was running in March" is answerable from the trail alone
   // (docs/security/plugin-storage-and-supply-chain.md § Supply chain).

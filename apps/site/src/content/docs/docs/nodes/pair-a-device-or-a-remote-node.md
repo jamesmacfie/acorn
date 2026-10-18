@@ -39,11 +39,13 @@ network you trust.
 ## Get a pairing code
 
 A pairing code works once, for 10 minutes, and allows five tries. Opening a new one closes the last.
-There are two places to get one:
+There are three places to get one:
 
 - **The Node's terminal.** A standalone Node prints a code when it starts with nothing paired yet, under
-  **Pairing code**. With a device already paired, it prints the command for a new one instead:
-  `kill -USR1 <pid>`.
+  **Pairing code**. With a device already paired, it prints the commands for a new one instead.
+- **`acorn node pair` on the Node's machine.** It prints the Node's address, its identity, and a code,
+  on every operating system, from a terminal acorn has paired with the Node. `acorn node pair --close`
+  closes it early.
 - **A desktop app already paired with the Node.** Open **Settings** > **Machines** > **Nodes**, and click
   **Pair another client** on the Node's row. The code shows with **Copy the code**, and **Close pairing**
   closes it early.
@@ -117,6 +119,9 @@ On the Node's row in **Settings** > **Machines** > **Nodes**:
   Coming back takes a new pairing code. Revoking your only device on a remote Node can lock you out of
   it.
 
+In a terminal, `acorn node devices` lists the devices paired with a Node, and `acorn node revoke <id>`
+revokes one. Revoking the terminal's own device needs `--force`.
+
 Agents and the commands they run never get a device token. They get a token limited to their task.
 
 ## If a Node's identity changes
@@ -134,7 +139,7 @@ can't allow another client, because it draws no dialog. Use the desktop app or a
 ## Limits
 
 - A Node keeps its code in memory, so restarting it closes the code.
-- On Windows there's no `kill -USR1`. Restart the Node to get a new code.
+- On Windows there's no `kill -USR1`. Run `acorn node pair` for a new code.
 - Pairing without a code works only on the Node's own computer, and only with a desktop app there to
   allow it.
 - Every paired device has full control. There are no read-only devices.

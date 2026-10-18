@@ -33,12 +33,14 @@ release is the protocol version, because it has no app version. Work only one ho
 entry: `runtime.ts` reports service states and installed bytes, and `standalone.ts` handles
 enrollment, the pairing banner, the handshake, and signals.
 
-After the handshake it prints a pairing banner: the address, the certificate fingerprint as six words,
-and a live pairing code. Compare those words with the ones acorn shows on its pairing screen, because
-that comparison is what makes pairing safe. A code opens automatically only while no device is paired,
-lasts ten minutes, and allows five attempts, so a copy in a log exposes far less than a token would.
-`kill -USR1 <pid>` opens another without a restart. Windows has no `SIGUSR1`, so pairing a second device
-there means a restart.
+After the handshake, a Node started by hand prints a pairing banner: the address, the certificate
+fingerprint as six words, and a live pairing code. Compare those words with the ones acorn shows on its
+pairing screen, because that comparison is what makes pairing safe. A code opens automatically only
+while no device is paired, lasts ten minutes, and allows five attempts, so a copy in a log exposes far
+less than a token would. For another code, run `acorn node pair` on the Node's machine. It works on every
+platform from a terminal acorn has paired ([pair from the terminal](./cli/local-service.md#pair-from-the-terminal)).
+On macOS and Linux, `kill -USR1 <pid>` also opens one. A Node the CLI starts prints no banner, because
+the CLI holds its token.
 
 A standalone Node supports pure-Node features: workspaces, tasks, providers, Git, files, Docker, the
 bundled loaded plugins, and core routes. Shell-only operations such as native dialogs, child webviews, and
@@ -83,7 +85,7 @@ Node running when it quits.
 
 `acorn` keeps its own device token in its config directory, at mode `0600`, never in the Node's root. A
 Node the desktop started has a token that belongs to the desktop, so the first `acorn` against it asks
-for a pairing code: `kill -USR1 <pid>` opens one. `acorn --node https://host:4317` pairs with a Node
+to pair: allow it in the desktop, or type a code from **Settings → Nodes**. `acorn --node https://host:4317` pairs with a Node
 elsewhere, and remembers it so the next time is `acorn --node <name>`. The [CLI](./cli.md) uses the same
 custody.
 
@@ -178,7 +180,7 @@ and the Node warns about it at boot ([Node keys](./security/credentials.md#node-
 ## Operations
 
 Use a dedicated mode-`0700` data root, and only one process may hold it. The `0700` and `0600` modes are
-POSIX permissions. On Windows they're advisory, so restrict the data root with an NTFS ACL. Send SIGTERM
-for a graceful drain: open task script waits abort, the listener closes, plugins dispose, SQLite closes,
+POSIX permissions. On Windows they're advisory, so restrict the data root with an NTFS ACL. Run
+`acorn node stop`, or send SIGTERM on macOS and Linux, for a graceful drain: open task script waits abort, the listener closes, plugins dispose, SQLite closes,
 and the lock releases, within a 30-second deadline. A setup script that was waiting to start is recorded
 as interrupted by `shutdown`.

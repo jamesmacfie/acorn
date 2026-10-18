@@ -1,9 +1,20 @@
+import { randomUUID } from 'node:crypto'
 import { runScriptCommand, validateScriptCommand } from './scriptCommands'
 import type { ArchivedTask, NodePluginState, Project, ProjectsResponse, Task, Workspace } from '@acorn/protocol/api.ts'
+import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
+import type { DevicesResponse, PairingWindow } from '@acorn/protocol/node.ts'
 import type { CliNode } from './node'
 import type { ParsedArgs } from './args'
 import { CliError } from './error'
-import { nodeResource, pluginResources, projectResource, taskResource, workspaceResource } from './projection'
+import {
+  deviceResource,
+  nodeResource,
+  pairingWindowResource,
+  pluginResources,
+  projectResource,
+  taskResource,
+  workspaceResource,
+} from './projection'
 import { runCoreWrite } from './coreWrites'
 import { runAgentCommand } from './agentCommands'
 import { runWorkflowCommand } from './workflowCommands'
@@ -67,9 +78,13 @@ export function validateCommand(args: ParsedArgs): void {
   const grammar: Record<string, Record<string, { count: number; options?: string[] }>> = {
     node: {
       info: { count: 2 },
-      start: { count: 2, options: ['background'] },
+      start: { count: 2, options: ['background', 'foreground', 'log'] },
       status: { count: 2 },
       stop: { count: 2, options: ['force'] },
+      restart: { count: 2 },
+      pair: { count: 2, options: ['close'] },
+      devices: { count: 2 },
+      revoke: { count: 3, options: ['force'] },
     },
     workspace: {
       list: { count: 2 },
@@ -167,10 +182,13 @@ export function validateCommand(args: ParsedArgs): void {
   const allowed = new Set(['node', 'output', 'no-header', 'help', ...(spec.options ?? [])])
   if (subject === 'browser' && args.node)
     throw new CliError('usage', 'Browser host commands act on this computer; omit --node.', 2)
-  if (subject === 'node' && verb !== 'info') {
+  // Pairing and devices work on any paired Node, as Settings → Nodes does in the desktop.
+  if (subject === 'node' && !['info', 'pair', 'devices', 'revoke'].includes(verb)) {
     if (args.node) throw new CliError('usage', 'Node service commands act on the local data root; omit --node.', 2)
     if (verb === 'start') {
-      if (!args.options.background) throw new CliError('usage', 'node start requires --background.', 2)
+      if (!!args.options.background === !!args.options.foreground)
+        throw new CliError('usage', 'node start needs exactly one of --background or --foreground.', 2)
+      if (args.options.log && !args.options.foreground) throw new CliError('usage', '--log needs --foreground.', 2)
     }
   }
   for (const option of Object.keys(args.options)) {
@@ -195,6 +213,36 @@ export async function runCommand(node: CliNode, args: ParsedArgs): Promise<unkno
     (subject === 'task' && verb === 'create')
   )
     return runCoreWrite(node, args)
+  if (subject === 'node' && verb === 'pair') {
+    if (args.options.close) {
+      await node.mutate('DELETE', '/v1/core/pair', undefined, randomUUID())
+      return undefined
+    }
+    const window = (await node.mutate('POST', '/v1/core/pair/start', undefined, randomUUID())) as PairingWindow
+    if (typeof window?.code !== 'string' || typeof window.expiresInMs !== 'number') return unexpected()
+    return pairingWindowResource(node.nodeId, {
+      // The address this terminal reached the Node on. For the local Node that's loopback.
+      endpoints: [node.endpoint],
+      identity: fingerprintPhrase(node.fingerprint) ?? node.fingerprint ?? '',
+      code: window.code,
+      expiresAt: Date.now() + window.expiresInMs,
+    })
+  }
+  if (subject === 'node' && verb === 'devices') {
+    const response = (await node.get('/v1/core/devices')) as DevicesResponse
+    if (!Array.isArray(response?.devices)) return unexpected()
+    return response.devices.map((row) => deviceResource(node.nodeId, row, node.deviceId))
+  }
+  if (subject === 'node' && verb === 'revoke') {
+    if (id === node.deviceId && !args.options.force)
+      throw new CliError(
+        'revoke_self',
+        'That is the device this terminal uses, so acorn must pair again afterward. Add --force to revoke it.',
+        4,
+      )
+    await node.mutate('DELETE', `/v1/core/devices/${encodeURIComponent(requiredId(id))}`, undefined, randomUUID())
+    return { apiVersion: 'acorn.cli/v1', kind: 'Deletion', nodeId: node.nodeId, id, resourceKind: 'Device' }
+  }
   if (subject === 'node' && verb === 'info' && !id) {
     const info = (await node.get('/v1/node')) as { protocolVersion: number; baseline: string; endpoint?: string }
     if (typeof info?.protocolVersion !== 'number' || typeof info.baseline !== 'string') return unexpected()

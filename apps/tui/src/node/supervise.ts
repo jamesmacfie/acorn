@@ -2,7 +2,7 @@ import type { ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { launchNode, type NodeEntry, type NodeHandshake } from '@acorn/custody/local'
+import { launchNode, requestNodeStop, type NodeEntry, type NodeHandshake } from '@acorn/custody/local'
 import { findWorkspaceRoot } from '@acorn/node-core/server/storage/paths.ts'
 import { join } from 'node:path'
 
@@ -12,9 +12,9 @@ import { join } from 'node:path'
 // `service.js` over an fd-3 RPC channel it opens before the service has bound anything; a standalone
 // node announces itself with one JSON line on a launcher pipe and speaks no RPC at all
 // (`launchNode`). Two protocols in one class would be worse than the forty lines below, and the part
-// worth sharing — SIGTERM then SIGKILL — is six of them.
+// worth sharing — ask to stop, then SIGKILL — is a few of them.
 
-/** How long a node gets to drain after SIGTERM before it is killed. Its own handler closes the
+/** How long a node gets to drain after it is asked to stop before it is killed. Its own handler closes the
  *  listener, the PTYs and SQLite, and releases the root's lock, which is worth waiting for; a wedged
  *  one still holding that lock is worse than a hard kill. The same five seconds the desktop helper
  *  allows (packages/custody/src/supervision/serviceHost.ts). */
@@ -85,18 +85,22 @@ export function startNode(dataDir: string, deviceToken?: string): SupervisedNode
     held.push(line)
   })
 
-  return { handshake, held, stop: () => stop(child) }
+  let ready: NodeHandshake | undefined
+  handshake.then(
+    (value) => (ready = value),
+    () => {},
+  )
+  return { handshake, held, stop: () => stop(child, ready) }
 }
 
-function stop(child: ChildProcess): Promise<void> {
-  if (child.exitCode !== null) return Promise.resolve()
-  return new Promise((done) => {
-    const escalate = setTimeout(() => child.kill('SIGKILL'), KILL_ESCALATION_MS)
-    escalate.unref?.()
-    child.once('exit', () => {
-      clearTimeout(escalate)
-      done()
-    })
-    child.kill('SIGTERM')
-  })
+// Asked over the stop route, because Windows ends a process outright for SIGTERM and skips the drain.
+// SIGTERM covers a node still booting, or one that doesn't take the request.
+async function stop(child: ChildProcess, ready: NodeHandshake | undefined): Promise<void> {
+  if (child.exitCode !== null) return
+  const exited = new Promise<void>((done) => child.once('exit', () => done()))
+  const escalate = setTimeout(() => child.kill('SIGKILL'), KILL_ESCALATION_MS)
+  escalate.unref?.()
+  if (!ready || !(await requestNodeStop(ready, ready.deviceToken))) child.kill('SIGTERM')
+  await exited
+  clearTimeout(escalate)
 }

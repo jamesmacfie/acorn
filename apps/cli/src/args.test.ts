@@ -33,10 +33,32 @@ describe('CLI argument contract', () => {
   })
 
   it('requires explicit local service intent and refuses remote lifecycle options', () => {
-    expect(() => validateCommand(parseCliArgs(['node', 'start']))).toThrow('requires --background')
-    expect(() => validateCommand(parseCliArgs(['--node', 'remote', 'node', 'stop']))).toThrow('local data root')
-    expect(() => validateCommand(parseCliArgs(['node', 'status', '--force']))).toThrow('not supported')
-    expect(() => validateCommand(parseCliArgs(['node', 'start', '--background']))).not.toThrow()
-    expect(() => validateCommand(parseCliArgs(['node', 'stop', '--force']))).not.toThrow()
+    const check =
+      (...argv: string[]) =>
+      () =>
+        validateCommand(parseCliArgs(argv))
+    expect(check('node', 'start')).toThrow('exactly one of --background or --foreground')
+    expect(check('node', 'start', '--background', '--foreground')).toThrow('exactly one')
+    expect(check('node', 'start', '--background', '--log', 'node.log')).toThrow('--log needs --foreground')
+    expect(check('--node', 'remote', 'node', 'stop')).toThrow('local data root')
+    expect(check('--node', 'remote', 'node', 'restart')).toThrow('local data root')
+    expect(check('node', 'status', '--force')).toThrow('not supported')
+    expect(check('node', 'start', '--background')).not.toThrow()
+    expect(check('node', 'start', '--foreground', '--log', 'node.log')).not.toThrow()
+    expect(check('node', 'stop', '--force')).not.toThrow()
+    expect(check('node', 'restart')).not.toThrow()
+  })
+
+  it('takes pairing and device commands for any paired Node', () => {
+    const check =
+      (...argv: string[]) =>
+      () =>
+        validateCommand(parseCliArgs(argv))
+    expect(check('--node', 'remote', 'node', 'pair', '--close')).not.toThrow()
+    expect(check('--node', 'remote', 'node', 'devices')).not.toThrow()
+    expect(check('node', 'revoke', 'device-one', '--force')).not.toThrow()
+    expect(check('node', 'revoke')).toThrow('positional')
+    expect(check('node', 'devices', '--close')).toThrow('not supported')
+    expect(() => parseCliArgs(['node', 'pair', '--close=yes'])).toThrow('takes no value')
   })
 })

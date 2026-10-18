@@ -58,6 +58,9 @@ export type RuntimeBindings = {
   // A CLI-owned standalone process's ephemeral identity. Only the authenticated Node probe
   // exposes it, so lifecycle commands can distinguish a restarted Node from a reused PID.
   SERVICE_INSTANCE_ID?: string
+  // Drains this Node and exits, with NODE_RESTART_EXIT_CODE when `restart` is set. Only the standalone
+  // host sets it. The desktop owns its Node's lifetime, so POST /v1/core/node/stop refuses there.
+  REQUEST_STOP?: (restart: boolean) => void
   BLOBS: BlobCache
   SESSION_ENC_KEY: string
   // Use-scoped credential access (server/core/secrets.ts), rather than the raw SESSION_ENC_KEY. It is

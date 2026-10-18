@@ -142,3 +142,9 @@ export type PairingRequestResponse = { request: PairingRequest | null }
 // POST /v1/core/pair/requests/:id.
 export const pairingDecisionSchema = z.strictObject({ decision: z.enum(['allow', 'deny']) })
 export type PairingDecision = z.infer<typeof pairingDecisionSchema>
+
+// POST /v1/core/node/stop (docs/cli/local-service.md § Stop and restart). No body is a plain stop.
+export const nodeStopRequestSchema = z.strictObject({ restart: z.boolean().optional() })
+// How a Node exits after a stop that asked for a restart. 75 is EX_TEMPFAIL. `acorn node start
+// --foreground` starts the Node again when its child exits with it.
+export const NODE_RESTART_EXIT_CODE = 75

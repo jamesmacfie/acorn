@@ -1,5 +1,6 @@
 import type { AgentEventRecord, AgentSession, AgentTurn } from '@acorn/plugin-agents/contract/wire.ts'
 import type { ArchivedTask, NodePluginState, Project, Task, Workspace } from '@acorn/protocol/api.ts'
+import type { PairedDevice } from '@acorn/protocol/node.ts'
 
 const apiVersion = 'acorn.cli/v1' as const
 
@@ -14,6 +15,35 @@ export const nodeResource = (
   protocolVersion: info.protocolVersion,
   baseline: info.baseline,
   endpoint: info.endpoint ?? null,
+})
+
+// What a person on another machine needs to pair with this Node. The code is meant to be read, so it's
+// printed. No device token is.
+export const pairingWindowResource = (
+  nodeId: string,
+  window: { endpoints: string[]; identity: string; code: string; expiresAt: number },
+) => ({
+  apiVersion,
+  kind: 'PairingWindow' as const,
+  nodeId,
+  endpoints: window.endpoints,
+  identity: window.identity,
+  code: window.code,
+  expiresAt: new Date(window.expiresAt).toISOString(),
+})
+
+const isoOrNull = (at: number | null) => (at === null ? null : new Date(at).toISOString())
+
+export const deviceResource = (nodeId: string, row: PairedDevice, ownDeviceId: string | undefined) => ({
+  apiVersion,
+  kind: 'Device' as const,
+  nodeId,
+  id: row.id,
+  name: row.name,
+  pairedAt: new Date(row.createdAt).toISOString(),
+  lastSeenAt: isoOrNull(row.lastSeenAt),
+  revokedAt: isoOrNull(row.revokedAt),
+  thisTerminal: row.id === ownDeviceId,
 })
 
 export const workspaceResource = (nodeId: string, row: Workspace) => ({
