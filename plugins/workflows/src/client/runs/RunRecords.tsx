@@ -357,7 +357,7 @@ export function RunRecords(props: {
                   : []),
               ]}
             />
-            <Fold label="Details">
+            <Fold level="sub" label="Details">
               <Facts
                 grouping="rows"
                 size="sm"
@@ -394,7 +394,7 @@ export function RunRecords(props: {
             </Fold>
             <Show when={row().result}>
               {(result) => (
-                <Fold label="Result">
+                <Fold level="sub" label="Result">
                   <CodeBlock wrap maxHeight="block">
                     {result()}
                   </CodeBlock>
@@ -403,7 +403,7 @@ export function RunRecords(props: {
             </Show>
             <Show when={detail()?.snapshot}>
               {(snapshot) => (
-                <Fold label="Input">
+                <Fold level="sub" label="Input">
                   <CodeBlock wrap maxHeight="block">
                     {JSON.stringify(snapshot(), null, 2)}
                   </CodeBlock>
@@ -411,7 +411,7 @@ export function RunRecords(props: {
               )}
             </Show>
             <Show when={detail()?.record?.outputs.length}>
-              <Fold label="Outputs" count={detail()!.record!.outputs.length}>
+              <Fold level="sub" label="Outputs" count={detail()!.record!.outputs.length}>
                 <Stack gap="row">
                   <For each={detail()!.record!.outputs}>
                     {(output) => <CodeBlock wrap maxHeight="block">{`${output.name}: ${output.preview}`}</CodeBlock>}
@@ -473,7 +473,7 @@ export function RunRecords(props: {
               )}
             </Show>
             <Show when={attempts().length}>
-              <Fold label="Attempt history" count={attempts().length}>
+              <Fold level="sub" label="Attempt history" count={attempts().length}>
                 <Stack gap="row">
                   <For each={attempts()}>
                     {(attempt) => (
@@ -518,7 +518,7 @@ export function RunRecords(props: {
                         <Show when={attempt.error}>{(error) => <Text emphasis="muted">{error()}</Text>}</Show>
                         <Show when={attempt.result}>
                           {(result) => (
-                            <Fold label="Attempt result">
+                            <Fold level="sub" label="Attempt result">
                               <CodeBlock wrap maxHeight="block">
                                 {result()}
                               </CodeBlock>
@@ -526,7 +526,7 @@ export function RunRecords(props: {
                           )}
                         </Show>
                         <Show when={attempt.outputs.length}>
-                          <Fold label="Attempt outputs" count={attempt.outputs.length}>
+                          <Fold level="sub" label="Attempt outputs" count={attempt.outputs.length}>
                             <Stack gap="row">
                               <For each={attempt.outputs}>
                                 {(output) => (

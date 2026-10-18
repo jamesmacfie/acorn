@@ -534,7 +534,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                   </Text>
                 </Show>
                 <Show when={otherEvents().length}>
-                  <Fold label="Events" count={otherEvents().length}>
+                  <Fold level="sub" label="Events" count={otherEvents().length}>
                     <CodeBlock wrap maxHeight="block">
                       {otherEvents().map(pretty).join('\n')}
                     </CodeBlock>
@@ -567,7 +567,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
           {/* Folded, because the transcript below says most of it in more detail. What is worth
               keeping is the harness the step ran on, the structured value a schema step answered
               with, and whatever a handler emitted that this pane has no drawing for. */}
-          <Fold label="Step details">
+          <Fold level="sub" label="Step details">
             <Stack gap="row">
               {childTaskLine()}
               <ChildRuns step={current() as WorkflowStepProjection} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
@@ -775,8 +775,8 @@ function AgentBody(props: { step: WorkflowStepRow; structured: unknown }) {
         }
       >
         {(text) => (
-          <Fold label="Last said" defaultOpen>
-            <CodeBlock wrap maxHeight="block">
+          <Fold level="sub" label="Last said" defaultOpen>
+            <CodeBlock copy wrap maxHeight="block">
               {text()}
             </CodeBlock>
           </Fold>
@@ -810,8 +810,8 @@ function CommandBody(props: { step: WorkflowStepRow; model: RunPaneModel }) {
         <Log lines={tail()} follow ariaLabel="Command output" />
       </Show>
       <Show when={output()?.stdout || output()?.stderr}>
-        <Fold label="Output">
-          <CodeBlock wrap maxHeight="block">
+        <Fold level="sub" label="Output">
+          <CodeBlock copy wrap maxHeight="block">
             {[output()?.stdout, output()?.stderr].filter(Boolean).join('\n')}
           </CodeBlock>
         </Fold>
@@ -873,7 +873,7 @@ function HttpBody(props: { output: HttpOutput | null }) {
           <Facts grouping="rows" size="sm" items={[{ label: 'Status', value: String(output().status ?? '—') }]} />
           <Show when={output().headers}>
             {(headers) => (
-              <Fold label="Headers">
+              <Fold level="sub" label="Headers">
                 <CodeBlock wrap maxHeight="block">
                   {Object.entries(headers())
                     .map(([name, value]) => `${name}: ${value}`)
@@ -884,7 +884,7 @@ function HttpBody(props: { output: HttpOutput | null }) {
           </Show>
           <Show when={output().body}>
             {(body) => (
-              <CodeBlock wrap maxHeight="block">
+              <CodeBlock copy wrap maxHeight="block">
                 {body()}
               </CodeBlock>
             )}

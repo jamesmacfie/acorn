@@ -42,7 +42,7 @@ export default function GoalDetails(props: { step: WorkflowStepRow }) {
   return (
     <Show when={objective()}>
       {(text) => (
-        <Fold label={`Completion condition: ${status()}`} defaultOpen={unfinished()}>
+        <Fold level="sub" label={`Completion condition: ${status()}`} defaultOpen={unfinished()}>
           <Stack gap="row">
             <Text wrap>{text()}</Text>
             <Show when={summary()}>
