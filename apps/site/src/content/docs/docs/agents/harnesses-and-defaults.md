@@ -14,7 +14,7 @@ sources:
   - plugins/agents/src/client/settings/startupContext.ts
   - plugins/agents/src/client/sessions/toolFoldPrefs.ts
   - packages/client-core/src/features/settings/models/generatePick.ts
-checked: 52225e24f
+checked: '6c099093c'
 ---
 
 This page covers the harnesses acorn runs, how it finds each one and its login, and every default on
