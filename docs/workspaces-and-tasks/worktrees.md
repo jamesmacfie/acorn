@@ -126,7 +126,9 @@ These rules keep the cache honest:
 
 The sweep also observes each task's HEAD. Only the newest observation for a task can publish
 `head:changed`. The first observation seeds silently, and an unknown HEAD keeps the last good one.
-Four workers run the sweep's Git reads, and the client drives its clock.
+Four workers run the sweep's Git reads, and the client drives its clock. Boot doesn't run the sweep.
+It only checks that each active task's folder exists and warns about the missing ones, so a commit
+made before a client's first status read raises no `head:changed`.
 
 **The cache serves reads, not refusals.** `setWorktreeAside` refuses to remove a worktree with
 uncommitted changes unless forced, and a stale "clean" there would destroy work. So `worktreeDirty`

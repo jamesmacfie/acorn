@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -9,6 +9,7 @@ import { makeTestDb, type TestDb } from '../../testkit/db'
 import {
   computeTaskStatuses,
   loadTask,
+  reconcileWorktrees,
   requireTaskRoot,
   resolveTaskCwd,
   setWorktreesRoot,
@@ -30,6 +31,12 @@ vi.mock('../transport/wsHub', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../transport/wsHub')>()),
   wsBroadcast: (frame: Record<string, unknown>) => void broadcasts.push(frame),
 }))
+
+// Passes through, so the other cases still run real Git; the boot check counts the spawns.
+vi.mock('node:child_process', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:child_process')>()
+  return { ...original, spawn: vi.fn(original.spawn) }
+})
 
 vi.setConfig({ testTimeout: 20_000 })
 
@@ -361,5 +368,71 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     const result = await resolveTaskCwd(t.db, await loadTask(t.db, 'plain-task'), plain)
     expect(result).toEqual({ cwd: plain, isWorktree: false, created: false })
     expect(created).toEqual([])
+  })
+})
+
+// Boot only needs to know which worktree folders are gone. A `git status` per task here would hold up
+// the agents cleanup that runs after it.
+describe('reconcileWorktrees', () => {
+  let t: TestDb
+  let dir: string
+
+  beforeEach(async () => {
+    t = makeTestDb()
+    dir = mkdtempSync(join(tmpdir(), 'acorn-reconcile-'))
+    mkdirSync(join(dir, 'present'))
+    const now = Date.now()
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.projects).values({
+      id: 'project-web',
+      name: 'web',
+      path: dir,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await t.db.insert(schema.tasks).values(
+      ['present', 'gone'].map((name, sort) => ({
+        id: `task-${name}`,
+        title: name,
+        origin: 'local' as const,
+        projectId: 'project-web',
+        branch: name,
+        worktreePath: join(dir, name),
+        status: 'active' as const,
+        sort,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    )
+    setWorktreesRoot(join(dir, 'worktrees'))
+  })
+  afterEach(() => {
+    setWorktreesRoot('')
+    t.cleanup()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('warns about a missing worktree without starting git', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.mocked(spawn).mockClear()
+
+    await reconcileWorktrees(t.db)
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]![0]).toContain(`1 task worktree(s) missing on disk (needs repair): ${join(dir, 'gone')}`)
+    expect(warn.mock.calls[0]![0]).not.toContain(join(dir, 'present'))
+    expect(spawn).not.toHaveBeenCalled()
+    warn.mockRestore()
   })
 })

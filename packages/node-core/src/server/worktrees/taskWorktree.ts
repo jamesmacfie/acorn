@@ -238,18 +238,21 @@ export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: strin
 
 // Startup reconciliation (docs/workspaces-and-tasks.md): finish or undo archives the last run left
 // set aside, then flag any persisted worktree whose directory is gone (manual rm) as needing repair.
-// The rail/footer surface `missing` live; this just logs at boot.
+// The rail/footer surface `missing` live; this just logs at boot. It checks folders without Git,
+// because a `git status` per worktree here holds up the agents cleanup that runs next. The client's
+// first status read starts those runs.
 export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
   await sweepAsideWorktrees(db)
-  try {
-    const missing = (await computeTaskStatuses(db)).filter((s) => s.missing)
-    if (missing.length)
-      log.warn(
-        `${missing.length} task worktree(s) missing on disk (needs repair): ${missing.map((m) => m.worktreePath).join(', ')}`,
-      )
-  } catch {
-    // best-effort: never block startup on status
-  }
+  const missing = db
+    .select({ id: schema.tasks.id, worktreePath: schema.tasks.worktreePath })
+    .from(schema.tasks)
+    .where(and(eq(schema.tasks.status, 'active'), isNotNull(schema.tasks.worktreePath)))
+    .all()
+    .filter((row) => !isTaskArchiving(row.id) && !isDir(row.worktreePath!))
+  if (missing.length)
+    log.warn(
+      `${missing.length} task worktree(s) missing on disk (needs repair): ${missing.map((m) => m.worktreePath).join(', ')}`,
+    )
 }
 
 // A folder archive set aside (`setWorktreeAside`) whose task is still active was never archived: the

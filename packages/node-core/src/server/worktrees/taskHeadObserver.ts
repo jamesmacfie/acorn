@@ -4,8 +4,8 @@ import { broadcastHeadChanged } from '../notify'
 // (docs/plugins/events.md § Hearing a core event). Nothing in the tree hooks HEAD directly, and a
 // commit from a PTY, an agent, or an outside editor has no hook to catch, so the poll that already
 // runs `git status` on every active worktree is the one honest place to notice. The first sighting
-// of a task seeds the map without a frame: a fresh node has nothing to compare against, and
-// `reconcileWorktrees` seeds every task at boot for that reason.
+// of a task seeds the map without a frame: a fresh node has nothing to compare against, so a commit
+// made before a client's first status read after boot raises no frame.
 //
 // The poll is the client's 10 s clock plus a re-pull on every `term:status` ping, so an
 // in-app commit (changes pane, which pings status) is noticed within one round trip and an
