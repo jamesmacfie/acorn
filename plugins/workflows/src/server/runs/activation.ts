@@ -230,6 +230,7 @@ export const createWorkflowExecution = (
       },
       taskCodeHost: async (taskId) =>
         (await ctx.core.tasks.changeRequests(taskId)).find((link) => link.role === 'primary')?.provider ?? null,
+      taskSetup: async (taskId) => core.taskScripts.select(taskId, 'setup'),
       notify,
       // Per step, unlike run-changed: the run pane moves one node's glyph without re-reading the run.
       stepChanged: (runId, stepId, status) =>

@@ -3,6 +3,7 @@ import type {
   AgentSessionExecuteRequest,
   AgentSessionExecuteResult,
 } from '@acorn/plugin-agents/contract/sessionExecute.ts'
+import type { TaskScriptSnapshot } from '@acorn/protocol/taskScripts.ts'
 import type { ToolCeiling, WorkflowStepDef } from '../../shared/workflowContracts'
 import type { WorkflowChildChangedEvent, WorkflowGateStatus, WorkflowRunStatus } from '../../contract/events'
 import type { WorkflowDispatchRequest, WorkflowDispatchResult } from '../dispatch/dispatcher'
@@ -52,6 +53,8 @@ export type RunnerDeps = {
   /** The plugin id of the code host that owns the task's pull request, or null when it has none. Absent
    *  means no task has one, so `checks-green`, `review-received`, and `ci-loop` fail closed. */
   taskCodeHost?(taskId: string): Promise<string | null>
+  /** The task's current setup attempt. Absent means nothing can read it, so `setup-settled` fails closed. */
+  taskSetup?(taskId: string): Promise<TaskScriptSnapshot>
   /** The pause between a polling gate's checks. Absent means a real timer; a test passes its own. */
   sleep?(ms: number, signal: AbortSignal): Promise<void>
   // Every notification carries a run reference and, when applicable, a step reference.

@@ -190,6 +190,7 @@ fail = "fix"
 | --- | --- |
 | `checks-green` | Every check on the task's pull request passed. It fails as soon as one fails. |
 | `review-received` | Someone other than the author or a bot reviewed or commented. |
+| `setup-settled` | The task's setup script succeeded, or the task has none. It fails if setup fails or stops. |
 | `terminal:command-check` | A command exits 0. Exit 75 means not yet, and anything else fails. |
 | `agent` | An agent, with read-only tools, says the condition in its `prompt` is true. It asks at most every 5 minutes, and each ask costs a turn. |
 
