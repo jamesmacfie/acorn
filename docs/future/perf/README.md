@@ -1,6 +1,8 @@
 # Make a cold launch usable sooner
 
-Date: October 19, 2026. Status: proposed. Implementation not started.
+Date: October 19, 2026. Status: in progress. The code for phases 1 to 5 landed on October 19, 2026.
+The owner still records phase 1's baseline, phase 5's threshold checks wait on it, and phase 6 comes
+last. Each phase page opens with its completion note.
 
 This programme shortens the time from opening the desktop app to a window you can work in. It
 targets a cold launch, where the shell, the helper, and the Node all start from nothing, on a data
