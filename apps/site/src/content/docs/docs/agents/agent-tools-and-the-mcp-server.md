@@ -9,7 +9,7 @@ sources:
   - docs/agent-tools/orchestration.md
   - packages/protocol/src/agents/toolPermissions.ts
   - plugins/agents/src/client/settings/AgentMcpServersSettings.tsx
-checked: '252cc2937'
+checked: '6a8d359b3'
 ---
 
 This page covers acorn's own tools for agents, the MCP server that carries them, the token that scopes
