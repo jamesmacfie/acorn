@@ -1,6 +1,6 @@
 # Run a Node for clients on other machines
 
-Date: October 18, 2026. Status: proposed. Implementation not started.
+Date: October 18, 2026. Status: phases 1 to 7 landed on October 18, 2026. Phase 8, acceptance on real machines, is still to do.
 
 This programme lets a person run an acorn Node on one machine and drive it from a client on another.
 It gives two ways to do that. A Node-only download for macOS, Linux, and Windows, built by a GitHub

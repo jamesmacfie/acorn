@@ -119,7 +119,6 @@ describe('CLI-owned local Node', () => {
       env: {
         ...process.env,
         ACORN_DATA_DIR: dataDir,
-        ACORN_CLI_BACKGROUND: undefined,
         ACORN_CLI_SERVICE_ID: undefined,
         ACORN_CLI_LOG_PATH: undefined,
       },
