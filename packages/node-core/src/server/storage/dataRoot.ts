@@ -181,6 +181,20 @@ export function recordNodeAttachment(dir: string, attachment: NodeIdentity['atta
   updateIdentity(identityPathOf(dir), { attachment, enrollmentError: undefined })
 }
 
+/** The advertised hosts and the last bound port, read straight off disk like the attachment above:
+ *  the route that asks runs long after this process opened its root, and may have changed the hosts
+ *  since. */
+export function readNodeReach(dir: string): { advertiseHost: string | undefined; port: number | undefined } {
+  const identity = readIdentity(identityPathOf(dir))
+  return { advertiseHost: identity?.advertiseHost, port: identity?.port }
+}
+
+/** Record the hosts to advertise, joined by commas. '' keeps the Node private and, like any answer,
+ *  stops the first-boot question. The listener reads it at the next boot. */
+export function recordNodeReach(dir: string, advertiseHost: string): void {
+  updateIdentity(identityPathOf(dir), { advertiseHost })
+}
+
 /** Record that enrollment was attempted and failed. Visible at GET /v1/core/attachment, because the
  *  alternative — a provisioned node that boots normally and is attached to nothing — is the failure
  *  nobody notices. */

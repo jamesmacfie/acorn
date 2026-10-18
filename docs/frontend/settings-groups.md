@@ -142,3 +142,9 @@ warning names both and says that plugins bundled with the Node's build ask for t
 run from source has no stamp, so that difference shows as a plain line. Builds of one protocol
 version work together, so the row stays usable
 ([Mixed builds](../api-reference/versioning.md#mixed-builds)).
+
+The local Node's row has a **Reachable from other machines** switch (`NodeReachSetting.tsx`). Turning
+it on offers this machine's IPv4 addresses and a host name field. Saving records the hosts, then
+restarts the Node, which reloads the window, so the row draws the address to share from the Node's
+answer. Remote rows don't show the switch, because a Node takes that change only from its own computer
+([reach a Node from another machine](../node-distribution/reaching.md)).

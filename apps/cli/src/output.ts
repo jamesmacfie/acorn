@@ -94,7 +94,44 @@ export function writeOutput(value: unknown, args: ParsedArgs): void {
     ]
     if (window.endpoints.every((endpoint) => /^https:\/\/(127\.0\.0\.1|\[::1\]|localhost)[:/]/.test(endpoint)))
       lines.push(
-        "That address works on this computer only. To reach the Node from another machine, set advertiseHost in its data root's node.json, then run acorn node restart.",
+        "That address works on this computer only. To reach the Node from another machine, run acorn node reach with this computer's address or name.",
+      )
+    process.stdout.write(`${lines.join('\n')}\n`)
+    return
+  }
+  if (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (value as { kind?: string }).kind === 'NodeReach'
+  ) {
+    const reach = value as {
+      source: string
+      port: number
+      endpoints: string[]
+      candidates: { address: string; interface: string }[]
+      restartRequired: boolean
+      restarted: boolean
+    }
+    const lines = [
+      reach.endpoints.length
+        ? `Connect to    ${reach.endpoints.join('\n              ')}`
+        : `Connect to    https://127.0.0.1:${reach.port}  (this computer only)`,
+      ...(reach.source === 'none'
+        ? []
+        : [`Set by        ${reach.source === 'environment' ? 'ACORN_ADVERTISE_HOST' : 'node.json'}`]),
+      `Addresses     ${reach.candidates.map((candidate) => `${candidate.address} (${candidate.interface})`).join(', ') || 'none'}`,
+    ]
+    if (reach.restarted) lines.push('', 'The Node restarted to apply the change.')
+    else if (reach.restartRequired)
+      lines.push(
+        '',
+        'The Node answers on its earlier list until it restarts. Run acorn node restart if acorn started it. Otherwise, quit and reopen the desktop app, or restart the process that runs the Node.',
+      )
+    if (!reach.endpoints.length)
+      lines.push(
+        '',
+        'To let other machines reach the Node, run acorn node reach with an address above or a name for this computer.',
       )
     process.stdout.write(`${lines.join('\n')}\n`)
     return

@@ -91,27 +91,11 @@ custody.
 
 ## Reaching a node from another machine
 
-A Node answers on loopback until someone says otherwise. Binding beyond `127.0.0.1` puts a service that
-runs PTYs, spawns agents, and executes repository commands on a network, so the Node never guesses. It
-advertises an address only when the operator answers the first-boot question or sets
-`ACORN_ADVERTISE_HOST`.
-
-On first boot at a terminal it lists this machine's IPv4 addresses and asks which to advertise, and
-pressing Enter keeps it private. The answer is recorded as `advertiseHost` in `node.json`, and "none" is
-recorded as an empty string so the question doesn't come back. Only IPv4 is offered, because the answer
-ends up in a URL the operator types and in a `Host` comparison. The prompt is skipped without recording
-anything when there's no TTY (launchd, systemd, Docker, CI) or no network address to offer.
-
-Set `ACORN_ADVERTISE_HOST` for an install with no terminal. It wins over the recorded answer, so a
-service manager can set it without touching the data root, and it takes a comma-separated list for a
-machine reached by both an IP and a hostname. With it set the listener binds `0.0.0.0` and accepts that
-`Host` as well as loopback. Every other `Host` gets a 403, which keeps a DNS-rebinding page out.
-
-What stands between the network and the Node is a device bearer token and a rate-limited pairing code,
-so advertise only on a network you trust. Internal child tokens are accepted only from the socket's
-loopback peer, even on an advertised listener. An SSH tunnel, `ssh -N -L <port>:127.0.0.1:<port>`, reaches a
-loopback-only Node with no exposure, as long as the local and remote ports match, because the `Host`
-guard compares the port too.
+A Node answers on loopback until a person on its machine chooses the hosts it answers other machines
+on: with `acorn node reach`, the **Settings → Nodes** switch, the first-boot question, or
+`ACORN_ADVERTISE_HOST`. A Node with hosts keeps its port. [Reach a Node from another
+machine](./node-distribution/reaching.md) covers each way in, firewalls, and why a name beats an
+address.
 
 ## Plugins
 

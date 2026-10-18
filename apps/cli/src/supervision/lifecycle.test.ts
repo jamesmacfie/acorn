@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn, type ChildProcess } from 'node:child_process'
+import { request as httpsRequest } from 'node:https'
 import { createInterface } from 'node:readline'
 import { setTimeout as delay } from 'node:timers/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -228,4 +229,56 @@ describe('CLI-owned local Node', () => {
     expect(log).toContain('stop requested — draining')
     expect(log).not.toContain('acorn_dt_')
   }, 240_000)
+
+  it('makes a CLI-owned Node answer on a name without moving its port, then private again', async () => {
+    const dataDir = isolatedRoot()
+    const first = await startNodeService(dataDir)
+    const port = Number(new URL(first.endpoint!).port)
+    const { certPem } = await probeNode(first.endpoint!)
+    // Over loopback with the name in Host, which is what the listener checks. The certificate names
+    // localhost, not the advertised name, because a remote client pins its fingerprint instead.
+    const answersAs = (host: string) =>
+      new Promise<number>((resolve, reject) => {
+        const request = httpsRequest(
+          {
+            host: '127.0.0.1',
+            port,
+            path: '/v1/node',
+            ca: [certPem],
+            servername: 'localhost',
+            agent: false,
+            headers: { host: `${host}:${port}` },
+          },
+          (response) => {
+            response.resume()
+            resolve(response.statusCode ?? 0)
+          },
+        )
+        request.on('error', reject)
+        request.end()
+      })
+    expect(await answersAs('reach.test')).toBe(403)
+
+    const reachable = JSON.parse((await acorn('node', 'reach', 'reach.test', '--output', 'json')).out)
+    expect(reachable).toMatchObject({
+      kind: 'NodeReach',
+      hosts: ['reach.test'],
+      source: 'node.json',
+      endpoints: [`https://reach.test:${port}`],
+      restartRequired: false,
+      restarted: true,
+    })
+    expect(await answersAs('reach.test')).toBe(200)
+    expect(JSON.parse((await acorn('node', 'pair', '--output', 'json')).out)).toMatchObject({
+      endpoints: [`https://reach.test:${port}`],
+    })
+
+    expect(JSON.parse((await acorn('node', 'reach', '--private', '--output', 'json')).out)).toMatchObject({
+      hosts: [],
+      source: 'none',
+      restarted: true,
+    })
+    expect(await answersAs('reach.test')).toBe(403)
+    expect((await nodeServiceStatus(dataDir)).endpoint).toBe(first.endpoint)
+  }, 120_000)
 })

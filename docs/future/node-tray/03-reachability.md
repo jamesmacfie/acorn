@@ -1,6 +1,81 @@
 # Phase 3: choose who can reach the Node
 
-Date: October 18, 2026. Status: proposed. The CLI command depends on [phase 2](./02-terminal-pairing.md).
+Date: October 18, 2026. Status: done. The CLI command depends on [phase 2](./02-terminal-pairing.md).
+
+## Completion note
+
+Landed on October 18, 2026, on the `phase-3-reachability` branch.
+
+What landed:
+
+- `GET` and `PUT /v1/core/node/reach` in `packages/node-core/src/server/routes/nodeReach.ts`, with
+  `NodeReach`, `coreNodeReachRoute`, and `nodeReachRequestSchema` in
+  `packages/protocol/src/transport/api/nodeAdmin.ts`. The router mounts beside the stop route, so the
+  `requireDevice` mount on `/v1/core/node/*` gates it. `PUT` answers only a loopback peer, refuses the
+  whole list over one bad entry, writes `advertiseHost` with `recordNodeReach`, and writes a
+  `node.reach.changed` audit row. It answers `409 reach_set_by_environment` while
+  `ACORN_ADVERTISE_HOST` is set. `port` is the port `node.json` remembers, which the listener records
+  when it binds.
+- `ADVERTISED_HOSTS` on the runtime bindings. `makeRuntime` reads the hosts once, the listener binds
+  with them, and the route compares `node.json` against them for `restartRequired`.
+- The listener never moves a Node with hosts off its remembered port. When the port is taken, the
+  boot fails with an error that names the holder, from `describePortHolder`. A private Node still moves
+  to a free port.
+- `acorn node reach [HOST...|--private]` and a `NodeReach` resource: schema, example, projection, and
+  text output. A change restarts a Node the CLI owns with `restartNodeService`. For any other Node, the
+  output says to restart it where it runs. `acorn node pair` reads its endpoints from the route. It
+  falls back to the address the CLI reached the Node on when the Node has no hosts, waits on a restart,
+  or predates the route. Its hint names `acorn node reach`.
+- **Settings → Nodes**: `NodeReachSetting.tsx` on the local Node's row.
+- The first-boot question's closing line and the standalone pairing banner name `acorn node reach`.
+- Docs: the reaching section moved out of `docs/node-distribution.md`, which had 14 lines to spare, into
+  [reach a Node from another machine](../../node-distribution/reaching.md). Every citation and link
+  moved with it. Also [the local service](../../cli/local-service.md#choose-who-can-reach-the-node),
+  [the CLI](../../cli.md#commands), [core routes](../../api-reference/core-routes.md),
+  [settings groups](../../frontend/settings-groups.md#node-management), the architecture overview, and
+  five site pages.
+- Tests: `apps/node/test/integration/nodeReach.test.ts` covers the route's acceptance points. A
+  listener test holds the remembered port and sees the boot fail with the holder named. The last test
+  in `apps/cli/src/supervision/lifecycle.test.ts` runs `node reach reach.test` against a background
+  Node, sees it answer that `Host` on the same port, reads the address from `node pair`, then runs
+  `--private` and sees a 403. It takes about five seconds.
+
+Decisions and deviations:
+
+- `ACORN_ADVERTISE_HOST` under the CLI is settled: the CLI keeps removing it, and `acorn node reach` is
+  how a CLI-owned Node gets hosts. One source the route can change beats a unit-file variable, which
+  would make the route answer 409 and lock the desktop switch.
+- The route has its own file rather than sitting in `attachment.ts`, because it mounts under
+  `/v1/core/node` with the stop route.
+- The Node service's size ceiling rose from 1,876,800 to 1,880,900 bytes. The base commit measured
+  1,876,649 bytes and this phase 1,878,874. About 1 KB is in node-core and 0.9 KB is the protocol
+  schema. Loading the route on first use saved 211 bytes and added four chunks, so it stays static.
+- Plugin frames can't call the route. `packages/client-core/src/host/frames/scopes.ts` lists it with
+  no scopes.
+- Audit details are comma-joined strings, because an audit row's details take scalars only.
+- The route doesn't lowercase hosts or drop duplicates. `restartRequired` compares the lists as text,
+  so reordering the same hosts counts as a change.
+- A desktop restart reloads the window, so the switch reads everything from the route after the
+  reload. The reload lands on the project page, not on **Settings**. The row's **Pair another client**
+  button is the existing one. Turning the switch off restarts without a confirmation, like the
+  **Restart node** button in **Settings → Plugins**.
+- No second machine was available. In a `dev:agent` window, the switch made the desktop's Node answer
+  `reach-test.local` through this machine's network address, `192.168.1.8`, and refuse another name.
+  Turning it off closed that address and kept the port. The cross-machine probe and pairing are left
+  for phase 8.
+- The listener test and the CLI test bind every interface. On a Mac with its firewall on, the first
+  run might ask whether `node` may accept incoming connections.
+
+For later phases:
+
+- Phase 5: have the installer run `acorn node reach HOST` instead of setting `ACORN_ADVERTISE_HOST` in
+  a unit that runs `acorn node start`. A unit that runs `dist/standalone.js` directly still honors the
+  variable.
+- Phase 6: the tray can read the address from `GET /v1/core/node/reach`. `reachEndpoints` in
+  `apps/cli/src/projection.ts` builds `https://HOST:PORT` for the CLI, and `NodeReachSetting.tsx` does
+  the same for Settings.
+- Phase 8: run the cross-machine acceptance checks above, and check the Windows Defender Firewall
+  prompt for `node.exe`.
 
 ## Goal
 

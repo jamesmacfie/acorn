@@ -47,8 +47,8 @@ const pluginLog = createLogger('plugins')
 // process tree. Opening it takes the root's exclusive lock, which is why a standalone node and a
 // running desktop app cannot share one.
 const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
-// Asked once, before anything else prints (docs/node-distribution.md § Reaching a node from another
-// machine); silent under a service manager (server/transport/advertise.ts).
+// Asked once, before anything else prints (docs/node-distribution/reaching.md); silent under a service
+// manager (server/transport/advertise.ts).
 await confirmAdvertiseHost(root)
 // A standalone Node has no keychain, so its keys are files in the data root or SESSION_ENC_KEY in its
 // environment. Agents it runs share its OS user and can read both (docs/security.md § What task scope
@@ -116,11 +116,10 @@ await node.reconciled
 //
 // The endpoint it enrolls with is the advertised one, not `listener.endpoint.origin`. That value is
 // deliberately loopback whatever `advertiseHost` says, because every child process this node spawns
-// dials it, and a control plane handed `https://127.0.0.1:<port>` would vouch for an address no
-// other machine can reach. With no advertised host the loopback origin is still what goes,
-// which is right for a control plane running on this same machine and useless for one that is not —
-// the operator's exposure decision either way (docs/node-distribution.md § Reaching a node from
-// another machine).
+// dials it, and a control plane handed `https://127.0.0.1:<port>` would vouch for an address no other
+// machine can reach. With no advertised host the loopback origin is still what goes, which is right for
+// a control plane running on this same machine and useless for one that is not — the operator's
+// exposure decision either way (docs/node-distribution/reaching.md).
 await enrollNode({
   dataDir: root.dir,
   nodeId: root.nodeId,
@@ -208,8 +207,7 @@ function printPairingBanner(code: string | null): void {
       console.log(`  or, from a terminal acorn hasn't paired:  kill -USR1 ${process.pid}`)
   }
   if (reachable.length === 0) {
-    console.log("  To reach this node from another machine, set advertiseHost in this data root's")
-    console.log('  node.json (or ACORN_ADVERTISE_HOST) and restart.')
+    console.log('  To reach this node from another machine, run:  acorn node reach <address or name>')
   }
   console.log('')
 }

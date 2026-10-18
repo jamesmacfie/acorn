@@ -1,5 +1,5 @@
 import type { AgentEventRecord, AgentSession, AgentTurn } from '@acorn/plugin-agents/contract/wire.ts'
-import type { ArchivedTask, NodePluginState, Project, Task, Workspace } from '@acorn/protocol/api.ts'
+import type { ArchivedTask, NodePluginState, NodeReach, Project, Task, Workspace } from '@acorn/protocol/api.ts'
 import type { PairedDevice } from '@acorn/protocol/node.ts'
 
 const apiVersion = 'acorn.cli/v1' as const
@@ -30,6 +30,25 @@ export const pairingWindowResource = (
   identity: window.identity,
   code: window.code,
   expiresAt: new Date(window.expiresAt).toISOString(),
+})
+
+// What another machine connects to.
+export const reachEndpoints = (reach: Pick<NodeReach, 'hosts' | 'port'>): string[] =>
+  reach.hosts.map((host) => `https://${host}:${reach.port}`)
+
+// The addresses this Node answers on besides loopback, and whether `node reach` restarted the Node to
+// apply a change.
+export const nodeReachResource = (nodeId: string, reach: NodeReach, restarted: boolean) => ({
+  apiVersion,
+  kind: 'NodeReach' as const,
+  nodeId,
+  hosts: reach.hosts,
+  source: reach.source,
+  port: reach.port,
+  endpoints: reachEndpoints(reach),
+  candidates: reach.candidates,
+  restartRequired: reach.restartRequired,
+  restarted,
 })
 
 const isoOrNull = (at: number | null) => (at === null ? null : new Date(at).toISOString())

@@ -61,6 +61,9 @@ export type RuntimeBindings = {
   // Drains this Node and exits, with NODE_RESTART_EXIT_CODE when `restart` is set. Only the standalone
   // host sets it. The desktop owns its Node's lifetime, so POST /v1/core/node/stop refuses there.
   REQUEST_STOP?: (restart: boolean) => void
+  // The hosts this Node answers on besides loopback, read once at boot (server/transport/advertise.ts).
+  // The listener binds with them and GET /v1/core/node/reach compares node.json against them.
+  ADVERTISED_HOSTS: readonly string[]
   BLOBS: BlobCache
   SESSION_ENC_KEY: string
   // Use-scoped credential access (server/core/secrets.ts), rather than the raw SESSION_ENC_KEY. It is
@@ -236,6 +239,7 @@ export type BindingsOptions = {
   blobsDir: string
   nodeId: string
   serviceInstanceId?: string
+  advertisedHosts: readonly string[]
   capabilities: Pick<CapabilityRegistry, 'get' | 'require'>
   // The desktop helper's delivered keys. Without them, a standalone Node reads or mints its key files.
   keys?: NodeKeys
@@ -249,6 +253,7 @@ export function makeBindings({
   blobsDir,
   nodeId,
   serviceInstanceId,
+  advertisedHosts,
   capabilities,
   keys,
 }: BindingsOptions): RuntimeBindings {
@@ -274,6 +279,7 @@ export function makeBindings({
     // fingerprint without the bindings ever touching the private key.
     NODE_FINGERPRINT: ensureCert(dataDir).fingerprint,
     ...(serviceInstanceId ? { SERVICE_INSTANCE_ID: serviceInstanceId } : {}),
+    ADVERTISED_HOSTS: advertisedHosts,
     BLOBS: diskBlobCache(blobCachePath),
     SESSION_ENC_KEY: encKey,
     SECRETS: new SecretService(encKey),

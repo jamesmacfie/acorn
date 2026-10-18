@@ -151,8 +151,9 @@ commands refuse, and say to run them outside the task's session.
 
 `acorn node start --background`, `node status`, `node restart`, and `node stop` run a Node for this
 machine with no desktop app, and `node start --foreground` runs one under a service manager. `node pair`
-prints a pairing code for a client on another machine, and `node devices` and `node revoke` manage the
-paired devices ([Run a standalone Node](/docs/nodes/run-a-standalone-node/#start-and-stop-it-from-the-command-line)).
+prints a pairing code for a client on another machine, `node reach` chooses the addresses that machine
+connects to, and `node devices` and `node revoke` manage the paired devices ([Run a standalone
+Node](/docs/nodes/run-a-standalone-node/#start-and-stop-it-from-the-command-line)).
 
 ## Limits
 

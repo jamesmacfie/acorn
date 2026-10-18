@@ -82,7 +82,7 @@ advertised host, or its loopback origin when none is set. The endpoint the Node 
 always loopback, because its child processes dial that, and a control plane handed
 `https://127.0.0.1:4317` would vouch for an address no other machine can reach. A Node with no
 `advertiseHost` enrolls with loopback anyway, which suits a control plane on the same machine
-([reaching a node from another machine](./node-distribution.md#reaching-a-node-from-another-machine)).
+([reaching a node from another machine](./node-distribution/reaching.md)).
 `fingerprint` is the SHA-256 of the Node's certificate, the value a client pins, and repeating it
 honestly is the whole of a control plane's vouching job.
 

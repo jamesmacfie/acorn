@@ -195,6 +195,19 @@ describe('pairing and devices', () => {
     ])
   })
 
+  it('names the addresses the Node answers other machines on, once it does', async () => {
+    const { node } = pairingNode()
+    const reach = { hosts: ['192.168.1.20'], source: 'node.json', port: 4317, candidates: [], restartRequired: false }
+    const advertised: CliNode = { ...node, get: async () => reach }
+    expect(await runCommand(advertised, parseCliArgs(['node', 'pair']))).toMatchObject({
+      endpoints: ['https://192.168.1.20:4317'],
+    })
+    const pending: CliNode = { ...node, get: async () => ({ ...reach, restartRequired: true }) }
+    expect(await runCommand(pending, parseCliArgs(['node', 'pair']))).toMatchObject({
+      endpoints: ['https://127.0.0.1:4317'],
+    })
+  })
+
   it('marks this terminal and refuses to revoke it without --force', async () => {
     const { node, mutations } = pairingNode()
     expect(await runCommand(node, parseCliArgs(['node', 'devices']))).toMatchObject([
@@ -211,5 +224,41 @@ describe('pairing and devices', () => {
       ['DELETE', '/v1/core/devices/device-other'],
       ['DELETE', '/v1/core/devices/device-cli'],
     ])
+  })
+})
+
+describe('node reach', () => {
+  const reach = { hosts: [], source: 'none', port: 4317, candidates: [], restartRequired: false }
+
+  it('reads, sets every host, and clears', async () => {
+    const sent: unknown[] = []
+    const node: CliNode = {
+      ...fakeNode({ '/v1/core/node/reach': reach }),
+      async mutate(method, path, body) {
+        sent.push([method, path, body])
+        const hosts = (body as { hosts: string[] }).hosts
+        return { ...reach, hosts, source: hosts.length ? 'node.json' : 'none' }
+      },
+    }
+    expect(await runCommand(node, parseCliArgs(['node', 'reach']))).toMatchObject({ kind: 'NodeReach', endpoints: [] })
+    expect(await runCommand(node, parseCliArgs(['node', 'reach', 'workshop.local', '10.0.0.2']))).toMatchObject({
+      endpoints: ['https://workshop.local:4317', 'https://10.0.0.2:4317'],
+      restarted: false,
+    })
+    await runCommand(node, parseCliArgs(['node', 'reach', '--private']))
+    expect(sent).toEqual([
+      ['PUT', '/v1/core/node/reach', { hosts: ['workshop.local', '10.0.0.2'] }],
+      ['PUT', '/v1/core/node/reach', { hosts: [] }],
+    ])
+  })
+
+  it('acts on this computer only, and takes hosts or --private', async () => {
+    const node = fakeNode({})
+    for (const argv of [
+      ['node', 'reach', '--node', 'other'],
+      ['node', 'reach', 'workshop.local', '--private'],
+      ['node', 'reach', '--close'],
+    ])
+      await expect(runCommand(node, parseCliArgs(argv)), argv.join(' ')).rejects.toMatchObject({ code: 'usage' })
   })
 })

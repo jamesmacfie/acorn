@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { NodeAttachment } from '../../device/node.ts'
 
 export const prefsRoute = '/v1/core/prefs'
@@ -45,6 +46,52 @@ export type NodeAttachmentState = {
   error: { at: number; reason: string } | null
 }
 export const coreAttachmentRoute = '/v1/core/attachment'
+
+// The addresses this Node answers on besides loopback (docs/node-distribution/reaching.md).
+// Device-only, and only a device on this computer may change them.
+//
+// `hosts` is what the environment or node.json names now. The listener binds once at boot, so
+// `restartRequired` says the Node still answers on an older list. `candidates` are this machine's
+// non-internal IPv4 addresses.
+export type NodeReach = {
+  hosts: string[]
+  source: 'environment' | 'node.json' | 'none'
+  port: number
+  candidates: { address: string; interface: string }[]
+  restartRequired: boolean
+}
+export const coreNodeReachRoute = '/v1/core/node/reach'
+
+const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/
+const DNS_NAME = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/i
+
+// The Host check compares names exactly, so an entry is a bare name: no scheme, port, path, or
+// wildcard. Loopback is refused because the Node always answers on it.
+function reachHostProblem(host: string): string | null {
+  const ipv4 = IPV4.test(host)
+  if (
+    host.length > 253 ||
+    !DNS_NAME.test(host) ||
+    (ipv4 && host.split('.').some((octet) => Number(octet) > 255)) ||
+    (!ipv4 && /^[\d.]+$/.test(host))
+  )
+    return `${host.slice(0, 80)} isn't an IPv4 address or a host name. Leave out the scheme, port, and path.`
+  if ((ipv4 && host.startsWith('127.')) || /^localhost$|\.localhost$/i.test(host))
+    return `${host} is this computer, which the Node always answers on.`
+  return null
+}
+
+// An empty list keeps the Node private to this machine.
+export const nodeReachRequestSchema = z.strictObject({
+  hosts: z
+    .array(
+      z.string().superRefine((host, ctx) => {
+        const problem = reachHostProblem(host)
+        if (problem) ctx.addIssue({ code: 'custom', message: problem })
+      }),
+    )
+    .max(8, 'List at most eight hosts.'),
+})
 
 // Nodes this node's plugins know about (docs/plugins/node-providers.md § Node providers). The client fans this out
 // over every reachable node and unions the answers, so a provider running on one node is visible from

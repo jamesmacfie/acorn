@@ -18,6 +18,7 @@ import { nodeProviderRoutes } from './routes/nodeProviders'
 import { integrations } from './routes/integrations'
 import { models } from './routes/models'
 import { pairingRoutes } from './routes/pairing'
+import { nodeReach } from './routes/nodeReach'
 import { nodeStop } from './routes/nodeStop'
 import { prefs } from './routes/prefs'
 import { plugins } from './routes/plugins/plugins'
@@ -73,7 +74,8 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/pair/*`, requireDevice)
     .use(`${CORE_NAMESPACE}/devices`, requireDevice)
     .use(`${CORE_NAMESPACE}/devices/*`, requireDevice)
-    // Stopping this Node, same class as devices: no task-scoped agent or service call may end it.
+    // Stopping this Node and choosing who can reach it, same class as devices: no task-scoped agent
+    // or service call may end it or put it on a network.
     .use(`${CORE_NAMESPACE}/node`, requireDevice)
     .use(`${CORE_NAMESPACE}/node/*`, requireDevice)
     // Node administration, same class as devices. Which plugins this node runs decides which routes
@@ -170,6 +172,7 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/browser-handoffs/*`, requireDevice)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices: owner-only device administration
     .route(`${CORE_NAMESPACE}/node`, nodeStop) // /stop: drain and exit, from this computer only (docs/cli/local-service.md)
+    .route(`${CORE_NAMESPACE}/node`, nodeReach) // /reach: the hosts this Node answers on (docs/node-distribution.md)
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/dashboards`, dashboards) // Typed panel drafts/publication plus /history measure series.
     .route(`${CORE_NAMESPACE}/datasets`, datasetsRoute)

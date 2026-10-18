@@ -48,12 +48,12 @@ the bundle ships. The Node reports its bound endpoint and certificate fingerprin
 protocol. The helper supervises the local Node and restarts it with bounded backoff. A standalone Node
 uses the same service graph.
 
-The Node listens over HTTPS with TLS 1.3 on `127.0.0.1`. It binds only loopback unless an operator
-records an `advertiseHost` in `node.json` or `ACORN_ADVERTISE_HOST`, as
-[node distribution](./node-distribution.md) describes. A Host header outside that allowlist gets 403.
-The endpoint the Node reports is always loopback, because its child processes validate its
-certificate against an `IP:127.0.0.1` SAN. The port is ephemeral unless `ACORN_PORT` is set or the
-port remembered in `node.json` is free.
+The Node listens over HTTPS with TLS 1.3 on `127.0.0.1`. It binds only loopback unless a person on its
+machine chooses hosts with `acorn node reach`, **Settings → Nodes**, or `ACORN_ADVERTISE_HOST`, as
+[reaching a Node from another machine](./node-distribution/reaching.md) describes. A Host header outside
+that allowlist gets 403. The endpoint the Node reports is always loopback, because its child processes
+validate its certificate against an `IP:127.0.0.1` SAN. The port is ephemeral unless `ACORN_PORT` is set
+or the port remembered in `node.json` is free. A Node with hosts never moves off its remembered port.
 
 The Node serves no web assets. The shell's `app://acorn` scheme serves the renderer and falls back
 to its bundled `index.html` for client-side routes.

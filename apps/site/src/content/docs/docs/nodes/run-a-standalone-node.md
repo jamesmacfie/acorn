@@ -3,6 +3,7 @@ title: Run a standalone Node
 description: Run acorn's Node without the desktop app, on a server or another machine, start and stop it from the command line or a service manager, and know which plugins it has.
 sources:
   - docs/node-distribution.md
+  - docs/node-distribution/reaching.md
   - docs/cli/local-service.md
   - apps/node/src/entries/standalone.ts
   - apps/node/src/composition/plugins.ts
@@ -59,8 +60,8 @@ A standalone Node reads its settings from the environment. These are the ones yo
 | Variable | What it does |
 | --- | --- |
 | `ACORN_DATA_DIR` | The folder the Node keeps everything in. Give each Node its own. |
-| `ACORN_ADVERTISE_HOST` | The addresses other machines reach it at, separated by commas. Without it, the Node answers only on this machine. |
-| `ACORN_PORT` | The port to listen on. Without it, the Node uses the port it had last time, if it's free. |
+| `ACORN_ADVERTISE_HOST` | The addresses other machines reach it at, separated by commas. It wins over `acorn node reach`. Without either, the Node answers only on this machine. |
+| `ACORN_PORT` | The port to listen on. Without it, the Node uses the port it had last time. A private Node takes another port if that one's taken. A reachable Node won't start without it. |
 | `SESSION_ENC_KEY` | The key it encrypts stored credentials with. Without it, the Node makes one and keeps it in its data folder. |
 
 [Environment variables](/docs/reference/environment-variables/#the-node) lists every one.
@@ -94,14 +95,17 @@ These always use this machine's data folder, and refuse `--node`. The command li
 in its config folder, under `services/`, and starts a new log file at 8 MB.
 
 A Node started this way prints no pairing banner, because the command line on that machine already has
-its token. To pair a client on another machine, run `node bin/acorn.mjs node pair`. It prints the
+its token. It also ignores `ACORN_ADVERTISE_HOST`. To let other machines reach it, run
+`node bin/acorn.mjs node reach <address or name>`, which restarts the Node on the same port. To pair a
+client on another machine, run `node bin/acorn.mjs node pair`. It prints the
 Node's address, its identity, and a pairing code. `node devices` lists the paired devices, and
 `node revoke <id>` revokes one.
 
 ## Run it as a service
 
 To keep a Node running on a server, start it from a service manager. With no terminal, the Node
-asks no question, so set `ACORN_ADVERTISE_HOST` if other machines should reach it. A systemd unit looks
+asks no question, so set `ACORN_ADVERTISE_HOST` if other machines should reach it. Open the port in the
+machine's firewall too. A systemd unit looks
 like this:
 
 ```ini

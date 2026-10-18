@@ -1,7 +1,14 @@
 import type { NodePairRequest, NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import { canPairNodes, fleetBridge } from '../platform'
 import type { PairingDecision, PairingRequestResponse, PairingWindow } from '@acorn/protocol/node.ts'
-import { corePairRequestRoute, corePairRequestsRoute, corePairRoute, corePairStartRoute } from '@acorn/protocol/api.ts'
+import {
+  coreNodeReachRoute,
+  corePairRequestRoute,
+  corePairRequestsRoute,
+  corePairRoute,
+  corePairStartRoute,
+  type NodeReach,
+} from '@acorn/protocol/api.ts'
 import { readJson, sendJson } from './apiClient'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { selectActiveNode } from './activeNode'
@@ -68,6 +75,19 @@ export const restartLocalNode = async (): Promise<void> => {
   if (!bridge) throw new Error('This build does not supervise a local node.')
   await bridge.restartLocal()
 }
+
+// Which addresses a Node answers on besides loopback (docs/node-distribution/reaching.md). The Node
+// takes a change only from a device on its own computer, so Settings offers it for the local Node
+// alone, and the change applies when the Node restarts.
+export const readNodeReach = (nodeId: string): Promise<NodeReach> => readJson<NodeReach>(coreNodeReachRoute, { nodeId })
+
+export const writeNodeReach = (nodeId: string, hosts: string[]): Promise<NodeReach> =>
+  sendJson<NodeReach>(coreNodeReachRoute, {
+    method: 'PUT',
+    nodeId,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ hosts }),
+  })
 
 // Pair a second client with a node this device already owns. The code returns through the
 // authenticated broker to Settings; the renderer never receives the desktop's device token.

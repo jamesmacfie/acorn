@@ -81,7 +81,7 @@ closes pairing.
 
 Each browser pairs on its own, so pair Chrome and Firefox separately. A Node on another computer must
 advertise its address, or be reached through an SSH tunnel, as
-[reaching a node from another machine](../node-distribution.md#reaching-a-node-from-another-machine) says.
+[reaching a node from another machine](../node-distribution/reaching.md) says.
 
 ## Turn on site features
 

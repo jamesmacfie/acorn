@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { runScriptCommand, validateScriptCommand } from './scriptCommands'
-import type { ArchivedTask, NodePluginState, Project, ProjectsResponse, Task, Workspace } from '@acorn/protocol/api.ts'
+import {
+  coreNodeReachRoute,
+  type ArchivedTask,
+  type NodePluginState,
+  type NodeReach,
+  type Project,
+  type ProjectsResponse,
+  type Task,
+  type Workspace,
+} from '@acorn/protocol/api.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import type { DevicesResponse, PairingWindow } from '@acorn/protocol/node.ts'
 import type { CliNode } from './node'
@@ -9,8 +18,10 @@ import { CliError } from './error'
 import {
   deviceResource,
   nodeResource,
+  nodeReachResource,
   pairingWindowResource,
   pluginResources,
+  reachEndpoints,
   projectResource,
   taskResource,
   workspaceResource,
@@ -19,6 +30,7 @@ import { runCoreWrite } from './coreWrites'
 import { runAgentCommand } from './agentCommands'
 import { runWorkflowCommand } from './workflowCommands'
 import { runPluginCommand } from './pluginCommands'
+import { nodeServiceStatus, restartNodeService } from './supervision/lifecycle'
 
 const requiredId = (id: string | undefined): string => {
   if (!id) throw new CliError('usage', 'This command needs an ID.', 2)
@@ -50,6 +62,19 @@ export function validateCommand(args: ParsedArgs): void {
     ])
     for (const option of Object.keys(args.options))
       if (!allowed.has(option)) throw new CliError('usage', `--${option} is not supported here.`, 2)
+    return
+  }
+  // Any number of hosts, so the fixed counts below don't fit. This computer's Node only, because only
+  // a device on its own computer may change who reaches it.
+  if (subject === 'node' && verb === 'reach') {
+    if (args.node) throw new CliError('usage', "node reach acts on this computer's Node; omit --node.", 2)
+    for (const option of Object.keys(args.options))
+      if (!['output', 'no-header', 'help', 'private'].includes(option))
+        throw new CliError('usage', `--${option} is not supported by node reach.`, 2)
+    if (args.options.private && args.positionals.length > 2)
+      throw new CliError('usage', 'Give hosts or --private, not both.', 2)
+    if (args.output === 'jsonl')
+      throw new CliError('usage', 'JSON Lines is for agent events and plugin command results.', 2)
     return
   }
   if (overflow) throw new CliError('usage', 'Too many arguments.', 2)
@@ -220,13 +245,32 @@ export async function runCommand(node: CliNode, args: ParsedArgs): Promise<unkno
     }
     const window = (await node.mutate('POST', '/v1/core/pair/start', undefined, randomUUID())) as PairingWindow
     if (typeof window?.code !== 'string' || typeof window.expiresInMs !== 'number') return unexpected()
+    // The addresses the Node answers other machines on, or the one this terminal reached it on, which
+    // for the local Node is loopback. A Node from before the reach route answers 404.
+    const reach = (await node.get(coreNodeReachRoute).catch(() => null)) as NodeReach | null
     return pairingWindowResource(node.nodeId, {
-      // The address this terminal reached the Node on. For the local Node that's loopback.
-      endpoints: [node.endpoint],
+      endpoints: reach?.hosts?.length && !reach.restartRequired ? reachEndpoints(reach) : [node.endpoint],
       identity: fingerprintPhrase(node.fingerprint) ?? node.fingerprint ?? '',
       code: window.code,
       expiresAt: Date.now() + window.expiresInMs,
     })
+  }
+  if (subject === 'node' && verb === 'reach') {
+    const hosts = args.positionals.slice(2)
+    const change = args.options.private === 'true' || hosts.length > 0
+    const reach = (
+      change
+        ? await node.mutate('PUT', coreNodeReachRoute, { hosts }, randomUUID())
+        : await node.get(coreNodeReachRoute)
+    ) as NodeReach
+    if (!Array.isArray(reach?.hosts) || typeof reach.port !== 'number') return unexpected()
+    // The listener binds at boot. A Node this CLI started restarts here, and the text output tells
+    // the person to restart any other one where it runs.
+    if (change && reach.restartRequired && (await nodeServiceStatus()).state === 'running') {
+      await restartNodeService()
+      return nodeReachResource(node.nodeId, { ...reach, restartRequired: false }, true)
+    }
+    return nodeReachResource(node.nodeId, reach, false)
   }
   if (subject === 'node' && verb === 'devices') {
     const response = (await node.get('/v1/core/devices')) as DevicesResponse

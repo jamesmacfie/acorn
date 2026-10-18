@@ -46,7 +46,7 @@ connection against it. A changed fingerprint stops the connection and needs an e
 Node entry.
 
 The Node checks the `Host` header against the bound loopback port and any advertised host
-([reaching a node from another machine](./node-distribution.md#reaching-a-node-from-another-machine)).
+([reaching a node from another machine](./node-distribution/reaching.md)).
 The renderer never handles TLS or bearers. It calls the broker through the injected bridge, and the
 desktop helper owns the endpoint, the pinned agent, and the device token.
 

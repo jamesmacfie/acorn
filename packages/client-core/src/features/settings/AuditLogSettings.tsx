@@ -37,6 +37,7 @@ const ACTION_LABELS: Record<string, string> = {
   'secrets.publication.blocked': 'Publication blocked by secret check',
   'secrets.publication.allowed': 'Publication allowed once',
   'plugins.disabled.changed': 'Plugins changed',
+  'node.reach.changed': 'Network reach changed',
   'backup.created': 'Backup created',
   'keys.check.failed': 'Node key check failed',
 }

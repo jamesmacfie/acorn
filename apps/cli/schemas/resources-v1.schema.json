@@ -11,6 +11,7 @@
     { "$ref": "#/$defs/PluginCommandResult" },
     { "$ref": "#/$defs/NodeService" },
     { "$ref": "#/$defs/PairingWindow" },
+    { "$ref": "#/$defs/NodeReach" },
     { "$ref": "#/$defs/Device" },
     { "$ref": "#/$defs/WorkspaceExternalProjects" },
     { "$ref": "#/$defs/ProjectConfig" },
@@ -94,6 +95,24 @@
         "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "PairingWindow" },
         "nodeId": { "type": "string" }, "endpoints": { "type": "array", "items": { "type": "string" } },
         "identity": { "type": "string" }, "code": { "type": "string" }, "expiresAt": { "type": "string" }
+      }
+    },
+    "NodeReach": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "hosts", "source", "port", "endpoints", "candidates", "restartRequired", "restarted"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "NodeReach" },
+        "nodeId": { "type": "string" }, "hosts": { "type": "array", "items": { "type": "string" } },
+        "source": { "enum": ["environment", "node.json", "none"] }, "port": { "type": "integer" },
+        "endpoints": { "type": "array", "items": { "type": "string" } },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["address", "interface"],
+            "properties": { "address": { "type": "string" }, "interface": { "type": "string" } }
+          }
+        },
+        "restartRequired": { "type": "boolean" }, "restarted": { "type": "boolean" }
       }
     },
     "Device": {

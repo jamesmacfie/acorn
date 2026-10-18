@@ -8,7 +8,7 @@ route or a socket channel. It's part of the [security model](../security.md).
 ## Transport
 
 - A Node binds `127.0.0.1` over TLS 1.3 and rejects an unexpected `Host` header.
-  [Node distribution](../node-distribution.md#reaching-a-node-from-another-machine) covers binding
+  [Node distribution](../node-distribution/reaching.md) covers binding
   beyond loopback.
 - An internal credential is accepted only when the TCP socket peer is loopback. This applies to HTTP
   and `/v1/events`, including an advertised listener. `Host`, `Forwarded`, and `X-Forwarded-For`

@@ -156,4 +156,25 @@ describe('the loopback TLS listener', () => {
       await new Promise<void>((resolve) => squatter.close(() => resolve()))
     }
   }, 30_000)
+
+  // Clients on other machines remember the address, port included, so an advertised Node would
+  // rather not start than move.
+  it('refuses to move an advertised Node off its remembered port, and names the holder', async () => {
+    root!.recordAdvertiseHost('workshop.local')
+    const first = await start()
+    const port = first.endpoint.port
+    disposeWsHub(first.server as unknown as import('node:http').Server)
+    await new Promise<void>((resolve) => first.server.close(() => resolve()))
+    listener = null
+
+    // On every interface, as the advertised Node binds, so the clash doesn't depend on the platform's
+    // rules for a wildcard beside a specific address.
+    const squatter = createNetServer()
+    await new Promise<void>((resolve) => squatter.listen(port, '0.0.0.0', resolve))
+    try {
+      await expect(start()).rejects.toThrow(new RegExp(`port ${port} is taken by .*won't start on another`))
+    } finally {
+      await new Promise<void>((resolve) => squatter.close(() => resolve()))
+    }
+  }, 30_000)
 })

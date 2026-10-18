@@ -84,17 +84,16 @@ export function startListener(
   const { keyPem, certPem, fingerprint } = ensureCert(root.dir)
   mark('cert')
 
-  // Host guard (docs/node-distribution.md § Reaching a node from another machine): binding an
-  // interface is not the same as answering to any name on it, so a Host we did not expect is refused.
-  // Loopback is always allowed; anything else is here because the operator advertised it
-  // (server/transport/advertise.ts).
+  // Host guard (docs/node-distribution/reaching.md): binding an interface is not the same as answering
+  // to any name on it, so a Host we did not expect is refused. Loopback is always allowed; anything
+  // else is here because the operator advertised it (server/transport/advertise.ts).
   //
   // One Set, shared by reference with the upgrade handler below and filled in place once the kernel has
   // picked a port. It starts empty and therefore rejects everything, which is the safe direction for the
   // sliver of time before the listening callback runs. Nobody may copy it: a copy taken while it is still
   // empty makes the Host guard reject every upgrade forever, a bare 403 with nothing logged.
   const allowedHosts = new Set<string>()
-  const advertised = advertisedHosts(root)
+  const advertised = runtime.ADVERTISED_HOSTS
   // 0.0.0.0 rather than the advertised address itself: children of this node still reach it over loopback
   // with full certificate validation (the cert's SAN is IP:127.0.0.1), so both audiences have to keep
   // working. `endpoint` below stays loopback for the same reason.
@@ -111,9 +110,10 @@ export function startListener(
 
   // An explicit ACORN_PORT is a demand (dev:node, tests) and never falls back. Otherwise prefer the port
   // this root last bound, so a restart usually keeps the same endpoint, and fall back to ephemeral when
-  // something else has taken it.
+  // something else has taken it. An advertised Node never falls back: a client on another machine dials
+  // the port it remembers, so a moved port would strand every one of them.
   const requested = configuredPort() ?? root.preferredPort ?? 0
-  const mayFallBack = configuredPort() === undefined && requested !== 0
+  const mayFallBack = configuredPort() === undefined && requested !== 0 && advertised.length === 0
 
   // createAdaptorServer plus an explicit listen() rather than serve(): a retry after EADDRINUSE has to
   // re-listen the same server object, or the hub below would be attached to a discarded one.
@@ -158,6 +158,12 @@ export function startListener(
         server.listen(0, bindHost, onListening)
         return
       }
+      if (error.code === 'EADDRINUSE' && advertised.length > 0)
+        return reject(
+          new Error(
+            `port ${requested} is taken by ${describePortHolder(requested)}. Other machines reach this Node on that port, so it won't start on another. Free the port, or stop advertising this Node.`,
+          ),
+        )
       reject(error)
     }
     function onListening(): void {
@@ -258,6 +264,7 @@ export function makeRuntime(
     blobsDir: resolve(root.dir, 'blobs'),
     nodeId: root.nodeId,
     serviceInstanceId,
+    advertisedHosts: advertisedHosts(root),
     capabilities,
   })
 }

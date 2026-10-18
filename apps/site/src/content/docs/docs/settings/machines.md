@@ -11,6 +11,7 @@ sources:
   - docs/managed-agents/operations.md
   - packages/client-core/src/features/settings/corePages.ts
   - packages/client-core/src/features/settings/nodes/NodesSettings.tsx
+  - packages/client-core/src/features/settings/nodes/NodeReachSetting.tsx
   - packages/client-core/src/features/settings/SecuritySettings.tsx
   - packages/client-core/src/features/settings/StorageSettings.tsx
   - plugins/agents/src/shared/sessionDefaults.ts
@@ -41,6 +42,7 @@ remote Node](/docs/nodes/pair-a-device-or-a-remote-node/)).
 | **Reconnect** | Connects again to a Node that dropped. | | |
 | **Pair another client** | Shows a one-time code to pair another device with this Node. | | |
 | **Pair a browser** | Shows a one-time code for the browser extension. | | |
+| **Reachable from other machines** | Only on the row for this computer. Lets other computers on your network reach its Node, at an address or **Host name** you pick. Saving restarts the Node ([Let other machines reach the Node](/docs/nodes/pair-a-device-or-a-remote-node/#let-other-machines-reach-the-node)). | Node | Off |
 | **Unpair…** | This device forgets the Node and what it cached from it. The Node keeps this device paired. | This device | |
 | **Revoke** | The Node deletes this device's credential, and this device forgets the Node. Coming back takes a new pairing code. | Node | |
 

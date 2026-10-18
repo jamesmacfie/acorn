@@ -1,7 +1,7 @@
 # The local service
 
 This page covers the CLI commands that run and administer a Node on this machine: `node start`,
-`status`, `stop`, `restart`, `pair`, `devices`, and `revoke`. It's part of the
+`status`, `stop`, `restart`, `pair`, `devices`, `revoke`, and `reach`. It's part of the
 [command-line client](../cli.md). The service code is in `apps/cli/src/supervision/`.
 
 ## Start, check, and stop
@@ -35,7 +35,7 @@ rotates at 8 MiB instead, for launchd and Windows, which don't rotate. Neither c
 The command forwards SIGTERM and SIGINT to the Node and exits with the Node's exit code. The Node treats
 a repeated signal as the same stop, so a terminal or systemd that also signals it directly can't cut its
 drain short. A crash is the service manager's to restart. Like `--background`, it drops
-`ACORN_ADVERTISE_HOST` from the Node's environment, so set `advertiseHost` in `node.json` instead.
+`ACORN_ADVERTISE_HOST` from the Node's environment, so choose the hosts with `acorn node reach` instead.
 
 ## Stop and restart
 
@@ -60,13 +60,33 @@ address, the certificate fingerprint as six identity words, and a code valid for
 `expiresAt`. The code is meant to be read, so it's printed. No device token is. `--close` closes the
 window early.
 
-The address is the one the CLI reached the Node on, which for the local Node is loopback. To reach it
-from another machine, set `advertiseHost` in the data root's `node.json` and run `acorn node restart`
-([reaching a node from another machine](../node-distribution.md#reaching-a-node-from-another-machine)).
+The address is each host the Node answers other machines on, from `GET /v1/core/node/reach`. A Node
+with no hosts, or one still waiting to restart onto new ones, gets the address the CLI reached it on,
+which for the local Node is loopback. To reach it from another machine, run `acorn node reach`.
 
 `pair` uses the CLI's device token, and with none it pairs the CLI first, as every command does. It
 also takes `--node`, because opening a code needs no authority a paired device lacks. A Node that runs
 as another operating system user is paired by that user, such as `sudo -u acorn acorn node pair`.
+
+## Choose who can reach the Node
+
+```sh
+acorn node reach
+acorn node reach 192.168.1.20 workshop.local
+acorn node reach --private
+```
+
+With no arguments, `reach` prints the address another machine connects to, where the hosts come from,
+and this machine's IPv4 addresses. With hosts, it sets the list the Node answers on besides loopback,
+and `--private` clears it. The Node checks the list and refuses all of it over one bad entry. With
+`--output json` it writes one `NodeReach` resource with `hosts`, `source`, `port`, `endpoints`,
+`candidates`, `restartRequired`, and `restarted`.
+
+The Node takes the change only from a device on its own computer, so `reach` refuses `--node`. The
+listener binds at boot, so a change restarts a Node the CLI started, as `acorn node restart` does, and
+the Node keeps its port. Any other Node, such as the desktop's, answers on the new list after its own
+restart, and `reach` says so. [Reach a Node from another machine](../node-distribution/reaching.md)
+covers the rules, the fixed port, and the firewall.
 
 ## List and revoke devices
 

@@ -51,6 +51,7 @@ const flagOptions = new Set([
   'background',
   'foreground',
   'close',
+  'private',
   'force',
   'skip-setup',
   'include-hidden',
@@ -146,6 +147,7 @@ export function helpFor(positionals: string[]): string {
                         'node start --background|--foreground [--log FILE]',
                         'node stop [--force]|restart',
                         'node pair [--close]|devices|revoke ID [--force]',
+                        'node reach [HOST...|--private] (restarts a Node this CLI started)',
                         'stop and restart drain the Node; pair, devices, and revoke also take --node',
                       ]
                     : section === 'browser'
@@ -155,7 +157,7 @@ export function helpFor(positionals: string[]): string {
                           'uninstall removes the registrations and keeps pairings; status names the folder that holds them',
                         ]
                       : [
-                          'node info|start|status|stop|restart|pair|devices|revoke',
+                          'node info|start|status|stop|restart|pair|devices|revoke|reach',
                           'workspace list|show|create|rename|remove|external-projects',
                           'project list|show|add|rename|move|hide|unhide|detect|remove|config',
                           'task list|show|create|scripts status|scripts wait|scripts logs',
