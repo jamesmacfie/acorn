@@ -8,7 +8,7 @@ sources:
   - docs/cli/plugin-commands.md
   - docs/cli/local-service.md
   - apps/cli/src/args.ts
-checked: '6d26989c5'
+checked: '034e42840'
 ---
 
 `acorn` with a command is acorn's command-line interface (CLI): it talks to a Node and prints what it
