@@ -17,8 +17,9 @@ styles. The script ceiling is about 5% above the measurement of 951,018 B on Oct
 from 740,000 B so the v0.0.2 release could build. A change that needs more raises the ceiling in the same commit, with the reason in the
 commit message.
 
-The same check counts the compiled roster's scripts beyond startup, against a ceiling of 310,000 B,
-about 5% above the 295,475 B measured the same day. The roster loads after the first frame, but the
+The same check counts the compiled roster's scripts beyond startup, against a ceiling of 340,000 B,
+about 5% above the 323,341 B measured on October 18, 2026, once the GitLab and Bitbucket plugins
+registered there. The roster loads after the first frame, but the
 workspace restore waits for its registration. A dynamic import that only moves startup code into the
 roster saves the launch nothing, and this ceiling fails it. The roster's key, `src/client/plugins.ts`,
 lives in `apps/desktop/scripts/renderer-graph.mjs`, which the size report reads too.
