@@ -28,6 +28,8 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `session.create` | `nodeId`, `taskId`, `providerId`, `profileId`, `customAgentId` and `account` (optional), `key` | `{ nodeId, session }` |
 | `turn.submit` | `nodeId`, `sessionId`, `input`, `key` | `{ nodeId, sessionId, turnId }` |
 | `session.archive` | `nodeId`, `sessionId`, `key` | `{ nodeId, sessionId }`: the host sends `PATCH` with `{ archived: true }` to the session's route |
+| `task.archive` | `nodeId`, `taskId`, `key` | `{ nodeId, taskIds }`: the host sends `POST` with `{ deleteWorktree: true }` to the task's `archive` route. `taskIds` lists every task archived, subtasks included. A refusal, such as uncommitted changes, is a `node_error` |
+| `task.delete` | `nodeId`, `taskId`, `key` | `{ nodeId, taskIds }`: the host sends `POST` with an empty body to the task's `delete` route, which archives an active task first |
 | `session.cancel` | `nodeId`, `sessionId`, `key` | `{ nodeId, sessionId }`: the host sends `POST` with an empty body to the session's `cancel` route, which stops its running turn; see [stopping the agent](./transcript.md#the-state-line) |
 | `request.resolve` | `nodeId`, `sessionId`, `requestId`, `resolution`, `key` | `{ nodeId, sessionId, request }`; see [answering the agent](./conversations.md#answering-the-agent) |
 | `attachment.upload`, `attachment.read`, `attachment.delete` | `nodeId`, `taskId`, and the attachment | See [page capture](./page-capture.md#attachment-operations) |

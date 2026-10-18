@@ -252,6 +252,13 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
       setArchives((count) => count + 1)
       if (at('conversation')?.sessionId === sessionId) nav.back()
     })
+  // The Node's next task list drops the task, and Workspace takes the panel Home then. Going now spares
+  // the wait.
+  const removeTask = (nodeId: string, taskId: string, op: 'task.archive' | 'task.delete') =>
+    attempt(async () => {
+      await client.call({ op, nodeId, taskId, key: crypto.randomUUID() })
+      if (at('task')?.taskId === taskId) nav.goHome()
+    })
   // A conversation an OS notification or a right-click asked to open, once its Node is the selected one.
   createEffect(
     on([openRequest, () => fleet()?.activeNodeId], ([target, nodeId]) => {
@@ -318,6 +325,8 @@ export function App(props: { api: BrowserApi; opensLinks?: boolean }) {
                       opensLinks={props.opensLinks ?? false}
                       pages={nodeTasks()?.find((task) => task.id === here().taskId)?.pages ?? []}
                       pageUrl={pageUrl()}
+                      archive={() => void removeTask(nodeId(), here().taskId, 'task.archive')}
+                      delete={() => void removeTask(nodeId(), here().taskId, 'task.delete')}
                       openSettings={nav.openSettings}
                     />
                   )}

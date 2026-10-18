@@ -122,6 +122,9 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
           ? { nodeId, workspaceId: request.workspaceId, sessions: rows }
           : { nodeId, taskId: request.taskId, sessions: rows.filter((row) => row.taskId === request.taskId) }
       }
+      case 'task.archive':
+      case 'task.delete':
+        return { nodeId, taskIds: [request.taskId] }
       case 'session.archive':
         state.archived.push(request.sessionId as string)
         return { nodeId, sessionId: request.sessionId }
@@ -1048,6 +1051,8 @@ describe('the task and conversation menus', () => {
       'Pull request #7This tab',
       'linear.app/acme/issue/ENG-1Switch to tab',
       'Runn stackrunning',
+      'Archive task',
+      'Delete task',
       'Settings',
     ])
     await choose('linear.app')
@@ -1066,6 +1071,22 @@ describe('the task and conversation menus', () => {
     await openMenu()
     await choose('Settings')
     expect(root.querySelector('header .title')?.textContent).toBe('Settings')
+  })
+
+  it('archives a task from its menu on the second press, then goes Home', async () => {
+    const { state, root } = mount({ url: 'https://example.com/' })
+    await settle(30)
+    await openTask(root, 'Fix login')
+    button(root, 'Task menu')!.click()
+    await settle(20)
+    await choose('Archive task')
+    expect(menuItem('Archive this task?')).toBeDefined()
+    expect(state.requests.some((request) => request.op === 'task.archive')).toBe(false)
+    await choose('Archive this task?')
+
+    const archives = state.requests.filter((request) => request.op === 'task.archive')
+    expect(archives).toEqual([expect.objectContaining({ nodeId: 'n1', taskId: 't1', key: expect.any(String) })])
+    expect(shownTask(root)).toBeNull()
   })
 
   it("archives a conversation from its menu and goes back to the task's Agents, which no longer lists it", async () => {

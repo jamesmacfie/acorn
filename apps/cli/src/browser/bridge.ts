@@ -3,6 +3,7 @@ import { NodeBroker, toNodeRecord, type FleetStore } from '@acorn/custody/broker
 import { askToPair, collectPairing, pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
 import { dataRootDir, runningNode } from '@acorn/custody/local'
 import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protocol/broker.ts'
+import type { ArchiveResult, DeleteResult } from '@acorn/protocol/task.ts'
 import {
   ATTACHMENT_MAX_BYTES,
   type BridgeAgentHint,
@@ -17,6 +18,8 @@ import {
 import {
   projectConfigRoute,
   projectsRoute,
+  taskArchiveRoute,
+  taskDeleteRoute,
   tasksRoute,
   workspacesRoute,
   type Project,
@@ -695,6 +698,20 @@ export function createBridge(options: {
           body: { archived: true },
         })
         return { nodeId: request.nodeId, sessionId: request.sessionId }
+      }
+      case 'task.archive':
+      case 'task.delete': {
+        // No `force`, so the Node refuses a worktree with uncommitted changes rather than discard them.
+        const result = (await nodeRequest(request.nodeId, {
+          method: 'POST',
+          path: request.op === 'task.archive' ? taskArchiveRoute(request.taskId) : taskDeleteRoute(request.taskId),
+          key: request.key,
+          body: request.op === 'task.archive' ? { deleteWorktree: true } : {},
+        })) as ArchiveResult | DeleteResult | null
+        if (!result?.ok)
+          throw new BridgeFailure('node_error', result?.reason ?? 'The Node returned an unreadable answer.')
+        const taskIds = 'taskIds' in result ? result.taskIds : (result.archivedTaskIds ?? [request.taskId])
+        return { nodeId: request.nodeId, taskIds }
       }
       case 'session.cancel': {
         await nodeRequest(request.nodeId, {
