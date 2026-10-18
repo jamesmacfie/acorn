@@ -6,6 +6,7 @@ import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import type { GateFormOutput, GateFormProposal } from '../../shared/gateForm'
 import { resolveGateFormProposal } from '../validation/bindings'
 import { setTimeout as delay } from 'node:timers/promises'
+import { taskScriptAcceptable, taskScriptSettled } from '@acorn/protocol/taskScripts.ts'
 import { CODE_HOST_POLICY, type CiSettledValue } from '../../contract/extensions'
 import { DEFAULT_POLL_INTERVAL_MS, MIN_POLL_INTERVAL_MS, readPolicyWait } from '../../shared/policyWait'
 import { waitForPolicy, type PolicyWaitOptions } from './policyWait'
@@ -129,6 +130,19 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
           fields: [],
         },
         evaluate: (ctx, step) => askCodeHost(CODE_HOST_POLICY.reviewReceived, ctx, step),
+      },
+    ],
+    [
+      'setup-settled',
+      {
+        describe: {
+          label: 'Setup finished',
+          description:
+            "Whether the task's setup script finished. Passes when it succeeded or the task has none, and fails when it failed or stopped.",
+          icon: 'wrench',
+          fields: [],
+        },
+        evaluate: setupSettled,
       },
     ],
     [
@@ -383,6 +397,35 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
       error: `Policy '${id}' ${reason}${result.detail ? `: ${result.detail}` : '.'}`,
       result,
       structured: result,
+    }
+  }
+
+  // Reads core's record of the setup attempt, so a poll costs nothing. A setup that hasn't started
+  // yet waits, because a task's worktree, and so its setup, can start after the run does.
+  async function setupSettled({ taskId }: PolicyContext): Promise<PolicyVerdict> {
+    const setup = await services.deps.taskSetup?.(taskId)
+    if (!setup) return { verdict: 'fail', detail: 'Setup status is unavailable on this Node.' }
+    if (taskScriptAcceptable(setup))
+      return {
+        verdict: 'pass',
+        detail: setup.state === 'succeeded' ? 'Setup finished.' : 'This task has no setup to run.',
+      }
+    if (setup.state === 'unknown')
+      return {
+        verdict: 'fail',
+        detail: "This task's setup history isn't recorded, so it can't tell whether setup ran.",
+      }
+    if (taskScriptSettled(setup.state))
+      return {
+        verdict: 'fail',
+        detail:
+          setup.exitCode !== null
+            ? `Setup exited with code ${setup.exitCode}.`
+            : `Setup ${setup.state}: ${setup.reason.replaceAll('_', ' ')}.`,
+      }
+    return {
+      verdict: 'wait',
+      detail: setup.state === 'not_started' ? "Setup hasn't started." : `Setup is ${setup.state}.`,
     }
   }
 

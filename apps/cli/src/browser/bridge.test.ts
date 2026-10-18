@@ -109,6 +109,8 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     paths: [] as string[],
     // Every session archive, with its key.
     archives: [] as { key: string; body: unknown }[],
+    // Every task archive or delete, with its path and key.
+    taskRemovals: [] as { path: string; key: string; body: unknown }[],
     // Every stop of a session's turn, with its key.
     cancels: [] as { key: string; body: unknown }[],
     // The body of the last session start.
@@ -291,6 +293,19 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         },
         { id: 'orphan', name: 'Orphan', providerId: 'gone', options: {}, instructions: '', source: { kind: 'user' } },
       ])
+    if (/^\/v1\/core\/tasks\/[^/]+\/(archive|delete)$/.test(url.pathname) && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      state.taskRemovals.push({
+        path: url.pathname,
+        key: String(req.headers['idempotency-key']),
+        body: JSON.parse(body),
+      })
+      if (url.pathname.includes('dirty')) return reply(200, { ok: false, reason: 'Worktree has uncommitted changes.' })
+      return url.pathname.endsWith('/delete')
+        ? reply(200, { ok: true, taskIds: ['t1', 't2'] })
+        : reply(200, { ok: true, archivedTaskIds: ['t1', 't2'] })
+    }
     if (url.pathname === '/v1/p/agents/sessions/s1/cancel' && req.method === 'POST') {
       let body = ''
       for await (const chunk of req) body += chunk
@@ -823,6 +838,27 @@ describe('browser bridge agent operations', () => {
       sessionId: 's1',
     })
     expect(node.state.archives).toEqual([{ key: 'archive-key-1', body: { archived: true } }])
+  })
+
+  it('archives and deletes a task through the core routes, without forcing', async () => {
+    const { call, node } = await selected()
+    expect(await call({ op: 'task.archive', nodeId: 'node-a', taskId: 't1', key: 'k1' })).toEqual({
+      nodeId: 'node-a',
+      taskIds: ['t1', 't2'],
+    })
+    expect(await call({ op: 'task.delete', nodeId: 'node-a', taskId: 't1', key: 'k2' })).toEqual({
+      nodeId: 'node-a',
+      taskIds: ['t1', 't2'],
+    })
+    await expect(call({ op: 'task.archive', nodeId: 'node-a', taskId: 'dirty', key: 'k3' })).rejects.toMatchObject({
+      code: 'node_error',
+      message: 'Worktree has uncommitted changes.',
+    })
+    expect(node.state.taskRemovals).toEqual([
+      { path: '/v1/core/tasks/t1/archive', key: 'k1', body: { deleteWorktree: true } },
+      { path: '/v1/core/tasks/t1/delete', key: 'k2', body: {} },
+      { path: '/v1/core/tasks/dirty/archive', key: 'k3', body: { deleteWorktree: true } },
+    ])
   })
 
   it("stops a session's turn through the agents route with the key", async () => {

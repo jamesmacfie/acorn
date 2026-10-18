@@ -51,10 +51,9 @@ refuses a write. The file pane has no such limit.
 
 ## Host document export and guarded replacement
 
-The host document region offers **Export full text** through the host's file-saving dialog. The
-export holds the whole live draft, including text past the editable limit. A stored oversized document
-offers the same export without creating an editor or a handle. Its read route stays authorized by the
-original Node and scope. Export gives the dialog bytes and a suggested name, and adds no plugin file
+A stored oversized document opens without an editor or a handle, and offers **Export full text**
+through the host's file-saving dialog. An editable document has no export button. Its read route stays
+authorized by the original Node and scope. Export gives the dialog bytes and a suggested name, and adds no plugin file
 system or network access.
 
 `bridge.document.write(text, { expectedText })` replaces the text only if the current text matches

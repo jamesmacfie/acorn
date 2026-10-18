@@ -157,11 +157,12 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     injectedFiles: [] as string[][],
     // A message from a content script in the active tab, in its top frame unless `frameId` says
     // otherwise, as the browser delivers it. Resolves with the background's answer, if it gives one.
-    sendFromPage: (message: unknown, frameId = 0): Promise<unknown> =>
+    // `senderUrl` stands in for Firefox, which keeps it at the page the script loaded on.
+    sendFromPage: (message: unknown, frameId = 0, senderUrl?: string): Promise<unknown> =>
       new Promise((resolve) => {
         const kept = onMessage.emit(
           structuredClone(message),
-          { tab: { ...fake.activeTab }, url: fake.activeTab.url, frameId },
+          { tab: { ...fake.activeTab }, url: senderUrl ?? fake.activeTab.url, frameId },
           (answer) => resolve(structuredClone(answer)),
         )
         // A browser answers `undefined` when no listener kept the channel open.

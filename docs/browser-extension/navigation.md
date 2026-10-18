@@ -47,6 +47,10 @@ the right holds the task's menu:
   shows it, and **Open** otherwise. An app shows its state instead. Choosing one brings that tab and
   its window forward, or opens the page in a new tab. The sidebar learns which tabs show what from
   the `tabs` permission, and reads the tabs again when one navigates or closes.
+- **Archive task** and **Delete task**. Each asks again on its first press and acts on the second.
+  They send `task.archive` and `task.delete`, which call the Node's archive and delete routes the way
+  the desktop's do, subtasks included. Neither forces: the Node refuses a worktree with uncommitted
+  changes, and the panel shows why. Once the task is gone, the panel goes Home.
 - **Settings**.
 
 A rail along the bottom edge holds the task's panes. It's the desktop's pane rail laid on its side:

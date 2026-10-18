@@ -227,6 +227,10 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
   }),
   // Archives a conversation, as the desktop's Archive does. The Node keeps it, out of every list.
   z.strictObject({ ...envelope, op: z.literal('session.archive'), nodeId, sessionId: rowId, key: operationKey }),
+  // Archives a task, or deletes it for good, as the desktop's Archive and Delete do. Neither forces: a
+  // worktree with uncommitted changes is refused, since the browser can't show the desktop's warnings.
+  z.strictObject({ ...envelope, op: z.literal('task.archive'), nodeId, taskId: rowId, key: operationKey }),
+  z.strictObject({ ...envelope, op: z.literal('task.delete'), nodeId, taskId: rowId, key: operationKey }),
   // Stops the conversation's running turn, as the desktop's Stop does. The next read shows the stop.
   z.strictObject({ ...envelope, op: z.literal('session.cancel'), nodeId, sessionId: rowId, key: operationKey }),
   // Answers one request the agent is waiting on. `requestId` is the agents plugin's provider request
@@ -524,6 +528,9 @@ export type BridgeResults = {
   'turn.submit': { nodeId: string; sessionId: string; turnId: string }
   'session.archive': { nodeId: string; sessionId: string }
   'session.cancel': { nodeId: string; sessionId: string }
+  // Every task the archive or delete took, subtasks included.
+  'task.archive': { nodeId: string; taskIds: string[] }
+  'task.delete': { nodeId: string; taskIds: string[] }
   // The request as the Node holds it after the answer. One already settled comes back unchanged.
   'request.resolve': { nodeId: string; sessionId: string; request: BridgeAgentRequest }
   // Oldest first. Only active tasks' requests: an archived task has no conversation to open.

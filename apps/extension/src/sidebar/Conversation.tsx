@@ -1,7 +1,9 @@
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from 'solid-js'
+import { render } from 'solid-js/web'
 import type { BridgeAgentHint, BridgeAgentSession, BridgeAttachmentRef } from '@acorn/protocol/extensionBridge.ts'
 import { Text } from '@acorn/client-core/kit/components/content'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
+import CopyButton from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 import { Fold, Inline, Stack } from '@acorn/client-core/kit/components/layout'
 import { Button, Card, Chip } from '@acorn/client-core/kit/components/primitives.tsx'
 import { renderMarkdown } from '@acorn/client-core/kit/lib/markdown'
@@ -341,8 +343,21 @@ function ToolRun(props: { lines: ToolLine[]; open: boolean; toggle(open: boolean
 
 // A message as the desktop renders it: the shared renderer's escaped and sanitized HTML. A remote image
 // shows as its alt text, so a message can't make the browser fetch an address it names.
+//
+// Each code block gets the desktop's copy button. The kit's Markdown component would add it too, but
+// it also brings the syntax highlighter and the diagram engine, which the extension doesn't ship.
 function Markdown(props: { text: string }) {
-  return <div class="ui-markdown" innerHTML={renderMarkdown(props.text, { images: 'placeholder' })} />
+  let root!: HTMLDivElement
+  createEffect(() => {
+    root.innerHTML = renderMarkdown(props.text, { images: 'placeholder' })
+    const disposers = [...root.querySelectorAll<HTMLElement>('.ui-code-wrap')].map((wrap) => {
+      wrap.classList.add('copyable')
+      const source = wrap.querySelector('code')?.textContent ?? ''
+      return render(() => <CopyButton text={source} />, wrap)
+    })
+    onCleanup(() => disposers.forEach((dispose) => dispose()))
+  })
+  return <div class="ui-markdown" ref={root} />
 }
 
 // The attachments a turn sent, as chips: a screenshot shows its picture, read through the bridge.

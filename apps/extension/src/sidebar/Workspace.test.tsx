@@ -122,6 +122,9 @@ function mount(options: { url?: string; sites?: ProjectSite[] } = {}) {
           ? { nodeId, workspaceId: request.workspaceId, sessions: rows }
           : { nodeId, taskId: request.taskId, sessions: rows.filter((row) => row.taskId === request.taskId) }
       }
+      case 'task.archive':
+      case 'task.delete':
+        return { nodeId, taskIds: [request.taskId] }
       case 'session.archive':
         state.archived.push(request.sessionId as string)
         return { nodeId, sessionId: request.sessionId }
@@ -521,13 +524,9 @@ describe('This page', () => {
     thisPage(root).querySelector<HTMLElement>('.ui-row')!.click()
     await settle(30)
     expect(shownTask(root)).toBe('Fix login')
-    // A page that matches nothing leaves the task shown, no longer tagged as this page's.
+    // A page that matches nothing goes Home from the task of the page before.
     fake.navigate('https://example.com/')
     await settle(20)
-    expect(shownTask(root)).toBe('Fix login')
-    expect(root.querySelector('header .here')).toBeNull()
-    expect(agentRows(root)).toEqual(['Chat s1'])
-    await goHome(root)
     expect(idle(root)).toBe(true)
     expect(fake.storage.get('destination:n1')).toMatchObject({ taskId: 't1' })
   })
@@ -588,6 +587,23 @@ describe('This page', () => {
     expect(strips()).toEqual(['This page is in Speed up searchSwitch'])
   })
 
+  it("goes Home from the page's task to a page of no task, and stays on a task opened by hand", async () => {
+    const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
+    state.taskPages = [pullTask, { ...pullTask, id: 't2', title: 'Speed up search', pages: [] }]
+    await settle(30)
+    expect(shownTask(root)).toBe('Fix login')
+    fake.navigate('https://github.com/acme/web/pull/21')
+    await settle(30)
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
+    fake.navigate('https://github.com/acme/web/pull/7')
+    await settle(30)
+    await goHome(root)
+    await openTask(root, 'Speed up search')
+    fake.navigate('https://github.com/acme/web/pull/21')
+    await settle(30)
+    expect(shownTask(root)).toBe('Speed up search')
+  })
+
   it('goes Home when the task it shows leaves the Node', async () => {
     const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
     state.taskPages = [pullTask]
@@ -630,15 +646,11 @@ describe('This page', () => {
   })
 
   it('says when the page carries an item no task holds, and Start task goes Home to it', async () => {
-    const { fake, state, root } = mount({ url: 'https://github.com/acme/web/pull/7' })
+    const { state, root } = mount({ url: 'https://github.com/acme/web/pull/8' })
     state.taskPages = [pullTask]
     state.handoffs = [pullHandoff]
     await settle(30)
-    expect(shownTask(root)).toBe('Fix login')
-    expect(root.querySelector('.strip')).toBeNull()
-    fake.navigate('https://github.com/acme/web/pull/8')
-    await settle(30)
-    expect(shownTask(root)).toBe('Fix login')
+    await openTask(root, 'Fix login')
     expect(root.querySelector('.strip')!.textContent).toBe('This page has no taskStart task')
     button(root.querySelector('.strip')!, 'Start task')!.click()
     await settle(30)
@@ -1048,6 +1060,8 @@ describe('the task and conversation menus', () => {
       'Pull request #7This tab',
       'linear.app/acme/issue/ENG-1Switch to tab',
       'Runn stackrunning',
+      'Archive task',
+      'Delete task',
       'Settings',
     ])
     await choose('linear.app')
@@ -1066,6 +1080,22 @@ describe('the task and conversation menus', () => {
     await openMenu()
     await choose('Settings')
     expect(root.querySelector('header .title')?.textContent).toBe('Settings')
+  })
+
+  it('archives a task from its menu on the second press, then goes Home', async () => {
+    const { state, root } = mount({ url: 'https://example.com/' })
+    await settle(30)
+    await openTask(root, 'Fix login')
+    button(root, 'Task menu')!.click()
+    await settle(20)
+    await choose('Archive task')
+    expect(menuItem('Archive this task?')).toBeDefined()
+    expect(state.requests.some((request) => request.op === 'task.archive')).toBe(false)
+    await choose('Archive this task?')
+
+    const archives = state.requests.filter((request) => request.op === 'task.archive')
+    expect(archives).toEqual([expect.objectContaining({ nodeId: 'n1', taskId: 't1', key: expect.any(String) })])
+    expect(shownTask(root)).toBeNull()
   })
 
   it("archives a conversation from its menu and goes back to the task's Agents, which no longer lists it", async () => {

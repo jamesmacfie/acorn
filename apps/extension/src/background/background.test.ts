@@ -282,6 +282,26 @@ describe('site buttons', () => {
     expect(second.messages.some((message) => message.type === 'handoff')).toBe(false)
   })
 
+  it("hands off the tab's address, not the one Firefox kept from before the page moved in place", async () => {
+    const { fake, panel } = await started({ url: 'https://tracker.example/items/43' })
+    await fake.sendFromPage(
+      { type: 'acorn:handoff', key: 'tracker:item', start: 'task' },
+      0,
+      'https://tracker.example/items/42',
+    )
+    await settle()
+    expect(panel.messages).toContainEqual({
+      type: 'handoff',
+      handoff: {
+        pluginId: 'tracker',
+        handoffId: 'item',
+        label: 'Open in Acorn',
+        url: 'https://tracker.example/items/43',
+        start: 'task',
+      },
+    })
+  })
+
   it('gives the tab the toolbar button was clicked on its buttons', async () => {
     const { fake } = await started({ url: 'https://tracker.example/boards/1' })
     fake.injected.length = 0

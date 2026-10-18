@@ -83,12 +83,12 @@ The generation modal waits for the host to accept its replacement before dismiss
 The host retains failed dirty text, including oversized edits. Closing and reopening the same
 Node/task document restores that draft; equal task IDs on another Node have independent custody.
 The desktop retains CodeMirror undo in memory. Device recovery storage can fail or run out of quota;
-keep acorn open until the draft saves or export its full text. A retired pane's handle cannot read,
+keep acorn open until the draft saves. A retired pane's handle cannot read,
 write, or flush the recovered draft through a replacement pane.
 
 A stored scratch row above the limit opens in a recovery state with no editable empty buffer or
 execution handle. In the desktop, choose **Export full text** to save every UTF-8 byte through the
-host file dialog. The same action exports a live unsent draft. Export reads only the document
+host file dialog. Export reads only the document
 fetched through the pane's declared route on its captured Node; the plugin receives no file path or
 filesystem grant.
 

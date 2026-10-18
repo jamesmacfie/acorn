@@ -162,7 +162,7 @@ and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#w
 | --- | --- | --- | --- |
 | GitHub | Pull requests and their tabs | A task chip in the header | One per GitHub account that can see it ([GitHub](../github-integration/tasks-and-references.md#browser-handoff)) |
 | Linear | Issues, short and slug addresses | None, sidebar only | One per Linear connection in the page's workspace ([Linear](../integrations/linear.md#browser-handoff)) |
-| Rollbar | Item permalinks, `rollbar.com/item/<id>/` | None, sidebar only | One per Rollbar connection whose project has the item, numbered by its project counter ([Rollbar](../integrations/rollbar.md#browser-handoff)) |
+| Rollbar | Item permalinks, `rollbar.com/item/<id>/`, and signed-in item views, `app.rollbar.com/a/<account>/fix/item/<project>/<counter>` | None, sidebar only | One per Rollbar connection whose project has the item, numbered by its project counter ([Rollbar](../integrations/rollbar.md#browser-handoff)) |
 
 ## Gaps
 
@@ -189,8 +189,8 @@ and creation are in [browser handoffs](../plugin-authoring/browser-handoffs.md#w
   and came back as "reconnect". Unit tests and the Node's parity tests cover a resolution.
 - Signed out, Rollbar redirects an item's permalink to its login page. The browser checks therefore
   answered the item address with a stub page through the browser's debugging protocol. The handoff
-  itself still went through the native host, the Node, and Rollbar's API. The address a signed-in
-  item view settles on wasn't seen.
+  itself still went through the native host, the Node, and Rollbar's API. The signed-in item view
+  address was taken from a real tab on 2026-10-19 and is covered by unit tests only.
 
 ## Why
 

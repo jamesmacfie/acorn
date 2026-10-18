@@ -70,8 +70,8 @@ function pageEntry(page: BridgeTaskPage): { icon: string; name: string } {
   return { icon: 'link', name: `${new URL(page.origin).host}${page.pathPrefix}` }
 }
 
-// The task's ⋯ menu: its Acorn link, its pages, each switching to its browser tab or opening one, and
-// Settings.
+// The task's ⋯ menu: its Acorn link, its pages, each switching to its browser tab or opening one,
+// Archive task and Delete task, each pressed twice, and Settings.
 export function TaskMenu(props: {
   api: BrowserApi
   href: string | null
@@ -79,6 +79,8 @@ export function TaskMenu(props: {
   pages: readonly BridgeTaskPage[]
   // The page beside the panel.
   pageUrl: string | undefined
+  archive(): void
+  delete(): void
   openSettings(): void
 }) {
   const tabs = openTabs(props.api)
@@ -108,6 +110,24 @@ export function TaskMenu(props: {
             </For>
             <Menu.Separator />
           </Show>
+          <Menu.Item
+            context={context}
+            leading={<Icon name="inbox" />}
+            confirm="Archive this task?"
+            onSelect={() => props.archive()}
+          >
+            Archive task
+          </Menu.Item>
+          <Menu.Item
+            context={context}
+            leading={<Icon name="trash-2" />}
+            tone="danger"
+            confirm="Delete for good?"
+            onSelect={() => props.delete()}
+          >
+            Delete task
+          </Menu.Item>
+          <Menu.Separator />
           <Menu.Item context={context} leading={<Icon name="settings" />} onSelect={() => props.openSettings()}>
             Settings
           </Menu.Item>

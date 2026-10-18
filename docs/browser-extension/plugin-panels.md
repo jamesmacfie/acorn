@@ -14,7 +14,8 @@ another task, it reads every declared panel for that task.
 A plugin whose route answers a view gets a tab on the task's rail, after **Agents** and **Runs**, with
 its label and glyph. A plugin that answers 404 has no panel for the task, and no tab. An open panel's
 tab stays while its view loads. An open panel gives way to **Agents** when the task has no panel or
-the plugin stops. A page that belongs to no task leaves it open.
+the plugin stops. A page that belongs to no task follows the rules in
+[Moving between pages](./task-pages.md#moving-between-pages).
 
 ## The panel
 

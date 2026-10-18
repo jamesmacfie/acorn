@@ -4,6 +4,7 @@ import type { Extension, ExtensionPointId } from '@acorn/plugin-api/node'
 import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runs/runner'
 import { WORKFLOW_POLICY } from '../contract/extensions'
 import { readPolicyWait } from '../shared/policyWait'
+import type { TaskScriptSnapshot } from '@acorn/protocol/taskScripts.ts'
 import type {
   PolicyContext,
   PolicyContribution,
@@ -336,5 +337,71 @@ describe('the policy gate', () => {
     const [gate] = await settled(runner, runId)
     expect(gate!.error).toBe("Policy 'test:ci' could not be checked: token revoked")
     expect(policy.evaluate).toHaveBeenCalledTimes(3)
+  })
+
+  describe('setup-settled', () => {
+    const snapshot = (over: Partial<TaskScriptSnapshot>): TaskScriptSnapshot => ({
+      taskId: 'task-1',
+      phase: 'setup',
+      generation: 1,
+      attemptId: 'attempt-1',
+      state: 'running',
+      reason: 'process_started',
+      terminalSessionId: null,
+      requestedAt: null,
+      startedAt: null,
+      finishedAt: null,
+      exitCode: null,
+      outputAvailable: false,
+      outputTruncated: false,
+      ...over,
+    })
+    const waitForSetup = async (...answers: TaskScriptSnapshot[]) => {
+      let poll = 0
+      const runner = runnerWith(passing(), {
+        sleep: clockSleep,
+        taskSetup: async () => answers[Math.min(poll++, answers.length - 1)]!,
+      })
+      const runId = await runner.start(
+        'task-1',
+        def([{ id: 'setup', name: 'setup', kind: 'gate-policy', policy: 'setup-settled', timeoutMs: 3_600_000 }]),
+      )
+      const [gate] = await settled(runner, runId)
+      return gate!
+    }
+
+    it('waits while setup runs, and passes once it succeeds', async () => {
+      const gate = await waitForSetup(
+        snapshot({ state: 'not_started', reason: 'not_requested', attemptId: null }),
+        snapshot({ state: 'running' }),
+        snapshot({ state: 'succeeded', reason: 'exit_zero', exitCode: 0 }),
+      )
+      expect(gate.status).toBe('done')
+      expect(JSON.parse(gate.structuredJson!)).toEqual({ verdict: 'pass', detail: 'Setup finished.', polls: 3 })
+    })
+
+    it('passes a task with no setup to run', async () => {
+      const gate = await waitForSetup(snapshot({ state: 'skipped', reason: 'not_configured' }))
+      expect(gate.status).toBe('done')
+    })
+
+    it('fails when setup fails or stops', async () => {
+      expect((await waitForSetup(snapshot({ state: 'failed', reason: 'nonzero_exit', exitCode: 2 }))).error).toBe(
+        "Policy 'setup-settled' failed: Setup exited with code 2.",
+      )
+      expect((await waitForSetup(snapshot({ state: 'interrupted', reason: 'process_lost' }))).error).toBe(
+        "Policy 'setup-settled' failed: Setup interrupted: process lost.",
+      )
+    })
+
+    it('fails closed when nothing can read setup', async () => {
+      const runner = runnerWith(passing())
+      const runId = await runner.start(
+        'task-1',
+        def([{ id: 'setup', name: 'setup', kind: 'gate-policy', policy: 'setup-settled' }]),
+      )
+      const [gate] = await settled(runner, runId)
+      expect(gate!.error).toBe("Policy 'setup-settled' failed: Setup status is unavailable on this Node.")
+    })
   })
 })

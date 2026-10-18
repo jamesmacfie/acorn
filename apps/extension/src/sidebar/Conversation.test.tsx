@@ -364,7 +364,7 @@ describe('conversation', () => {
 
   it('renders messages as Markdown and a tool call as a state mark', async () => {
     const subject = mount()
-    subject.say('s1', 'Run **the** tests')
+    subject.say('s1', 'Run **the** tests\n\n```sql\nSELECT 1\n```')
     const tool = (seq: number, status: string) =>
       subject.state.events.get('s1')!.push({
         id: `s1-t${seq}`,
@@ -380,6 +380,8 @@ describe('conversation', () => {
     const agent = subject.root.querySelector('.transcript .ui-card[data-stripe="ok"]')!
     expect(agent.querySelector('.ui-text[data-emphasis="eyebrow"]')!.textContent).toBe('Claude')
     expect(agent.querySelector('.ui-markdown strong')!.textContent).toBe('the')
+    const fence = agent.querySelector('.ui-markdown .ui-code-wrap.copyable')!
+    expect(fence.querySelector('.copy-btn')).not.toBeNull()
     // A finished call is its mark alone; any other state is written beside it.
     expect(transcript(subject.root).slice(1)).toEqual(['pnpm test 2', 'pnpm test 3 · running'])
     const marks = [...subject.root.querySelectorAll('.transcript li.tool > .ui-icon')]

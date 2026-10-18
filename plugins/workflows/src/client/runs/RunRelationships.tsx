@@ -139,8 +139,8 @@ export function ChildRuns(props: { step: WorkflowStepProjection; tasks: readonly
                 </Show>
                 <Show when={child.resultSummary}>
                   {(result) => (
-                    <Fold label="Result">
-                      <CodeBlock wrap maxHeight="block">
+                    <Fold level="sub" label="Result">
+                      <CodeBlock copy wrap maxHeight="block">
                         {result()}
                       </CodeBlock>
                     </Fold>

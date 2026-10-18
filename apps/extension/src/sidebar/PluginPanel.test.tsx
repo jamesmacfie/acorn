@@ -296,17 +296,13 @@ describe('plugin panels', () => {
     expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 
-  it('stays on the task and tab it shows when the page moves to one no task holds', async () => {
-    const { fake, state, root } = mount()
+  it("goes Home from the page's task on its panel when the page moves to one no task holds", async () => {
+    const { fake, root } = mount()
     await settle(30)
     await openPanel(root)
-    const reads = panelReads(state).length
     fake.navigate('https://elsewhere.example/')
     await settle(30)
-    expect(shownTask(root)).toBe('Task t1')
-    expect(shownTab(root)).toBe('Runn')
-    expect(header(root).slice(0, 2)).toEqual(['Stack', 'running'])
-    expect(panelReads(state).length).toBe(reads)
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
   })
 
   it('opens a task on the tab last picked there, after the panel closes and opens again too', async () => {

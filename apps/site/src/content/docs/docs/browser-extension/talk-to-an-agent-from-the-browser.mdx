@@ -10,7 +10,7 @@ sources:
   - apps/extension/src/sidebar/Composer.tsx
   - apps/extension/src/sidebar/Conversation.tsx
   - apps/extension/src/sidebar/Requests.tsx
-checked: '68053b2e9'
+checked: 'fba6712a5'
 ---
 
 import Keys from '../../../../components/Keys.astro'
@@ -27,6 +27,9 @@ belongs to, such as the task holding the pull request you're on
 ([Task chips and handoffs](/docs/browser-extension/task-chips-and-handoffs/#match-a-page-to-its-task)).
 Click a task on Home to open another. **Back** goes up a level, from a conversation to its task and from
 a task to Home.
+The task's ⋯ menu holds **Archive task** and **Delete task**. Each asks again on the first click and
+acts on the second. A task with uncommitted changes in its worktree stays, with the reason shown;
+archive it from the desktop app to discard them.
 
 - The task's **Agents** tab lists its conversations under **Managed sessions**, each with its state as
   an icon, its agent and model, and how long ago it last changed. **Workflow runs** and **Inline
@@ -60,8 +63,8 @@ the draft as a chip ([Send pages, selections, and screenshots](/docs/browser-ext
 
 An open conversation stays open as you move between pages, so you can add the page you're on to it. On a
 page of another task, a line under the top bar names that task, and **Switch** opens it. With no
-conversation open, a page of another task opens that task, on the tab you last used there. A page that
-belongs to no task leaves the panel where it is.
+conversation open, a page of another task opens that task, on the tab you last used there, and a page
+that belongs to no task, reached from the page of the task the panel shows, goes back to Home.
 
 ## When a send doesn't go through
 

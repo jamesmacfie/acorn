@@ -1,4 +1,6 @@
 import {
+  isRecord,
+  parseJson,
   truncateBytes,
   type CoreServices,
   type PluginFetchHandler,
@@ -19,9 +21,10 @@ import {
 } from './occurrenceResources'
 
 // The route behind the item handoff the browser extension offers on a Rollbar item's permalink
-// (docs/integrations/rollbar.md § Browser handoff). The manifest declares it. The page names an item by
-// Rollbar's system-wide id; this route asks every connection for that id through the items resource,
-// and each connection that can read it answers with the item's own project counter.
+// (docs/integrations/rollbar.md § Browser handoff). The manifest declares it. A permalink names an item
+// by Rollbar's system-wide id, so this route asks every connection for that id through the items
+// resource. An account address names a project and its counter, so only that project's connection is
+// asked.
 
 const PROVIDER = 'rollbar'
 
@@ -38,17 +41,22 @@ export function createBrowserHandoffHandler(dependencies: {
   return async (request, context) => {
     if (request.method !== 'POST') return Response.json({ error: 'method_not_allowed' }, { status: 405 })
     const body = (await request.json().catch(() => null)) as { captures?: Record<string, unknown> } | null
-    const itemId = typeof body?.captures?.itemId === 'string' ? body.captures.itemId : ''
-    if (!/^\d{1,20}$/.test(itemId)) return refusal(400, 'bad_request', 'That address is not a Rollbar item.')
+    const page = pageItem(body?.captures ?? {})
+    if (!page) return refusal(400, 'bad_request', 'That address is not a Rollbar item.')
 
-    const connections = (await context.providers.connections(PROVIDER)).filter(
+    const connected = (await context.providers.connections(PROVIDER)).filter(
       (connection) => connection.status !== 'disabled',
     )
-    if (!connections.length)
+    if (!connected.length)
       return refusal(403, 'provider_not_connected', 'Connect Rollbar in Acorn to open items from the browser.')
+    const connections = page.project
+      ? connected.filter((connection) => projectName(connection) === page.project)
+      : connected
+    if (!connections.length)
+      return refusal(404, 'not_found', `Acorn isn't connected to the Rollbar project ${page.project}.`)
 
-    // A Rollbar connection is one project, and the item is in at most one of them, so every connection
-    // is asked. A fresh read, so a deleted item or a revoked token isn't hidden by the cache.
+    // A Rollbar connection is one project. A permalink's item is in at most one of them, so every
+    // connection is asked. A fresh read, so a deleted item or a revoked token isn't hidden by the cache.
     const reads = await Promise.all(
       connections.map(async (connection) => ({
         connection,
@@ -56,7 +64,7 @@ export function createBrowserHandoffHandler(dependencies: {
           providerId: PROVIDER,
           connectionId: connection.id,
           resourceId: ROLLBAR_ITEMS_RESOURCE,
-          input: { kind: 'item', itemId },
+          input: page.input,
           force: true,
           requireFresh: true,
         }),
@@ -71,20 +79,49 @@ export function createBrowserHandoffHandler(dependencies: {
         if (read.failure.status !== 404) failures.push({ connection, failure: read.failure })
         continue
       }
-      // Rollbar's own id for what it answered has to be the page's. The counter is never taken from
-      // the address: it is the project's number for the item, and differs from the id.
-      if (read.value.itemId !== itemId) continue
+      // What Rollbar answered has to be the page's item, by the number the page named it with.
+      if (!page.is(read.value)) continue
       items.push(await handoffItem(context, connection, read.value, dependencies.projectsFor))
     }
     // A project that answered is a real answer even when another connection failed, as on the rail.
     if (items.length) return Response.json({ items: items.slice(0, 8) } satisfies BrowserHandoffResolution)
     if (failures.length) return failureRefusal(failures)
-    return refusal(
-      404,
-      'not_found',
-      `No connected Rollbar project can show item ${itemId}. It may have been deleted, or be in a project Acorn isn't connected to.`,
-    )
+    return refusal(404, 'not_found', page.notFound)
   }
+}
+
+const ROLLBAR_NUMBER = /^\d{1,20}$/
+
+// What the page names. The permalink gives Rollbar's system-wide id. The account address gives a
+// project's name and that project's counter, which means nothing in another project. The two numbers
+// differ, so neither is ever read as the other.
+function pageItem(captures: Record<string, unknown>) {
+  const text = (key: string) => (typeof captures[key] === 'string' ? captures[key] : '')
+  const itemId = text('itemId')
+  if (ROLLBAR_NUMBER.test(itemId))
+    return {
+      input: { kind: 'item', itemId } as RollbarResourceInput,
+      project: null,
+      is: (item: RollbarItemMetadata) => item.itemId === itemId,
+      notFound: `No connected Rollbar project can show item ${itemId}. It may have been deleted, or be in a project Acorn isn't connected to.`,
+    }
+  const counter = text('counter')
+  const project = text('project')
+  if (ROLLBAR_NUMBER.test(counter) && project)
+    return {
+      input: { kind: 'detail', identifier: counter } as RollbarResourceInput,
+      project,
+      is: (item: RollbarItemMetadata) => item.identifier === counter,
+      notFound: `Rollbar project ${project} has no item #${counter}. It may have been deleted.`,
+    }
+  return null
+}
+
+// The project a connection covers, as `normalize` recorded it from Rollbar when the token was checked.
+// Rollbar's account address names a project by this name.
+function projectName(connection: StoredConnection): string | null {
+  const account = parseJson(connection.account ?? '')
+  return isRecord(account) && typeof account.label === 'string' ? account.label : null
 }
 
 async function handoffItem(

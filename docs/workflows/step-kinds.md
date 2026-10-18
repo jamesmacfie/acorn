@@ -113,6 +113,7 @@ poll, which the gate retries at its next interval.
 | `agent` | workflows | A one-shot agent turn with read-only tools answers. |
 | `checks-green` | workflows | Asks the `ci-settled` policy of the task's code host. |
 | `review-received` | workflows | Asks the `review-received` policy of the task's code host. |
+| `setup-settled` | workflows | `wait` while the task's setup script hasn't finished, `pass` when it succeeded or the task has none, `fail` when it failed or stopped. |
 
 A code host that supports CI files a policy with the entry id `ci-settled`, and one that supports
 reviews files `review-received`, so the host mints `<plugin>:ci-settled` and

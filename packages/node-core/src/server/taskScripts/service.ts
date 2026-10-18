@@ -257,7 +257,7 @@ export function setupCheckoutActivity(db: AppDatabase, taskIds: readonly string[
 // First-party process evidence seam. Loaded plugins receive neither a ledger writer nor a DB handle.
 export type TaskScriptEvidenceService = Pick<
   TaskScriptService,
-  'takeSetup' | 'report' | 'forSession' | 'reconcile' | 'close'
+  'select' | 'takeSetup' | 'report' | 'forSession' | 'reconcile' | 'close'
 > & {
   admitManualSetup(taskId: string): Promise<TaskScriptSnapshot>
 }
@@ -270,6 +270,7 @@ export function taskScriptEvidence(
   const service = taskScripts(db)
   return {
     admitManualSetup: (taskId) => admitWork(taskId, async () => service.admitManualSetup(taskId)),
+    select: service.select.bind(service),
     takeSetup: service.takeSetup.bind(service),
     report: service.report.bind(service),
     forSession: service.forSession.bind(service),
