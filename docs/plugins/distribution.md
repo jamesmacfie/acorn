@@ -58,7 +58,7 @@ observation with freshness and reachability:
   reconcile.
 - Reads and trust refreshes run in a serial queue, and a response from an unpaired Node can't
   restore its authority.
-- An unreadable Node keeps a stale observation for explanation but contributes no live UI.
+- An unreadable Node keeps a stale observation for explanation but contributes no loaded UI.
 
 There's no fleet-wide version winner. The active Node's registrations come from its own running
 identity. An installed update is an offer to cache and review, not a replacement.
@@ -88,7 +88,9 @@ disabled, or failed runtime, waiting for restart, missing bundle, incompatible A
 conflict, pending trust, or rejection. Loaded panes, settings, importers, footer slots, commands, and
 other declarations use those reasons. A compiled contribution with a `{ plugin: id }` requirement
 checks that Node's running service instead, so a saved disable that waits for a restart doesn't hide
-a compiled service that's still running.
+a compiled service that's still running. That check also answers from a stale observation, because a
+compiled contribution is app code and a dropped connection isn't a disable. Without it, every built-in
+pane and rail source disappears for the moment a Node takes to reconnect.
 
 An older Node omits `active`. The client accepts an older row only when `running` and its installed
 declaration describe an active package. Pending, failed, and disabled rows are withheld.

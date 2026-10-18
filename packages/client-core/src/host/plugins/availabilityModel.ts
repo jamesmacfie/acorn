@@ -49,6 +49,11 @@ export function nodePluginRuntime(
     const lastKnown = row && runtimeIdentityForRow(row)
     return { kind: 'unreachable', ...(lastKnown ? { lastKnown } : {}) }
   }
+  return rowRuntime(row)
+}
+
+/** What one roster row says is running, whatever the freshness of the observation it came from. */
+function rowRuntime(row: NodePluginRow | undefined): NodePluginRuntimeState {
   if (!row) return { kind: 'absent' }
   const runtime = runtimeIdentityForRow(row)
   if (runtime) {
@@ -78,13 +83,19 @@ export function nodePluginRuntime(
   return { kind: 'absent' }
 }
 
-/** The shared node-runtime gate for compiled contributions with `{ plugin: id }`. */
+/** The shared node-runtime gate for compiled contributions with `{ plugin: id }`.
+ *
+ * Unlike loaded UI, this answers from the last roster even when it is stale. A compiled contribution
+ * is app code, so a stale roster authorizes nothing new. A connection blip is not a disable, and
+ * treating it as one hid every built-in pane and rail source until the node answered again. */
 export const nodePluginServiceAvailable = (
   snapshot: PluginDistributionSnapshot,
   nodeId: string,
   pluginId: string,
 ): boolean => {
-  const state = nodePluginRuntime(snapshot, nodeId, pluginId)
+  const observation = snapshot.byNode.get(nodeId)
+  if (!observation) return false
+  const state = rowRuntime(observation.rows.find((candidate) => candidate.name === pluginId))
   return state.kind === 'compiled-active' || (state.kind === 'active' && state.runtime.activation === 'node')
 }
 
