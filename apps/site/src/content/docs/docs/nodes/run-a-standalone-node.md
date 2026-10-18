@@ -9,7 +9,7 @@ sources:
   - apps/node/src/composition/plugins.ts
   - scripts/pack-node.mjs
   - scripts/node-archive/README.md
-checked: '034e42840'
+checked: '61c60ef77'
 ---
 
 A standalone Node is acorn's Node with no desktop app: on a server, a build machine, or Linux, where the
