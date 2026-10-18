@@ -40,8 +40,9 @@ type RegisteredHandler = {
 }
 
 // How long each kind's handlers get. Per kind, because the budget is a property of what is being
-// asked. `app:quit` and `workspace:remove` are answered from state the client holds, so 250ms is
-// generous for reading a signal. `task:archive` waits on the node, whose own check budget is two
+// asked. `workspace:remove` is answered from state the client holds, so 250ms is generous for reading
+// a signal. `app:quit` refreshes the session lists first, because a window a quit just opened hasn't
+// loaded them, so it gets a node round trip. `task:archive` waits on the node, whose own check budget is two
 // seconds plus the slowest check (docs/plugins/task-checks.md § Task checks), so it gets room for that round trip.
 // It lives here so a caller opening a confirmation need not know what the handlers cost.
 const BUDGET_MS: Record<WillEventKind, number> = {
@@ -49,7 +50,7 @@ const BUDGET_MS: Record<WillEventKind, number> = {
   'task:restore': 250,
   'task:delete': 250,
   'workspace:remove': 250,
-  'app:quit': 250,
+  'app:quit': 2_000,
 }
 
 const handlers = new Map<WillEventKind, RegisteredHandler[]>()

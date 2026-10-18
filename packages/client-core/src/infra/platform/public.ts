@@ -4,6 +4,7 @@ export {
   canPickFolder,
   cliInstaller,
   desktopExtras,
+  deviceConfigBridge,
   pickFiles,
   pickFolder,
   previewViews,

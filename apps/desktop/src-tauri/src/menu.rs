@@ -71,7 +71,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 }
 
 /// Menu clicks that are product behaviour. Everything else is a predefined item the platform handles.
-pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
+pub fn on_menu_event(app: &AppHandle, id: &str) {
     match id {
         // The pane that owns focus decides what closes. If none does, nothing closes. This is a
         // single-window app, and Cmd-Q is what quits it.
@@ -86,9 +86,32 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum OnExit {
+    Exit,
+    /// Tray mode: the window closed, and the helper and the Node keep running.
+    KeepRunning,
+    /// Hold the exit and ask the renderer.
+    AskRenderer,
+}
+
+/// What a `RunEvent::ExitRequested` does. Tauri sends no exit code when the last window closed, and a
+/// code when something called `exit`. The macOS dock's Quit never arrives here: it terminates the
+/// app without asking the event loop.
+pub fn on_exit_requested(keep_node_running: bool, code: Option<i32>, quit_approved: bool) -> OnExit {
+    match (quit_approved, code) {
+        (true, _) => OnExit::Exit,
+        (false, None) if keep_node_running => OnExit::KeepRunning,
+        // The person closed the last window, so they asked to quit. The renderer that could have
+        // asked them anything has already gone.
+        (false, None) => OnExit::Exit,
+        (false, Some(_)) => OnExit::AskRenderer,
+    }
+}
+
 /// Ask the renderer before quitting, once. It collects concerns, such as a running agent or an
 /// unsaved buffer, and answers through the `quit_approved` command, which is what exits.
-pub fn request_quit<R: Runtime>(app: &AppHandle<R>) {
+pub fn request_quit(app: &AppHandle) {
     let Some(shell) = app.try_state::<Shell>() else { return };
     if shell.quit_approved.load(Ordering::SeqCst) {
         return;
@@ -97,10 +120,34 @@ pub fn request_quit<R: Runtime>(app: &AppHandle<R>) {
     if shell.quit_pending.swap(true, Ordering::SeqCst) {
         return;
     }
-    // No renderer to ask means nothing to lose by quitting.
-    if app.webview_windows().is_empty() || app.emit("acorn:will-quit", ()).is_err() {
-        shell.quit_approved.store(true, Ordering::SeqCst);
-        shell.quit_pending.store(false, Ordering::SeqCst);
-        app.exit(0);
+    // In tray mode the window can be closed while agents run, and only a renderer can name them. The
+    // new renderer asks once its quit listener exists, through `take_pending_quit`.
+    if app.get_webview_window("main").is_none() {
+        shell.quit_after_reopen.store(true, Ordering::SeqCst);
+        crate::ensure_window(app);
+        return;
+    }
+    // The prompt shows in the window, so bring it forward.
+    crate::ensure_window(app);
+    if app.emit("acorn:will-quit", ()).is_err() {
+        shell.approve_quit(app);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{on_exit_requested, OnExit};
+
+    #[test]
+    fn closing_the_window_quits_unless_tray_mode_keeps_the_node_running() {
+        for keep in [false, true] {
+            // An approved quit always goes through, and an unapproved `exit` always asks.
+            assert_eq!(on_exit_requested(keep, None, true), OnExit::Exit);
+            assert_eq!(on_exit_requested(keep, Some(0), true), OnExit::Exit);
+            assert_eq!(on_exit_requested(keep, Some(0), false), OnExit::AskRenderer);
+            assert_eq!(on_exit_requested(keep, Some(1), false), OnExit::AskRenderer);
+        }
+        assert_eq!(on_exit_requested(false, None, false), OnExit::Exit);
+        assert_eq!(on_exit_requested(true, None, false), OnExit::KeepRunning);
     }
 }

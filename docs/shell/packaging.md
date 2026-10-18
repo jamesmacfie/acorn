@@ -148,9 +148,10 @@ The RustSec review on October 1, 2026, reported no vulnerabilities and seven inf
   roots reviewed don't call `VariantStrIter` or `array_iter_str`, which isn't proof it can't run. The
   fix needs glib 0.20, outside GTK 0.18's constraint, so it waits on a GTK and Tauri migration.
 - `proc-macro-error` 1.0.4, unmaintained, through the Linux GTK and glib build macros.
-- Five unmaintained UNIC 0.9 crates through `urlpattern` 0.3 and `tauri-utils` 2.9.3. A
-  [`tauri-utils` 2.10 migration](https://github.com/tauri-apps/tauri/releases/tag/tauri-utils-v2.10.0)
-  replaces them but needs Rust 1.90, above the desktop manifest's 1.82.
+- Five unmaintained UNIC 0.9 crates through `urlpattern` 0.3 and `tauri-utils` 2.9.3. The move to
+  Tauri 2.12 on October 18, 2026 brought in
+  [`tauri-utils` 2.10](https://github.com/tauri-apps/tauri/releases/tag/tauri-utils-v2.10.0), which
+  drops them, and raised the desktop manifest's minimum Rust to 1.90.
 
 Keep these visible in dependency audits until their upstream paths change.
 

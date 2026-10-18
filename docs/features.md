@@ -135,7 +135,7 @@ Settings is a full-window view with a searchable rail of nine groups:
 
 | Group | Pages |
 | --- | --- |
-| General | Appearance, Notifications, Keyboard shortcuts, and Command line. |
+| General | Appearance, Notifications, Keyboard shortcuts, Command line, and Background on the desktop. |
 | Workspaces and projects | Overview, a table of every project with a bar for moving, hiding, and colouring several at once. Under it, a page per workspace and a page per project with General, Setup and scripts, Preview, Database, and Connections tabs. Values a project's `.acorn/config.toml` sets are read-only. |
 | Agents | Harnesses and defaults, Custom agents, Tools and permissions, MCP, and Limits and cost. |
 | Connections | Services, with a page per connection and an Add connection gallery, and AI models. |

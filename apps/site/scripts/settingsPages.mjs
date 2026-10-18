@@ -19,6 +19,15 @@ const corePages = () => {
   return [...table.matchAll(/\bid: '([^']+)'/g)].map((match) => match[1])
 }
 
+// The desktop's own pages, such as Background, which no other client has.
+// shortcut: takes every `id: '…'` after the list opens, which holds while core's pages arrive by spread;
+// import the list if this runs under a TypeScript loader.
+const DESKTOP = 'apps/desktop/src/client/pageContributions.tsx'
+const desktopPages = () => {
+  const list = readFileSync(join(ROOT, DESKTOP), 'utf8').split('export const settingsPageContributions')[1] ?? ''
+  return [...list.matchAll(/\bid: '([^']+)'/g)].map((match) => match[1])
+}
+
 // A compiled plugin registers its pages from code that needs a host to run, so this reads the golden
 // list the desktop's plugin-disable test derives by activating every compiled plugin, and fails on.
 const COMPILED = 'apps/desktop/test/client/clientPluginDisable.snapshot.json'
@@ -39,10 +48,10 @@ async function loadedPages() {
   return pages.flat().map((frame) => frame.id)
 }
 
-/** Every shipped Settings page ID: core's, each compiled plugin's, and each loaded plugin's. */
+/** Every shipped Settings page ID: core's, the desktop's, each compiled plugin's, and each loaded plugin's. */
 export async function shippedSettingsPages() {
   const compiled = JSON.parse(readFileSync(join(ROOT, COMPILED), 'utf8')).full.settingsPages
-  return [...corePages(), ...compiled, ...(await loadedPages())]
+  return [...corePages(), ...desktopPages(), ...compiled, ...(await loadedPages())]
 }
 
 /** Each docs page with a `covers` list, as `{ file, covers }`. */

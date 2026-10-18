@@ -44,6 +44,10 @@ export default function PairingRequestDialog() {
   }
 
   onCleanup(wsOnFleetPairingRequested((nodeId) => void show(nodeId)))
+  // A request can arrive before this window does: in tray mode, the request is what opened it. A request
+  // the ping shows as well is the same one, so the second read replaces it with itself.
+  const local = nodes().find((node) => node.local)
+  if (local) void show(local.nodeId)
   onCleanup(() => clearTimeout(expiry))
 
   const answer = async (decision: PairingDecision['decision']) => {

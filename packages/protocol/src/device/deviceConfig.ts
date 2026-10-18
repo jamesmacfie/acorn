@@ -53,6 +53,16 @@ export const deviceConfigSchema = z
       .describe('The order of the left rail.'),
     leftCollapsed: z.boolean().optional().describe('Whether the left rail is collapsed.'),
     workspaceRail: z.boolean().optional().describe('Whether the workspace rail shows.'),
+    keepNodeRunning: z
+      .boolean()
+      .optional()
+      .describe(
+        "Desktop only. Whether closing the window keeps this computer's Node running behind a tray icon. While the window is closed, this computer shows no acorn notifications.",
+      ),
+    openAtLogin: z
+      .boolean()
+      .optional()
+      .describe('Desktop only. Whether acorn opens at login with no window. Takes effect only with `keepNodeRunning`.'),
     // `<pluginId>:<sourceId>` → shown. Only explicit choices live here; an absent entry reads the
     // source's own default.
     railVisibility: z

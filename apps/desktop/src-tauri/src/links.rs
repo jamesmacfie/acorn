@@ -27,17 +27,14 @@ impl PendingLinks {
     }
 }
 
-fn receive(app: &AppHandle, href: String) {
+pub(crate) fn receive(app: &AppHandle, href: String) {
     if let Some(pending) = app.try_state::<PendingLinks>() {
         pending.receive(href.clone());
     }
     // The event wakes a subscribed renderer. The queue also retains links received before its
-    // listener exists; the renderer drains it after subscribing.
+    // listener exists, such as one that opened the window; the renderer drains it after subscribing.
     let _ = app.emit(OPEN_LINK_EVENT, href);
-    if let Some(window) = app.webview_windows().values().next() {
-        let _ = window.unminimize();
-        let _ = window.set_focus();
-    }
+    crate::ensure_window(app);
 }
 
 pub fn start(app: &AppHandle) -> Result<(), tauri_plugin_deep_link::Error> {

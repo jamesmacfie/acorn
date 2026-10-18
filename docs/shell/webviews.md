@@ -68,7 +68,7 @@ Background throttling stays at the engine's default. Hidden pages keep their sta
 keeps their document, and there's no inactivity eviction. Retiring an incognito page discards its
 document and storage.
 
-The pinned stack is Tauri 2.11.5, tauri-runtime-wry 2.11.4, and wry 0.55.1. Tauri exposes no
+The pinned stack is Tauri 2.12.4, tauri-runtime-wry 2.12.2, and wry 0.57.0. Tauri exposes no
 content-process termination callback, so acorn can't tell an engine unload from a page reload. It does
 no inferred recovery. **Reload** and **Home** recover explicitly, and neither an engine crash nor a
 restart keeps form values or full history.

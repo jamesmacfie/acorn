@@ -98,6 +98,14 @@
       "description": "Whether the workspace rail shows.",
       "type": "boolean"
     },
+    "keepNodeRunning": {
+      "description": "Desktop only. Whether closing the window keeps this computer's Node running behind a tray icon. While the window is closed, this computer shows no acorn notifications.",
+      "type": "boolean"
+    },
+    "openAtLogin": {
+      "description": "Desktop only. Whether acorn opens at login with no window. Takes effect only with `keepNodeRunning`.",
+      "type": "boolean"
+    },
     "railVisibility": {
       "description": "Whether each source shows in the left rail, keyed `<pluginId>:<sourceId>`. A missing entry uses the source's default.",
       "type": "object",

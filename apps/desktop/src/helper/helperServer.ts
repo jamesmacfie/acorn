@@ -73,6 +73,11 @@ export type HelperServer = {
   // because it is not a JSON message and never becomes one: it arrives from the node already tagged
   // with its session id, and this end tags the node id around it (../shell/wire.ts § The binary push).
   pushBytes(nodeId: string, frame: Uint8Array, viewerId?: string): void
+  // Whether a renderer is attached. In tray mode the window, and its renderer, can be closed.
+  hasRenderer(): boolean
+  // The shell destroyed the window. WebKit's networking process can hold a dead page's socket open,
+  // which would keep that renderer's node subscriptions alive and count it as attached.
+  closeRenderers(): void
   close(): Promise<void>
 }
 
@@ -539,6 +544,10 @@ export function startHelperServer(
         secret,
         push,
         pushBytes,
+        hasRenderer: () => connections.size > 0,
+        closeRenderers: () => {
+          for (const socket of sockets) socket.terminate()
+        },
         close: () =>
           new Promise<void>((done) => {
             for (const owner of connections.values()) owner.close()

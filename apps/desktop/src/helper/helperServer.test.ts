@@ -211,6 +211,22 @@ it('closes an oversized request with 1009 before dispatch, then shuts down promp
   expect(write).not.toHaveBeenCalled()
 })
 
+// In tray mode the shell destroys the window, and WebKit can keep the dead page's socket open.
+it('drops every renderer when the shell says the window is gone', async () => {
+  const { helper } = stubHelper()
+  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost' })
+  servers.push(server)
+  expect(server.hasRenderer()).toBe(false)
+  const ws = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
+  ws.on('error', () => {})
+  await new Promise<void>((resolve) => ws.once('open', resolve))
+  await vi.waitFor(() => expect(server.hasRenderer()).toBe(true))
+  const closed = new Promise<void>((resolve) => ws.once('close', () => resolve()))
+  server.closeRenderers()
+  await closed
+  await vi.waitFor(() => expect(server.hasRenderer()).toBe(false))
+})
+
 it('does not apply the incoming carrier limit to a larger helper reply', async () => {
   const { helper } = stubHelper()
   vi.spyOn(helper.config, 'read').mockReturnValue({ config: { testValue: 'x'.repeat(1000) } } as ReturnType<

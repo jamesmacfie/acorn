@@ -35,6 +35,13 @@ terminal inbox both act on the target alone, so an item about the Node instead o
 
 Both kinds come from the same reading of a session.
 
+## While the desktop window is closed
+
+In the desktop's tray mode ([the shell process](./shell/process.md#tray-mode)), closing the window
+leaves the Node running. The renderer sends every banner, sound, and badge, so while the window is
+closed this computer shows none of them. Nothing in the notification code changes. A client on another
+machine still notifies, and **Settings → Background** says so.
+
 ## Pages
 
 [States and edges](./notifications/states-and-edges.md) covers the five states, how the managed and

@@ -22,6 +22,11 @@ pub struct Shell {
     pub quit_approved: AtomicBool,
     /// A prompt is out with the renderer. Guards against a second Cmd-Q stacking another one.
     pub quit_pending: AtomicBool,
+    /// A quit arrived with no window, which opened one. Its renderer collects `take_pending_quit`.
+    pub quit_after_reopen: AtomicBool,
+    /// Tray mode's setting. The renderer reports it at start and on every change, and a window is
+    /// open whenever it can change, so the shell never reads acorn.json for it.
+    pub keep_node_running: AtomicBool,
 }
 
 impl Shell {
@@ -246,6 +251,20 @@ pub fn quit_approved(app: AppHandle, shell: State<'_, Shell>, approved: bool) {
     if approved {
         shell.approve_quit(&app);
     }
+}
+
+/// The renderer's half of a quit that arrived with no window, called once its quit listener exists.
+#[tauri::command]
+pub fn take_pending_quit(shell: State<'_, Shell>) -> bool {
+    shell.quit_after_reopen.swap(false, Ordering::SeqCst)
+}
+
+/// Tray mode's two switches, from the renderer's copy of acorn.json. The login item needs both.
+#[tauri::command]
+pub fn set_background_mode(app: AppHandle, shell: State<'_, Shell>, keep_node_running: bool, open_at_login: bool) {
+    shell.keep_node_running.store(keep_node_running, Ordering::SeqCst);
+    crate::tray::sync(&app, keep_node_running);
+    crate::tray::sync_login_item(&app, keep_node_running && open_at_login, crate::PACKAGED);
 }
 
 /// Stop the helper, once, on the way out. Called from the exit path rather than `Drop`, because a

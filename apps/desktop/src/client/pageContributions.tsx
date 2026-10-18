@@ -28,6 +28,7 @@ const TelemetrySettings = lazy(() => import('@acorn/client-core/features/setting
 const DeviceConfigSettings = lazy(() => import('@acorn/client-core/features/settings/DeviceConfigSettings.tsx'))
 const ExtensionPointsDev = lazy(() => import('@acorn/client-core/features/settings/ExtensionPointsDev.tsx'))
 const ClearCacheSettings = lazy(() => import('./ClearCacheSettings.tsx'))
+const BackgroundSettings = lazy(() => import('./BackgroundSettings.tsx'))
 
 // How this app draws each of core's settings pages. Where a page sits, what it affects and what
 // search finds on it are declared once in client-core, because the terminal client lists the same
@@ -65,8 +66,32 @@ const components: Record<CoreSettingsPageId, SettingsContribution['component']> 
   'extension-points': () => <ExtensionPointsDev />,
 }
 
+// What Background offers search, declared beside the list rather than inside it, as core's pages do
+// (client-core/features/settings/corePages.ts).
+const background: Pick<SettingsContribution, 'keywords' | 'sections'> = {
+  keywords: ['tray', 'menu bar', 'login', 'startup', 'close window', 'keep running'],
+  sections: [
+    {
+      id: 'background',
+      label: 'When the window closes',
+      rows: ['Keep the Node running when the window closes', 'Open acorn at login'],
+    },
+  ],
+}
+
 export const settingsPageContributions: SettingsContribution[] = [
   ...CORE_SETTINGS_PAGES.map((page) => ({ ...page, component: components[page.id] })),
+  // Desktop only: tray mode keeps this app's own Node running, which no other client has.
+  {
+    id: 'background',
+    ...background,
+    label: 'Background',
+    category: 'general',
+    scope: 'device',
+    icon: 'server',
+    order: 45,
+    component: () => <BackgroundSettings />,
+  },
   // Dev only: the style-pack authoring surface, not something a user needs.
   ...(import.meta.env.DEV
     ? [

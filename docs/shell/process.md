@@ -81,7 +81,7 @@ directory, which wins. The helper loads them, and keeps secrets out of the envir
 Node with. The Node's keys reach it in its start message, sealed at rest under the data key
 ([Node keys](../security/credentials.md#node-keys)).
 
-`tauri_plugin_single_instance` makes a second launch focus the running window. The data root's
+`tauri_plugin_single_instance` makes a second launch open or focus the window. The data root's
 exclusive lock (`packages/node-core/src/server/storage/dataRoot.ts`) is the real guard, and the
 single-instance plugin keeps a second launch from getting that far. The automation-only debug build
 leaves it out, because each of its windows has its own data root.
@@ -90,7 +90,48 @@ Quitting asks the renderer first. **Quit** is a custom menu item, because
 `PredefinedMenuItem::quit` goes through `[NSApp terminate:]` and skips the event loop. The menu item
 and `RunEvent::ExitRequested` emit the same event to the renderer, which collects concerns and answers
 `quit_approved`. The recovery screen's `force_quit` skips this, because the app shell isn't mounted
-behind the recovery gate.
+behind the recovery gate. The macOS dock's **Quit** also skips it: Tauri ends the app without raising
+`ExitRequested`, so the helper drains the Node and nothing asks.
+
+`on_exit_requested` in `apps/desktop/src-tauri/src/menu.rs` decides each `ExitRequested`. Tauri sends
+no exit code when the last window closed, and a code when something called `exit`. An approved quit
+exits. A closed last window exits, unless tray mode keeps the app running. An unapproved `exit` asks
+the renderer.
+
+## Tray mode
+
+With **Settings → Background → Keep the Node running when the window closes** on, closing the window
+closes it for real, freeing the renderer's memory, while the helper and the Node keep running. The
+setting is `keepNodeRunning` in `acorn.json`, off by default. The bridge sends it to Rust with
+`set_background_mode` whenever it reads or writes the file, or hears that it changed. Rust keeps it in
+`Shell` and never reads the file.
+
+When the main window closes, Rust clears the dock badge and the `Webviews` registry, whose child
+webviews went with the window. The dock icon stays on macOS. `ensure_window` in
+`apps/desktop/src-tauri/src/lib.rs` opens the window when there isn't one, and otherwise brings it
+forward. A second launch, a click on the dock icon, an `acorn://` link, the tray, and the helper's
+`open-window` signal all call it. A new window boots a fresh renderer through the startup gate.
+
+The tray icon (`apps/desktop/src-tauri/src/tray.rs`) exists while the setting is on. Its menu has a
+status line, **Open acorn**, **Pair another client…**, which opens `acorn://local/settings/nodes`, and
+**Quit acorn**. On each status change of the local Node, the helper writes a `node-status` line with
+the broker state and, while the Node answers, the hosts and port from `GET /v1/core/node/reach`. On
+GNOME the icon shows only with the AppIndicator extension. Without a visible tray, launching acorn
+again opens the window.
+
+A quit with no window, from the tray or the app menu, records a pending quit and opens the window.
+Once the bridge has installed its `acorn:will-quit` listener, it calls `take_pending_quit`, and a
+pending quit runs the normal prompt, which names running agents.
+
+When a local client asks to pair and no renderer is connected, the helper writes `open-window`.
+`PairingRequestDialog.tsx` reads the local Node's waiting request when it mounts, so the request that
+opened the window shows. A request lasts two minutes.
+
+**Open acorn at login** (`openAtLogin`) needs the first switch. Rust registers a LaunchAgent on macOS,
+through the Tauri autostart plugin, only while both are on, and only in a packaged build. A LaunchAgent
+rather than a login item, because only it passes the `--hidden` argument. With `--hidden`, setup
+builds the tray and opens no window. While the window is closed, this computer shows no notifications
+([notifications](../notifications.md#while-the-desktop-window-is-closed)).
 
 ## Keys and custody
 

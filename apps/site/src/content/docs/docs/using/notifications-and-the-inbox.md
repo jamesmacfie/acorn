@@ -98,5 +98,8 @@ switches.
 ## Limits
 
 - The bell keeps 50 notifications, on this device. They aren't stored on the Node.
+- With **Keep the Node running when the window closes** on, this computer shows no notifications,
+  sounds, or app icon count while the desktop window is closed. Clients on other machines still do
+  ([General](/docs/settings/general/#background)).
 - A system notification never includes what the agent said, or any file name or path.
 - Notices from an installed plugin stay in the bell. They never become system notifications.

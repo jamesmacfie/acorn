@@ -63,6 +63,21 @@ pub enum Signal {
     /// Telemetry is on and the helper wants this machine's memory numbers. Answered on stdin by
     /// src/footprint.rs, because only this process can find the renderer's web content process.
     FootprintRequest,
+    /// The local Node's state changed. Tray mode's status line (src/tray.rs).
+    NodeStatus(NodeStatus),
+    /// A client on this computer asked to pair while no renderer was connected. The approval dialog
+    /// is the renderer's, so the shell opens a window.
+    OpenWindow,
+}
+
+/// The local Node's broker state, and the addresses it answers on besides loopback. `port` is absent
+/// when the Node couldn't say, such as before it is online.
+#[derive(Debug, Deserialize)]
+pub struct NodeStatus {
+    pub state: String,
+    #[serde(default)]
+    pub hosts: Vec<String>,
+    pub port: Option<u16>,
 }
 
 fn parse_signal(line: &str) -> Option<Signal> {
@@ -73,6 +88,8 @@ fn parse_signal(line: &str) -> Option<Signal> {
             reason: value.get("reason").and_then(|r| r.as_str()).map(str::to_string),
         }),
         "footprint-request" => Some(Signal::FootprintRequest),
+        "node-status" => serde_json::from_value(value.clone()).ok().map(Signal::NodeStatus),
+        "open-window" => Some(Signal::OpenWindow),
         _ => None,
     }
 }
@@ -253,7 +270,8 @@ impl Helper {
         Ok(helper)
     }
 
-    /// One command line to the helper: `stop` to drain, `retry` to forgive a spent crash budget.
+    /// One command line to the helper: `stop` to drain, `retry` to forgive a spent crash budget,
+    /// `renderer-closed` to drop the sockets of a window that is gone.
     pub fn command(&self, command: &str) {
         self.send(&format!("{{\"command\":\"{command}\"}}"));
     }
@@ -306,6 +324,18 @@ mod tests {
         assert_eq!(ready.port, 51234);
         assert_eq!(ready.node_version, "v24.11.0");
         assert!(matches!(parse_signal("{\"acorn-helper\":\"footprint-request\"}"), Some(Signal::FootprintRequest)));
+        assert!(matches!(parse_signal("{\"acorn-helper\":\"open-window\"}"), Some(Signal::OpenWindow)));
+    }
+
+    #[test]
+    fn a_node_status_line_carries_its_addresses_when_it_has_them() {
+        let reachable = parse_signal("{\"acorn-helper\":\"node-status\",\"state\":\"online\",\"hosts\":[\"192.168.1.20\"],\"port\":4317}");
+        let Some(Signal::NodeStatus(status)) = reachable else { panic!("expected a node status") };
+        assert_eq!((status.state.as_str(), status.hosts, status.port), ("online", vec!["192.168.1.20".to_string()], Some(4317)));
+        let bare = parse_signal("{\"acorn-helper\":\"node-status\",\"state\":\"offline\"}");
+        let Some(Signal::NodeStatus(status)) = bare else { panic!("expected a node status") };
+        assert_eq!((status.state.as_str(), status.hosts.len(), status.port), ("offline", 0, None));
+        assert!(parse_signal("{\"acorn-helper\":\"node-status\"}").is_none(), "a status needs a state");
     }
 
     /// A shell in its own process group, with stdout piped so it can say when it is ready.

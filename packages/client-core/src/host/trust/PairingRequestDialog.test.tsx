@@ -10,9 +10,14 @@ vi.mock('../../infra/node/wsClient', () => ({
     return () => {}
   },
 }))
-vi.mock('../../infra/node/fleet', () => ({ nodes: () => [{ nodeId: 'node-1', label: 'This computer' }] }))
+vi.mock('../../infra/node/fleet', () => ({
+  nodes: () => [
+    { nodeId: 'node-1', label: 'This computer', local: true },
+    { nodeId: 'node-2', label: 'Build box', local: false },
+  ],
+}))
 vi.mock('../../infra/node/fleetActions', () => ({
-  readPairingRequest: vi.fn(async () => ({
+  readPairingRequest: vi.fn(async (): Promise<{ request: unknown }> => ({
     request: {
       id: 'req-1',
       deviceName: 'acorn on laptop',
@@ -37,7 +42,9 @@ const press = (text: string) =>
   [...dialog()!.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === text)!.click()
 
 it('shows the request a Node announces, and allows that request on that Node', async () => {
+  vi.mocked(readPairingRequest).mockResolvedValueOnce({ request: null })
   dispose = render(() => <PairingRequestDialog />, document.body.appendChild(document.createElement('div')))
+  await vi.waitFor(() => expect(readPairingRequest).toHaveBeenCalledTimes(1))
   expect(dialog()).toBeNull()
 
   ping('node-1')
@@ -51,4 +58,13 @@ it('shows the request a Node announces, and allows that request on that Node', a
   press('Allow')
   await vi.waitFor(() => expect(dialog()).toBeNull())
   expect(answerPairingRequest).toHaveBeenCalledWith('node-1', 'req-1', 'allow')
+})
+
+// In tray mode the request opens the window, so it arrives before the dialog exists to hear the ping.
+it("shows the local Node's waiting request when it mounts", async () => {
+  vi.mocked(readPairingRequest).mockClear()
+  dispose = render(() => <PairingRequestDialog />, document.body.appendChild(document.createElement('div')))
+  await vi.waitFor(() => expect(dialog()).not.toBeNull())
+  expect(readPairingRequest).toHaveBeenCalledExactlyOnceWith('node-1')
+  expect(dialog()!.textContent).toContain('maple river stone')
 })

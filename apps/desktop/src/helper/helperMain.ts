@@ -1,7 +1,9 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { z } from 'zod'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import type { NodeStatus } from '@acorn/protocol/broker.ts'
+import { coreNodeReachRoute, type NodeReach } from '@acorn/protocol/api.ts'
 import { createHelper, nodeKeyCustody, serviceEnvironment, type Helper } from '@acorn/custody/runtime'
 import { helperMark } from '@acorn/custody/runtime'
 import type { TokenCipher } from '@acorn/custody/custody/deviceTokenStore.ts'
@@ -58,7 +60,7 @@ type Handshake = z.infer<typeof handshakeSchema>
 // A byte count the shell read, or null for a process it could not read.
 const footprintBytes = z.number().int().nonnegative().nullable()
 const commandSchema = z.union([
-  z.strictObject({ command: z.enum(['stop', 'retry']) }),
+  z.strictObject({ command: z.enum(['stop', 'retry', 'renderer-closed']) }),
   // The shell's answer to a `footprint-request` (apps/desktop/src-tauri/src/footprint.rs).
   z.strictObject({ command: z.literal('footprint'), renderer: footprintBytes, helper: footprintBytes }),
 ])
@@ -87,9 +89,36 @@ const dataKeyCipher = (dataKey: string): TokenCipher => {
 // Anything the shell has to react to. Rust reads these off stdout the same way it reads the ready
 // line. The recovery screen is a native dialog, so the crash budget has to reach Rust. A footprint
 // request asks Rust for memory numbers only it can read, and the answer comes back as a command
-// (docs/shell/node-child.md § What the shell reports).
-const emit = (event: 'crash-budget-exhausted' | 'footprint-request', detail?: object): void =>
-  console.log(JSON.stringify({ [TAG]: event, ...detail }))
+// (docs/shell/node-child.md § What the shell reports). Tray mode reads the local Node's status, and
+// opens a window for a pairing request nobody would otherwise see (docs/shell/process.md § Tray mode).
+const emit = (
+  event: 'crash-budget-exhausted' | 'footprint-request' | 'node-status' | 'open-window',
+  detail?: object,
+): void => console.log(JSON.stringify({ [TAG]: event, ...detail }))
+
+// The addresses another machine can reach the Node on, or null when it can't say.
+const readReach = async (helper: Helper, nodeId: string): Promise<NodeReach | null> => {
+  try {
+    const response = await helper.broker.fetch(nodeId, { requestId: randomUUID(), path: coreNodeReachRoute })
+    return response.status === 200 ? (JSON.parse(Buffer.from(response.body).toString('utf8')) as NodeReach) : null
+  } catch {
+    return null
+  }
+}
+
+// The tray's status line. A status that arrives while an older one is still reading its addresses
+// replaces it, so the line never goes back to a state the Node has left.
+let latestLocalStatus = 0
+const reportLocalStatus = async (helper: Helper, status: NodeStatus): Promise<void> => {
+  const current = ++latestLocalStatus
+  const answering = status.state === 'online' || status.state === 'degraded'
+  const reach = answering ? await readReach(helper, status.nodeId) : null
+  if (current !== latestLocalStatus) return
+  emit('node-status', { state: status.state, ...(reach ? { hosts: reach.hosts, port: reach.port } : {}) })
+}
+
+const isPairingRequest = (frame: unknown): boolean =>
+  !!frame && typeof frame === 'object' && (frame as { channel?: unknown }).channel === 'pairing:requested'
 
 async function boot(handshake: Handshake): Promise<{ helper: Helper; server: HelperServer }> {
   const tokenCipher = dataKeyCipher(handshake.dataKey)
@@ -128,9 +157,18 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
     // Looked up rather than captured, because the listener does not exist yet and there may be no
     // renderer attached when a frame arrives.
     push: {
-      frame: (nodeId, frame, viewerId) => server?.push({ push: 'node-frame', nodeId, frame }, viewerId),
+      frame: (nodeId, frame, viewerId) => {
+        server?.push({ push: 'node-frame', nodeId, frame }, viewerId)
+        // The approval dialog is the renderer's, and a request lasts two minutes, which covers a
+        // window's startup. The dialog reads the waiting request when it mounts.
+        if (isPairingRequest(frame) && server && !server.hasRenderer() && helper.fleet.get(nodeId)?.local)
+          emit('open-window')
+      },
       bytes: (nodeId, frame, viewerId) => server?.pushBytes(nodeId, frame, viewerId),
-      status: (status) => server?.push({ push: 'node-status', status }),
+      status: (status) => {
+        server?.push({ push: 'node-status', status })
+        if (helper.fleet.get(status.nodeId)?.local) void reportLocalStatus(helper, status)
+      },
       transportError: (nodeId, error, viewerId) =>
         server?.push({ push: 'node-transport-error', nodeId, error }, viewerId),
     },
@@ -204,6 +242,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       }
       const parsed = commandSchema.parse(JSON.parse(trimmed))
       if (parsed.command === 'stop') return stop(0)
+      if (parsed.command === 'renderer-closed') return (await booted).server.closeRenderers()
       if (parsed.command === 'footprint')
         return (await booted).helper.footprint({ renderer: parsed.renderer, helper: parsed.helper })
       // The owner's answer to the recovery screen. Forgive the spent budget and try once more.

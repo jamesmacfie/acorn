@@ -13,6 +13,7 @@ mod menu;
 mod notifications;
 mod plugin_scheme;
 mod reset_stage;
+mod tray;
 mod webviews;
 mod webview_target;
 #[cfg(feature = "agent-automation")]
@@ -54,7 +55,7 @@ const HELPER_PROTOCOL: u32 = 1;
 
 /// A release build is a packaged one. It decides which roots the helper is pointed at, the
 /// application data directory or the checkout, and nothing else.
-const PACKAGED: bool = !cfg!(debug_assertions);
+pub(crate) const PACKAGED: bool = !cfg!(debug_assertions);
 
 /// The Vite dev server to proxy the renderer from, when there is one. See src/app_scheme.rs for why
 /// dev is proxied rather than loaded directly.
@@ -78,6 +79,8 @@ pub fn run() {
         std::process::exit(2);
     });
     let reset_mode = reset_options.is_some();
+    // The login item's launch, in tray mode: the tray and no window.
+    let hidden = std::env::args().any(|arg| arg == tray::HIDDEN_ARG);
     // Read once, at the top, because the window and the scheme handler both need it. A runtime
     // variable rather than a compile-time one, so a stale cargo cache cannot bake the wrong answer
     // into a binary.
@@ -102,11 +105,10 @@ pub fn run() {
         // beside an installed Acorn without waking or touching that installation.
         if !reset_options.as_ref().is_some_and(|options| options.fixture) {
             // The data root's exclusive lock in the node is the real mutual exclusion. This makes a second
-            // launch focus the running window instead of failing on that lock.
-            builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-                if let Some(window) = app.webview_windows().values().next() {
-                    let _ = window.unminimize();
-                    let _ = window.set_focus();
+            // launch open or focus the window instead of failing on that lock.
+            builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+                if !argv.iter().any(|arg| arg == tray::HIDDEN_ARG) {
+                    ensure_window(app);
                 }
             }));
         }
@@ -126,6 +128,8 @@ pub fn run() {
         // The renderer never invokes this plugin's own commands — capabilities/default.json grants it
         // nothing — so it is here only to give src/commands.rs `app.notification()`.
         .plugin(tauri_plugin_notification::init())
+        // A LaunchAgent on macOS rather than a login item, because only a LaunchAgent passes arguments.
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec![tray::HIDDEN_ARG])))
         // Asynchronous, because the synchronous form runs the whole response on the thread that
         // delivered the request — the same thread the webview draws on — and a cold window asks for
         // more than a hundred module scripts. Each would be a blocking `fs::read` in front of the next
@@ -176,6 +180,8 @@ pub fn run() {
                 commands::open_config_file,
                 commands::force_quit,
                 commands::quit_approved,
+                commands::take_pending_quit,
+                commands::set_background_mode,
                 commands::show_notification,
                 commands::set_badge,
                 commands::set_window_background,
@@ -203,6 +209,31 @@ pub fn run() {
         })
         .menu(menu::build)
         .on_menu_event(|app, event| menu::on_menu_event(app.app_handle(), event.id().as_ref()))
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+            match event {
+                // While the window is closed, no renderer updates the count. The window still exists
+                // here, which the badge call needs.
+                tauri::WindowEvent::CloseRequested { .. } => {
+                    let _ = window.set_badge_count(None);
+                }
+                // The child webviews went with the window, and a reopened window starts with none. The
+                // renderer went too, but its helper socket can outlive it.
+                tauri::WindowEvent::Destroyed => {
+                    if let Some(webviews) = window.try_state::<Webviews<tauri::Wry>>() {
+                        webviews.dispose();
+                    }
+                    if let Some(shell) = window.try_state::<Shell>() {
+                        if let Some(helper) = shell.helper.lock().ok().as_ref().and_then(|held| held.as_ref()) {
+                            helper.command("renderer-closed");
+                        }
+                    }
+                }
+                _ => {}
+            }
+        })
         .setup(move |app| {
             let handle = app.handle().clone();
             links::start(&handle)?;
@@ -215,11 +246,12 @@ pub fn run() {
                 return Ok(());
             }
             app.manage(Webviews::<tauri::Wry>::default());
+            app.manage(tray::Tray::default());
             // Deliberately blocking, and short: the helper reports itself ready as soon as it is
             // listening, which is a cache sweep and a socket bind rather than a node boot. There is
             // nothing for the event loop to do in the meantime, and a window opened before the
             // helper existed could not ask which nodes there are.
-            match boot(&handle) {
+            match boot(&handle, hidden) {
                 Ok((helper, plugin_frames)) => {
                     *helper_port.write().unwrap() = helper.ready.port;
                     *frames.write().unwrap() = Some(plugin_frames);
@@ -227,10 +259,14 @@ pub fn run() {
                     if let Some(shell) = handle.try_state::<Shell>() {
                         *shell.helper.lock().unwrap() = Some(helper);
                     }
-                    if let Some(origin) = dev_server.as_deref() {
-                        dev_server::wait_for_entry(origin);
+                    if hidden {
+                        tray::sync(&handle, true);
+                    } else {
+                        if let Some(origin) = dev_server.as_deref() {
+                            dev_server::wait_for_entry(origin);
+                        }
+                        open_window(&handle)?;
                     }
-                    open_window(&handle)?;
                 }
                 Err(error) => {
                     // A helper that never became ready. Nothing can reach a node without it, so say
@@ -251,15 +287,24 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("the acorn shell failed to build")
         .run(move |app, event| match event {
-            // The quit negotiation's other entry point: the dock's Quit, or a Cmd-Q the menu missed.
-            // `prevent_exit` holds the process while the renderer is asked.
-            RunEvent::ExitRequested { api, .. } if !reset_mode => {
-                let approved = app.try_state::<Shell>().is_some_and(|s| s.quit_approved.load(Ordering::SeqCst));
-                if !approved {
-                    api.prevent_exit();
-                    menu::request_quit(app);
+            // The last window closed, or something called `exit`. `prevent_exit` holds the process
+            // while the renderer is asked, or keeps it running in tray mode. No shell means the boot
+            // failed, and there is nothing to ask about.
+            RunEvent::ExitRequested { api, code, .. } if !reset_mode => {
+                let Some(shell) = app.try_state::<Shell>() else { return };
+                let keep = shell.keep_node_running.load(Ordering::SeqCst);
+                match menu::on_exit_requested(keep, code, shell.quit_approved.load(Ordering::SeqCst)) {
+                    menu::OnExit::Exit => {}
+                    menu::OnExit::KeepRunning => api.prevent_exit(),
+                    menu::OnExit::AskRenderer => {
+                        api.prevent_exit();
+                        menu::request_quit(app);
+                    }
                 }
             }
+            // A click on the dock icon.
+            #[cfg(target_os = "macos")]
+            RunEvent::Reopen { .. } if !reset_mode => ensure_window(app),
             // The keyboard, on a window nobody has clicked yet. `open_window` runs in `setup`, before
             // the event loop, so wry makes the webview the window's first responder while macOS has
             // not activated the app; activation can then settle on the window itself, and a first
@@ -304,7 +349,7 @@ fn bridge_dir(app: &tauri::AppHandle) -> PathBuf {
 
 /// Resolve the two roots, get or create the data key, then start and wait for the helper. The plugin
 /// frame handler's inputs come back with it, because this is where both roots are known.
-fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
+fn boot(app: &tauri::AppHandle, hidden: bool) -> Result<(Helper, Frames), String> {
     let packaged = PACKAGED;
     let path = app.path();
 
@@ -361,8 +406,13 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
             },
         },
         move |signal| match signal {
-            Signal::CrashBudgetExhausted { reason } => show_recovery(&handle, reason.as_deref()),
+            Signal::CrashBudgetExhausted { reason } => {
+                tray::set_status(&handle, tray::stopped_text(reason.as_deref()));
+                show_recovery(&handle, reason.as_deref())
+            }
             Signal::FootprintRequest => footprint::answer(&handle),
+            Signal::NodeStatus(status) => tray::set_status(&handle, tray::status_text(&status)),
+            Signal::OpenWindow => ensure_window(&handle),
             Signal::Ready(_) => {}
         },
     )?;
@@ -373,6 +423,9 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
         user_data_dir,
         quit_approved: AtomicBool::new(false),
         quit_pending: AtomicBool::new(false),
+        quit_after_reopen: AtomicBool::new(false),
+        // Only a launch in tray mode passes `--hidden`, so the setting is on before any renderer says.
+        keep_node_running: AtomicBool::new(hidden),
     });
     Ok((helper, frames))
 }
@@ -447,7 +500,22 @@ fn host_suffix() -> &'static str {
     }
 }
 
-fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
+/// Open the main window when there isn't one, and otherwise bring it forward. A new window boots a
+/// fresh renderer through the startup gate; the helper and the Node are already running.
+pub(crate) fn ensure_window(app: &tauri::AppHandle) {
+    let window = match app.get_webview_window("main") {
+        Some(window) => window,
+        None => match open_window(app) {
+            Ok(window) => window,
+            Err(error) => return eprintln!("[shell] could not open the window: {error}"),
+        },
+    };
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
+fn open_window(app: &tauri::AppHandle) -> tauri::Result<tauri::WebviewWindow> {
     let url = format!("{APP_ORIGIN}/").parse().expect("the app origin is a valid url");
     let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::CustomProtocol(url));
     // A macOS title bar that paints the window background instead of the system chrome, so the strip
@@ -481,8 +549,7 @@ fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
             eprintln!("[shell] blocked navigation: {url}");
             false
         })
-        .build()?;
-    Ok(())
+        .build()
 }
 
 fn open_reset_window(app: &tauri::AppHandle, fixture: bool) -> tauri::Result<()> {

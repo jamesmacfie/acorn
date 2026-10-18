@@ -48,7 +48,7 @@ import {
   workspaceOwnsPath,
 } from '@acorn/client-core/features/workspaces'
 import { initSoundNotices } from '@acorn/client-core/features/notifications'
-import { sessionSummaries } from '@acorn/client-core/features/tasks'
+import { refreshSessionSources, sessionSummaries } from '@acorn/client-core/features/tasks'
 import { workspaceRailShown } from '@acorn/client-core/features/workspaces/workspaceRailPrefs.ts'
 import TabRail from '@acorn/client-core/features/tabs/TabRail.tsx'
 import Tips from '@acorn/client-core/kit/components/overlays/tips.tsx'
@@ -367,7 +367,11 @@ export default function App() {
     )
     // Quitting has no node meaning: a node does not know a window is closing, so this one stays a
     // client handler over the session store.
-    const offQuit = registerWillHandler('app:quit', 'Terminal', () => {
+    const offQuit = registerWillHandler('app:quit', 'Terminal', async () => {
+      // A quit can open this window and ask at once, before the node's plugins are applied and their
+      // session lists read. An empty list would let the quit through with an agent running.
+      await applyNodePlugins().catch(() => {})
+      await refreshSessionSources().catch(() => {})
       const active = sessionSummaries().filter((session) => session.running)
       return active.length
         ? {

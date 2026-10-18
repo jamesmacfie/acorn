@@ -31,7 +31,7 @@ The rail on the left holds nine groups, in this order:
 
 | Group | What's in it |
 | --- | --- |
-| [General](/docs/settings/general/) | This screen: appearance, notifications, shortcuts, and the command line. |
+| [General](/docs/settings/general/) | This screen: appearance, notifications, shortcuts, the command line, and on the desktop, what closing the window does. |
 | [Workspaces and projects](/docs/settings/workspaces-and-projects/) | Every project on the Node, each workspace's page, and each project's page. Reads **Projects** when projects are kept separate. |
 | [Agents](/docs/settings/agents/) | Harnesses and new-session defaults, custom agents, tool permissions, MCP servers, and limits and prices. |
 | [Connections](/docs/settings/connections/) | Services such as GitHub and Linear, and API keys for generating text. |

@@ -12,11 +12,14 @@ sources:
   - packages/client-core/src/features/notifications/settings.ts
   - packages/client-core/src/features/settings/NotificationSettings.tsx
   - apps/desktop/src/client/CliSettings.tsx
+  - apps/desktop/src/client/BackgroundSettings.tsx
+  - docs/shell/process.md
 covers:
   - appearance
   - notifications
   - shortcuts
   - cli
+  - background
 checked: 52225e24f
 ---
 
@@ -73,8 +76,23 @@ The `acorn` command for your terminal.
 
 The command runs with this app, so it stays in step when the app updates.
 
+## Background
+
+What happens when you close the desktop window. Only the desktop has this page.
+
+| Setting | What it changes | Stored on | Default |
+| --- | --- | --- | --- |
+| **Keep the Node running when the window closes** | Closing the window leaves this computer's Node running, with an icon in the menu bar or system tray, so clients on other machines keep working. The icon's menu shows the Node's state and address, and has **Open acorn**, **Pair another client…**, and **Quit acorn**. | This device | Off |
+| **Open acorn at login** | Opens acorn at login with no window, in the tray. Available only while the first switch is on. | This device | Off |
+
+While the window is closed, this computer shows no acorn notifications, sounds, or app icon count.
+Clients on other machines still show them. A client on this computer that asks to pair opens the
+window, and quitting from the tray opens it to ask about anything still running. On Linux with GNOME,
+the icon shows only with the AppIndicator extension installed.
+
 ## In the terminal
 
 The terminal client draws its own **Notifications** page, which shows how it alerts you in the
 terminal. **Appearance** and **Keyboard shortcuts** name the terminal client's own `acorn.json`, where
-you set them by hand. **Command line** doesn't apply: you're running the command already.
+you set them by hand. **Command line** doesn't apply: you're running the command already. **Background** is the desktop's
+alone.

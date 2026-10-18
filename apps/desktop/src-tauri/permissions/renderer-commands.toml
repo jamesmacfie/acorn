@@ -12,6 +12,8 @@ commands.allow = [
   "open_config_file",
   "force_quit",
   "quit_approved",
+  "take_pending_quit",
+  "set_background_mode",
   "show_notification",
   "set_badge",
   "set_window_background",

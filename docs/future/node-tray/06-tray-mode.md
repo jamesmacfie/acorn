@@ -1,7 +1,115 @@
 # Phase 6: keep the desktop's Node running in the tray
 
-Date: October 18, 2026. Status: proposed. Shows the Node's address when [phase 3](./03-reachability.md)
-has landed.
+Date: October 18, 2026. Status: done on macOS, with the Windows and Linux trays unproven until phase 8.
+Shows the Node's address, because [phase 3](./03-reachability.md) has landed.
+
+## Completion note
+
+Landed on October 18, 2026, on the `phase-6-tray-mode` branch.
+
+What landed:
+
+- **Settings → Background** (`apps/desktop/src/client/BackgroundSettings.tsx`), registered in
+  `pageContributions.tsx`, with `keepNodeRunning` and `openAtLogin` in the device config schema and
+  `acorn-device.schema.json`. The bridge sends both to Rust with `set_background_mode` whenever it
+  reads or writes `acorn.json` or hears `config-changed`.
+- `on_exit_requested` in `apps/desktop/src-tauri/src/menu.rs` decides each `ExitRequested` from the
+  setting, the exit code, and whether quit is approved, with a test over every combination. Closing the
+  main window clears the dock badge, the `Webviews` registry, and the helper's renderer sockets.
+- `ensure_window` in `lib.rs`, called by the single-instance callback, `RunEvent::Reopen`,
+  `links::receive`, the tray, and the helper's `open-window` signal.
+- `apps/desktop/src-tauri/src/tray.rs`: the icon, its four-item menu, and the status line. The helper
+  writes `node-status` with the broker state, plus the hosts and port from `GET /v1/core/node/reach`
+  while the Node answers. A crash budget that runs out sets "Node stopped: REASON".
+- The pending quit: `quit_after_reopen` in `Shell`, and `take_pending_quit`, which the bridge calls once
+  its `acorn:will-quit` listener exists.
+- `open-window` when a local pairing request arrives and no renderer is connected, and
+  `PairingRequestDialog.tsx` reads the local Node's waiting request when it mounts.
+- `tauri-plugin-autostart` with a LaunchAgent and `--hidden`. With `--hidden`, setup builds the tray and
+  opens no window.
+- Docs: [the shell process](../../shell/process.md#tray-mode), [notifications](../../notifications.md),
+  [features](../../features.md), the pinned stack in [webviews](../../shell/webviews.md), the UNIC note in
+  [packaging](../../shell/packaging.md#rust-dependency-security), and three site pages.
+- Tests: Rust tests for the exit decision, the status text, and `parse_signal` on both new lines. The
+  bridge test covers the pending quit pull, the dialog test covers the mount-time read, and a helper
+  server test covers dropping renderer sockets.
+
+Checked in a `dev:agent` window on macOS, on Tauri 2.12:
+
+- With the switch on, the tray icon appears. Closing the window keeps the app, the helper, and the Node
+  running, and the window's web content process, about 160 MB, exits within five seconds.
+- `open` on the running app, which sends the same reopen event as a dock click, opens one window, and
+  the renderer boots through the startup gate.
+- A pairing request from this machine with the window closed opens the window with the request showing.
+- **Quit acorn** from the app menu with the window closed and a shell running opens the window and shows
+  the prompt naming "1 terminal is still running". Cancel keeps the app, and Quit exits.
+- Memory with one window and a shell, in a debug build: shell 164 MB, helper 134 MB, Node 715 MB, web
+  content 160 MB. With the window closed, the first three didn't change and the web content process was
+  gone.
+
+Decisions and deviations:
+
+- **Tauri moved from 2.11.5 to 2.12.4**, with `@tauri-apps/api` and `@tauri-apps/cli` on 2.12 to
+  match, because the autostart plugin needs it and because 2.11.5 doesn't free the renderer. On 2.11.5 a
+  destroyed window's web content process stayed alive at 160 to 173 MB, and every reopen left another
+  one. On 2.12 the same steps freed it. The upgrade brings in `tauri-utils` 2.10, which drops the five
+  UNIC crates the October 1 review listed, and raises the manifest's `rust-version` from 1.82 to 1.90.
+  CI builds on stable. Revert the lock files and `apps/desktop/package.json` together to undo it.
+- **The helper's renderer sockets close when the window does.** WebKit's networking process kept the
+  destroyed page's helper socket open. The helper then counted a renderer as attached, so `open-window`
+  never fired, and each close would have left that renderer's Node subscriptions behind. Rust sends
+  `renderer-closed` on the main window's destroy, and `HelperServer.closeRenderers` ends every renderer
+  socket.
+- **The quit prompt refreshes sessions first.** A renderer that a quit opens is asked before the Node's
+  plugins are applied, so its session list was empty and it approved a quit with a shell running. The
+  `app:quit` handler in `App.tsx` awaits `applyNodePlugins()` and `refreshSessionSources()`, and the
+  `app:quit` budget in `willPhaseModel.ts` rises from 250 ms to 2 seconds to cover the round trip.
+- **The macOS dock's Quit isn't intercepted.** Tao calls `applicationWillTerminate` with no
+  `applicationShouldTerminate` hook, so Tauri never raises `ExitRequested` for it. It quits at once,
+  with or without a window, as it did before this phase. The helper still drains the Node. The tray and
+  the app menu quit through the prompt.
+- **Closing the last window with the setting off quits without asking**, as before. The pending quit
+  applies only to a quit with no window, which only tray mode allows.
+- **A boot failure exits.** `ExitRequested` with no `Shell` lets the exit through. Before, the helper
+  failing to start left a windowless process after its error dialog.
+- **The login item is a LaunchAgent**, because only a LaunchAgent passes `--hidden`. A dev build never
+  registers one, because it would register its debug binary. `--hidden` reaching a running instance
+  opens no window.
+- **The tray icon is the app icon**, not a template image, so it doesn't follow the macOS menu bar's
+  light and dark tint.
+- Background is a desktop page in `pageContributions.tsx`, not a core page, so the terminal client
+  doesn't list it. The site's settings coverage check reads the desktop's pages as well.
+- The tray's status line joins every host with the port. "offline" reads as "Node starting", because
+  the helper restarts a local Node that stops, and the crash budget reports the final stop.
+
+Verify before building, as answered:
+
+- The exit code: none for a closed last window, `Some(code)` for `exit`, and the dock's Quit never
+  raises `ExitRequested`. Cmd+Q is the custom menu item.
+- A renderer that connects late reads statuses through `fleet-list`, and the helper pushes later
+  changes.
+- The autostart plugin writes a LaunchAgent plist under `~/Library/LaunchAgents` naming the app's
+  path. An update that keeps the app at the same path keeps it. Not checked with a packaged build.
+- A destroyed window's WebKit content process exits on Tauri 2.12 and not on 2.11.5, as above.
+- Whether the AppImage carries `libayatana-appindicator` wasn't checked.
+
+Not seen working:
+
+- The tray menu's text. macOS doesn't expose the status item's menu to System Events, and this session
+  has no screen recording permission. The icon's presence and tooltip were checked, and the text has a
+  unit test.
+- **Open acorn at login** and a login with `--hidden`, because a dev build doesn't register the item.
+- Windows, Ubuntu with GNOME and the AppIndicator extension, and KDE.
+- A second launch, which the automation build leaves out, and an `acorn://` link with the window closed.
+- A client on another machine while the window is closed, and the hour-long memory record. Phase 8 owns
+  both.
+
+For later phases:
+
+- Phase 8: run this page's acceptance list on each platform, including a packaged macOS build with
+  **Open acorn at login**, a log out and in, and the hour-long memory record with a remote client.
+- Phase 7: the Node keeps running with the window closed, so keeping the machine awake belongs to the
+  Node, not the renderer.
 
 ## Goal
 

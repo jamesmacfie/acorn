@@ -17,6 +17,7 @@ import {
   type WireFetchRequest,
 } from './wire'
 import { watchAppearance } from '@acorn/client-core/kit/tokens'
+import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
 import { recordDuration, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 
@@ -131,7 +132,10 @@ const receive = (message: HelperMessage, receipt?: ReplyReceipt): void => {
     else if (message.push === 'node-transport-error') {
       if (!transportErrorListeners.size) pendingTransportErrors.set(message.nodeId, message.error)
       else for (const cb of transportErrorListeners) cb(message.nodeId, message.error)
-    } else if (message.push === 'config-changed') for (const cb of configListeners) cb(message.state)
+    } else if (message.push === 'config-changed') {
+      reportBackgroundMode(message.state)
+      for (const cb of configListeners) cb(message.state)
+    }
     // The node this renderer was talking to has been replaced by a restart or crash recovery. Its
     // endpoint, certificate and token are all new, so everything in memory is about a process that is
     // gone. Electron reloads the window from main; here the page reloads itself.
@@ -215,6 +219,18 @@ const tell = (method: HelperMethod, params?: unknown): void => {
   void call(method, params).catch((error: unknown) => log.warn(`${method} failed`, error, { 'helper.method': method }))
 }
 
+// Tray mode's switches live in acorn.json, which the shell never reads. The renderer reports them
+// whenever it reads or writes the file, or hears that it changed (apps/desktop/src-tauri/src/tray.rs).
+const reportBackgroundMode = (state: unknown): unknown => {
+  const { config, error } = state as { config: DeviceConfig; error?: unknown }
+  if (!error)
+    void invoke('set_background_mode', {
+      keepNodeRunning: config.keepNodeRunning === true,
+      openAtLogin: config.openAtLogin === true,
+    })
+  return state
+}
+
 const subscribe = <T>(set: Set<T>, cb: T): (() => void) => {
   set.add(cb)
   return () => set.delete(cb)
@@ -287,12 +303,18 @@ const acorn = {
   // The same native crossing for Cmd/Ctrl+K. A child preview webview has its own document, so the
   // renderer's keymap cannot see the chord while that page owns focus.
   onCommandPalette: (cb: () => void) => onEvent('acorn:command-palette', cb),
-  onWillQuit: (cb: () => boolean | Promise<boolean>) =>
-    onEvent('acorn:will-quit', () => {
+  onWillQuit: (cb: () => boolean | Promise<boolean>) => {
+    const ask = () => {
       void Promise.resolve(cb())
         .then((approved) => invoke('quit_approved', { approved }))
         .catch(() => invoke('quit_approved', { approved: false }))
-    }),
+    }
+    const unlisten = listen('acorn:will-quit', ask)
+    // A quit that arrived with no window opened this one, and waits in the shell until a listener
+    // exists to ask the person.
+    void unlisten.then(() => invoke<boolean>('take_pending_quit')).then((pending) => pending && ask())
+    return () => void unlisten.then((off) => off())
+  },
   openConfigFile: () => invoke<void>('open_config_file'),
   cli: {
     status: () =>
@@ -372,8 +394,8 @@ const acorn = {
     devGrant: (request: unknown) => call<void>('plugins-dev-grant', request),
   },
   config: {
-    read: () => call('config-read'),
-    write: (patch: unknown) => call('config-write', patch),
+    read: () => call('config-read').then(reportBackgroundMode),
+    write: (patch: unknown) => call('config-write', patch).then(reportBackgroundMode),
     onChange: (cb: (state: unknown) => void) => {
       configListeners.add(cb)
       return () => void configListeners.delete(cb)
