@@ -14,8 +14,11 @@ What landed:
 - A cut result keeps its first 24 KiB and last 8 KiB, with this marker line between them:
   `[acorn cut this result: <total> bytes in all, <omitted> left out here. Read the full text from <path>]`.
   When the file can't be written, the marker says so instead of naming a path.
-- Saved files go to `<os.tmpdir()>/acorn-tool-output/<taskId>/<callId>.txt`. The folder is mode 700
-  and each file is mode 600, because Linux's `/tmp` is shared.
+- Saved files go to `<os.tmpdir()>/acorn-tool-output/<taskId>/<callId>.txt`. Linux's `/tmp` is
+  shared, so the server saves only when the root and the task folder are each a real folder the user
+  owns with no group or other access. Otherwise it refuses, and the marker says why. It writes each
+  file with mode 600 and without overwriting, and the sweep uses `lstat` and never follows a link. A
+  security review caught the shared-folder case after the first commit.
 - The managed Claude Code harness adds `Read(//<that task folder>/**)` to its flag settings' allow
   list, beside the skill folders. So every managed Claude session sends a `permissions.allow` list,
   even one with no skills.
@@ -45,6 +48,8 @@ Deviations:
   `toolOutputDir` through `@acorn/plugin-api/node`, and importing `server.ts` would pull in the MCP
   SDK. That added a node-core export, so the export limit in `tools/arch/boundaries.test.ts` went
   from 67 to 68.
+- When another Linux user created `/tmp/acorn-tool-output` first, this user's results are still cut
+  but not saved. A uid in the folder name would avoid that, at the cost of a less readable path.
 - The sweep deletes old files but leaves empty task folders. Removing a folder could race another
   server writing into it.
 - A Claude Code session in the terminal drawer still asks before it reads the file, as the doc

@@ -1,10 +1,10 @@
 // The one size limit on an agent's tool result (docs/mcp/result-size.md). A result over the limit
 // keeps its head and tail, because a log or a diff usually fails at the end, and the full text goes
 // to a file the agent can read with its own file tool.
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { readdir, rm, stat } from 'node:fs/promises'
+import { lstatSync, mkdirSync, writeFileSync } from 'node:fs'
+import { lstat, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 
 // 32 KiB is about 8,000 tokens, well under the 25,000 past which Claude Code cuts a result's end.
 const HEAD_BYTES = 24 * 1024
@@ -23,6 +23,19 @@ const toolOutputRoot = () => join(tmpdir(), 'acorn-tool-output')
  *  environment, so both name the same folder. */
 export const toolOutputDir = (taskId: string) => join(toolOutputRoot(), taskId)
 
+/** Creates the folder if it's missing, and throws unless it's a real folder, not a link, that this
+ *  user owns and nobody else can open. Linux's temp folder is shared, so another user could create a
+ *  folder first, or plant a link, to read results, redirect a write, or aim the sweep at other files. */
+function ownedDir(dir: string): string {
+  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  const info = lstatSync(dir)
+  // Windows has no uids to compare, and its temp folder is per user.
+  const owned = !process.getuid || info.uid === process.getuid()
+  if (!info.isDirectory() || !owned || info.mode & 0o077)
+    throw new Error(`${dir} must be a folder only this user can open`)
+  return dir
+}
+
 function headEnd(bytes: Buffer): number {
   const newline = bytes.lastIndexOf(NEWLINE, HEAD_BYTES - 1)
   if (newline + 1 >= HEAD_BYTES - LINE_SLACK) return newline + 1
@@ -40,8 +53,8 @@ function tailStart(bytes: Buffer): number {
 }
 
 /** The text unchanged when it fits, otherwise its head and tail around one marker line. The full text
- *  goes to `file` first. */
-export function capToolText(text: string, file: string): string {
+ *  goes to the task's folder first, named after the call. */
+export function capToolText(text: string, taskId: string, callId: string): string {
   const bytes = Buffer.from(text)
   if (bytes.length <= HEAD_BYTES + TAIL_BYTES) return text
   const head = bytes.subarray(0, headEnd(bytes)).toString()
@@ -49,9 +62,9 @@ export function capToolText(text: string, file: string): string {
   const omitted = bytes.length - Buffer.byteLength(head) - Buffer.byteLength(tail)
   let saved: string
   try {
-    // Owner-only, because the text can hold anything a tool returned and Linux's temp folder is shared.
-    mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
-    writeFileSync(file, bytes, { mode: 0o600 })
+    const file = join(ownedDir(join(ownedDir(toolOutputRoot()), taskId)), `${callId}.txt`)
+    // Owner-only, because the text can hold anything a tool returned. `wx` never overwrites.
+    writeFileSync(file, bytes, { mode: 0o600, flag: 'wx' })
     saved = `Read the full text from ${file}`
   } catch (error) {
     saved = `The full text could not be saved: ${(error as Error).message}`
@@ -61,15 +74,20 @@ export function capToolText(text: string, file: string): string {
 }
 
 /** Deletes saved results older than seven days. Best effort: a file another process removed, or a
- *  folder it can't read, is skipped. */
+ *  folder it can't read, is skipped. It never follows a link, so it deletes only inside the root. */
 export async function sweepToolOutput(now = Date.now()): Promise<void> {
-  const root = toolOutputRoot()
-  const tasks = await readdir(root).catch(() => [])
-  for (const task of tasks) {
-    const files = await readdir(join(root, task)).catch(() => [])
-    for (const name of files) {
-      const file = join(root, task, name)
-      const info = await stat(file).catch(() => null)
+  let root: string
+  try {
+    root = ownedDir(toolOutputRoot())
+  } catch {
+    return
+  }
+  for (const task of await readdir(root).catch(() => [])) {
+    const dir = join(root, task)
+    if (!(await lstat(dir).catch(() => null))?.isDirectory()) continue
+    for (const name of await readdir(dir).catch(() => [])) {
+      const file = join(dir, name)
+      const info = await lstat(file).catch(() => null)
       if (info?.isFile() && now - info.mtimeMs > KEEP_MS) await rm(file, { force: true }).catch(() => {})
     }
   }

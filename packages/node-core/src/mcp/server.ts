@@ -8,13 +8,12 @@
 // and a call returns a structured 'no-active-task' or 'acorn-not-running' result, never a protocol
 // error, because a plain terminal loads this server too.
 import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { isToolImageResult } from '@acorn/protocol/api.ts'
 import { apiGet, apiSend } from './api'
-import { capToolText, sweepToolOutput, toolOutputDir } from './toolOutput'
+import { capToolText, sweepToolOutput } from './toolOutput'
 
 const TASK_ID = process.env.ACORN_TASK_ID ?? ''
 
@@ -22,7 +21,7 @@ const TASK_ID = process.env.ACORN_TASK_ID ?? ''
 // can be large, so the fixed no-task answer passes no call ID and skips the cap.
 const text = (value: unknown, callId?: string) => {
   const full = typeof value === 'string' ? value : JSON.stringify(value)
-  const capped = callId ? capToolText(full, join(toolOutputDir(TASK_ID), `${callId}.txt`)) : full
+  const capped = callId ? capToolText(full, TASK_ID, callId) : full
   return { content: [{ type: 'text' as const, text: capped }] }
 }
 const NO_TASK = text({

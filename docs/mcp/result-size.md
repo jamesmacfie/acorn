@@ -15,6 +15,11 @@ line or a diff line stays whole. The full text goes to
 `<temp folder>/acorn-tool-output/<task ID>/<call ID>.txt`, readable only by the user. The server
 deletes saved files older than seven days when it starts.
 
+Linux shares its temp folder between users, so the server saves into `acorn-tool-output` and the
+task's folder only when each is a real folder, not a link, that the user owns and nobody else can
+open. It never overwrites a file, and the sweep never follows a link. When a folder fails that check,
+results are still cut, and the marker says why the full text couldn't be saved.
+
 The cap lives in the MCP server, not in the Node, because the renderer calls the same tools over HTTP and wants the
 whole answer. Without it, the harness trims an oversized result itself: Claude Code 2.1.302 keeps the
 head past 25,000 tokens and drops the end, and Codex 0.162.1 cuts the middle at its own token limit.

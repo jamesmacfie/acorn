@@ -424,7 +424,8 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
 
   it('deletes saved results older than seven days when it starts', async () => {
     const saved = join(tmp, 'acorn-tool-output', 'old-task')
-    mkdirSync(saved, { recursive: true })
+    // Owner-only, as the server makes it. It refuses a folder other users can open.
+    mkdirSync(saved, { recursive: true, mode: 0o700 })
     const old = join(saved, 'old.txt')
     const recent = join(saved, 'recent.txt')
     writeFileSync(old, 'old')
