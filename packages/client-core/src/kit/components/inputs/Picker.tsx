@@ -63,6 +63,9 @@ export type PickerProps<T> = {
   isDisabled?: (item: T) => boolean
   onSelect?: (item: T) => void
   leading?: (item: T) => JSX.Element // optional per-row leading control (e.g. pin)
+  /** A control at the end of each row, such as a second action on the item. It receives `close`, as
+   *  `footer` does, so pressing it can dismiss the picker. Callback form only. */
+  trailing?: (item: T, close: () => void) => JSX.Element
   tools?: JSX.Element // optional extra toolbar control beside the filter (e.g. refresh)
   status?: JSX.Element // optional status line under the toolbar (e.g. refresh failed)
   /** An action below the list, such as "Add project…". It receives `close` so pressing it can dismiss the picker. */
@@ -123,6 +126,8 @@ export default function Picker<T>(props: PickerProps<T>) {
     if (open()) queueMicrotask(() => inputRef?.focus())
   }
   onMount(() => props.defaultOpen && toggle())
+  // The caller's item behind a callback-form row, whose id is its index.
+  const itemAt = (index: number) => (props.results?.(filter()) ?? [])[index] as T
   const choose = (row: PickerItem) => {
     if (row.disabled) return
     if (props.items) props.onPick?.(row.id)
@@ -208,9 +213,10 @@ export default function Picker<T>(props: PickerProps<T>) {
                                 <Icon name="x" />
                               </ConfirmButton>
                             ) : (
-                              props.leading?.((props.results?.(filter()) ?? [])[index()] as T)
+                              props.leading?.(itemAt(index()))
                             )
                           }
+                          trailing={props.items ? undefined : props.trailing?.(itemAt(index()), close)}
                           onSelect={() => choose(row)}
                         />
                       </>

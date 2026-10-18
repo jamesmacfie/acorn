@@ -168,4 +168,4 @@ export class ProviderCatalogue {
   }
 }
 
-const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
+export const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`

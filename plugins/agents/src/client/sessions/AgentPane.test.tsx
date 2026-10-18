@@ -18,6 +18,9 @@ const disposeCommands = vi.fn()
 const openManagedParent = vi.fn()
 const cancel = vi.fn(async () => ({ ok: true }))
 const cancelSubagent = vi.fn(async () => ({ ok: true }))
+const openAccountTerminal = vi.fn(async () => ({ terminalSessionId: 'term-1' }))
+const setTerminalOpen = vi.fn()
+const requestTerminalFocusIntent = vi.fn()
 
 const usageReading = (accountName: string | undefined, percentRemaining: number): AgentProviderUsage => ({
   provider: 'claude',
@@ -59,12 +62,14 @@ vi.mock('../usage/usageStore', () => ({
   },
 }))
 
-vi.mock('./managedClient', () => ({ managedAgentApi: { cancel, cancelSubagent } }))
+vi.mock('./managedClient', () => ({ managedAgentApi: { cancel, cancelSubagent, openAccountTerminal } }))
 
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   clientCapability: () => ({ runForSession }),
   openPane: (...args: unknown[]) => openPane(...args),
+  setTerminalOpen: (...args: unknown[]) => setTerminalOpen(...args),
+  requestTerminalFocusIntent: (...args: unknown[]) => requestTerminalFocusIntent(...args),
   // Mocked rather than driven through the real registry: what is worth pinning is which commands the
   // pane hands over and what they do when they are asked. The registry is core's to test.
   registerCommands: (...args: unknown[]) => registerCommands(...args) ?? { dispose: disposeCommands },
@@ -120,7 +125,12 @@ const modelFor = (current: AgentSession, parent?: AgentSession): AgentPaneModel 
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
 
-const mount = (current: AgentSession, parent?: AgentSession, selected?: () => AgentSession): void => {
+const mount = (
+  current: AgentSession,
+  parent?: AgentSession,
+  selected?: () => AgentSession,
+  over: Partial<AgentPaneModel> = {},
+): void => {
   host = document.createElement('div')
   document.body.append(host)
   const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
@@ -134,8 +144,8 @@ const mount = (current: AgentSession, parent?: AgentSession, selected?: () => Ag
     () => (
       <QueryClientProvider client={queryClient}>
         <AgentDetailHeader
-          task={{ id: 'task-1' } as never}
-          model={{ ...modelFor(current, parent), ...(selected ? { selected } : {}) }}
+          task={{ id: 'task-1', status: 'active' } as never}
+          model={{ ...modelFor(current, parent), ...(selected ? { selected } : {}), ...over }}
         />
       </QueryClientProvider>
     ),
@@ -181,6 +191,36 @@ describe('session account usage', () => {
     usageButton().click()
     await settle()
     expect(openAccounts()).toEqual(['Usual sign-in'])
+  })
+})
+
+describe('the New menu', () => {
+  it('opens a terminal on an account from its row, and offers none for a harness without accounts', async () => {
+    const claude = {
+      id: 'claude',
+      label: 'Claude Code',
+      installed: true,
+      authenticated: true,
+      accounts: [{ name: 'work', label: 'Work', authenticated: true }],
+    }
+    const codex = { id: 'codex', label: 'Codex', installed: true, authenticated: true }
+    mount(session({}), undefined, undefined, {
+      choices: () => [{ provider: claude, account: 'work' }, { provider: codex }] as never,
+    })
+    await settle()
+    host.querySelector<HTMLButtonElement>('button[aria-label="New session"]')!.click()
+    await settle()
+    const terminals = [
+      ...document.querySelectorAll<HTMLButtonElement>('.repo-picker-row button[aria-label^="Open a terminal"]'),
+    ]
+    expect(terminals.map((button) => button.getAttribute('aria-label'))).toEqual(['Open a terminal on Work'])
+
+    terminals[0]!.click()
+    await settle()
+    expect(openAccountTerminal).toHaveBeenCalledWith('task-1', 'claude', 'work')
+    expect(setTerminalOpen).toHaveBeenCalledWith('task-1', true)
+    expect(requestTerminalFocusIntent).toHaveBeenCalledWith('task-1', 'term-1')
+    expect(document.querySelector('.repo-picker-popover')).toBeNull()
   })
 })
 

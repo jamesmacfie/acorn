@@ -341,6 +341,11 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
             throw error
           }
         },
+        openTerminal: async ({ taskId, title, command, env }) => {
+          const sessions = ctx.capabilities.get(TERMINAL_SESSIONS)
+          if (!sessions) throw new Error('Terminal engine is unavailable.')
+          return (await sessions.create({ taskId, title, command, env })).id
+        },
         // The return path of the same handoff. `false` with no terminal plugin is correct, not a
         // degradation: with no PTY engine, no shell holds the session, so control can return to acorn.
         terminalHandoffRunning: async (sessionId) => {

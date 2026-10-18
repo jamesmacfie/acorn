@@ -13,6 +13,8 @@ export default function PickerRow(props: {
   active?: boolean
   disabled?: boolean
   leading?: JSX.Element
+  /** A control after the name, at the row's right edge, such as a second action on the same item. */
+  trailing?: JSX.Element
   /** `option` for a list the keyboard walks, so `active` also reports as `aria-selected`. */
   role?: 'option'
   onSelect: () => void
@@ -39,6 +41,7 @@ export default function PickerRow(props: {
         <span>{props.label}</span>
         <Show when={props.description}>{(description) => <small>{description()}</small>}</Show>
       </button>
+      {props.trailing}
     </li>
   )
 }

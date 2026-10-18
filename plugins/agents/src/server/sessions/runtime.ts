@@ -33,7 +33,7 @@ import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 import type { TurnAttendanceContext, WorkflowPosture } from './attendance'
 import type { SessionSummaryInput } from '../../shared/sessionSummary'
 import { agentDriverRegistry } from '../drivers/registry'
-import { ProviderCatalogue } from './providerCatalogue'
+import { ProviderCatalogue, shellQuote } from './providerCatalogue'
 import { sessionAccount } from '../../shared/accounts'
 import type { AgentDriverRegistry } from '../drivers/registry'
 import { isActiveSubagent } from './stateMachine'
@@ -88,6 +88,7 @@ export class ManagedAgentRuntime {
   private readonly telemetry: AgentRuntimeOptions['telemetry']
   private readonly startTerminalHandoff: AgentRuntimeOptions['startTerminalHandoff']
   private readonly terminalHandoffRunning: AgentRuntimeOptions['terminalHandoffRunning']
+  private readonly openTerminal: AgentRuntimeOptions['openTerminal']
   // Bridge asks waiting on the person, by request id. holdAsk, reached through loopHook(), holds them
   // and resolveRequest() answers them.
   private readonly loopAsks = new Map<string, (resolution: unknown) => void>()
@@ -114,6 +115,7 @@ export class ManagedAgentRuntime {
     this.telemetry = options.telemetry
     this.startTerminalHandoff = options.startTerminalHandoff
     this.terminalHandoffRunning = options.terminalHandoffRunning
+    this.openTerminal = options.openTerminal
     this.titleGeneration = this.createTitleGeneration()
     this.sessionDefaults = this.createSessionDefaults()
   }
@@ -370,6 +372,30 @@ export class ManagedAgentRuntime {
     const accounts = this.registry.create(session.providerId)?.accounts
     if (!accounts) throw new Error(`'${session.providerId}' doesn't support a second account.`)
     return { [accounts.env]: home }
+  }
+
+  /** Opens a task terminal on one account, for work the CLI does itself, such as `claude mcp add` or a
+   *  server's sign-in. It runs the CLI, then the person's own shell once the CLI exits. Both get the
+   *  account's folder, so a command typed after quitting still reaches that account. */
+  async openAccountTerminal(taskId: string, providerId: string, name: string): Promise<{ terminalSessionId: string }> {
+    const accounts = this.registry.create(providerId)?.accounts
+    if (!accounts) throw new Error(`'${providerId}' doesn't support a second account.`)
+    if (!(await this.engine.accounts.has(providerId, name))) throw new Error(`Account '${name}' not found.`)
+    const provider = (await this.providers.list()).find((candidate) => candidate.id === providerId)
+    if (!provider?.executable) throw new Error(`${provider?.label ?? providerId} is not available on this Node.`)
+    if (!this.openTerminal) throw new Error('Terminals are unavailable on this Node.')
+    const home = await this.engine.linkedAccountFolder(providerId, name)
+    // Unset rather than left out of `env`: the terminal's environment comes from the Node's, and a token
+    // in it would sign the CLI in as someone else.
+    const unset = accounts.overrides?.length ? `unset ${accounts.overrides.join(' ')}; ` : ''
+    const label = provider.accounts?.find((account) => account.name === name)?.label ?? name
+    const terminalSessionId = await this.openTerminal({
+      taskId,
+      title: `${provider.label} · ${label}`,
+      command: `${unset}${shellQuote(provider.executable)}; exec "\${SHELL:-/bin/sh}" -l`,
+      env: { [accounts.env]: home },
+    })
+    return { terminalSessionId }
   }
 
   /** Chooses the account new sessions of a harness start on when they name none. Null is the CLI's own

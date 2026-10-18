@@ -391,6 +391,8 @@
     "POST /v1/p/agents/loop-hook",
     "POST /v1/p/agents/providers/:providerId/accounts",
     "POST /v1/p/agents/providers/:providerId/accounts",
+    "POST /v1/p/agents/providers/:providerId/accounts/:name/terminal",
+    "POST /v1/p/agents/providers/:providerId/accounts/:name/terminal",
     "POST /v1/p/agents/sessions",
     "POST /v1/p/agents/sessions",
     "POST /v1/p/agents/sessions/:sessionId/cancel",

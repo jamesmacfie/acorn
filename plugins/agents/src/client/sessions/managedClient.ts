@@ -66,6 +66,13 @@ export const managedAgentApi = {
       `${ROOT}/providers/${encodeURIComponent(providerId)}/accounts/${encodeURIComponent(name)}`,
       'DELETE',
     ),
+  // The Agent pane's terminal menu: a task terminal on one account, for the CLI's own setup.
+  openAccountTerminal: (taskId: string, providerId: string, name: string) =>
+    jsonWrite<{ terminalSessionId: string }>(
+      `${ROOT}/providers/${encodeURIComponent(providerId)}/accounts/${encodeURIComponent(name)}/terminal`,
+      'POST',
+      { taskId },
+    ),
   // Settings > Storage and memory. At a named node, because the page says which node it shows.
   footprint: (options: { nodeId?: string } = {}) => readJson<AgentFootprint>(`${ROOT}/footprint`, options),
   stopIdle: (options: { nodeId?: string } = {}) =>

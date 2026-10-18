@@ -1,6 +1,13 @@
 import { createEffect, createMemo, createResource, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { clientCapability, featureUsable, openPane, type Task } from '@acorn/plugin-api/client'
+import {
+  clientCapability,
+  featureUsable,
+  openPane,
+  requestTerminalFocusIntent,
+  setTerminalOpen,
+  type Task,
+} from '@acorn/plugin-api/client'
 import { AGENT_SESSION_HEADER_POINT, type AgentSessionHeaderProps } from '@acorn/protocol/extensionPoints.ts'
 import {
   Alert,
@@ -65,6 +72,14 @@ import { accountIcon, accountLabel, sessionAccount } from '../../shared/accounts
 export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   const pricing = createQuery(() => agentPricingOptions())
+  // A task terminal on one account, for what the CLI does itself, such as adding an MCP server or
+  // signing in to one (docs/managed-agents/accounts.md).
+  const openAccountTerminal = (taskId: string, providerId: string, name: string) =>
+    model.action(async () => {
+      const { terminalSessionId } = await managedAgentApi.openAccountTerminal(taskId, providerId, name)
+      setTerminalOpen(taskId, true)
+      requestTerminalFocusIntent(taskId, terminalSessionId)
+    }, false)
   const usageAccounts = createMemo(() => {
     const accounts: Record<string, string | undefined> = Object.fromEntries(
       model.providers().map((provider) => [provider.id, provider.defaultAccount]),
@@ -264,6 +279,22 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           isActive={() => false}
           isDisabled={(item) => !choiceAvailable(item) || model.creating()}
           onSelect={(item) => void model.createSession(item)}
+          trailing={(item, close) => (
+            <Show when={!item.agent && item.account}>
+              {(account) => (
+                <IconButton
+                  icon="square-terminal"
+                  variant="bare"
+                  size="xs"
+                  label={`Open a terminal on ${accountLabel(item.provider, account())}`}
+                  onPress={() => {
+                    close()
+                    void openAccountTerminal(props.task.id, item.provider.id, account())
+                  }}
+                />
+              )}
+            </Show>
+          )}
           tools={
             <IconButton
               icon="refresh-cw"

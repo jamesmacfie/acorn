@@ -50,6 +50,13 @@ there too. Acorn gives each extra account its own folder and points the CLI at i
   reach the shared file through the link.
 - **Other readers.** The terminal handoff passes the same variable. A delegated child on its parent's
   harness inherits the parent's account, unless it's a custom agent that names its own.
+- **Account terminals.** Each account's row in **New** has a terminal icon at its end, drawn through
+  the picker's `trailing` slot. Pressing it opens a task terminal that runs the CLI on that account's folder,
+  then your own login shell once the CLI exits, with the variable still set. A `claude mcp add`, or a
+  `/mcp` sign-in, typed there reaches that account only. The command unsets the overriding variables
+  first, because the terminal's environment comes from the Node's. The icon opens it through
+  `POST /v1/p/agents/providers/:providerId/accounts/:name/terminal`, which is device-only and takes
+  the task (`openAccountTerminal` in `server/sessions/runtime.ts`).
 - **Custom agents.** A custom agent can name an account. Its sessions start there while the Node still
   holds it, and on the default account otherwise ([custom agents](./custom-agents.md)).
 
@@ -118,7 +125,8 @@ a usage limit, the wait reads the quota of the session's own account. For more i
 
 - A new account starts with no MCP servers or history from the default folder. Only the person's
   skills and settings file are linked in. Linking the rest, as T3 Code does, needs a list of private files per
-  CLI release. Wait until someone misses them. Acorn's own server isn't one of them either. A session on an account gets it
+  CLI release. Wait until someone misses them. To add a server to one account only, use an account
+  terminal. Acorn's own server isn't one of them either. A session on an account gets it
   when it starts, and again in a terminal handoff ([MCP](../mcp.md#configuration)).
 - The servers in Settings → MCP reach every account. One
   [sign-in to a remote server](../mcp/sign-in.md) on the Node serves them all, so no

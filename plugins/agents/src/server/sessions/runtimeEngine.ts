@@ -148,6 +148,9 @@ export type AgentRuntimeOptions = {
   publish?(frame: PublishedFrame): void
   startTerminalHandoff?(session: AgentSession): Promise<string>
   terminalHandoffRunning?(sessionId: string): Promise<boolean>
+  /** Opens a shell in a task's terminal and answers its terminal session id. Absent when the Node runs
+   *  no terminals. */
+  openTerminal?(input: { taskId: string; title: string; command: string; env: Record<string, string> }): Promise<string>
   // The owner's half of this plugin's hooks (docs/plugins/hooks.md § Hooks). Optional so a test can build an
   // engine with no host around it, and absent means nobody objects, which is also what an empty chain
   // means.
@@ -686,8 +689,14 @@ export class ManagedAgentEngine {
     if (!account) return null
     if (!(await this.accounts.has(session.providerId, account)))
       throw new Error(`This session runs on the '${account}' account, which was removed from this Node.`)
-    const home = this.accounts.home(session.providerId, account)
-    const { skills, settings } = this.registry.create(session.providerId)?.accounts ?? {}
+    return this.linkedAccountFolder(session.providerId, account)
+  }
+
+  /** An account's folder with the person's own skills and settings linked in, for any process that
+   *  runs the harness's CLI on it. */
+  async linkedAccountFolder(providerId: string, account: string): Promise<string> {
+    const home = this.accounts.home(providerId, account)
+    const { skills, settings } = this.registry.create(providerId)?.accounts ?? {}
     // A session that starts without the person's skills or settings still works, so a failure here
     // doesn't stop it.
     if (skills)

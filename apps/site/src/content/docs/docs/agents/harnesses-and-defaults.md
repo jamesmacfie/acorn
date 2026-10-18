@@ -74,6 +74,11 @@ to keep starting sessions on it. **Default account** picks the account a workflo
 or an inline chat uses when it names none. **Show accounts as** draws each account by **Name** or by
 **Icon**. **Remove** signs the account out and deletes its folder.
 
+To set up one account by hand, such as adding an MCP server only that account uses, open
+**New** in the Agent pane and click the terminal icon at the end of the account's row. The terminal runs Claude Code or
+Codex on that account. Quit it and the shell stays on the same account, so a command such as
+`claude mcp add` reaches that account only.
+
 ## What a new session starts with
 
 A new session starts on the model, effort, and other options you last picked for that harness. Change
@@ -126,5 +131,6 @@ reach the terminal client.
 
 - A plugin's harness can't use accounts.
 - acorn doesn't move a session to another account when one runs out of usage.
-- A new account starts without your MCP servers or history from the default folder.
+- A new account starts without your MCP servers or history from the default folder. Servers in
+  **Settings** > **MCP** reach every account.
 - Aider runs only in the terminal drawer. acorn records no transcript for it.

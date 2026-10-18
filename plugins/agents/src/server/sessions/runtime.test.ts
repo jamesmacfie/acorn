@@ -3010,9 +3010,14 @@ describe('sessions pinned to an extra account', () => {
   // docs/managed-agents/accounts.md: the account is chosen at creation, kept on the session, and handed
   // to the driver as a config folder at every start.
   class AccountDriver extends FakeAgentDriver {
-    readonly accounts = { env: 'FAKE_HOME', login: ['login'], logout: ['logout'] }
+    readonly accounts = { env: 'FAKE_HOME', login: ['login'], logout: ['logout'], overrides: ['FAKE_TOKEN'] }
     readonly signedIn = new Set<string>()
     readonly starts: AgentDriverStartOptions[] = []
+    executable: string | undefined
+
+    override async probe(): Promise<AgentProviderDescriptor> {
+      return { ...(await super.probe()), ...(this.executable ? { executable: this.executable } : {}) }
+    }
 
     async probeAccount(home: string): Promise<boolean | null> {
       return this.signedIn.has(home)
@@ -3030,6 +3035,7 @@ describe('sessions pinned to an extra account', () => {
   let runtime: ManagedAgentRuntime
   let driver: AccountDriver
   let taskId: string
+  let terminals: { taskId: string; title: string; command: string; env: Record<string, string> }[]
 
   beforeEach(async () => {
     testDb = makeTestDb()
@@ -3037,9 +3043,14 @@ describe('sessions pinned to an extra account', () => {
     dataDir = await mkdtemp(join(tmpdir(), 'acorn-managed-accounts-'))
     taskId = (await seedTask(testDb, dataDir)).taskId
     driver = new AccountDriver()
+    terminals = []
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => driver)
     runtime = new ManagedAgentRuntime({
+      openTerminal: async (input) => {
+        terminals.push(input)
+        return `terminal-${terminals.length}`
+      },
       db: pluginDb.db,
       dataDir,
       core: createCoreServices({
@@ -3148,6 +3159,23 @@ describe('sessions pinned to an extra account', () => {
     const session = await create({})
     expect(session.config.account).toBeUndefined()
     expect(driver.starts.at(-1)?.accountHome).toBeUndefined()
+  })
+
+  it("opens a terminal that runs the CLI, then a shell, on the account's folder", async () => {
+    driver.executable = "/opt/fake's cli"
+    await runtime.addAccount('fake', 'work')
+    await runtime.setAccountDetails('fake', 'work', { label: 'Work' })
+
+    expect(await runtime.openAccountTerminal(taskId, 'fake', 'work')).toEqual({ terminalSessionId: 'terminal-1' })
+    expect(terminals).toEqual([
+      {
+        taskId,
+        title: 'Fake managed agent · Work',
+        command: `unset FAKE_TOKEN; '/opt/fake'\\''s cli'; exec "\${SHELL:-/bin/sh}" -l`,
+        env: { FAKE_HOME: join(dataDir, 'agent-accounts', 'fake', 'work') },
+      },
+    ])
+    await expect(runtime.openAccountTerminal(taskId, 'fake', 'other')).rejects.toThrow(/not found/)
   })
 
   it('fails a start whose account was removed', async () => {
