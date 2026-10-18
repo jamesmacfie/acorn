@@ -502,14 +502,6 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 - [OpenCode as a contributed harness](./future/opencode.md), postponed.
 
-## Cold launch proposal
-
-- [Make a cold launch usable sooner](./future/perf/README.md), with phases for [measuring every cold
-  launch](./future/perf/01-measure-cold-launch.md), [the login-shell
-  `PATH`](./future/perf/02-login-shell-path.md), [the agents cleanup](./future/perf/03-agents-at-launch.md),
-  [the Node's boot](./future/perf/04-node-boot-and-cleanup.md), [release-only
-  costs](./future/perf/05-release-only-costs.md), and [acceptance](./future/perf/06-acceptance.md).
-
 ## Performance measurement proposal
 
 - [Measure where slow requests spend their time](./future/performance-spans.md).
