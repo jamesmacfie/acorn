@@ -6,7 +6,7 @@ sources:
   - docs/shell/webviews.md
   - docs/tui/rectangles.md
   - docs/first-party-plugins/terminal.md
-checked: 52225e24f
+checked: 'e7c7447f7'
 ---
 
 This page covers the web pages acorn shows inside the desktop app: the preview pane, and pages a plugin

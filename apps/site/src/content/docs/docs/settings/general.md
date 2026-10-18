@@ -20,7 +20,7 @@ covers:
   - shortcuts
   - cli
   - background
-checked: 52225e24f
+checked: 'e7c7447f7'
 ---
 
 This page lists every setting in **Settings** > **General**. Every page here is stored on **This

@@ -11,7 +11,7 @@ covers:
   - device-config
   - clear-cache
   - extension-points
-checked: 52225e24f
+checked: 'e7c7447f7'
 ---
 
 This page lists every setting in **Settings** > **Advanced**. Every page here is stored on **This

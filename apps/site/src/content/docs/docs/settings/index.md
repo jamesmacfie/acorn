@@ -10,7 +10,7 @@ sources:
   - docs/tui/sources-and-settings.md
   - packages/client-core/src/features/settings/corePages.ts
   - packages/protocol/src/chrome/settingsPages.ts
-checked: 52225e24f
+checked: 'e7c7447f7'
 ---
 
 This page covers how Settings works: opening it, its groups, what the label beside each page's title

@@ -9,7 +9,7 @@ sources:
   - docs/tui/chrome.md
   - packages/client-core/src/features/settings/NotificationSettings.tsx
   - packages/client-core/src/features/notifications/NotificationBell.tsx
-checked: 90ded85ca
+checked: 'e7c7447f7'
 ---
 
 This page covers when acorn tells you about an agent, the ways it can reach you, the inbox behind the
