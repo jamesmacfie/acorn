@@ -1,6 +1,53 @@
 # Phase 3: Spike the script tool's interpreter
 
-Date: October 16, 2026. Status: proposed.
+Date: October 16, 2026. Status: done on October 19, 2026.
+
+## Completion note
+
+October 19, 2026. Landed on branch `phase-3-script-tool-spike`. The full record, with every
+measurement, is under [Decision](./04-script-tool.md#decision) in phase 4.
+
+Decision: QuickJS, through `quickjs-emscripten-core` and `@jitl/quickjs-wasmfile-release-sync`,
+both pinned at 0.32.0. It passed every check below. `@opencode/codemode` passed every escape check
+but failed the memory check, and the memory check decided it.
+
+What I measured, with a throwaway proof of concept for each option in a scratch folder outside the
+repo:
+
+- Size: codemode bundles to 357,973 bytes of JavaScript, most of it Effect and the `acorn` parser.
+  QuickJS bundles to 51,542 bytes of JavaScript plus a 503,134-byte wasm file.
+- Start-up: a cold `return 1` took 11.3 ms in codemode and 7.9 ms in QuickJS. A warm one took
+  0.21 ms and 0.17 ms.
+- Async host calls in `Promise.all` work in both. QuickJS needs no asyncify build, only a promise
+  bridge.
+- Both stop a busy loop at the time limit.
+- Only QuickJS has a memory limit. A codemode program took 540 MB of the Node's heap in 8 seconds.
+  A heap-capped worker thread didn't fix it: the program slowed to a crawl and reported a timeout
+  38 seconds later. QuickJS stopped a growing array at 32 MiB after 280 ms.
+- Every escape attempt failed in both. In QuickJS, `Function` and `eval` run, but they reach only
+  the engine's own built-ins and `tools`.
+- QuickJS reports a line and column for syntax errors and thrown errors. Codemode gives no line for
+  a thrown `Error`, and puts a syntax error's line in the message only.
+
+Deviations:
+
+- The doc said to delete this file. I kept it with this note, so each phase doc has one, and so the
+  links from the README and `docs/README.md` stay valid.
+- Removing Effect from codemode is far more than a day. Effect runs the interpreter's evaluation,
+  timeouts, interruption, and concurrency, so I counted its size. Effect 4 left beta after this doc
+  was written.
+
+For phase 4:
+
+- The branch was already 273 bytes over the service size ceiling before any interpreter: 1,884,673
+  bytes against 1,884,400. I didn't raise it.
+- Load the interpreter with `await import()` from the tool's handler module, so it adds 0 bytes to
+  the budget. A static import would add 51,542 bytes. The tool's registration still adds some bytes,
+  so phase 4 has to find room or justify a raise.
+- Ship the two QuickJS packages through `requiredRuntimePackages`. Vite doesn't copy the wasm file,
+  and a bundled build fails without it.
+- Limits: 120 seconds, 32 MiB, and 50 calls. The host has to stop waiting on a pending call at the
+  deadline, because QuickJS's interrupt handler runs only while JavaScript does.
 
 This spike decides what runs the programs that phase 4's `run_script` tool accepts. Read it before
 you add an interpreter to the Node.
