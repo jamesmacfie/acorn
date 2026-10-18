@@ -57,8 +57,8 @@ function memoryChanges(lastTold: unknown, current: string | null): MemoryChanges
 }
 
 /**
- * This turn's note, or null, which is also the answer without a reader. `deliver` runs once the turn has run: it saves the index as
- * `standingContextTold` and writes the transcript line. A failed turn never calls it, so the next turn
+ * This turn's note, or null when nothing changed or no memory plugin provides `current`. `deliver` runs
+ * once the turn has run: it saves the index as `standingContextTold` and writes the transcript line. A failed turn never calls it, so the next turn
  * offers the same change. Neither half throws, because the note must never fail a turn.
  */
 export async function memoryNote(
