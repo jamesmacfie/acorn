@@ -8,7 +8,7 @@ sources:
   - docs/state-ownership/scope-rules.md
   - packages/client-core/src/features/settings/models/AiModelsSettings.tsx
   - packages/client-core/src/features/settings/models/generatePick.ts
-checked: 52225e24f
+checked: '05009afda'
 ---
 
 This page covers what acorn uses when a feature writes text for you, such as a commit message or a SQL
