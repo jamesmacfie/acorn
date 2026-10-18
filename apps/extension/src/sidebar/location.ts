@@ -45,6 +45,8 @@ export function createLocation(options: {
   let restoring = false
   // The task the stored location named, until the Node's task list says whether it's still active.
   let restored: string | null = null
+  // The task the page belonged to when the panel last followed it.
+  let pageTask: string | null = null
 
   // Home and Settings leave the stored destination alone, so a selection added from the page's menu
   // still has a conversation to go to.
@@ -70,7 +72,8 @@ export function createLocation(options: {
   // The page beside the panel moved, or the Node's task list arrived. A stored task the list doesn't
   // have, archived while the panel was closed, gives way to Home. A page of a task opens that task,
   // unless Settings or a conversation is open: pages are often visited to capture them into the
-  // conversation. A page of no task leaves the panel where it is.
+  // conversation. A page of no task, reached from the page of the task the panel shows, goes Home.
+  // Any other page of no task leaves the panel where it is.
   const followPage = (taskId: string | null) => {
     if (restoring) return
     const list = tasks()
@@ -78,9 +81,13 @@ export function createLocation(options: {
       if (locationTask(location()) === restored && !list.some((task) => task.id === restored)) goHome()
       restored = null
     }
+    const left = pageTask
+    pageTask = taskId
     const here = location()
-    if (!taskId || here.level === 'settings' || here.level === 'conversation') return
-    if (here.level !== 'task' || here.taskId !== taskId) openTask(taskId)
+    if (here.level === 'settings' || here.level === 'conversation') return
+    if (!taskId) {
+      if (here.level === 'task' && here.taskId === left) goHome()
+    } else if (here.level !== 'task' || here.taskId !== taskId) openTask(taskId)
   }
 
   return {

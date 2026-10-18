@@ -565,7 +565,7 @@ describe('a handoff in the sidebar', () => {
     expect(root.querySelector<HTMLTextAreaElement>('textarea[name="input-focus"]')!.value).toBe('The retry loop')
   })
 
-  it('stays on the task, tab, or conversation it shows when the tab moves to a page no task holds', async () => {
+  it("goes Home from the page's task on any tab, but keeps a conversation, when the tab moves to a page no task holds", async () => {
     const { fake, root, state } = mount({ url: PAGE })
     state.pageTasks = [
       {
@@ -583,10 +583,10 @@ describe('a handoff in the sidebar', () => {
       await tab(root, label)
       fake.navigate('https://elsewhere.example/')
       await settle(30)
-      expect(shownTask(root)).toBe('Fix the flaky test')
-      expect(shownTab(root)).toBe(label)
+      expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
       fake.navigate(PAGE)
       await settle(30)
+      expect(shownTab(root)).toBe(label)
     }
     await openChat(root, 'Chat s2')
     fake.navigate('https://elsewhere.example/')

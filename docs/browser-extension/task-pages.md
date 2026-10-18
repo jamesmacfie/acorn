@@ -89,8 +89,10 @@ you were reading. When the page moves, by navigating or by switching tabs, the p
 rules in order (`followPage` in `apps/extension/src/sidebar/location.ts`):
 
 1. Bridge setup, pairing, and Settings never move.
-2. A page that belongs to no task leaves the panel where it is, so following a link from a pull
-   request keeps the task and tab you were on.
+2. A page that belongs to no task, reached from the page of the task the panel shows, goes Home, so
+   the panel doesn't keep showing a task the page has nothing to do with. Any other page that belongs
+   to no task leaves the panel where it is, such as one reached while showing a task you opened from
+   Home.
 3. An open conversation stays open, because pages are often visited to capture them into it. The
    strip under the top bar names the page's task, with **Switch**
    ([the strip under the bars](./navigation.md#the-strip-under-the-bars)).
