@@ -117,7 +117,7 @@ advertise its address, or be reached through an SSH tunnel, as
 
 The panel is always on **Home**, on one task with its panes as tabs, or in one conversation inside a
 task, with **Settings** beside them. [Sidebar navigation](./navigation.md) covers each level's top
-bar, the tabs under a task, **Back**, and the strip under the bars.
+bar, a task's rail, **Back**, and the strip under the bars.
 
 A state shows as a coloured dot beside a word, never colour alone: green for working or online, amber
 for waiting, red for failed or unreachable, and an empty ring for idle.

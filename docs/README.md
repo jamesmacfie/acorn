@@ -474,6 +474,24 @@ Each plugin landing page above has topic pages in a folder of the same name:
   picker](./future/extension-ux/13-context-picker.md), then [plugin reuse
   passes](./future/extension-ux/plugin-reuse.md).
 
+## Mobile web app proposal
+
+- [Build a mobile web app](./future/mobile/README.md), with phases for [the
+  gateway](./future/mobile/01-gateway.md), [the shell](./future/mobile/02-shell.md), [narrow
+  mode](./future/mobile/03-narrow-mode.md), [narrow layouts](./future/mobile/04-narrow-layouts.md),
+  [Needs you and the conversation](./future/mobile/05-needs-you.md), and [running on a
+  phone](./future/mobile/06-on-a-phone.md), then [later work](./future/mobile/later.md).
+
+## Node for other machines proposal
+
+- [Run a Node for clients on other machines](./future/node-tray/README.md), with phases for [the
+  device token in logs](./future/node-tray/01-token-out-of-logs.md), [terminal
+  pairing](./future/node-tray/02-terminal-pairing.md), [reachability](./future/node-tray/03-reachability.md),
+  [platform archives](./future/node-tray/04-platform-archives.md), [installing and running at
+  login](./future/node-tray/05-install-and-service.md), [tray mode](./future/node-tray/06-tray-mode.md),
+  [keeping the machine awake](./future/node-tray/07-keep-awake.md), and [acceptance on real
+  machines](./future/node-tray/08-acceptance.md).
+
 ## Lessons from OpenCode proposal
 
 - [Lessons from OpenCode](./future/opencode/README.md), with phases for [a tool result

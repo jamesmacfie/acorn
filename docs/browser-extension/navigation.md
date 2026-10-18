@@ -1,7 +1,7 @@
 # Sidebar navigation in the browser extension
 
 This page covers how the [browser extension](../browser-extension.md)'s sidebar is laid out: its
-three levels, the top bar at each, **Go to task**, the ⋯ menus, the tabs under a task, **Back**, and
+three levels, the top bar at each, **Go to task**, the ⋯ menus, a task's rail, **Back**, and
 the strip under the bars. How the panel follows the browser tab is in
 [moving between pages](./task-pages.md#moving-between-pages). The code is in
 `apps/extension/src/sidebar/location.ts`, which holds the level and the moves between levels,
@@ -49,7 +49,10 @@ the right holds the task's menu:
   the `tabs` permission, and reads the tabs again when one navigates or closes.
 - **Settings**.
 
-Under the bar, the kit's tab strip holds the task's panes:
+A rail along the bottom edge holds the task's panes. It's the desktop's pane rail laid on its side:
+square icon buttons with a divider after each, the open one striped on top, and each button's name in
+its tip. The rail stays under a conversation too, with the tab the conversation came from marked, so
+any pane is one click from the conversation. It holds:
 
 - **Agents**, always: the task's waiting requests, then its conversations under **Managed
   sessions**, with **New chat** in that header, then **Workflow runs** and **Inline chats** as closed

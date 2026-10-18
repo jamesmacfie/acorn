@@ -245,10 +245,11 @@ describe('the Tauri shell boots its world', () => {
     // bundle, and its whole boot to a bound listener. The line below logs the figure. Windows CI
     // runners take several times longer than a developer machine, so their bound is wider. Run this
     // separately from the unit suites and leave room for shared-runner variation while catching
-    // startup regressions.
+    // startup regressions. A macOS runner usually takes 650 to 1,200 ms, and a slow one takes twice
+    // that across every boot step (1,924 and 2,573 ms on 2026-10-18), so the bound is 3,000 ms.
     const elapsed = markOffsets.get('service.start')! - markOffsets.get('ready line')!
     console.log(`[boot-test] node started ${elapsed}ms after the ready line`)
-    expect(elapsed).toBeLessThan(process.platform === 'win32' ? 10_000 : 1_500)
+    expect(elapsed).toBeLessThan(process.platform === 'win32' ? 10_000 : 3_000)
   })
 
   it('adopts the local node into the fleet behind the ready line', async () => {

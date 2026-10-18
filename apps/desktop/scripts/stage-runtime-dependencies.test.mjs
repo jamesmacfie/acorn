@@ -66,10 +66,12 @@ it.each(targets)('keeps only node-pty assets for %s', (triple) => {
   for (const other of targets.map(runtimeTarget)) {
     if (other.triple !== triple) expect(existsSync(join(staged, `prebuilds/${other.platform}-${other.arch}`))).toBe(false)
   }
+  // Windows keeps no execute bit, so a Windows host can't check one, whichever target it stages.
+  const executable = (path) => process.platform === 'win32' || (statSync(path).mode & 0o111) !== 0
   if (chosen.platform === 'win32') {
     expect(existsSync(join(staged, prefix, 'conpty/conpty.dll'))).toBe(true)
-    expect(statSync(join(staged, prefix, 'winpty-agent.exe')).mode & 0o111).not.toBe(0)
-  } else if (chosen.platform === 'darwin') expect(statSync(join(staged, prefix, 'spawn-helper')).mode & 0o111).not.toBe(0)
+    expect(executable(join(staged, prefix, 'winpty-agent.exe'))).toBe(true)
+  } else if (chosen.platform === 'darwin') expect(executable(join(staged, prefix, 'spawn-helper'))).toBe(true)
 })
 
 it('rejects missing target assets and unreviewed node-pty layouts', () => {

@@ -17,6 +17,7 @@ import {
   openTask,
   shownTask,
   tab,
+  tabMarker,
   taskTabs,
 } from '../test/sidebarUi'
 import { reportResize } from '../test/sidebarSetup'
@@ -762,10 +763,7 @@ describe('home', () => {
 
   it("marks the Agents tab with the task's working agents, or the ones waiting, counted under an open conversation too", async () => {
     const subject = mount()
-    const marker = () =>
-      subject.root
-        .querySelector('[role="tablist"][aria-label="Task"] [role="tab"] [role="img"]')
-        ?.getAttribute('aria-label') ?? null
+    const marker = () => tabMarker(subject.root, 'Agents')
     subject.state.sessions[1]!.runtimeState = 'working'
     await settle()
     await openTask(subject.root, 'Fix it')

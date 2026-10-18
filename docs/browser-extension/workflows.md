@@ -43,7 +43,7 @@ starts, the card closes, and the panel opens the new task on its **Runs** tab, w
 
 ## The Runs tab
 
-A task shows **Runs** in its tab strip while the Node runs the workflows plugin, so a task with no run
+A task shows **Runs** on its rail while the Node runs the workflows plugin, so a task with no run
 yet still has one. A turning loader marks the tab while a run runs.
 
 The tab is the kit's `Section`, headed **Runs** with the count and **Run workflow** at its right. Each

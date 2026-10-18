@@ -5,6 +5,10 @@ Date: October 8, 2026. Status: standalone staging implemented; release delivery 
 Use this plan to turn the standalone Node archive into platform downloads and add the terminal client
 to desktop installations. [Node distribution](../node-distribution.md) owns the artifact and operator commands.
 
+On October 18, 2026, [Run a Node for clients on other machines](./node-tray/README.md) took over three
+sections of this page: platform archives, Windows operation support, and the installer. Follow its
+phases for that work. This page keeps the container image, terminal embedding, and macOS signing.
+
 ## Starting point
 
 `scripts/pack-node.mjs` stages the Node, migrations, CLI, TUI, and shared `apps/cli/bin/acorn.mjs`

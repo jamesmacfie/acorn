@@ -6,7 +6,8 @@ import { Heading, Log, Text } from '@acorn/client-core/kit/components/content'
 import { IconButton } from '@acorn/client-core/kit/components/inputs'
 import CopyButton from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
-import { Inline, Section, Stack, type TabDef } from '@acorn/client-core/kit/components/layout'
+import type { RailMarker } from '@acorn/client-core/features/tabs'
+import { Inline, Section, Stack } from '@acorn/client-core/kit/components/layout'
 import { Badge, Row } from '@acorn/client-core/kit/components/primitives.tsx'
 import { taskPaneLink } from '../acornLinks'
 import { OpenInAcorn } from './OpenInAcorn'
@@ -32,8 +33,10 @@ const headerOf = (view: BrowserPanelView | null | undefined): StatusBlock | unde
 }
 
 // The panel's tab marker: the header's icon, while the header says something is wrong.
-export const panelMarker = (view: BrowserPanelView | null | undefined): TabDef['marker'] =>
-  headerOf(view)?.severity === 'danger' ? { ...SEVERITY.danger, label: 'Needs attention' } : undefined
+export const panelMarker = (view: BrowserPanelView | null | undefined): RailMarker[] | undefined =>
+  headerOf(view)?.severity === 'danger'
+    ? [{ id: 'danger', icon: SEVERITY.danger.icon, tone: 'danger', label: 'Needs attention', placements: ['top-end'] }]
+    : undefined
 
 // Only a web address that answers opens in a tab. Anything else, such as a database address, is copied.
 const opens = (link: { url: string; ready?: boolean }) =>

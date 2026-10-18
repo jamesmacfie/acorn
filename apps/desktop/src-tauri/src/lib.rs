@@ -31,7 +31,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
-use app_scheme::{Source, APP_ORIGIN, APP_SCHEME};
+use app_scheme::{Source, APP_ORIGIN, APP_SCHEME, MAPPED_SCHEMES};
 use commands::Shell;
 use helper::{Handshake, Helper, Launch, Signal};
 use plugin_scheme::{Frames, PLUGIN_SCHEME};
@@ -357,7 +357,7 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
                 env_files: env_files(app, &data_dir, packaged)?,
                 version: app.package_info().version.to_string(),
                 is_packaged: packaged,
-                app_origin: renderer_origin(cfg!(windows) || cfg!(target_os = "android")).to_string(),
+                app_origin: renderer_origin(MAPPED_SCHEMES).to_string(),
             },
         },
         move |signal| match signal {
@@ -498,11 +498,11 @@ fn open_reset_window(app: &tauri::AppHandle, fixture: bool) -> tauri::Result<()>
 }
 
 fn is_renderer_url(url: &tauri::Url) -> bool {
-    is_renderer_url_for(url, cfg!(windows) || cfg!(target_os = "android"))
+    is_renderer_url_for(url, MAPPED_SCHEMES)
 }
 
 fn renderer_origin(mapped_schemes: bool) -> &'static str {
-    if mapped_schemes { "http://app.localhost" } else { APP_ORIGIN }
+    if mapped_schemes { "http://app.localhost" } else { app_scheme::app_origin(false) }
 }
 
 fn is_renderer_url_for(url: &tauri::Url, mapped_schemes: bool) -> bool {
@@ -512,7 +512,7 @@ fn is_renderer_url_for(url: &tauri::Url, mapped_schemes: bool) -> bool {
 }
 
 fn is_plugin_url(url: &tauri::Url) -> bool {
-    is_plugin_url_for(url, cfg!(windows) || cfg!(target_os = "android"))
+    is_plugin_url_for(url, MAPPED_SCHEMES)
 }
 
 fn is_plugin_url_for(url: &tauri::Url, mapped_schemes: bool) -> bool {
@@ -585,14 +585,18 @@ fn show_recovery(app: &tauri::AppHandle, reason: Option<&str>) {
 mod tests {
     use super::*;
 
-    /// Wry maps the app scheme to HTTP on Windows. The helper must check the browser's origin.
+    /// Wry maps the app scheme to HTTP on Windows. The URL the window opens, after that mapping, must
+    /// be the origin the navigation guard and the helper check, or the guard blocks the first load.
     #[test]
     fn the_window_url_is_the_origin_the_helper_checks() {
-        assert!(format!("{APP_ORIGIN}/").starts_with(APP_ORIGIN));
-        assert_eq!(APP_ORIGIN, "app://acorn");
-        assert_eq!(renderer_origin(false), APP_ORIGIN);
-        assert_eq!(renderer_origin(true), "http://app.localhost");
-        assert!(is_renderer_url_for(&renderer_origin(true).parse().unwrap(), true));
+        for mapped in [false, true] {
+            let window = format!("{}/", app_scheme::app_origin(mapped));
+            // Wry's own rewrite: custom_protocol_workaround::apply_uri_work_around.
+            let loaded = if mapped { window.replace("app://", "http://app.") } else { window };
+            assert!(loaded.starts_with(renderer_origin(mapped)), "{loaded}");
+            assert!(is_renderer_url_for(&loaded.parse().unwrap(), mapped), "{loaded}");
+        }
+        assert_eq!(APP_ORIGIN, app_scheme::app_origin(MAPPED_SCHEMES));
     }
 
     #[test]

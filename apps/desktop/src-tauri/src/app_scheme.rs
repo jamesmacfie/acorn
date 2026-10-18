@@ -9,10 +9,24 @@ use crate::plugin_scheme::PLUGIN_SCHEME;
 // protocol handler", for every directive below and the dev-only widening.
 
 pub const APP_SCHEME: &str = "app";
-pub const APP_ORIGIN: &str = "app://acorn";
+
+/// Wry can't load a custom scheme on Windows or Android, so there it rewrites `app://<host>` to
+/// `http://app.<host>`. Only a `localhost` host keeps that page a secure context, so those platforms
+/// serve the renderer from `app://localhost`, which the page sees as `http://app.localhost`.
+pub const MAPPED_SCHEMES: bool = cfg!(windows) || cfg!(target_os = "android");
+pub const APP_ORIGIN: &str = app_origin(MAPPED_SCHEMES);
+
+pub const fn app_origin(mapped_schemes: bool) -> &'static str {
+    if mapped_schemes { "app://localhost" } else { "app://acorn" }
+}
 
 pub fn is_app_authority(uri: &Uri) -> bool {
-    uri.scheme_str() == Some(APP_SCHEME) && uri.authority().is_some_and(|authority| authority.as_str() == "acorn")
+    is_app_authority_for(uri, MAPPED_SCHEMES)
+}
+
+fn is_app_authority_for(uri: &Uri, mapped_schemes: bool) -> bool {
+    uri.scheme_str() == Some(APP_SCHEME)
+        && uri.authority().is_some_and(|authority| format!("{APP_SCHEME}://{authority}") == app_origin(mapped_schemes))
 }
 
 /// See docs/shell.md, "The syntax-highlighter worker's separate policy", for why this matches only
@@ -355,15 +369,19 @@ mod tests {
 
     #[test]
     fn only_the_exact_renderer_authority_is_served() {
-        for (url, allowed) in [
-            ("app://acorn/index.html", true),
-            ("app://acorn.evil/index.html", false),
-            ("app://acorn:123/index.html", false),
-            ("app://evil@acorn/index.html", false),
-            ("app-plugin://acorn/index.html", false),
+        for (url, native, mapped) in [
+            ("app://acorn/index.html", true, false),
+            ("app://localhost/index.html", false, true),
+            ("app://acorn.evil/index.html", false, false),
+            ("app://localhost.evil/index.html", false, false),
+            ("app://acorn:123/index.html", false, false),
+            ("app://evil@acorn/index.html", false, false),
+            ("app-plugin://acorn/index.html", false, false),
+            ("app-plugin://localhost/index.html", false, false),
         ] {
             let uri: Uri = url.parse().unwrap();
-            assert_eq!(is_app_authority(&uri), allowed, "{url}");
+            assert_eq!(is_app_authority_for(&uri, false), native, "{url}");
+            assert_eq!(is_app_authority_for(&uri, true), mapped, "{url}");
         }
     }
 
@@ -371,7 +389,7 @@ mod tests {
     fn a_plugin_worker_can_never_be_served_from_the_renderer_origin() {
         const HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
         let request = Request::builder()
-            .uri(format!("app://acorn/plugin-worker/{HASH}.js"))
+            .uri(format!("{APP_ORIGIN}/plugin-worker/{HASH}.js"))
             .body(Vec::new())
             .unwrap();
         let response = serve(&Source::Files(PathBuf::from("/nowhere")), 51234, &request);
@@ -402,7 +420,7 @@ mod tests {
         std::fs::write(root.join("index.html"), b"<!doctype html>").unwrap();
 
         let cache_of = |source: &Source, path: &str| -> String {
-            let request = Request::builder().uri(format!("app://acorn{path}")).body(Vec::new()).unwrap();
+            let request = Request::builder().uri(format!("{APP_ORIGIN}{path}")).body(Vec::new()).unwrap();
             let response = serve(source, 51234, &request);
             response.headers().get("cache-control").unwrap().to_str().unwrap().to_string()
         };
@@ -456,7 +474,7 @@ mod tests {
             );
         });
 
-        let request = Request::builder().uri("app://acorn/@fs/plugins/preview/src/client/PreviewTaskPane.tsx").body(Vec::new()).unwrap();
+        let request = Request::builder().uri(format!("{APP_ORIGIN}/@fs/plugins/preview/src/client/PreviewTaskPane.tsx")).body(Vec::new()).unwrap();
         let response = serve(&Source::DevServer(origin), 51234, &request);
         assert_eq!(response.status(), 504);
         assert_eq!(response.body(), b"Outdated Optimize\n");
@@ -471,7 +489,7 @@ mod tests {
     fn an_absent_dev_server_is_the_one_case_that_is_a_502() {
         // Bound and dropped, so the port is closed rather than merely quiet.
         let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
-        let request = Request::builder().uri("app://acorn/index.html").body(Vec::new()).unwrap();
+        let request = Request::builder().uri(format!("{APP_ORIGIN}/index.html")).body(Vec::new()).unwrap();
         let response = serve(&Source::DevServer(format!("http://127.0.0.1:{port}")), 51234, &request);
         assert_eq!(response.status(), 502);
     }
