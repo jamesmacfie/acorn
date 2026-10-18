@@ -4,7 +4,7 @@ setlocal
 
 rem Without it, acorn falls back to the desktop app's data root, which this Node must not share.
 if not defined ACORN_DATA_DIR (
-  echo acorn: set ACORN_DATA_DIR to a folder for the Node's data, for example set ACORN_DATA_DIR=%%LOCALAPPDATA%%\acorn-node. The archive's README.md covers installing. 1>&2
+  echo acorn: run this archive's install.ps1, which gives the acorn command a data folder, or set ACORN_DATA_DIR to a folder for the Node's data. 1>&2
   exit /b 1
 )
 

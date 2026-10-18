@@ -110,6 +110,7 @@ export function validateCommand(args: ParsedArgs): void {
       pair: { count: 2, options: ['close'] },
       devices: { count: 2 },
       revoke: { count: 3, options: ['force'] },
+      service: { count: 3 },
     },
     workspace: {
       list: { count: 2 },
@@ -168,6 +169,8 @@ export function validateCommand(args: ParsedArgs): void {
     )
   if (subject === 'workspace' && verb === 'external-projects' && !['list', 'replace'].includes(id ?? ''))
     throw new CliError('usage', 'workspace external-projects needs list or replace.', 2)
+  if (subject === 'node' && verb === 'service' && !['install', 'uninstall', 'status'].includes(id ?? ''))
+    throw new CliError('usage', 'node service needs install, uninstall, or status.', 2)
   if (subject === 'project' && verb === 'config' && !['show', 'set'].includes(id ?? ''))
     throw new CliError('usage', 'project config needs show or set.', 2)
   if (subject === 'workspace' && verb === 'external-projects' && id === 'replace' && !args.options.file)

@@ -13,6 +13,7 @@ import {
 } from './supervision/lifecycle'
 import { pluginCommandHelp } from './pluginCommands'
 import { hostTargets, installNativeHost, nativeHostStatus, uninstallNativeHost } from './browser/hostInstall'
+import { installNodeService, nodeServiceRegistration, uninstallNodeService } from './supervision/service'
 
 // The native host is its own bundle entry beside this one, so the browser never loads the CLI.
 const nativeHostEntry = fileURLToPath(new URL('./native-host.js', import.meta.url))
@@ -60,6 +61,18 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
               ? await restartNodeService()
               : await stopNodeService(args.options.force === 'true')
       writeOutput(result, args)
+      return 0
+    }
+    if (args.positionals[0] === 'node' && verb === 'service') {
+      const action = args.positionals[2]
+      writeOutput(
+        await (action === 'install'
+          ? installNodeService()
+          : action === 'uninstall'
+            ? uninstallNodeService()
+            : nodeServiceRegistration()),
+        args,
+      )
       return 0
     }
     if (args.positionals[0] === 'browser') {

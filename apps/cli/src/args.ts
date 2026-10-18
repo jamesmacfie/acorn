@@ -148,6 +148,7 @@ export function helpFor(positionals: string[]): string {
                         'node stop [--force]|restart',
                         'node pair [--close]|devices|revoke ID [--force]',
                         'node reach [HOST...|--private] (restarts a Node this CLI started)',
+                        'node service install|uninstall|status (start the installed Node at login)',
                         'stop and restart drain the Node; pair, devices, and revoke also take --node',
                       ]
                     : section === 'browser'
@@ -157,7 +158,7 @@ export function helpFor(positionals: string[]): string {
                           'uninstall removes the registrations and keeps pairings; status names the folder that holds them',
                         ]
                       : [
-                          'node info|start|status|stop|restart|pair|devices|revoke|reach',
+                          'node info|start|status|stop|restart|pair|devices|revoke|reach|service',
                           'workspace list|show|create|rename|remove|external-projects',
                           'project list|show|add|rename|move|hide|unhide|detect|remove|config',
                           'task list|show|create|scripts status|scripts wait|scripts logs',

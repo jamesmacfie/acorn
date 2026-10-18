@@ -125,24 +125,26 @@ target machine needs no Node.js, npm, or compiler.
 bin/acorn, bin/acorn.cmd   launchers that run lib/bin/acorn.mjs on runtime/node
 runtime/                   the Node.js release node-runtime.json pins, with its LICENSE
 lib/                       the tarball's tree, with npm ci --omit=dev and the prune step already run
-README.md, BUILD           how to check and start it; version, commit, build time, and platform
+install.sh                 the installer, install.ps1 on Windows (node-distribution/install.md)
+README.md, BUILD           how to check and install it; version, commit, build time, and platform
 ```
 
-The launchers refuse to run without `ACORN_DATA_DIR`, because the CLI would otherwise fall back to the
-desktop's data root. `.github/workflows/build-node.yml` builds macOS arm64 and x64, Linux x64 and arm64,
-and Windows x64 on `v*` tags and manual dispatches, each on its own platform. Each job extracts its
-archive outside the checkout with a bare environment, then runs `scripts/node-archive/smoke.mjs`: help,
-a node-pty terminal, `node start`, `node status`, `node pair`, `node stop`, and a log search for device
-tokens. The run keeps each archive as a 14-day artifact, and nothing publishes it.
+`.github/workflows/build-node.yml` builds macOS arm64 and x64, Linux x64 and arm64, and Windows x64 on
+`v*` tags and manual dispatches, each on its own platform. Each job extracts its archive outside the
+checkout with a bare environment, then runs `scripts/node-archive/smoke.mjs`: help, a node-pty
+terminal, `node start`, `node status`, `node pair`, `node stop`, a log search for device tokens, and an
+install and uninstall where the runner isn't root or an administrator. The run keeps each archive as a
+14-day artifact, and nothing publishes it.
 
 The Linux archives build node-pty in a Debian 11 container, so they need glibc 2.31 or later: Ubuntu
-22.04, Debian 11, Raspberry Pi OS 11, or later. musl distributions such as Alpine can't run them. A
-browser download on macOS needs `xattr -dr com.apple.quarantine <folder>` before Gatekeeper loads the
-unsigned `pty.node`, and the archive's README says so.
+22.04, Debian 11, Raspberry Pi OS 11, or later. musl distributions such as Alpine can't run them. On
+macOS, Gatekeeper refuses the unsigned `pty.node` from a browser download until the installer clears
+the quarantine mark from its copy.
 
 ## Install and start
 
-These steps install the platform-neutral tarball on a machine with its own Node.js.
+A platform archive installs with its own installer ([install a Node from an archive](./node-distribution/install.md)).
+These steps install the platform-neutral tarball on a machine with its own Node.js instead.
 
 ```sh
 tar -xzf acorn-node-*.tar.gz
@@ -191,7 +193,8 @@ and the Node warns about it at boot ([Node keys](./security/credentials.md#node-
 ## Operations
 
 Use a dedicated mode-`0700` data root, and only one process may hold it. The `0700` and `0600` modes are
-POSIX permissions. On Windows they're advisory, so restrict the data root with an NTFS ACL. Run
-`acorn node stop`, or send SIGTERM on macOS and Linux, for a graceful drain: open task script waits abort, the listener closes, plugins dispose, SQLite closes,
-and the lock releases, within a 30-second deadline. A setup script that was waiting to start is recorded
-as interrupted by `shutdown`.
+POSIX permissions. On Windows they're advisory, so the archive installer gives the data root an access
+list for its user and SYSTEM alone, with inherited entries removed. Run `acorn node stop`, or send
+SIGTERM on macOS and Linux, for a graceful drain: open task script waits abort, the listener closes,
+plugins dispose, SQLite closes, and the lock releases, within a 30-second deadline. A setup script that
+was waiting to start is recorded as interrupted by `shutdown`.

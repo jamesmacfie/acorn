@@ -60,12 +60,11 @@ running task continues. Record how the installer establishes and checks director
 
 ## Add the installer
 
-Select an archive from the host's operating system and architecture, verify its checksum, and install
-into a user-selected location. Provide a separate Windows path. Expose the shared `acorn` command
-and document removal and upgrades. Keep systemd and launchd setup as documented recipes.
-
-Acceptance: install and upgrade from a clean profile without a checkout, compiler, or separately
-installed Node. Failed download or verification must leave the working installation usable.
+Each archive carries `install.sh` or `install.ps1`, which installs it for one user, registers it with
+launchd, systemd, or a scheduled task through `acorn node service install`, upgrades in place, and
+removes it ([install a Node from an archive](../node-distribution/install.md)). The installers act on an
+extracted archive. Downloading and checking the checksum stay with the person, as the archive's README
+describes.
 
 ## Embed the terminal client in the desktop
 

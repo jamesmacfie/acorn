@@ -1,7 +1,7 @@
 # The local service
 
 This page covers the CLI commands that run and administer a Node on this machine: `node start`,
-`status`, `stop`, `restart`, `pair`, `devices`, `revoke`, and `reach`. It's part of the
+`status`, `stop`, `restart`, `pair`, `devices`, `revoke`, `reach`, and `service`. It's part of the
 [command-line client](../cli.md). The service code is in `apps/cli/src/supervision/`.
 
 ## Start, check, and stop
@@ -36,6 +36,26 @@ The command forwards SIGTERM and SIGINT to the Node and exits with the Node's ex
 a repeated signal as the same stop, so a terminal or systemd that also signals it directly can't cut its
 drain short. A crash is the service manager's to restart. Like `--background`, it drops
 `ACORN_ADVERTISE_HOST` from the Node's environment, so choose the hosts with `acorn node reach` instead.
+
+## Start at login
+
+```sh
+acorn node service install
+acorn node service status
+acorn node service uninstall
+```
+
+`install` registers the installed Node with launchd, a systemd user unit, or a Windows scheduled task,
+and starts it through that definition. It runs the shim an archive installer writes, and refuses when
+the shim is missing. The definition records the `PATH`, `ACORN_DATA_DIR`, `HOME`, and `XDG_CONFIG_HOME`
+of the shell that runs `install`, so run it again after installing a harness somewhere new. It stops a
+Node this CLI started first, so the service's launcher owns the Node, and waits up to two minutes for
+the Node to answer. Its `problem` says when neither `claude` nor `codex` is on that `PATH`, when Linux
+refused lingering, or when the Node didn't start.
+
+`uninstall` stops the Node and removes the definition. `status` answers a `NodeServiceRegistration`
+with the manager, the file, whether the manager has it loaded, and whether the Node is running. Each
+platform's file is in [install a Node from an archive](../node-distribution/install.md#start-at-login).
 
 ## Stop and restart
 

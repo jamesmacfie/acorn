@@ -1,7 +1,91 @@
 # Phase 5: install, run at login, upgrade, and remove
 
-Date: October 18, 2026. Status: proposed. Depends on [phase 2](./02-terminal-pairing.md) and
-[phase 4](./04-platform-archives.md).
+Date: October 18, 2026. Status: done on macOS, with the Linux and Windows paths unproven until phase 8.
+Depends on [phase 2](./02-terminal-pairing.md) and [phase 4](./04-platform-archives.md).
+
+## Completion note
+
+Landed on October 18, 2026, on the `phase-5-install-and-service` branch.
+
+What landed:
+
+- `scripts/node-archive/install.sh` and `install.ps1`, copied into each archive by `packPlatformArchive`.
+  They run the nine steps below, plus `--uninstall` and `--purge`. The shim at `~/.local/bin/acorn`, or
+  `<root>\bin\acorn.cmd`, defaults `ACORN_DATA_DIR` to `<root>/node` and runs `<root>/current/bin/acorn`.
+- `acorn node service install|uninstall|status` in `apps/cli/src/supervision/service.ts`. It renders a
+  LaunchAgent, a systemd user unit, or a scheduled task's XML and script, and loads it. `status` answers a
+  `NodeServiceRegistration` with the manager, the file, `loaded`, `running`, and `problem`.
+- The launchers keep refusing a missing `ACORN_DATA_DIR`, and the message names the installer.
+- `smoke.mjs` installs the archive into its temporary home, starts the Node from the shim, checks the
+  default data root, and uninstalls. It registers a real LaunchAgent only when `GITHUB_ACTIONS` is set on
+  macOS, and skips the installer where it runs as root or an elevated administrator.
+- Docs: [install a Node from an archive](../../node-distribution/install.md) (new), "Install and start",
+  "Archives", and "Operations" in [Node distribution](../../node-distribution.md),
+  [the local service](../../cli/local-service.md#start-at-login), [the CLI](../../cli.md), the archive's
+  README, the bundle plan's installer section cut to a pointer, and two site pages.
+- Tests: `apps/cli/src/supervision/service.test.ts` compares each platform's file with a fixture.
+  `install.test.ts` runs `install.sh` against a fake archive: the root refusal, the desktop warning and
+  `--force`, the shim's default and override, an upgrade that keeps one earlier version, and an uninstall
+  that keeps the data.
+
+Checked on this Mac: the `darwin-arm64` archive passes the smoke test with the installer steps. With a
+stand-in `launchctl` that runs the plist's job, `install.sh --service` started the Node through the
+LaunchAgent, `plutil -lint` passed the plist, a second install stopped the Node and restarted it through
+the service on the same port, `acorn node pair` opened a code, and `--uninstall` left only the data root.
+The real `~/Library` was never touched.
+
+Decisions and deviations:
+
+- The default data root lives in the shim, as this page says, not in the launchers as phase 4's note
+  suggested. An archive that isn't installed still refuses to run without `ACORN_DATA_DIR`, so it never
+  falls back to the desktop's data root.
+- The service records `HOME` and `XDG_CONFIG_HOME` as well as `PATH` and `ACORN_DATA_DIR`. The CLI under
+  the service keeps the Node's token in the custody folder those name, and `acorn node pair` from the
+  person's shell must find the same one.
+- `service install` stops a Node the CLI started, so the service's launcher owns the Node, then waits up
+  to two minutes for the Node to answer. Running it again is how an upgrade restarts the Node through the
+  service and refreshes the `PATH`.
+- The LaunchAgent adds `ExitTimeOut` 45, because launchd kills a job 20 seconds after SIGTERM by default,
+  inside the 30-second drain. It writes the launcher's own errors to `<root>/logs/launcher.log`.
+- The Windows task comes from XML, because `schtasks /SC ONLOGON` skips a start on battery and stops a
+  task after three days. A batch script sets the environment, because a task can't. It uses
+  `chcp 65001` so a non-ASCII path survives.
+- The Windows log is the CLI's service log, which `acorn node status` names, not `<root>\logs\node.log`,
+  because `--log` needs `--foreground`.
+- The installer asks about the service only when none is registered. With no terminal and no flag, it
+  answers no. A fresh install without the service doesn't start the Node, and the next steps say how.
+- The installer doesn't run `acorn node reach`. It can't know the host, so it prints the command. No
+  definition sets `ACORN_ADVERTISE_HOST`, as phase 3 decided.
+- Unix has no `PATH` entry to remove. The installer prints the line to add when `~/.local/bin` is missing.
+- The smoke test can run the installer only on the macOS jobs, because the Linux container runs as root
+  and GitHub's Windows runner is elevated.
+- `NodeServiceRegistration` isn't in the resource schema, like `BrowserHost`.
+
+Verify before building, as answered:
+
+- `windowsHide`: no change. libuv starts a detached child with `DETACHED_PROCESS`, so the Node gets no
+  console window of its own, and `CREATE_NO_WINDOW` is ignored alongside it. Whether the Node's own
+  console children flash windows is for phase 8.
+- `--foreground` in a scheduled task keeps a console window open for the Node's whole life, so the task
+  uses `--background` and Windows gets no restart after a crash.
+- `loginctl enable-linger` without `sudo` and App Nap under the default `ProcessType` weren't checked.
+  The first is reported with the `sudo` command when refused.
+
+What only CI or phase 8 can prove:
+
+- Every Linux and Windows path: `install.ps1` as a whole, the junction, `icacls`, the user `PATH` edit,
+  `schtasks` creating a logon task without elevation, systemd, and lingering over SSH. Neither PowerShell
+  nor Linux was available here, and CI's smoke skips the installer on both.
+- A real LaunchAgent: the first macOS dispatch registers one on the runner. If the runner has no GUI
+  domain, drop the `--service` run from `smoke.mjs`.
+- Reboot, upgrade between two builds, and pairing from another machine.
+
+For later phases:
+
+- Phase 8: run the acceptance list below on each platform, plus the open checks above. Install with
+  `--service` and `-Service`, reboot, and run `acorn node service status`.
+- Phase 6: a desktop and an installed archive on one machine is refused unless `--force`, so tray mode
+  doesn't need to handle a second Node.
 
 ## Goal
 

@@ -27,7 +27,7 @@
 //
 // `--platform <os>-<arch>` writes a self-contained archive for this machine's platform instead: the
 // tree above under lib/ with its dependencies installed and pruned, the pinned Node.js runtime under
-// runtime/, and the launchers and README from scripts/node-archive/. The runner's own Node only
+// runtime/, and the launchers, installer, and README from scripts/node-archive/. The runner's own Node only
 // installs packages. CI builds one per platform (.github/workflows/build-node.yml), on that platform,
 // because node-pty takes a prebuild on macOS and Windows and compiles on Linux.
 //
@@ -326,6 +326,9 @@ async function packPlatformArchive(tree) {
   chmodSync(join(root, 'bin/acorn'), 0o755)
   cpSync(join(launchers, 'acorn.cmd'), join(root, 'bin/acorn.cmd'))
   cpSync(join(launchers, 'README.md'), join(root, 'README.md'))
+  const installer = windows ? 'install.ps1' : 'install.sh'
+  cpSync(join(launchers, installer), join(root, installer))
+  if (!windows) chmodSync(join(root, installer), 0o755)
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim()
   writeFileSync(
     join(root, 'BUILD'),

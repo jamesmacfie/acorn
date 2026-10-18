@@ -450,6 +450,7 @@ describe('architecture boundaries', () => {
       'packages/custody/src/local/launch.ts', // starts a standalone Node on launcher pipes for the two below
       'apps/tui/src/node/supervise.ts', // `acorn` supervising the node it started, when it started one
       'apps/cli/src/supervision/lifecycle.ts', // explicit background Node lifecycle commands
+      'apps/cli/src/supervision/service.ts', // launchctl, systemctl, loginctl, and schtasks for `acorn node service`
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/server/terminal.ts', // PTYs
       'plugins/agents/src/server/drivers/jsonRpcProcess.ts', // child stream types for JSON-RPC

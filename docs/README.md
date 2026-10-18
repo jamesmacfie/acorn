@@ -219,6 +219,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [browser-extension/notifications.md](./browser-extension/notifications.md) | The extension's toolbar badge, waiting list, and opt-in OS notifications for requests agents are waiting on, and the `requests.pending` operation. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball, the self-contained platform archives, and how a Node boots without a desktop. |
 | [node-distribution/dependency-security.md](./node-distribution/dependency-security.md) | How the standalone Node's runtime dependencies are pinned, audited, and locked. |
+| [node-distribution/install.md](./node-distribution/install.md) | The archive installers, where they put the Node, starting it at login with `acorn node service`, upgrades, and removal. |
 | [node-distribution/reaching.md](./node-distribution/reaching.md) | How a person chooses the addresses a Node answers other machines on, and why the port stays fixed. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
 

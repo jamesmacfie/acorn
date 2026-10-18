@@ -4,6 +4,7 @@ description: Run acorn's Node without the desktop app, on a server or another ma
 sources:
   - docs/node-distribution.md
   - docs/node-distribution/reaching.md
+  - docs/node-distribution/install.md
   - docs/cli/local-service.md
   - apps/node/src/entries/standalone.ts
   - apps/node/src/composition/plugins.ts
@@ -24,22 +25,31 @@ service, and what it can do.
 A packaging run of acorn's GitHub Actions builds a self-contained archive for macOS arm64 and x64, Linux
 x64 and arm64, and Windows x64. It carries its own Node.js and every dependency, so the machine needs no
 Node.js or build tools. Download `acorn-node-<platform>` from the run's artifacts, then check, extract,
-and start it:
+and install it, as yourself rather than as root:
 
 ```sh
 shasum -a 256 -c acorn-node-*.tar.gz.sha256
 tar -xzf acorn-node-*.tar.gz
-cd acorn-node-*/
-export ACORN_DATA_DIR="$HOME/.acorn-node"
-bin/acorn node start --background
-bin/acorn node pair
+acorn-node-*/install.sh
 ```
 
-`bin/acorn` refuses to run without `ACORN_DATA_DIR`. On Windows, extract the zip and run
-`bin\acorn.cmd`. On Linux, the archive needs glibc 2.31 or later, which Ubuntu 22.04, Debian 11, and
-Raspberry Pi OS 11 have. If a browser downloaded it on macOS, run
-`xattr -dr com.apple.quarantine <folder>` on the extracted folder first. The archive's `README.md`
-covers the rest, and the run keeps it for 14 days.
+The installer copies the Node into your user's application data folder, puts an `acorn` command in
+`~/.local/bin`, keeps the Node's data in a private folder beside it, and asks whether to start the Node
+when you log in. It stops if the desktop app already runs a Node on this machine, because one machine
+runs one Node. On Windows, extract the zip, then run
+`powershell -ExecutionPolicy Bypass -File install.ps1` in its folder, from a PowerShell window that
+isn't elevated. Then start the Node, unless it already starts at login, and pair:
+
+```sh
+acorn node start --background
+acorn node pair
+```
+
+On Linux, the archive needs glibc 2.31 or later, which Ubuntu 22.04, Debian 11, and Raspberry Pi OS 11
+have. The archive's `README.md` covers the rest, and the run keeps it for 14 days.
+
+To upgrade, extract a newer archive and run its installer. The Node keeps its data and its paired
+devices. `install.sh --uninstall`, or `install.ps1 -Uninstall`, removes acorn and keeps the Node's data.
 
 ### From the tarball
 
@@ -92,7 +102,8 @@ A standalone Node reads its settings from the environment. These are the ones yo
 [Environment variables](/docs/reference/environment-variables/#the-node) lists every one.
 
 The data folder should be readable only by the user the Node runs as. Only one Node can use a folder
-at a time. On Windows, file modes don't protect it, so restrict the folder's access in its properties.
+at a time. On Windows, file modes don't protect it. The installer restricts its folder to you, so
+restrict a folder you choose yourself in its properties.
 
 ## Start and stop it from the command line
 
@@ -128,7 +139,19 @@ Node's address, its identity, and a pairing code. `node devices` lists the paire
 
 ## Run it as a service
 
-To keep a Node running on a server, start it from a service manager. With no terminal, the Node
+An installed archive registers itself with `acorn node service install`, which is what the installer
+runs when you ask it to start the Node at login. On macOS a LaunchAgent starts the Node when you log in,
+and on Linux a systemd user service starts it at boot. Both restart it after a crash. On Windows a
+scheduled task starts it when you sign in, but nothing restarts it after a crash. A Mac starts it only
+once someone logs in. On Linux the service keeps running after you log out. If Linux refuses that, the
+command prints the `sudo loginctl enable-linger` line to run.
+
+- `acorn node service status` says whether the service is registered and the Node is running.
+- `acorn node service uninstall` stops the Node and removes the service.
+- The service keeps the `PATH` it was installed with. After you install Claude Code or Codex
+  somewhere new, run `acorn node service install` again.
+
+For a Node from the tarball, start it from a service manager yourself. With no terminal, the Node
 asks no question, so set `ACORN_ADVERTISE_HOST` if other machines should reach it. Open the port in the
 machine's firewall too. A systemd unit looks
 like this:

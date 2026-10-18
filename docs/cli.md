@@ -16,7 +16,7 @@ source is `apps/cli/src/`, and `apps/cli/src/args.ts` holds the parser and the h
 | [Workspaces, projects, and tasks](./cli/workspaces-projects-tasks.md) | Core writes, request IDs, stdin piping, and task script reads |
 | [Agents and workflows](./cli/agents-and-workflows.md) | Managed agent sessions, workflow runs, and the merged run list |
 | [Plugin commands](./cli/plugin-commands.md) | Discovering and invoking a plugin's CLI commands |
-| [The local service](./cli/local-service.md) | `node start`, `status`, `stop`, `restart`, `pair`, `devices`, `revoke`, and `reach` |
+| [The local service](./cli/local-service.md) | `node start`, `status`, `stop`, `restart`, `pair`, `devices`, `revoke`, `reach`, and `service` |
 | [The browser host](./cli/browser-host.md) | `browser install`, `status`, and `uninstall` for the browser extension |
 
 ## Choosing a Node
@@ -41,6 +41,7 @@ the prompt.
 ```text
 acorn node start --background|--foreground [--log FILE]|status|stop [--force]|restart
 acorn node reach [HOST...|--private]
+acorn node service install|uninstall|status
 acorn [--node NODE] node info|pair [--close]|devices|revoke ID [--force]
 acorn [--node NODE] workspace list|show ID|create --name NAME|rename ID --name NAME|remove ID
 acorn [--node NODE] workspace external-projects list ID|replace ID --file FILE|-
