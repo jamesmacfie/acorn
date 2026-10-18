@@ -468,10 +468,11 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
         <Alert>{error()}</Alert>
       </Show>
       <Show when={servicesOff()}>{(reason) => <Alert tone="muted">{reason()}</Alert>}</Show>
-      <Show when={ready() || oversizedText() !== undefined}>
+      {/* Only for a document too large to open: its text has no other way out of the pane. */}
+      <Show when={oversizedText() !== undefined}>
         <Button
           onPress={() => {
-            const text = custody?.current.toString() ?? oversizedText()
+            const text = oversizedText()
             if (disposed || text === undefined) return
             void saveFile({
               bytes: new TextEncoder().encode(text),
