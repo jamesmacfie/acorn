@@ -67,7 +67,7 @@ const result = (rows: NodePluginRow[], decision?: 'accepted' | 'rejected', reach
 }
 
 describe('contribution availability', () => {
-  it('requires an observed, reachable, active node service for compiled contributions', () => {
+  it('requires an observed, active node service for compiled contributions', () => {
     // Built-in node plugins have a roster outcome but no installed client declaration. A failed
     // disk package with the same id can leave that built-in serving, so both forms must pass.
     const compiled = active({ active: null, installed: undefined })
@@ -99,7 +99,27 @@ describe('contribution availability', () => {
     ]) {
       expect(nodePluginServiceAvailable(result(rows), 'a', 'reports')).toBe(false)
     }
-    expect(nodePluginServiceAvailable(result([active()], 'accepted', false), 'a', 'reports')).toBe(false)
+  })
+
+  it('keeps the last roster for compiled contributions while the node is unreachable', () => {
+    // A connection blip marks the roster stale. Compiled panes and rail sources stay on that last
+    // answer rather than vanishing until the node is read again. Loaded UI still waits.
+    expect(nodePluginServiceAvailable(result([active()], 'accepted', false), 'a', 'reports')).toBe(true)
+    const compiled = active({ active: null, installed: undefined })
+    expect(nodePluginServiceAvailable(result([compiled], undefined, false), 'a', 'reports')).toBe(true)
+    expect(
+      nodePluginServiceAvailable(
+        result([active({ active: null, state: 'disabled', disabled: true })], undefined, false),
+        'a',
+        'reports',
+      ),
+    ).toBe(false)
+    expect(nodePluginServiceAvailable(result([], undefined, false), 'a', 'reports')).toBe(false)
+    expect(
+      contributionAvailability(result([active()], 'accepted', false), 'a', 'reports', PLUGIN_API_MAJOR).available,
+    ).toBe(false)
+    // A node with no roster at all is still unknown, so nothing is assumed to run there.
+    expect(nodePluginServiceAvailable(result([compiled]), 'b', 'reports')).toBe(false)
   })
 
   it('keeps the old accepted runtime available while an installed update waits for restart', () => {
