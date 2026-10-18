@@ -5,6 +5,7 @@ sources:
   - docs/agent-tools.md
   - docs/mcp.md
   - docs/mcp/managed-servers.md
+  - docs/mcp/result-size.md
   - docs/agent-tools/orchestration.md
   - packages/protocol/src/agents/toolPermissions.ts
   - plugins/agents/src/client/settings/AgentMcpServersSettings.tsx
@@ -60,6 +61,14 @@ Node on the same computer. It holds no data of its own: every call goes to the N
 
 To take acorn's tools away from a CLI you run outside acorn, run `claude mcp remove acorn` or
 `codex mcp remove acorn`.
+
+### Long results
+
+An agent gets at most 32 KiB of any one result, about 8,000 tokens. A longer one keeps its start and
+its end, with one line between them that says how much was left out and where the full text is. The
+full text goes to `acorn-tool-output` in your temp folder, readable only by you, and is deleted after
+seven days. A managed Claude Code session may read it without asking. A Claude Code session in the
+terminal drawer asks first.
 
 ### The task-scoped token
 

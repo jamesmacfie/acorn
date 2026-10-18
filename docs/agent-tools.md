@@ -95,6 +95,9 @@ tool names; a stale preference key cannot introduce a tool into the report.
 - A task-scoped caller can't address another task.
 - Secrets are used through scoped provider APIs and never returned.
 - Child processes use the process broker and bounded output.
+- The MCP server caps every result an agent receives ([tool result size](./mcp/result-size.md)), so a
+  tool doesn't need its own cap for safety. Bound or page a tool's output only when that makes it more
+  useful, such as when the middle of a long result matters.
 - Agent text isn't control flow. Workflow gates read structured step output only.
 - Tool failures use the common API error envelope and don't expose provider payloads or credentials.
 

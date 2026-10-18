@@ -7,7 +7,7 @@
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { encodeFileGuardPolicy, FILE_GUARD_MATCHER } from '@acorn/plugin-api/node'
+import { encodeFileGuardPolicy, FILE_GUARD_MATCHER, toolOutputDir } from '@acorn/plugin-api/node'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { LOOP_HOOK_TIMEOUT_SECONDS, type AgentLoopHookEvent } from '../../contract/loopHook.ts'
 import type { HarnessLaunchSpec } from './harness'
@@ -139,11 +139,9 @@ export const claudeHarness: HarnessLaunchSpec = {
       .filter(Boolean)
       .join('\n\n')
     const block = readBlock ? claudeReadBlockSettings(readBlock) : null
-    const allow = skills.folders.map((dir) => `Read(/${dir}/**)`)
-    const permissions =
-      allow.length || block
-        ? { permissions: { ...(allow.length ? { allow } : {}), ...(block ? { deny: block.deny } : {}) } }
-        : {}
+    // The task's saved tool results sit outside the worktree, and a cut result's marker points there.
+    const allow = [...skills.folders, toolOutputDir(session.taskId)].map((dir) => `Read(/${dir}/**)`)
+    const permissions = { permissions: { allow, ...(block ? { deny: block.deny } : {}) } }
     const plugins = skills.plugins.length ? { plugins: skills.plugins.map((path) => ({ type: 'local', path })) } : {}
     const bridged = loopHooks ? claudeLoopHookSettings(loopHooks) : {}
     const preToolUse = [...(block?.preToolUse ?? []), ...((bridged.PreToolUse as unknown[] | undefined) ?? [])]

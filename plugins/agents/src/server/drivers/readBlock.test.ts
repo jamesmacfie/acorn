@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AgentSession } from '../../contract/wire.ts'
 import { fileToolRefusal } from '@acorn/plugin-api/testkit'
-import type { FileGuardPolicy } from '@acorn/plugin-api/node'
+import { toolOutputDir, type FileGuardPolicy } from '@acorn/plugin-api/node'
 import { claudeHarness, claudeReadBlockSettings } from './claudeHarness'
 import { dataRootReadBlock, gitWrites, linkedGitDirs } from './readBlock'
 
@@ -168,7 +168,7 @@ describe('the data root read block', () => {
 })
 
 describe('the read block in Claude Code', () => {
-  const session = { kind: 'interactive', config: {} } as unknown as AgentSession
+  const session = { kind: 'interactive', taskId: 't1', config: {} } as unknown as AgentSession
   const settings = (meta: Record<string, unknown>) =>
     (meta.claudeCode as { options: { settings: Record<string, unknown> } }).options.settings
 
@@ -206,7 +206,7 @@ describe('the read block in Claude Code', () => {
       hooks: undefined,
       autoContinueAtUsageLimit: false,
       permissions: {
-        allow: ['Read(//skills/a/**)'],
+        allow: ['Read(//skills/a/**)', `Read(/${toolOutputDir('t1')}/**)`],
         deny: [
           'Read(//data/core.sqlite)',
           'Read(//data/core.sqlite/**)',
@@ -232,6 +232,7 @@ describe('the read block in Claude Code', () => {
   it('leaves a session without the block unconfined', () => {
     expect(settings(claudeHarness.acpSessionMeta!(session, { folders: [], plugins: [] }))).toEqual({
       autoContinueAtUsageLimit: false,
+      permissions: { allow: [`Read(/${toolOutputDir('t1')}/**)`] },
     })
   })
 })

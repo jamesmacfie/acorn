@@ -76,6 +76,7 @@ script running ([task script tools](./agent-tools/browser-and-scripts.md#task-sc
 
 The server returns structured results for absent task context, unavailable optional plugins, and provider
 errors. It never returns device tokens, provider credentials, raw secret fields, or database handles.
+It sends results as compact JSON and caps each at 32 KiB ([tool result size](./mcp/result-size.md)).
 
 The proxy assigns a UUID call ID once per `tools/call` and sends it as `x-acorn-tool-call-id`. If the
 first loopback request loses the Node during a restart, the retry keeps the same ID. Stateful handlers

@@ -392,6 +392,7 @@ node: setRouteTestCapability
 node: taskContext
 node: textAdapter
 node: tmuxAvailable
+node: toolOutputDir
 node: truncateBytes
 node: viaBridge
 node: worktreeGitText

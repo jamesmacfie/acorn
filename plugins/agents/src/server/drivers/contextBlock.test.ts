@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { toolOutputDir } from '@acorn/plugin-api/node'
 import { contextBlock } from './contextBlock'
 import { claudeHarness } from './claudeHarness'
 import type { AgentSession } from '../../contract/wire.ts'
@@ -25,7 +26,7 @@ describe('claudeHarness session metadata', () => {
     plugins: string[] = [],
   ) =>
     claudeHarness.acpSessionMeta!(
-      { kind, config } as AgentSession,
+      { kind, taskId: 't1', config } as AgentSession,
       { folders, plugins },
       undefined,
       attendanceInstructions(kind === 'interactive' ? 'attended' : 'supervised') ?? undefined,
@@ -37,7 +38,9 @@ describe('claudeHarness session metadata', () => {
     expect(meta('interactive').systemPrompt).toBeUndefined()
     expect(meta('interactive').claudeCode).toEqual({
       emitRawSDKMessages: [{ type: 'system', subtype: 'task_notification' }],
-      options: { settings: { autoContinueAtUsageLimit: false } },
+      options: {
+        settings: { autoContinueAtUsageLimit: false, permissions: { allow: [`Read(/${toolOutputDir('t1')}/**)`] } },
+      },
     })
   })
 
@@ -68,7 +71,9 @@ describe('claudeHarness session metadata', () => {
       options: {
         settings: {
           autoContinueAtUsageLimit: false,
-          permissions: { allow: ['Read(//data/agent-skills/s1/1/acme/skills/review/**)'] },
+          permissions: {
+            allow: ['Read(//data/agent-skills/s1/1/acme/skills/review/**)', `Read(/${toolOutputDir('t1')}/**)`],
+          },
         },
         plugins: [{ type: 'local', path: '/data/agent-skills/s1/1/acme' }],
       },

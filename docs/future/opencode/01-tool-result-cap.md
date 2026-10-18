@@ -1,6 +1,60 @@
 # Phase 1: Cap tool results in one place
 
-Date: October 16, 2026. Status: proposed.
+Date: October 16, 2026. Status: done on October 19, 2026.
+
+## Completion note
+
+October 19, 2026. Landed on branch `phase-1-tool-result-cap`.
+
+What landed:
+
+- `text()` in `packages/node-core/src/mcp/server.ts` sends compact JSON and caps every call's text
+  result at 32 KiB. The cut, the saved file, and the seven-day sweep live in
+  `packages/node-core/src/mcp/toolOutput.ts`. The server runs the sweep after it connects.
+- A cut result keeps its first 24 KiB and last 8 KiB, with this marker line between them:
+  `[acorn cut this result: <total> bytes in all, <omitted> left out here. Read the full text from <path>]`.
+  When the file can't be written, the marker says so instead of naming a path.
+- Saved files go to `<os.tmpdir()>/acorn-tool-output/<taskId>/<callId>.txt`. The folder is mode 700
+  and each file is mode 600, because Linux's `/tmp` is shared.
+- The managed Claude Code harness adds `Read(//<that task folder>/**)` to its flag settings' allow
+  list, beside the skill folders. So every managed Claude session sends a `permissions.allow` list,
+  even one with no skills.
+- Docs: a new [tool result size](../../mcp/result-size.md) page, one sentence in [MCP](../../mcp.md),
+  and a safety rule in [agent tools](../../agent-tools.md). Two site pages say the same for users and
+  plugin authors.
+
+What I checked first:
+
+- Claude Code 2.1.302, read from its binary, cuts an MCP result past 25,000 tokens
+  (`MAX_MCP_OUTPUT_TOKENS`). It keeps the head and appends `[OUTPUT TRUNCATED`. The doc's claim
+  holds.
+- Codex 0.162.1 cuts the middle at `tool_output_token_limit`, with a "tokens truncated" marker. So it
+  already kept the tail. The cap still matters for Claude and for token cost.
+- `claude -p` in default mode refused a Read of a file in the temp folder. Both `--add-dir` and a
+  `Read(//…/**)` allow rule cleared it.
+- With my branch's MCP server against the live Node, an 80,434-byte `local_diff` came back as
+  32,824 bytes. Its tail held the diff's last line. A real Claude Code session read the saved file
+  with no permission prompt. A real Codex session read it from its read-only sandbox.
+
+Deviations:
+
+- The doc said `--add-dir`. Managed Claude sessions start through the ACP adapter, which takes no
+  command line, so I used a read-only allow rule, the same seam the skill folders use. It also grants
+  no write access.
+- The constants sit in `toolOutput.ts`, not beside `text()`. The agents plugin imports
+  `toolOutputDir` through `@acorn/plugin-api/node`, and importing `server.ts` would pull in the MCP
+  SDK. That added a node-core export, so the export limit in `tools/arch/boundaries.test.ts` went
+  from 67 to 68.
+- The sweep deletes old files but leaves empty task folders. Removing a folder could race another
+  server writing into it.
+- A Claude Code session in the terminal drawer still asks before it reads the file, as the doc
+  allowed. Headless workflow steps run in `auto` mode and weren't tested.
+
+For later phases:
+
+- Phase 4 can rely on the cap. A script tool's result goes through `text()` like any other call.
+- A tool whose middle matters should page its own output. JSON results are one line after
+  compaction, so their cuts never land on a line break.
 
 This phase gives every Acorn tool result one size limit, applied where the agent receives it. Read
 it before you change what the MCP server returns.

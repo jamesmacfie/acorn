@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { toolOutputDir } from '@acorn/plugin-api/node'
 import { claudeHarness, claudeLoopHookSettings } from './claudeHarness'
 import { claudeHookOutput, claudeToolSubject } from './claudeLoopHook'
 import type { AgentSession } from '../../contract/wire.ts'
@@ -44,16 +45,21 @@ describe('Claude Code hook input', () => {
 })
 
 describe('installing the bridge in Claude Code', () => {
-  const session = { kind: 'interactive', config: {} } as unknown as AgentSession
+  const session = { kind: 'interactive', taskId: 't1', config: {} } as unknown as AgentSession
   const skills = { folders: [], plugins: [] }
   const settings = (meta: Record<string, unknown>) =>
     (meta.claudeCode as { options: { settings: Record<string, unknown> } }).options.settings
 
   it('adds a command hook only for the points that have a handler, beside the settings acorn already sends', () => {
-    expect(settings(claudeHarness.acpSessionMeta!(session, skills))).toEqual({ autoContinueAtUsageLimit: false })
+    const permissions = { allow: [`Read(/${toolOutputDir('t1')}/**)`] }
+    expect(settings(claudeHarness.acpSessionMeta!(session, skills))).toEqual({
+      autoContinueAtUsageLimit: false,
+      permissions,
+    })
     const bridge = { command: '/app/node', args: ["/app/helper/it's/loop-hook.js"], beforeTool: true, afterTool: false }
     expect(settings(claudeHarness.acpSessionMeta!(session, skills, bridge))).toEqual({
       autoContinueAtUsageLimit: false,
+      permissions,
       hooks: {
         PreToolUse: [
           {

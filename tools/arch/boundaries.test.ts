@@ -803,8 +803,9 @@ describe('architecture boundaries', () => {
       '@acorn/client-core': 196, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, and the anchored popover and focus restore the sidebar's Go to task draws on.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
       // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
-      // public site's plugin reference reads to check its examples and list the grants.
-      '@acorn/node-core': 67,
+      // public site's plugin reference reads to check its examples and list the grants. `mcp/toolOutput`,
+      // so the Claude harness can let an agent read the folder where a cut tool result's full text goes.
+      '@acorn/node-core': 68,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.
       // The document model, and the store a code host's Node half keeps documents in.

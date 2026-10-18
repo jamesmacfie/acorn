@@ -54,7 +54,8 @@ A tool needs no client bundle.
    - `requiresSession: true` hides the tool from a caller that isn't a managed agent session, such as a
      command typed in a terminal.
    - `timeoutMs` and `maxOutputBytes` bound one call. A slow call fails with a timeout, and a bigger
-     answer is refused.
+     answer is refused. An agent sees at most 32 KiB of any answer anyway, with a pointer to the full
+     text, so set `maxOutputBytes` for what your route can produce, not to protect the agent.
 
 2. **Answer it.** acorn posts `{ arguments, origin }` to the `handler` route. Read the task from the
    request's credential, not from `origin`: the credential is signed, and `origin` is only a hint.

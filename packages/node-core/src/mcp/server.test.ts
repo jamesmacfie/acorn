@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createServer, type Server } from 'node:https'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -125,8 +125,14 @@ class McpClient {
   }
 }
 
-const toolText = (res: { result?: unknown }): unknown =>
-  JSON.parse((res.result as { content: { text: string }[] }).content[0].text)
+const rawText = (res: { result?: unknown }): string => (res.result as { content: { text: string }[] }).content[0].text
+const toolText = (res: { result?: unknown }): unknown => JSON.parse(rawText(res))
+
+// A tool result well over the 32 KiB cap, one numbered line at a time like a log or a diff.
+const BIG_TEXT = Array.from({ length: 4000 }, (_, i) => `line ${String(i).padStart(5, '0')} of the big result`).join(
+  '\n',
+)
+const IMAGE = { type: 'image', data: 'iVBORw0KGgo=', mimeType: 'image/png' }
 
 describe('acorn MCP server projects the agent-tool registry over stdio (docs/agent-tools.md)', () => {
   let stub: Server
@@ -139,6 +145,8 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
   let caPath: string
   // A certificate the stub does not serve: the case where some other node is on that port.
   let strangerCaPath: string
+  // The child's TMPDIR, where it saves the full text of a result it cut.
+  let tmp: string
   const posts: {
     url: string
     body: unknown
@@ -151,6 +159,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
 
   beforeAll(async () => {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-mcp-root-'))
+    tmp = mkdtempSync(join(tmpdir(), 'acorn-mcp-tmp-'))
     const cert = ensureCert(dataDir)
     caPath = join(dataDir, 'tls', 'cert.pem')
     const stranger = mkdtempSync(join(tmpdir(), 'acorn-mcp-stranger-'))
@@ -192,6 +201,8 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
               pullNumber: 813,
               links: [{ id: 'linear:ENG-42', kind: 'linear', label: 'ENG-42', details: ['In Progress'] }],
             })
+          if (url.endsWith('/tools/big_tool')) return json(BIG_TEXT)
+          if (url.endsWith('/tools/image_tool')) return json(IMAGE)
           json({ ok: true })
         })
         return
@@ -227,6 +238,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     stub.close()
     retryStub.close()
     rmSync(dataDir, { recursive: true, force: true })
+    rmSync(tmp, { recursive: true, force: true })
     rmSync(dirname(dirname(strangerCaPath)), { recursive: true, force: true })
   })
 
@@ -253,8 +265,10 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
         properties: { slug: { type: 'string' } },
       })
 
-      const current = toolText(await client.send('tools/call', { name: 'task_current', arguments: {} }))
-      expect(current).toMatchObject({ repo: 'acme/api', pullNumber: 813 })
+      const current = await client.send('tools/call', { name: 'task_current', arguments: {} })
+      expect(toolText(current)).toMatchObject({ repo: 'acme/api', pullNumber: 813 })
+      // Compact, with nothing cut: indentation costs the model tokens.
+      expect(rawText(current)).toBe(JSON.stringify(toolText(current)))
 
       await client.send('tools/call', { name: 'notes_append', arguments: { slug: 'plan', text: 'Done.' } })
       const post = posts.find((p) => p.url.endsWith('/tools/notes_append'))
@@ -352,6 +366,76 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       expect(attempts.map((attempt) => attempt.server)).toEqual(['primary', 'retry'])
       expect(attempts[0]?.callId).toMatch(/^[0-9a-f-]{36}$/)
       expect(attempts[1]?.callId).toBe(attempts[0]?.callId)
+    } finally {
+      client.kill()
+    }
+  }, 30_000)
+
+  it('cuts an oversized result to its head and tail and saves the full text', async () => {
+    const client = new McpClient({
+      ACORN_TASK_ID: 't1',
+      ACORN_DATA_DIR: dataDir,
+      NODE_EXTRA_CA_CERTS: caPath,
+      ACORN_API_TOKEN: 'internal-token',
+      TMPDIR: tmp,
+    })
+    try {
+      await client.init()
+      const text = rawText(await client.send('tools/call', { name: 'big_tool', arguments: {} }))
+      const lines = BIG_TEXT.split('\n')
+      const [head, rest] = text.split('[acorn cut this result: ')
+      const [marker, tail] = rest!.split(']\n')
+      // Both cuts land on a line break, so the first and last lines survive whole.
+      expect(head!.startsWith(`${lines[0]}\n`)).toBe(true)
+      expect(head!.endsWith('\n')).toBe(true)
+      expect(BIG_TEXT.startsWith(head!)).toBe(true)
+      expect(tail!.endsWith(lines.at(-1)!)).toBe(true)
+      expect(BIG_TEXT.endsWith(`\n${tail}`)).toBe(true)
+      const total = Buffer.byteLength(BIG_TEXT)
+      const kept = Buffer.byteLength(head!) + Buffer.byteLength(tail!)
+      expect(kept).toBeLessThanOrEqual(32 * 1024)
+      const [, file] = marker!.match(/Read the full text from (\S+)$/) ?? []
+      expect(marker).toContain(`${total} bytes in all, ${total - kept} left out here`)
+      expect(file).toMatch(new RegExp(`^${tmp}/acorn-tool-output/t1/[0-9a-f-]{36}\\.txt$`))
+      expect(readFileSync(file!, 'utf8')).toBe(BIG_TEXT)
+    } finally {
+      client.kill()
+    }
+  }, 30_000)
+
+  it('passes an image result through', async () => {
+    const client = new McpClient({
+      ACORN_TASK_ID: 't1',
+      ACORN_DATA_DIR: dataDir,
+      NODE_EXTRA_CA_CERTS: caPath,
+      ACORN_API_TOKEN: 'internal-token',
+      TMPDIR: tmp,
+    })
+    try {
+      await client.init()
+      const res = await client.send('tools/call', { name: 'image_tool', arguments: {} })
+      expect((res.result as { content: unknown[] }).content).toEqual([
+        { type: 'image', data: IMAGE.data, mimeType: IMAGE.mimeType },
+      ])
+    } finally {
+      client.kill()
+    }
+  }, 30_000)
+
+  it('deletes saved results older than seven days when it starts', async () => {
+    const saved = join(tmp, 'acorn-tool-output', 'old-task')
+    mkdirSync(saved, { recursive: true })
+    const old = join(saved, 'old.txt')
+    const recent = join(saved, 'recent.txt')
+    writeFileSync(old, 'old')
+    writeFileSync(recent, 'recent')
+    const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+    utimesSync(old, eightDaysAgo, eightDaysAgo)
+    const client = new McpClient({ ACORN_TASK_ID: '', TMPDIR: tmp })
+    try {
+      await client.init()
+      await expect.poll(() => existsSync(old), { timeout: 10_000, interval: 100 }).toBe(false)
+      expect(existsSync(recent)).toBe(true)
     } finally {
       client.kill()
     }

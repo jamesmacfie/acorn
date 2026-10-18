@@ -8,17 +8,23 @@
 // and a call returns a structured 'no-active-task' or 'acorn-not-running' result, never a protocol
 // error, because a plain terminal loads this server too.
 import { randomUUID } from 'node:crypto'
+import { join } from 'node:path'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { isToolImageResult } from '@acorn/protocol/api.ts'
 import { apiGet, apiSend } from './api'
+import { capToolText, sweepToolOutput, toolOutputDir } from './toolOutput'
 
 const TASK_ID = process.env.ACORN_TASK_ID ?? ''
 
-const text = (value: unknown) => ({
-  content: [{ type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }],
-})
+// Compact JSON, because indentation costs the model tokens and tells it nothing. Only a call's result
+// can be large, so the fixed no-task answer passes no call ID and skips the cap.
+const text = (value: unknown, callId?: string) => {
+  const full = typeof value === 'string' ? value : JSON.stringify(value)
+  const capped = callId ? capToolText(full, join(toolOutputDir(TASK_ID), `${callId}.txt`)) : full
+  return { content: [{ type: 'text' as const, text: capped }] }
+}
 const NO_TASK = text({
   status: 'no-active-task',
   hint: 'This session was not launched from an acorn task — task-scoped tools need ACORN_TASK_ID.',
@@ -61,10 +67,10 @@ function buildServer(): Server {
       req.params.arguments ?? {},
       { callId },
     )
-    if (!res.ok) return text({ status: res.kind, detail: res.detail })
+    if (!res.ok) return text({ status: res.kind, detail: res.detail }, callId)
     if (isToolImageResult(res.data))
       return { content: [{ type: 'image' as const, data: res.data.data, mimeType: res.data.mimeType }] }
-    return text(res.data)
+    return text(res.data, callId)
   })
 
   return server
@@ -73,6 +79,7 @@ function buildServer(): Server {
 export async function main(): Promise<void> {
   const server = buildServer()
   await server.connect(new StdioServerTransport())
+  void sweepToolOutput()
 
   if (TASK_ID) {
     // Compare whole definitions, not just names: a changed description or schema is a change the
