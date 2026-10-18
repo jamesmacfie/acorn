@@ -85,6 +85,8 @@ describe('the full agent-tool manifest', () => {
     'issue_detail',
     'issue_comment',
     'issue_image',
+    // A program that calls the read-tier tools above in one round trip (docs/agent-tools.md § Scripts).
+    'run_script',
   ]
   // Preview tools remain a desktop-only capability exposed through the same assembled tool manifest.
   const BROWSER_TOOLS = [

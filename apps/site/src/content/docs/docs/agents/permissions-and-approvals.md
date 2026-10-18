@@ -78,6 +78,9 @@ acorn's own tools come in three tiers, set under **Settings** > **Agents** > **T
 
 Below the tiers, every tool has its own switch, grouped **By owner** or **By tier**. A tool's switch
 overrides its tier. A tool that's off is gone from the agent's tool list, and a direct call is refused.
+So is a call from a `run_script` program, which can call read tools only. A rule in your harness's
+own settings that blocks one acorn read tool doesn't see that tool inside a script, so switch the
+tool off here instead.
 
 A new execute tool added in a later release stays off until you turn it on. A workflow step and a
 custom agent can narrow these further, never widen them.

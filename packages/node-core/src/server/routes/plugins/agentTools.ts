@@ -1,43 +1,18 @@
-import { and, eq } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import {
   agentToolContributions,
   agentToolOwner,
   isToolPermitted,
-  parseToolPerms,
-  TOOL_PERMS_PREF_KEY,
-  ToolError,
   type AgentToolContribution,
   type ToolContext,
 } from '../../agentTools/registry'
-import { getDb, schema } from '../../db'
+import { callAgentTool, hasRequiredSession, loadToolPerms, toolAvailable } from '../../agentTools/callTool'
+import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { mayActOnTask, ownerId } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
-import { issueAgentToolProvenance } from '../../agentTools/provenance'
-import { runHook } from '../../pluginHost/hooks'
-import { startSpan } from '../../telemetry/collector'
 import { isToolWithinCeiling } from '@acorn/protocol/toolPolicy.ts'
-
-const STATUS: Record<ToolError['kind'], 404 | 400 | 409 | 500 | 504> = {
-  not_found: 404,
-  bad_request: 400,
-  conflict: 409,
-  'needs-trust': 409,
-  timeout: 504,
-  failed: 500,
-}
-type AvailabilityCache = Map<NonNullable<AgentToolContribution['when']>, Promise<boolean>>
-
-async function loadPerms(c: Context<AppEnv>) {
-  const login = ownerId(c)
-  const [row] = await getDb(c.env)
-    .select({ value: schema.prefs.value })
-    .from(schema.prefs)
-    .where(and(eq(schema.prefs.userId, login), eq(schema.prefs.key, TOOL_PERMS_PREF_KEY)))
-  return parseToolPerms(row?.value)
-}
 
 function toolContext(c: Context<AppEnv>): ToolContext {
   const principal = c.get('principal')
@@ -55,42 +30,6 @@ function toolContext(c: Context<AppEnv>): ToolContext {
 function contributions(): readonly AgentToolContribution[] | null {
   const tools = agentToolContributions()
   return tools.length ? tools : null
-}
-
-async function available(tool: AgentToolContribution, ctx: ToolContext, cache: AvailabilityCache): Promise<boolean> {
-  if (!tool.when) return true
-  let result = cache.get(tool.when)
-  if (!result) {
-    // Owned by the plugin that contributed the tool, so a slow `/tools` call names whose check held it.
-    const span = startSpan(agentToolOwner(tool.name), {
-      name: 'tool.availability',
-      attrs: { seam: 'tool.availability', tool: tool.name },
-    })
-    result = Promise.resolve(tool.when(ctx)).then(
-      (ok) => {
-        span.end('ok', { available: ok })
-        return ok
-      },
-      () => {
-        span.end('error', { available: false })
-        return false
-      },
-    )
-    cache.set(tool.when, result)
-  }
-  return result
-}
-
-function hasRequiredSession(c: Context<AppEnv>, tool: AgentToolContribution): boolean {
-  if (!tool.requiresSession) return true
-  const principal = c.get('principal')
-  return (
-    principal?.kind === 'internal' &&
-    principal.scope === 'task' &&
-    !!principal.taskId &&
-    principal.taskId === c.req.param('id') &&
-    !!principal.sessionId
-  )
 }
 
 // Match the high-level MCP SDK's schema projection: draft-07 for argument-bearing tools, and its exact
@@ -115,48 +54,13 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   // the path, so without this check a credential minted for task A could invoke task B's tools. 404,
   // matching every other denial here, so the surface reveals nothing about which tasks exist.
   if (!mayActOnTask(c, c.req.param('id')!)) return respondError(c, 404, 'not_found')
-  const registry = contributions()
-  if (!registry) return respondError(c, 503, 'bridge-unavailable')
-  const tool = registry.find((candidate) => candidate.name === c.req.param('name'))
-  if (!tool || (opts.renderer && !tool.exposeToRenderer)) return respondError(c, 404, 'not_found')
-  const perms = await loadPerms(c)
-  const ctx = toolContext(c)
-  if (!hasRequiredSession(c, tool) || !isToolPermitted(tool, perms) || !isToolWithinCeiling(tool, ctx.toolCeiling)) {
-    return respondError(c, 404, 'not_found')
-  }
-  if (!(await available(tool, ctx, new Map()))) return respondError(c, 404, 'not_found')
-  const parsed = tool.input.safeParse(await c.req.json().catch(() => ({})))
-  if (!parsed.success) return respondError(c, 400, 'bad_request', [parsed.error.message])
-  // The last gate, after the tier check and the workflow ceiling and before anything runs: an approval
-  // plugin's turn to say no (server/pluginHost/hooks.ts, docs/plugins/hooks.md § Hooks). The arguments are not in
-  // the payload, deliberately — a handler that saw them would be reading the agent's work, and the
-  // decision this hook exists for is about the verb.
-  const verdict = await runHook('core:before-tool-call', {
-    taskId: ctx.taskId,
-    tool: tool.name,
-    sessionId: ctx.sessionId ?? '',
-  })
-  if (!verdict.ok) return respondError(c, STATUS['needs-trust'], 'needs-trust', [`${verdict.by}: ${verdict.reason}`])
-  if (tool.requiresSession && ctx.sessionId) {
-    ctx.provenanceProof = issueAgentToolProvenance(ctx.taskId, ctx.sessionId, tool.name)
-  }
-  // Started after every gate, so the span measures the tool and not the permission check in front
-  // of it, and named for the plugin that contributed the tool rather than the one whose route this
-  // is: an agent tool is arbitrary work an agent asked for, and the question is whose work was slow.
-  // The arguments never ride along, for the reason the hook above does not see them either.
-  const span = startSpan(agentToolOwner(tool.name), {
-    name: 'tool.call',
-    attrs: { seam: 'tool.call', tool: tool.name, risk: tool.risk },
-  })
-  try {
-    const answer = c.json((await tool.handler(parsed.data, ctx)) ?? null)
-    span.end('ok', { outcome: 'ok' })
-    return answer
-  } catch (error) {
-    const kind: ToolError['kind'] = error instanceof ToolError ? error.kind : 'failed'
-    span.end('error', { outcome: kind })
-    return respondError(c, STATUS[kind], kind, [error instanceof Error ? error.message : 'tool call failed'])
-  }
+  const result = await callAgentTool(
+    { principal: principal!, db: getDb(c.env), renderer: opts.renderer },
+    c.req.param('name')!,
+    await c.req.json().catch(() => ({})),
+    toolContext(c),
+  )
+  return result.ok ? c.json(result.value) : respondError(c, result.status, result.error, result.detail)
 }
 
 export const agentTools = new Hono<AppEnv>()
@@ -168,16 +72,17 @@ export const agentTools = new Hono<AppEnv>()
     if (!mayActOnTask(c, c.req.param('id')!)) return respondError(c, 404, 'not_found')
     const registry = contributions()
     if (!registry) return respondError(c, 503, 'bridge-unavailable')
-    const perms = await loadPerms(c)
+    const principal = c.get('principal')!
+    const perms = await loadToolPerms(getDb(c.env), principal.userId)
     const ctx = toolContext(c)
-    const availability: AvailabilityCache = new Map()
+    const availability = new Map()
     const tools = []
     for (const tool of registry) {
       if (
-        !hasRequiredSession(c, tool) ||
+        !hasRequiredSession(principal, ctx.taskId, tool) ||
         !isToolPermitted(tool, perms) ||
         !isToolWithinCeiling(tool, ctx.toolCeiling) ||
-        !(await available(tool, ctx, availability))
+        !(await toolAvailable(tool, ctx, availability))
       )
         continue
       tools.push({

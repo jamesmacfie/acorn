@@ -84,7 +84,8 @@ task and session:
 
 The token decides which task a call reaches, and the person's tool tiers, any custom agent's limit, and
 any workflow step's limit decide whether it's allowed, all before your route runs. A tool turned off
-in Settings never reaches you. [Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)
+in Settings never reaches you. An agent can also call a read tool from a `run_script` program, and
+the same checks run first. [Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)
 covers the rest.
 
 ## Mistakes

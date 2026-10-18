@@ -9,4 +9,7 @@ export const requiredRuntimePackages = [
   'playwright-core',
   '@xterm/headless',
   '@xterm/addon-serialize',
+  // run_script's interpreter. Its loader finds the .wasm file beside its own code, which bundling breaks.
+  'quickjs-emscripten-core',
+  '@jitl/quickjs-wasmfile-release-sync',
 ]

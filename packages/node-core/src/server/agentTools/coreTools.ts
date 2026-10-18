@@ -5,6 +5,7 @@ import { changeRequestChecks, changeRequestCreated, changeRequestFeedback } from
 import { assembleContext, changeRequestSection, parseInclude, registerContextSection } from './contextSections.ts'
 import { pluginAuthoringTool } from './pluginAuthoringContribution.ts'
 import { pluginRequestTool } from './pluginRequests.ts'
+import { RUN_SCRIPT_TOOL } from './callTool.ts'
 import {
   registerAgentTool,
   removeAgentTools,
@@ -496,6 +497,17 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
     issueImageTool(deps),
     ...changeRequestTools(deps),
     ...sourceTools(deps),
+    // Read tier, because it reads nothing itself. Each call the program makes passes that tool's own
+    // gates, and only read-tier tools pass (./callTool.ts).
+    {
+      name: RUN_SCRIPT_TOOL,
+      description:
+        'Run a short JavaScript program that calls acorn tools and returns one result. `await tools.<name>(input)` calls any read-tier tool listed here with its usual input, and throws if the call is refused or fails. `return` the result; console.log goes to logs. No file, network, or timer access. Limits: 120 s, 1 s of JavaScript, 50 calls, 32 MiB.',
+      input: z.object({ code: z.string().min(1).max(20_000) }),
+      scope: 'task',
+      risk: 'read',
+      handler: async (input, ctx) => (await import('./runScript.ts')).runScript((input as { code: string }).code, ctx),
+    },
   ]
 }
 

@@ -5,7 +5,12 @@
 // exist.
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
-import { CORE_PLUGIN_PAGE_POINT, CORE_SECURITY_POINT, CORE_STORAGE_POINT } from '@acorn/protocol/extensionPoints.ts'
+import {
+  AGENT_TOOL_CARD_POINT,
+  CORE_PLUGIN_PAGE_POINT,
+  CORE_SECURITY_POINT,
+  CORE_STORAGE_POINT,
+} from '@acorn/protocol/extensionPoints.ts'
 import { AGENTS_CONVERSATION } from '../contract/conversation'
 import { AGENTS_INLINE_DIFF } from '../contract/inlineDiffClient.ts'
 import { isStale, reportPatches } from './inlineDiff/patchStatus.ts'
@@ -45,6 +50,9 @@ const CustomAgentsSettings = lazy(() => import('./settings/CustomAgentsSettings'
 const AgentStorageSection = lazy(() => import('./settings/AgentStorageSection'))
 const AgentSecuritySection = lazy(() => import('./settings/AgentSecuritySection'))
 const LoopCoverageSection = lazy(() => import('./settings/LoopCoverageSection'))
+const RunScriptToolCard = lazy(async () => ({
+  default: (await import('./sessions/RunScriptToolCard')).RunScriptToolCard,
+}))
 
 export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
@@ -305,6 +313,15 @@ export const agentsClientPlugin: ClientPlugin = {
       order: 10,
       requires: { plugin: 'agents' },
       component: AgentSecuritySection,
+    })
+    // Core's run_script tool has no client of its own, so the transcript's owner draws its card.
+    ctx.extensions.register({
+      id: 'agents.run-script-card',
+      point: AGENT_TOOL_CARD_POINT,
+      label: 'Scripts',
+      order: 10,
+      matches: ['run_script'],
+      component: RunScriptToolCard,
     })
     // Which harnesses a plugin's tool hooks reach, on that plugin's own page.
     ctx.extensions.register({

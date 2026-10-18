@@ -1,6 +1,88 @@
 # Phase 4: Add the run_script tool
 
-Date: October 16, 2026. Status: proposed. Needs phases 1 and 3.
+Date: October 16, 2026. Status: done on October 19, 2026, except the real Codex check.
+
+## Completion note
+
+October 19, 2026. Landed on branch `phase-4-script-tool`.
+
+What landed:
+
+- `callAgentTool` in `packages/node-core/src/server/agentTools/callTool.ts` holds every check after
+  authentication, in the order `invoke` had them, then runs the tool. The route and `run_script`'s
+  inner calls both use it, and the route keeps only authentication and the task check. It returns a
+  `ToolCallResult` with the status and error code, so a program sees the answer a direct caller gets.
+- `ToolContext` gained an optional `callTool`. `callAgentTool` sets it only when the tool is core's
+  `run_script`, and an inner call to `run_script` gets the same 404 as a missing tool. Inner calls
+  get the outer call's identity, never its provenance proof, and the IDs `<outer>:<n>`.
+- `run_script` registers in `coreTools.ts` and loads `runScript.ts` with `await import()`. Only that
+  module imports QuickJS. The result is `{ ok, value, logs, calls }`, or `ok: false` with
+  `error: { message, line }`. Each `calls` entry is `{ tool, ok, error? }`, and a call still pending
+  when the program ends reads `cancelled`.
+- The agents plugin draws a transcript card for `run_script`: the calls with their outcomes, the
+  error and line, and the program in a closed fold.
+- Both QuickJS packages are in `requiredRuntimePackages`, `packages/node-core`, and
+  `apps/desktop/package.json`, pinned at 0.32.0. Staging them with `stageRuntimeDependencies` copied
+  the `.wasm` file, and the built `runScript` chunk ran programs from there.
+- Docs: a Scripts section in [agent tools](../../agent-tools.md#scripts), one sentence in
+  [MCP](../../mcp.md#security), and a row and a paragraph on the site's agent tools page.
+
+Deviations:
+
+- One wasm module per program, not one per process. A value nested about 200,000 levels deep makes
+  `JSON.stringify` inside QuickJS overflow Node's own stack, at every stack limit I tried. The host
+  sees a `RangeError`, freeing the runtime then aborts, and the module is unusable after that. A
+  fresh module costs a median of 1.1 ms after the first 5 ms load, so no program can break another,
+  and the 2 GiB shared-memory concern goes away. The runner reports this case as "The interpreter
+  failed" and the next program runs normally.
+- The stack limit is 256 KiB, not 512 KiB. At 512 KiB plain recursion overflowed Node's stack before
+  QuickJS's own check, with the same crash. At 256 KiB QuickJS throws "stack overflow" first.
+- Only `return` gives the result. A last bare expression gives `null`. QuickJS-emscripten has no
+  flag for top-level `await` in a script, and finding the last expression means parsing the program.
+  The tool description says to use `return`.
+- A program reaches read-tier tools only. The doc had each inner call checked against its own tier,
+  so a script could write when the write tier was on. A security review after the first commit
+  pointed out that a harness asks the person about a write by the tool's name, in Claude Code's own
+  permission flow and through `agents:before-tool`. Inside a script those see only `run_script`, a
+  read tool, so a write would skip the person's approval. The inner calls' ceiling is narrowed to
+  `maxRisk: 'read'`, which keeps any workflow `allow` list. The doc's write test became "every
+  write is refused", and the ceiling test uses an `allow` list. Allowing writes later needs a way
+  to ask the person about each inner write, not just a wider ceiling.
+- A harness rule or `agents:before-tool` policy that names one read tool doesn't see that tool's
+  calls inside a script. The Node's per-tool switches and `core:before-tool-call` still apply, and
+  the owner can switch `run_script` off. The same review suggested defaulting it off, or running
+  the loop hook for each inner call. I documented the gap in agent tools, loop hooks, and the
+  permissions page instead, and left the default for the owner to decide.
+- A program's own JavaScript gets 1 second in total, counted only while the engine runs. QuickJS
+  runs on the Node's event loop, so the doc's 120-second limit let `while (true) {}` freeze every
+  session and request on the Node for two minutes. A second security review caught it. An
+  interrupt in QuickJS ends the program and can't pause it, so slicing wasn't possible. A worker
+  thread would remove the limit's reason, at the cost of carrying tool calls across a message port.
+- The input cap is 20,000 characters, checked by Zod, not 20 KB.
+- No cap on concurrent scripts. Each holds at most 32 MiB of engine memory and 1 second of the
+  event loop.
+- The route file reads a body it doesn't parse itself, so `tools/arch/boundaries.test.ts` lists it
+  as allowed: `callAgentTool` parses it with the tool's own schema.
+- The service graph is 1,884,361 bytes, 39 under the 1,884,400 ceiling. The first description was
+  47 bytes over, so I shortened it. I didn't raise the ceiling. The next phase that adds boot code
+  has to find room.
+
+Real-harness check, on a Node run from this branch's source with its own data folder:
+
+- Claude Code: two child sessions answered one word each. A third session made one `run_script`
+  call whose program called `agent_session_list` and then `agent_session_read` for both children
+  with `Promise.all`. The result listed three calls, all `ok`.
+- Codex: not checked. A managed Codex session on that Node reported no Acorn tools at all, which the
+  project memory `drive-managed-sessions-on-a-worktree-node` records as a known gap of a standalone
+  Node. Wiring `codex exec` to the scratch Node needed a task credential from its data folder, and
+  the sandbox refused that read. Check it from a desktop dev session.
+
+For later phases:
+
+- A tool that needs to call other tools gets `ctx.callTool` only if `callAgentTool` sets it. Widen
+  that check on purpose, never by default. The same goes for the read-tier ceiling on inner calls.
+- Read the QuickJS changelog before moving off 0.32.0, and rerun the stack tests in
+  `runScript.test.ts`. They pin the two Node-stack crashes above.
 
 This phase adds one agent tool, `run_script`, which runs a short program that calls other Acorn
 tools and returns one result. Read it before you build the tool.

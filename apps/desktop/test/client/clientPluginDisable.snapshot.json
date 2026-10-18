@@ -109,6 +109,7 @@
     "extensions": [
       "agents.storage",
       "agents.security",
+      "agents.run-script-card",
       "agents.loop-coverage",
       "bitbucket.push-actions",
       "github.push-actions",

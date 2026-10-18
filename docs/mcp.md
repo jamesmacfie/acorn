@@ -89,7 +89,8 @@ task ID with the addressed task. Device administration, plugin administration, b
 and security reads, provider connection administration, and the interactive HTTP sender are unavailable
 to the MCP principal. Each tool validates its own input at the Node boundary. Paths are confined to the
 task worktree, process execution is brokered, output is bounded, and provider answers are normalized
-before they reach the agent.
+before they reach the agent. A `run_script` program has no file, network, or process access, and
+each call it makes is checked like a direct call ([scripts](./agent-tools.md#scripts)).
 
 ## Configuration
 

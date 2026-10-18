@@ -14,7 +14,21 @@ export type ToolContext = {
   provenanceProof?: string
   callId?: string
   toolCeiling?: ToolCeiling
+  // Set only for run_script. Calls another tool as the same caller, through every gate a direct call
+  // passes (callAgentTool).
+  callTool?: (name: string, input: unknown, call: { callId?: string; signal: AbortSignal }) => Promise<ToolCallResult>
 }
+
+// A call's answer after every gate. A refusal carries the status and code the HTTP route sends, so a
+// run_script program sees the same answer a direct caller gets.
+export type ToolCallResult =
+  | { ok: true; value: unknown }
+  | {
+      ok: false
+      status: 400 | 404 | 409 | 500 | 503 | 504
+      error: ToolError['kind'] | 'bridge-unavailable'
+      detail?: string[]
+    }
 
 export type AgentToolContribution = {
   name: string

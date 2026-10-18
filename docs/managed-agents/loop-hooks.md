@@ -163,6 +163,9 @@ stays the fallback for a refusal on the permission hook.
 - **It doesn't rewrite a tool's output.** A note sits beside the result. It doesn't replace it.
 - **It isn't containment.** A refused command can come back as a script the hook sees only as
   `bash script.sh`. [Security](../security.md) owns the boundaries that exist.
+- **It doesn't see the calls inside `run_script`.** The hook sees one `run_script` call. The read
+  tools the program calls pass the Node's checks and `core:before-tool-call`, not this hook
+  ([scripts](../agent-tools.md#scripts)).
 
 The `acorn-permission-policy` plugin, kept in its own repository, is the sample consumer. It
 refuses on `agents:before-tool` with its permission rules, asks with its warning rules, and adds a

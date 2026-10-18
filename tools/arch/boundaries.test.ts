@@ -1811,6 +1811,9 @@ describe('architecture boundaries', () => {
       // gives, and the stored-preference reader parses through the same function. Rewriting them to
       // satisfy a grep would lose the messages and validate no better.
       ['plugins/agents/src/server/routes/usage.ts', 'validateAgentPricingPreferences and its two siblings in shared/'],
+      // The body is the addressed tool's input. callAgentTool parses it with that tool's own schema, the
+      // same path a run_script program's calls take.
+      ['packages/node-core/src/server/routes/plugins/agentTools.ts', "callAgentTool parses it with the tool's schema"],
     ])
     const offenders: string[] = []
     for (const pkg of PACKAGES) {

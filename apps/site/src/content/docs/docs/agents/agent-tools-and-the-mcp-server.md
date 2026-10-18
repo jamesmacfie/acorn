@@ -35,12 +35,19 @@ Every agent acorn starts in a task, managed or in the terminal drawer, can call 
 | Workflows | Listing, reading, drafting, and validating workflows, and running one you approved for agents |
 | Data sources | Four read-only tools that describe connected data sources, and `dataset_write` |
 | Plugins | `plugin_authoring` and `plugin_request` |
+| Scripts | `run_script`, which runs a short program that calls other tools and returns one result |
 
 A plugin can add its own tools, named after the plugin. **Settings** > **Agents** > **Tools and
 permissions** lists every tool with its owner and tier.
 
 No acorn tool reads or writes a file, opens a database, or talks to Docker. An agent edits files with
 its harness's own tools, in the worktree.
+
+`run_script` saves an agent a round trip per call. Its program runs in a sealed interpreter with no
+file, network, or process access, for at most two minutes, one second of its own computing, and 50
+tool calls. It can call read tools
+only, so every write still reaches you, or your harness's approval, as its own call. Each call the
+program makes is checked exactly like a direct call, so a script can't reach a tool you turned off.
 
 ## Who can call what
 

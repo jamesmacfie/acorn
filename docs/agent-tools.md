@@ -30,7 +30,7 @@ The registry is the authority on this list. These tools ship:
 
 | Owner | Tools |
 | --- | --- |
-| Core | `task_current`, `task_context`, `repo_info`, `linked_issues`, `issue_detail`, `issue_comment`, `issue_image`, `pr_current`, `pr_changed_files`, `pr_checks`, `pr_review_comments`, `pr_create`, `data_sources_list`, `data_sources_discover`, `data_source_describe`, `data_source_options`, `dataset_write`, `task_scripts_status`, `task_scripts_wait`, `task_scripts_logs`, `plugin_authoring`, `plugin_request` |
+| Core | `task_current`, `task_context`, `repo_info`, `linked_issues`, `issue_detail`, `issue_comment`, `issue_image`, `pr_current`, `pr_changed_files`, `pr_checks`, `pr_review_comments`, `pr_create`, `data_sources_list`, `data_sources_discover`, `data_source_describe`, `data_source_options`, `dataset_write`, `task_scripts_status`, `task_scripts_wait`, `task_scripts_logs`, `plugin_authoring`, `plugin_request`, `run_script` |
 | `github` | `github_pull_create`, the older name for `pr_create` |
 | `git` | `local_changes`, `local_diff`, `git_log` |
 | `notes` | `notes_list`, `notes_read`, `notes_write`, `notes_append` |
@@ -54,6 +54,34 @@ credentials, or change provider state.
 reason. The Node derives workspace and project from the authenticated task and rejects other
 datasets, stale schema versions, and malformed rows. A person can correct an agent row from a
 published panel; that correction is stored separately and survives later feeder writes.
+
+## Scripts
+
+`run_script` runs a short JavaScript program that calls other tools, so an agent pays one round trip
+for many calls and gets back only what the program returns. The program calls a tool as
+`await tools.<name>(input)` and gives its answer with `return`. The result is
+`{ ok, value, logs, calls }`, or `{ ok: false, error, logs, calls }` with the message and line.
+`calls` names each tool the program called and its outcome, and the transcript card lists them.
+
+Every call from a program passes the same checks as a direct call, in the same order:
+`callAgentTool` in `packages/node-core/src/server/agentTools/callTool.ts` serves both the route and
+the program. A refused call throws inside the program. A program can't call `run_script`, and each
+inner call gets the call ID `<outer call ID>:<n>`, so a retried script repeats the same IDs.
+
+A program reaches read-tier tools only, the tier of `run_script` itself. A harness asks the person
+about a write or execute call by the tool's name, and so does an `agents:before-tool` policy. Inside a
+script they would see only `run_script`, so those calls go to the harness one at a time. The same
+holds for a harness rule or hook policy that names one read tool: it doesn't see that tool inside a
+script. To stop a read tool everywhere, switch it off in **Tools and permissions**, or switch off
+`run_script` itself.
+
+The program runs in QuickJS, compiled to WebAssembly, with no file, network, timer, or process
+access. Values cross as JSON copies. Each program gets a fresh engine, with these limits from
+`SCRIPT_LIMITS` in `runScript.ts`: 120 seconds, 50 tool calls, 32 MiB of memory, and 32,768
+characters of logs. The engine runs on the Node's event loop, so the program's own JavaScript gets
+1 second in total. Time spent waiting on a tool call doesn't count. The program's text is at most 20,000 characters. Cancelling the outer call stops
+the program and aborts its pending calls. Read the QuickJS changelog before you change its pinned
+version, because a bug in the engine is a bug in this boundary.
 
 ## Projections
 

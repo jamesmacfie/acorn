@@ -65,7 +65,8 @@ The points acorn and its plugins open:
 | `editor:before-save` | observe, transform, veto | Before Editor saves a file |
 
 Claude Code and Codex send every tool call through `before-tool` and `after-tool`, on a Node that has
-acorn's bridge for them. Other harnesses have only `before-permission`.
+acorn's bridge for them. Other harnesses have only `before-permission`. A `run_script` call reaches
+`before-tool` once. The read tools its program calls reach `core:before-tool-call` instead.
 
 ## Steps
 
