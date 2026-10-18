@@ -130,12 +130,15 @@ export function siteButtons(
 
   api.runtime.onMessage.addListener((raw, sender: MessageSender) => {
     const message = raw as ButtonClick | null
-    if (!message || !sender.tab || sender.frameId !== 0 || !sender.url) return
+    // The tab's address, not the sender's: Firefox keeps a content script's `sender.url` at the page it
+    // loaded on, so after GitHub moves to another pull request in place it still names the first one.
+    const url = sender.tab?.url
+    if (!message || !sender.tab || sender.frameId !== 0 || !url) return
     // The browser's record of the page address again, and only a page that still has a marker.
     if (message.type === 'acorn:marker') {
-      if (!markerFor(sender.url)) return
+      if (!markerFor(url)) return
       if (message.action === 'hide')
-        void api.storage.local.set({ [HIDDEN_MARKERS_KEY]: [...hidden, new URL(sender.url).origin] })
+        void api.storage.local.set({ [HIDDEN_MARKERS_KEY]: [...hidden, new URL(url).origin] })
       else {
         events.open(sender.tab)
         events.showTask(null)
@@ -145,20 +148,20 @@ export function siteButtons(
     const handoff = cached.handoffs.find((entry) => handoffKey(entry) === message.key)
     // The browser's record of the page address, not anything the page said, and only a page the
     // handoff still matches.
-    if (!handoff || !pageHandoffs([handoff], sender.url).length) return
+    if (!handoff || !pageHandoffs([handoff], url).length) return
     if (message.type === 'acorn:handoff') {
       events.open(sender.tab)
       events.clicked({
         pluginId: handoff.pluginId,
         handoffId: handoff.id,
         label: handoff.label,
-        url: sender.url,
+        url: url,
         // The page sent this, so only the two known choices pass.
         start: message.start === 'workflow' ? 'workflow' : 'task',
       })
-    } else if (message.type === 'acorn:chip' && events.chip(sender.url)) {
+    } else if (message.type === 'acorn:chip' && events.chip(url)) {
       events.open(sender.tab)
-      events.showTask(message.action === 'chat' ? { url: sender.url, title: sender.tab.title ?? sender.url } : null)
+      events.showTask(message.action === 'chat' ? { url: url, title: sender.tab.title ?? url } : null)
     }
   })
 

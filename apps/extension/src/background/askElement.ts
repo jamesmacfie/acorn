@@ -268,12 +268,14 @@ export function askElement(
   api.runtime.onMessage.addListener((raw, sender, sendResponse) => {
     const message = raw as AskMessage | null
     const tab = sender.tab
+    // The tab's address, because Firefox's `sender.url` stays on the page a script loaded on.
+    const url = tab?.url
     if (
       !message ||
       !String(message.type).startsWith('acorn:ask.') ||
       sender.frameId !== 0 ||
       tab?.id === undefined ||
-      !sender.url
+      !url
     )
       return
     const tabId = tab.id
@@ -285,8 +287,8 @@ export function askElement(
     if (message.type === 'acorn:ask.send') events.open(tab)
     const answer =
       message.type === 'acorn:ask.open'
-        ? open(tabId, tab.windowId, sender.url, message)
-        : send(tabId, tab.title?.trim() || sender.url, sender.url, message)
+        ? open(tabId, tab.windowId, url, message)
+        : send(tabId, tab.title?.trim() || url, url, message)
     answer
       .catch((error: unknown): AskOpened | AskSent => ({
         ok: false,
