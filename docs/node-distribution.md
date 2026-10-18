@@ -115,7 +115,34 @@ row looks like a missing feature.
 The disabled list is the data root's file, unioned with any start-config override. Only the supervised
 host passes an override, so tests and `pnpm dev:node` can pin a list without writing into a data root.
 
+## Archives
+
+`pnpm pack:node --platform <os>-<arch>` writes a self-contained archive for the machine it runs on:
+`acorn-node-<version>-<platform>.tar.gz`, or `.zip` on Windows, with a `.sha256` file beside it. The
+target machine needs no Node.js, npm, or compiler.
+
+```text
+bin/acorn, bin/acorn.cmd   launchers that run lib/bin/acorn.mjs on runtime/node
+runtime/                   the Node.js release node-runtime.json pins, with its LICENSE
+lib/                       the tarball's tree, with npm ci --omit=dev and the prune step already run
+README.md, BUILD           how to check and start it; version, commit, build time, and platform
+```
+
+The launchers refuse to run without `ACORN_DATA_DIR`, because the CLI would otherwise fall back to the
+desktop's data root. `.github/workflows/build-node.yml` builds macOS arm64 and x64, Linux x64 and arm64,
+and Windows x64 on `v*` tags and manual dispatches, each on its own platform. Each job extracts its
+archive outside the checkout with a bare environment, then runs `scripts/node-archive/smoke.mjs`: help,
+a node-pty terminal, `node start`, `node status`, `node pair`, `node stop`, and a log search for device
+tokens. The run keeps each archive as a 14-day artifact, and nothing publishes it.
+
+The Linux archives build node-pty in a Debian 11 container, so they need glibc 2.31 or later: Ubuntu
+22.04, Debian 11, Raspberry Pi OS 11, or later. musl distributions such as Alpine can't run them. A
+browser download on macOS needs `xattr -dr com.apple.quarantine <folder>` before Gatekeeper loads the
+unsigned `pty.node`, and the archive's README says so.
+
 ## Install and start
+
+These steps install the platform-neutral tarball on a machine with its own Node.js.
 
 ```sh
 tar -xzf acorn-node-*.tar.gz

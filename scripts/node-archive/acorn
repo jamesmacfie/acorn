@@ -1,0 +1,12 @@
+#!/bin/sh
+# Runs acorn on the archive's own Node.js runtime, from any working directory.
+set -e
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+# Without it, acorn falls back to the desktop app's data root, which this Node must not share.
+if [ -z "$ACORN_DATA_DIR" ]; then
+  echo "acorn: set ACORN_DATA_DIR to a folder for the Node's data, for example ACORN_DATA_DIR=\$HOME/.acorn-node. The archive's README.md covers installing." >&2
+  exit 1
+fi
+
+exec "$root/runtime/node" --disable-warning=ExperimentalWarning "$root/lib/bin/acorn.mjs" "$@"

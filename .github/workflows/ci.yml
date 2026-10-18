@@ -1,8 +1,8 @@
 name: Lint and test
 
 # The Linux suite gates every run. The unsigned macOS desktop suite runs on pull requests and main
-# pushes. Installers are built only for `v*` tags and manual dispatches, through build-desktop.yml,
-# and only after the Linux suite passes for the same commit.
+# pushes. Installers and Node archives are built only for `v*` tags and manual dispatches, through
+# build-desktop.yml and build-node.yml, and only after the Linux suite passes for the same commit.
 on:
   pull_request:
   push:
@@ -172,3 +172,9 @@ jobs:
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  # The Node-only archives, on the installers' triggers and behind the same gate.
+  package-node:
+    needs: [lint, test]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/build-node.yml

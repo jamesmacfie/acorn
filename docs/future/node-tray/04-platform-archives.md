@@ -1,7 +1,89 @@
 # Phase 4: build platform archives in GitHub Actions
 
-Date: October 18, 2026. Status: proposed. Its smoke test grows as [phase 1](./01-token-out-of-logs.md)
-and [phase 2](./02-terminal-pairing.md) land.
+Date: October 18, 2026. Status: done locally for macOS arm64. The other four platforms and the workflow
+are unproven until a manual dispatch runs.
+
+## Completion note
+
+Landed on October 18, 2026, on the `phase-4-platform-archives` branch.
+
+What landed:
+
+- `pnpm pack:node --platform <os>-<arch>` in `scripts/pack-node.mjs`. It builds the neutral tree, moves
+  it to `lib/`, runs `npm ci --omit=dev` and the prune step there, sets `spawn-helper` to `755`, copies
+  the pinned runtime and its LICENSE into `runtime/`, adds the launchers, the README, and `BUILD`, and
+  writes the archive and `<archive>.sha256` in `sha256sum` format. Without `--platform` it writes the
+  neutral tarball as before.
+- `scripts/node-archive/`: `acorn`, `acorn.cmd`, the archive's `README.md`, and `smoke.mjs`, which runs
+  all six smoke checks from this page plus one more: `bin/acorn` without `ACORN_DATA_DIR` must fail and
+  name the variable.
+- `.github/workflows/build-node.yml` and a `package-node` job in `ci.yml`, with the `package` job's
+  `needs` and `if`. It uses no secrets.
+- `apps/desktop/scripts/node-runtime.mjs` exports `cachedRuntime`, `cachedLicense`, and `tar`. The
+  checksum check moved into `verifiedDownload`, which both download paths share. The desktop's
+  behavior and its test didn't change.
+- Docs: an Archives section in [Node distribution](../../node-distribution.md#archives), the
+  [bundle plan](../bundle.md#produce-platform-archives)'s archive section cut to a pointer, the docs
+  index entry, and the site's "Run a standalone Node" page.
+
+Measured on this Mac, for `darwin-arm64` at version 0.0.2: the archive is 87,057,395 bytes (83.0 MiB)
+compressed and 306.1 MB extracted. The runtime is 122.1 MB of that. The smoke test took about 10
+seconds. The other platforms' sizes come from the first
+dispatch.
+
+Decisions and deviations:
+
+- The packer builds only for the machine it runs on and refuses any other `--platform`. GitHub offers
+  the `macos-15-intel` label, supported until the macOS 15 image retires in 2027, so `darwin-x64`
+  builds natively there. No Rosetta assembly path exists.
+- The archive keeps the zip wrapper. `actions/upload-artifact` v7 can upload one file unzipped with
+  `archive: false`, but the pinned v5 can't, and an artifact holds the archive and its checksum. The
+  inner tarball keeps the file modes.
+- The runtime's LICENSE comes from the checksum-verified Linux x64 tarball, whatever the target. The
+  headers tarball has no LICENSE, and the desktop downloads a bare `node.exe` on Windows. Taking it
+  from the Windows zip would have changed the desktop's download and its test. The cost is one extra
+  download of about 50 MB per pin, cached beside the runtime.
+- The packer runs pnpm through `runPnpm`, npm through a shell, and tar through Windows' own `tar.exe`.
+  Before this, `pnpm pack:node` couldn't run on Windows at all, because `execFile` can't start a `.cmd`,
+  and Git for Windows' GNU tar reads neither zip archives nor drive-letter paths.
+- Linux jobs run whole in the `node:24-bullseye` container, smoke test included, rather than only
+  steps 1 to 3, because splitting the packer across a container boundary costs more than it buys. The
+  smoke test runs with a `PATH` of `/usr/bin:/bin:/usr/sbin:/sbin`, which leaves out the container's
+  `/usr/local/bin/node`. A container step adds the checkout to Git's `safe.directory`, because the
+  packer reads the commit for `BUILD`.
+- The smoke test builds its environment from nothing. Windows keeps only `SystemRoot`, `ComSpec`,
+  `PATHEXT`, `TEMP`, and `TMP`, with `System32` on its `PATH`.
+- The smoke test uses `node start --background`, as this page says, and searches the service log the
+  CLI reports plus the data root's `logs/` folder.
+- `bin/acorn` refuses every command without `ACORN_DATA_DIR`, `--help` included, and exits 1. A check
+  scoped to some commands would need its own list of commands, and phase 5 replaces it.
+- `BUILD` is `key=value` lines and also names the Node.js version.
+- The launcher resolves its folder from `$0` and doesn't follow a symlink.
+- The archive drops the neutral tarball's README from `lib/`, because its steps are ones the packer
+  has already run.
+- The runtime cache uses the desktop's key, as this page asked. When the desktop's entry is restored,
+  the cache doesn't save again, so a Linux or macOS arm64 job downloads the LICENSE tarball again on
+  every run.
+
+What only CI can prove:
+
+- Every job in `build-node.yml`. `actionlint` isn't installed here, so I read the workflow against
+  `build-desktop.yml` and parsed it. Parts nothing here has run: a matrix `container` that is empty on
+  macOS and Windows, the Linux container steps, `macos-15-intel`, the Windows zip and `acorn.cmd`, and
+  node-pty compiling in Debian 11.
+- The 14-day retention needs the repository's cap raised in **Settings → Actions → General**. Only
+  the owner can change it. Until then, GitHub clamps the artifacts to one day.
+- The acceptance check on clean machines belongs to phase 8.
+
+For later phases:
+
+- Phase 5: add `install.sh` and `install.ps1` to `scripts/node-archive/`, copy them in
+  `packPlatformArchive`, and replace the `ACORN_DATA_DIR` check in both launchers with the default
+  data root. If the installer links `bin/acorn` onto the `PATH`, use a wrapper script or make the
+  launcher follow symlinks. The archive README's "Start a Node" section is where the installer steps
+  go. The installer should run `xattr -dr com.apple.quarantine` on macOS and `Unblock-File` on Windows.
+- Phase 8: record each platform's archive size from the first dispatch, and run the clean-machine
+  check with `gh run download`.
 
 ## Goal
 

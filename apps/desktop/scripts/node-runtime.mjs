@@ -49,10 +49,32 @@ const download = async (url) => {
   return Buffer.from(await response.arrayBuffer())
 }
 
+// Windows' own bsdtar, which reads zip archives and drive-letter paths. Git for Windows puts GNU tar
+// first on a runner's PATH, and that one does neither.
+export const tar = process.platform === 'win32' ? resolve(process.env.SystemRoot ?? 'C:\\Windows', 'System32/tar.exe') : 'tar'
+
+/// One file from this release, checked against the release's SHASUMS256.txt.
+const verifiedDownload = async (version, file) => {
+  const base = `https://nodejs.org/dist/v${version}`
+  const [shasums, bytes] = await Promise.all([download(`${base}/SHASUMS256.txt`), download(`${base}/${file}`)])
+
+  // The whole point of the exercise: the bytes that go into the bundle are the bytes nodejs.org
+  // published for this release, not whatever a proxy or a half-finished download handed back.
+  const expected = shasums
+    .toString('utf8')
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/))
+    .find(([, name]) => name === file)?.[0]
+  if (!expected) throw new Error(`${base}/SHASUMS256.txt does not list ${file}. Check the pin in node-runtime.json.`)
+  const actual = createHash('sha256').update(bytes).digest('hex')
+  if (actual !== expected) throw new Error(`${file} failed its checksum: nodejs.org published ${expected}, the download hashes to ${actual}.`)
+  return bytes
+}
+
 /// The extracted `node` binary for this version and triple, from the cache when it is there and intact.
 /// The cache records the digest of the extracted binary rather than the tarball's, so a hit re-verifies
 /// without going back to the network.
-const cachedRuntime = async (version, triple, cacheDir) => {
+export const cachedRuntime = async (version, triple, cacheDir = CACHE) => {
   const dist = DIST_NAMES.get(triple)
   if (!dist) throw new Error(`No nodejs.org build is mapped for ${triple}. Add it to DIST_NAMES, or set ACORN_TARGET_TRIPLE.`)
   const cached = resolve(cacheDir, `node-v${version}-${triple}`)
@@ -63,19 +85,7 @@ const cachedRuntime = async (version, triple, cacheDir) => {
 
   const windows = triple.includes('-windows-')
   const archive = windows ? `${dist}/node.exe` : `node-v${version}-${dist}.tar.gz`
-  const base = `https://nodejs.org/dist/v${version}`
-  const [shasums, tarball] = await Promise.all([download(`${base}/SHASUMS256.txt`), download(`${base}/${archive}`)])
-
-  // The whole point of the exercise: the bytes that go into the bundle are the bytes nodejs.org
-  // published for this release, not whatever a proxy or a half-finished download handed back.
-  const expected = shasums
-    .toString('utf8')
-    .split('\n')
-    .map((line) => line.trim().split(/\s+/))
-    .find(([, name]) => name === archive)?.[0]
-  if (!expected) throw new Error(`${base}/SHASUMS256.txt does not list ${archive}. Check the pin in node-runtime.json.`)
-  const actual = createHash('sha256').update(tarball).digest('hex')
-  if (actual !== expected) throw new Error(`${archive} failed its checksum: nodejs.org published ${expected}, the download hashes to ${actual}.`)
+  const tarball = await verifiedDownload(version, archive)
 
   const scratch = mkdtempSync(resolve(tmpdir(), 'acorn-node-runtime-'))
   try {
@@ -92,6 +102,26 @@ const cachedRuntime = async (version, triple, cacheDir) => {
     renameSync(extracted, cached)
     writeFileSync(digestFile, sha256(cached))
     return { path: cached, source: 'nodejs.org' }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+}
+
+/// Node's LICENSE for this version, which a copy of the runtime has to carry. Every release archive holds
+/// the same file and the headers tarball holds none, so it comes from the Linux x64 tarball for any target.
+export const cachedLicense = async (version, cacheDir = CACHE) => {
+  const cached = resolve(cacheDir, `node-v${version}-LICENSE`)
+  if (existsSync(cached)) return cached
+  const dist = `node-v${version}-linux-x64`
+  const tarball = await verifiedDownload(version, `${dist}.tar.gz`)
+  const scratch = mkdtempSync(resolve(tmpdir(), 'acorn-node-license-'))
+  try {
+    const local = resolve(scratch, `${dist}.tar.gz`)
+    writeFileSync(local, tarball)
+    execFileSync(tar, ['-xzf', local, '-C', scratch, '--strip-components=1', `${dist}/LICENSE`])
+    mkdirSync(cacheDir, { recursive: true })
+    renameSync(resolve(scratch, 'LICENSE'), cached)
+    return cached
   } finally {
     rmSync(scratch, { recursive: true, force: true })
   }

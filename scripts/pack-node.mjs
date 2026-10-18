@@ -23,17 +23,46 @@
 //   package-lock.json  resolved at pack time, so every operator installs the same versions
 //   README.md      pointing at docs/node-distribution.md
 //
+// ## Platform archives
+//
+// `--platform <os>-<arch>` writes a self-contained archive for this machine's platform instead: the
+// tree above under lib/ with its dependencies installed and pruned, the pinned Node.js runtime under
+// runtime/, and the launchers and README from scripts/node-archive/. The runner's own Node only
+// installs packages. CI builds one per platform (.github/workflows/build-node.yml), on that platform,
+// because node-pty takes a prebuild on macOS and Windows and compiles on Linux.
+//
 // The desktop renderer, the shell and every `@acorn/*` package are absent by construction: the
 // builds bundle first-party source into the artifacts, so the archive needs none of them at runtime.
 
-import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { execFileSync, execSync } from 'node:child_process'
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseArgs } from 'node:util'
+import { cachedLicense, cachedRuntime, sha256, tar } from '../apps/desktop/scripts/node-runtime.mjs'
 import { buildBundledPlugins } from './bundled-plugins.mjs'
 import { externalSpecifiers, packageName, readChunkGraph } from './chunkGraph.mts'
 import { requiredRuntimePackages } from './nodeRuntimePackages.ts'
 import { REVIEWED_PACKAGES } from './prune-runtime.mjs'
+import { runPnpm } from './run-pnpm.mjs'
+
+// Each archive platform and the target triple its pinned runtime is cached under.
+const ARCHIVE_TRIPLES = {
+  'darwin-arm64': 'aarch64-apple-darwin',
+  'darwin-x64': 'x86_64-apple-darwin',
+  'linux-arm64': 'aarch64-unknown-linux-gnu',
+  'linux-x64': 'x86_64-unknown-linux-gnu',
+  'win32-x64': 'x86_64-pc-windows-msvc',
+}
+const { platform } = parseArgs({ options: { platform: { type: 'string' } } }).values
+if (platform !== undefined && platform !== `${process.platform}-${process.arch}`) {
+  throw new Error(
+    `--platform ${platform} must be this machine's, ${process.platform}-${process.arch}, because npm installs node-pty's build for the machine it runs on.`,
+  )
+}
+if (platform !== undefined && !ARCHIVE_TRIPLES[platform]) {
+  throw new Error(`There is no archive for ${platform}. Archives cover ${Object.keys(ARCHIVE_TRIPLES).join(', ')}.`)
+}
 
 // The standalone manifest uses the same supported security range as the checkout.
 const workspaceManifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
@@ -66,6 +95,9 @@ const RUNTIME = [
 const DYNAMIC = ['@xterm/headless', '@xterm/addon-serialize']
 
 const read = (path) => JSON.parse(readFileSync(path, 'utf8'))
+// Through a shell, because Windows runs npm as npm.cmd, which execFile can't start. Every argument is
+// this script's own.
+const npm = (args, cwd) => execSync(`npm ${args.join(' ')}`, { cwd, stdio: 'inherit' })
 
 // The one runnable check in this script, and the failure it exists for is silent: a package the bundle
 // imports but the manifest omits produces a tarball that installs cleanly and then throws
@@ -101,9 +133,9 @@ function stageMigrations(target) {
 }
 
 console.log('[pack-node] building the artifact')
-execFileSync('pnpm', ['--filter', '@acorn/node', 'build'], { cwd: ROOT, stdio: 'inherit' })
-execFileSync('pnpm', ['--filter', '@acorn/cli', 'build'], { cwd: ROOT, stdio: 'inherit' })
-execFileSync('pnpm', ['--filter', '@acorn/tui', 'build'], { cwd: ROOT, stdio: 'inherit' })
+runPnpm(['--filter', '@acorn/node', 'build'], { cwd: ROOT, stdio: 'inherit' })
+runPnpm(['--filter', '@acorn/cli', 'build'], { cwd: ROOT, stdio: 'inherit' })
+runPnpm(['--filter', '@acorn/tui', 'build'], { cwd: ROOT, stdio: 'inherit' })
 
 const dist = join(NODE_APP, 'dist')
 if (!existsSync(join(dist, 'standalone.js'))) throw new Error('apps/node/dist/standalone.js is missing after the build.')
@@ -220,10 +252,7 @@ writeFileSync(
 const minimumReleaseAge = Number(/^minimumReleaseAge: (\d+)$/m.exec(workspaceText)?.[1])
 if (!minimumReleaseAge) throw new Error('pnpm-workspace.yaml has no minimumReleaseAge.')
 const before = new Date(Date.now() - minimumReleaseAge * 60_000).toISOString()
-execFileSync('npm', ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', `--before=${before}`], {
-  cwd: staging,
-  stdio: 'inherit',
-})
+npm(['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', `--before=${before}`], staging)
 console.log(`[pack-node] locked the runtime dependencies to releases before ${before}`)
 
 writeFileSync(
@@ -264,9 +293,61 @@ writeFileSync(
   ].join('\n'),
 )
 
-// `tar` rather than a packing library, for the same reason server/storage/backup.ts uses it: the platform has one,
-// it is what the operator will unpack with, and a dependency for a single `-czf` is not worth it.
-const archive = join(OUT, `acorn-node-${desktop.version}.tar.gz`)
-execFileSync('tar', ['-czf', archive, '-C', OUT, 'acorn-node'], { stdio: 'inherit' })
-rmSync(staging, { recursive: true, force: true })
+// The steps docs/node-distribution.md § Install and start gives an operator, done here on the platform
+// the archive is for, so the target machine needs no npm or compiler.
+async function packPlatformArchive(tree) {
+  const name = `acorn-node-${desktop.version}-${platform}`
+  const root = join(OUT, name)
+  const lib = join(root, 'lib')
+  mkdirSync(root)
+  renameSync(tree, lib)
+  npm(['ci', '--omit=dev', '--no-audit', '--no-fund'], lib)
+  execFileSync(process.execPath, ['scripts/prune-runtime.mjs'], { cwd: lib, stdio: 'inherit' })
+  // Its steps are the ones this function has already run. The archive's own README replaces it.
+  rmSync(join(lib, 'README.md'))
+  // node-pty publishes spawn-helper as mode 644, and a terminal fails with "posix_spawnp failed"
+  // until it's executable. tar keeps the mode from here on.
+  const spawnHelper = join(lib, 'node_modules/node-pty/prebuilds', platform, 'spawn-helper')
+  if (existsSync(spawnHelper)) chmodSync(spawnHelper, 0o755)
+
+  const windows = platform.startsWith('win32')
+  const pin = read(join(ROOT, 'node-runtime.json')).version
+  const runtime = await cachedRuntime(pin, ARCHIVE_TRIPLES[platform])
+  mkdirSync(join(root, 'runtime'))
+  const node = join(root, 'runtime', windows ? 'node.exe' : 'node')
+  cpSync(runtime.path, node)
+  chmodSync(node, 0o755)
+  cpSync(await cachedLicense(pin), join(root, 'runtime/LICENSE'))
+  console.log(`[pack-node] Node.js ${pin} for ${platform}, from ${runtime.source}`)
+
+  const launchers = join(ROOT, 'scripts/node-archive')
+  mkdirSync(join(root, 'bin'))
+  cpSync(join(launchers, 'acorn'), join(root, 'bin/acorn'))
+  chmodSync(join(root, 'bin/acorn'), 0o755)
+  cpSync(join(launchers, 'acorn.cmd'), join(root, 'bin/acorn.cmd'))
+  cpSync(join(launchers, 'README.md'), join(root, 'README.md'))
+  const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim()
+  writeFileSync(
+    join(root, 'BUILD'),
+    `version=${desktop.version}\ncommit=${commit}\nbuilt=${new Date().toISOString()}\nplatform=${platform}\nnode=${pin}\n`,
+  )
+
+  // A zip on Windows, where people extract with Explorer. A tarball elsewhere, because it keeps the
+  // executable bits that bin/acorn, the runtime, and spawn-helper need.
+  const archive = join(OUT, `${name}${windows ? '.zip' : '.tar.gz'}`)
+  execFileSync(tar, [...(windows ? ['-a', '-cf'] : ['-czf']), archive, '-C', OUT, name], { stdio: 'inherit' })
+  writeFileSync(`${archive}.sha256`, `${sha256(archive)}  ${basename(archive)}\n`)
+  rmSync(root, { recursive: true, force: true })
+  return archive
+}
+
+let archive
+if (platform) archive = await packPlatformArchive(staging)
+else {
+  // `tar` rather than a packing library, for the same reason server/storage/backup.ts uses it: the platform has one,
+  // it is what the operator will unpack with, and a dependency for a single `-czf` is not worth it.
+  archive = join(OUT, `acorn-node-${desktop.version}.tar.gz`)
+  execFileSync('tar', ['-czf', archive, '-C', OUT, 'acorn-node'], { stdio: 'inherit' })
+  rmSync(staging, { recursive: true, force: true })
+}
 console.log(`[pack-node] ${archive}`)

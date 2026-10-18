@@ -41,25 +41,9 @@ Preserve these container decisions:
 
 ## Produce platform archives
 
-Start with `scripts/pack-node.mjs`, `scripts/rebuild-node-abi.mjs`, `scripts/nodeRuntimePackages.ts`,
-`node-runtime.json`, and the dependency policy in `package.json`.
-
-Implement these steps:
-
-1. Build native dependencies on runners matching each supported operating system and architecture.
-   Produce Linux glibc binaries for x64 and arm64. Verify the module loads before packaging it.
-2. Assemble archives for macOS arm64 and x64, Linux arm64 and x64, and Windows x64.
-   Add Windows arm64 only after its runtime and native dependency path passes the same checks.
-3. Include the runtime pinned by `node-runtime.json`. Reuse checksum verification from desktop staging;
-   preserve the shared supported-runtime policy.
-4. Retain the generated dependency manifest and lockfile. Verify bundled native binaries and installed
-   dependencies in an extracted archive outside the workspace dependency tree.
-5. Publish versioned archives and checksums from a tag whose tests and artifact checks pass.
-   Keep credentials out of artifacts and logs.
-
-Acceptance: a clean supported host can extract the archive, run a headless command, open the terminal
-client, start a Node, pair a second client, and drain the supervised Node. A client that only attaches
-must leave the Node running. Verify restart with the same data root preserves identity and data.
+`.github/workflows/build-node.yml` builds and smoke-tests the five archives on `v*` tags and manual
+dispatches ([archives](../node-distribution.md#archives)). Publishing them waits on the same signing gate
+as the desktop's installers ([sign macOS artifacts](#sign-macos-artifacts)).
 
 ## Finish Windows operation support
 

@@ -8,6 +8,7 @@ sources:
   - apps/node/src/entries/standalone.ts
   - apps/node/src/composition/plugins.ts
   - scripts/pack-node.mjs
+  - scripts/node-archive/README.md
 checked: '034e42840'
 ---
 
@@ -17,6 +18,30 @@ This page covers installing it, the settings it reads, starting and stopping it,
 service, and what it can do.
 
 ## Install it
+
+### From a platform archive
+
+A packaging run of acorn's GitHub Actions builds a self-contained archive for macOS arm64 and x64, Linux
+x64 and arm64, and Windows x64. It carries its own Node.js and every dependency, so the machine needs no
+Node.js or build tools. Download `acorn-node-<platform>` from the run's artifacts, then check, extract,
+and start it:
+
+```sh
+shasum -a 256 -c acorn-node-*.tar.gz.sha256
+tar -xzf acorn-node-*.tar.gz
+cd acorn-node-*/
+export ACORN_DATA_DIR="$HOME/.acorn-node"
+bin/acorn node start --background
+bin/acorn node pair
+```
+
+`bin/acorn` refuses to run without `ACORN_DATA_DIR`. On Windows, extract the zip and run
+`bin\acorn.cmd`. On Linux, the archive needs glibc 2.31 or later, which Ubuntu 22.04, Debian 11, and
+Raspberry Pi OS 11 have. If a browser downloaded it on macOS, run
+`xattr -dr com.apple.quarantine <folder>` on the extracted folder first. The archive's `README.md`
+covers the rest, and the run keeps it for 14 days.
+
+### From the tarball
 
 The machine needs Node.js 22.23.2 or later in branch 22, 24.18.1 or later in branch 24, or 26.5.1 or
 later in branch 26. On Linux it also needs the usual build tools, because `node-pty`, the one native

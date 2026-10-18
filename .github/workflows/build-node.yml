@@ -1,0 +1,92 @@
+name: Build the Node archives
+
+# A self-contained Node archive per platform: the pinned Node.js runtime, the Node, the CLI, and every
+# installed dependency (docs/node-distribution.md § Archives). Each job builds on the platform it
+# targets, because node-pty takes a prebuild on macOS and Windows and compiles on Linux, then starts a
+# Node from the extracted archive before it uploads it.
+#
+# Called by ci.yml for `v*` tags and manual dispatches, after the Linux suite passes for the same
+# commit. It needs no secrets.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: darwin-arm64
+            os: macos-latest
+            format: tar.gz
+          - platform: darwin-x64
+            os: macos-15-intel
+            format: tar.gz
+          # Built in Debian 11, so the compiled node-pty needs glibc 2.31, not the runner's 2.39. The
+          # pinned runtime needs 2.28, so this sets the floor: Ubuntu 22.04, Debian 11, Raspberry Pi OS 11.
+          - platform: linux-x64
+            os: ubuntu-24.04
+            container: node:24-bullseye
+            format: tar.gz
+          - platform: linux-arm64
+            os: ubuntu-24.04-arm
+            container: node:24-bullseye
+            format: tar.gz
+          - platform: win32-x64
+            os: windows-latest
+            format: zip
+    runs-on: ${{ matrix.os }}
+    # Empty on macOS and Windows, which runs the job on the runner itself.
+    container: ${{ matrix.container }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      # The container runs as root over a checkout the runner's user owns, and Git refuses to read
+      # it. The packer reads the commit for the archive's BUILD file.
+      - name: Trust the checkout inside the container
+        if: matrix.container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          # Only builds and installs packages. The archive carries the runtime node-runtime.json pins.
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The desktop workflow's key, so a runner downloads each pin once.
+      - name: Cache the pinned Node runtime
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/acorn/node-runtime
+          key: node-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node-runtime.json') }}
+
+      - name: Build the archive
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: pnpm pack:node --platform "$PLATFORM"
+
+      - name: Start a Node from the extracted archive
+        env:
+          ARCHIVE_GLOB: apps/node/release/acorn-node-*-${{ matrix.platform }}.${{ matrix.format }}
+        run: node scripts/node-archive/smoke.mjs $ARCHIVE_GLOB
+
+      # GitHub zips every artifact, and that zip drops file modes. The tarball inside keeps them.
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: acorn-node-${{ matrix.platform }}
+          path: |
+            apps/node/release/acorn-node-*-${{ matrix.platform }}.${{ matrix.format }}
+            apps/node/release/acorn-node-*-${{ matrix.platform }}.${{ matrix.format }}.sha256
+          if-no-files-found: error
+          # Above the repository's one-day cap, which has to rise to 14 days in Settings → Actions →
+          # General. Saying so here keeps the 90-day default from returning when the cap does.
+          retention-days: 14
