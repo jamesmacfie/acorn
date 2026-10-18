@@ -5,7 +5,7 @@ sources:
   - docs/notes-and-memory.md
   - docs/notes-and-memory/memory-page.md
   - docs/managed-agents/sessions.md
-checked: 90ded85ca
+checked: 'af672a9ab'
 ---
 
 This page covers memory: the facts agents save so a later session doesn't start from nothing, how

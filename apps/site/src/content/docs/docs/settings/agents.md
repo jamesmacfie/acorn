@@ -30,7 +30,7 @@ covers:
   - agent-mcp-servers
   - agent-limits
   - memory
-checked: '252cc2937'
+checked: 'af672a9ab'
 ---
 
 This page lists every setting in **Settings** > **Agents**. Every page here is stored on the Node, so
