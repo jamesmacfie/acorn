@@ -1,4 +1,5 @@
 mod app_scheme;
+mod boot_marks;
 mod commands;
 mod cli_install;
 mod crash;
@@ -74,6 +75,7 @@ fn dev_server_for(packaged: bool, read: impl FnOnce() -> Option<String>) -> Opti
 }
 
 pub fn run() {
+    boot_marks::start();
     let reset_options = reset_stage::options_from_args().unwrap_or_else(|error| {
         eprintln!("[reset] {error}");
         std::process::exit(2);
@@ -247,6 +249,7 @@ pub fn run() {
             }
             app.manage(Webviews::<tauri::Wry>::default());
             app.manage(tray::Tray::default());
+            boot_marks::mark("setup");
             // Deliberately blocking, and short: the helper reports itself ready as soon as it is
             // listening, which is a cache sweep and a socket bind rather than a node boot. There is
             // nothing for the event loop to do in the meantime, and a window opened before the
@@ -266,6 +269,7 @@ pub fn run() {
                             dev_server::wait_for_entry(origin);
                         }
                         open_window(&handle)?;
+                        boot_marks::mark("window built");
                     }
                 }
                 Err(error) => {
@@ -386,6 +390,11 @@ fn boot(app: &tauri::AppHandle, hidden: bool) -> Result<(Helper, Frames), String
 
     let frames = Frames::new(&user_data_dir, &bridge_dir(app).join("plugin-frame.css"));
 
+    // Read here rather than inside the handshake, so the marks either side time the keychain alone.
+    boot_marks::mark("roots");
+    let data_key = keychain::data_key(&user_data_dir, packaged);
+    boot_marks::mark("keychain");
+
     let handle = app.clone();
     let helper = Helper::start(
         Launch {
@@ -393,7 +402,7 @@ fn boot(app: &tauri::AppHandle, hidden: bool) -> Result<(Helper, Frames), String
             entry: staging.join("helper.js"),
             handshake: Handshake {
                 protocol: HELPER_PROTOCOL,
-                data_key: keychain::data_key(&user_data_dir, packaged),
+                data_key,
                 data_dir: data_dir.to_string_lossy().into_owned(),
                 user_data_dir: user_data_dir.to_string_lossy().into_owned(),
                 service_entry: staging.join("service.js").to_string_lossy().into_owned(),

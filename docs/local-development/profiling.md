@@ -8,7 +8,7 @@ For repeatable streaming and idle measurements in a real window, use
 
 ## Timing a cold start
 
-Each of the four processes logs its own boot. Every line carries `+Nms` from that process's start and
+Each process logs its own boot. Every line carries `+Nms` from that process's start and
 `(Nms)` for the step alone, so the slow step is the one wide number.
 
 ### The Node's marks
@@ -59,6 +59,7 @@ watches while using the app:
 
 | Process | Turn it on | Prints |
 | --- | --- | --- |
+| Shell | Set `ACORN_PERF=1` in the environment that starts the shell | `[shell:boot]` on stderr: `setup` (Tauri's own start), `roots`, `keychain` (the data-key read alone), `helper spawned`, `helper ready`, and `window built`. The helper's `+0ms` is about `helper spawned`. Tray mode builds no window. |
 | Helper | Set `ACORN_PERF=1` in the environment that starts the shell | `[helper:boot]` on stderr: handshake, plugin-cache sweep, bundled plugins trusted, `service.start`, Node adopted, WebSocket bound, and the ready line. Stdout is the line protocol Rust parses. |
 | Node | The same variable | `[perf:request]` per request, with method, route pattern, status, milliseconds, response bytes, and request ID, plus `git` and SQLite histograms. Response bytes come from `content-length`, and `-1` means none was declared, which is what a stream looks like. |
 | Renderer | Run `localStorage.setItem('acorn.perf', '1')` and reload | `[renderer:boot]` in the devtools console: script start, Node selected, plugins applied, tree built, first paint, and `nodeReady`. |
@@ -70,9 +71,8 @@ performance panel shows the same labels with the switch off. With telemetry on, 
 `nodeReady` also go to sinks as a `renderer.boot` span. [Telemetry](../telemetry.md) § Renderer seams
 covers those.
 
-`acorn` holds its lines until exit, because stderr is the terminal the renderer draws on. A line
-written mid-session would corrupt the screen. It prints them after `renderer.destroy()`, beside any
-held Node warnings.
+`acorn` holds its lines until exit, because stderr is the terminal the renderer draws on. It prints
+them after `renderer.destroy()`, beside any held Node warnings.
 
 The Node's histograms count work repeated with nothing else counting it: `git status` and `git diff`
 as `git.<subcommand>`, and SQLite statements as `sql.<verb>`. They print when the Node drains.

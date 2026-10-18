@@ -217,6 +217,7 @@ impl Helper {
     pub fn start(launch: Launch, on_signal: impl Fn(Signal) + Send + 'static) -> Result<Self, String> {
         let expected = launch.handshake.protocol;
         let mut child = spawn(&launch).map_err(|e| format!("could not start the desktop helper: {e}"))?;
+        crate::boot_marks::mark("helper spawned");
         let mut stdin = child.stdin.take().ok_or("the desktop helper has no stdin")?;
         let stdout = child.stdout.take().ok_or("the desktop helper has no stdout")?;
 
@@ -244,7 +245,10 @@ impl Helper {
         });
 
         let ready = match rx.recv_timeout(READY_TIMEOUT) {
-            Ok(ready) => ready,
+            Ok(ready) => {
+                crate::boot_marks::mark("helper ready");
+                ready
+            }
             Err(RecvTimeoutError::Timeout) => {
                 let helper = Self { child: Arc::new(Mutex::new(Some(child))), stdin: Arc::new(Mutex::new(None)), ready: Ready { protocol: 0, port: 0, secret: String::new(), node_version: String::new() } };
                 helper.stop();

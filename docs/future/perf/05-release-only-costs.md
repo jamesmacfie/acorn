@@ -1,7 +1,57 @@
 # Phase 5: check the costs only a release build pays
 
-Date: October 19, 2026. Status: proposed. Needs phase 1's release baseline. This phase may end with
-no code change.
+## Completion note
+
+The timing lines landed on October 19, 2026. Nothing under
+[fix what crosses its threshold](#fix-what-crosses-its-threshold) was done. Each fix needs five
+release launches from Finder, which only the owner can run, and the keychain option is the owner's
+call. Both [acceptance](#acceptance) items stay open.
+
+What changed:
+
+- `apps/desktop/src-tauri/src/boot_marks.rs` prints `[shell:boot] <label> +<ms>ms (<ms>ms)` to
+  stderr when `ACORN_PERF=1`, the shape of the helper's lines. `run` starts the clock first thing.
+  With the switch off, a mark only checks an empty lock.
+- The marks, in order: `setup` when Tauri hands over, `roots` once both roots and the bundle check
+  are done, `keychain` after the data-key read, `helper spawned` right after the spawn,
+  `helper ready` when the ready line arrives, and `window built` after `open_window`. A launch in
+  tray mode stops at `helper ready`.
+- `boot` reads the data key before it builds the handshake, so `keychain`'s own time is the keychain
+  read and the file fallback, nothing else.
+- Test: one unit test for the line format. The marks themselves print and do nothing else.
+- Docs: a Shell row in [the other processes](../../local-development/profiling.md#the-other-processes).
+
+Decisions and deviations:
+
+- `setup` and `roots` aren't in the plan. Without a mark right before the read, the `keychain` step
+  would include Tauri's start, the data roots, and the crash hook, and the 50 ms threshold couldn't
+  be read off it.
+- The clock is one process-wide value behind a lock, like the helper's module-level clock. Passing a
+  timer through `boot` into `Helper::start` would add a parameter to every call for two marks.
+- `cargo fmt` isn't used in this repo. Its check fails on files this change didn't touch.
+- The public site's environment-variable page lists `ACORN_PERF` for the Node only. It never named
+  the helper's lines either, so it wasn't changed. "Configuration files" cites `lib.rs` and still
+  matches.
+
+What the owner measures, and what each result triggers:
+
+- Launch the release app through LaunchServices with the lines on:
+  `open --env ACORN_PERF=1 --stderr /tmp/acorn-boot.log <path>/acorn.app`. That's the Finder path,
+  so the five baseline launches and the shell lines come from the same runs.
+- **`keychain` over 50 ms at the median, or any prompt.** Bring the owner two options: read the
+  fallback file first when it exists, or sign the build with a stable identity. The first changes
+  which store wins, and needs the Rust test under [tests](#tests).
+- **A quarantined copy's first launch more than 5 s slower than its second.** The scan runs before
+  the process starts, so the lines can't show it. Time from `open` until `[shell:boot] setup`
+  appears in the log, once on a fresh download and once after. An ad-hoc copy may be refused
+  outright, which is itself evidence. Record the result in [the bundle plan](../bundle.md#sign-macos-artifacts)
+  as evidence for notarization, and don't work around the scan.
+- **The release `[renderer:boot] script start` over 150 ms at the median.** Work the three steps
+  under [fix what crosses its threshold](#fix-what-crosses-its-threshold) in order.
+- Rust's `helper spawned` to `helper ready`, minus the helper's own `ready line` offset, is Node
+  starting and evaluating the helper bundle before the helper's clock starts. No other line shows it.
+
+Date: October 19, 2026. Status: timing lines landed, release measurements not taken.
 
 Three launch costs exist only in a packaged build, and none has been measured: the keychain read
 in front of the helper, the Gatekeeper scan on a downloaded copy's first launch, and the renderer
