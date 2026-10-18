@@ -25,7 +25,7 @@ covers:
   - telemetry
   - sentry-telemetry
   - storage
-checked: '034e42840'
+checked: 'adb301ec6'
 ---
 
 This page lists every setting in **Settings** > **Machines**. **Nodes** is stored on **This device**,

@@ -11,7 +11,7 @@ sources:
   - apps/node/src/composition/plugins.ts
   - scripts/pack-node.mjs
   - scripts/node-archive/README.md
-checked: '1aaa5e5b6'
+checked: 'adb301ec6'
 ---
 
 A standalone Node is acorn's Node with no desktop app: on a server, a build machine, or Linux, where the
