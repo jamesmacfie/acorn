@@ -105,9 +105,10 @@ Memory does not register a context section or duplicate its index in `task_conte
 
 Memory supplies `agents.standingContext.v1` with a `build(taskId)` operation. Agents reads that optional
 capability once at session admission and stores `config.standingContext`. A resume sends the stored
-text unchanged. Generic configuration updates cannot replace it. A fresh session builds another
-snapshot; another live session can call `memory_list` or `memory_search` to see subsequent writes.
-With Memory disabled, admission stores no memory text.
+text unchanged, and generic configuration updates can't replace it. With Memory disabled, admission
+stores no memory text. Later writes reach a running session through `current(taskId)`, as a **Memory
+changes** part ahead of its next turn ([standing memory](./managed-agents/sessions.md#standing-memory)).
+The switch is on Settings > Agents > Memory, stored per user as `memory:live-updates:v1`, on unless `0`.
 
 Standing context contains the single memory contract, the private index, and the signed task's project
 index. It includes descriptions, not bodies. The per-scope caps default to 4,000 and 12,000 characters.

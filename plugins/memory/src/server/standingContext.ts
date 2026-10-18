@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import type { CoreServices } from '@acorn/plugin-api/node'
 import type { MemoryScope } from '../contract/library'
+import { MEMORY_LIVE_UPDATES_KEY } from '../shared/api'
 import { renderMemoryIndex } from './memory'
 import type { MemoryStore } from './memoryStore'
 
@@ -63,11 +64,16 @@ export async function memoryPreview(
   }
 }
 
+// `live` reads for a running session, so it honours the live-updates switch. The switch is on unless the
+// person turned it off, because an agent working from a stale index is the worse case.
 export function standingContextBuilder(
   store: Pick<MemoryStore, 'list'>,
   core: Pick<CoreServices, 'tasks' | 'identity' | 'prefs'>,
+  live = false,
 ) {
   return async (taskId: string): Promise<string | null> => {
+    const user = core.identity.active()
+    if (live && user && (await core.prefs.read(user, MEMORY_LIVE_UPDATES_KEY)) === '0') return null
     const task = await core.tasks.load(taskId)
     return task ? (await memoryPreview(store, core, task.projectId ?? null)).text : null
   }

@@ -43,7 +43,10 @@ export const memoryPlugin = (): NodePlugin => {
             )
         },
       })
-      ctx.capabilities.provide(AGENT_STANDING_CONTEXT, { build: runtime.standingContext })
+      ctx.capabilities.provide(AGENT_STANDING_CONTEXT, {
+        build: runtime.standingContext,
+        current: (taskId) => runtime.standingContext(taskId, true),
+      })
       routeCapability = ctx.capabilities.provide(KNOWLEDGE, runtime.route)
       ctx.routes.register(knowledge, { prefix: '', note: 'memory pane' })
       for (const tool of memoryAgentTools(runtime.store, ctx.core)) ctx.tools.register(tool)

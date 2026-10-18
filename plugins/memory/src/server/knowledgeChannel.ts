@@ -20,7 +20,9 @@ export type MemoryKnowledge = {
   list(projectId: string | null): Promise<MemoryRow[]>
   // Builds the bounded task and memory block. Terminal owns delivery to its new session.
   launchContext(taskId: string): Promise<string | null>
-  standingContext(taskId: string): Promise<string | null>
+  // `live` is the read before a running session's turn, which is null when the person switched live
+  // updates off.
+  standingContext(taskId: string, live?: boolean): Promise<string | null>
   store: MemoryStoreAccess
 }
 
@@ -67,9 +69,9 @@ export function registerKnowledgeChannel(
       createdAt: memory.createdAt || Math.round(memory.updatedAt),
       updatedAt: Math.round(memory.updatedAt),
     }))
-  const standingContext = async (taskId: string) => {
+  const standingContext = async (taskId: string, live = false) => {
     const { standingContextBuilder } = await import('./standingContext')
-    return standingContextBuilder(store, core)(taskId)
+    return standingContextBuilder(store, core, live)(taskId)
   }
 
   const launchContext = async (taskId: string): Promise<string | null> => {

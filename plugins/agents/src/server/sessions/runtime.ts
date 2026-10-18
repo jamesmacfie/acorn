@@ -342,7 +342,8 @@ export class ManagedAgentRuntime {
       () => this.standingContext?.(input.taskId) ?? Promise.resolve(null),
     )
     this.engine.shutdownSignal.throwIfAborted()
-    const { account: _account, ...config } = withAgent.config
+    // A new session starts from its own memory snapshot, so nothing it was "told" before can carry in.
+    const { account: _account, standingContextTold: _told, ...config } = withAgent.config
     const session = await this.store.createSession(
       { ...withAgent, config: { ...config, mcpServers, standingContext, ...(account ? { account } : {}) } },
       provider,

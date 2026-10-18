@@ -11,6 +11,8 @@ const serverOwnedKeys = [
   'delegationSpawnId',
   'customAgent',
   'standingContext',
+  // The memory index the agent was last told about, once it changed after the start.
+  'standingContextTold',
   'initialAttendance',
   // Pinned at creation, because the CLI resumes a session only from its account's folder.
   'account',

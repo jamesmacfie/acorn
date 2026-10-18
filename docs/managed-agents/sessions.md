@@ -32,6 +32,18 @@ configuration patch can't replace it. Claude gets it through `systemPrompt.appen
 developer instructions, and a contributed ACP harness through the first prompt.
 [Notes and memory](../notes-and-memory.md#context-integration) has the contents and caps.
 
+The snapshot never changes, so the system prompt and its prompt cache survive. Before each dispatched
+turn, Agents calls the capability's optional `current(taskId)` and compares its index entries with the
+last ones the session was told: `config.standingContextTold`, or `config.standingContext` before the
+first change. When entries were added or removed, one context part with `contextId: 'memory'`, source
+`context.memory`, and the label **Memory changes** rides ahead of the turn. It lists the new lines under
+"Added or updated" and the old ones under "No longer in the index", so an edited description shows
+both. Once the turn has run, Agents writes `standingContextTold` and records one transcript line, such
+as "Memory changed since the last turn: 2 added, 1 removed." A failed turn writes nothing, so the next
+turn carries the same part. A configuration patch can't set `standingContextTold`, and a new session
+starts without one. `current` returns `null` when the person switches the setting off, so no part or
+line appears. Switched on again, the next part covers everything the session missed.
+
 ## Session model
 
 A session belongs to one task and one provider profile. It holds turns, normalized events,

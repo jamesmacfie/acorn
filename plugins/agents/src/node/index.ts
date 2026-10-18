@@ -263,6 +263,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         mcp: acornMcp,
         standingContext: (taskId) =>
           ctx.capabilities.get(AGENT_STANDING_CONTEXT)?.build(taskId) ?? Promise.resolve(null),
+        currentStandingContext: async (taskId) =>
+          ctx.capabilities.get(AGENT_STANDING_CONTEXT)?.current?.(taskId) ?? null,
         secrets: core.secrets,
         // Read per call, never captured. Agent records and credentials remain scoped to the active
         // account, and an account switch must not be served from a cached value.

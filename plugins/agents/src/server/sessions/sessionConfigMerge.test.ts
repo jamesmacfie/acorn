@@ -11,6 +11,7 @@ describe('session configuration merge', () => {
       customAgent: { id: 'reviewer', instructions: 'Review only.' },
       toolCeiling: { maxRisk: 'read' },
       mcpServers: ['approved'],
+      standingContextTold: 'The memory index the agent was last told about.',
     }
     expect(retainSessionAuthority({ providerOption: 'changed' }, identity)).toEqual({
       providerOption: 'changed',

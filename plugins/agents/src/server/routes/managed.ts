@@ -428,6 +428,7 @@ export const managedAgents = new Hono<AppEnv>()
     const {
       customAgent: _unread,
       standingContext: _standingContext,
+      standingContextTold: _standingContextTold,
       skillIndex: _skillIndex,
       account: _account,
       ...config

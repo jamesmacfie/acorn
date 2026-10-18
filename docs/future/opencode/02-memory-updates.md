@@ -1,6 +1,73 @@
 # Phase 2: Tell running sessions when memory changes
 
-Date: October 16, 2026. Status: proposed.
+Date: October 16, 2026. Status: done on October 19, 2026.
+
+## Completion note
+
+October 19, 2026. Landed on branch `phase-2-memory-updates`.
+
+What landed:
+
+- `AgentStandingContext` gained an optional `current(taskId)`. The capability ID stays `v1`.
+- The memory plugin provides `current` from the same lazy `standingContext` loader, with a `live`
+  flag. A live read returns `null` when the per-user preference `memory:live-updates:v1` is `0`.
+  Anything else, or no value, is on. The key lives in `plugins/memory/src/shared/api.ts`, because the
+  client and the server both read it.
+- `plugins/agents/src/server/sessions/memoryChanges.ts` owns the whole note. Before each dispatched
+  turn, `memoryNote` diffs the index entries, meaning the lines that start with `- `, against
+  `standingContextTold ?? standingContext`. It returns the part and a `deliver` callback. The
+  dispatcher runs `deliver` in the turn's success callback. That saves `standingContextTold` and
+  records the transcript line. A failed turn never calls it, and a failed read or save logs a warning
+  without failing the turn.
+- `standingContextTold` is in `serverOwnedKeys`. The HTTP create route strips it, and so does
+  `ManagedAgentRuntime.createSession`, so a forged or copied value can't become a session's
+  baseline. The session list leaves it out of each row, like `standingContext`.
+- The memory plugin registers a **Memory** settings page under Settings > Agents, with one switch.
+  The terminal client draws it too, because it uses the same kit rows as the editor's page.
+- Docs: [standing memory](../../managed-agents/sessions.md#standing-memory) and
+  [context integration](../../notes-and-memory.md#context-integration). On the site, the memory
+  guide, the memory plugin page, and the Agents settings page, which now covers `memory`.
+
+Deviations:
+
+- The removed lines go under "No longer in the index:", not "Removed:". The project index is capped,
+  so each new memory can push an old one out of the list. "Removed" would tell the agent a memory
+  was deleted when it still exists.
+- The part goes into the request input in `dispatchQueuedTurn`, not through `sendTurn`. The skills
+  part is still prepended in `sendTurn`, so a first turn after a start carries skills, then memory,
+  then the turn. This needed no change to `sendTurn`, and the owed-again rule comes from the database
+  row: nothing is saved until the turn runs.
+- Only `- ` entry lines count. Without that, the truncation marker's count would show as a change on
+  every write past the cap. A change to a memory's body alone sends no note, because the index has no
+  bodies.
+- The note isn't added to steered turns, only to dispatched ones.
+
+Measurements:
+
+- One `current` read over a copy of this machine's real memory took a median of 9.1 ms, and 13.4 ms
+  cold. That was 155 project memories and six private ones, an index of 14,405 characters.
+- The Node's static service graph went from 1,883,875 to 1,884,348 bytes. The ceiling is 1,884,400,
+  so 52 bytes are left. The first version was 206 bytes over. Raising the ceiling was refused, so the
+  logic moved behind the lazy import instead. The next phase that adds code to the boot graph has to
+  find room or justify a raise.
+
+Real-harness check, on a standalone Node built from this branch with its own data folder:
+
+- Claude Code: session A saved a memory with `memory_write`. Session B's next turn carried the
+  **Memory changes** part, and B quoted it back. The transcript showed "Memory changed since the last
+  turn: 1 added, 0 removed." `standingContextTold` held the new index, and `standingContext` didn't
+  change.
+- Codex: a Codex session's next turn carried the part, with two added lines and one removed line for
+  an edited description. A standalone Node gives Codex no Acorn tools, so a Claude session did the
+  writes.
+- Off: with the preference at `0`, B answered NONE and no transcript line appeared. On again, B's
+  next note listed everything it had missed: 3 added, 1 removed.
+
+For later phases:
+
+- To run a Node from source with Claude Code available, set `NODE_PATH` to `apps/desktop/node_modules`.
+  The ACP adapter is a desktop dependency. To pair the CLI without a terminal, pipe the pairing code
+  through `script -q /dev/null`, with `ACORN_TUI_CONFIG_DIR` pointing at a scratch folder.
 
 This phase lets a running agent session hear about memory that changed after it started. The
 memory plugin owns a setting that turns it on and off. Read it before you change how standing

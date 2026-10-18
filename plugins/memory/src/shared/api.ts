@@ -11,6 +11,8 @@ export const memoryProjectAddRoute = (projectId: string) =>
 export const memoryUndoRoute = (changeId: string) => `/v1/p/memory/memory/changes/${encodeURIComponent(changeId)}/undo`
 
 export const MEMORY_SOURCE_ID = 'memory'
+// '0' stops the notes a running session gets when memory changes. Anything else, or nothing, is on.
+export const MEMORY_LIVE_UPDATES_KEY = 'memory:live-updates:v1'
 
 export type MemoryAddress = { scope: 'project' | 'private'; projectId: string | null; name: string }
 export type MemoryAuthor = { by: 'agent' | 'owner' | 'import'; sessionId?: string; taskId?: string }

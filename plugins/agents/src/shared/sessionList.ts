@@ -60,7 +60,7 @@ export const sessionListQuerySchema = z
 // stays out of it: the slash commands and skills the provider advertised, the standing context, and
 // every config option value but the chosen one. Those run to tens of kilobytes a session, so a full
 // page of whole rows is megabytes.
-const DETAIL_CONFIG_KEYS = ['commands', 'skills', 'standingContext'] as const
+const DETAIL_CONFIG_KEYS = ['commands', 'skills', 'standingContext', 'standingContextTold'] as const
 
 const configOptionsOf = (config: AgentSession['config']): AgentConfigOption[] | undefined =>
   Array.isArray(config.configOptions) ? (config.configOptions as AgentConfigOption[]) : undefined

@@ -70,4 +70,22 @@ describe('standing memory context', () => {
     const omitted = Number(index.match(/truncated: (\d+)/)![1])
     expect(index.split('\n').filter((line) => line.startsWith('- [')).length + omitted).toBe(12)
   })
+
+  it('reads the current index for a running session unless the person switched live updates off', async () => {
+    await store.write({ scope: 'project', projectId: 'own', name: input.name }, input, author)
+    const prefs: Record<string, string> = {}
+    const core = {
+      tasks: { load: async () => ({ projectId: 'own' }) },
+      identity: { active: () => 'owner' },
+      prefs: { read: async (_user: string, key: string) => prefs[key] ?? null },
+    } as never
+    const current = standingContextBuilder(store, core, true)
+    expect(await current('task')).toContain('[database](database.md)')
+    prefs['memory:live-updates:v1'] = '0'
+    expect(await current('task')).toBeNull()
+    // A new session's snapshot doesn't depend on the switch.
+    expect(await standingContextBuilder(store, core)('task')).toContain('[database](database.md)')
+    prefs['memory:live-updates:v1'] = '1'
+    expect(await current('task')).toContain('[database](database.md)')
+  })
 })

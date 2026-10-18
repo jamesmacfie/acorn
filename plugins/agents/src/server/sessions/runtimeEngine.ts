@@ -141,6 +141,8 @@ export type AgentRuntimeOptions = {
   mcp?: () => { name: string; launcher: Launcher } | null
   secrets: SecretService
   standingContext?(taskId: string): Promise<string | null>
+  /** The memory index as of now, read before each dispatched turn. `null` when live updates are off. */
+  currentStandingContext?(taskId: string): Promise<string | null>
   currentUserId(): string | null
   registry?: AgentDriverRegistry
   publish?(frame: PublishedFrame): void
@@ -252,6 +254,7 @@ export class ManagedAgentEngine {
   private readonly hooks?: Pick<PluginHookRegistry, 'run' | 'handlers'>
   private readonly telemetry?: PluginTelemetry
   private readonly usageLimitResetAt?: AgentRuntimeOptions['usageLimitResetAt']
+  private readonly currentStandingContext?: AgentRuntimeOptions['currentStandingContext']
   private readonly usageContinuationGraceMs: number
   private readonly notice?: (notice: PluginNotice) => void
   // Loaded on the first tool call that has input.
@@ -285,6 +288,7 @@ export class ManagedAgentEngine {
     this.hooks = options.hooks
     this.telemetry = options.telemetry
     this.usageLimitResetAt = options.usageLimitResetAt
+    this.currentStandingContext = options.currentStandingContext
     this.usageContinuationGraceMs = options.usageContinuationGraceMs ?? USAGE_CONTINUATION_GRACE_MS
     this.notice = options.notice
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
@@ -1031,15 +1035,22 @@ export class ManagedAgentEngine {
       })
       const sent = await this.prepareSend(session, turn.id, input, generation)
       if (!sent || !this.processes.owns(generation)) return false
+      // What memory changed since the session was last told, as a part for this turn (./memoryChanges.ts).
+      const { memoryNote } = await import('./memoryChanges')
+      const memory = await memoryNote(session.id, this.store, this.currentStandingContext, (event) =>
+        this.record(session.id, null, event),
+      )
       await this.store.startTurn(turn.id)
       if (!this.processes.owns(generation)) return false
       this.beginTurnSpan(turn.id, session.id, session.providerId, turn.source)
       this.processes.sendTurn(
         generation,
-        { turn, input: driverInput, attachments: sent },
+        { turn, input: memory ? [memory.part, ...driverInput] : driverInput, attachments: sent },
         async (result) => {
           if (!this.processes.owns(generation)) return
           if (result.providerTurnRef) await this.store.setTurnProviderRef(turn.id, result.providerTurnRef)
+          // Only once the turn has run, so a failed turn offers the same change again.
+          await memory?.deliver()
         },
         async (error) => {
           if (!this.processes.owns(generation) || this.processes.current(session.id)?.activeTurnId !== turn.id) return

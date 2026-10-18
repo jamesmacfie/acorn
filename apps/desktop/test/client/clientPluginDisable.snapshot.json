@@ -67,6 +67,7 @@
       "editor",
       "git",
       "git-display",
+      "memory",
       "terminal",
       "workflows"
     ],

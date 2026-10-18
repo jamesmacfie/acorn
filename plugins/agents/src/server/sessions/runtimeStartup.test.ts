@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createCoreServices,
@@ -11,7 +12,7 @@ import { ManagedAgentRuntime } from './runtime'
 import { ManagedAgentEngine, type AgentRuntimeOptions } from './runtimeEngine'
 import { FakeAgentDriver } from '../drivers/fake'
 import { AgentDriverRegistry } from '../drivers/registry'
-import type { AgentSession } from '../../contract/wire.ts'
+import type { AgentInputPart, AgentSession } from '../../contract/wire.ts'
 import type { AgentDriverStartOptions } from '../drivers/types'
 import { ProcessRetirementError } from '../processes/ownedProcess'
 
@@ -37,6 +38,7 @@ describe('managed startup generations', () => {
   let expectedStopError: Error | null
   let memory: string | null
   let memoryReads: number
+  let currentMemory: string | null
   let launch: (options: AgentDriverStartOptions) => Promise<Awaited<ReturnType<FakeAgentDriver['start']>>>
 
   // The engine is built here and handed to the runtime, so a test can start and stop a provider directly.
@@ -63,6 +65,7 @@ describe('managed startup generations', () => {
     expectedStopError = null
     memory = null
     memoryReads = 0
+    currentMemory = null
     launch = (options) => new FakeAgentDriver().start(options)
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => ({
@@ -96,6 +99,7 @@ describe('managed startup generations', () => {
         memoryReads++
         return memory
       },
+      currentStandingContext: async () => currentMemory,
     })
     session = await runtime.store.createSession(
       { taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} },
@@ -150,6 +154,86 @@ describe('managed startup generations', () => {
     })
     expect(fresh.config.standingContext).toBe('Memory after another agent wrote.')
     expect(memoryReads).toBe(2)
+  })
+
+  it('tells a running session what memory changed since its last turn, and again after a failed turn', async () => {
+    const index = (...lines: string[]) => `## Memory\n\nThe contract.\n\n## Project memory\n\n${lines.join('\n')}`
+    memory = index('- [db](db.md) — Use SQLite', '- [style](style.md) — Tabs')
+    currentMemory = memory
+    const sent: AgentInputPart[][] = []
+    let failNext = false
+    launch = async (options) => {
+      const handle = await new FakeAgentDriver().start(options)
+      const send = handle.sendTurn.bind(handle)
+      handle.sendTurn = async (turn) => {
+        sent.push(turn.input)
+        if (failNext) {
+          failNext = false
+          throw new Error('Provider refused the turn.')
+        }
+        return send(turn)
+      }
+      return handle
+    }
+    const created = await runtime.createSession({
+      taskId: 'task',
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: { standingContextTold: 'Forged.' },
+    })
+    const turn = (text: string) =>
+      runtime.enqueueTurn(created.id, {
+        input: [{ type: 'text', text }],
+        source: 'interactive',
+        effectivePolicy: { providerDefault: true },
+        idempotencyKey: randomUUID(),
+      })
+    const memoryPart = (input: AgentInputPart[]) =>
+      input.find((part) => part.type === 'context' && part.source === 'context.memory')
+    const told = async () => (await runtime.store.requireSession(created.id)).config.standingContextTold
+
+    await turn('First.')
+    await vi.waitFor(() => expect(sent).toHaveLength(1))
+    expect(memoryPart(sent[0]!)).toBeUndefined()
+    expect(await told()).toBeUndefined()
+
+    // Another agent saves a memory and edits a description. The failed turn records nothing.
+    currentMemory = index('- [api](api.md) — REST only', '- [db](db.md) — Use Postgres', '- [style](style.md) — Tabs')
+    failNext = true
+    await turn('Second.')
+    await vi.waitFor(() => expect(sent).toHaveLength(2))
+    const note = {
+      type: 'context',
+      contextId: 'memory',
+      source: 'context.memory',
+      label: 'Memory changes',
+      content: [
+        'The memory index changed since your last turn. Read a memory with memory_get when it matters.',
+        'Added or updated:',
+        '- [api](api.md) — REST only',
+        '- [db](db.md) — Use Postgres',
+        'No longer in the index:',
+        '- [db](db.md) — Use SQLite',
+      ].join('\n'),
+    }
+    expect(memoryPart(sent[1]!)).toMatchObject(note)
+    await turn('Third.')
+    await vi.waitFor(() => expect(sent).toHaveLength(3))
+    expect(memoryPart(sent[2]!)).toMatchObject(note)
+    await vi.waitFor(async () => expect(await told()).toBe(currentMemory))
+    const { events } = await runtime.store.snapshot(created.id)
+    expect(events.map((record) => record.event)).toContainEqual(
+      expect.objectContaining({ message: 'Memory changed since the last turn: 2 added, 1 removed.' }),
+    )
+
+    // Told once, so the next turn is quiet. A configuration patch can't rewind what it was told.
+    await turn('Fourth.')
+    await vi.waitFor(() => expect(sent).toHaveLength(4))
+    expect(memoryPart(sent[3]!)).toBeUndefined()
+    await runtime.patchSession(created.id, { config: { standingContextTold: 'Client replacement.' } })
+    expect(await told()).toBe(currentMemory)
+    expect((await runtime.store.requireSession(created.id)).config.standingContext).toBe(memory)
   })
 
   it.each(['cwd', 'workspace', 'history', 'mcp'])(

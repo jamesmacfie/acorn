@@ -40,8 +40,21 @@ when to save, followed by two indexes: your private memories and this project's.
 memory's name and description, not its body, so the agent reads a body only when it needs one.
 
 The private index is capped at 4,000 characters and the project index at 12,000, cutting at whole
-lines and saying how many it left out. A session keeps the memory it started with. A memory saved
-during the session reaches the next one, or any session that searches for it.
+lines and saying how many it left out.
+
+## What a running session is told
+
+A session keeps the index it started with. When a memory is added, changed, or removed after that, the
+session's next message carries a short **Memory changes** note. It lists the new index lines, and the
+old ones that left the index, so an agent sees what an edit replaced. A line can also leave the index
+because newer memories pushed it past the cap. The memory still exists, and the agent can read it.
+
+The transcript shows one line for each note, such as "Memory changed since the last turn: 2 added, 1
+removed." If the message fails, the next one carries the same note. Changing only a memory's body
+doesn't send a note, because the index doesn't show bodies.
+
+To stop the notes, turn off **Settings** > **Agents** > **Memory** > **Tell running sessions when memory
+changes**. It's on by default.
 
 ## The Memory page
 
@@ -106,5 +119,5 @@ saves it.
   them through an agent, or as files.
 - Each memory keeps 20 earlier versions, and the change log keeps the last 1,000 changes.
 - Undo refuses once anything else has changed that memory, including an edit outside acorn.
-- A session's memory is fixed when it starts. A later save doesn't reach a running session unless it
-  searches.
+- A note can drop out of a long session when the agent's harness compacts the conversation. The next
+  change brings a new note, and the agent can call `memory_list` any time.

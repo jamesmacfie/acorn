@@ -21,12 +21,15 @@ sources:
   - plugins/agents/src/client/settings/AgentPricingSettings.tsx
   - plugins/agents/src/client/sessions/toolFoldPrefs.ts
   - packages/protocol/src/agents/toolPermissions.ts
+  - plugins/memory/src/client/MemorySettings.tsx
+  - docs/notes-and-memory.md
 covers:
   - agent-defaults
   - custom-agents
   - agent-tools
   - agent-mcp-servers
   - agent-limits
+  - memory
 checked: '252cc2937'
 ---
 
@@ -119,8 +122,17 @@ empty one to the project folder.
 The prices change only the estimate, never what you're billed
 ([Usage and cost](/docs/agents/usage-and-cost/)).
 
+## Memory
+
+| Setting | What it changes | Stored on | Default |
+| --- | --- | --- | --- |
+| **Tell running sessions when memory changes** | When a memory is added, changed, or removed, a session that's already running gets a short note on its next message. Turned back on, the next note covers everything it missed. | Node | On |
+
+Sessions always start with the memory index as it is then
+([Memory](/docs/using/memory/#what-a-new-session-is-told)).
+
 ## In the terminal
 
-The terminal client draws **Harnesses and defaults**, **Custom agents**, **MCP**, and **Limits and
-cost**. **Tools and permissions** opens in the desktop app. **Generate with** and **Tool call display**
+The terminal client draws **Harnesses and defaults**, **Custom agents**, **MCP**, **Limits and
+cost**, and **Memory**. **Tools and permissions** opens in the desktop app. **Generate with** and **Tool call display**
 belong to each device.

@@ -10,6 +10,7 @@ const MemoryList = lazy(() => import('./MemoryCenter').then((module) => ({ defau
 const MemoryCenterDetail = lazy(() =>
   import('./MemoryCenter').then((module) => ({ default: module.MemoryCenterDetail })),
 )
+const MemorySettings = lazy(() => import('./MemorySettings'))
 const MemoryToolCard = lazy(async () => ({ default: (await import('./MemoryToolCard')).MemoryToolCard }))
 
 export const memoryClientPlugin: ClientPlugin = {
@@ -35,6 +36,18 @@ export const memoryClientPlugin: ClientPlugin = {
       regions: { list: MemoryList, detail: MemoryCenterDetail, scroll: true },
       // The page shows memory for the selected project.
       projectScoped: true,
+    })
+    ctx.settingsPages.register({
+      id: 'memory',
+      label: 'Memory',
+      category: 'agents',
+      scope: 'node',
+      icon: 'brain',
+      order: 50,
+      requires: { plugin: 'memory' },
+      keywords: ['memory index', 'live updates', 'standing memory'],
+      sections: [{ id: 'sessions', label: 'Running sessions', rows: ['Tell running sessions when memory changes'] }],
+      component: MemorySettings,
     })
   },
 }
