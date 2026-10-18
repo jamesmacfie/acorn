@@ -1,6 +1,56 @@
 # Phase 2: stop launch-time spawns waiting for the login shell
 
-Date: October 19, 2026. Status: proposed.
+## Completion note
+
+The code landed on October 19, 2026. The release measurements under [acceptance](#acceptance) aren't
+taken, because they need phase 1's release baseline, which the owner records. All three acceptance
+items stay open.
+
+What changed:
+
+- `beginLoginShellPath(isPackaged, dataDir)` takes the data root. `bootNode` passes `root.dir`.
+- `startLoginShellPath(dataDir, shell, probe)` holds the cache and the gate. It reads
+  `login-shell-path.json` beside `node.json`, holding `shell`, `path`, and `readAt`. When the file
+  names the same shell and a non-empty `PATH`, it sets `process.env.PATH` from it and holds nothing.
+  Otherwise it holds spawns on the probe as before. When the probe answers, it sets `PATH` and
+  rewrites the file with `writePrivateAtomic`. A failed probe warns and keeps the cached `PATH`, and
+  the file stays as it was.
+- The file is listed in [the data root](../../data-layer/data-root.md#where-it-lives), in the reset
+  inventory in `scripts/reset/inventory.mjs`, and on the public site's "Where your data lives" page.
+- [Boot order](../../node-distribution.md#boot-order) says what the owner sees after a `PATH` edit.
+- Tests: six new cases in `packages/node-core/src/server/core/proc.test.ts`, one for each item under
+  [tests](#tests). They drive `startLoginShellPath` with a probe the test controls.
+
+Decisions and deviations:
+
+- The tests call `startLoginShellPath` rather than `holdSpawnsUntil`, because the cache sits above
+  the gate. `beginLoginShellPath` keeps the platform check and the real shell, and nothing else.
+- A failed write of the cache file warns and leaves the fresh `PATH` in place. The probe's promise
+  still never rejects, so `login-shell.settled` and the boot spans are unchanged.
+- No provider answer from the stale-`PATH` window outlives its normal refresh, so nothing refreshes
+  on the probe's answer. The Node holds no answer about a missing CLI. `harnessBackends` and
+  `listProfiles` run `which` on every read, and the Codex model catalog caches only a success. The
+  clients hold `/v1/core/models/backends` for 30 seconds and the terminal profile list for five
+  minutes, and the agents usage service holds a reading for five minutes. The terminal list and the
+  usage reads never waited for the probe, so in that window they used launchd's bare `PATH` before
+  this change. They see the cached `PATH` now, which is closer to right.
+- `docs/node-distribution.md` was at its 200-line limit, so the boot-order text was rewritten to fit
+  rather than grown. It dropped the 520 ms figure and the five-second ceiling, which the code keeps.
+- The site pages that cite `docs/node-distribution.md` don't describe the probe, so only "Where your
+  data lives" changed and was marked.
+- `pnpm --filter @acorn/node build` fails its service budget, as it did on the base commit. This
+  change adds 952 B, from 1,887,041 B to 1,887,993 B against a 1,884,400 B ceiling. The ceiling
+  wasn't raised.
+
+For later phases:
+
+- On a release cold launch with a cached file, `login-shell.settled` still lands about two seconds
+  in, but the first `proc.spawn` shouldn't wait for it. On the first launch of an installation, it
+  still does.
+- The managed-agent drivers and the terminal profile list still skip `spawnsReady()`. With a cached
+  file that matters only on a first launch.
+
+Date: October 19, 2026. Status: code landed, release measurements not taken.
 
 A packaged macOS build holds every process the Node starts until the owner's login shell has reported
 its `PATH`. On the owner's machine that takes more than two seconds, and every Git status, provider

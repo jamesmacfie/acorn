@@ -26,6 +26,7 @@ exclusive `node.lock` protects it, so only one process opens it.
   internal-token               the internal token signing key, on a standalone Node
   session.key                  SESSION_ENC_KEY, on a standalone Node without it in the environment
   active-identity              the node-owner id
+  login-shell-path.json        the last login-shell PATH, on a packaged macOS build
 ```
 
 `packages/node-core/src/server/storage/dataRoot.ts` owns the layout. Worktrees are ordinary

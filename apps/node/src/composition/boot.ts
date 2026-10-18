@@ -94,11 +94,11 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
   const { mark } = timer
   // Started, not awaited. On a packaged macOS build this spawns a login shell to recover the owner's
   // PATH, which takes half a second to two seconds on a profile with a version manager in it. The
-  // PATH is for spawning agents and build commands later, so the first spawn waits on it instead of
-  // the whole boot (node-core server/core/loginShellPath.ts, docs/node-distribution.md § Boot order).
-  // `login-shell.settled` lands among the other marks wherever the probe finishes, which shows how far
-  // into the boot spawns were held.
-  const loginShell = beginLoginShellPath(options.loginShellPath)
+  // last launch's answer, kept in the data root, is used until it lands, so only a launch without one
+  // makes the first spawn wait, and never the whole boot (node-core server/core/loginShellPath.ts,
+  // docs/node-distribution.md § Boot order). `login-shell.settled` lands among the other marks
+  // wherever the probe finishes.
+  const loginShell = beginLoginShellPath(options.loginShellPath, dataDir)
   mark('login-shell')
   void loginShell?.then(() => mark('login-shell.settled'))
   if (options.mcp) configureAcornMcp(options.mcp.name, options.mcp.launcher)

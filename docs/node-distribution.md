@@ -57,17 +57,17 @@ plugin's `init` and then every plugin's `ready`, mint or read the TLS certificat
 steps run after that. The supervised Node reports `ready` when they finish. The standalone Node waits
 for them before it prints its handshake, because a launcher acts on that line.
 
-On a packaged app, the login-shell `PATH` probe starts at the first step and nothing waits on it. A
-standalone Node skips it, because it inherits its shell's `PATH`. A window-launched process
-on packaged macOS inherits a minimal `PATH`, so the Node asks the owner's login shell with
-`$SHELL -lic 'printf %s "$PATH"'`. That took 520 ms on one developer machine and up to two seconds with a
-version manager in the profile. The probe has a five-second ceiling, and `runProcess` and `runHeadless`
-wait for it before they `spawn` (`packages/node-core/src/server/core/loginShellPath.ts`).
+On a packaged macOS app, a window-launched process inherits a minimal `PATH`, so the Node asks the
+owner's login shell with `$SHELL -lic 'printf %s "$PATH"'`, which can take two seconds. A standalone
+Node skips it. The Node keeps the last answer in `login-shell-path.json` and uses it at once when it
+names the current `$SHELL`. The probe runs in the background, so a `PATH` edit reaches spawned processes
+when it answers, about two seconds into the next launch, and until then a tool in a new folder can show
+as missing. Only a launch with no usable file, the first or the first after a shell change, makes
+`runProcess` and `runHeadless` wait (`packages/node-core/src/server/core/loginShellPath.ts`).
 
-Two spawn paths skip that gate on purpose. A terminal session runs `$SHELL -lc`, which reads the profile
-itself. The managed-agent drivers in `plugins/agents/src/server/` call `spawn` directly, so an agent
-started in the first two seconds of a packaged launch can see the inherited `PATH`. Move them onto
-`spawnsReady()` if that shows up as a missing-binary report.
+A terminal session runs `$SHELL -lc`, which reads the profile itself. The managed-agent drivers in
+`plugins/agents/src/server/` call `spawn` directly, so on a first launch they can see the inherited
+`PATH`. Move them onto `spawnsReady()` if that shows up as a missing-binary report.
 
 `[service:boot] <label> +<offset>ms (<step>ms)` prints one line per step, always, so a slow bind says so
 without anyone asking. Read the labels as wall-clock slices: with plugins initializing together, a

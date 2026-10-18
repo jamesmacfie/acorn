@@ -1,11 +1,11 @@
 import { execFile } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { afterAll, describe, expect, it } from 'vitest'
-import { holdSpawnsUntil } from './loginShellPath'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { holdSpawnsUntil, startLoginShellPath } from './loginShellPath'
 import { brokerEnv, runProcess, runProcessOrThrow } from './proc'
 
 const exec = promisify(execFile)
@@ -268,5 +268,82 @@ describe('the login-shell PATH gate', () => {
     // rejection on top of that.
     holdSpawnsUntil(Promise.reject(new Error('no login shell here')))
     expect((await sh('exit 0')).code).toBe(0)
+  })
+})
+
+// The last launch's answer, kept in the data root, lets a launch skip the wait. Each test gets its own
+// root and puts PATH back, because the probe writes `process.env.PATH`.
+describe('the cached login-shell PATH', () => {
+  const inherited = process.env.PATH
+  afterEach(() => {
+    process.env.PATH = inherited
+  })
+
+  const printPath = async () => (await sh('printf %s "$PATH"')).stdout
+  const rootWith = (cache?: string) => {
+    const root = mkdtempSync(join(dir, 'root-'))
+    if (cache !== undefined) writeFileSync(join(root, 'login-shell-path.json'), cache)
+    return root
+  }
+  const cacheFor = (shell: string, path: string) => JSON.stringify({ shell, path, readAt: '2026-10-19T00:00:00.000Z' })
+  const slowProbe = () => {
+    let answer!: (path: string) => void
+    let fail!: (error: Error) => void
+    const probe = new Promise<string>((resolve, reject) => {
+      answer = resolve
+      fail = reject
+    })
+    return { probe: () => probe, answer, fail }
+  }
+
+  it('starts a spawn on the cached PATH before a slow probe settles, then moves to the fresh one', async () => {
+    const root = rootWith(cacheFor('/bin/zsh', '/cached/bin:/usr/bin:/bin'))
+    const { probe, answer } = slowProbe()
+    const settled = startLoginShellPath(root, '/bin/zsh', probe)
+
+    expect(await printPath()).toBe('/cached/bin:/usr/bin:/bin')
+
+    answer('/fresh/bin:/usr/bin:/bin')
+    await settled
+    expect(await printPath()).toBe('/fresh/bin:/usr/bin:/bin')
+    expect(JSON.parse(readFileSync(join(root, 'login-shell-path.json'), 'utf8'))).toMatchObject({
+      shell: '/bin/zsh',
+      path: '/fresh/bin:/usr/bin:/bin',
+    })
+  })
+
+  it('keeps the cached PATH and the file when the probe fails', async () => {
+    const cache = cacheFor('/bin/zsh', '/cached/bin:/usr/bin:/bin')
+    const root = rootWith(cache)
+    const { probe, fail } = slowProbe()
+    const settled = startLoginShellPath(root, '/bin/zsh', probe)
+
+    fail(new Error('no login shell here'))
+    await settled
+    expect(await printPath()).toBe('/cached/bin:/usr/bin:/bin')
+    expect(readFileSync(join(root, 'login-shell-path.json'), 'utf8')).toBe(cache)
+  })
+
+  it.each([
+    ['no file', undefined],
+    ['a file for another shell', cacheFor('/bin/bash', '/cached/bin:/usr/bin:/bin')],
+    ['a file that does not parse', '{"shell":'],
+    ['a file with an empty PATH', cacheFor('/bin/zsh', '')],
+  ])('holds a spawn until the probe settles with %s', async (_, cache) => {
+    const { probe, answer } = slowProbe()
+    const settled = startLoginShellPath(rootWith(cache), '/bin/zsh', probe)
+
+    let finished = false
+    const during = printPath().then((path) => {
+      finished = true
+      return path
+    })
+    // The same allowance as the gate test above: far more than `spawn` needs for `printf`.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(finished).toBe(false)
+
+    answer('/fresh/bin:/usr/bin:/bin')
+    await settled
+    expect(await during).toBe('/fresh/bin:/usr/bin:/bin')
   })
 })

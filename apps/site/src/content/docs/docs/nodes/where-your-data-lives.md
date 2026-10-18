@@ -44,6 +44,7 @@ second one that tries is refused.
 | `node.lock` | Says a Node has the folder open. |
 | `node-keys.sealed` | The desktop app's Node only: its keys, sealed with a key in the operating system's keychain. |
 | `session.key`, `internal-token` | A standalone Node only: its keys, unless you set `SESSION_ENC_KEY`. |
+| `login-shell-path.json` | The desktop app's Node on macOS only: the `PATH` your login shell last reported, so the Node can start tools without waiting for the shell. It stays on this machine. |
 
 **Settings** > **Machines** > **Storage and memory** shows how much space each database and the blob
 cache take, for the Node the header names. Worktrees aren't counted.
