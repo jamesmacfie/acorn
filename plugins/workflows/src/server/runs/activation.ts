@@ -1,4 +1,5 @@
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
+import { NODE_KEEP_AWAKE } from '@acorn/protocol/api.ts'
 import { homedir } from 'node:os'
 import { formatContextBlock } from '@acorn/plugin-context/contract/contextBlock.ts'
 import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '@acorn/plugin-agents/contract/sessionExecute.ts'
@@ -240,6 +241,8 @@ export const createWorkflowExecution = (
       gateChanged: (taskId, runId, stepId, status) =>
         ctx.events.send({ channel: pluginChannel('workflows', 'gate-changed'), taskId, runId, stepId, status }),
       emitStepEvent: notices.stepEvent,
+      // Each active run keeps the computer awake (docs/node-distribution/keep-awake.md).
+      holdAwake: () => ctx.capabilities.get(NODE_KEEP_AWAKE)?.hold(),
       onRunTerminal: async (taskId, runId) => {
         await settleSchedule(runId).catch((error) =>
           ctx.log.warn(`workflow schedule settlement failed: ${describeError(error).message}`),

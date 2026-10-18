@@ -209,6 +209,9 @@ const RULES: readonly RouteRule[] = [
   // Which network addresses this node answers on (docs/node-distribution/reaching.md). The PUT puts the
   // machine on a network, so no frame reaches either half.
   { path: shape('/v1/core/node/reach'), scopes: {}, note: 'Decides who on the network can reach this node.' },
+  // Whether this node keeps its computer awake (docs/node-distribution/keep-awake.md). Node
+  // administration, like reach, and it says when agents are busy.
+  { path: shape('/v1/core/node/power'), scopes: {}, note: 'Describes how this node manages its computer.' },
   // Node providers (docs/plugins/node-providers.md § Node providers). The sharpest entry added since the plugin-install
   // routes below, and for the same reason: `adopt` hands over a durable credential for another machine,
   // `create` spends the owner's money, and `destroy` is irreversible. The list is no better — it

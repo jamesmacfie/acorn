@@ -1,6 +1,101 @@
 # Phase 7: keep the machine awake while agents work
 
-Date: October 18, 2026. Status: proposed.
+Date: October 18, 2026. Status: done on macOS, with the Linux and Windows inhibitors unproven until
+phase 8.
+
+## Completion note
+
+Landed on October 18, 2026, on the `phase-7-keep-awake` branch.
+
+What landed:
+
+- `createKeepAwake` in `packages/node-core/src/server/power.ts` counts leases, starts the inhibitor on
+  the first, stops it 60 seconds after the last, and stops it at the drain. `platformInhibitor` builds
+  the macOS, Linux, and Windows child processes from this page's table. `bootNode` provides it as
+  `core.keepAwake` (`NODE_KEEP_AWAKE`) before the plugins start, and a `keepAwake` drain step after the
+  plugins stops it.
+- `NodePower`, `KeepAwake`, `coreNodePowerRoute`, `KEEP_AWAKE_PREF_KEY`, and `NODE_KEEP_AWAKE` in
+  `packages/protocol/src/transport/api/nodeAdmin.ts`. `GET /v1/core/node/power` in
+  `routes/nodePower.ts`, behind the `requireDevice` mount on `/v1/core/node/*`.
+- Agents: `holdAwakeWhileBusy` in `plugins/agents/src/server/sessions/keepAwake.ts` follows the
+  session rows the engine broadcasts, using the same `managedState` the notifications read.
+- Workflows: `WorkflowRunState.trackAwake` holds for a `running` or `cancelling` run and releases at any
+  other status edge. The runner calls it from `tick` and `reconcile`, so every path that resumes a run
+  holds.
+- **Settings → Nodes**: `NodePowerSetting.tsx` on every Node's row. It writes the preference with
+  `setPref` and reads the route.
+- Docs: [keep the computer awake](../../node-distribution/keep-awake.md) (new), links from
+  [Node distribution](../../node-distribution.md#operations) and
+  [agent operations](../../managed-agents/operations.md#idle-stop), [core routes](../../api-reference/core-routes.md),
+  [settings groups](../../frontend/settings-groups.md#node-management), and two site pages.
+- Tests: `power.test.ts` covers the acceptance list with a fake inhibitor, plus a missing command, an
+  inhibitor that exits on its own, and a stop that doesn't report itself. `keepAwake.test.ts` in the
+  agents plugin covers working, blocked, and finished, then a deleted session. `keepAwake.test.ts` in
+  the workflows plugin runs a real gate: one lease while running, none at the gate, one more until
+  done. `apps/node/test/integration/nodePower.test.ts` covers the route, a change to the preference,
+  and the device gate.
+
+Checked on this Mac: the real inhibitor showed in `pmset -g assertions` as `PreventUserIdleSystemSleep`
+from `caffeinate`, "asserting on behalf of" the test's process, and cleared when it stopped. A process
+that started `caffeinate -i -w` on its own pid and was killed with `SIGKILL` cleared the listing within
+a second.
+
+Decisions and deviations:
+
+- **A gated workflow run holds no lease.** This page says each active run holds one. `reconcile`
+  restores gated runs on every boot, so a gate nobody answers would keep the computer awake for good.
+  An agent waiting at a gate still holds through the agents plugin until the Node restarts.
+- `hold()` takes no reason. The inhibitor runs once for every lease, so one lease's reason would
+  mislabel it. Linux gets a fixed `--why`.
+- The service reads the preference on each lease and on each read of the route, not only when a lease
+  would start the inhibitor. `PUT /v1/core/prefs` can't notify, and the switch reads the route after it
+  saves, so turning it off stops a running inhibitor at once.
+- An inhibitor that ends on its own marks the Node unavailable until it restarts, with one warning,
+  rather than spawning a failing `systemd-inhibit` on every lease. A platform with no inhibitor reports
+  unavailable from the start.
+- The agents plugin seeds no leases at boot. Provider processes die with the Node, so a session only
+  holds again once the engine broadcasts its row.
+- `power.ts` is a listed exception in the child process rule in `tools/arch/boundaries.test.ts`,
+  because the broker runs only bounded commands.
+- `@acorn/node-core` uses the last of its 67 export slots for `./server/power.ts`.
+- The Node service's size ceiling rose from 1,880,900 to 1,884,400 bytes. The base commit measured
+  1,879,917 bytes and this phase 1,882,364. The service has to exist before the plugins start, so
+  loading it on first use would only add an async wrapper. The switch is on a lazy settings page, so
+  the renderer's startup roster gains only the one-line `readNodePower`.
+- `docs/node-distribution.md`, `docs/managed-agents/operations.md`, and
+  `docs/api-reference/core-routes.md` were at the 200-line limit. Each kept it by re-wrapping a
+  paragraph.
+
+Verify before building, as answered:
+
+- `caffeinate -i` from a test process creates an assertion `pmset` lists. A LaunchAgent and the
+  desktop's helper child weren't checked.
+- Whether `--what=idle` alone stops idle suspend on GNOME and on a headless Ubuntu server wasn't
+  checked. GNOME's automatic suspend might need `--what=idle:sleep`, which also blocks a suspend the
+  person asks for.
+- Whether a hidden PowerShell process started from Node.js holds `ES_SYSTEM_REQUIRED`, and how long it
+  takes to start, wasn't checked. The flag value is written in decimal, because PowerShell 5 reads the
+  hex literal as a negative number.
+- A compiled plugin takes a capability with `ctx.capabilities.get(id)`, and a core-provided id lives in
+  `@acorn/protocol` so a plugin can import it.
+
+Not seen working:
+
+- Linux and Windows. No machine of either kind was available, so `systemd-inhibit --list` and
+  `powercfg /requests` were never read.
+- A real Node with a real agent. The leases are proven with the agents and workflows code under test,
+  and the inhibitor with the real `caffeinate`, but not together in a `dev:agent` window.
+- The switch in a desktop window.
+
+Full suite: every package passes except `@acorn/site`, where "searching for Show workspace rail puts
+/docs/settings/general/ first" fails. It fails the same way with this phase's site edits set aside.
+
+For later phases:
+
+- Phase 8: with an agent running, read `pmset -g assertions`, `systemd-inhibit --list`, and
+  `powercfg /requests`, check each clears about a minute after the agent finishes, and kill the Node to
+  see the listing clear. On Linux, find whether GNOME needs `sleep` as well as `idle`.
+
 
 ## Goal
 
@@ -96,14 +191,3 @@ row. It needs a device principal.
   preference turns it off.
 - `systemd-inhibit` under a user service can be refused by polkit for a session that isn't active.
   Then the Node reports the state as unavailable, and a server that never sleeps loses nothing.
-
-## Verify before building
-
-- Check that `caffeinate -i` from a LaunchAgent and from the desktop's helper child both create an
-  assertion `pmset` lists.
-- Check whether `--what=idle` alone stops idle suspend on GNOME and on a headless Ubuntu server, or
-  whether `sleep` is needed too.
-- Check that a PowerShell process started hidden from Node.js can hold `ES_SYSTEM_REQUIRED`, and
-  how long it takes to start.
-- Read how a compiled plugin takes a capability in `packages/node-core/src/server/pluginHost/capabilities.ts`
-  before you name the capability.

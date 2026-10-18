@@ -91,11 +91,10 @@ custody.
 
 ## Reaching a node from another machine
 
-A Node answers on loopback until a person on its machine chooses the hosts it answers other machines
-on: with `acorn node reach`, the **Settings → Nodes** switch, the first-boot question, or
+A Node answers on loopback until a person on its machine chooses the hosts it answers other machines on:
+with `acorn node reach`, the **Settings → Nodes** switch, the first-boot question, or
 `ACORN_ADVERTISE_HOST`. A Node with hosts keeps its port. [Reach a Node from another
-machine](./node-distribution/reaching.md) covers each way in, firewalls, and why a name beats an
-address.
+machine](./node-distribution/reaching.md) covers each way in, firewalls, and why a name beats an address.
 
 ## Plugins
 
@@ -197,4 +196,5 @@ POSIX permissions. On Windows they're advisory, so the archive installer gives t
 list for its user and SYSTEM alone, with inherited entries removed. Run `acorn node stop`, or send
 SIGTERM on macOS and Linux, for a graceful drain: open task script waits abort, the listener closes,
 plugins dispose, SQLite closes, and the lock releases, within a 30-second deadline. A setup script that
-was waiting to start is recorded as interrupted by `shutdown`.
+was waiting to start is recorded as interrupted by `shutdown`. Busy agents and workflows keep the
+computer awake ([keep awake](./node-distribution/keep-awake.md)).

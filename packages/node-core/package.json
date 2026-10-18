@@ -46,6 +46,7 @@
     "./server/plugins/installer.ts": "./src/server/plugins/installer.ts",
     "./server/plugins/manifest.ts": "./src/server/plugins/manifest.ts",
     "./server/plugins/packageFiles.ts": "./src/server/plugins/packageFiles.ts",
+    "./server/power.ts": "./src/server/power.ts",
     "./server/profiles.ts": "./src/server/profiles.ts",
     "./server/projects.ts": "./src/server/projects/projects.ts",
     "./server/repoConfigTrust.ts": "./src/server/projects/repoConfigTrust.ts",

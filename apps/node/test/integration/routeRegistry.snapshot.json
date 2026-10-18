@@ -156,6 +156,7 @@
     "GET /v1/core/integrations/:id/mappings",
     "GET /v1/core/integrations/:id/projects",
     "GET /v1/core/models/backends",
+    "GET /v1/core/node/power",
     "GET /v1/core/node/reach",
     "GET /v1/core/nodes",
     "GET /v1/core/pair/requests",

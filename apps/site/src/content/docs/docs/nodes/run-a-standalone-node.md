@@ -5,6 +5,7 @@ sources:
   - docs/node-distribution.md
   - docs/node-distribution/reaching.md
   - docs/node-distribution/install.md
+  - docs/node-distribution/keep-awake.md
   - docs/cli/local-service.md
   - apps/node/src/entries/standalone.ts
   - apps/node/src/composition/plugins.ts
@@ -180,6 +181,19 @@ the service's log. The Node never writes a device token to its output, so the lo
 code, which lasts ten minutes. Once a device is paired, the banner shows the commands that open a new
 pairing code: `acorn node pair`, from a terminal acorn has paired with the Node, or `kill -USR1 <pid>`,
 which writes the code to the log.
+
+## Keep the computer awake
+
+While an agent works or waits for you, or a workflow runs, the Node keeps its computer from sleeping
+when idle. A minute after the last one finishes, it lets the computer sleep again. That way a client on
+another machine can still reach it while there's work on it. A closed laptop lid still sleeps a Mac.
+
+On macOS the Node runs `caffeinate`, on Linux `systemd-inhibit`, and on Windows a hidden PowerShell
+process. Each ends with the Node, so a Node that crashes never leaves the computer awake. On a Linux
+machine without logind, or where polkit refuses, the Node can't do this and says so.
+
+To turn it off, switch off **Keep this computer awake while agents work** on the Node's row in
+**Settings** > **Machines** > **Nodes**, from any paired desktop app.
 
 ## Which plugins it has
 

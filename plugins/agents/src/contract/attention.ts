@@ -2,7 +2,7 @@ import type { AttentionSnapshot, AttentionState } from '@acorn/protocol/attentio
 import type { AgentSession } from './wire'
 
 /** Attention outranks process state because a live provider can be waiting for the owner. */
-function managedState(session: AgentSession): AttentionState {
+export function managedState(session: AgentSession): AttentionState {
   switch (session.attention) {
     case 'permission':
     case 'question':

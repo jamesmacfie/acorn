@@ -1,7 +1,6 @@
 # Core routes
 
 This page lists core's `/v1/core` routes by owner and gate ([API reference](../api-reference.md)). The modules under `packages/node-core/src/server/routes/` own bodies and validation.
-
 `packages/node-core/src/server/mountCoverage.test.ts` builds the app and fails unless every core
 route is behind a gate mount or named, with its reason, as open to a task token.
 [Transport and authentication](../security/transport-and-auth.md) explains the gates.
@@ -21,6 +20,7 @@ Every route in this table is device-only.
 | `POST` | `/v1/core/node/stop` | Answer `202`, then drain and exit. `{ "restart": true }` exits with code 75 for a foreground launcher to start it again. A loopback peer only, and the desktop's Node refuses it ([stop and restart](../cli/local-service.md#stop-and-restart)) |
 | `GET` | `/v1/core/node/reach` | The hosts the Node answers other machines on, their `source`, the `port`, this machine's IPv4 `candidates`, and `restartRequired` ([reach a Node from another machine](../node-distribution/reaching.md)) |
 | `PUT` | `/v1/core/node/reach` | Record `{ "hosts": [...] }` for the next boot, at most eight IPv4 addresses or DNS names, and audit `node.reach.changed`. A loopback peer only. `409 reach_set_by_environment` while `ACORN_ADVERTISE_HOST` is set |
+| `GET` | `/v1/core/node/power` | `{ setting, available, held }`: the `power.keepAwake` preference, whether the operating system let the Node keep the computer awake, and how many agent sessions and workflow runs want it awake now ([keep the computer awake](../node-distribution/keep-awake.md)) |
 | `GET` | `/v1/core/plugins` | The plugin roster, install state, and pending agent install requests |
 | `PUT` | `/v1/core/plugins` | Replace the disabled list with `{ disabled }` |
 | `POST` | `/v1/core/plugins/install` | Install a package from GitHub, npm, a URL, or a folder. Needs `Idempotency-Key` |

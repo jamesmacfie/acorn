@@ -148,3 +148,9 @@ it on offers this machine's IPv4 addresses and a host name field. Saving records
 restarts the Node, which reloads the window, so the row draws the address to share from the Node's
 answer. Remote rows don't show the switch, because a Node takes that change only from its own computer
 ([reach a Node from another machine](../node-distribution/reaching.md)).
+
+Every Node's row has a **Keep this computer awake while agents work** switch (`NodePowerSetting.tsx`).
+It writes the `power.keepAwake` preference on that Node, then reads `GET /v1/core/node/power`, which
+applies the change, so a remote row can turn it off too. When the Node's operating system refused to
+stay awake, the switch says "Unavailable on this computer"
+([keep the computer awake](../node-distribution/keep-awake.md)).

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { NodeAttachment } from '../../device/node.ts'
+import { capabilityId } from '../../plugin/ids.ts'
 
 export const prefsRoute = '/v1/core/prefs'
 // The same map narrowed to one key, which is how plugin state is read: the whole map leaves it out.
@@ -61,6 +62,19 @@ export type NodeReach = {
   restartRequired: boolean
 }
 export const coreNodeReachRoute = '/v1/core/node/reach'
+
+// Whether this Node keeps its computer awake while agents work or workflows run
+// (docs/node-distribution/keep-awake.md). Device-only, like reach. `setting` is the owner preference
+// under KEEP_AWAKE_PREF_KEY, `available` is false once the operating system refused to hold the machine
+// awake, and `held` counts the agent sessions and workflow runs that want it awake now.
+export type KeepAwakeSetting = 'while-busy' | 'never'
+export type NodePower = { setting: KeepAwakeSetting; available: boolean; held: number }
+export const coreNodePowerRoute = '/v1/core/node/power'
+export const KEEP_AWAKE_PREF_KEY = 'power.keepAwake'
+
+// Core provides it to compiled plugins. `hold` returns the release, which is safe to call twice.
+export type KeepAwake = { hold(): () => void; status(): Promise<NodePower> }
+export const NODE_KEEP_AWAKE = capabilityId<KeepAwake>('core.keepAwake')
 
 const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/
 const DNS_NAME = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/i

@@ -445,6 +445,7 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/server/core/loginShellPath.ts', // the login-shell PATH probe, once at boot
       'packages/node-core/src/server/transport/listener.ts', // lsof and ps, only when the wanted port is taken
       'packages/node-core/src/server/telemetry/runtimePressure.ts', // sysctl swap read, once a minute; the broker imports the collector this feeds
+      'packages/node-core/src/server/power.ts', // the keep-awake inhibitor, held open until released or the Node dies
       // The supervised node's own child.
       'packages/custody/src/supervision/serviceHost.ts',
       'packages/custody/src/local/launch.ts', // starts a standalone Node on launcher pipes for the two below

@@ -140,9 +140,10 @@ as sessions start.
 
 ## Idle stop
 
-A provider process runs until the session is archived or deleted, its MCP servers change, it moves to
-a terminal, its task is archived, the idle stop takes it, or the Node exits. Each one holds an agent
-CLI and its MCP servers, about 450 MB.
+A provider process runs until the session is archived or deleted, its MCP servers change, it moves to a
+terminal, its task is archived, the idle stop takes it, or the Node exits. Each one holds an agent CLI
+and its MCP servers, about 450 MB. While a session works or waits on you, the Node keeps the computer
+awake ([keep awake](../node-distribution/keep-awake.md)).
 
 Archiving a task runs core's `core:task-archiving` hook ([hooks](../plugins/hooks.md#hooks)) before
 the worktree goes. `stopTaskSessions` in `processUpkeep.ts` stops the task's processes, marks an active
@@ -189,12 +190,11 @@ same rules and no time limit. Both routes are device-only, because they reach ev
 Shutdown closes queue admission, aborts starts, and clears reconnect, quiet, idle, and process sample
 timers. It joins every provider retirement, queue scan, and callback, then flushes durable events and
 search, joins publication work, and stops webhook delivery. All of it runs before the plugin's SQLite
-file closes.
-The facade starts engine retirement as soon as `stop()` is called. It also joins title generation,
-session reservations, and initialization work before returning. Repeated calls share the same stop
-promise, and an engine or title stop failure reaches plugin disposal.
-`dispose()` in `plugins/agents/src/node/index.ts` runs this and then clears its capability bridges, so
-a second boot in one process never reads through the first boot's closed handle
+file closes. The facade starts engine retirement as soon as `stop()` is called. It also joins title
+generation, session reservations, and initialization work before returning. Repeated calls share the same
+stop promise, and an engine or title stop failure reaches plugin disposal. `dispose()` in
+`plugins/agents/src/node/index.ts` runs this and then clears its capability bridges, so a second boot in
+one process never reads through the first boot's closed handle
 (`apps/node/src/composition/runtime.test.ts`).
 
 [Archived agent history](./history-retention.md) covers the retention pass.

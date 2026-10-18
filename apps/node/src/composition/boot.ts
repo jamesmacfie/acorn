@@ -14,6 +14,8 @@ import { closeListener, makeRuntime, startListener, type Listener } from '@acorn
 import type { DataRoot } from '@acorn/node-core/server/storage'
 import { setWorktreesRoot } from '@acorn/node-core/server/worktrees'
 import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
+import { createKeepAwake, platformInhibitor } from '@acorn/node-core/server/power.ts'
+import { KEEP_AWAKE_PREF_KEY, NODE_KEEP_AWAKE } from '@acorn/protocol/api.ts'
 import { configureAcornMcp, type Launcher, refreshAcornMcpRegistrations } from '@acorn/node-core/server/mcpRegister.ts'
 import { wireAgentTools } from '@acorn/node-core/server/agentTools'
 import { startTelemetry, stopTelemetry, TELEMETRY_PREF_KEY } from '@acorn/node-core/server/telemetry'
@@ -137,6 +139,7 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
     schedules: async () => {},
     pluginState: async () => {},
     plugins: async () => {},
+    keepAwake: async () => {},
     sqlite: async () => {},
     dataRoot: async () => root.release(),
   }
@@ -231,6 +234,20 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
       },
     })
     installPerfSink()
+    // Provided before the plugins, so the agents and workflows plugins can hold leases from their first
+    // session or run (docs/node-distribution/keep-awake.md).
+    const keepAwake = createKeepAwake({
+      inhibitor: platformInhibitor(),
+      readSetting: async () => {
+        const userId = runtime.ACTIVE_IDENTITY.get()
+        return userId ? await core.prefs.read(userId, KEEP_AWAKE_PREF_KEY) : null
+      },
+    })
+    const providedKeepAwake = capabilities.provide(NODE_KEEP_AWAKE, keepAwake)
+    drain.keepAwake = async () => {
+      providedKeepAwake.dispose()
+      keepAwake.stop()
+    }
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/pluginHost/host.ts).
     const graph = await assembleNodeGraph(

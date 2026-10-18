@@ -12,6 +12,8 @@ sources:
   - packages/client-core/src/features/settings/corePages.ts
   - packages/client-core/src/features/settings/nodes/NodesSettings.tsx
   - packages/client-core/src/features/settings/nodes/NodeReachSetting.tsx
+  - packages/client-core/src/features/settings/nodes/NodePowerSetting.tsx
+  - docs/node-distribution/keep-awake.md
   - packages/client-core/src/features/settings/SecuritySettings.tsx
   - packages/client-core/src/features/settings/StorageSettings.tsx
   - plugins/agents/src/shared/sessionDefaults.ts
@@ -43,6 +45,7 @@ remote Node](/docs/nodes/pair-a-device-or-a-remote-node/)).
 | **Pair another client** | Shows a one-time code to pair another device with this Node. | | |
 | **Pair a browser** | Shows a one-time code for the browser extension. | | |
 | **Reachable from other machines** | Only on the row for this computer. Lets other computers on your network reach its Node, at an address or **Host name** you pick. Saving restarts the Node ([Let other machines reach the Node](/docs/nodes/pair-a-device-or-a-remote-node/#let-other-machines-reach-the-node)). | Node | Off |
+| **Keep this computer awake while agents work** | Keeps the Node's computer from sleeping when idle while an agent works or waits for you, or a workflow runs. A closed laptop lid can still sleep it. Says **Unavailable on this computer** when the computer won't allow it ([Keep the computer awake](/docs/nodes/run-a-standalone-node/#keep-the-computer-awake)). | Node | On |
 | **Unpair…** | This device forgets the Node and what it cached from it. The Node keeps this device paired. | This device | |
 | **Revoke** | The Node deletes this device's credential, and this device forgets the Node. Coming back takes a new pairing code. | Node | |
 

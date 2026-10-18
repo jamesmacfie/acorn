@@ -2,11 +2,13 @@ import type { NodePairRequest, NodeProbeResult, NodeRecord } from '@acorn/protoc
 import { canPairNodes, fleetBridge } from '../platform'
 import type { PairingDecision, PairingRequestResponse, PairingWindow } from '@acorn/protocol/node.ts'
 import {
+  coreNodePowerRoute,
   coreNodeReachRoute,
   corePairRequestRoute,
   corePairRequestsRoute,
   corePairRoute,
   corePairStartRoute,
+  type NodePower,
   type NodeReach,
 } from '@acorn/protocol/api.ts'
 import { readJson, sendJson } from './apiClient'
@@ -88,6 +90,8 @@ export const writeNodeReach = (nodeId: string, hosts: string[]): Promise<NodeRea
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ hosts }),
   })
+
+export const readNodePower = (nodeId: string): Promise<NodePower> => readJson<NodePower>(coreNodePowerRoute, { nodeId })
 
 // Pair a second client with a node this device already owns. The code returns through the
 // authenticated broker to Settings; the renderer never receives the desktop's device token.

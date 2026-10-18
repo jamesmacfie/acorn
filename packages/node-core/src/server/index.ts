@@ -18,6 +18,7 @@ import { nodeProviderRoutes } from './routes/nodeProviders'
 import { integrations } from './routes/integrations'
 import { models } from './routes/models'
 import { pairingRoutes } from './routes/pairing'
+import { nodePower } from './routes/nodePower'
 import { nodeReach } from './routes/nodeReach'
 import { nodeStop } from './routes/nodeStop'
 import { prefs } from './routes/prefs'
@@ -173,6 +174,7 @@ export function createApp() {
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices: owner-only device administration
     .route(`${CORE_NAMESPACE}/node`, nodeStop) // /stop: drain and exit, from this computer only (docs/cli/local-service.md)
     .route(`${CORE_NAMESPACE}/node`, nodeReach) // /reach: the hosts this Node answers on (docs/node-distribution.md)
+    .route(`${CORE_NAMESPACE}/node`, nodePower) // /power: whether this Node keeps its computer awake (docs/node-distribution/keep-awake.md)
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/dashboards`, dashboards) // Typed panel drafts/publication plus /history measure series.
     .route(`${CORE_NAMESPACE}/datasets`, datasetsRoute)

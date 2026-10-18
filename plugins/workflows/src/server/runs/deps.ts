@@ -70,6 +70,8 @@ export type RunnerDeps = {
   gateChanged?(taskId: string, runId: string, stepId: string, status: WorkflowGateStatus): void
   emitStepEvent?(runId: string, stepId: string, event: StreamEvent): void
   onRunTerminal?(taskId: string, runId: string): Promise<void>
+  /** Keeps the computer awake until the returned release. Undefined when the Node offers no such service. */
+  holdAwake?(): (() => void) | undefined
   startRunTarget?(taskId: string, targetId: string): Promise<{ ok: boolean; url?: string }>
   /** An absent `before-step` hook permits the step. */
   hooks?: Pick<PluginHookRegistry, 'run'>

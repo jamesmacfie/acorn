@@ -1,5 +1,7 @@
 import { AGENT_STANDING_CONTEXT } from '../contract/standingContext'
 import { readAgentCheckoutActivity } from '../server/sessions/checkoutActivity'
+import { holdAwakeWhileBusy } from '../server/sessions/keepAwake'
+import { NODE_KEEP_AWAKE } from '@acorn/protocol/api.ts'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import {
   acornMcp,
@@ -176,6 +178,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let transcriptMediaRoute: { dispose(): void } | null = null
   let lifecycleCapabilities: Array<{ dispose(): void }> = []
   let stopCheckoutActivity: (() => void) | null = null
+  let stopKeepAwake: (() => void) | null = null
   return {
     name: 'agents',
     label: 'Agents',
@@ -346,6 +349,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           )
         },
       })
+      stopKeepAwake = holdAwakeWhileBusy(
+        (listener) => runtime!.frames.subscribe(listener),
+        () => ctx.capabilities.get(NODE_KEEP_AWAKE)?.hold(),
+      )
       // Archiving a task stops its provider processes, because otherwise they live until the node exits
       // (docs/managed-agents/operations.md § Operations and failure). A handler on core's hook rather than a task
       // check, because a check's cleanup runs only if the client asks for it. `transform` so core
@@ -721,6 +728,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     dispose: async () => {
       stopCheckoutActivity?.()
       stopCheckoutActivity = null
+      stopKeepAwake?.()
+      stopKeepAwake = null
       // First, so no sender queues a turn on a runtime that is stopping.
       reconcileMessages = null
       void messages?.then((loaded) => loaded.dispose())

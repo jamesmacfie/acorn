@@ -11,12 +11,14 @@ const TERMINAL_STEP = new Set(['done', 'completed-with-failures', 'failed', 'ski
 export class WorkflowRunState {
   readonly #runSpans = new Map<string, SpanHandle>()
   readonly #stepSpans = new Map<string, SpanHandle>()
+  // One keep-awake lease per run that's moving (docs/node-distribution/keep-awake.md).
+  readonly #awake = new Map<string, () => void>()
 
   constructor(
     private readonly db: PluginDatabase,
     private readonly deps: Pick<
       RunnerDeps,
-      'runChanged' | 'stepChanged' | 'gateChanged' | 'statusChanged' | 'telemetry'
+      'runChanged' | 'stepChanged' | 'gateChanged' | 'statusChanged' | 'telemetry' | 'holdAwake'
     >,
     private readonly publishChild: (runId: string) => Promise<void>,
   ) {}
@@ -25,6 +27,23 @@ export class WorkflowRunState {
     // An open span cannot describe work that continues after this process exits.
     this.#runSpans.clear()
     this.#stepSpans.clear()
+    for (const release of this.#awake.values()) release()
+    this.#awake.clear()
+  }
+
+  /** Holds while the run moves and releases at a gate or an end. A gated run doesn't hold, because one
+   *  nobody answers would keep the computer awake across every restart. An agent waiting at the gate
+   *  still holds through the agents plugin. Called on every status edge and for every run the runner
+   *  advances or restores. */
+  trackAwake(runId: string, status: string): void {
+    if (status === 'running' || status === 'cancelling') {
+      if (this.#awake.has(runId)) return
+      const release = this.deps.holdAwake?.()
+      if (release) this.#awake.set(runId, release)
+      return
+    }
+    this.#awake.get(runId)?.()
+    this.#awake.delete(runId)
   }
 
   startRunSpan(runId: string, trigger: string, stepCount: number): void {
@@ -93,6 +112,7 @@ export class WorkflowRunState {
       .where(eq(schema.workflowRuns.id, runId))
     if (before && before.status !== patch.status) {
       this.deps.runChanged?.(before.taskId, runId, patch.status as WorkflowRunStatus)
+      this.trackAwake(runId, patch.status!)
       if (before.parentRunId) await this.publishChild(runId)
     }
     this.deps.statusChanged?.()

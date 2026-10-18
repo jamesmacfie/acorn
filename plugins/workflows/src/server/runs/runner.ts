@@ -421,6 +421,7 @@ export class WorkflowRunner {
       .where(inArray(schema.workflowRuns.status, ['running', 'gated', 'cancelling']))
     const byId = new Map(runs.map((run) => [run.id, run]))
     for (const run of runs) {
+      this.#state.trackAwake(run.id, run.status)
       if (run.deadlineAt != null && run.deadlineAt <= now()) {
         await this.safetyRailRun(
           run.rootRunId ?? run.id,
@@ -476,6 +477,7 @@ export class WorkflowRunner {
     try {
       const run = await this.run(runId)
       if (!run || !['running', 'gated'].includes(run.status)) return
+      this.#state.trackAwake(run.id, run.status)
       const def = JSON.parse(run.defJson) as WorkflowDef // defJson is frozen at start
       const steps = (await this.steps(runId)).filter((step) => step.parentStepId == null)
       // A persisted failed/safety-rail step with the run still 'running' means the app died

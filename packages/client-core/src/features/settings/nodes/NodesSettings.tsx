@@ -17,6 +17,7 @@ import { ACORN_BUILD, NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../../fleet/NodeChip'
 import { createNodePairing, NodePairingButtons, NodePairingPanel } from './NodePairingCode'
 import { NodeReachSetting } from './NodeReachSetting'
+import { NodePowerSetting } from './NodePowerSetting'
 import '../../fleet/nodes.css'
 import { Alert, Badge, Button, Card, EmptyState, Field, Input } from '../../../kit/components/primitives'
 import Icon from '../../../kit/components/content/Icon'
@@ -363,6 +364,7 @@ export default function NodesSettings() {
                     <Show when={node().local}>
                       <NodeReachSetting nodeId={node().nodeId} />
                     </Show>
+                    <NodePowerSetting nodeId={node().nodeId} />
 
                     {/* Unpair and revoke stay on the row rather than in a danger zone: this page is the
                         whole fleet, and each node's own actions belong beside its name. */}

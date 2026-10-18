@@ -171,6 +171,8 @@ export type NodeDrainResources = {
   schedules: () => Promise<unknown>
   pluginState: () => Promise<unknown>
   plugins: () => Promise<unknown>
+  // After the plugins, which release their leases as they stop.
+  keepAwake: () => Promise<unknown>
   sqlite: () => Promise<unknown>
   dataRoot: () => Promise<unknown>
 }
@@ -182,6 +184,7 @@ export function drainNode(resources: NodeDrainResources): Promise<'drained' | 't
     ['schedules', resources.schedules],
     ['plugin state', resources.pluginState],
     ['plugins', resources.plugins],
+    ['keep awake', resources.keepAwake],
     ['sqlite', resources.sqlite],
     ['data root', resources.dataRoot],
   ])
