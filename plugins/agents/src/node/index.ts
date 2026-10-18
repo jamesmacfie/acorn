@@ -141,8 +141,9 @@ export type AgentsPluginDeps = {
   // Mints the per-session loopback credential, from the composition root rather than CoreServices.
   // See docs/security/credentials.md § Credential handling.
   internalEnv: InternalEnvFactory
-  // Resolves after runtime and delegation recovery. Orchestration calls wait for it so a retried
-  // spawn cannot race the repair of the same creating ledger row.
+  // Resolves after runtime and delegation recovery. Orchestration calls and the session routes' writes
+  // wait for it, so a retried spawn cannot race the repair of the same creating ledger row, and a
+  // prompt cannot reach a session the recovery is about to stop.
   reconciled: Promise<void>
 }
 
@@ -429,7 +430,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       for (const tool of sessionHistoryTools(runtime.store)) ctx.tools.register(tool)
       for (const tool of crossSessionTools(runtime.store, core)) ctx.tools.register(tool)
 
-      managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime, delegation))
+      managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime, delegation, deps.reconciled))
       lifecycleCapabilities = [
         ctx.capabilities.provide(AGENTS_DEFAULT_PROFILE, { id: claudeCodeProfile.id }),
         ctx.capabilities.provide(AGENTS_TURNS, {

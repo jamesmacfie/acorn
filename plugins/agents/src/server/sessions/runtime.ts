@@ -37,6 +37,7 @@ import { ProviderCatalogue, shellQuote } from './providerCatalogue'
 import { sessionAccount } from '../../shared/accounts'
 import type { AgentDriverRegistry } from '../drivers/registry'
 import { isActiveSubagent } from './stateMachine'
+import { setImmediate as yieldToNode } from 'node:timers/promises'
 
 // Events deleted per step by removeArchivedHistory. Each is a row and its search row. A step this size
 // holds the node for milliseconds, and a larger one holds it longer for little gain.
@@ -45,6 +46,19 @@ const HISTORY_BATCH = 200
 // How far before its own start a command settle reaches back. Rereading ten minutes of settled events is
 // cheap, and it covers a network time correction that set the clock back between two starts.
 const COMMAND_SETTLE_CLOCK_MARGIN_MS = 10 * 60_000
+
+// How many items a startup repair loop handles before it gives the event loop a turn, so a request
+// that arrives during the repair isn't held for the whole loop.
+const REPAIRS_PER_YIELD = 50
+
+/** Iterates `items`, giving the event loop a turn after every REPAIRS_PER_YIELD of them. */
+async function* givingWay<T>(items: Iterable<T>): AsyncGenerator<T> {
+  let count = 0
+  for (const item of items) {
+    yield item
+    if (++count % REPAIRS_PER_YIELD === 0) await yieldToNode()
+  }
+}
 
 /**
  * A button answer must be one the stored request offered. The client builds its buttons from that
@@ -127,36 +141,55 @@ export class ManagedAgentRuntime {
    * step as it finishes, for the boot account.
    */
   async reconcile(mark: (step: string) => void = () => {}): Promise<void> {
+    // Every statement here is synchronous, so no request is answered until a step gives the event loop
+    // a turn.
+    const step = async (name: string) => {
+      mark(name)
+      await yieldToNode()
+    }
     // The settle below reads only events written since the last start's settle began. Taken before any
     // read, and the margin covers a clock set back between starts. See `agentCommandSettle`.
     const settleStartedAt = Date.now() - COMMAND_SETTLE_CLOCK_MARGIN_MS
     const settleScope = { since: this.store.commandsSettledBefore() ?? 0 }
-    for (const session of await this.store.unsettledSessions()) {
+    // The two loops below record with `settle: false`, because recording a stop or an idle child would
+    // read that session's whole history for commands to settle. The settle after them covers these
+    // sessions too: it reads every event since the last start, and that start settled everything older.
+    for await (const session of givingWay(await this.store.unsettledSessions())) {
       await this.store.interruptActiveTurn(session.id, 'Acorn restarted while the provider turn was active.')
       await this.store.expirePendingRequests(session.id)
-      await this.engine.record(session.id, null, {
-        type: 'session_state',
-        state: 'stopped',
-        detail: 'The provider process stopped when Acorn last exited. Send a prompt to resume.',
-      })
+      await this.engine.record(
+        session.id,
+        null,
+        {
+          type: 'session_state',
+          state: 'stopped',
+          detail: 'The provider process stopped when Acorn last exited. Send a prompt to resume.',
+        },
+        { settle: false },
+      )
     }
-    mark('unsettled')
+    await step('unsettled')
     // Nothing is streaming into a roster the previous process left behind, so any child still marked
     // active is one whose ending we will never hear. These sessions are not in `unsettledSessions`:
     // a backgrounded child leaves its parent `ready`, which is exactly why the row was stranded.
-    for (const session of await this.store.sessionsWithActiveSubagents()) {
+    for await (const session of givingWay(await this.store.sessionsWithActiveSubagents())) {
       for (const id of session.subagents.filter(isActiveSubagent).map((child) => child.id)) {
-        await this.engine.record(session.id, null, { type: 'subagent', subagent: { id, status: 'idle' } })
+        await this.engine.record(
+          session.id,
+          null,
+          { type: 'subagent', subagent: { id, status: 'idle' } },
+          { settle: false },
+        )
       }
     }
-    mark('subagents')
+    await step('subagents')
     await this.store.requeueSteeringTurns()
-    mark('steering')
-    await this.engine.settleCommands(settleScope)
-    mark('commands')
+    await step('steering')
+    const unfinished = await this.engine.settleCommands(settleScope)
+    await step('commands')
     // No harness outlives the Node, so a background command still marked running lost the process that
     // would have reported its exit. Its session can be `ready`, which the rule above leaves running.
-    for (const record of await this.store.unfinishedCommands(settleScope)) {
+    for await (const record of givingWay(unfinished)) {
       if (record.event.type !== 'tool' || !record.event.tool.background) continue
       await this.engine.record(record.sessionId, record.turnId, {
         type: 'tool',
@@ -171,21 +204,21 @@ export class ManagedAgentRuntime {
     }
     // Only once both passes finish, so a start that dies partway reads the same events again next time.
     this.store.markCommandsSettled(settleStartedAt)
-    mark('background')
+    await step('background')
     await this.store.cancelWorkflowFollowUps()
-    mark('followups')
+    await step('followups')
     await this.attachments.collectGarbage()
-    mark('attachments')
+    await step('attachments')
     // A start's skill folder goes when its process stops. One left by a Node that died is removed here,
     // unless a session that started since is using it.
     await (
       await import('../drivers/skillFolder')
     ).sweepSkillFolders(this.engine.skillFolders, (sessionId) => this.engine.hasLiveSession(sessionId))
-    mark('skills')
+    await step('skills')
     await this.engine.webhooks.reconcile()
-    mark('webhooks')
+    await step('webhooks')
     await (await this.engine.goals.get()).recover()
-    mark('goals')
+    await step('goals')
     // Turns queued when the process last exited have nothing else to wake them: pump() runs on enqueue,
     // on a provider start, and when a turn settles, none of which happen on their own after a restart.
     // Not awaited, because draining spawns a provider child per session and boot waits on reconcile().

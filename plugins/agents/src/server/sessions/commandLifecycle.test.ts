@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { AgentWsFrame } from '../../contract/wire'
 import { normalizeCodexNotification } from '../drivers/codexNormalizer'
@@ -208,6 +208,56 @@ describe('command lifecycle across restart and delayed output', () => {
     // Ten minutes back from the start, for a clock set back before the next one.
     expect(store.commandsSettledBefore()).toBeGreaterThanOrEqual(startedAt - 10 * 60_000 - 1_000)
     expect(store.commandsSettledBefore()).toBeLessThan(startedAt)
+  })
+
+  it('settles stopped, child, and background commands with one read scoped to the last start', async () => {
+    // Settled history from before the last start, which the restart must not read again.
+    const { session: crashed, turn } = await open()
+    for (let n = 0; n < 30; n++) {
+      await command(crashed.id, turn.id, 'item/completed', { aggregatedOutput: 'old\n', status: 'completed' })
+    }
+    store.markCommandsSettled(Date.now() + 1)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    await store.recordEvent(crashed.id, turn.id, {
+      type: 'tool',
+      tool: { id: 'fresh', title: 'sleep 30', kind: 'execute', status: 'running' },
+    })
+    const { session: parent, turn: parentTurn } = await open()
+    await store.recordEvent(parent.id, parentTurn.id, {
+      type: 'subagent',
+      subagent: { id: 'child', status: 'running' },
+    })
+    await store.recordEvent(parent.id, null, {
+      type: 'tool',
+      tool: { id: 'cmd', title: 'Child command', kind: 'execute', status: 'running', subagentId: 'child' },
+    })
+    await store.recordEvent(parent.id, parentTurn.id, { type: 'turn_completed' })
+    const { session: background, turn: backgroundTurn } = await open()
+    await command(background.id, backgroundTurn.id, 'item/started')
+    await store.recordEvent(background.id, backgroundTurn.id, {
+      type: 'tool',
+      tool: { id: 'cmd', title: '', kind: 'execute', background: true },
+    })
+    await store.recordEvent(background.id, backgroundTurn.id, { type: 'turn_completed' })
+    const since = store.commandsSettledBefore()
+    runtime = new ManagedAgentRuntime({
+      db: ctx.storage.open(),
+      core: ctx.core,
+      dataDir: ctx.dataDir,
+      secrets: ctx.env.SECRETS,
+      internalEnv: () => ({}),
+      currentUserId: () => null,
+      registry: new AgentDriverRegistry(),
+    })
+    const reads = vi.spyOn(runtime.store, 'unfinishedCommands')
+    await runtime.reconcile()
+    expect(reads.mock.calls).toEqual([[{ since }]])
+    expect(await cards(crashed.id)).toMatchObject([
+      { id: 'cmd', status: 'completed' },
+      { id: 'fresh', status: 'interrupted' },
+    ])
+    expect(await cards(parent.id)).toMatchObject([{ status: 'unknown' }])
+    expect(await cards(background.id)).toMatchObject([{ status: 'unknown', background: true }])
   })
 
   it('settles a background command with its exit code', async () => {

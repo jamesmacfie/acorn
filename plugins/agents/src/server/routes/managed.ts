@@ -60,6 +60,8 @@ export type ManagedAgentsBridge = {
   taskIdForSession(sessionId: string): Promise<string | null>
   taskIdForAttachment(attachmentId: string): Promise<string | null>
   taskIdForArtifact(artifactId: string): Promise<string | null>
+  // Settles once the Node's startup cleanup has run. Every write waits for it.
+  reconciled(): Promise<void>
   providers(force?: boolean): Promise<AgentProviderDescriptor[]>
   // Settings > Agents > Accounts (docs/managed-agents/accounts.md). Each answers the fresh provider list.
   addAccount(providerId: string, name: string): Promise<AgentProviderDescriptor[]>
@@ -203,6 +205,13 @@ const ownsSessionUnlessSearch = createMiddleware<AppEnv>((c, next) =>
   c.req.param('sessionId') === 'search' ? next() : ownsSession(c, next),
 )
 const ownsAttachment = owns('attachmentId', (b, id) => b.taskIdForAttachment(id))
+// The startup cleanup stops every session the last process left running. A prompt that arrived first
+// would reach a session the cleanup is about to stop, so writes wait for it. Reads don't, and a
+// session it hasn't reached yet reads as working until the row it changes is sent.
+const writesAfterCleanup = createMiddleware<AppEnv>(async (c, next) => {
+  if (c.req.method !== 'GET' && c.req.method !== 'HEAD') await routeCapabilityFor(c, MANAGED_AGENTS)?.reconciled()
+  await next()
+})
 const ownsArtifact = owns('artifactId', (b, id) => b.taskIdForArtifact(id))
 
 // Pin a list or search filter to a confined caller's own task. Returns null when the caller asked for a
@@ -260,6 +269,7 @@ export const managedAgents = new Hono<AppEnv>()
   .use('/attachments/:attachmentId/*', ownsAttachment)
   .use('/artifacts/:artifactId', ownsArtifact)
   .use('/artifacts/:artifactId/*', ownsArtifact)
+  .use('*', writesAfterCleanup)
   // This plugin's contribution to core's merged run list. Read by the node
   // with service authority, so it takes no params and answers node-wide. Task callers use core's
   // filtered merged run list and cannot read this unfiltered source directly.

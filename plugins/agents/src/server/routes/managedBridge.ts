@@ -69,12 +69,14 @@ const toRunStatus = (state: AgentRuntimeState): RunStatus => {
 export function managedAgentsBridge(
   runtime: ManagedAgentRuntime,
   delegation?: Pick<AgentDelegationService, 'projectSessionList'>,
+  reconciled: Promise<void> = Promise.resolve(),
 ): ManagedAgentsBridge {
   // Not wrapped in `guarded`. These answer the router's authorization question, and bridgeFailure would
   // turn a "not found" into a thrown BridgeError(404), skipping the comparison the guard needs to make.
   const taskIdForSession = async (sessionId: string) => (await runtime.store.getSession(sessionId))?.taskId ?? null
   return {
     taskIdForSession,
+    reconciled: () => reconciled,
     taskIdForAttachment: async (attachmentId) => (await runtime.attachments.get(attachmentId))?.taskId ?? null,
     // Two hops: an artifact belongs to a session, and the session names the task.
     taskIdForArtifact: async (artifactId) => {

@@ -52,6 +52,11 @@ event has a durable sequence. HTTP pages are the replay authority, and the WebSo
 tail. A state change and its event records commit together. Once a turn has committed events, a
 restart doesn't resubmit it: reconciliation marks the work interrupted for you to inspect.
 
+Reconciliation runs after the Node starts listening, and it gives the event loop a turn between steps
+and every 50 sessions, so reads answer while it runs. A session it hasn't reached yet reads as working
+until its new row arrives. Every write to the session routes waits for it to finish, so a prompt sent
+at launch can't reach a session that reconciliation is about to stop.
+
 On the tail, each event goes out as an `agent:event` frame. The session row follows as an
 `agent:session` frame only when the event changed something a client keeps, about one event in 30.
 `sessionFrames.ts` compares the row with the last one broadcast and ignores `lastEventSeq`,

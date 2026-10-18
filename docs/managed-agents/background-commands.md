@@ -77,7 +77,10 @@ harness survives a Node restart. Output recorded before then stays on the card.
 
 That startup pass reads only events written since the previous start's pass began, less a
 ten-minute margin for a clock set back. The previous pass settled everything older, and the
-`agent_command_settle` table remembers when it began. Reading every event would block the Node for
+`agent_command_settle` table remembers when it began. The same read settles the sessions that startup
+stops and the children it idles, so those records skip their usual settle, which reads the session's
+whole history. On one long-used database's largest session, 31,157 events, that read took 230 ms with the file cached and 1.8 s
+without on October 19, 2026. Reading every event would block the Node for
 tens of seconds on a long-used database, because its SQLite calls are synchronous. The time is saved
 only after the pass finishes, so a start that dies partway rereads the same events next time. In a check on
 October 12, 2026, a Claude command that was running when the app restarted didn't survive the restart

@@ -1,6 +1,77 @@
 # Phase 3: keep the agents cleanup out of the window's way
 
-Date: October 19, 2026. Status: proposed. Needs phase 1's per-step timing.
+## Completion note
+
+The code landed on October 19, 2026. Phase 1's per-step numbers from the owner's data root don't
+exist yet, so the steps were timed by running their reads against the owner's `agents.sqlite`, opened
+read-only with `node:sqlite`, while the app ran. "Cold" below means the first read in a run, when the
+pages weren't in memory. All four [acceptance](#acceptance) items stay open, because they need phase
+1's baseline and launches on the owner's data root.
+
+What changed:
+
+- Two loops in `ManagedAgentRuntime.reconcile` record with `settle: false`: the one that stops
+  unsettled sessions and the one that idles stranded children. Before, each recorded stop and each
+  idled child ran `settleCommands({ sessionId })`, which reads the session's whole history. That
+  read took 230 ms with the pages in memory and 1,827 ms cold on the owner's largest session (31,157
+  events). It took 92 ms and 633 ms on the second largest. The settle scoped to the last start,
+  which runs next, now covers those sessions. The last start settled everything older.
+- The scoped `unfinishedCommands` read runs once. `settleCommands` returns the commands it left
+  pending or running, and the background pass reads those. With the pages in memory, the read took
+  27 ms when the last start was 3.6 hours earlier (8,047 events), 55 ms over a day (15,341), 245 ms
+  over three days (53,086), and about 800 ms over a week (176,547). Cold, it took 139 ms and
+  1,883 ms at the ends of that range. It grows with how long the last Node ran, and the second read
+  repeated it.
+- `reconcile` gives the event loop a turn with `setImmediate` from `node:timers/promises` after each
+  step, and after every 50 items in its three loops (`givingWay`).
+- The managed agents router makes every request other than `GET` and `HEAD` wait for
+  `bridge.reconciled()`. That's the root's `reconciled`, the promise workflow admission and the
+  delegation tools wait on. Reads don't wait.
+- Tests: `routes/managedStartup.test.ts` shows a read answering while `reconcile` is held inside a
+  step and a write waiting until it resolves, and that the loop gets a turn after each step. A new
+  case in `commandLifecycle.test.ts` shows one scoped read settling a stopped session, an idled
+  child, and a background command. All three fail on the old code. The step tests didn't change.
+- Docs: [sessions](../../managed-agents/sessions.md#session-model) and
+  [background commands](../../managed-agents/background-commands.md#when-the-exit-never-comes).
+  The Node's route golden gained one `ALL /v1/p/agents/*` line for the new middleware.
+
+Steps left alone, because their timings don't justify a change:
+
+- `sessionsWithActiveSubagents` took 2.8 to 5.5 ms for 33 full rows, and 0.9 to 1.4 ms with only the
+  id and the roster.
+- Collecting attachments looked at 390 rows, all still referenced, in 1.1 to 1.7 ms. The owner's root
+  has no `agent-skills` folder, so the skill sweep does nothing. Neither moved to the background.
+- `requeueSteeringTurns` scans `agent_turns`, 12 MB. It took 162 ms cold and 1.3 to 1.9 ms after. One
+  cold sample doesn't justify a migration. Phase 1's numbers decide whether it needs an index.
+- The other reads took under 2 ms each, and the delegation's reporting-turns read took 30 ms cold
+  and 4 ms after.
+
+Opening the pane from cached data:
+
+- The provider list is the persisted query `['agents', 'providers']`, with no `persist: false`.
+- The session list isn't a query. `managedAgentStore.loadTask` keeps it in memory only, so a cold
+  launch always waits for `/v1/p/agents/sessions`. That read took 18 to 31 ms for the task with the
+  most live sessions, 205. Caching it wouldn't make the pane usable sooner when a session is selected,
+  because the pane then waits for the transcript. Nothing changed.
+- The transcript of the largest session is 16 pages of 2,000 events, 44.8 MB of event JSON. Reading
+  and parsing every page took 145 ms in memory, at most 12 ms a page, and 2,447 ms cold, at most
+  319 ms a page. A page is quick once the Node answers, but the size is real work for the Node, the
+  socket, and the client's merge. That's its own change, not made here.
+
+For later phases:
+
+- `record` still settles a session's whole history on every `turn_completed`, `error`, stop, and
+  idle child outside startup, so a long session holds the loop for hundreds of milliseconds each time
+  a turn ends. [The performance spans plan](../performance-spans.md) covers slow work after launch.
+- A single SQLite statement can't yield. The scoped settle grows with how long the last Node ran.
+- Usage settings and the MCP server routes don't wait for the cleanup. Raising the concurrency limit
+  during it drains the queue, which can start a queued turn before the cleanup ends. That was true
+  before this change.
+- `pnpm --filter @acorn/node build` fails its service budget, as it did on the base commit. This
+  change adds 518 B, from 1,887,993 B to 1,888,511 B against a 1,884,400 B ceiling. The ceiling
+  wasn't raised.
+
+Date: October 19, 2026. Status: code landed, acceptance not measured.
 
 Right after the Node starts listening, the agents plugin repairs what the last run left behind. On
 the owner's data root that took 1,451 ms on October 18, 2026, against 9 to 12 ms on a scratch root.

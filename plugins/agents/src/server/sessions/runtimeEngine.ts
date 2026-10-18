@@ -1276,7 +1276,13 @@ export class ManagedAgentEngine {
     this.frames.emit({ channel: 'agent:session', session: await this.store.requireSession(turn.sessionId) })
   }
 
-  async record(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<AgentEventRecord> {
+  /** `settle: false` skips the session's command settle, for a caller that settles every session itself. */
+  async record(
+    sessionId: string,
+    turnId: string | null,
+    event: AgentNormalizedEvent,
+    { settle = true }: { settle?: boolean } = {},
+  ): Promise<AgentEventRecord> {
     const record = await this.store.recordEvent(sessionId, turnId, event)
     if (record.turnId) this.timeTurnEvent(record.turnId, event)
     const session = await this.store.requireSession(sessionId)
@@ -1309,25 +1315,29 @@ export class ManagedAgentEngine {
       this.frames.emit({ channel: 'agent:session', session })
     }
     if (
-      event.type === 'turn_completed' ||
-      event.type === 'error' ||
-      (event.type === 'session_state' &&
-        ['ready', 'stopped', 'failed', 'archived', 'reconnecting'].includes(event.state)) ||
-      (event.type === 'subagent' && ['idle', 'completed', 'failed'].includes(event.subagent.status ?? ''))
+      settle &&
+      (event.type === 'turn_completed' ||
+        event.type === 'error' ||
+        (event.type === 'session_state' &&
+          ['ready', 'stopped', 'failed', 'archived', 'reconnecting'].includes(event.state)) ||
+        (event.type === 'subagent' && ['idle', 'completed', 'failed'].includes(event.subagent.status ?? '')))
     ) {
       await this.settleCommands({ sessionId })
     }
     return record
   }
 
-  /** Append lifecycle endings past client cursors. Read projection also covers untouched history. */
-  async settleCommands(scope: CommandScope): Promise<void> {
+  /** Append lifecycle endings past client cursors. Read projection also covers untouched history.
+   *  Answers the commands it left pending or running. */
+  async settleCommands(scope: CommandScope): Promise<AgentEventRecord[]> {
     const { commandStatus } = await import('./commandLifecycle')
+    const unfinished: AgentEventRecord[] = []
     for (const record of await this.store.unfinishedCommands(scope)) {
       if (record.event.type !== 'tool') continue
       const session = await this.store.requireSession(record.sessionId)
       const turn = record.turnId ? await this.store.turn(record.turnId) : null
       const status = commandStatus(record.event.tool, turn ?? undefined, session)
+      if (status === 'pending' || status === 'running') unfinished.push(record)
       if (status === record.event.tool.status) continue
       await this.record(record.sessionId, record.turnId, {
         type: 'tool',
@@ -1340,6 +1350,7 @@ export class ManagedAgentEngine {
         },
       })
     }
+    return unfinished
   }
 
   // The row a projected event changed, sent with the event, so a client updates that row rather than

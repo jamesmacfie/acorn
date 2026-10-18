@@ -85,6 +85,7 @@ const fake = (over: Partial<ManagedAgentsBridge> = {}): ManagedAgentsBridge =>
     taskIdForSession: async (id: string) => OWNERS[id] ?? null,
     taskIdForAttachment: async (id: string) => ATTACHMENTS[id] ?? null,
     taskIdForArtifact: async (id: string) => OWNERS[ARTIFACTS[id] ?? ''] ?? null,
+    reconciled: async () => {},
     ...over,
   }) as ManagedAgentsBridge
 
