@@ -24,12 +24,15 @@ const wsClient = await import('../../infra/node/wsClient')
 const { _resetPluginChannels } = await import('../plugins/pluginChannel')
 
 describe('descriptor source scope', () => {
-  it('adds an encoded active project while preserving plugin query parameters', () => {
-    expect(scopedSourceItemsPath('/v1/p/board/items', 'project/one')).toBe('/v1/p/board/items?project=project%2Fone')
-    expect(scopedSourceItemsPath('/v1/p/board/items?status=open', 'project-1')).toBe(
+  it('adds an encoded active project or workspace while preserving plugin query parameters', () => {
+    expect(scopedSourceItemsPath('/v1/p/board/items', { projectId: 'project/one' })).toBe(
+      '/v1/p/board/items?project=project%2Fone',
+    )
+    expect(scopedSourceItemsPath('/v1/p/board/items?status=open', { projectId: 'project-1' })).toBe(
       '/v1/p/board/items?status=open&project=project-1',
     )
-    expect(scopedSourceItemsPath('/v1/p/board/items', undefined)).toBe('/v1/p/board/items')
+    expect(scopedSourceItemsPath('/v1/p/board/items', { workspaceId: 'ws-1' })).toBe('/v1/p/board/items?workspace=ws-1')
+    expect(scopedSourceItemsPath('/v1/p/board/items', {})).toBe('/v1/p/board/items')
   })
 })
 
@@ -43,7 +46,7 @@ describe('descriptor source search', () => {
       '/v1/p/linear/rail-search',
       'node-1',
       'crash',
-      'project-1',
+      { projectId: 'project-1' },
       new AbortController().signal,
     )
     expect(readJson.mock.calls[0][0]).toBe('/v1/p/linear/rail-search?project=project-1&q=crash')
@@ -57,7 +60,7 @@ describe('descriptor source search', () => {
       '/v1/p/linear/rail-search',
       'node-1',
       'row',
-      undefined,
+      {},
       new AbortController().signal,
     )
     expect(result.items).toHaveLength(100)
@@ -66,7 +69,7 @@ describe('descriptor source search', () => {
 
   it("refuses a search route outside the plugin's namespace", async () => {
     await expect(
-      readRailSearch('linear', '/v1/p/rollbar/rail-search', 'node-1', 'x', undefined, new AbortController().signal),
+      readRailSearch('linear', '/v1/p/rollbar/rail-search', 'node-1', 'x', {}, new AbortController().signal),
     ).rejects.toThrow('linear may not read')
   })
 })

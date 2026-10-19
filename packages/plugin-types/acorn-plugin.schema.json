@@ -838,6 +838,10 @@
                 "description": "Set it when the list depends on the open project. The rail then shows a project picker and sends `?project=` to `items`.",
                 "type": "boolean"
               },
+              "workspaceScoped": {
+                "description": "Set it when the list depends on the open workspace. The rail then sends `?workspace=` to `items` and `search`. Not with `projectScoped`.",
+                "type": "boolean"
+              },
               "showInRailByDefault": {
                 "description": "Whether the desktop rail shows the source's icon before the person chooses. Defaults to `true`.",
                 "type": "boolean"

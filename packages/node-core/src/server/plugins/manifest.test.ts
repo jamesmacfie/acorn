@@ -521,6 +521,14 @@ describe('webview surfaces', () => {
     ).toBe(false)
   })
 
+  it('refuses a source scoped to both the project and the workspace', () => {
+    const source = { id: 'cards', label: 'Cards', order: 1, items: '/v1/p/board/items' }
+    expect(manifest({ sources: [{ ...source, workspaceScoped: true }] }).success).toBe(true)
+    expect(messages(manifest({ sources: [{ ...source, projectScoped: true, workspaceScoped: true }] }))).toContain(
+      'a source declares projectScoped or workspaceScoped, never both',
+    )
+  })
+
   it('confines a rail presentation route to the plugin and floors its refresh', () => {
     const source = { id: 'cards', label: 'Cards', order: 1, items: '/v1/p/board/items' }
     const presenting = (railPresentation: unknown) => manifest({ sources: [{ ...source, railPresentation }] })

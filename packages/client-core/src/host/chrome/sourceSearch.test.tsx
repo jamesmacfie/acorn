@@ -3,6 +3,7 @@ import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { PluginRailItem, PluginSourceDescriptor } from '@acorn/protocol/api.ts'
+import type { SourceScope } from './chromeData'
 
 const readJson = vi.fn()
 vi.mock('../../infra/node/apiClient', () => ({
@@ -38,7 +39,7 @@ afterEach(() => {
 
 function mount(source: PluginSourceDescriptor) {
   const [text, setText] = createSignal('')
-  const [projectId, setProjectId] = createSignal<string | undefined>('project-1')
+  const [scope, setScope] = createSignal<SourceScope | undefined>({ projectId: 'project-1' })
   let search!: Search
   const client = new QueryClient()
   // A component body, which is untracked, as the real hosts' are.
@@ -47,7 +48,7 @@ function mount(source: PluginSourceDescriptor) {
       pluginId: 'board',
       nodeId: 'node-1',
       descriptor: () => source,
-      projectId,
+      scope,
       text,
       loaded: () => loaded,
     })
@@ -61,7 +62,7 @@ function mount(source: PluginSourceDescriptor) {
     ),
     document.body.appendChild(document.createElement('div')),
   )
-  return { search, setText, setProjectId }
+  return { search, setText, setScope }
 }
 
 const settle = () => vi.advanceTimersByTimeAsync(300)
@@ -129,12 +130,12 @@ it("never draws an earlier project's answer for a new one", async () => {
       answer = resolve
     }),
   )
-  const { search, setText, setProjectId } = mount(descriptor('/v1/p/board/search'))
+  const { search, setText, setScope } = mount(descriptor('/v1/p/board/search'))
   setText('crash')
   await settle()
   expect(search.items().map((item) => item.id)).toEqual(['a:1', 'a:900'])
 
-  setProjectId('project-2')
+  setScope({ projectId: 'project-2' })
   await settle()
   expect(search.status()).toBe('searching')
   expect(search.items().map((item) => item.id)).toEqual(['a:1'])
@@ -156,5 +157,14 @@ it('searches only the loaded rows for a source with no search route or a one-let
   withRoute.setText('c')
   await settle()
   expect(withRoute.search.status()).toBe('local')
+  expect(readJson).not.toHaveBeenCalled()
+})
+
+it('asks nothing while the list has no scope yet', async () => {
+  const { search, setText, setScope } = mount(descriptor('/v1/p/board/search'))
+  setScope(undefined)
+  setText('crash')
+  await settle()
+  expect(search.status()).toBe('local')
   expect(readJson).not.toHaveBeenCalled()
 })

@@ -243,6 +243,15 @@ export const sourceDescriptor = z
       .describe(
         'Set it when the list depends on the open project. The rail then shows a project picker and sends `?project=` to `items`.',
       ),
+    // Does this rail read the active workspace? The host sends `?workspace=` to `items` and `search`,
+    // keeps one list per workspace, and calls no route while no workspace is known (client-core's
+    // `createSourceItems`).
+    workspaceScoped: z
+      .boolean()
+      .optional()
+      .describe(
+        'Set it when the list depends on the open workspace. The rail then sends `?workspace=` to `items` and `search`. Not with `projectScoped`.',
+      ),
     // Whether the desktop rail draws this source's icon before the user has chosen. Absent means `true`,
     // so every older manifest keeps its icon. A default, not a gate: the source still registers and
     // opens from the palette, and the user's switch in Settings wins over it (client-core's
@@ -309,6 +318,15 @@ export const sourceDescriptor = z
     }
     if (source.search !== undefined && source.items === undefined) {
       ctx.addIssue({ code: 'custom', message: 'a search route searches an items list, so it needs an items route' })
+    }
+    // A project already names its workspace, and a list with two scopes leaves the reader guessing
+    // which one it follows.
+    if (source.projectScoped && source.workspaceScoped) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['workspaceScoped'],
+        message: 'a source declares projectScoped or workspaceScoped, never both',
+      })
     }
     if (source.tree && (source.onSelect || source.emptyState || source.panels)) {
       ctx.addIssue({

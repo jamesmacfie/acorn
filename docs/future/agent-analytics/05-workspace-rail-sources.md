@@ -1,6 +1,51 @@
 # Phase 5: let a rail source read the workspace
 
-Date: October 19, 2026. Status: proposed. Needs nothing.
+## Completion note
+
+Built on October 20, 2026, on branch `phase-5-workspace-rail-sources`.
+
+What landed:
+
+- `workspaceScoped` on a rail source, with its description, in `chromeDescriptors.ts`. The parser
+  refuses a source that also declares `projectScoped`, with "a source declares projectScoped or
+  workspaceScoped, never both". `acorn-plugin.schema.json` is regenerated.
+- `createSourceItems` in `client-core/host/chrome/sourceItems.ts` holds the rail list's query. Both
+  `ChromeSourcePanel.tsx` and the terminal's `SourcePanel.tsx` call it, so the two clients can't
+  build the route or the cache key differently. It reads the routed project for a project-scoped
+  source, the active workspace for a workspace-scoped one, and nothing otherwise. With no workspace
+  known, it calls no route and answers an empty list, so the source draws its `emptyState`.
+- `scopedSourceItemsPath` takes a `SourceScope`, `{ projectId?, workspaceId? }`, and appends
+  `project` or `workspace`. `readRailSearch`, `chromeSearchKey`, and `createSourceSearch` take the
+  same scope, so `search` gets `?workspace=` too. A search with no scope asks nothing.
+- Tests: `sourceItems.test.tsx` covers the workspace route, a workspace switch, no workspace, the
+  project scope, and one cache entry for an unscoped source. `chromeData.test.ts`,
+  `sourceSearch.test.tsx`, and `manifest.test.ts` cover the path, the unscoped search, and the parse
+  rule.
+- Docs: [descriptors](../../plugins/descriptors.md#rail-sources), and the site's rail source guide
+  and sources reference.
+
+Decisions and deviations:
+
+- Step 2 is skipped. The source registry carries `projectScoped` for shell controls that follow the
+  project: the topbar picker, copy link, and `core:source` marks. None of them changes for a
+  workspace-scoped source, so a registry field would have no reader. The panels read the descriptor.
+- The workspace ID is wrapped in a memo before it reaches the fan-out. `createActiveWorkspaceId`
+  reads the task list, so without the memo every task change would refetch the rail list.
+- The cache key's scope part is the project or the workspace ID. A source declares only one, so
+  the two can't collide.
+- While the workspace mapping loads at startup, a workspace-scoped source briefly shows its empty
+  state, because the active workspace is undefined until then. The workspace query is usually
+  cached, so this is short.
+- The other site pages that `stale --touching` lists cite the descriptors doc or the chrome folder
+  in general, and nothing they say changed.
+
+For later phases:
+
+- Phase 8's rail source declares `workspaceScoped: true`, reads `workspace` from the query of its
+  `items` and `search` routes, and passes it as the data source query's `workspaceId`. It must not
+  declare `projectScoped`.
+
+Date: October 19, 2026. Status: built. Needs nothing.
 
 ## Goal
 

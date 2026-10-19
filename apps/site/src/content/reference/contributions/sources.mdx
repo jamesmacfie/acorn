@@ -126,6 +126,7 @@ in the main area. It leaves out the create-task menu on a row and any dashboard 
 ## Mistakes
 
 - Give `items` or `tree`, never both. `search` needs `items`.
+- Declare `projectScoped` or `workspaceScoped`, never both. A project already names its workspace.
 - `order` is required. Load order never places a source.
 - `emptyState` shows when your route answers with no items, not when it fails. Don't say "nothing assigned" after an error.
 

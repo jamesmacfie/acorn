@@ -147,6 +147,8 @@ its detail in the main area. The rail icon, its marks, and **Show in left rail**
 
 - One source is one icon. The rail places it by `order`, never by when the plugin loaded.
 - `projectScoped: true` makes an `items` source follow the open project. The route gets `?project=`.
+- `workspaceScoped: true` makes it follow the open workspace instead. The route gets `?workspace=`,
+  and with no workspace open the source shows its `emptyState`. A source can't declare both.
 - A row's menu on an `items` source takes other plugins' rows through `item.row`
   ([Add rows to context menus](/docs/build-plugins/ui/add-rows-to-context-menus/)).
 

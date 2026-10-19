@@ -141,19 +141,20 @@ export function unwatchChrome(): void {
 // ── Reads ─────────────────────────────────────────────────────────────────────────────────────────
 
 // Private to chrome. `nodeId` is absent on purpose: the cache is already partitioned per node.
-// `scope` is whatever else went into the path, so far only the rail's project that
+// `scope` is whatever else went into the path, such as the rail's project or workspace that
 // `scopedSourceItemsPath` appends. It has to be in the key, because the cache is served on mount and a
 // key naming only the source would hand the next project the previous project's rows.
 export const chromeKey = (pluginId: string, contributionId: string, scope?: string): readonly unknown[] =>
   scope ? ['plugin-chrome', pluginId, contributionId, scope] : ['plugin-chrome', pluginId, contributionId]
 
-/** Add the shell's active project without letting a plugin choose another node or namespace. Extra
- * query parameters are advisory scope; plugins that are not project-aware simply ignore them. */
-export const scopedSourceItemsPath = (path: string, projectId: string | undefined): string => {
-  if (!projectId) return path
-  const separator = path.includes('?') ? '&' : '?'
-  return `${path}${separator}project=${encodeURIComponent(projectId)}`
-}
+/** Where the reader is, as a rail source's routes are told it: the routed project for a
+ *  `projectScoped` source, the active workspace for a `workspaceScoped` one, and neither otherwise. */
+export type SourceScope = { projectId?: string; workspaceId?: string }
+
+/** Add the shell's scope without letting a plugin choose another node or namespace. The parameters
+ * are advisory, and the plugin checks them as it would any input. */
+export const scopedSourceItemsPath = (path: string, scope: SourceScope): string =>
+  withQuery(path, { project: scope.projectId, workspace: scope.workspaceId })
 
 // `signal` is optional only for the agent-context reads below; every query-backed reader has one.
 async function read<T>(
@@ -284,14 +285,21 @@ export async function readRailItems(
 export const chromeSearchKey = (
   pluginId: string,
   sourceId: string,
-  projectId: string | undefined,
+  scope: SourceScope,
   query: string,
-): readonly unknown[] => ['plugin-chrome-search', pluginId, sourceId, projectId ?? '', query]
+): readonly unknown[] => [
+  'plugin-chrome-search',
+  pluginId,
+  sourceId,
+  scope.projectId ?? '',
+  scope.workspaceId ?? '',
+  query,
+]
 
 /**
  * One source search, from the plugin's own `search` route (docs/plugins/descriptors.md § Searching a
- * source). The host sends the reader's text and the routed project, the same `project` the items route
- * gets, and nothing the plugin chose. Rows are sanitized one by one like the list's, and an answer
+ * source). The host sends the reader's text and the same scope the items route gets, and nothing the
+ * plugin chose. Rows are sanitized one by one like the list's, and an answer
  * longer than the host draws is cut and reported as incomplete rather than shown as the whole set.
  */
 export async function readRailSearch(
@@ -299,10 +307,10 @@ export async function readRailSearch(
   path: string,
   nodeId: string,
   query: string,
-  projectId: string | undefined,
+  scope: SourceScope,
   signal: AbortSignal,
 ): Promise<Required<PluginRailSearchResult>> {
-  const scoped = withQuery(scopedSourceItemsPath(path, projectId), { q: query.slice(0, MAX_COMMAND_SEARCH_QUERY) })
+  const scoped = withQuery(scopedSourceItemsPath(path, scope), { q: query.slice(0, MAX_COMMAND_SEARCH_QUERY) })
   const body = await read<{ items?: unknown; incomplete?: unknown }>(pluginId, scoped, nodeId, signal)
   const rows = Array.isArray(body?.items) ? body.items : []
   const items = rows.slice(0, MAX_RAIL_SEARCH_ITEMS).flatMap((row) => {

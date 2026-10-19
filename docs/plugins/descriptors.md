@@ -34,6 +34,13 @@ can declare:
   partial-failure reporting.
 - `projectScoped`: the items route reads the shell's project. The host appends `?project=`, keys the
   cache by it, and offers the topbar project picker while the source is on screen.
+- `workspaceScoped`: the items route reads the active workspace. The host appends `?workspace=` to
+  `items` and `search`, and keeps one cached list per workspace, so switching back is instant. While
+  no workspace is known, the host calls no route and draws the `emptyState`. Read the parameter as
+  untrusted input, as you would `project`. A plugin that reads data sources passes it as the query's
+  `workspaceId` scope, and the Node checks it there. A source can't declare both scopes, because a
+  project already names its workspace. A source with neither keeps one list for every project and
+  workspace.
 - `search`: a route that searches the provider beyond the loaded rows. It needs an `items` route,
   and the Node confines it to the plugin's namespace like every other route. See
   [searching a source](#searching-a-source).
@@ -64,8 +71,8 @@ or `#` followed by a number matches identifiers too. It doesn't match opaque row
 counts, or task descriptions. An empty field shows the ordinary list and asks nothing.
 
 A source with a `search` route also asks the plugin. After a 250 ms pause, and once the text has two
-characters, the host sends `GET <search>?project=<routed project>&q=<text>`, with the text cut to 200
-characters. The answer is `PluginRailSearchResult`: rows in the `PluginRailItem` shape, plus
+characters, the host sends `GET <search>?q=<text>`, with the text cut to 200 characters, and the
+same `project` or `workspace` the items route gets. The answer is `PluginRailSearchResult`: rows in the `PluginRailItem` shape, plus
 `incomplete` when the provider holds more matches than it sent. The host sanitizes each row as it
 does a list row, draws at most 100 (`MAX_RAIL_SEARCH_ITEMS`), and treats a longer answer as
 incomplete. A search row keeps the source's `onSelect`, so navigation and **Create task** work.
@@ -77,11 +84,12 @@ stay and a line says the wider search failed. An incomplete answer asks the read
 search. With no rows, the list says which of these happened instead of showing the source's
 `emptyState`, which describes an empty list.
 
-Answers are cached apart from the list, keyed by the plugin, source, project, and text, and never
-persisted ([renderer query cache](../caching.md#renderer-query-cache)). A changed project or text
+Answers are cached apart from the list, keyed by the plugin, source, scope, and text, and never
+persisted ([renderer query cache](../caching.md#renderer-query-cache)). A changed scope or text
 abandons the earlier request, and its answer is never drawn for the new one. A collapsed rail keeps
 the text but doesn't search. Both hosts share this behavior through
-`client-core/host/chrome/sourceSearch.ts`.
+`client-core/host/chrome/sourceSearch.ts`, and read the list itself through `createSourceItems` in
+`client-core/host/chrome/sourceItems.ts`.
 
 A source can offer a panel area beside its list instead of a detail pane: a dashboard the person
 composes, under constraints the source declares in `panels`

@@ -7,7 +7,7 @@ import {
   MAX_COMMAND_SEARCH_QUERY,
 } from '@acorn/protocol/commands.ts'
 import { debounce } from '../../kit/lib/state/debounce'
-import { chromeSearchKey, readRailSearch } from './chromeData'
+import { chromeSearchKey, readRailSearch, type SourceScope } from './chromeData'
 import { filterSourceItems } from './sourceFilter'
 
 // The Search field above a descriptor source's rail list, shared by the desktop and terminal hosts so
@@ -38,7 +38,8 @@ export function createSourceSearch(input: {
   pluginId: string
   nodeId: string
   descriptor: () => PluginSourceDescriptor
-  projectId: () => string | undefined
+  /** The list's scope from `createSourceItems`. Undefined means the list has none yet, so nothing is asked. */
+  scope: () => SourceScope | undefined
   /** The field's text. The caller passes '' while the list is hidden, so nothing searches unseen. */
   text: () => string
   loaded: () => PluginRailItem[]
@@ -46,7 +47,7 @@ export function createSourceSearch(input: {
   const text = () => input.text().trim()
   const outbound = () => {
     const query = text().slice(0, MAX_COMMAND_SEARCH_QUERY)
-    return input.descriptor().search && query.length >= DEFAULT_COMMAND_SEARCH_MIN_QUERY ? query : ''
+    return input.descriptor().search && input.scope() && query.length >= DEFAULT_COMMAND_SEARCH_MIN_QUERY ? query : ''
   }
 
   // The text the provider is asked about, which trails the field by the debounce. Clearing is
@@ -63,16 +64,16 @@ export function createSourceSearch(input: {
     }
   })
 
-  // Keyed by project and text, so an answer for an earlier scope can never be drawn for this one, and
+  // Keyed by scope and text, so an answer for an earlier scope can never be drawn for this one, and
   // abandoned with its signal when the key moves on. Kept out of the persisted cache: a search is
   // asked again rather than restored as if it had just answered.
   const remote = createQuery(() => {
     const query = settled()
-    const projectId = input.projectId()
+    const scope = input.scope() ?? {}
     return {
-      queryKey: chromeSearchKey(input.pluginId, input.descriptor().id, projectId, query),
+      queryKey: chromeSearchKey(input.pluginId, input.descriptor().id, scope, query),
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        readRailSearch(input.pluginId, input.descriptor().search!, input.nodeId, query, projectId, signal),
+        readRailSearch(input.pluginId, input.descriptor().search!, input.nodeId, query, scope, signal),
       enabled: !!query && query === outbound(),
       staleTime: 30_000,
       gcTime: 5 * 60_000,

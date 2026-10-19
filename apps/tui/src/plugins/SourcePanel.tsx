@@ -6,13 +6,9 @@ import { bindIntents } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { useNavigate, useParams } from '@solidjs/router'
 import type { PluginRailItem, PluginSourceDescriptor } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
-import { createFleetQuery } from '@acorn/client-core/infra/node'
 import {
-  chromeDeps,
-  chromeKey,
+  createSourceItems,
   createSourceSearch,
-  readRailItems,
-  scopedSourceItemsPath,
   sourceSearchEmpty,
   sourceSearchNotice,
 } from '@acorn/client-core/host/chrome'
@@ -34,8 +30,8 @@ import { openPromotion } from '../chrome/promotionStore'
 // `<main class="panes">` around `<section>`s and the DOM kit's primitives, which the reconciler
 // refuses. This host supplies its own through the `setSourcePanel` seam.
 //
-// The halves that are not drawing are shared and are imported rather than rewritten: `readRailItems`
-// and `chromeKey` are the query, `runChromeAction` is what a row press does, and
+// The halves that are not drawing are shared and are imported rather than rewritten: `createSourceItems`
+// is the query, `runChromeAction` is what a row press does, and
 // `projectSurfaceRegistry` is what the detail is. So the two hosts cannot disagree about the cache
 // key, the verbs, or which surface a row addresses. What differs is where the halves go — the desktop
 // draws both across one window, and this host puts the list in its Browse panel and the detail in the
@@ -66,18 +62,9 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
   // of the cache below.
   const [query, setQuery] = createSignal('')
 
-  // The same fan-out the DOM panel runs, pinned to one node, with the project in the dependency rather
-  // than read inside the fetch so it reaches the cache key too. Both hosts build the key with
-  // `chromeKey`, so a list drawn here and the same list drawn there are one cache entry.
-  const projectId = () => (props.descriptor.projectScoped ? params.projectId : undefined)
-  const scope = () => ({ revision: chromeDeps(props.pluginId), projectId: projectId() })
-  const [result] = createFleetQuery(
-    ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
-    (node, { projectId }, signal) =>
-      readRailItems(props.pluginId, scopedSourceItemsPath(props.descriptor.items!, projectId), node, signal),
-    scope,
-    { nodeIds: [nodeId] },
-  )
+  // The same rows the DOM panel reads, through the same hook, so a list drawn here and the same list
+  // drawn there are one route and one cache entry.
+  const { scope, result } = createSourceItems(props.pluginId, props.descriptor, nodeId)
 
   const row = () => result().rows[0]
   const all = createMemo<PluginRailItem[]>(() => row()?.data ?? [])
@@ -85,7 +72,7 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
     pluginId: props.pluginId,
     nodeId,
     descriptor: () => props.descriptor,
-    projectId,
+    scope,
     text: query,
     loaded: all,
   })

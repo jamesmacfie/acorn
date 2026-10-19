@@ -6,7 +6,6 @@ import type { PluginRailItem, PluginSourceDescriptor, PluginSourceEmptyState, Ta
 import PanelGrid from '../../features/dashboards/PanelGrid'
 import { panelRegion, regionScope, sourceRegionOwner } from '../../features/dashboards/region'
 import { activeNodeId } from '../../infra/node/activeNode'
-import { createFleetQuery } from '../../infra/node/fanout'
 import { FRESHNESS_LABELS } from '../../infra/node/freshness'
 import { Alert, Badge, Button, EmptyState, Input, Row, SectionHeader, FilterBar } from '../../kit/components/primitives'
 import { Inline } from '../../kit/components/layout/Inline'
@@ -17,7 +16,7 @@ import { RowActions } from '../../kit/components/layout/RowActions'
 import { contextMenuItems, registerContextMenuItems, type ItemRowTarget } from '../registries/panes/contextMenus'
 import { ContextMenuItems } from '../registries/panes/contextMenuHost'
 import { runChromeAction } from './actions'
-import { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from './chromeData'
+import { createSourceItems } from './sourceItems'
 import { tasksKey, tasksOptions, workspacesOptions } from '../../infra/queries'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { createActiveWorkspaceId } from '../../features/workspaces/activeWorkspaceId'
@@ -88,27 +87,10 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const nodeId = activeNodeId() ?? ''
   const collapsed = sidebarCollapsed(props.descriptor.id)
 
-  // The fan-out rather than a bare resource, pinned to one node: it is the only reader with a per-node
-  // deadline, a cache fallback and the live/stale/offline vocabulary. An offline node shows the list it
-  // last had, badged stale, like every native surface.
-  //
-  // The project rides in the dependency rather than being read from `params` inside the fetch, so it
-  // reaches the cache key as well as the path. The fan-out serves its last answer on mount, so both
-  // halves have to agree on scope.
-  //
-  // A source that didn't declare `projectScoped` drops out of both. Its rows are the same rows in every
-  // project, so carrying the project would split one cache entry into one per project and refetch the
-  // identical list on every project switch. The `navigate` verb below still gets the project, because
-  // that addresses a surface at `/p/:projectId/x/…` whether or not the rail cares.
-  const projectId = () => (props.descriptor.projectScoped ? params.projectId : undefined)
-  const scope = () => ({ revision: chromeDeps(props.pluginId), projectId: projectId() })
-  const [result, { refetch }] = createFleetQuery(
-    ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
-    (node, { projectId }, signal) =>
-      readRailItems(props.pluginId, scopedSourceItemsPath(props.descriptor.items!, projectId), node, signal),
-    scope,
-    { nodeIds: [nodeId] },
-  )
+  // The rows, scoped by the source's declaration, as the terminal host reads them (./sourceItems.ts).
+  // The `navigate` verb below still gets the project whatever the scope, because that addresses a
+  // surface at `/p/:projectId/x/…` whether or not the rail cares.
+  const { scope, result, refetch } = createSourceItems(props.pluginId, props.descriptor, nodeId)
 
   const row = () => result().rows[0]
   const allItems = () => row()?.data ?? []
@@ -122,7 +104,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
     pluginId: props.pluginId,
     nodeId,
     descriptor: () => props.descriptor,
-    projectId,
+    scope,
     text: () => (collapsed() ? '' : filter()),
     loaded: allItems,
   })
