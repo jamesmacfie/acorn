@@ -1194,6 +1194,28 @@
                   }
                 }
               },
+              "railPresentation": {
+                "description": "Live artwork and tooltip text for the rail button, such as the cover and title of a playing song.",
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "description": "A GET route that answers `PluginRailPresentation`: artwork and tooltip text, or `null` for the static glyph."
+                  },
+                  "refresh": {
+                    "description": "Seconds between rereads of the route, at least 30. A fallback: push changes with `ctx.events.status()` instead of polling.",
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 86400
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "additionalProperties": false
+              },
               "refresh": {
                 "description": "Seconds between rereads of the route, at least 30. A fallback: push changes with `ctx.events.status()` instead of polling.",
                 "type": "integer",
