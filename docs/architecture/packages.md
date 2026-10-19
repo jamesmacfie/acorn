@@ -76,7 +76,7 @@ standalone Node's import graph clean.
 so it imports nothing from `@acorn/*` and nothing outside `@openuidev/lang-core`, `solid-js`, and `zod`,
 except Node built-ins in its tests. It has no JSX and no renderer target, so the desktop app and the
 terminal client each compile it for their own renderer. It stays private until
-[the dynamic UI programme](../future/dynamic-ui/02-renderer-and-spike.md) decides to publish it.
+[the dynamic UI programme](../future/dynamic-ui/README.md) decides to publish it.
 
 ## Graph shape
 

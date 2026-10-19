@@ -61,7 +61,7 @@ and the panel on Home are the same plan.
 
 ## Agent-made panels
 
-This is [phase 1](./01-agent-panels.md), and it needs no OpenUI.
+This is phase 1, and it needs no OpenUI. It shipped as [panels from a conversation](../../dashboards.md).
 
 ### Panel tools
 
@@ -181,7 +181,7 @@ The library has three kinds of component:
 - `Panel(plan)`, which draws a plan with the dashboard's own views, with their drill-down, row menus,
   and board moves. The library has no chart or table of its own, so a chart in an app is a dashboard
   chart. See [refused](./refused.md#charts-of-the-librarys-own).
-- Host actions and pure functions, added when [phase 2](./02-renderer-and-spike.md) or later use shows
+- Host actions and pure functions, added when phase 2 or later use shows
   a need. A program can never define one.
 
 Each component has a Zod schema for its props and a description that the generated prompt shows the
@@ -227,7 +227,7 @@ a pinned published surface. Offering it to OpenUI's own repository instead stays
 | Card | Inline in the agent transcript, as the tool card for `app_show` | Every time an agent shows a revision |
 | Task pane | One **Apps** button in the task's right rail, with a list of the task's apps and the selected app beside it | The task has at least one app |
 | Project pane | One **Apps** source in the left rail, listing the routed project's apps, each opening a project-scoped pane | The workspace has at least one project app |
-| Dashboard | A cell on a Home tab, beside ordinary panels | The owner added a project app ([phase 6](./06-apps-on-dashboards.md)) |
+| Dashboard | A cell on a Home tab, beside ordinary panels | The owner added a project app (phase 6) |
 
 Each placement draws the same program. The host sets the reserved variable `$placement` to `card`,
 `pane`, `project`, or `dashboard`, so a program can draw a compact version in a card and a full
@@ -464,7 +464,7 @@ unavailable state that names it. A task app is deleted with its task only when t
 ## Apps on dashboards
 
 A project app can sit on a Home tab beside ordinary panels. This is
-[phase 6](./06-apps-on-dashboards.md). The cell runs the app's head with `$placement` set to
+phase 6. The cell runs the app's head with `$placement` set to
 `dashboard`, and its plans refresh on the dashboard's rules: when the window regains focus, after a
 reported account or plugin change, and at each plan's refresh interval.
 
@@ -488,7 +488,7 @@ the plugin reserves ([placements](../../dashboards/placements.md#plugin-regions)
 
 The owner installs the result through the ordinary trust prompt, and can then add a node half, routes,
 settings, or anything else a plugin can do. The app stays until the owner deletes it. See
-[phase 7](./07-plugin-from-app.md).
+phase 7.
 
 ## In the terminal client
 
@@ -553,7 +553,7 @@ cases that someone else maintains. The refusal still holds for plugins. Apps dif
 
 - The author is an agent writing small, short-lived UIs. A ceiling on what a program can express is
   what makes every program safe to draw without a prompt.
-- An app that hits the ceiling becomes a plugin, through [phase 7](./07-plugin-from-app.md).
+- An app that hits the ceiling becomes a plugin, through phase 7.
 - An agent-written JavaScript tree would need a sandboxed worker per card, a headless boot to
   validate, a per-Node trust grant with its own review, and an install per revision. A program needs
   none of these. See [refused](./refused.md#agent-written-javascript-trees).

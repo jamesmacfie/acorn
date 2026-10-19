@@ -2,9 +2,10 @@
 
 Status: proposed, 2026-10-01. Revised 2026-10-19: agent-made dashboard panels come first, apps are
 OpenUI Lang programs, and every agent-built UI reads its data through dashboard plans. Phases 1 to 7
-were built on October 19 and 20, 2026, and each phase file opens with a completion note. Phase 8 waits
-on the cloud programme. Where a file here disagrees with a shipped contract, the owning reference
-document wins.
+were built on October 19 and 20, 2026, and their phase files are deleted. The shipped behaviour is in
+[agent-built apps](../../agent-built-apps.md), [dashboards](../../dashboards.md), and
+[agent tools](../../agent-tools.md). Phase 8 waits on the cloud programme. Where a file here disagrees
+with a shipped contract, the owning reference document wins.
 
 ## What this is
 
@@ -30,13 +31,6 @@ same job, and what Acorn's dashboards already do. For the study, read [research]
 | [design.md](./design.md) | The model: one way to fetch, shape, and draw; agent-made panels; apps as programs and plans; the library and renderer package; placements; tools; validation; revisions; what an app can reach; lifecycle; dashboards; turning an app into a plugin; the terminal; cost; and security. |
 | [research.md](./research.md) | What Lemma does and what it costs, what OpenUI specifies and ships, what dashboards already do, which Acorn seams exist, and what is missing. |
 | [refused.md](./refused.md) | What this programme decided not to build, and when to revisit it. |
-| [01-agent-panels.md](./01-agent-panels.md) | Phase 1. An agent drafts a dashboard panel in the conversation, and **Add to dashboard** puts it on Home. |
-| [02-renderer-and-spike.md](./02-renderer-and-spike.md) | Phase 2. A Solid renderer for OpenUI, then a spike: can an agent write a useful app for what a panel can't do? Decides whether to go on. |
-| [03-inline-cards.md](./03-inline-cards.md) | Phase 3. Task apps shown as cards, with the library, tools, validation, and revisions. |
-| [04-task-pane.md](./04-task-pane.md) | Phase 4. The task Apps pane, the editing drawer, app state, and archive. |
-| [05-project-apps.md](./05-project-apps.md) | Phase 5. Publish to the project, the left-rail source, drafts, forks, and deletion. |
-| [06-apps-on-dashboards.md](./06-apps-on-dashboards.md) | Phase 6. Project apps on Home tabs, beside ordinary panels. |
-| [07-plugin-from-app.md](./07-plugin-from-app.md) | Phase 7. Turn an app into a plugin through an agent session, with its dependencies declared. |
 | [08-teams.md](./08-teams.md) | Phase 8. Apps on a team Node, with roles. Waits on the cloud programme. |
 
 ## The phases at a glance
@@ -51,6 +45,14 @@ same job, and what Acorn's dashboards already do. For the study, read [research]
 | 6 | Project apps on Home tabs, refreshing like any panel. | 5. |
 | 7 | **Turn into a plugin**, which starts an agent session that rebuilds an app as a plugin package with `requires.plugins` filled in. | 5. |
 | 8 | Project apps shared by a team, with roles. | 5, and [cloud phase 9](../cloud/phases/09-teams.md). |
+
+## What the spike found
+
+Phase 2's spike, on October 19, 2026, ended **Go with changes**. A managed Claude session wrote useful
+apps for 7 of 10 prompts a single panel couldn't serve, each on the first try, judged by an agent
+rather than the owner. Every miss was a plan or a missing source, not the language: no tool returned
+account IDs, no source carried review comments, and bar charts refused a text axis. Phase 3 fixed the
+first and third. The ten programs and their plans are in the phase 2 file at commit `619d5aaa9`.
 
 ## The decisions that shape it
 
@@ -105,7 +107,8 @@ alternative a reader might expect.
 - **The renderer package's name and home.** It could be published unscoped from this repository, or
   offered to OpenUI's repository as its Solid renderer. OpenUI's Vue, Svelte, and Angular renderers
   trail its core by a major version, which argues for keeping it here. Decide after phase 3.
-- **Security review.** Done in phase 3 and recorded in [its completion note](./03-inline-cards.md). One
+- **Security review.** Done in phase 3 and recorded in
+  [the October 19 review](../../security/review-2026-10-19.md). One
   finding stays open: lang-core's evaluator can call a built-in function with no arguments, which only
   a change to lang-core removes.
 

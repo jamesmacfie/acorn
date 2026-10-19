@@ -209,4 +209,4 @@ validates it on the Node.
 Whether an agent, given the library, the plan guide, and a handful of examples, writes a useful app in
 one or two tries for requests a panel can't serve. Panels need no spike, because the studio's AI
 already writes plans. Everything else in this programme is plumbing that already has a pattern. That
-one question does not, which is why [phase 2](./02-renderer-and-spike.md) exists.
+one question does not, which is why phase 2 exists.

@@ -1,7 +1,7 @@
 # Phase 8: apps on a team
 
 Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang and plans. Depends on
-[phase 5](./05-project-apps.md), and waits on
+[project apps](../../agent-built-apps/project-apps.md), and waits on
 [cloud phase 9](../cloud/phases/09-teams.md), which brings roles and route classification. Nothing
 here changes a local Node with no account.
 

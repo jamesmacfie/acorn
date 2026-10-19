@@ -68,6 +68,7 @@ the whole plugin system in one page.
 | [security/plugin-secrets-and-routes.md](./security/plugin-secrets-and-routes.md) | How plugins borrow credentials, task-token reach, and agent tool rules. |
 | [security/plugin-storage-and-supply-chain.md](./security/plugin-storage-and-supply-chain.md) | Plugin SQLite policy, install integrity, and the boundary design rules. |
 | [security/review-2026-10-01.md](./security/review-2026-10-01.md) | Ten-area security review, completed remediation ledger, verification evidence, and remaining limits. |
+| [security/review-2026-10-19.md](./security/review-2026-10-19.md) | Review of agent-built apps: each way a program could reach beyond its plans and host tools, what stops it, and the one open finding. |
 | [security/review-2026-10-11.md](./security/review-2026-10-11.md) | Follow-up review: the TOML parser cap, release-build renderer origin, idempotency query strings, plugin route gates, and the dependency audit. |
 
 ## The renderer
