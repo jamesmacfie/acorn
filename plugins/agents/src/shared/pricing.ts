@@ -1,3 +1,5 @@
+import { estimateUsageEventCost } from '@acorn/protocol/usageCost.ts'
+
 export const agentPricingRoute = '/v1/p/agents/pricing'
 export const agentPricingPreferenceKey = 'agents:pricing:v1'
 
@@ -352,4 +354,35 @@ export function agentModelPrice(
   if (providerId === 'claude') return claudeModelPrice(model, at, preferences)
   if (providerId === 'codex') return codexModelPrice(model, at, preferences)
   return null
+}
+
+export type AgentUsageTokens = {
+  provider: string
+  model: string | null
+  at: number
+  inputTokens: number | null
+  outputTokens: number | null
+  cacheReadTokens: number | null
+  cacheWriteTokens: number | null
+  reportedCostUsd: number | null
+}
+
+/** What some usage cost: the provider's own figure when it reported one, else an estimate from its
+ *  tokens at the model's price on that date, else unknown. */
+export function agentUsageCost(usage: AgentUsageTokens, preferences: AgentPricingPreferences) {
+  if (usage.reportedCostUsd !== null)
+    return { costUsd: usage.reportedCostUsd, costSource: 'reported' as const, priceName: null }
+  const price = usage.model ? agentModelPrice(usage.provider, usage.model, usage.at, preferences) : null
+  const estimated = estimateUsageEventCost(
+    {
+      input: usage.inputTokens,
+      output: usage.outputTokens,
+      cacheRead: usage.cacheReadTokens,
+      cacheWrite: usage.cacheWriteTokens,
+    },
+    price,
+  )
+  return estimated === null
+    ? { costUsd: null, costSource: 'unknown' as const, priceName: null }
+    : { costUsd: estimated, costSource: 'estimated' as const, priceName: usage.model }
 }

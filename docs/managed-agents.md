@@ -24,9 +24,13 @@ The `usage-records` data source exposes one ledger usage event per record, inclu
 task, provider, model recorded on that turn, token deltas, USD cost, and whether cost was reported,
 estimated from the named model price, or unknown. A reported cost is the session's running total for every harness, and Codex's tokens are too, so
 each counts from the session's previous report. Deltas are computed before a dashboard time filter,
-so a session crossing a window boundary contributes only usage inside it. Historical deletion or a
-bounded ledger scan is reported as incomplete event coverage. Session totals are sums of these
-records; any convenience total must use the same pricing and delta policy. The pure per-event token
+so a session crossing a window boundary contributes only usage inside it. A dashboard's time window
+narrows the read in SQL, and the source also reads each session's earlier reports, which the first
+record in the window counts from. The read is newest first, so the 5,000-record budget drops the
+oldest records, and the source reports `incomplete` when records of the window remain. Removed
+history is outside its coverage. Any convenience total must use the same pricing and delta policy.
+For one record per finished turn or per session, read **Agent turns** and **Agent session totals**
+([turn facts](./managed-agents/turn-facts.md#data-sources)). The pure per-event token
 pricing formula lives in `@acorn/protocol/usageCost.ts` and is shared with the `agent-cost` badge.
 
 ## Pages

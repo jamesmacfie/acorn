@@ -11,9 +11,10 @@ checked: 07aa959a0
 ---
 
 A data source is a set of records a plugin can read, each with the same known fields: GitHub pull
-requests, Linear issues, Rollbar errors, acorn's own tasks, or agent sessions. Dashboards and workflows'
-**Find records** steps read every record through sources. This page covers what a source is, which
-account and projects a read reaches, saved queries, and sources built from other sources.
+requests, Linear issues, Rollbar errors, acorn's own tasks, agent sessions, or what each agent turn and
+session spent. Dashboards and workflows' **Find records** steps read every record through sources.
+This page covers what a source is, which account and projects a read reaches, saved queries, and
+sources built from other sources.
 
 ## What a typed source is
 
@@ -86,3 +87,5 @@ others.
 - A source whose plugin is off, or whose account is gone, is unavailable. acorn never treats it as
   empty.
 - The agent sessions source reads at most 5,000 sessions, and says it's partial past that.
+- The agent usage records, turns, and session totals sources read the newest 5,000 records in a
+  panel's time window, and say they're partial when the window holds more.

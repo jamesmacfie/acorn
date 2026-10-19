@@ -1,7 +1,6 @@
 import type { AgentUsage } from '../../contract/wire'
-import { agentModelPrice, type AgentPricingPreferences } from '../../shared/pricing'
+import { agentUsageCost, type AgentPricingPreferences } from '../../shared/pricing'
 import { mergeAgentUsage } from '../../shared/usageFold'
-import { estimateUsageEventCost } from '@acorn/protocol/usageCost.ts'
 
 export type UsageEventInput = {
   id: string
@@ -76,32 +75,18 @@ export function usageDeltas<T extends UsageSnapshot>(events: readonly T[]) {
 
 /** Convert before filtering so a window never absorbs usage from before it. */
 export function usageRecords(events: readonly UsageEventInput[], preferences: AgentPricingPreferences) {
-  return usageDeltas(events).map(({ event, reportedCostUsd: reported, ...tokens }) => {
-    const price = event.model ? agentModelPrice(event.provider, event.model, event.at, preferences) : null
-    const estimated = estimateUsageEventCost(
-      {
-        input: tokens.inputTokens,
-        output: tokens.outputTokens,
-        cacheRead: tokens.cacheReadTokens,
-        cacheWrite: tokens.cacheWriteTokens,
-      },
-      price,
-    )
-    return {
-      recordId: event.id,
-      data: {
-        at: event.at,
-        sessionId: event.sessionId,
-        turnId: event.turnId,
-        taskId: event.taskId,
-        provider: event.provider,
-        model: event.model,
-        ...tokens,
-        costUsd: reported ?? estimated,
-        costSource: reported !== null ? 'reported' : estimated !== null ? 'estimated' : 'unknown',
-        priceName: reported !== null ? null : estimated !== null ? event.model : null,
-      },
+  return usageDeltas(events).map(({ event, reportedCostUsd, ...tokens }) => ({
+    recordId: event.id,
+    data: {
+      at: event.at,
+      sessionId: event.sessionId,
+      turnId: event.turnId,
       taskId: event.taskId,
-    }
-  })
+      provider: event.provider,
+      model: event.model,
+      ...tokens,
+      ...agentUsageCost({ ...event, ...tokens, reportedCostUsd }, preferences),
+    },
+    taskId: event.taskId,
+  }))
 }

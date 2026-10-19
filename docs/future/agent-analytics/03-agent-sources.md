@@ -1,5 +1,94 @@
 # Phase 3: serve the facts as data sources
 
+## Completion note
+
+Built on October 20, 2026, on branch `phase-3-agent-sources`.
+
+What landed:
+
+- `sourceQuery.ts` in `plugins/agents/src/server/data`. `scopeTasks` turns a workspace or project
+  into task IDs through `projects.byWorkspace` or `projects.byId` and `tasks.inProject`.
+  `sqlFilters` returns the time comparisons and the `eq` comparisons SQL can answer, apart, so a
+  source can put an aggregate time field in `having`. `withinBudget` and `sourcePage` handle the
+  newest-first read, the budget report, sorting, and paging. `sourceHandler` holds the principal
+  check, `describe`, and the response envelope. All three handlers use it.
+- `agentUsageCost` in `shared/pricing.ts` is the pricing rule. `usageRecords` calls it, and its
+  tests pass unchanged.
+- `usage-records` reads newest first within the window. Its records, starter, and revision are
+  unchanged.
+- **Agent turns** (`turns`) and **Agent session totals** (`session-totals`), with descriptions and
+  starters in `shared/turnSource.ts` and `shared/sessionTotalsSource.ts`, handlers in
+  `server/data`, and registrations in `shared/sourceRegistrations.ts`, which replaces
+  `usageRegistration.ts`. `sourceShape` builds a description's schema and fields from one list.
+- Tests: `sourceQuery.test.ts`, `agentSources.test.ts` (6,000 usage events, workspace and project
+  scope, pricing, options, archived sessions, removed history), and `sourceStarters.test.ts`, which
+  validates every starter of the three sources and replaces `usageSource.test.ts`.
+- The plugin route golden in `apps/node/test/integration/pluginSystem/pluginDisable.snapshot.json`
+  lists the two new routes.
+- Docs: [turn facts](../../managed-agents/turn-facts.md#data-sources), [managed
+  agents](../../managed-agents.md#usage-records), [data sources](../../data-sources.md), and the site's
+  data sources page.
+
+Decisions and deviations:
+
+- SQL only narrows. Every handler runs the whole query in memory over what it read, so a pushed
+  comparison can't disagree with the in-memory one.
+- `usage-records` pushes only the window and the fields a whole session shares: `sessionId`, `taskId`,
+  and `provider`. `model` and `turnId` change within a session, and a delta needs the session's
+  earlier reports, so those stay in memory. For the same reason, the handler also reads each session's
+  usage events before the first one it kept, and computes deltas over both. Without that read, a
+  Codex session that started last month would count its whole running total in this month's first
+  record. A test checks the windowed records equal an unbounded read's.
+- A record's order with no sort is the newest-first read order. `usage-records` used to break ties
+  by record ID.
+- A covered range is returned only when the budget cut the read. A complete read covers the whole
+  window, and an earlier start would raise a coverage warning on every windowed panel.
+- Coverage for both new sources is complete when `turnFactsPending` finds no finished turn waiting for
+  its facts. It shares its rule with the backfill.
+- A turn whose facts hold no tokens isn't estimated. The facts store 0 for unreported tokens, so
+  without this a Claude Code turn with no reported cost would show an estimate of 0 USD.
+- `provider` and `model` on **Agent turns** have dynamic choices and an `options` operation listing
+  the values in the rows. Harnesses can come from plugins, so a static list would go stale.
+- **Agent session totals** sums `filesRewritten` and keeps the per-turn maximum as `maxFilesRewritten`,
+  because the plan asks for both under one name. `repeatedCalls` there is the per-turn maximum, as
+  the plan lists it with the maximums. Its `costUsd` sums the turns with a known cost, and is null
+  when none has one.
+- Session totals read change requests once per task on the page, after paging. Turn titles and
+  project names come from the scope's tasks, or for a whole-Node read, from the projects the rows
+  name.
+- Both new sources' records carry the `agents.session` target and open the Agent pane, as the
+  sessions source does.
+
+Acceptance, measured on October 20, 2026, on an Apple M2 Pro:
+
+- On a clone of phase 2's copy of the owner's 3.4 GB `agents.sqlite`, "Spend by day, last 30 days"
+  read 3,294 turns over 33 pages and came back complete, with coverage complete. The read and the
+  plan's stages took 0.71 s, warm, the median of four runs. The run used the real handler and the
+  real plan stages from a scratch test, with the window pushed as the Node's `plannedQuery` pushes
+  it. It had no core database, so task titles and project names were null. Recorded in turn facts.
+- On the same copy, `usage-records` answered this month's window in 0.36 s. It reports `incomplete`,
+  because the copy holds 192,108 usage events and the newest 5,000 span about 11 hours.
+- `agentSources.test.ts` shows two projects in one workspace, the second workspace with only its own,
+  a session in an archived task, and a session whose history was removed.
+- Every starter validates against its description in `sourceStarters.test.ts`. In `pnpm dev:agent`,
+  **Add panel** listed both sources and offered every starter. Each of the five published to Home
+  from the launcher with no edits, and the studio reported no problems for any of them.
+- The Node service's boot graph is 1,902,556 bytes, under its 1,903,000-byte ceiling.
+
+For later phases:
+
+- Phase 4 adds the heatmap and stacked starters to `turnSourceDescription.starterPlans`. Stacking by
+  model needs a plan column with declared choices, because `model` has dynamic ones.
+- Phase 8 can bind `agents:turns` and `agents:session-totals` in its region and derived sources.
+  The worst-run fields hold the turn's `ordinal` and the run's first `seq`, which phase 7's links need.
+- The sessions source still reads unarchived sessions and filters in memory. It's outside this phase.
+- The plugin SDK's field lists (`packages/plugin-sdk/src/testing/sourceFields.json`) don't include the
+  new sources. Adding them changes what `create-acorn-plugin` offers, and its test pins scaffolded
+  plugins to the SDK release that has the lists, so it needs an SDK release. Phase 8 needs them if
+  its derived sources' tests build fixtures for `agents:turns` or `agents:session-totals`. Add both
+  to `fieldLists()` in `tools/arch/sourceFields.test.ts` and to `KNOWN_SOURCES` in
+  `packages/create-acorn-plugin/index.mjs`, and bump the SDK version.
+
 Date: October 19, 2026. Status: proposed. Needs [phase 2](./02-turn-facts.md).
 
 ## Goal

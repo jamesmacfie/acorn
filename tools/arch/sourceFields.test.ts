@@ -6,7 +6,7 @@ import { registeredDataSource } from '../../packages/node-core/src/server/dataSo
 import '../../packages/node-core/src/server/dataSources/coreTasks.ts'
 import '../../packages/node-core/src/server/dataSources/localGitRegistration.ts'
 import { sessionSource, sessionSourceDescription } from '../../plugins/agents/src/shared/sessionSource.ts'
-import { usageSource } from '../../plugins/agents/src/shared/usageRegistration.ts'
+import { usageSource } from '../../plugins/agents/src/shared/sourceRegistrations.ts'
 import { usageSourceDescription } from '../../plugins/agents/src/shared/usageSource.ts'
 import { actionsSource } from '../../plugins/github/src/shared/actionsRegistration.ts'
 import { actionsSourceDescription } from '../../plugins/github/src/shared/actionsSource.ts'

@@ -80,7 +80,7 @@ import { sessionHistoryTools } from '../server/sessions/sessionHistoryTools'
 import { crossSessionTools } from '../server/sessions/crossSessionTools'
 import { createSessionSourceHandler } from '../server/data/sessionSourceHandler'
 import { sessionSource } from '../shared/sessionSource'
-import { usageSource } from '../shared/usageRegistration'
+import { sessionTotalsSource, turnSource, usageSource } from '../shared/sourceRegistrations'
 import { removeExpiredHistory } from '../server/sessions/historyRetention'
 
 let builtInProfileDisposables: (() => void)[] | null = null
@@ -382,6 +382,21 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         { prefix: '/data/usage' },
       )
       ctx.dataSources.register(usageSource)
+      ctx.routes.fetch(
+        async (request, context) =>
+          (await import('../server/data/turnSourceHandler')).createTurnSourceHandler(store, core)(request, context),
+        { prefix: '/data/turns' },
+      )
+      ctx.dataSources.register(turnSource)
+      ctx.routes.fetch(
+        async (request, context) =>
+          (await import('../server/data/sessionTotalsSourceHandler')).createSessionTotalsSourceHandler(store, core)(
+            request,
+            context,
+          ),
+        { prefix: '/data/session-totals' },
+      )
+      ctx.dataSources.register(sessionTotalsSource)
 
       // A plugin's notes to a session (`SessionMessages`). Entries are read live, and
       // `ready` and every roster change connect the ones a late or reloaded plugin filed.

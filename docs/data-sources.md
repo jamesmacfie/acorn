@@ -11,7 +11,10 @@ their own plugin routes. Core tasks, managed agent sessions, GitHub pull request
 Rollbar error groups are all sources. A core task's `worktreeChanged` stays `null` until the Node
 has inspected its worktree. The agent sessions source reads every unarchived session through the
 store's cursor, up to the host's 5,000-record budget, and reports `incomplete` with `host-budget`
-when more remain. No client registers a source or discovers a schema on its own.
+when more remain. The agents plugin's usage records, turns, and session totals push a time window
+into SQL and read newest first, so the budget drops the oldest records
+([turn facts](./managed-agents/turn-facts.md#data-sources)). No client registers a source or
+discovers a schema on its own.
 
 ## Identity, reach, time, and coverage
 
@@ -81,8 +84,9 @@ that discovered it. Refreshing discovery cannot replace a static descriptor.
 A source description may include up to 10 `starterPlans` for dashboard authoring, each a version 2
 panel plan. A starter's scope names no workspace or account. The panel launcher and the source
 inspector move it onto the scope the person picked, then the Node validates it before it's offered.
-Workspace tasks, Local worktrees, Agent usage records, and GitHub pull requests ship starters. Each
-sits next to its source's description, with a test that validates it against that description.
+Workspace tasks, Local worktrees, Agent usage records, Agent turns, Agent session totals, and GitHub
+pull requests ship starters. Each sits next to its source's description, with a test that
+validates it against that description.
 Static field choices may declare a `tone` and numeric `rank`. Panel columns inherit these until the
 author overrides them. The query contract has no projection lists.
 

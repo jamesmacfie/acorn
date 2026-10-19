@@ -15,6 +15,17 @@ const log = createLogger('agents:turn-facts', 'agents')
 
 const yieldToNode = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
 
+// A finished turn of `t` with no facts in `f`, or facts an older version of the rules wrote.
+const needsFacts = sql`t.status IN ('completed', 'failed', 'cancelled', 'interrupted')
+  AND t.started_at IS NOT NULL AND t.completed_at IS NOT NULL
+  AND (f.turn_id IS NULL OR f.version < ${TURN_FACTS_VERSION})`
+
+/** Whether some finished turn still waits for its facts, so a reader can say its history is partial. */
+export const turnFactsPending = (db: PluginDatabase): boolean =>
+  db.get(
+    sql`SELECT 1 FROM agent_turns t LEFT JOIN agent_turn_facts f ON f.turn_id = t.id WHERE ${needsFacts} LIMIT 1`,
+  ) !== undefined
+
 // A step ends early once its writes have held the database this long, so one long turn doesn't bring
 // the rest of its batch with it. A single turn can't be split.
 const STEP_MS = 100
@@ -39,10 +50,7 @@ export async function backfillTurnFacts(
       FROM agent_turns t
       JOIN agent_sessions s ON s.id = t.session_id
       LEFT JOIN agent_turn_facts f ON f.turn_id = t.id
-      WHERE t.rowid > ${after}
-        AND t.status IN ('completed', 'failed', 'cancelled', 'interrupted')
-        AND t.started_at IS NOT NULL AND t.completed_at IS NOT NULL
-        AND (f.turn_id IS NULL OR f.version < ${TURN_FACTS_VERSION})
+      WHERE t.rowid > ${after} AND ${needsFacts}
       ORDER BY t.rowid
       LIMIT ${batch}
     `)

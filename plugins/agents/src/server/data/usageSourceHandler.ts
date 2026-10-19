@@ -1,141 +1,87 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, lt, sql, type SQL } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase, PluginFetchHandler } from '@acorn/plugin-api/node'
-import { compareDataValues, type DataPredicate } from '@acorn/protocol/dataBindings.ts'
-import { dataSourceRequestSchema } from '@acorn/protocol/dataSources.ts'
-import { DATA_LIMITS, MISSING, readDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { AgentUsage } from '../../contract/wire'
 import * as schema from '../../node/schema'
 import { usageSourceDescription } from '../../shared/usageSource'
 import { readAgentPricingPreferences } from '../pricingStore'
+import { READ_LIMIT, scopeTasks, sourceHandler, sourcePage, sqlFilters, withinBudget } from './sourceQuery'
 import { modelAtTurn, usageRecords, type UsageEventInput } from './usageRecords'
 
-function matches(record: ReturnType<typeof usageRecords>[number], predicate: DataPredicate): boolean {
-  if (predicate.kind !== 'comparison')
-    return predicate.kind === 'all'
-      ? predicate.predicates.every((item) => matches(record, item))
-      : predicate.predicates.some((item) => matches(record, item))
-  if (predicate.left.address.from !== 'item' || predicate.right?.address.from !== 'literal')
-    throw new Error('unsupported_predicate')
-  return compareDataValues(
-    readDataPointer(record.data, predicate.left.address.pointer),
-    predicate.operator,
-    predicate.right?.address.from === 'literal' ? predicate.right.address.value : MISSING,
-  )
+// A record counts from its session's earlier reports, and its model and turn can change within a
+// session, so SQL narrows only by the window and the fields a whole session shares.
+const fields = {
+  time: { pointer: '/at', column: schema.agentEvents.createdAt },
+  equals: {
+    '/sessionId': schema.agentEvents.sessionId,
+    '/taskId': schema.agentSessions.taskId,
+    '/provider': schema.agentSessions.providerId,
+  },
+}
+
+type UsageRow = Omit<UsageEventInput, 'model' | 'usage'> & { seq: number; eventJson: string; policy: string | null }
+
+const usageEvent = (row: UsageRow): UsageEventInput[] => {
+  try {
+    const parsed = JSON.parse(row.eventJson) as { type: string; usage?: AgentUsage }
+    if (parsed.type !== 'usage' || !parsed.usage) return []
+    const { id, sessionId, turnId, taskId, provider, at } = row
+    return [{ id, sessionId, turnId, taskId, provider, at, model: modelAtTurn(row.policy), usage: parsed.usage }]
+  } catch {
+    return []
+  }
 }
 
 export function createUsageSourceHandler(
   db: PluginDatabase,
-  core: Pick<CoreServices, 'tasks' | 'prefs'>,
+  core: Pick<CoreServices, 'tasks' | 'projects' | 'prefs'>,
 ): PluginFetchHandler {
-  return async (request, context) => {
-    try {
-      if (request.method !== 'POST') return Response.json({ error: 'method_not_allowed' }, { status: 405 })
-      if (
-        context.principal.kind !== 'device' &&
-        !(context.principal.kind === 'internal' && context.principal.scope === 'service')
-      ) {
-        return Response.json({ error: 'forbidden' }, { status: 403 })
-      }
-      const input = dataSourceRequestSchema.parse(await request.json())
-      if (input.operation === 'describe') return Response.json(usageSourceDescription)
-      if (input.operation !== 'query') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
-      const allowedIds = input.query.scope.workspaceId
-        ? await core.tasks.idsForWorkspace(input.query.scope.workspaceId)
-        : null
-      const projectId = input.query.scope.projectId
-      const projectIds =
-        projectId && allowedIds
-          ? (await Promise.all(allowedIds.map(async (id) => ({ id, task: await core.tasks.load(id) }))))
-              .filter((item) => item.task?.projectId === projectId)
-              .map((item) => item.id)
-          : allowedIds
-      if (projectIds?.length === 0)
-        return Response.json({
-          records: [],
-          revision: usageSourceDescription.revision,
-          readTime: Date.now(),
-          completeness: { kind: 'complete' },
-          coveredRange: { start: Date.now(), end: Date.now() },
-        })
-      const rows = await db
-        .select({
-          id: schema.agentEvents.id,
-          sessionId: schema.agentEvents.sessionId,
-          turnId: schema.agentEvents.turnId,
-          at: schema.agentEvents.createdAt,
-          eventJson: schema.agentEvents.eventJson,
-          taskId: schema.agentSessions.taskId,
-          provider: schema.agentSessions.providerId,
-          policy: schema.agentTurns.effectivePolicyJson,
-        })
-        .from(schema.agentEvents)
-        .innerJoin(schema.agentSessions, eq(schema.agentEvents.sessionId, schema.agentSessions.id))
-        .leftJoin(schema.agentTurns, eq(schema.agentEvents.turnId, schema.agentTurns.id))
-        .where(
-          and(
-            eq(sql<string>`json_extract(${schema.agentEvents.eventJson}, '$.type')`, 'usage'),
-            projectIds ? inArray(schema.agentSessions.taskId, projectIds) : undefined,
-          ),
+  const usageEvents = (where: SQL | undefined) =>
+    db
+      .select({
+        id: schema.agentEvents.id,
+        sessionId: schema.agentEvents.sessionId,
+        turnId: schema.agentEvents.turnId,
+        seq: schema.agentEvents.seq,
+        at: schema.agentEvents.createdAt,
+        eventJson: schema.agentEvents.eventJson,
+        taskId: schema.agentSessions.taskId,
+        provider: schema.agentSessions.providerId,
+        policy: schema.agentTurns.effectivePolicyJson,
+      })
+      .from(schema.agentEvents)
+      .innerJoin(schema.agentSessions, eq(schema.agentEvents.sessionId, schema.agentSessions.id))
+      .leftJoin(schema.agentTurns, eq(schema.agentEvents.turnId, schema.agentTurns.id))
+      .where(and(eq(sql<string>`json_extract(${schema.agentEvents.eventJson}, '$.type')`, 'usage'), where))
+  return sourceHandler({
+    description: usageSourceDescription,
+    failure: 'agent_usage_source_failed',
+    query: async (input, context) => {
+      const tasks = await scopeTasks(core, input.query.scope)
+      const { time, equals } = sqlFilters(input.query.predicate, fields)
+      const read = withinBudget(
+        await usageEvents(
+          and(...time, ...equals, tasks ? inArray(schema.agentSessions.taskId, [...tasks.keys()]) : undefined),
         )
-        .orderBy(asc(schema.agentEvents.createdAt), asc(schema.agentEvents.sessionId), asc(schema.agentEvents.seq))
-        .limit(DATA_LIMITS.selectionRecords + 1)
-      const truncated = rows.length > DATA_LIMITS.selectionRecords
-      const events: UsageEventInput[] = rows.slice(0, DATA_LIMITS.selectionRecords).flatMap((row) => {
-        try {
-          const parsed = JSON.parse(row.eventJson) as { type: string; usage?: AgentUsage }
-          return parsed.type === 'usage' && parsed.usage
-            ? [
-                {
-                  id: row.id,
-                  sessionId: row.sessionId,
-                  turnId: row.turnId,
-                  taskId: row.taskId,
-                  provider: row.provider,
-                  model: modelAtTurn(row.policy),
-                  at: row.at,
-                  usage: parsed.usage,
-                },
-              ]
-            : []
-        } catch {
-          return []
-        }
-      })
+          .orderBy(desc(schema.agentEvents.createdAt), desc(schema.agentEvents.sessionId), desc(schema.agentEvents.seq))
+          .limit(READ_LIMIT),
+      )
+      // Each session's reports before the first one kept, which that one's deltas count from.
+      const firstSeq = new Map<string, number>()
+      for (const row of read.rows)
+        firstSeq.set(row.sessionId, Math.min(row.seq, firstSeq.get(row.sessionId) ?? row.seq))
+      const earlier: UsageRow[] = []
+      for (const [sessionId, seq] of firstSeq)
+        earlier.push(
+          ...(await usageEvents(
+            and(eq(schema.agentEvents.sessionId, sessionId), lt(schema.agentEvents.seq, seq)),
+          ).orderBy(asc(schema.agentEvents.seq))),
+        )
+      const kept = new Set(read.rows.map((row) => row.id))
       const preferences = await readAgentPricingPreferences(core.prefs, context.userId)
-      let records = usageRecords(events, preferences)
-      if (input.query.predicate) records = records.filter((record) => matches(record, input.query.predicate!))
-      records.sort((left, right) => {
-        for (const sort of input.query.sort) {
-          const a = readDataPointer(left.data, sort.pointer)
-          const b = readDataPointer(right.data, sort.pointer)
-          if (a === b) continue
-          if (typeof a !== 'number' || typeof b !== 'number') throw new Error('unsupported_sort')
-          return (a - b) * (sort.direction === 'asc' ? 1 : -1)
-        }
-        return left.recordId.localeCompare(right.recordId)
-      })
-      if (input.query.take) records = records.slice(0, input.query.take)
-      const offset = input.cursor ? Number(input.cursor) : 0
-      if (!Number.isSafeInteger(offset) || offset < 0 || offset >= Math.max(records.length, 1))
-        throw new Error('invalid_cursor')
-      const selected = records.slice(offset, offset + input.pageSize)
-      const more = offset + selected.length < records.length
-      const now = Date.now()
-      return Response.json({
-        records: selected,
-        revision: usageSourceDescription.revision,
-        readTime: now,
-        coveredRange: { start: events[0]?.at ?? now, end: now },
-        completeness: truncated
-          ? { kind: 'incomplete', cause: 'host-budget' }
-          : more
-            ? { kind: 'more', cursor: String(offset + selected.length) }
-            : input.query.take && records.length >= input.query.take
-              ? { kind: 'bounded' }
-              : { kind: 'complete' },
-      })
-    } catch {
-      return Response.json({ error: 'agent_usage_source_failed' }, { status: 502 })
-    }
-  }
+      const records = usageRecords([...earlier, ...[...read.rows].reverse()].flatMap(usageEvent), preferences)
+        .filter((record) => kept.has(record.recordId))
+        .reverse()
+      return sourcePage(input, { records, truncated: read.truncated }, '/at')
+    },
+  })
 }
