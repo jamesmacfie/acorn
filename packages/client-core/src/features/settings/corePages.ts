@@ -58,7 +58,7 @@ const cli: SearchDeclaration = {
 }
 const performance: SearchDeclaration = {
   keywords: ['memory', 'undo history', 'task switch', 'subtask', 'keep'],
-  sections: [{ id: 'memory', label: 'Memory', rows: ['Keep task state in memory'] }],
+  sections: [{ id: 'task-state', label: 'Task state', rows: ['Keep task state in memory'] }],
 }
 const workspaces: SearchDeclaration = {
   keywords: [

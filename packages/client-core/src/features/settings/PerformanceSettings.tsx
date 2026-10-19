@@ -20,7 +20,7 @@ export default function PerformanceSettings() {
   const kept = createSettingSave()
   const save = (value: number) => void kept.run(() => savePref(qc, PrefKeys.keptTasks, String(value)))
   return (
-    <SettingsSection id="memory" label="Memory">
+    <SettingsSection id="task-state" label="Task state">
       <SettingRow
         label="Keep task state in memory"
         help="Each pane keeps what you were doing in this many recent tasks: open files with their undo history and scroll, the note you were editing, and lists you filtered. Going back to one of them finds it as you left it. An older task opens from what was saved, so its files, scroll, and cursor come back, and its undo history doesn't."
