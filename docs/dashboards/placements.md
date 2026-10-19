@@ -40,8 +40,12 @@ nothing draws them.
 ## Plugin regions
 
 A plugin region is the same `PanelGrid` in a rectangle a plugin reserved: a rail source's side panel
-beside its list, or a `pane.aside` beside a plugin pane. Both are stored under
-`plugin-region/<pluginId>:<id>`. The host draws the region, and the manifest only reserves it, because
+beside its list, or a `pane.aside` beside a plugin pane. Both are stored per workspace under
+`plugin-region/<pluginId>:<id>/<workspaceId>`, because a panel's plan reads one workspace, and the
+routed workspace picks the board, as it does for Home. Regions stored before they had a workspace are
+keyed `plugin-region/<pluginId>:<id>`. The first workspace that draws one adopts it, and the next
+starts empty (`adoptUnscoped` in `persist.ts`, the rule Home's adoption uses). Adoption doesn't
+overwrite a board. The host draws the region, and the manifest only reserves it, because
 panels are host components and a frame is a separate realm. An aside shares the `extensionPoints` key
 with the cooperative kinds, but you fill it, not another plugin
 ([cooperative extension points](../plugins/cooperative-extension-points.md)).
@@ -53,6 +57,16 @@ twice. The panel studio checks them at publish: the review describes each source
 the region wouldn't show, with the reason, such as "This area only shows Board and List panels"
 (`regionRefusal`). The host checks again at render, because a plugin can narrow its region in an
 update. A refused panel isn't drawn there and nothing is deleted.
+
+The registration passes list every region in `panelRegionRegistry` (`region.ts`), so an agent's
+panel card can offer it in **Add to dashboard**
+([panels from a conversation](../dashboards.md#panels-from-a-conversation)). The card lists each region
+under its rail source's or pane's label. Opening the menu describes the plan's sources, and only when
+some region is on, because a region checks sources and field roles. A region that would refuse the
+plan is left out, and a full one is disabled, as **Duplicate** is. App cells go on Home tabs only.
+
+A region's `sources` can name another plugin's source, such as `agents:turns`. The list only limits
+what draws there, and grants no read.
 
 **Remove from this dashboard** unplaces a panel. **Delete panel** destroys the definition and asks first. A
 region whose plugin is disabled disappears, and its panels survive to return with it.

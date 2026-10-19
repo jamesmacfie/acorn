@@ -21,10 +21,10 @@ export type PlacementScope = {
   surface: PlacementSurface
   /** The pane id, or `pluginId:regionId`. Absent for `home`, which has one of itself. */
   ownerId?: string
-  /** Which workspace's board this is. Home carries one, because a panel's rows link to that
-   *  workspace's work and a board composed in one has nothing to say in another; a plugin region
-   *  does not, being already pinned to the surface it hangs off. Absent is the unscoped board, drawn
-   *  while no workspace is known (`adoptUnscopedHome`). */
+  /** Which workspace's board this is. Home and plugin regions carry one, because a panel's plan reads
+   *  one workspace and its rows link to that workspace's work, so a board composed in one has nothing
+   *  to say in another. Absent is the unscoped board, drawn while no workspace is known, and adopted
+   *  by the next workspace to draw it (`adoptUnscoped`). */
   workspaceId?: string
 }
 
@@ -319,43 +319,45 @@ export const removeHomeTab = (tabId: string, workspaceId?: string): void =>
 
 // ── Adopting the unscoped board ───────────────────────────────────────────────────────────────
 
-/** Move a board composed while no workspace was known into the workspace Home is next opened in.
- *
- *  Home draws with no workspace at `/` with no project routed, and before the workspace mapping loads. A
- *  board composed then is keyed by the bare `home` and `home/<tab>`. This re-keys them to `home//<ws>` and
- *  `home/<tab>/<ws>` and stamps the matching names, whichever workspace the person opens Home in next. The
- *  board named no workspace, so any choice is arbitrary, and this one keeps the panels visible.
+/** Move the board composed for `scope`'s surface and owner while no workspace was known into `scope`'s
+ *  workspace, placements and geometry both. The board named no workspace, so whichever workspace draws
+ *  it next is an arbitrary choice, and this one keeps the panels visible.
  *
  *  Never overwrites: a key the workspace already has means the board it would land on is somebody's
  *  own, so the unscoped one stays where it is rather than replacing it. Returns the same state when
  *  there is nothing to adopt, so the caller can run it on every render without writing anything. */
+export function adoptUnscoped(state: DashboardState, scope: PlacementScope): DashboardState {
+  const from = placementScopeKey({ ...scope, workspaceId: undefined })
+  const to = placementScopeKey(scope)
+  const has = (key: string) => !!(state.placements[key] || state.layouts[key])
+  if (!scope.workspaceId || !has(from) || has(to)) return state
+  const moved = <T>(record: Record<string, T>): Record<string, T> =>
+    Object.fromEntries(Object.entries(record).map(([key, value]) => [key === from ? to : key, value]))
+  return { ...state, placements: moved(state.placements), layouts: moved(state.layouts) }
+}
+
+/** Every unscoped Home tab, adopted by the workspace Home is next opened in, with the matching names.
+ *
+ *  Home draws with no workspace at `/` with no project routed, and before the workspace mapping loads. A
+ *  board composed then is keyed by the bare `home` and `home/<tab>`, and lands on `home//<ws>` and
+ *  `home/<tab>/<ws>`. */
 export function adoptUnscopedHome(state: DashboardState, workspaceId: string): DashboardState {
   if (!workspaceId) return state
-  const rekey = new Map<string, string>()
-  for (const key of new Set([...Object.keys(state.placements), ...Object.keys(state.layouts)])) {
+  const keys = new Set([...Object.keys(state.placements), ...Object.keys(state.layouts)])
+  const adopted = [...keys].reduce((next, key) => {
     const tabId = homeTabIdOf(key)
-    if (tabId === undefined) continue
-    const target = placementScopeKey(homeTabScope(tabId, workspaceId))
-    if (state.placements[target] || state.layouts[target]) continue
-    rekey.set(key, target)
-  }
-  const named = state.tabs ?? []
-  const stale = named.some((tab) => tab.workspaceId === undefined)
-  if (!rekey.size && !stale) return state
-  const moved = <T>(record: Record<string, T>): Record<string, T> =>
-    Object.fromEntries(Object.entries(record).map(([key, value]) => [rekey.get(key) ?? key, value]))
-  return {
-    ...state,
-    placements: moved(state.placements),
-    layouts: moved(state.layouts),
-    ...(named.length
-      ? { tabs: named.map((tab) => (tab.workspaceId === undefined ? { ...tab, workspaceId } : tab)) }
-      : {}),
-  }
+    return tabId === undefined ? next : adoptUnscoped(next, homeTabScope(tabId, workspaceId))
+  }, state)
+  const named = adopted.tabs ?? []
+  if (!named.some((tab) => tab.workspaceId === undefined)) return adopted
+  return { ...adopted, tabs: named.map((tab) => (tab.workspaceId === undefined ? { ...tab, workspaceId } : tab)) }
 }
 
 export const adoptUnscopedHomeDashboards = (workspaceId: string): void =>
   void setDashboards((state) => adoptUnscopedHome(state, workspaceId))
+
+export const adoptUnscopedDashboards = (scope: PlacementScope): void =>
+  void setDashboards((state) => adoptUnscoped(state, scope))
 
 // ── Slice ─────────────────────────────────────────────────────────────────────────────────────
 

@@ -2,6 +2,7 @@ import { Show } from 'solid-js'
 import PanelGrid from '../../features/dashboards/PanelGrid'
 import { regionScope } from '../../features/dashboards/region'
 import { taskById } from '../../features/tasks/taskLookup'
+import { createActiveWorkspaceId } from '../../features/workspaces/activeWorkspaceId'
 import ExtensionPointHost from './ExtensionPointHost'
 import { InlineSlot } from '../frames/InlineSlot'
 import { DetailRegion } from './DetailRegion'
@@ -37,20 +38,24 @@ export default function ExtendedPane(props: ExtendedPaneProps) {
         <Show when={props.inlineBelowPointId}>{(pointId) => <InlineSlot point={pointId()} {...scope()} />}</Show>
         <Show when={props.footerPointId}>{(pointId) => <ExtensionPointHost pointId={pointId()} />}</Show>
       </div>
-      {/* Scoped by the point, not by the task: definitions are per-user-per-node and surface-free, so the
-          same board renders in this pane in every task. The grid's narrow-window collapse is what makes a
+      {/* Scoped by the point and the routed workspace, not by the task, so the same board renders in
+          this pane in every task of the workspace. The grid's narrow-window collapse is what makes a
           column this size work at all: too narrow for twelve cells is simply always collapsed, and the
-          stored geometry returns intact when the pane is widened. */}
+          stored geometry returns intact when the pane is widened. The workspace is read inside the
+          aside, so a pane without one needs no router. */}
       <Show when={props.aside}>
-        {(aside) => (
-          <aside class="extended-pane-aside">
-            <PanelGrid
-              scope={regionScope(aside().pointId)}
-              region={aside().region}
-              returnLabel={(props.taskId && taskById(props.taskId)?.title) || 'Task'}
-            />
-          </aside>
-        )}
+        {(aside) => {
+          const workspaceId = createActiveWorkspaceId()
+          return (
+            <aside class="extended-pane-aside">
+              <PanelGrid
+                scope={regionScope(aside().pointId, workspaceId())}
+                region={aside().region}
+                returnLabel={(props.taskId && taskById(props.taskId)?.title) || 'Task'}
+              />
+            </aside>
+          )
+        }}
       </Show>
     </div>
   )

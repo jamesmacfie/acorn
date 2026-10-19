@@ -1,5 +1,61 @@
 # Phase 1: check that dynamic UI fits
 
+## Completion note
+
+Built on October 20, 2026, on branch `phase-1-dynamic-ui-fit`.
+
+What landed:
+
+- Plugin regions are keyed by workspace, `plugin-region/<pluginId>:<id>/<workspaceId>`.
+  `regionScope(ownerId, workspaceId)` builds the key. The rail source's side panel and the pane aside
+  both pass the routed workspace from `createActiveWorkspaceId`.
+- Adoption is one function, `adoptUnscoped(state, scope)` in `persist.ts`. It moves one scope's
+  unscoped board and its geometry to the workspace, and never overwrites a key that has a board.
+  `adoptUnscopedHome` calls it for each unscoped tab, then stamps the tab names, so Home's keys,
+  behavior, and tests are unchanged. `PanelGrid` adopts a region's unscoped board when it draws one.
+- `panelRegionRegistry` in `region.ts` lists every region. The chrome pass registers each rail source
+  that declares `panels`, and the frame pass registers each `pane.aside`, both gated on the plugin
+  being on for the node. `regionsToAddTo` answers which regions of a workspace would show a panel,
+  and whether each is full.
+- A panel card's **Add to dashboard** lists the Home tabs, a separator, then those regions under
+  their source or pane label. Opening the menu describes the plan's sources once, and only when a
+  region is on. A refusing region is left out, a full one is disabled, and choosing one places the
+  panel through `addNewPanel` with the region passed, so publish checks it again. **Edit…** in the
+  toast opens the studio with the region.
+- Docs: [placements](../../dashboards/placements.md) for keys, adoption, the registry, and the card's
+  region rules; [dashboards](../../dashboards.md) for **Add to dashboard**; and the open question in
+  [dynamic UI's README](../dynamic-ui/README.md) is answered.
+
+The five checks:
+
+1. Starters in an empty region hold. `PanelGrid` hands its region to `DashboardPanelHost`, which hands
+   it to `PanelLauncher`. Before this phase the launcher got an empty workspace ID in a region, because
+   the region scope had none. It now gets the routed workspace.
+2. Added views reach cards and apps. A panel card and an app's `Panel` both draw through
+   `PublishedDashboardPanel`. Trellis's `Panel` schema takes a plan name and lists no view kinds.
+3. The agent learns added views. `panel_guide` embeds `PANEL_CAPABILITIES`, and the app guide embeds
+   `panel_guide`'s output. Phase 4 adds the view to `dashboardViewKinds` and to
+   `PANEL_CAPABILITIES.views`. Two prose lines also name the five views and need the new one:
+   `choosingAView` in `panelGuide.ts`, and the `Panel` description in trellis's `shared/library.ts`.
+4. Run budget holds: `DATA_LIMITS.selectionRecords` is 5,000. Nothing changed.
+5. A region's `sources` accepts any `<pluginId>:<sourceId>`. Neither the manifest parser nor the Node's
+   manifest checks tie it to the declaring plugin, and the launcher offers another plugin's source.
+
+Deviations:
+
+- A full region shows disabled with no reason text. **Duplicate** shows none either, so "the same
+  reason **Duplicate** gives" is no text.
+- After adding to a region, the card names the region but offers **Open** only for a Home tab.
+  Opening a region would need the source or pane to navigate to, which the registry doesn't carry.
+
+Checked in `pnpm dev:agent`: a throwaway plugin with a rail source whose region allows
+`agents:sessions`, and a seeded `panel_show` card in a task. The card's menu listed **Home** and
+**Session board**. Choosing **Session board** stored the panel under the workspace's region key, and
+the region drew it. The region's **Add panel** opened the launcher with only the agents source.
+
+For later phases: phase 8's region can list `agents:*` sources directly. No shipped plugin declares a
+region yet, so phase 8's will be the first.
+
 Date: October 19, 2026. Status: proposed. Needs the [dynamic UI](../dynamic-ui/README.md)
 programme merged.
 

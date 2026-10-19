@@ -1,15 +1,25 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { PanelDefinition } from './model'
 import {
   panelRegion,
+  panelRegionRegistry,
   regionAllows,
   regionAllowsSource,
   regionHasRoom,
   regionScope,
+  regionsToAddTo,
   regionViews,
   sourceRegionOwner,
 } from './region'
-import { placementScopeKey } from './persist'
+import {
+  adoptUnscopedDashboards,
+  emptyDashboards,
+  hydrateDashboards,
+  panelsAt,
+  placementScopeKey,
+  placePanel,
+  savePanel,
+} from './persist'
 
 const panel = (sources: string[], fieldRoles: string[] = [], kind = 'list'): PanelDefinition => ({
   id: 'p1',
@@ -58,5 +68,41 @@ describe('panel region constraints', () => {
     expect(placementScopeKey(regionScope(sourceRegionOwner('tracker', 'issues')))).toBe(
       'plugin-region/tracker%3Aissues',
     )
+  })
+})
+
+describe('region boards per workspace', () => {
+  const registered: { dispose(): void }[] = []
+  afterEach(() => {
+    for (const entry of registered.splice(0)) entry.dispose()
+    hydrateDashboards(emptyDashboards())
+  })
+
+  it('keys a region by workspace, so another workspace opens it empty', () => {
+    const owner = sourceRegionOwner('tracker', 'issues')
+    expect(placementScopeKey(regionScope(owner, 'w1'))).toBe('plugin-region/tracker%3Aissues/w1')
+    savePanel(panel(['tracker:issues']))
+    placePanel(regionScope(owner, 'w1'), 'p1')
+    // What drawing the region in the second workspace does first.
+    adoptUnscopedDashboards(regionScope(owner, 'w2'))
+    expect(panelsAt(regionScope(owner, 'w2'))).toEqual([])
+    expect(panelsAt(regionScope(owner, 'w1')).map((placed) => placed.id)).toEqual(['p1'])
+  })
+
+  it('offers the regions that would show a panel, and marks a full one', () => {
+    const entry = (id: string, region: ReturnType<typeof panelRegion>, when = true) =>
+      registered.push(panelRegionRegistry.register({ id, label: id, region, when: () => when }))
+    entry('tracker:issues', panelRegion('tracker', { max: 1 }))
+    entry('tracker:tables', panelRegion('tracker', { views: ['table'], max: 4 }))
+    entry('tracker:off', panelRegion('tracker', { max: 4 }), false)
+    savePanel(panel(['tracker:issues']))
+    placePanel(regionScope('tracker:issues', 'w1'), 'p1')
+
+    const metadata = { sources: ['tracker:issues'], fieldRoles: [] }
+    expect(regionsToAddTo('w1', 'list', metadata).map(({ label, full }) => ({ label, full }))).toEqual([
+      { label: 'tracker:issues', full: true },
+    ])
+    expect(regionsToAddTo('w2', 'list', metadata).map(({ full }) => full)).toEqual([false])
+    expect(regionsToAddTo('w1', 'list', { sources: ['github:pulls'], fieldRoles: [] })).toEqual([])
   })
 })

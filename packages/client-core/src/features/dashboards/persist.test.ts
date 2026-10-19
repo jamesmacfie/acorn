@@ -4,6 +4,7 @@ import {
   dashboards,
   dashboardsSlice,
   emptyDashboards,
+  adoptUnscoped,
   adoptUnscopedHome,
   hydrateDashboards,
   homeTabIdOf,
@@ -585,5 +586,19 @@ describe('adopting the unscoped board', () => {
     )
     expect(state.placements['home//w1']).toEqual(['b'])
     expect(state.placements.home).toEqual(['a'])
+  })
+
+  it('moves an unscoped region board to the first workspace that draws it, and the next starts empty', () => {
+    const sidebar = (workspaceId: string) => ({
+      surface: 'plugin-region' as const,
+      ownerId: 'github:sidebar',
+      workspaceId,
+    })
+    const first = adoptUnscoped(unscoped(), sidebar('w1'))
+    expect(first.placements['plugin-region/github%3Asidebar/w1']).toEqual(['a'])
+    expect(first.placements['plugin-region/github%3Asidebar']).toBeUndefined()
+    // Home's unscoped boards aren't this region's to move.
+    expect(first.placements.home).toEqual(['a'])
+    expect(adoptUnscoped(first, sidebar('w2'))).toBe(first)
   })
 })

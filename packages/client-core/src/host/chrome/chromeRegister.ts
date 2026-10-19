@@ -17,6 +17,7 @@ import { commandRegistry } from '../registries/commands/commands'
 import { keybindingRegistry } from '../registries/commands/keybindings'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { sourceRegistry } from '../registries/sources/sources'
+import { panelRegion, panelRegionRegistry, sourceRegionOwner } from '../../features/dashboards/region'
 import { uiSlotRegistry } from '../registries/extensionPoints/slots'
 import { brandMarkRegistry } from '../../kit/tokens/brandMarks'
 import { loadedPluginStateOnNode, pluginEnabledOnNode, pluginInstalledAtOnNode } from '../plugins/distribution'
@@ -351,6 +352,18 @@ function registerChrome(
         // so it's registered next to that surface's component (`projectSurfaceRegistry`).
       }),
     )
+    // The dashboard region beside the list, listed so Add to dashboard can reach it from elsewhere.
+    const declaredRegion = descriptor.panels
+    if (declaredRegion) {
+      add('panel region', descriptor.id, () =>
+        own(panelRegionRegistry, {
+          id: sourceRegionOwner(pluginId, descriptor.id),
+          label: descriptor.label,
+          region: panelRegion(pluginId, declaredRegion),
+          when: () => pluginEnabledOnNode(chromeNode(), pluginId),
+        }),
+      )
+    }
   }
 
   for (const descriptor of contributions.slots ?? []) {

@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { Button, SectionHeader } from '../../kit/components/primitives'
@@ -20,6 +20,7 @@ import PanelGridItem, { type PanelGridGestureKind } from './PanelGridItem'
 import { panelGridHeight, panelPlaceholderStyle, panelSlotStyle } from './panelGridGeometry'
 import { regionAllows, regionHasRoom, type PanelRegion } from './region'
 import {
+  adoptUnscopedDashboards,
   dashboards,
   homeTabs,
   homeTabScope,
@@ -101,6 +102,11 @@ export default function PanelGrid(props: {
   /** A region's cap takes the affordance away rather than failing on click, the same rule the
    *  "no plugin provides a source" gate below applies. */
   const hasRoom = () => !props.region || regionHasRoom(props.region, panels().length)
+  // A region's board composed while no workspace was known goes to the first workspace that draws it.
+  // Home adopts its own, tab names included, in `Home`.
+  createEffect(() => {
+    if (props.scope.surface === 'plugin-region') adoptUnscopedDashboards(props.scope)
+  })
   const committed = createMemo(() => layoutAt(props.scope))
   /** What the grid draws: the live candidate while a gesture is running, else what is stored. */
   const layout = (): PanelLayout => gesture()?.layout ?? committed()

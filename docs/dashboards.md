@@ -105,9 +105,9 @@ A card caps at 480 pixels with **Expand**, and runs its plan only while it's on 
 with the `panelId` of an earlier one is a new version. The earlier card collapses to one line with
 its title and **Show**, which draws that version again, because the plan is in its own call.
 
-**Add to dashboard** lists the Home tabs of the task's workspace. Choosing one publishes the plan as a
-new panel and places it there, through the drill-down's path (`addNewPanel` in `panelPublish.ts`),
-under this device. The card then names the tab and offers **Open**, and a toast offers **Edit…**.
+**Add to dashboard** lists the Home tabs, then the [plugin regions](./dashboards/placements.md#plugin-regions)
+of the task's workspace. Choosing one publishes the plan as a new panel and places it there
+(`addNewPanel` in `panelPublish.ts`). The card names it and offers **Open** for a tab.
 **Edit in studio** creates a new draft from the plan and opens the studio on it. Changes there don't
 flow back to the card. An agent never publishes or places a panel itself.
 

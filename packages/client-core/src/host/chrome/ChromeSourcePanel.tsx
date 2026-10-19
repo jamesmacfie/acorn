@@ -20,6 +20,7 @@ import { runChromeAction } from './actions'
 import { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from './chromeData'
 import { tasksKey, tasksOptions, workspacesOptions } from '../../infra/queries'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
+import { createActiveWorkspaceId } from '../../features/workspaces/activeWorkspaceId'
 import { PromoteToTaskModal } from '../../features/integrations/PromoteToTaskModal'
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '../registries/panes/projectSurfaces'
 import { taskTracksRef } from '../registries/sources/sources'
@@ -423,6 +424,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
  *  one telling the other. */
 export function ChromeSourceDetail(props: ChromeSourcePanelProps) {
   const params = useParams()
+  const workspaceId = createActiveWorkspaceId()
   const surface = () => {
     const onSelect = props.descriptor.onSelect
     return onSelect?.verb === 'navigate' ? projectSurfaceRegistry.get(onSelect.surface) : undefined
@@ -447,12 +449,12 @@ export function ChromeSourceDetail(props: ChromeSourcePanelProps) {
           one of the two can be present: the manifest refuses a source that both reserves a region and
           navigates to a project surface.
 
-          Scoped by plugin and source, never by project, because definitions are per-user-per-node and
-          surface-free. Too narrow for twelve cells collapses, and the stored geometry returns when it
-          is widened. */}
+          Scoped by plugin, source, and the routed workspace, because a panel's plan reads one
+          workspace. Too narrow for twelve cells collapses, and the stored geometry returns when it is
+          widened. */}
       {(declared) => (
         <PanelGrid
-          scope={regionScope(sourceRegionOwner(props.pluginId, props.descriptor.id))}
+          scope={regionScope(sourceRegionOwner(props.pluginId, props.descriptor.id), workspaceId())}
           region={panelRegion(props.pluginId, declared())}
           returnLabel={props.descriptor.label}
         />

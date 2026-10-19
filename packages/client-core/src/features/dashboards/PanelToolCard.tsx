@@ -7,7 +7,7 @@ import { Alert, Button, CodeBlock } from '../../kit/components/primitives'
 import { Inline } from '../../kit/components/layout/Inline'
 import { Stack } from '../../kit/components/layout/Stack'
 import { Text } from '../../kit/components/content/Text'
-import { Menu } from '../../kit/components/overlays/Menu'
+import { Menu, type MenuContext } from '../../kit/components/overlays/Menu'
 import { activeCacheId } from '../../infra/node/activeNode'
 import { sourceOpeningPath } from '../../host/registries/sources/sources'
 import { allProjects } from '../projects/projectLookup'
@@ -20,9 +20,10 @@ import CardFrame from './CardFrame'
 import DashboardPanelHost from './DashboardPanelHost'
 import { homeTabsToAddTo } from './cells'
 import { setActiveHomeTab } from './homeTab'
-import { addNewPanel } from './panelPublish'
+import { addNewPanel, describePanelSources, publishFailureMessage, type PanelPublicationMetadata } from './panelPublish'
 import { readPanelShowCall } from './panelShowCall'
 import { homeTabScope, type DashboardTab, type PlacementScope } from './persist'
+import { panelRegionRegistry, regionsToAddTo, type PanelRegion } from './region'
 import PublishedDashboardPanel from './PublishedDashboardPanel'
 import './dashboards.css'
 
@@ -100,25 +101,30 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
   const location = useLocation()
   const projectId = () => taskById(props.taskId)?.projectId
   const workspaceId = () => allProjects().find((project) => project.id === projectId())?.workspaceId ?? ''
-  const [added, setAdded] = createSignal<DashboardTab>()
-  const [studio, setStudio] = createSignal<{ dashboardId: string; scope: PlacementScope }>()
-  const add = async (tab: DashboardTab) => {
-    const placement = homeTabScope(tab.id, workspaceId())
+  /** Where the panel went, named under the card, and how to open it there. */
+  const [added, setAdded] = createSignal<{ name: string; open?: () => void }>()
+  const [studio, setStudio] = createSignal<{ dashboardId: string; scope: PlacementScope; region?: PanelRegion }>()
+  const add = async (destination: { name: string; scope: PlacementScope; region?: PanelRegion; open?: () => void }) => {
+    const { scope, region } = destination
     try {
       const saved = await addNewPanel({
         nodeId,
         scope: { workspaceId: workspaceId() },
         plan: props.plan,
-        placement,
+        placement: scope,
+        ...(region ? { region } : {}),
         queryClient,
         recovery: dashboardRecoveryStore(typeof localStorage === 'undefined' ? undefined : localStorage),
       })
-      setAdded(tab)
+      setAdded(destination)
       toast('Panel added.', {
-        action: { label: 'Edit…', onPress: () => setStudio({ dashboardId: saved.id, scope: placement }) },
+        action: {
+          label: 'Edit…',
+          onPress: () => setStudio({ dashboardId: saved.id, scope, ...(region ? { region } : {}) }),
+        },
       })
-    } catch {
-      toast("Couldn't add the panel. Try again.", { tone: 'danger' })
+    } catch (error) {
+      toast(publishFailureMessage(error, "Couldn't add the panel. Try again."), { tone: 'danger' })
     }
   }
   const editInStudio = async () => {
@@ -172,13 +178,33 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
                     )}
                   >
                     {(menu) => (
-                      <For each={homeTabsToAddTo(workspaceId())}>
-                        {(tab) => (
-                          <Menu.Item context={menu} onSelect={() => void add(tab)}>
-                            {tab.name}
-                          </Menu.Item>
-                        )}
-                      </For>
+                      <>
+                        <For each={homeTabsToAddTo(workspaceId())}>
+                          {(tab) => (
+                            <Menu.Item
+                              context={menu}
+                              onSelect={() =>
+                                void add({
+                                  name: tab.name,
+                                  scope: homeTabScope(tab.id, workspaceId()),
+                                  open: () => openTab(tab),
+                                })
+                              }
+                            >
+                              {tab.name}
+                            </Menu.Item>
+                          )}
+                        </For>
+                        <RegionItems
+                          menu={menu}
+                          nodeId={nodeId}
+                          workspaceId={workspaceId()}
+                          plan={props.plan}
+                          onSelect={(region) =>
+                            void add({ name: region.label, scope: region.scope, region: region.region })
+                          }
+                        />
+                      </>
                     )}
                   </Menu>
                   <Button size="xs" variant="ghost" onPress={() => void editInStudio()}>
@@ -189,12 +215,16 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
             />
           </CardFrame>
           <Show when={added()}>
-            {(tab) => (
+            {(destination) => (
               <Inline spread>
-                <Text tone="muted">{`Added to ${tab().name}.`}</Text>
-                <Button size="sm" variant="ghost" onPress={() => openTab(tab())}>
-                  Open
-                </Button>
+                <Text tone="muted">{`Added to ${destination().name}.`}</Text>
+                <Show when={destination().open}>
+                  {(open) => (
+                    <Button size="sm" variant="ghost" onPress={open()}>
+                      Open
+                    </Button>
+                  )}
+                </Show>
               </Inline>
             )}
           </Show>
@@ -208,9 +238,41 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
       <DashboardPanelHost
         session={studio() && { dashboardId: studio()!.dashboardId }}
         scope={studio()?.scope ?? homeTabScope('', workspaceId())}
+        {...(studio()?.region ? { region: studio()!.region } : {})}
         returnLabel="Conversation"
         onClose={() => setStudio(undefined)}
       />
     </>
+  )
+}
+
+/** The plugin regions of the workspace that would show this plan, after the Home tabs. A region checks a
+ *  panel's sources and their field roles, so the plan's sources are described when the menu opens, and
+ *  only when some region could take it. A failed description leaves the Home tabs alone. */
+function RegionItems(props: {
+  menu: MenuContext
+  nodeId: string
+  workspaceId: string
+  plan: PanelPlan
+  onSelect: (region: ReturnType<typeof regionsToAddTo>[number]) => void
+}) {
+  const [metadata, setMetadata] = createSignal<PanelPublicationMetadata>()
+  if (panelRegionRegistry.entries().some((entry) => entry.when()))
+    describePanelSources(props.nodeId, { workspaceId: props.workspaceId }, props.plan).then(setMetadata, () => {})
+  const regions = () => {
+    const described = metadata()
+    return described ? regionsToAddTo(props.workspaceId, props.plan.view.kind, described) : []
+  }
+  return (
+    <Show when={regions().length}>
+      <Menu.Separator />
+      <For each={regions()}>
+        {(region) => (
+          <Menu.Item context={props.menu} disabled={region.full} onSelect={() => props.onSelect(region)}>
+            {region.label}
+          </Menu.Item>
+        )}
+      </For>
+    </Show>
   )
 }

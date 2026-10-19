@@ -91,9 +91,10 @@ alternative a reader might expect.
 - **Panels in the terminal.** The terminal client draws no dashboard panels, so panel cards and
   `Panel` components show one line there. A terminal view for the dashboard's five views would fix
   both, and isn't scheduled in this programme.
-- **Where Add to dashboard can put things.** Phase 1 offers Home tabs only. Plugin regions constrain
-  panels by source, field role, and view, and could be added for panels later. App cells can't go
-  there until regions understand an app's plans.
+- **Where Add to dashboard can put things.** Settled on October 20, 2026: a panel card offers the
+  Home tabs and the plugin regions of the task's workspace
+  ([dashboards](../../dashboards.md)). App cells stay on Home tabs, because regions check a panel's
+  sources and view and don't understand an app's plans.
 - **A whole task to edit an app.** Phase 5 measured it on October 19, 2026. **Edit in a new task**
   makes a project-folder task, the kind the reference panel's **Create task** makes, so no worktree is
   created at all. From the click, the task was open on its Apps pane with the draft in 1.16 seconds,

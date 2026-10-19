@@ -11,7 +11,7 @@ import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import { isCoreExclusiveSlot, qualifiedExtensionPointId, type DetailRegion } from '@acorn/protocol/extensionPoints.ts'
 import { isPluginSettingsCategory, isSettingsScope } from '@acorn/protocol/settingsPages.ts'
-import { panelRegion } from '../../features/dashboards/region'
+import { panelRegion, panelRegionRegistry } from '../../features/dashboards/region'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { registerPluginExtension } from '../chrome/chromeExtensionPoints'
 import { commandRegistry } from '../registries/commands/commands'
@@ -551,12 +551,21 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
             })
           },
         })
-        // After the pane, so a duplicate pane id that throws above leaves no schedule running.
-        if (!availability) return pane
-        const schedule = clientScheduleRegistry.register(availability.schedule, pluginId)
+        // After the pane, so a duplicate pane id that throws above leaves no region or schedule behind.
+        // The region is listed so Add to dashboard can reach the aside from elsewhere.
+        const region = aside
+          ? own(panelRegionRegistry, {
+              id: aside.pointId,
+              label: surface.label,
+              region: aside.region,
+              when: () => pluginEnabledOnNode(frameNode(), pluginId),
+            })
+          : undefined
+        const schedule = availability && clientScheduleRegistry.register(availability.schedule, pluginId)
         return {
           dispose: () => {
-            schedule.dispose()
+            schedule?.dispose()
+            region?.dispose()
             pane.dispose()
           },
         }

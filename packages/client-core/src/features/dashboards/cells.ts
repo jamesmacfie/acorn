@@ -39,7 +39,8 @@ export const dashboardCellRegistry = new Registry<DashboardCellContribution>('da
 
 // Add to dashboard, for anything that puts a definition on Home: an agent's panel card, and a plugin's
 // own cell such as an app. Home tabs only, of one workspace (docs/dashboards/placements.md § Home tabs).
-// The tabs are a list, not menu items, so each caller draws them in its own menu.
+// The tabs are a list, not menu items, so each caller draws them in its own menu. A panel card also
+// lists plugin regions (`regionsToAddTo`), which a cell can't go in.
 
 /** A workspace's Home tabs to add to. A workspace with one dashboard names it Home. */
 export const homeTabsToAddTo = (workspaceId: string): DashboardTab[] => {

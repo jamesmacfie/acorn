@@ -1,8 +1,9 @@
 import { dashboardViewKinds } from '@acorn/protocol/dashboardViews.ts'
 import { VIEW_LABELS } from '@acorn/dashboards-core/labels.ts'
 import type { PluginPanelRegion } from '@acorn/protocol/plugin/contract.ts'
+import { Registry } from '../../kit/lib/state/registry'
 import type { PanelDefinition, PanelViewKind } from './model'
-import type { PlacementScope } from './persist'
+import { panelsAt, type PlacementScope } from './persist'
 
 export type PanelRegion = {
   pluginId: string
@@ -31,7 +32,13 @@ export function panelRegion(pluginId: string, declared: PluginPanelRegion | unde
   }
 }
 
-export const regionScope = (ownerId: string): PlacementScope => ({ surface: 'plugin-region', ownerId })
+/** A region's board in one workspace, keyed `plugin-region/<ownerId>/<workspaceId>`, because a panel's
+ *  plan reads one workspace. With no workspace known it is the unscoped board, as Home's is. */
+export const regionScope = (ownerId: string, workspaceId?: string): PlacementScope => ({
+  surface: 'plugin-region',
+  ownerId,
+  workspaceId,
+})
 export const sourceRegionOwner = (pluginId: string, sourceId: string): string => `${pluginId}:${sourceId}`
 export const regionViews = (region: PanelRegion): readonly PanelViewKind[] => region.views ?? dashboardViewKinds
 
@@ -81,3 +88,31 @@ const listWords = (words: readonly string[]): string =>
   words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
 
 export const regionHasRoom = (region: PanelRegion, placed: number): boolean => placed < region.max
+
+// The regions the registration passes found in plugin manifests, so a panel can be put in one from
+// outside it, as an agent's panel card's Add to dashboard does.
+
+type PanelRegionContribution = {
+  /** The region's owner id, as `regionScope` takes it. */
+  id: string
+  /** The rail source's label, or the pane's. */
+  label: string
+  region: PanelRegion
+  when: () => boolean
+}
+
+export const panelRegionRegistry = new Registry<PanelRegionContribution>('panel-region')
+
+/** The regions of a workspace that would show a panel with this view and publication metadata, each
+ *  with its scope and whether it is full. */
+export const regionsToAddTo = (
+  workspaceId: string,
+  view: string,
+  publication: { sources?: readonly string[]; fieldRoles?: readonly string[] },
+) =>
+  panelRegionRegistry.entries().flatMap((entry) => {
+    if (!entry.when() || regionRefusal(entry.region, view, publication)) return []
+    const scope = regionScope(entry.id, workspaceId)
+    const placed = panelsAt(scope).filter((panel) => regionAllows(entry.region, panel)).length
+    return [{ label: entry.label, region: entry.region, scope, full: !regionHasRoom(entry.region, placed) }]
+  })
