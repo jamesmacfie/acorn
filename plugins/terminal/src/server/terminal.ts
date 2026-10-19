@@ -52,7 +52,7 @@ import {
 } from './terminalUtils'
 import { fileURLToPath } from 'node:url'
 import type { RunSessionGlue } from './runChannel'
-import { outputText, TerminalDisplay } from './terminalDisplay'
+import { TerminalDisplay } from './terminalDisplay'
 import type { TerminalCompletedEvent } from '../contract/lifecycle'
 
 // This plugin's own logger. A module-level engine with no `ctx` in reach, so the id is stated here
@@ -1050,6 +1050,7 @@ export function registerTerminalChannel(
       assertOwner(engine)
       const s = sessions.get(id)
       if (!s?.admitted || s.retired) return null
+      const { outputText } = await import('./terminalOutput')
       return outputText(s.ring.tail(), s.meta.cols, s.meta.rows, lines)
     },
   }

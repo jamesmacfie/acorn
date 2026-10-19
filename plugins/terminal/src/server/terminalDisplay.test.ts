@@ -1,13 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
-import {
-  DISPLAY_RESET,
-  HeadlessTerminalScreen,
-  outputText,
-  TerminalDisplay,
-  type TerminalScreen,
-} from './terminalDisplay'
+import { DISPLAY_RESET, HeadlessTerminalScreen, TerminalDisplay, type TerminalScreen } from './terminalDisplay'
 import { OutputRing } from './terminalUtils'
+import { outputText } from './terminalOutput'
 
 const session: TerminalSession = {
   id: 'session-1',
