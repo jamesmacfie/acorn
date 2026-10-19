@@ -1106,6 +1106,27 @@ describe('syncChromeContributions', () => {
       expect(agentContextRegistry.get('board-context')!.keyword).toBe('board-agent')
     })
 
+    it('numbers a qualified keyword that is taken as well', () => {
+      const [entry] = CHROME.agentContexts!
+      const squatter = agentContextRegistry.register({
+        id: 'squatter',
+        source: 'squatter',
+        keyword: 'board-agent',
+        label: 'Squatter',
+        options: async () => [],
+        capture: async () => [],
+      })
+      try {
+        _seedPluginDistribution([
+          ['node-a', [row('board', {}, { ...CHROME, agentContexts: [{ ...entry!, keyword: 'agent' }] })]],
+        ])
+        syncChromeContributions()
+        expect(agentContextRegistry.get('board-context')!.keyword).toBe('board-agent-2')
+      } finally {
+        squatter.dispose()
+      }
+    })
+
     it('sends what was typed only to a source that declared search', async () => {
       readJson.mockResolvedValue([])
       await agentContextRegistry.get('board-context')!.options(scope, 'card')
@@ -1116,6 +1137,8 @@ describe('syncChromeContributions', () => {
         ['node-a', [row('board', {}, { ...CHROME, agentContexts: [{ ...entry!, search: true }] })]],
       ])
       syncChromeContributions()
+      // Its own earlier registration is not a collision.
+      expect(agentContextRegistry.get('board-context')!.keyword).toBe('board-context')
       await agentContextRegistry.get('board-context')!.options(scope, 'card 1')
       expect(readJson).toHaveBeenLastCalledWith(
         '/v1/p/board/context-options?taskId=task-1&query=card+1',
