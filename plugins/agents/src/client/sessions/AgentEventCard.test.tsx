@@ -344,7 +344,7 @@ it('links each # reference the message sent, and opens the session it names', ()
         capturedAt: 1,
       },
     ],
-  } as AgentTurn
+  } as unknown as AgentTurn
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" turn={turn} />, host)
