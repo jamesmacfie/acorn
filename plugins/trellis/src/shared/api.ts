@@ -70,6 +70,12 @@ export const APP_CHANGED_VERB = 'app-changed'
 export const APPS_PANE_ID = 'apps'
 export const APPS_SOURCE_ID = 'apps'
 
+/** The view kind of a project app's dashboard cell. Its definition has no publication, and names the
+ *  app in `app`. */
+export const APP_CELL_KIND = 'app'
+export const appCellSchema = z.object({ projectId: z.string().min(1), appId: appIdSchema })
+export type AppCell = z.infer<typeof appCellSchema>
+
 /** Where the Apps source shows a project's apps, and one of them. */
 export const projectAppsPath = (projectId: string, appId?: string) =>
   `/p/${encodeURIComponent(projectId)}/apps${appId ? `/${encodeURIComponent(appId)}` : ''}`

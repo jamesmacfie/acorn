@@ -290,6 +290,21 @@ state, and delete, and `PublishButton.test.tsx` covers the conflict's two choice
 6. Give a draft a new head with **Restore** on an old card, archive its task, and tick **Publish to
    the project first**. The project app moves to that head and opens from the rail.
 
+Project apps on dashboards, in the same kind of session. `persist.test.ts` round-trips a definition
+of a kind the build doesn't know, `PanelGridItem.test.tsx` draws it inert or through a registered
+cell, and `AppCell.test.tsx` and `PublishButton.test.tsx` cover the app cell and **Publish and add to
+dashboard**.
+
+1. Put a definition with an unknown view kind in the `dashboards` preference, placed on Home. Home
+   draws it inert, with only the layout items and **Remove** in its menu, and a save keeps it.
+2. **Add to dashboard** on a project app, beside an ordinary panel. Tick an item in the cell, open the
+   app's page, and the tick is there. Switch away from the window and back: the panel and the app's
+   plans both run again.
+3. **Delete** the app. The cell names it and offers **Restore** and **Remove from this dashboard**.
+   **Restore** the app, and the cell draws it again with its ticks.
+4. In a chat, build a task app and choose **Publish and add to dashboard** on its card. It appears on
+   the chosen Home tab and in the project's **Apps** source.
+
 Dashboard authoring evaluation has scripted cases in
 `packages/dashboards-core/src/authoringEvaluation.test.ts`. Run the real-model layer on demand with
 `node scripts/dashboard-authoring-eval.mjs <output.jsonl>` after setting `ACORN_EVAL_URL`,

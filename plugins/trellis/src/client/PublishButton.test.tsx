@@ -2,8 +2,23 @@ import { render } from 'solid-js/web'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { AppListing } from '../shared/api'
 
-const mocks = vi.hoisted(() => ({ writeJson: vi.fn(), refreshApps: vi.fn(async () => undefined) }))
-vi.mock('@acorn/plugin-api/client', () => ({ activeNodeId: () => 'n', writeJson: mocks.writeJson }))
+const mocks = vi.hoisted(() => ({
+  writeJson: vi.fn(),
+  refreshApps: vi.fn(async () => undefined),
+  addAppToDashboard: vi.fn(),
+}))
+vi.mock('@acorn/plugin-api/client', () => ({
+  activeNodeId: () => 'n',
+  writeJson: mocks.writeJson,
+  taskById: () => ({ projectId: 'p' }),
+}))
+// The menu of Home tabs, reduced to one button that picks Home.
+vi.mock('./addToDashboard', () => ({
+  addAppToDashboard: mocks.addAppToDashboard,
+  AddToDashboardMenu: (props: { label: string; onSelect: (tab: { id: string; name: string }) => void }) => (
+    <button onClick={() => props.onSelect({ id: '', name: 'Home' })}>{props.label}</button>
+  ),
+}))
 vi.mock('./appsStore', () => ({
   appById: (appId: string) =>
     appId === 'app-project00001' ? { appId, projectId: 'p', name: 'Checklist', head: 4 } : undefined,
@@ -28,10 +43,10 @@ afterEach(() => {
   host?.remove()
   vi.clearAllMocks()
 })
-const draw = (app: AppListing) => {
+const draw = (app: AppListing, addToDashboard = false) => {
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => <PublishButton app={app} />, host)
+  dispose = render(() => <PublishButton app={app} addToDashboard={addToDashboard} />, host)
 }
 const button = (label: string) =>
   [...document.querySelectorAll('button')].find((candidate) => candidate.textContent === label)!
@@ -59,4 +74,26 @@ it('offers Publish to project on a task app, and nothing to publish on an unchan
   host.remove()
   draw({ ...draft, head: 1 })
   expect(button('Publish').disabled).toBe(true)
+})
+
+it('publishes a task app, then puts the project app on the Home tab the person picked', async () => {
+  mocks.writeJson.mockResolvedValueOnce({ appId: 'app-project00001', revision: 1 })
+  draw({ ...draft, draftOf: undefined }, true)
+  button('Publish and add to dashboard').click()
+  await settle()
+  expect(JSON.parse(mocks.writeJson.mock.calls[0]![1].body)).toEqual({ mode: 'safe' })
+  expect(mocks.addAppToDashboard).toHaveBeenCalledWith(
+    expect.objectContaining({ appId: 'app-project00001', projectId: 'p' }),
+    { id: '', name: 'Home' },
+  )
+})
+
+it("adds an unchanged draft's project app without publishing it again", () => {
+  draw({ ...draft, head: 1 }, true)
+  button('Publish and add to dashboard').click()
+  expect(mocks.writeJson).not.toHaveBeenCalled()
+  expect(mocks.addAppToDashboard).toHaveBeenCalledWith(expect.objectContaining({ appId: 'app-project00001' }), {
+    id: '',
+    name: 'Home',
+  })
 })

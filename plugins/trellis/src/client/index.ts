@@ -1,7 +1,7 @@
 import { lazy } from 'solid-js'
-import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { dashboardCellRegistry, type ClientPlugin } from '@acorn/plugin-api/client'
 import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
-import { APPS_SOURCE_ID } from '../shared/api'
+import { APP_CELL_KIND, APPS_SOURCE_ID } from '../shared/api'
 import { appsSchedule, workspaceHasProjectApps } from './appsStore'
 import { appsPaneContribution } from './paneContribution'
 
@@ -9,6 +9,8 @@ import { appsPaneContribution } from './paneContribution'
 const AppToolCard = lazy(() => import('./AppToolCard'))
 const ProjectAppList = lazy(async () => ({ default: (await import('./ProjectApps')).ProjectAppList }))
 const ProjectAppDetail = lazy(async () => ({ default: (await import('./ProjectApps')).ProjectAppDetail }))
+const AppDashboardCell = lazy(async () => ({ default: (await import('./AppCell')).AppDashboardCell }))
+const AppDashboardCellMenu = lazy(async () => ({ default: (await import('./AppCell')).AppDashboardCellMenu }))
 
 export const trellisClientPlugin: ClientPlugin = {
   name: 'trellis',
@@ -38,6 +40,13 @@ export const trellisClientPlugin: ClientPlugin = {
         { id: 'trellis.apps', path: '/p/:projectId/apps', order: 60 },
         { id: 'trellis.app', path: '/p/:projectId/apps/:appId', order: 61 },
       ],
+    })
+    // A project app on a Home tab, beside ordinary panels (docs/agent-built-apps/project-apps.md § On a
+    // dashboard).
+    ctx.contribute(dashboardCellRegistry, {
+      id: APP_CELL_KIND,
+      component: AppDashboardCell,
+      menuItems: AppDashboardCellMenu,
     })
     ctx.schedules.register(appsSchedule)
   },

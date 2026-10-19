@@ -45,3 +45,11 @@ export function PlanPanel(props: {
 }) {
   return <Text emphasis="muted">{`${props.plan.title}: this panel draws in the desktop app.`}</Text>
 }
+
+export type DashboardTab = { id: string; name: string; workspaceId?: string }
+
+/** No Home tabs to add to: this host draws no dashboards and doesn't load their preference. */
+export const homeTabsToAddTo = (_workspaceId: string): DashboardTab[] => []
+
+/** Nothing offers a tab here, so nothing is placed. */
+export function placeOnHomeTab(_definition: unknown, _workspaceId: string, _tab: DashboardTab): void {}

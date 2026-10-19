@@ -133,8 +133,9 @@ read only, and runs none of them.
 ## Project apps
 
 **Publish to project** turns a task app into a project app, which opens from the left rail's **Apps**
-source and is edited through drafts in tasks. [Project apps](./agent-built-apps/project-apps.md) covers
-publishing, drafts and their conflicts, the Apps source, editing, and deleting.
+source, can sit on a Home tab, and is edited through drafts in tasks.
+[Project apps](./agent-built-apps/project-apps.md) covers publishing, drafts and their conflicts, the
+Apps source, editing, dashboards, and deleting.
 
 ## App state
 

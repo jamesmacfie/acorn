@@ -40,6 +40,7 @@ or unaccepted runtime leaves nothing visible ([distribution](./plugins/distribut
 | --- | --- | --- | --- |
 | Panes | Both | `ctx.panes` / `contributions.frames` (`target: 'pane'`) | A task's pane layout |
 | Project surfaces | Both | `ctx.contribute(projectSurfaceRegistry)` / a project-scoped `frames` entry plus its `contributions.routes` entry | The project view, beside the plugin's rail list |
+| Dashboard cells | Compiled | `ctx.contribute(dashboardCellRegistry)` | A Home tab cell for a definition with no publication, by its `view.kind`, such as a project app ([cells a plugin draws](./dashboards/placements.md#cells-a-plugin-draws)). **Direction: stays compiled.** The cell is an in-process component with menu items |
 | Reference panels | Both | `ctx.refPanels` / `frames` (`target: 'refPanel'`) | The side panel over an external item |
 | Overlays | Both | `ctx.slots` (`slot: 'overlay'`) / `frames` (`target: 'overlay'`) | A window-level picker |
 | Settings pages | Both | `ctx.settingsPages` / `frames` (`target: 'settings'`) | Settings, in the group the page names as `category`, or Features. `keywords` and `sections` feed settings search, and `railSourceVisibility` puts **Show in left rail** switches on the plugin strip ([settings pages](./plugin-authoring/settings-pages.md)). A compiled page that absorbed another lists the old id in `aliases` |

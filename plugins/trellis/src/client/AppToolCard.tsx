@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, Show, type Accessor } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { Alert, Button, CodeBlock, Inline, Stack, Text } from '@acorn/plugin-api/ui'
 import {
@@ -23,7 +23,7 @@ import {
   type AppSummary,
 } from '../shared/api'
 import { appById } from './appsStore'
-import AppView from './AppView'
+import AppView, { type AppPlacement } from './AppView'
 import { PublishButton } from './PublishButton'
 
 // The transcript card for `app_show` (docs/agent-built-apps.md § Cards). Each card pins the revision
@@ -153,7 +153,7 @@ function AppCard(props: { taskId: string; shown: AppShowResult; note: string }) 
           <Inline spread wrap>
             <Text emphasis="strong">{label()}</Text>
             <Inline gap="inline">
-              <Show when={appById(props.shown.appId)}>{(app) => <PublishButton app={app()} />}</Show>
+              <Show when={appById(props.shown.appId)}>{(app) => <PublishButton app={app()} addToDashboard />}</Show>
               <Button
                 size="sm"
                 variant="ghost"
@@ -189,7 +189,7 @@ export const revisionFilesOptions = (nodeId: string, appId: string, revision: nu
 })
 
 /** One revision of an app, running, once its files are read. The card, the Apps pane, and the Apps
- *  source draw it. A project app has no task. */
+ *  source draw it, and a dashboard cell. A project app has no task. */
 export function Revision(props: {
   appId: string
   revision: number
@@ -197,7 +197,8 @@ export function Revision(props: {
   workspaceId: string
   nodeId: string
   readOnly: boolean
-  placement: 'card' | 'pane' | 'project'
+  placement: AppPlacement
+  refreshes?: Accessor<number>
 }) {
   const files = createQuery(() => revisionFilesOptions(props.nodeId, props.appId, props.revision))
   return (
@@ -215,6 +216,7 @@ export function Revision(props: {
           nodeId={props.nodeId}
           readOnly={props.readOnly}
           placement={props.placement}
+          refreshes={props.refreshes}
         />
       )}
     </Show>

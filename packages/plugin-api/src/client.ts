@@ -140,6 +140,15 @@ export type { RefPanelProps } from '@acorn/client-core/host/registries/panes'
 // way in.
 export { projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes'
 export type { ProjectSurfaceContribution } from '@acorn/client-core/host/registries/panes'
+// A cell a plugin draws on a dashboard, for a definition with no publication whose `view.kind` it
+// names. The registry itself, registered through `ctx.contribute`, as project surfaces are
+// (docs/dashboards/placements.md § Cells a plugin draws).
+export { dashboardCellRegistry } from '@acorn/client-core/features/dashboards/cells.ts'
+export type {
+  DashboardCellDefinition,
+  DashboardCellMenuProps,
+  DashboardCellProps,
+} from '@acorn/client-core/features/dashboards/cells.ts'
 // The registry value, not just the props type: first-run onboarding hosts whichever importers are
 // registered rather than importing another plugin's component.
 export { projectImporterRegistry } from '@acorn/client-core/host/registries/sources'

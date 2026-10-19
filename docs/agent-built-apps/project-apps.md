@@ -1,7 +1,8 @@
 # Project apps
 
 This page covers publishing a task app to its project, drafts and what happens when two of them
-publish, the left rail's **Apps** source, editing a project app, and deleting one. It's part of
+publish, the left rail's **Apps** source, editing a project app, putting one on a dashboard, and
+deleting one. It's part of
 [agent-built apps](../agent-built-apps.md).
 
 ## Publishing
@@ -46,9 +47,29 @@ Apps pane. A task keeps one draft per project app, so a second **Edit** opens th
 The new task is a project-folder task, as the reference panel's **Create task** makes, so it creates no
 worktree. Its agent runs in the project's checkout, and the app tools keep its edits in the data root.
 
+## On a dashboard
+
+**Add to dashboard**, on a project app's page and in its row's menu in the **Apps** source, lists the
+Home tabs of the workspace that holds the project and puts the app there. On a task app's card,
+**Publish and add to dashboard** publishes it first, the way **Publish to project** does, then adds the
+project app. The cell's definition has no publication. It names the project and the app,
+`{ "view": { "kind": "app" }, "app": { "projectId", "appId" } }`, so it always runs the app's head.
+One app has one definition, and the same state, on every tab it's on. The code is
+`plugins/trellis/src/client/AppCell.tsx` and `addToDashboard.tsx`.
+
+The cell names the project and runs the head with `$placement` set to `dashboard`, sharing the project
+app's state with its page. Its queries run again when the window regains focus, after a reported
+plugin or account change, and at each plan's refresh interval, and its `Panel`s refresh as panels do.
+Its menu adds **Open app** and **Edit in a new task** to the grid's layout items and **Remove from this
+dashboard** ([cells a plugin draws](../dashboards/placements.md#cells-a-plugin-draws)). A deleted app's
+cell says so and offers **Restore** and **Remove from this dashboard**. The cell has its own
+**Restore** because the **Apps** source hides when its project has no live app. The Node's
+measure sampler skips app cells, which have no measure of their own. The terminal client draws no
+dashboards, so its **Add to dashboard** menu says they're in the desktop app.
+
 ## Deleting
 
 **Delete** moves a project app to **Archived apps** at the bottom of the source's list. It leaves the
-rail, and its drafts publish as a new app. **Restore** brings it back at its head. **Remove for good**
+rail, its drafts publish as a new app, and its dashboard cells say it isn't available. **Restore** brings it back at its head. **Remove for good**
 deletes its files after a confirm. The routes behind these, `/apps/<appId>/publish`, `/drafts`,
 `/deleted`, and `DELETE /apps/<appId>`, are device only.

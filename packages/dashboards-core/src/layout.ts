@@ -37,6 +37,9 @@ const SIZES: Record<string, PanelSize> = {
   board: { minW: 4, minH: 3, w: 8, h: 4 },
   // An axis needs room to carry ticks at both ends.
   chart: { minW: 4, minH: 3, w: 6, h: 4 },
+  // An agent-built app's cell. An app is laid out for its card in a conversation, so the cell goes no
+  // smaller than a card.
+  app: { minW: 4, minH: 4, w: 6, h: 5 },
 }
 
 /** A view kind this client cannot draw still gets a rect. It renders the inert "view unavailable"

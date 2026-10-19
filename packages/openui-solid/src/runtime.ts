@@ -289,6 +289,15 @@ export function createOpenUIRuntime(options: OpenUIRuntimeOptions) {
       setRenderErrors((all) => [...all, { source: 'runtime', code: 'render-error', component, message }])
     },
     triggerAction,
+    /** Runs the program's queries again: every one, or only those calling the named tools. */
+    refresh(tools?: readonly string[]) {
+      const statements = untrack(() => result()?.queryStatements ?? [])
+      const ids = statements
+        .filter((q) => !tools || (q.toolAST && tools.includes(String(untrack(() => evaluate(q.toolAST!, ctx))))))
+        .map((q) => q.statementId)
+      // An empty list would make lang-core run every query.
+      if (ids.length) queries.invalidate(ids)
+    },
     getFieldValue,
     setFieldValue,
   }

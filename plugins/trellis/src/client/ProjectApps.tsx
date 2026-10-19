@@ -9,7 +9,9 @@ import {
   Fold,
   Heading,
   Inline,
+  Menu,
   Row,
+  RowActions,
   Rows,
   Section,
   SectionHeader,
@@ -41,6 +43,13 @@ import {
   projectAppsPath,
   type AppListing,
 } from '../shared/api'
+import {
+  addAppToDashboard,
+  AddToDashboardMenu,
+  canAddToDashboard,
+  HomeTabMenuItems,
+  projectWorkspaceId,
+} from './addToDashboard'
 import { appById, projectApps, refreshApps } from './appsStore'
 import { Revision } from './AppToolCard'
 import { startEditingSession } from './editingSession'
@@ -87,6 +96,22 @@ function AppsOfProject(props: { projectId: string; selected?: string }) {
               selected={props.selected === entry.app.appId}
               onPress={() => navigate(projectAppsPath(props.projectId, entry.app.appId))}
               meta={<Text emphasis="muted">{`v${entry.app.head}`}</Text>}
+              trailing={
+                <Show when={canAddToDashboard(props.projectId)}>
+                  <RowActions ariaLabel={`Actions for ${entry.app.name}`}>
+                    {(menu) => (
+                      <>
+                        <Menu.Label>Add to dashboard</Menu.Label>
+                        <HomeTabMenuItems
+                          menu={menu}
+                          projectId={props.projectId}
+                          onSelect={(tab) => addAppToDashboard({ ...entry.app, projectId: props.projectId }, tab)}
+                        />
+                      </>
+                    )}
+                  </RowActions>
+                </Show>
+              }
             >
               <Text emphasis="strong">{entry.app.name}</Text>
               <Show when={entry.app.description}>
@@ -145,7 +170,7 @@ function ArchivedApp(props: { app: AppListing }) {
   )
 }
 
-const setDeleted = (nodeId: string, appId: string, deleted: boolean) =>
+export const setDeleted = (nodeId: string, appId: string, deleted: boolean) =>
   writeJson(appDeletedRoute(appId), {
     method: 'PUT',
     nodeId,
@@ -170,24 +195,15 @@ export function ProjectAppDetail() {
   )
 }
 
-function ProjectApp(props: { app: () => AppListing }) {
+/** Editing a project app: a draft in a task, opened in the task's Apps pane. The Apps source and an
+ *  app's dashboard cell both edit this way. */
+export function useAppEditing() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const nodeId = activeNodeId() ?? ''
   const surface = clientCapability(AGENTS_CONVERSATION)
-  const projectId = () => props.app().projectId!
-  const workspaceId = () => allProjects().find((project) => project.id === projectId())?.workspaceId ?? ''
-  // The task open behind this page, when it's an active task of the same project.
-  const openTask = () => {
-    const task = taskById(activeTaskId() ?? '')
-    return task?.projectId === projectId() && task.status !== 'archived' ? task : undefined
-  }
-  const [busy, setBusy] = createSignal<'this' | 'new' | 'delete'>()
-  const [error, setError] = createSignal('')
-
-  /** Makes a draft in the task and opens it in the task's Apps pane. */
-  const draftIn = async (task: Task) => {
-    const draft = await writeJson<{ appId: string }>(appDraftsRoute(props.app().appId), {
+  const draftIn = async (app: AppListing, task: Task) => {
+    const draft = await writeJson<{ appId: string }>(appDraftsRoute(app.appId), {
       method: 'POST',
       nodeId,
       headers: { 'content-type': 'application/json' },
@@ -201,6 +217,33 @@ function ProjectApp(props: { app: () => AppListing }) {
     navigate(pathForTask(task))
     openPane(task.id, APPS_PANE_ID, { kind: 'plugin:select', item: appId })
   }
+  return {
+    editIn: async (app: AppListing, task: Task) => open(task, await draftIn(app, task)),
+    /** Creates a task named after the app, with the draft in it and an editing session started. */
+    editInNewTask: async (app: AppListing) => {
+      const task = await createTask({ origin: 'manual', projectId: app.projectId!, title: app.name })
+      await queryClient.invalidateQueries({ queryKey: tasksOptions(true).queryKey })
+      const draftId = await draftIn(app, task)
+      const draft = appById(draftId)
+      if (surface && draft) await startEditingSession(surface, queryClient, nodeId, task.id, draft)
+      open(task, draftId)
+    },
+  }
+}
+
+function ProjectApp(props: { app: () => AppListing }) {
+  const navigate = useNavigate()
+  const nodeId = activeNodeId() ?? ''
+  const editing = useAppEditing()
+  const projectId = () => props.app().projectId!
+  const workspaceId = () => projectWorkspaceId(projectId())
+  // The task open behind this page, when it's an active task of the same project.
+  const openTask = () => {
+    const task = taskById(activeTaskId() ?? '')
+    return task?.projectId === projectId() && task.status !== 'archived' ? task : undefined
+  }
+  const [busy, setBusy] = createSignal<'this' | 'new' | 'delete'>()
+  const [error, setError] = createSignal('')
   const run = async (kind: 'this' | 'new' | 'delete', work: () => Promise<void>, failure: string) => {
     setBusy(kind)
     setError('')
@@ -214,20 +257,9 @@ function ProjectApp(props: { app: () => AppListing }) {
   }
 
   const editHere = (task: Task) =>
-    run('this', async () => open(task, await draftIn(task)), "Couldn't make a draft in this task.")
+    run('this', () => editing.editIn(props.app(), task), "Couldn't make a draft in this task.")
   const editInNewTask = () =>
-    run(
-      'new',
-      async () => {
-        const task = await createTask({ origin: 'manual', projectId: projectId(), title: props.app().name })
-        await queryClient.invalidateQueries({ queryKey: tasksOptions(true).queryKey })
-        const draftId = await draftIn(task)
-        const draft = appById(draftId)
-        if (surface && draft) await startEditingSession(surface, queryClient, nodeId, task.id, draft)
-        open(task, draftId)
-      },
-      "Couldn't make a task to edit this app.",
-    )
+    run('new', () => editing.editInNewTask(props.app()), "Couldn't make a task to edit this app.")
   const remove = () =>
     run(
       'delete',
@@ -244,6 +276,11 @@ function ProjectApp(props: { app: () => AppListing }) {
       <Toolbar ariaLabel="App">
         <Heading level={2}>{props.app().name}</Heading>
         <Toolbar.Spacer />
+        <AddToDashboardMenu
+          label="Add to dashboard"
+          projectId={projectId()}
+          onSelect={(tab) => addAppToDashboard({ ...props.app(), projectId: projectId() }, tab)}
+        />
         <Show when={openTask()}>
           {(task) => (
             <Button

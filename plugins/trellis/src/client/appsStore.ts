@@ -16,12 +16,11 @@ import { APP_CHANGED_VERB, appsRoute, type AppListing } from '../shared/api'
 // head moves, reads it again. The interval is the backstop for a frame missed while another Node was
 // active.
 
-const [listing, setListing] = createSignal<{ nodeId: string | null; apps: AppListing[] }>({
-  nodeId: null,
-  apps: [],
-})
+const [listing, setListing] = createSignal<{ nodeId: string | null; apps: AppListing[] }>()
 
-const apps = () => (listing().nodeId === activeNodeId() ? listing().apps : [])
+/** Whether the active Node's list has been read, so an app missing from it is really gone. */
+export const appsLoaded = (): boolean => listing()?.nodeId === activeNodeId()
+const apps = () => (appsLoaded() ? listing()!.apps : [])
 const newestFirst = (a: AppListing, b: AppListing) => b.updatedAt - a.updatedAt
 
 /** This task's shown apps, newest change first. Empty until the first read answers. */
@@ -56,7 +55,7 @@ export async function refreshApps(): Promise<void> {
   if (activeNodeId() !== nodeId) return
   // Same answer, same object: the pane strip reads `when` on every render.
   setListing((current) =>
-    current.nodeId === nodeId && JSON.stringify(current.apps) === JSON.stringify(apps) ? current : { nodeId, apps },
+    current?.nodeId === nodeId && JSON.stringify(current.apps) === JSON.stringify(apps) ? current : { nodeId, apps },
   )
 }
 

@@ -90,4 +90,34 @@ describe('Renderer', () => {
     expect(host.querySelector('p')!.textContent).toBe('Typed: typed')
     dispose()
   })
+
+  it('runs the queries again on refresh, all of them or those calling the named tools', async () => {
+    const calls: string[] = []
+    const tools = Object.fromEntries(
+      ['a', 'b'].map((name) => [name, async () => (calls.push(name), { text: name })] as const),
+    )
+    const host = document.body.appendChild(document.createElement('div'))
+    let runtime!: ReturnType<typeof createOpenUIRuntime>
+    const dispose = render(() => {
+      runtime = createOpenUIRuntime({
+        program: () => `a = Query("a", {}, {text: ""})
+b = Query("b", {}, {text: ""})
+root = Stack([Text(a.text), Text(b.text)])`,
+        library,
+        tools,
+      })
+      return <Renderer runtime={runtime} />
+    }, host)
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+    await settle()
+    expect(calls.sort()).toEqual(['a', 'b'])
+    runtime.refresh(['b'])
+    await settle()
+    expect(calls.sort()).toEqual(['a', 'b', 'b'])
+    runtime.refresh()
+    await settle()
+    expect(calls.sort()).toEqual(['a', 'a', 'b', 'b', 'b'])
+    dispose()
+    host.remove()
+  })
 })

@@ -19,7 +19,7 @@ reads your data through the same plans a dashboard panel uses, and the agent's v
 stays a panel.
 
 <PluginFacts id="trellis">
-  <Fragment slot="adds">Seven agent tools that build an app, the card that draws it in the conversation, the task's Apps pane, and an Apps source in the left rail for apps you publish to a project.</Fragment>
+  <Fragment slot="adds">Seven agent tools that build an app, the card that draws it in the conversation, the task's Apps pane, an Apps source in the left rail for apps you publish to a project, and project apps on Home.</Fragment>
   <Fragment slot="needs">A managed agent session in a task.</Fragment>
 </PluginFacts>
 
@@ -88,6 +88,17 @@ your draft started, **Publish** asks whether to publish your draft as a new app 
 **Delete** moves a project app to **Archived apps** at the bottom of the list, where **Restore** brings it
 back and **Remove for good** deletes it. When you archive a task whose app has changes the project
 doesn't have, the archive dialog offers to publish them first.
+
+## Put an app on a dashboard
+
+A project app can sit on a Home tab beside your panels. Select **Add to dashboard** on the app in
+**Apps**, or in its row's **…** menu, and pick a tab of the workspace that holds the project. On an
+app's card in the chat, **Publish and add to dashboard** publishes it to the project first.
+
+On Home, the app shows its project's name and its latest version, and keeps the same ticks as in
+**Apps**. It reads its data again when the window comes back into focus, and on each plan's refresh
+interval, as panels do. Its menu has **Open app**, **Edit in a new task**, and **Remove from this
+dashboard**. If you delete the app, its place on Home says so and offers **Restore**.
 
 ## Earlier versions
 

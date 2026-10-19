@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { QueryClient } from '@tanstack/solid-query'
-import { invalidatePublishedPanels, publishedDashboardPanelKey } from './dashboardClient'
+import { invalidatePublishedPanels, publishedDashboardPanelKey, reportedChanges } from './dashboardClient'
 
 const scope = { workspaceId: 'workspace' }
 const read = (pluginId: string, connectionId?: string) => ({
@@ -23,5 +23,16 @@ it('refetches the placed panels that read a changed account or plugin', async ()
 
   await invalidatePublishedPanels(client, 'node', { pluginId: 'linear' })
   expect(client.getQueryState(personal)?.isInvalidated).toBe(true)
+  client.clear()
+})
+
+it("refetches an app's or card's plan runs too, and counts the change for cells that run their own reads", async () => {
+  const client = new QueryClient()
+  const plan = ['dashboard-plan-run', 'node', 'workspace', { title: 'Pulls' }]
+  client.setQueryData(plan, read('github'))
+  const before = reportedChanges()
+  await invalidatePublishedPanels(client, 'node', { pluginId: 'github' })
+  expect(client.getQueryState(plan)?.isInvalidated).toBe(true)
+  expect(reportedChanges()).toBe(before + 1)
   client.clear()
 })

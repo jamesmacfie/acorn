@@ -7,3 +7,7 @@ export { default as PanelToolCard } from '@acorn/client-core/features/dashboards
 // agent-built app's card is made of (docs/agent-built-apps.md).
 export { default as CardFrame } from '@acorn/client-core/features/dashboards/CardFrame.tsx'
 export { default as PlanPanel } from '@acorn/client-core/features/dashboards/PlanPanel.tsx'
+// Add to dashboard for a plugin's own cell: a workspace's Home tabs, and the placing. The terminal
+// draws no dashboards, and its stand-ins offer no tabs.
+export { homeTabsToAddTo, placeOnHomeTab } from '@acorn/client-core/features/dashboards/cells.ts'
+export type { DashboardTab } from '@acorn/client-core/features/dashboards/cells.ts'

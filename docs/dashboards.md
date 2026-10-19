@@ -163,8 +163,9 @@ that isn't version 1 resets to the empty model (`packages/client-core/src/featur
 A placement ID with no rect is normal: it renders in reading order. A definition with no publication
 and a view kind that isn't a plan's comes from a newer build. The shared codec (`parsePanels` in
 `packages/dashboards-core/src/definition.ts`) keeps it as written, so an older client saves it back
-unchanged and draws it inert, and the Node's sampler skips it. A flat definition from before
-publications has a plan view, and is still dropped.
+unchanged and draws it inert, and the Node's sampler skips it. A project app's cell is one
+([cells a plugin draws](./dashboards/placements.md#cells-a-plugin-draws)). A flat definition from
+before publications has a plan view, and is still dropped.
 
 Home tabs are placement scopes. Their names and order live in the same preference, at most eight per
 workspace with names trimmed to 60 characters ([placements](./dashboards/placements.md)).

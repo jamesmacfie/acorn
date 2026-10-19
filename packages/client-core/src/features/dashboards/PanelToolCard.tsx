@@ -18,10 +18,11 @@ import { dashboardClient } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
 import CardFrame from './CardFrame'
 import DashboardPanelHost from './DashboardPanelHost'
+import { homeTabsToAddTo } from './cells'
 import { setActiveHomeTab } from './homeTab'
 import { addNewPanel } from './panelPublish'
 import { readPanelShowCall } from './panelShowCall'
-import { dashboards, homeTabs, homeTabScope, type DashboardTab, type PlacementScope } from './persist'
+import { homeTabScope, type DashboardTab, type PlacementScope } from './persist'
 import PublishedDashboardPanel from './PublishedDashboardPanel'
 import './dashboards.css'
 
@@ -99,11 +100,6 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
   const location = useLocation()
   const projectId = () => taskById(props.taskId)?.projectId
   const workspaceId = () => allProjects().find((project) => project.id === projectId())?.workspaceId ?? ''
-  const tabs = (): DashboardTab[] => {
-    const named = homeTabs(dashboards(), workspaceId())
-    return named.length ? named : [{ id: '', name: 'Home' }]
-  }
-
   const [added, setAdded] = createSignal<DashboardTab>()
   const [studio, setStudio] = createSignal<{ dashboardId: string; scope: PlacementScope }>()
   const add = async (tab: DashboardTab) => {
@@ -176,7 +172,7 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
                     )}
                   >
                     {(menu) => (
-                      <For each={tabs()}>
+                      <For each={homeTabsToAddTo(workspaceId())}>
                         {(tab) => (
                           <Menu.Item context={menu} onSelect={() => void add(tab)}>
                             {tab.name}

@@ -2,6 +2,8 @@ import { render } from 'solid-js/web'
 import type { Accessor, JSX } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardRevision, PanelPlan } from '@acorn/protocol/dashboards.ts'
+import { Menu } from '../../kit/components/overlays/Menu'
+import { dashboardCellRegistry } from './cells'
 import type { PanelDefinition } from './model'
 import type { PanelGridItemActions } from './PanelGridItem'
 
@@ -179,5 +181,29 @@ describe('PanelGridItem menu', () => {
     openMenu({ id: 'c1', title: 'Pulls', shaping: {}, view: { kind: 'later-kind' } })
     expect(host.textContent).toContain("Acorn can't show this here.")
     expect(menuRows()).toEqual(['Move or resize', 'Move up', 'Move down', '-', 'Remove from this dashboard'])
+  })
+
+  it('draws a kind a plugin registered with its body and its menu items above the layout items', () => {
+    const registration = dashboardCellRegistry.register({
+      id: 'later-kind',
+      component: (props) => <p>{`Drawn ${String(props.definition.extra)}`}</p>,
+      menuItems: (props) => (
+        <Menu.Item context={props.menu} onSelect={() => {}}>
+          Open it
+        </Menu.Item>
+      ),
+    })
+    openMenu({ id: 'c1', title: 'Pulls', shaping: {}, view: { kind: 'later-kind' }, extra: 'here' } as PanelDefinition)
+    expect(host.textContent).toContain('Drawn here')
+    expect(menuRows()).toEqual([
+      'Open it',
+      '-',
+      'Move or resize',
+      'Move up',
+      'Move down',
+      '-',
+      'Remove from this dashboard',
+    ])
+    registration.dispose()
   })
 })

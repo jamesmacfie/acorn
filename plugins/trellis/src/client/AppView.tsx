@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createEffect, createSignal, For, on, onCleanup, Show, type Accessor } from 'solid-js'
 import { Alert, Button, CopyButton, Modal, ModalActions, ModalBody, Stack, Text } from '@acorn/plugin-api/ui'
 import { CardFrame } from '@acorn/plugin-api/ui/dashboards'
 import { composeForAgent, taskById, writeJson } from '@acorn/plugin-api/client'
@@ -30,6 +30,8 @@ const isWebUrl = (url: string) => {
 // so its confirm offers to copy the link instead.
 const canOpen = typeof window !== 'undefined' && typeof window.open === 'function'
 
+export type AppPlacement = 'card' | 'pane' | 'project' | 'dashboard'
+
 export default function AppView(props: {
   appId: string
   /** The task it's drawn in. A project app has none, so it has no task to read or composer to fill. */
@@ -38,7 +40,10 @@ export default function AppView(props: {
   files: AppRevisionFiles
   nodeId: string
   readOnly: boolean
-  placement: 'card' | 'pane' | 'project'
+  placement: AppPlacement
+  /** A dashboard's refreshes. Present on a dashboard, where the program's queries also follow the
+   *  dashboard's rules: again on each refresh, and at each plan's own refresh interval. */
+  refreshes?: Accessor<number>
 }) {
   const inCard = props.placement === 'card'
   // A card's plans first run when it is first on screen, so a long conversation reads only what is
@@ -169,6 +174,16 @@ export default function AppView(props: {
       initialState: { $placement: props.placement },
     })
     if (saved) keepState(runtime, saved, setNotice)
+    if (props.refreshes) {
+      createEffect(on(props.refreshes, () => runtime.refresh(), { defer: true }))
+      for (const [name, plan] of Object.entries(props.files.plans)) {
+        const seconds = (plan as { refresh?: unknown } | null)?.refresh
+        if (typeof seconds !== 'number' || !(seconds > 0)) continue
+        // The plan schema's floor, held here too, because a revision planted in the data root skipped it.
+        const timer = setInterval(() => runtime.refresh([name]), Math.max(30, seconds) * 1000)
+        onCleanup(() => clearInterval(timer))
+      }
+    }
     return (
       <AppHostContext.Provider
         value={{

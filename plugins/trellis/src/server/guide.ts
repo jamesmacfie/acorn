@@ -18,7 +18,7 @@ const RULES = [
   `Query("${TASK_TOOL}", {}, {}) returns the task the app is drawn in: { id, title, branch }.`,
   `A row's actions are listed on it as _actions: [{ id, label, risk }]. Run one with Mutation("${ROW_ACTION_TOOL}", {plan: "myPlan", row: $row, action: $action}) and @Run, after @Set($row, r._id) and @Set($action, "close"). The person confirms it first.`,
   '@ToAssistant(text) puts text in the composer for the person to send; it never sends. @OpenUrl(url) opens only http and https links, after the person confirms the URL.',
-  '$placement is "card" in a conversation, "pane" in the task\'s Apps pane, and "project" once the person publishes it to the project, where there is no task: Query("task") fails and @ToAssistant does nothing there. Read it to draw a compact version in a card; never declare or set it.',
+  '$placement is "card" in a conversation, "pane" in the task\'s Apps pane, "project" once the person publishes it to the project, and "dashboard" on a Home tab they put a project app on. A project app has no task: Query("task") fails and @ToAssistant does nothing there. On a dashboard, queries run again when the window regains focus and at each plan\'s refresh interval. Read it to draw a compact version in a card; never declare or set it.',
   "Every $ variable is saved with the app and comes back when it opens again, in a card or the pane, after a reload too. A new revision keeps a variable's value by name: rename or drop one and its value is gone, and a new one starts at its default. Keep the names of what the person set, such as ticks, when you change an app. Saved state is at most 256 KiB.",
   'A chart or table is always a Panel. There is no other.',
 ]

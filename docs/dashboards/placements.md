@@ -1,8 +1,8 @@
 # Placements
 
 A placement is a surface that holds panels: a Home tab or a plugin region. This page covers Home and
-its tabs, plugin regions, and the grid every placement uses. The grid component is
-`packages/client-core/src/features/dashboards/PanelGrid.tsx`, and its arithmetic is
+its tabs, plugin regions, the panel menu, cells a plugin draws, and the grid every placement uses. The
+grid component is `packages/client-core/src/features/dashboards/PanelGrid.tsx`, and its arithmetic is
 `packages/dashboards-core/src/layout.ts`.
 
 ## Placements
@@ -84,6 +84,23 @@ updates the panel definition on this device. A quick edit refuses when the draft
 published revision, or when this device holds a studio copy the Node doesn't have yet, because
 publishing would ship those edits unseen. The refusal is a toast with **Open**. Quick edits have no
 undo. **Edit…** can change a panel back.
+
+## Cells a plugin draws
+
+A definition with no publication names its kind in `view.kind`, and a plugin can draw that kind on
+Home. Trellis draws `app`, a project app ([project apps](../agent-built-apps/project-apps.md#on-a-dashboard)).
+A compiled plugin registers through `ctx.contribute(dashboardCellRegistry, …)` with the kind as its
+`id`, a `component` for the cell's body, and optional `menuItems` (`cells.ts`). The grid keeps the
+frame, the definition's title, the gestures, and the menu's layout items and **Remove from this
+dashboard**. Rename, **View as**, **Sort by**, **About**, **Duplicate**, and **Delete panel** need a
+publication, so a cell has none of them. The body gets `refreshes`, a count that goes up when the
+window regains focus and after a reported plugin or account change, so a cell that runs its own reads
+refreshes when panels do. A kind nobody registered, from a newer build or a plugin that's off, draws
+inert. Cells go on Home tabs only, because a region's constraints read publication metadata.
+
+Anything that puts a definition on Home, an agent's panel card or a plugin's cell, lists the tabs with
+`homeTabsToAddTo` and places with `placeOnHomeTab`, both in `cells.ts`. Each kind takes its size from
+the tuning table in `layout.ts`.
 
 ## The grid
 

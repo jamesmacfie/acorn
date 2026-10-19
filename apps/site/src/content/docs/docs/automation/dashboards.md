@@ -101,6 +101,9 @@ Home can hold up to eight dashboards in each workspace, as tabs. **+** adds one,
 renames, moves, or deletes it. A panel moves to another dashboard from **Move to** in its menu. Each workspace has
 its own Home, so switching workspace switches the dashboards.
 
+An app an agent built and you published to a project can sit on Home beside your panels. See
+[Apps](/docs/built-in-plugins/apps/#put-an-app-on-a-dashboard).
+
 ## Panels in plugins' views
 
 Some plugins keep a space for panels, such as beside a source's list in the left rail, or beside a

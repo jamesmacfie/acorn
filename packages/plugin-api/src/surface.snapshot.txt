@@ -15,6 +15,9 @@ client: CommandOutcome
 client: ContentLinkContribution
 client: ContentSelectionTarget
 client: ContributedCommand
+client: DashboardCellDefinition
+client: DashboardCellMenuProps
+client: DashboardCellProps
 client: DocumentServiceRoute
 client: FileMenuTarget
 client: InAppTarget
@@ -84,6 +87,7 @@ client: createTextSetting
 client: createWorkspace
 client: createWorkspaceWords
 client: currentWorkspaceId
+client: dashboardCellRegistry
 client: debounce
 client: defaultDeliveryContext
 client: deletedTasksOptions
@@ -481,8 +485,11 @@ testkit: testGate
 testkit: testSecretEnv
 testkit: validatePluginConfig
 ui/dashboards: CardFrame
+ui/dashboards: DashboardTab
 ui/dashboards: PanelToolCard
 ui/dashboards: PlanPanel
+ui/dashboards: homeTabsToAddTo
+ui/dashboards: placeOnHomeTab
 ui/data-sources: AuthoringConversation
 ui/data-sources: AuthoringConversationProps
 ui/data-sources: SourceQueryEditor

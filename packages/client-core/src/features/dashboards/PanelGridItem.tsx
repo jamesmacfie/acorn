@@ -1,4 +1,6 @@
 import { createSignal, For, onCleanup, Show, type Accessor, type JSX } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
+import { focusManager } from '@tanstack/solid-query'
 import type { DashboardRevision, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { availableViews, switchView } from '@acorn/dashboards-core/outline.ts'
 import { outputPlanColumns } from '@acorn/dashboards-core/plan.ts'
@@ -10,6 +12,8 @@ import { Card, EmptyState } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Menu, type MenuContext } from '../../kit/components/overlays/Menu'
 import { formatChord } from '../../kit/lib/rendering/formatChord'
+import { dashboardCellRegistry } from './cells'
+import { reportedChanges } from './dashboardClient'
 import type { PanelDefinition } from './model'
 import PanelAbout from './PanelAbout'
 import PublishedDashboardPanel from './PublishedDashboardPanel'
@@ -75,7 +79,8 @@ const sortedTowards = (plan: PanelPlan, direction: Direction): PanelPlan => ({
  *
  * The menu's quick edits, About, and Duplicate read the published revision the panel already loaded
  * (docs/dashboards/placements.md § The panel menu). A definition with no publication, which this
- * build can't draw, gets an inert cell whose menu only arranges and removes it.
+ * build can't draw, is drawn by the cell a plugin registered for its kind (./cells.ts), or else inert. Its
+ * menu has the cell's own items, then the layout items and Remove.
  */
 export default function PanelGridItem(props: {
   definition: PanelDefinition
@@ -211,6 +216,14 @@ export default function PanelGridItem(props: {
             </Menu.Item>
             <Menu.Separator />
           </Show>
+          <Show when={cell()?.menuItems}>
+            {(items) => (
+              <>
+                <Dynamic component={items()} definition={props.definition} menu={menu} />
+                <Menu.Separator />
+              </>
+            )}
+          </Show>
           <Show when={!props.layout.collapsed()}>
             <Menu.Item context={menu} onSelect={props.actions.beginLayout}>
               Move or resize
@@ -262,6 +275,12 @@ export default function PanelGridItem(props: {
     />
   )
 
+  // A definition with no publication is drawn by the cell registered for its kind, if any.
+  const cell = () => (props.definition.publication ? undefined : dashboardCellRegistry.get(props.definition.view.kind))
+  const [focused, setFocused] = createSignal(0)
+  onCleanup(focusManager.subscribe((isFocused) => isFocused && setFocused((count) => count + 1)))
+  const refreshes = () => focused() + reportedChanges()
+
   const headProps = () => (props.layout.collapsed() ? {} : { onPointerDown: props.layout.onBeginDrag })
 
   onCleanup(props.layout.unregister)
@@ -291,9 +310,24 @@ export default function PanelGridItem(props: {
               {chrome(() => undefined)}
             </div>
             <div class="dash-panel-body">
-              <EmptyState align="start" size="sm">
-                Acorn can't show this here. It may need a newer version of Acorn, or a plugin that's turned off.
-              </EmptyState>
+              <Show
+                when={cell()}
+                fallback={
+                  <EmptyState align="start" size="sm">
+                    Acorn can't show this here. It may need a newer version of Acorn, or a plugin that's turned off.
+                  </EmptyState>
+                }
+              >
+                {(drawn) => (
+                  <Dynamic
+                    component={drawn().component}
+                    definition={props.definition}
+                    workspaceId={props.workspaceId}
+                    refreshes={refreshes}
+                    remove={props.actions.remove}
+                  />
+                )}
+              </Show>
             </div>
           </Card>
         }

@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import type {
   DashboardDraft,
@@ -28,16 +29,24 @@ export const publishedDashboardPanelKey = (
     zone ?? null,
   ] as const
 
-/** Refetches placed panels on one Node that read the given plugin or account. A panel with no data yet
- * also refetches, because the change may be what it was waiting for. */
+const [reportedChanges, setReportedChanges] = createSignal(0)
+/** Counts reported plugin and account changes, for a dashboard cell that runs its own reads. */
+export { reportedChanges }
+
+const PANEL_RUN_KEYS: readonly unknown[] = ['published-dashboard-panel', 'dashboard-plan-run']
+
+/** Refetches panels on one Node that read the given plugin or account: placed panels, and the plans an
+ * agent's card or app draws. A panel with no data yet also refetches, because the change may be what it
+ * was waiting for. */
 export function invalidatePublishedPanels(
   client: QueryClient,
   nodeId: string,
   filter?: { pluginId?: string; connectionId?: string },
 ): Promise<void> {
+  setReportedChanges((count) => count + 1)
   return client.invalidateQueries({
     predicate: (query) => {
-      if (query.queryKey[0] !== 'published-dashboard-panel' || query.queryKey[1] !== nodeId) return false
+      if (!PANEL_RUN_KEYS.includes(query.queryKey[0]) || query.queryKey[1] !== nodeId) return false
       const diagnostics = (query.state.data as DashboardRun | undefined)?.diagnostics
       return (
         !diagnostics ||
