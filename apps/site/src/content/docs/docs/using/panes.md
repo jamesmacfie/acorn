@@ -7,7 +7,7 @@ sources:
   - packages/client-core/src/features/tasks/TaskPaneHost.tsx
   - packages/client-core/src/features/tasks/PaneSwitcher.tsx
   - apps/desktop/src/client/TaskView.tsx
-checked: '500839a27'
+checked: 'a6aae8cba'
 ---
 
 This page covers the row of panes a task shows: which panes there are, and how to show, add, close,
