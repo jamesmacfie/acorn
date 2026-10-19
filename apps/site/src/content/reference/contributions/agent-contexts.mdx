@@ -7,8 +7,9 @@ sources:
 checked: '498833615'
 ---
 
-An agent context is an entry in the composer's list of things to attach to a message. The person
-opens it, picks options your route lists, and acorn attaches the text your second route answers, stamped
+An agent context is a source a person can reference in an agent message. They type `#` and your
+keyword, such as `#acme:login-bug`, or tick an item under **Context**. Your first route lists the
+items. When the message is sent, acorn asks your second route for the text and attaches it, stamped
 with your plugin and the time.
 
 ## A minimal example
@@ -38,8 +39,10 @@ with your plugin and the time.
     "agentContexts": [
       {
         "id": "issues",
+        "keyword": "acme",
         "label": "Acme issues",
-        "description": "Attach the issues linked to this task.",
+        "description": "Attach any Acme issue, linked to this task or not.",
+        "search": true,
         "options": "/v1/p/acme/context/options",
         "capture": "/v1/p/acme/context/capture"
       }
@@ -51,6 +54,9 @@ with your plugin and the time.
 ## Fields
 
 {/* facts */}
+
+A reserved or taken keyword is bound as `<pluginId>-<keyword>`. With `search`, your options route
+gets what the person typed as `query`, so it can answer matches beyond what it would list.
 
 ## In the terminal
 
