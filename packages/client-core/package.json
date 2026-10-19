@@ -189,6 +189,7 @@
     "./kit/lib": "./src/kit/lib/public.ts",
     "./kit/lib/anchor": "./src/kit/lib/controls/anchor.ts",
     "./kit/lib/confirm": "./src/kit/lib/controls/confirm.ts",
+    "./kit/lib/mentions": "./src/kit/lib/controls/mentions.ts",
     "./kit/lib/latestSignal": "./src/kit/lib/state/latestSignal.ts",
     "./kit/lib/formatChord": "./src/kit/lib/rendering/formatChord.ts",
     "./kit/lib/savedSignal": "./src/kit/lib/controls/savedSignal.ts",

@@ -1093,6 +1093,36 @@ describe('syncChromeContributions', () => {
       await expect(agentContextRegistry.get('board-context')!.capture(scope)).rejects.toThrow(/512 KiB of context/)
     })
 
+    it('gives a manifest with no keyword its entry id as the keyword', () => {
+      expect(agentContextRegistry.get('board-context')!.keyword).toBe('board-context')
+    })
+
+    it('qualifies a reserved keyword with the plugin id', () => {
+      const [entry] = CHROME.agentContexts!
+      _seedPluginDistribution([
+        ['node-a', [row('board', {}, { ...CHROME, agentContexts: [{ ...entry!, keyword: 'agent' }] })]],
+      ])
+      syncChromeContributions()
+      expect(agentContextRegistry.get('board-context')!.keyword).toBe('board-agent')
+    })
+
+    it('sends what was typed only to a source that declared search', async () => {
+      readJson.mockResolvedValue([])
+      await agentContextRegistry.get('board-context')!.options(scope, 'card')
+      expect(readJson).toHaveBeenLastCalledWith('/v1/p/board/context-options?taskId=task-1', expect.anything())
+
+      const [entry] = CHROME.agentContexts!
+      _seedPluginDistribution([
+        ['node-a', [row('board', {}, { ...CHROME, agentContexts: [{ ...entry!, search: true }] })]],
+      ])
+      syncChromeContributions()
+      await agentContextRegistry.get('board-context')!.options(scope, 'card 1')
+      expect(readJson).toHaveBeenLastCalledWith(
+        '/v1/p/board/context-options?taskId=task-1&query=card+1',
+        expect.anything(),
+      )
+    })
+
     it('asks a node that does not run the plugin for nothing', async () => {
       setActiveNode('node-b')
       _seedPluginDistribution([

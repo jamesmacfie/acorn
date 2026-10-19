@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onMount, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, onMount, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type Placement } from '../../lib/controls/anchor'
 import PickerRow from './PickerRow'
@@ -77,6 +77,9 @@ export type PickerProps<T> = {
   variant?: ButtonProps['variant']
   disabled?: boolean // greys the button and blocks opening (e.g. repo is fixed in a task view)
   keepOpen?: boolean // stay open after a pick, so the same list can drive a multi-select (isActive marks the chosen ones)
+  /** Present while the list is a nested one, such as one category's items after the category was
+   *  picked. Escape calls it instead of closing, and the filter clears on the way in and out. */
+  onBack?: () => void
   placement?: Placement // 'bottom-end' for a trigger at the right edge, so the list opens leftward
   defaultOpen?: boolean // open once it mounts, as when the person asked for this list somewhere else
 }
@@ -85,6 +88,13 @@ export default function Picker<T>(props: PickerProps<T>) {
   const [filter, setFilter] = createSignal('')
   // The trigger takes the caption of the field or setting row it sits in, as a select does.
   const field = claimField()
+  createEffect(
+    on(
+      () => !!props.onBack,
+      () => setFilter(''),
+      { defer: true },
+    ),
+  )
   let rootRef: HTMLDivElement | undefined
   let inputRef: HTMLInputElement | undefined
 
@@ -169,6 +179,13 @@ export default function Picker<T>(props: PickerProps<T>) {
               class="repo-picker-popover repo-picker-popover-fixed"
               role="listbox"
               style={popover.surfaceStyle()}
+              onKeyDown={(event) => {
+                // Ahead of the popover's own Escape, which listens on window and skips a handled key.
+                if (event.key !== 'Escape' || !props.onBack) return
+                event.preventDefault()
+                props.onBack()
+                inputRef?.focus()
+              }}
             >
               <div class="repo-picker-tools">
                 <input

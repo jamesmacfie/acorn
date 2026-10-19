@@ -1,10 +1,15 @@
 import { fuzzyScore } from '@acorn/plugin-api/client'
 import { fileMentionMatches } from './fileMentions'
+import { resolveContextReferences, type ContextCategory, type ContextReferenceMap } from './contextReferences'
 
-type ComposerTokenKind = 'file' | 'command' | 'skill'
+type ComposerTokenKind = 'file' | 'command' | 'skill' | 'context'
 
-/** `name` is the token without its sigil, which is what a description is keyed by. */
-export type ComposerToken = { kind: ComposerTokenKind; name: string; start: number; end: number }
+/** `name` is the token without its sigil, which is what a description is keyed by. A context token
+ *  carries the label of what it attaches instead. */
+export type ComposerToken = { kind: ComposerTokenKind; name: string; start: number; end: number; label?: string }
+
+/** The Acorn context a draft can reference, and what completion recorded for it. */
+export type ComposerContexts = { categories: readonly ContextCategory[]; map: ContextReferenceMap }
 
 export type ComposerSegment = { text: string; token: ComposerToken | null }
 
@@ -27,12 +32,14 @@ const SIGIL = /(?:^|\s)([/$])([A-Za-z0-9][\w.:-]*)/g
  * misremembered `/reviw` stays visibly uncoloured, which is the useful half of the feedback.
  *
  * File mentions come from `fileMentionMatches` with the same worktree list used on send, so what is
- * coloured is exactly what the turn sends as a file part.
+ * coloured is exactly what the turn sends as a file part. Context references come from
+ * `resolveContextReferences`, which `submitTurn` captures from, for the same reason.
  */
 export function composerTokens(
   text: string,
   advertised: { commands?: readonly string[]; skills?: readonly string[] } = {},
   files: readonly string[] = [],
+  contexts?: ComposerContexts,
 ): ComposerToken[] {
   if (!text || text.length > MAX_HIGHLIGHT_LENGTH) return []
   const commands = new Set(advertised.commands ?? [])
@@ -41,6 +48,16 @@ export function composerTokens(
 
   for (const match of fileMentionMatches(text, files)) {
     tokens.push({ kind: 'file', name: match.path, start: match.start, end: match.end })
+  }
+
+  for (const reference of contexts ? resolveContextReferences(text, contexts.categories, contexts.map) : []) {
+    tokens.push({
+      kind: 'context',
+      name: reference.text.slice(1),
+      start: reference.start,
+      end: reference.end,
+      label: reference.label,
+    })
   }
 
   for (const match of text.matchAll(SIGIL)) {
@@ -66,10 +83,11 @@ export function composerSegments(
   text: string,
   advertised: { commands?: readonly string[]; skills?: readonly string[] } = {},
   files: readonly string[] = [],
+  contexts?: ComposerContexts,
 ): ComposerSegment[] {
   const segments: ComposerSegment[] = []
   let cursor = 0
-  for (const token of composerTokens(text, advertised, files)) {
+  for (const token of composerTokens(text, advertised, files, contexts)) {
     if (token.start < cursor) continue
     if (token.start > cursor) segments.push({ text: text.slice(cursor, token.start), token: null })
     segments.push({ text: text.slice(token.start, token.end), token })

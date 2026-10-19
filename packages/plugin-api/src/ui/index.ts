@@ -79,7 +79,11 @@ export { copyText } from '@acorn/client-core/kit/lib'
 // is the short form (one list of logins after `@`); `sources` and `segments` are the general one, and
 // what the agents composer's `@file` / `/command` / `$skill` draft is written against.
 export { default as MentionTextarea } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
-export type { MentionSegment, MentionSource } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
+export type {
+  MentionSegment,
+  MentionSource,
+  MentionSuggestion,
+} from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 export { Modal, ModalActions, ModalBody } from '@acorn/client-core/kit/components/overlays'
 export { Tabs, TabPanel } from '@acorn/client-core/kit/components/layout'
 export { UserAvatar } from '@acorn/client-core/kit/components/content'

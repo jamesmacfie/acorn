@@ -124,6 +124,7 @@ export { createTimelineWindow } from '@acorn/client-core/kit/lib'
 export type {
   MentionSegment,
   MentionSource,
+  MentionSuggestion,
   MentionTextareaProps,
 } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 

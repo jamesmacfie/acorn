@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { checkDeclaredContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../../content/contentLinkPattern.ts'
 import { isThemeColorValue, THEME_COLOR_VALUE_MAX, THEME_PALETTE_TOKENS } from '../../appearance/themeTokens.ts'
 import { styleValueProblem } from '../../appearance/styleValues.ts'
+import { AGENT_CONTEXT_KEYWORD } from '../../agents/agentContext.ts'
 import { refresh } from './chromeDescriptors.ts'
 import { pluginRoute } from './manifestFields.ts'
 
@@ -129,8 +130,27 @@ export const agentContextDescriptor = z.object({
   id: z.string().min(1).max(64).describe("The entry's ID, unique in this manifest."),
   label: z.string().min(1).max(80).describe("The entry's name in the composer's context list."),
   description: z.string().min(1).max(240).optional().describe('One line under the label.'),
-  // GET ?taskId=&workspaceId= → AgentContextOption[]
-  options: pluginRoute.describe('A GET route sent `taskId` that answers the options the person can pick.'),
+  // The host qualifies a reserved or taken keyword as `<pluginId>-<keyword>` rather than refusing the
+  // manifest, because two independent plugins can't coordinate names. Absent, the entry's id stands in.
+  keyword: z
+    .string()
+    .min(1)
+    .max(40)
+    .regex(AGENT_CONTEXT_KEYWORD, 'keyword must be lower-case letters, digits, and dashes, starting with a letter')
+    .optional()
+    .describe('What follows `#` in the composer, such as `db` in `#db:monthly-revenue`. Defaults to the entry ID.'),
+  itemless: z
+    .boolean()
+    .optional()
+    .describe('No items to pick. The entry is referenced as a bare `#keyword` and captured with no `optionIds`.'),
+  search: z
+    .boolean()
+    .optional()
+    .describe('Send the typed text to `options` as `query`, so the route can search past what it would list.'),
+  // GET ?taskId=&workspaceId=&query= → AgentContextOption[]
+  options: pluginRoute.describe(
+    'A GET route sent `taskId`, and `query` when `search` is set, that answers the options the person can pick.',
+  ),
   // POST { taskId, workspaceId?, optionIds? } → snapshot bodies. The host binds `source` from the
   // plugin id, stamps the capture time, and measures the bytes itself.
   capture: pluginRoute.describe(

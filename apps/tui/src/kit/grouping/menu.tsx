@@ -24,6 +24,8 @@ export function Menu(props: {
   disabled?: () => boolean
   /** Keep long pane menus scrollable when the host gives their inline panel little height. */
   maxVisibleRows?: number
+  /** Escape calls this instead of closing: a picker showing a nested list steps back out of it. */
+  onBack?: () => void
   children: (context: { close: () => void }) => JSX.Element
 }) {
   const [local, setLocal] = createSignal(false)
@@ -49,7 +51,7 @@ export function Menu(props: {
       </box>
       <Show when={open()}>
         {/* Mount the trap with the list so closing it releases the keys. */}
-        <MenuList close={() => set(false)} maxVisibleRows={props.maxVisibleRows}>
+        <MenuList close={() => (props.onBack ? props.onBack() : set(false))} maxVisibleRows={props.maxVisibleRows}>
           {props.children({ close: () => set(false) })}
         </MenuList>
       </Show>

@@ -5,6 +5,7 @@ import { refreshSessions, sessions } from './sessionStore'
 export const terminalAgentContextContribution: AgentContextContribution = {
   id: 'acorn-terminals',
   source: 'terminal',
+  keyword: 'terminal',
   label: 'Terminal sessions',
   description: 'Capture bounded terminal session status without silently importing screen history.',
   async options(scope) {

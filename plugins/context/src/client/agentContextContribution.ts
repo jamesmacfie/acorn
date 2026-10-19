@@ -10,19 +10,14 @@ const byteSize = (value: string): number => new TextEncoder().encode(value).byte
 export const taskContextAgentContribution: AgentContextContribution = {
   id: 'acorn-task-context',
   source: 'context.task',
+  keyword: 'task',
   label: 'Task context',
   description: 'Attach the sections currently selected in Acorn’s Context pane.',
+  // `#task` alone. The sections are picked in the Context pane, not in the composer.
+  itemless: true,
   revision: (scope) => contextRevisionFor(scope.taskId),
-  async options(scope) {
-    const context = await readJson<TaskContext>(taskContextRoute(scope.taskId, 'all'))
-    const selection = selectionFor(scope.taskId)
-    return context.sections.map((section) => ({
-      id: section.id,
-      label: section.label,
-      description: `${section.items.length} item${section.items.length === 1 ? '' : 's'}${section.absent ? ` · ${section.absent.detail}` : ''}`,
-      defaultSelected: selection?.[section.id] ?? section.defaultIncluded,
-    }))
-  },
+  // Itemless, so the composer never asks for options.
+  options: async () => [],
   async capture(scope, optionIds) {
     const selection = selectionFor(scope.taskId)
     const selectedIds = optionIds

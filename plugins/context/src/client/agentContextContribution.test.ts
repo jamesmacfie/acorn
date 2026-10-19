@@ -74,7 +74,7 @@ describe('task agent context contribution', () => {
     )
   })
 
-  it('lists selectable sections and captures the modal selection', async () => {
+  it('captures the sections it is given', async () => {
     const fetch = vi.fn(
       async () =>
         new Response(JSON.stringify(context), {
@@ -84,23 +84,9 @@ describe('task agent context contribution', () => {
     )
     vi.stubGlobal('fetch', fetch)
 
-    await expect(taskContextAgentContribution.options({ taskId: 'task-1' })).resolves.toEqual([
-      {
-        id: 'issues',
-        label: 'Linked issues',
-        description: '1 item',
-        defaultSelected: true,
-      },
-    ])
     await taskContextAgentContribution.capture({ taskId: 'task-1' }, ['issues'])
 
-    expect(fetch).toHaveBeenNthCalledWith(
-      1,
-      '/v1/core/tasks/task-1/context?include=*',
-      expect.objectContaining({ signal: undefined }),
-    )
-    expect(fetch).toHaveBeenNthCalledWith(
-      2,
+    expect(fetch).toHaveBeenCalledWith(
       '/v1/core/tasks/task-1/context?include=issues',
       expect.objectContaining({ signal: undefined }),
     )
