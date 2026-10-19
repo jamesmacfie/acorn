@@ -19,7 +19,7 @@ export const notesPaneContribution: PaneLayoutContribution<NotesModel> = {
   layout: 'list-detail',
   // The selection, the note being edited and its autosave timer, held once per task by the host so
   // collapsing the library cannot take them with it (client-core's `paneModel`).
-  model: (task) => createNotesModel(task.id, task.projectId),
+  model: (task, pane) => createNotesModel(task.id, task.projectId, pane.shown),
   regions: { 'list-header': NotesHeader, list: NotesList, detail: NoteBody },
   collapsible: true,
   collapseContent: 'empty',

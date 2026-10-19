@@ -36,6 +36,7 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.exclusiveSlots,
   PrefKeys.remoteSlots,
   PrefKeys.notifications,
+  PrefKeys.keptTasks,
 ])
 
 const PREFIX = `acorn-pref:${ACORN_BASELINE}:`

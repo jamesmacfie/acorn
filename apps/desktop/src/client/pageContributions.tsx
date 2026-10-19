@@ -13,6 +13,7 @@ const AgentToolsSettings = lazy(() => import('@acorn/client-core/features/settin
 const AppearanceSettings = lazy(() => import('@acorn/client-core/features/settings/AppearanceSettings.tsx'))
 const NotificationSettings = lazy(() => import('@acorn/client-core/features/settings/NotificationSettings.tsx'))
 const CliSettings = lazy(() => import('./CliSettings.tsx'))
+const PerformanceSettings = lazy(() => import('@acorn/client-core/features/settings/PerformanceSettings.tsx'))
 const ShortcutsSettings = lazy(() => import('@acorn/client-core/features/settings/ShortcutsSettings.tsx'))
 const NodesSettings = lazy(() => import('@acorn/client-core/features/settings/nodes/NodesSettings.tsx'))
 const PluginsSettings = lazy(() => import('@acorn/client-core/features/settings/plugins/PluginsSettings.tsx'))
@@ -39,6 +40,7 @@ const components: Record<CoreSettingsPageId, SettingsContribution['component']> 
   notifications: () => <NotificationSettings />,
   shortcuts: () => <ShortcutsSettings />,
   cli: () => <CliSettings />,
+  performance: () => <PerformanceSettings />,
   workspaces: (props) => <WorkspaceProjectAssignments navigate={props.context.navigate} />,
   'workspace.detail': (props) =>
     props.context.scope.workspace ? (

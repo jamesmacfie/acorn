@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, on, type Accessor } from 'solid-js'
 import {
   agentSessionsFor,
   bytesOf,
@@ -47,7 +47,7 @@ export const pillText = (status: SyncStatus): string =>
       ? `Sent ${agoText(status.at)}`
       : `${status.changes} change${status.changes === 1 ? '' : 's'} since you sent it`
 
-export function createContextModel(task: Task) {
+export function createContextModel(task: Task, shown: Accessor<boolean> = () => true) {
   const [msg, setMsg] = createSignal('')
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
   // Which section folds the reader has shut. Closed-set rather than open-set, because a section is
@@ -61,6 +61,18 @@ export function createContextModel(task: Task) {
   const [ctx, { refetch }] = createResource(
     () => task.id,
     (id) => readJson<TaskContext>(taskContextRoute(id, 'all')),
+  )
+
+  // The host keeps this model after the reader leaves the task, and the inventory is read once, so
+  // coming back reads it again rather than showing notes and links as they were when you left.
+  createEffect(
+    on(
+      shown,
+      (visible) => {
+        if (visible) void refetch()
+      },
+      { defer: true },
+    ),
   )
 
   // Effective selection: the persisted per-task set, or the contribution defaults for an untouched

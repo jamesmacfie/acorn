@@ -26,6 +26,6 @@ export const workflowsPaneContribution: PaneLayoutContribution<RunPaneModel> = {
   minWidth: 640,
   layout: 'list-detail',
   // The runs, the selection, the live tail and the four verbs, built once per task by the host.
-  model: (task) => createRunPaneModel(task),
+  model: (task, pane) => createRunPaneModel(task, pane.shown),
   regions: { 'list-header': RunPaneHeader, list: RunPaneList, 'list-footer': RunPaneFooter, detail: NodeDetail },
 }

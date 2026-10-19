@@ -22,4 +22,15 @@ export function applyViewState(view: EditorView, state: EditorViewState): void {
   const end = view.state.doc.length
   view.dispatch({ selection: { anchor: Math.min(state.anchor, end), head: Math.min(state.head, end) } })
   view.scrollDOM.scrollTop = state.scrollTop
+  // Again once CodeMirror has measured the document. Straight after `setState` the scroller can still
+  // be the height of the previous document, and the browser clamps a scroll past its end.
+  view.requestMeasure({
+    key: restoreScroll,
+    read: () => undefined,
+    write: () => {
+      view.scrollDOM.scrollTop = state.scrollTop
+    },
+  })
 }
+
+const restoreScroll = {}

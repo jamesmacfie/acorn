@@ -3,10 +3,40 @@ import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider, createQuery } from '@tanstack/solid-query'
 import { afterEach, expect, it } from 'vitest'
 import { PaneModelHost } from './PaneModelHost'
-import { _resetPaneModels, acquirePaneModelHost, markPaneDrawn, paneDrawn, paneModel } from './paneModels'
+import {
+  DEFAULT_KEPT_TASKS,
+  _resetPaneModels,
+  acquirePaneModelHost,
+  keptTasks,
+  markPaneDrawn,
+  paneDrawn,
+  paneModel,
+} from './paneModels'
 import { evictScope } from '../shell/scopeEviction'
+import { writeDevicePref } from '../../../infra/persistence/devicePrefs'
+import { PrefKeys } from '../../../infra/persistence/prefKeys'
 
-afterEach(_resetPaneModels)
+afterEach(() => {
+  _resetPaneModels()
+  localStorage.clear()
+})
+
+it('keeps as many tasks per pane as the device setting says, and reads anything else as the default', () => {
+  expect(keptTasks({ [PrefKeys.keptTasks]: '7' })).toBe(DEFAULT_KEPT_TASKS)
+  writeDevicePref(PrefKeys.keptTasks, '1')
+  const lease = acquirePaneModelHost('a')
+  const disposed: string[] = []
+  const build = (id: string) => () => {
+    onCleanup(() => disposed.push(id))
+    return id
+  }
+  paneModel('notes', 't1', build('notes t1'), 'notes', lease.scope)
+  paneModel('editor', 't1', build('editor t1'), 'editor', lease.scope)
+  paneModel('notes', 't2', build('notes t2'), 'notes', lease.scope)
+  // Each pane counts its own tasks.
+  expect(disposed).toEqual(['notes t1'])
+  lease.release()
+})
 
 it('retires the captured generation without clearing an equal-ID replacement or its drawn mark', () => {
   const old = acquirePaneModelHost('a')

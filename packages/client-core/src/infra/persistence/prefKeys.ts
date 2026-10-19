@@ -121,6 +121,9 @@ export const PrefKeys = {
   // The device's, like `theme`: a sound on this machine is not a fact about the node, and the other
   // client paired with the same node may not even be able to make one.
   notifications: 'notifications',
+  // How many recent tasks each pane keeps in memory (host/registries/panes/paneModels.ts). The
+  // device's, like `theme`: it's about this machine's memory, not the Node's.
+  keptTasks: 'kept_tasks',
   // Whether this node collects telemetry at all (docs/telemetry/model.md § The switch). The node's, and
   // emphatically not the device's: the collector lives on the node, it re-reads this row on its own
   // five-second tick, and every runtime paired with that node stops collecting when it goes off.

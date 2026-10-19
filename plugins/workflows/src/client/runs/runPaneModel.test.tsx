@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { createComponent } from 'solid-js'
-import { createRoot } from 'solid-js'
+import { createRoot, createSignal, type Accessor } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkflowRunProjection, WorkflowStepRow } from '../../contract/wire.ts'
 
@@ -132,14 +132,14 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 let dispose: (() => void) | undefined
 
-const mount = async () => {
+const mount = async (shown?: Accessor<boolean>) => {
   let model!: ReturnType<typeof createRunPaneModel>
   createRoot((disposeRoot) => {
     dispose = disposeRoot
     createComponent(QueryClientProvider, {
       client: new QueryClient(),
       get children() {
-        model = createRunPaneModel({ id: 'task-1' } as never)
+        model = createRunPaneModel({ id: 'task-1' } as never, shown)
         return null
       },
     })
@@ -163,6 +163,22 @@ afterEach(() => {
 })
 
 describe('the run pane model', () => {
+  // The host keeps the model for a task the reader has left, so a reconnect must not re-read every
+  // kept task at once.
+  it('owes one read for a reconnect while hidden and pays it when drawn again', async () => {
+    const [shown, setShown] = createSignal(true)
+    await mount(shown)
+    setShown(false)
+    runsCalls.mockClear()
+    onReconnect?.()
+    onReconnect?.()
+    await settle()
+    expect(runsCalls).not.toHaveBeenCalled()
+    setShown(true)
+    await settle()
+    expect(runsCalls).toHaveBeenCalledTimes(1)
+  })
+
   it('lands on the newest run and orders its nodes the way the editor does', async () => {
     const model = await mount()
     expect(model.selectedRunId()).toBe('run-1')

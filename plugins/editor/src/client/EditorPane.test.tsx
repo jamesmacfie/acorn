@@ -110,6 +110,13 @@ const { activeFile, editorActivate, editorClose, editorOpen, openFiles, requestE
 const { saveEditorLineBlame, saveEditorMode } = await import('./editorPrefs')
 const { editorViewState } = await import('./editorViewState')
 
+// Visit enough other tasks' editors that this task's pool is the oldest past any retention setting,
+// which is how a real pool is dropped.
+const dropEditorModel = async () => {
+  const { paneModel } = await import('@acorn/plugin-api/client')
+  for (let visited = 0; visited < 10; visited++) paneModel('editor', `other-task-${visited}`, () => ({}))
+}
+
 // A task per test. The per-file document pool is held by the host per (pane, task) and outlives a
 // mount on purpose, so two tests sharing a task id would share the first one's open documents.
 let tasks = 0
@@ -999,8 +1006,7 @@ describe('the editor pane', () => {
     await vi.waitFor(() => expect(typeof release).toBe('function'))
     if (change === 'node-switch') setActiveNode('other-node')
     else {
-      const { paneModel } = await import('@acorn/plugin-api/client')
-      paneModel('editor', 'other-task', () => ({}))
+      await dropEditorModel()
       unmount()
     }
     release('// stale response\n')
@@ -1081,8 +1087,7 @@ describe('the editor pane', () => {
       await Promise.resolve()
       expect(write).not.toHaveBeenCalled()
       expect(openFiles(taskId)[0]?.path).toBe('a.ts')
-      const { paneModel } = await import('@acorn/plugin-api/client')
-      paneModel('editor', 'other-task', () => ({}))
+      await dropEditorModel()
       first.unmount()
       await Promise.resolve()
       expect(write).not.toHaveBeenCalled()
@@ -1271,8 +1276,7 @@ describe('the editor pane', () => {
     await showing(() => view, 'const a = 1')
     view.dispatch({ changes: { from: 0, insert: '// recovery\n' }, selection: { anchor: 5 } })
     write.mockRejectedValue(new Error('offline'))
-    const { paneModel } = await import('@acorn/plugin-api/client')
-    paneModel('editor', 'other-task', () => ({}))
+    await dropEditorModel()
     first.unmount()
     await Promise.resolve()
     read.mockRejectedValue(new Error('still offline'))

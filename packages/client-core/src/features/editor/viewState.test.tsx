@@ -27,6 +27,16 @@ describe('editor view state', () => {
     editor.destroy()
   })
 
+  it('puts the scroll back after CodeMirror lays out the document', async () => {
+    const editor = view('one\ntwo\nthree\n')
+    applyViewState(editor, { anchor: 0, head: 0, scrollTop: 40 })
+    // What a browser does to a scroller that is still the height of the previous document.
+    editor.scrollDOM.scrollTop = 0
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(editor.scrollDOM.scrollTop).toBe(40)
+    editor.destroy()
+  })
+
   it('clamps to a document that shrank underneath it', () => {
     // The agent and the human share a worktree, so a file getting shorter between the stash and the
     // restore is ordinary. An unclamped offset is a thrown range error in the middle of a tab swap.

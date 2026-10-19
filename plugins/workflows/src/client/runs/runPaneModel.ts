@@ -4,7 +4,7 @@
 //
 // Built once per task in the host's own root, so the socket subscriptions below are opened once for
 // the pane and not once per region.
-import { createEffect, createMemo, createResource, createSignal, onCleanup } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, on, onCleanup, type Accessor } from 'solid-js'
 import {
   clientEvents,
   consumePaneIntent,
@@ -61,7 +61,7 @@ const parseDef = (raw: string | undefined): WorkflowDef | null => {
 
 export const isLiveRun = (run: WorkflowRunRow | undefined): boolean => !!run && runIsLive(run.status)
 
-export function createRunPaneModel(task: Task) {
+export function createRunPaneModel(task: Task, shown: Accessor<boolean> = () => true) {
   const queryClient = useQueryClient()
   const registered = queryOwner(queryClient)
   const nodeId = registered === undefined ? activeNodeId() : registered
@@ -171,9 +171,10 @@ export function createRunPaneModel(task: Task) {
     }
   })
 
-  // The elapsed column, and only while something is running or waiting on a person. A finished
-  // step's elapsed is two stored timestamps and needs no clock at all.
+  // The elapsed column, and only while something is running or waiting on a person and the pane is
+  // drawn. A finished step's elapsed is two stored timestamps and needs no clock at all.
   createEffect(() => {
+    if (!shown()) return
     if (!steps().some((step) => step.status === 'running' || step.status === 'waiting-gate')) return
     const timer = setInterval(() => setNow(Date.now()), 1000)
     onCleanup(() => clearInterval(timer))
@@ -259,9 +260,25 @@ export function createRunPaneModel(task: Task) {
     if (!live()) return
     await Promise.all([refetchRuns(), refetchSteps()])
   }
+  // Only while the pane is drawn. The host keeps this model after the reader leaves the task, and a
+  // reconnect would otherwise re-read every kept task's runs at once. A skipped read is owed, and
+  // paid once when the pane is drawn again. Status edges and output above still land while hidden.
+  let owed = false
   const invalidate = () => {
-    void refresh().catch(() => undefined)
+    if (!shown()) owed = true
+    else void refresh().catch(() => undefined)
   }
+  createEffect(
+    on(
+      shown,
+      (visible) => {
+        if (!visible || !owed) return
+        owed = false
+        void refresh().catch(() => undefined)
+      },
+      { defer: true },
+    ),
+  )
 
   onCleanup(
     onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), (payload) => {
