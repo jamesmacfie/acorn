@@ -10,7 +10,7 @@ import type { Disposable } from '../../kit/lib/state/registry'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource } from '../tasks/tasks'
 import { CORE_SOURCE_POINT, type PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
 import type { RailProps } from '@acorn/protocol/chrome.ts'
-import { sourceRegistry } from '../../host/registries/sources/sources'
+import { sourceRegistry, type RailPresentation } from '../../host/registries/sources/sources'
 import { extensionRegistry, type ExtensionContribution } from '../../host/registries/extensionPoints/extensionPoints'
 import { exclusiveSlotRegistry } from '../../host/registries/extensionPoints/exclusiveSlots'
 import { clearAnnotations } from '../../host/annotations/annotations'
@@ -26,7 +26,8 @@ const { archiveTaskMock, copyLinkMock, createTaskMock, navigateMock, readJsonMoc
   readJsonMock: vi.fn(),
 }))
 vi.mock('../../host/registries/commands/copyLink', () => ({ copyLink: copyLinkMock }))
-vi.mock('../../infra/node/apiClient', () => ({ readJson: readJsonMock }))
+// Artwork bytes never arrive here, so a picture stays on its stand-in glyph.
+vi.mock('../../infra/node/apiClient', () => ({ readJson: readJsonMock, readBytes: () => new Promise(() => {}) }))
 vi.mock('../tasks/taskMutations', () => ({
   archiveTask: archiveTaskMock,
   createTask: createTaskMock,
@@ -504,6 +505,79 @@ describe('a row whose markers are read again', () => {
 
     setLabel('2 agents working')
     expect(host.querySelector('.tabrail-task')?.getAttribute('data-tip-legend')).toContain('2 agents working')
+  })
+})
+
+describe('a source button with live presentation', () => {
+  const sourceButton = (id: string) => host.querySelector<HTMLElement>(`.tabrail-source[data-source-id="${id}"]`)
+  const presenting = () => {
+    const [presentation, setPresentation] = createSignal<RailPresentation | null>({
+      artwork: {
+        owner: { nodeId: 'node-a', pluginId: 'music' },
+        image: { path: '/v1/p/music/art/42', revision: '42', alt: 'Album cover' },
+      },
+      tooltip: { title: 'Example song', detail: 'Example artist\nExample album' },
+    })
+    const created = vi.fn(() => presentation)
+    const hidden = vi.fn(() => () => null)
+    registered.push(
+      sourceRegistry.register({
+        id: 'music-src',
+        order: 10,
+        glyph: 'music',
+        label: 'Music',
+        createRailPresentation: created,
+      }),
+      sourceRegistry.register({ id: 'other-src', order: 11, glyph: 'box', label: 'Other' }),
+      sourceRegistry.register(
+        {
+          id: 'hidden-src',
+          order: 12,
+          glyph: 'eye-off',
+          label: 'Hidden',
+          showInRailByDefault: false,
+          createRailPresentation: hidden,
+        },
+        'music',
+      ),
+    )
+    return { setPresentation, created, hidden }
+  }
+
+  it('draws the artwork and words while another source is open, and still opens on a click', () => {
+    const { created, hidden } = presenting()
+    setSelectedSource('other-src')
+    mount()
+    const button = sourceButton('music-src')!
+    expect(button.getAttribute('aria-label')).toBe('Music')
+    expect(button.dataset.tip).toBe('Music')
+    expect(button.dataset.tipSub).toBe('Example song')
+    expect(button.dataset.tipDetail).toBe('Example artist\nExample album')
+    expect(button.querySelector('.sr-only')?.textContent).toBe('Example song. Example artist\nExample album')
+    expect(button.querySelector('.ui-artwork[data-preset="rail"]')).not.toBeNull()
+    // The picture says nothing the description doesn't already.
+    expect(button.querySelector('img')).toBeNull()
+
+    button.click()
+    expect(selectedSource()).toBe('music-src')
+    // Selecting re-renders the rail; the button and its reads stay the ones it had.
+    expect(created).toHaveBeenCalledOnce()
+    expect(hidden).not.toHaveBeenCalled()
+  })
+
+  it('says when its words are stale, and goes back to the glyph for a null answer', () => {
+    const { setPresentation } = presenting()
+    mount()
+    setPresentation((current) => ({ ...current!, freshness: 'stale' }))
+    const button = sourceButton('music-src')!
+    expect(JSON.parse(button.dataset.tipLegend!)).toEqual([
+      { l: 'Not updating: this is the last information it sent', g: 'circle-alert', t: 'warn' },
+    ])
+    setPresentation(null)
+    expect(button.querySelector('.ui-artwork')).toBeNull()
+    expect(button.dataset.tipSub).toBeUndefined()
+    expect(button.querySelector('.ui-icon')).not.toBeNull()
+    expect(button.getAttribute('aria-describedby')).toBeNull()
   })
 })
 

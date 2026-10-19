@@ -4,7 +4,7 @@ import { Dynamic } from '../tree/renderer'
 import { activeTaskId, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { markersFor, type RailMarkerTarget } from '@acorn/client-core/host/registries/rail'
-import { resolveRailMarkers } from '@acorn/client-core/features/tabs'
+import { createSourcePresentation, resolveRailMarkers } from '@acorn/client-core/features/tabs'
 import { requestTaskAnnotations } from '@acorn/client-core/host/annotations/taskAnnotations.ts'
 import { requestSourceAnnotations } from '@acorn/client-core/host/annotations/statusAnnotations.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
@@ -83,13 +83,19 @@ function Marks(props: { markers: ReturnType<typeof markersFor>; cells: number })
   return <Show when={label()}>{(text) => <Line role="muted">{text()}</Line>}</Show>
 }
 
-/** Every marker's words for one row, opened from its menu key: the terminal's hover legend. */
-function MarkerLegend(props: { title: string; id: string; target: RailMarkerTarget; onDismiss: () => void }) {
+/** Every marker's words for one row, opened from its menu key: the terminal's hover legend. A
+ *  source's live words come first, one row per line, the way the desktop tooltip stacks them. */
+function MarkerLegend(props: {
+  title: string
+  id: string
+  target: RailMarkerTarget
+  info?: readonly string[]
+  onDismiss: () => void
+}) {
   const rows = createMemo(() =>
-    resolveRailMarkers(markersFor(props.target)).legend.map((marker, index) => ({
-      key: String(index),
-      label: marker.l,
-    })),
+    [...(props.info ?? []), ...resolveRailMarkers(markersFor(props.target)).legend.map((marker) => marker.l)].map(
+      (label, index) => ({ key: String(index), label }),
+    ),
   )
   return (
     <Modal onDismiss={props.onDismiss} title={props.title} size="sm">
@@ -237,32 +243,51 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
             onSelect={setSelectedSource}
             onActivate={setSelectedSource}
             onMenu={(id) => {
-              if (hasMarkers({ kind: 'source', id })) setInspecting(id)
+              if (hasMarkers({ kind: 'source', id }) || sourceRegistry.get(id)?.createRailPresentation)
+                setInspecting(id)
             }}
           >
-            {(entry, item) => (
-              <Row
-                item={item}
-                selected={selectedSource() === entry.id}
-                keepTrailing
-                trailing={
-                  <Marks markers={markersFor({ kind: 'source', id: entry.id })} cells={Math.max(2, props.cells - 14)} />
-                }
-              >
-                {entry.label}
-              </Row>
-            )}
+            {(entry, item) => {
+              // Words only. A terminal draws no picture, so it never reads a source's artwork.
+              const presentation = createSourcePresentation(entry.id)
+              const title = () => presentation.tooltip()?.title
+              return (
+                <Row
+                  item={item}
+                  selected={selectedSource() === entry.id}
+                  keepTrailing
+                  trailing={
+                    <Marks
+                      markers={markersFor({ kind: 'source', id: entry.id })}
+                      cells={Math.max(2, props.cells - 14)}
+                    />
+                  }
+                >
+                  {title() ? `${entry.label} · ${title()}` : entry.label}
+                </Row>
+              )
+            }}
           </Rows>
         </Show>
-        <Show when={inspecting()}>
-          {(sourceId) => (
-            <MarkerLegend
-              title="Source markers"
-              id="chrome.rail.source-markers"
-              target={{ kind: 'source', id: sourceId() }}
-              onDismiss={() => setInspecting(null)}
-            />
-          )}
+        <Show when={inspecting()} keyed>
+          {(sourceId) => {
+            const presentation = createSourcePresentation(sourceId)
+            const info = () =>
+              [
+                presentation.tooltip()?.title,
+                ...(presentation.tooltip()?.detail?.split('\n') ?? []),
+                presentation.notice(),
+              ].filter((line): line is string => !!line)
+            return (
+              <MarkerLegend
+                title={info().length ? (sourceRegistry.get(sourceId)?.label ?? 'Source') : 'Source markers'}
+                id="chrome.rail.source-markers"
+                target={{ kind: 'source', id: sourceId }}
+                info={info()}
+                onDismiss={() => setInspecting(null)}
+              />
+            )
+          }}
         </Show>
       </Panel>
       {/* The chosen source's own list, drawn here rather than in the surface it belongs to. A source

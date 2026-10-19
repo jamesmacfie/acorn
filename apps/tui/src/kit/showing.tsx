@@ -2,7 +2,7 @@
 export { Heading, Link, Text } from './showing/text'
 export { Row, RowActions, TreeRow } from './showing/row'
 export { keyedRows, Rows } from './showing/collection'
-export { Badge, Chip, ChipRow, Icon, Kbd, Spinner, StatusDot, UserAvatar } from './showing/marks'
+export { Artwork, Badge, Chip, ChipRow, Icon, Kbd, Spinner, StatusDot, UserAvatar } from './showing/marks'
 export { DescriptionList, Facts, Meter } from './showing/facts'
 export { CodeBlock, Lines, Log, Markdown } from './showing/documents'
 export { Grid, Table, TableCell, TableHead, TableRow } from './showing/tables'

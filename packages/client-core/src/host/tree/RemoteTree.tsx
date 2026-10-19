@@ -327,6 +327,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     >
       <TreeHost
         pluginId={pluginId()}
+        nodeId={bound.nodeId}
         transport={transport}
         onRefused={refuse}
         onFailed={(reason) => {

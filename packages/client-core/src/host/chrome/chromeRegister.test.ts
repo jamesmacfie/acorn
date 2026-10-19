@@ -276,6 +276,32 @@ describe('syncChromeContributions', () => {
     expect(sourceRegistry.get('board-quiet')?.statusAnnotations).toBeUndefined()
   })
 
+  it('offers a rail presentation for a route the plugin owns, and leaves a foreign one static', () => {
+    const source = { label: 'Board', glyph: 'kanban', order: 60, items: '/v1/p/board/rail-items' }
+    _seedPluginDistribution([
+      [
+        'node-a',
+        [
+          row(
+            'board',
+            {},
+            {
+              sources: [
+                { ...source, id: 'board', railPresentation: { data: '/v1/p/board/now', refresh: 60 } },
+                { ...source, id: 'board-foreign', railPresentation: { data: '/v1/p/other/now' } },
+                { ...source, id: 'board-static' },
+              ],
+            },
+          ),
+        ],
+      ],
+    ])
+    syncChromeContributions()
+    expect(sourceRegistry.get('board')?.createRailPresentation).toBeTypeOf('function')
+    expect(sourceRegistry.get('board-foreign')?.createRailPresentation).toBeUndefined()
+    expect(sourceRegistry.get('board-static')?.createRailPresentation).toBeUndefined()
+  })
+
   it('registers host-owned promotion independently of the row selection action', () => {
     const promotable: Partial<PluginContributions> = {
       frames: [

@@ -9,6 +9,7 @@ import { runInNewContext } from 'node:vm'
 import { MessageChannel } from 'node:worker_threads'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '@acorn/protocol/tree/messages.ts'
+import { pluginRailPresentationSchema } from '@acorn/protocol/railPresentation.ts'
 import {
   clientBundle,
   EXAMPLES,
@@ -315,6 +316,18 @@ describe('acme-tracker', () => {
       (await json('/v1/p/acme-tracker/marks/sources', post({ keys: [{ sourceId: 'issues', projectId: '' }] }))).items,
     ).toHaveLength(1)
     expect((await json('/v1/p/acme-tracker/attention')).items).toMatchObject([{ id: 'i14', severity: 'warn' }])
+  })
+
+  it('answers its rail presentation and the picture it names', async () => {
+    node = await startNode(readExample('acme-tracker'))
+    const now = await (await node.call('/v1/p/acme-tracker/rail/now')).json()
+    expect(pluginRailPresentationSchema.parse(now)).toEqual({
+      artwork: { path: '/v1/p/acme-tracker/rail/art/logo-1', revision: 'logo-1', alt: '' },
+      tooltip: { title: 'ACME-12 in progress', detail: 'Webhooks give up after one retry\n2 open' },
+    })
+    const art = await node.call(now.artwork.path)
+    expect(art.headers.get('content-type')).toBe('image/png')
+    expect([...new Uint8Array(await art.arrayBuffer()).subarray(1, 4)]).toEqual([80, 78, 71])
   })
 })
 

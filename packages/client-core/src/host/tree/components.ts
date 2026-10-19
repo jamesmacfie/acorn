@@ -68,6 +68,7 @@ import { KeyValueEditor } from '../../kit/components/inputs/KeyValueEditor'
 import { Modal } from '../../kit/components/overlays/Modal'
 import { Tabs } from '../../kit/components/layout/Tabs'
 import { UserAvatar } from '../../kit/components/content/UserAvatar'
+import { Artwork } from '../artwork/Artwork'
 import { Pane } from '../../kit/components/layout/Pane'
 import { Stack } from '../../kit/components/layout/Stack'
 import { Text } from '../../kit/components/content/Text'
@@ -172,6 +173,7 @@ export const KIT_COMPONENTS: KitTable = {
   Spinner,
   Kbd,
   UserAvatar: TreeUserAvatar,
+  Artwork,
   Icon,
   Button,
   IconButton,

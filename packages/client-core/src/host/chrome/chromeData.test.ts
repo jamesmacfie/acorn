@@ -13,6 +13,7 @@ vi.mock('../../infra/node/apiClient', () => ({
 const {
   chromeDeps,
   readAnnotationMarks,
+  readRailPresentation,
   readRailSearch,
   sanitizeRailItem,
   scopedSourceItemsPath,
@@ -161,6 +162,40 @@ describe('descriptor source row parsing', () => {
       title: 'Checkout failed',
       task: { origin: 'rollbar' },
     })
+  })
+})
+
+describe('rail presentation answers', () => {
+  beforeEach(() => readJson.mockReset())
+  const read = () => readRailPresentation('music', '/v1/p/music/now', 'node-a', new AbortController().signal)
+  const artwork = { path: '/v1/p/music/art/42', revision: '42', alt: 'Album cover' }
+
+  it('reads a bounded answer from the plugin route and keeps its artwork and words', async () => {
+    readJson.mockResolvedValueOnce({ artwork, tooltip: { title: 'Song', detail: 'Artist\nAlbum' }, later: true })
+    expect(await read()).toEqual({ artwork, tooltip: { title: 'Song', detail: 'Artist\nAlbum' } })
+    expect(readJson).toHaveBeenCalledWith('/v1/p/music/now', expect.objectContaining({ maxResponseBytes: 32 * 1024 }))
+    readJson.mockResolvedValueOnce(null)
+    expect(await read()).toBeNull()
+  })
+
+  it('reads a malformed answer, or one naming another plugin artwork, as the static button', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const answer of [
+      { tooltip: { title: 'x'.repeat(81) } },
+      { artwork: { ...artwork, revision: '' } },
+      { artwork: { ...artwork, path: '/v1/p/other/art/42' } },
+      { artwork: { ...artwork, path: 'https://example.com/cover.png' } },
+      'Song',
+    ]) {
+      readJson.mockResolvedValueOnce(answer)
+      expect(await read()).toBeNull()
+    }
+    // What went wrong and where, never the words the plugin sent.
+    const logged = warn.mock.calls.flat().join(' ')
+    expect(logged).toContain('music returned an unusable rail presentation (tooltip.title:')
+    expect(logged).toContain("artwork.path: not one of this plugin's routes")
+    expect(logged).not.toContain('x'.repeat(20))
+    warn.mockRestore()
   })
 })
 

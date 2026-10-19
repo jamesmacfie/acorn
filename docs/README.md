@@ -185,6 +185,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/incremental-markdown-parse-2026-10-13.md](./testing/incremental-markdown-parse-2026-10-13.md) | Dated Markdown parse cost at the end of a 50 KB streamed reply, measured in Node, and the real-window numbers still to take. |
 | [testing/session-revisit-2026-10-13.md](./testing/session-revisit-2026-10-13.md) | Dated cost of returning to a long agent session, measured in jsdom, and the real-window numbers still to take. |
 | [testing/idle-cost-2026-10-13.md](./testing/idle-cost-2026-10-13.md) | Dated count of the work an idle desktop window asks for, measured in tests, and the real-window idle numbers still to take. |
+| [testing/rail-artwork-2026-10-19.md](./testing/rail-artwork-2026-10-19.md) | One desktop check of a plugin's live rail artwork and tooltip words, using the acme-tracker example. |
 | [testing/sentry-baseline-2026-10-13.md](./testing/sentry-baseline-2026-10-13.md) | A day of Sentry telemetry from real use: git calls, session-open timing, agent process and renderer memory, and response sizes. The before numbers for UI performance phases 06 to 10. |
 | [testing/ui-performance-open-checks-2026-10-14.md](./testing/ui-performance-open-checks-2026-10-14.md) | The real-window and Sentry checks still to run for all ten UI performance phases. |
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by the October 2026 runtime packaging work. |
@@ -405,7 +406,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
   markers](./plugins/menus-and-markers.md), [More descriptors](./plugins/more-descriptors.md), [Node
   providers](./plugins/node-providers.md), [Node-side extension
   points](./plugins/node-side-extension-points.md), [Package shape](./plugins/package-shape.md), [The
-  plugin API](./plugins/plugin-api.md), [Published packages](./plugins/publishing.md), [Remote
+  plugin API](./plugins/plugin-api.md), [Published packages](./plugins/publishing.md), [Rail presentation and
+  artwork](./plugins/rail-presentation.md), [Remote
   points](./plugins/remote-points.md), [Remote trees](./plugins/remote-trees.md), [Replacing a core
   surface](./plugins/replacing-core-surfaces.md), [Rows and
   annotations](./plugins/rows-and-annotations.md), [Search providers](./plugins/search-providers.md),
@@ -461,26 +463,21 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 ## Plugin rail and artwork proposal
 
-- [Dynamic plugin rail presentation and artwork](./future/plugin-rail-artwork.md).
 
 ## Browser extension panels proposal
 
 - [Pull request panel in the browser extension](./future/extension-github-panel.md) and [Docker
   panel in the browser extension](./future/extension-docker-panel.md).
 
-## Browser extension sidebar rework proposal
+## Agent analytics proposal
 
-- [Rework the browser extension's sidebar](./future/extension-ux/README.md), with phases for
-  [navigation](./future/extension-ux/01-navigation.md), [Go to task and
-  menus](./future/extension-ux/02-go-to-task-and-menus.md), [Home](./future/extension-ux/03-home.md),
-  [Needs you](./future/extension-ux/04-needs-you.md), [This page](./future/extension-ux/05-this-page.md),
-  [the Agents tab](./future/extension-ux/06-agents-tab.md), [the
-  conversation](./future/extension-ux/07-conversation.md), [the Runs tab](./future/extension-ux/08-runs-tab.md),
-  [plugin panels](./future/extension-ux/09-plugin-panels.md), [Settings](./future/extension-ux/10-settings.md),
-  [connecting](./future/extension-ux/11-connect.md), [the page's chip and
-  marker](./future/extension-ux/12-on-the-page.md), and [a Context
-  picker](./future/extension-ux/13-context-picker.md), then [plugin reuse
-  passes](./future/extension-ux/plugin-reuse.md).
+- [Show how a workspace's agents spend time and money](./future/agent-analytics/README.md), with phases
+  for [fitting dynamic UI](./future/agent-analytics/01-dynamic-ui-fit.md), [turn
+  facts](./future/agent-analytics/02-turn-facts.md), [agent sources](./future/agent-analytics/03-agent-sources.md),
+  [heatmaps and stacked bars](./future/agent-analytics/04-heatmaps-and-stacked-bars.md),
+  [workspace rail sources](./future/agent-analytics/05-workspace-rail-sources.md), [session
+  marks](./future/agent-analytics/06-session-marks.md), [message links](./future/agent-analytics/07-message-links.md),
+  and [the analytics plugin](./future/agent-analytics/08-analytics-plugin.md).
 
 ## Mobile web app proposal
 

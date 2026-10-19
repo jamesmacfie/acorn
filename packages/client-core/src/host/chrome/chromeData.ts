@@ -34,10 +34,15 @@ import {
   pluginRefResolutionsSchema,
   type PluginRefResolution,
 } from '@acorn/protocol/refResolvers.ts'
+import {
+  MAX_RAIL_PRESENTATION_BYTES,
+  pluginRailPresentationSchema,
+  type PluginRailPresentation,
+} from '@acorn/protocol/railPresentation.ts'
 import { readJson, writeJson } from '../../infra/node/apiClient'
 import { wsOnStatus } from '../../infra/node/wsClient'
 import { onPluginPush } from '../plugins/pluginChannel'
-import { ownsTaskOrigin } from './ownership'
+import { ownedPluginPath, ownsTaskOrigin, PLUGIN_NAMESPACE } from './ownership'
 import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('plugin-chrome')
@@ -46,11 +51,6 @@ const log = createLogger('plugin-chrome')
 // routes were confined to `/v1/p/<id>/` at parse time, but this arrives as a roster row, so the path is
 // re-checked here and a malformed body is dropped rather than thrown into the shell chrome
 // (docs/security/plugin-bundles.md § Third-party plugin bundles; docs/plugins/cooperative-extension-points.md § Cooperative extension points).
-
-// Re-spelled rather than imported: the namespace is node-core's (server/routes/registry.ts) and
-// @acorn/protocol may not name a plugin route, so the client holds its own copy, as the frame scope
-// table in frames/scopes.ts does.
-const PLUGIN_NAMESPACE = '/v1/p/'
 
 /** The path a descriptor may address. Normalize dot segments before checking so an apparently owned
  * `/v1/p/id/../other` route cannot escape after URL parsing.
@@ -156,9 +156,15 @@ export const scopedSourceItemsPath = (path: string, projectId: string | undefine
 }
 
 // `signal` is optional only for the agent-context reads below; every query-backed reader has one.
-async function read<T>(pluginId: string, path: string, nodeId: string, signal?: AbortSignal): Promise<T> {
+async function read<T>(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  signal?: AbortSignal,
+  maxResponseBytes?: number,
+): Promise<T> {
   if (!ownsRoute(pluginId, path)) throw new Error(`${pluginId} may not read ${path}`)
-  return readJson<T>(path, { nodeId, signal })
+  return readJson<T>(path, { nodeId, signal, ...(maxResponseBytes ? { maxResponseBytes } : {}) })
 }
 
 const str = (value: unknown): value is string => typeof value === 'string' && value.length > 0
@@ -451,6 +457,33 @@ export async function readBadge(
     return null
   }
   return badge
+}
+
+/**
+ * A source's rail presentation (docs/plugins/rail-presentation.md § Rail presentation). All or nothing: an
+ * answer this build cannot read puts the button back to its static glyph, and an artwork path outside
+ * the plugin's own routes is unreadable too. A failed read throws, so the caller keeps the last good
+ * answer and marks it stale.
+ *
+ * The diagnostic names the field and the rule it broke, never the answer itself, because the words
+ * are someone's listening history as often as not.
+ */
+export async function readRailPresentation(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  signal: AbortSignal,
+): Promise<PluginRailPresentation> {
+  const body = await read<unknown>(pluginId, path, nodeId, signal, MAX_RAIL_PRESENTATION_BYTES)
+  const parsed = pluginRailPresentationSchema.safeParse(body ?? null)
+  const problem = !parsed.success
+    ? `${parsed.error.issues[0]?.path.join('.') || 'answer'}: ${parsed.error.issues[0]?.message}`
+    : parsed.data?.artwork && !ownedPluginPath(pluginId, parsed.data.artwork.path)
+      ? "artwork.path: not one of this plugin's routes"
+      : null
+  if (!problem) return parsed.data ?? null
+  log.warn(`${pluginId} returned an unusable rail presentation (${problem})`, undefined, { 'plugin.id': pluginId })
+  return null
 }
 
 const SEVERITIES = new Set(['info', 'warn', 'danger'])

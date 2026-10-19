@@ -84,6 +84,7 @@ export const KIT_NODES = [
   'Spinner',
   'Kbd',
   'UserAvatar',
+  'Artwork',
   'Icon',
   // Asking
   'Button',

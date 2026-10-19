@@ -81,6 +81,7 @@ export {
   Spinner,
   Kbd,
   UserAvatar,
+  Artwork,
   Icon,
   Button,
   IconButton,

@@ -112,6 +112,11 @@
   --icon-box: 18px;
   --avatar-sm: 18px;
   --avatar-md: 24px;
+  /* Artwork's three presets. The rail picture fits the button's icon box and leaves its corners to the
+     status markers; the thumbnail fits a row; both follow a pack that moves either height. */
+  --artwork-rail: calc(var(--pane-head-h) - 28px);
+  --artwork-thumbnail: calc(var(--row-h) - 8px);
+  --artwork-detail: 160px;
   --diff-line-h: 20px;
   /* docs/ui-design/tokens.md § Token axes covers why --term-fs is a bridge token. */
   --term-fs: 15px;

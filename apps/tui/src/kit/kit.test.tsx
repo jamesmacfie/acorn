@@ -72,6 +72,7 @@ import {
   Text,
   TreeRow,
   UserAvatar,
+  Artwork,
 } from './showing'
 import {
   Button,
@@ -983,6 +984,21 @@ const CASES: Case[] = [
     draws: 'reduced: initials in brackets, no image',
     render: () => <UserAvatar login="ada-lovelace" />,
     check: (frame) => has(frame, '[AL]'),
+  },
+  {
+    node: 'Artwork',
+    draws: 'reduced: the fallback words in brackets, and no box without them',
+    render: () => (
+      <Inline>
+        <Artwork fallback="Example album" />
+        <Artwork />
+        <Text>after</Text>
+      </Inline>
+    ),
+    check: (frame) => {
+      has(frame, '[Example album]')
+      has(frame, 'after')
+    },
   },
   {
     node: 'Icon',

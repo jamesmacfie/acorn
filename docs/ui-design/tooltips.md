@@ -6,12 +6,13 @@ the help mark. Read it before you add a tooltip or an explanation to a setting. 
 
 ## Tooltips
 
-A tooltip is six data attributes, honored on any element, not a `<Tooltip>` wrapper:
+A tooltip is seven data attributes, honored on any element, not a `<Tooltip>` wrapper:
 
 | Attribute | Meaning |
 | --- | --- |
 | `data-tip` | The tip text. Required. No attribute, no tip. |
 | `data-tip-sub` | A second, muted line. |
+| `data-tip-detail` | Muted lines under it, with their line breaks kept. `RailTab` writes a source's live words here. |
 | `data-tip-key` | A keyboard chord, drawn as a key cap. |
 | `data-tip-at` | An event's time in epoch milliseconds. The muted line becomes its age, worked out when the tip opens. |
 | `data-tip-legend` | A JSON array of status markers: icon name, `StatusDot` tone, color tone, and meaning. `RailTab` writes this from its own markers. |

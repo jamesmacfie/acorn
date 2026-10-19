@@ -183,6 +183,7 @@ export const {
   Spinner,
   Kbd,
   UserAvatar,
+  Artwork,
   Icon,
   Button,
   IconButton,

@@ -62,6 +62,7 @@ import {
   Text,
   TreeRow,
   UserAvatar,
+  Artwork,
 } from './showing'
 import {
   Button,
@@ -165,6 +166,7 @@ export const KIT_COMPONENTS: KitTable = {
   Spinner,
   Kbd,
   UserAvatar,
+  Artwork,
   Icon,
   Button,
   IconButton,

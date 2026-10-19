@@ -578,6 +578,7 @@ ui/sdk: setProperty
 ui/sdk: setText
 ui/tokens: HOST
 ui/tree: Alert
+ui/tree: Artwork
 ui/tree: Badge
 ui/tree: Button
 ui/tree: Card
@@ -680,6 +681,7 @@ ui/tree: solidTree
 ui/tree: spread
 ui/tree: use
 ui: Alert
+ui: Artwork
 ui: Badge
 ui: Button
 ui: Card

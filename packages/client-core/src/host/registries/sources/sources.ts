@@ -1,4 +1,6 @@
-import type { Component } from 'solid-js'
+import type { Accessor, Component } from 'solid-js'
+import type { ArtworkReference } from '@acorn/protocol/artwork.ts'
+import type { ArtworkOwner } from '../../artwork/artworkResources'
 import type { ProjectRepository, Task, TaskSeed } from '@acorn/protocol/api.ts'
 import type { ProviderCapabilityName } from '@acorn/protocol/integrations.ts'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
@@ -33,6 +35,17 @@ export type SourceRouteContribution = {
   id: string
   path: string
   order: number
+}
+
+/** What a drawn rail button shows beyond its glyph and label, right now. */
+export type RailPresentation = {
+  /** Drawn in the glyph's place. `owner` names whose Node routes the picture is read from. */
+  artwork?: { owner: ArtworkOwner; image: ArtworkReference }
+  /** Under the source's label in the tooltip, and read as the button's description, never its name. */
+  tooltip?: { title?: string; detail?: string }
+  /** `stale`: the words and picture are the last answer, kept while the owner can't be reached.
+   *  `unavailable`: there was never an answer to keep. */
+  freshness?: 'stale' | 'unavailable'
 }
 
 export type SourceContribution<Item = unknown> = {
@@ -112,6 +125,15 @@ export type SourceContribution<Item = unknown> = {
   // docs/plugins/client-half.md § Loaded plugins: the client half explains why `task.links` alone is not enough.
   tracksRef?: (task: Task, ref: { providerId?: string; displayId: string }) => boolean
   promotion?: SourcePromotion<Item>
+  /**
+   * Live artwork and tooltip words for the rail button, such as the cover and title of a playing song.
+   * Presentation only: identity, order, and what a click opens stay the fields above.
+   *
+   * Called once per drawn button, inside that button's reactive owner, and its reads are disposed with
+   * it, so a hidden source reads nothing. A loaded plugin's comes from its `railPresentation` route
+   * (../../chrome/railPresentation.ts); a compiled plugin returns its own accessor.
+   */
+  createRailPresentation?: () => Accessor<RailPresentation | null>
   // No `emptyState` here, unlike the descriptor twin, because a first-party source is a component and
   // renders its own empty case (docs/plugins/client-half.md § Loaded plugins: the client half).
 }

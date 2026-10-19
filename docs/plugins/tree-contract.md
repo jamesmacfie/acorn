@@ -115,6 +115,10 @@ The host validates every message:
   row says which.
 - Text is set as text. `Markdown` goes through the shell's markdown policy. An `href` prop accepts an
   explicit HTTPS URL only, and the kit checks every rendered anchor again.
+- An `Artwork` node's `owner` is the host's. The DOM host replaces whatever the tree sent with the
+  Node and plugin the tree was mounted for, so its `image` path can only name the plugin's own routes
+  ([artwork bytes](./rail-presentation.md#artwork-bytes)). A tree with no Node draws the fallback. A host
+  that doesn't know `Artwork` leaves the node out, as it does any unknown name.
 
 `TREE_LIMITS` in `packages/protocol/src/tree/messages.ts` holds the caps: 1 MiB and 4,000 mutations
 per batch, 5,000 live nodes and 64 levels per tree, 65,536 characters per text node, and 512 live or

@@ -1607,6 +1607,32 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   line-height: 1;
   color: var(--text-muted);
 }
+/* ── Artwork ──────────────────────────────────────────────────────────────────────────────
+   Worn by kit/components/content/ArtworkFrame.tsx. A square of a preset size that keeps its size
+   whatever it holds. The picture is fitted whole, never cropped, and hidden until its own bytes have
+   loaded, so a replaced cover never shows through the placeholder for the next one. */
+.ui-artwork {
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--artwork-thumbnail);
+  height: var(--artwork-thumbnail);
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  line-height: 1.2;
+  text-align: center;
+}
+.ui-artwork[data-preset='rail'] { width: var(--artwork-rail); height: var(--artwork-rail); font-size: inherit; }
+.ui-artwork[data-preset='detail'] { width: var(--artwork-detail); height: var(--artwork-detail); font-size: var(--fs-sm); }
+/* The rail draws its glyph as the stand-in, so the box only takes a colour once a picture is in it. */
+.ui-artwork[data-preset='rail']:not([data-drawn]) { background: transparent; color: inherit; }
+.ui-artwork > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.ui-artwork:not([data-drawn]) > img { visibility: hidden; }
+.ui-artwork > span { padding: var(--space-1); overflow-wrap: anywhere; overflow: hidden; max-height: 100%; }
 .comment-meta-with-avatar {
   display: inline-flex;
   align-items: center;

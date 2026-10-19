@@ -114,6 +114,7 @@ export declare const Alert: (props: KitNodeProps) => JSX.Element
 export declare const Spinner: (props: KitNodeProps) => JSX.Element
 export declare const Kbd: (props: KitNodeProps) => JSX.Element
 export declare const UserAvatar: (props: KitNodeProps) => JSX.Element
+export declare const Artwork: (props: KitNodeProps) => JSX.Element
 export declare const Icon: (props: KitNodeProps) => JSX.Element
 export declare const Button: (props: KitNodeProps) => JSX.Element
 export declare const IconButton: (props: KitNodeProps) => JSX.Element

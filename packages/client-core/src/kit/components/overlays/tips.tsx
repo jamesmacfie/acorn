@@ -15,6 +15,8 @@ import './tips.css'
 type Tip = {
   title: string
   sub?: string
+  /** Lines under `sub`, such as a source's live words. Line breaks are kept. */
+  detail?: string
   key?: string
   legend?: RailLegendItem[]
   /** `help` is a sentence or three rather than a label: body weight, and a wider bubble. */
@@ -99,6 +101,7 @@ export default function Tips() {
     setTip({
       title,
       sub: Number.isFinite(at) ? formatRelativeTime(at) : (el.getAttribute('data-tip-sub') ?? undefined),
+      detail: el.getAttribute('data-tip-detail') ?? undefined,
       key: el.getAttribute('data-tip-key') ?? undefined,
       legend: parseLegend(el.getAttribute('data-tip-legend')),
       kind: el.getAttribute('data-tip-kind') ?? undefined,
@@ -165,6 +168,9 @@ export default function Tips() {
           </span>
           <Show when={t().sub}>
             <span class="rail-tip-sub">{t().sub}</span>
+          </Show>
+          <Show when={t().detail}>
+            <span class="rail-tip-detail">{t().detail}</span>
           </Show>
           <Show when={t().legend}>
             <div class="rail-tip-legend">

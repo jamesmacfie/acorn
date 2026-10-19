@@ -32,6 +32,9 @@ export type TreeTransport = {
 
 export type TreeHostProps = {
   pluginId: string
+  /** The Node this tree's plugin answers on. An `Artwork` node's picture is read from it and nowhere
+   *  else; without it, the node draws its fallback. */
+  nodeId?: string
   transport: TreeTransport
   /** Called with a one-line reason whenever something was refused, for the roster row. */
   onRefused?: (reason: string) => void
@@ -72,7 +75,11 @@ export function TreeHost(props: TreeHostProps) {
     // `undefined`.
     const resolved = createMemo(() => {
       const own = state.resolveProps(stored())
-      return type() === 'Markdown' ? { ...own, fences } : own
+      if (type() === 'Markdown') return { ...own, fences }
+      // The picture's owner is this mount's, so a tree can only show artwork from its own routes.
+      if (type() === 'Artwork')
+        return { ...own, owner: props.nodeId ? { nodeId: props.nodeId, pluginId: props.pluginId } : undefined }
+      return own
     })
     return (
       <Show when={stored()} keyed={false}>

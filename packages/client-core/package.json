@@ -84,6 +84,7 @@
     "./host/annotations/statusAnnotations.ts": "./src/host/annotations/statusAnnotations.ts",
     "./host/annotations/annotations.ts": "./src/host/annotations/annotations.ts",
     "./host/clientRuntime.ts": "./src/host/clientRuntime.ts",
+    "./host/artwork/Artwork.tsx": "./src/host/artwork/Artwork.tsx",
     "./host/chrome": "./src/host/chrome/public.ts",
     "./host/chrome/Topbar.tsx": "./src/host/chrome/Topbar.tsx",
     "./host/components/ProviderHtml.tsx": "./src/host/components/ProviderHtml.tsx",

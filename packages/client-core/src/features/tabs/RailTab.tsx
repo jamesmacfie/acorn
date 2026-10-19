@@ -1,4 +1,4 @@
-import { createMemo, createUniqueId, For, Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
+import { children, createMemo, createUniqueId, For, Show, splitProps, type ComponentProps, type JSX } from 'solid-js'
 import { cx } from '../../kit/lib/rendering/cx'
 import Icon from '../../kit/components/content/Icon'
 import { StatusDot } from '../../kit/components/primitives'
@@ -30,6 +30,14 @@ export type RailTabProps = Omit<ComponentProps<'button'>, 'children' | 'color'> 
   /** A second line under the glyph, for run targets. */
   sublabel?: JSX.Element
   markers?: readonly RailMarker[]
+  /** Drawn in the glyph's place, such as a source's live artwork. It draws its own stand-in while it
+   *  has no picture. */
+  artwork?: JSX.Element
+  /** Live words about the control, under the label in the tooltip and read as its description. The
+   *  label stays the accessible name, so a change is never announced. */
+  info?: { title?: string; detail?: string }
+  /** A host warning about `info`, such as stale information. Listed with the marker legend. */
+  notice?: string
   /** Escape hatch for a genuinely compound centre. Prefer `glyph` plus `sublabel`. */
   children?: JSX.Element
 }
@@ -47,6 +55,9 @@ export function RailTab(props: RailTabProps) {
     'busyLabel',
     'sublabel',
     'markers',
+    'artwork',
+    'info',
+    'notice',
     'onClick',
     'style',
     'classList',
@@ -56,8 +67,14 @@ export function RailTab(props: RailTabProps) {
   // every read, and `For` below keys on identity, so each re-render would rebuild every marker element
   // and restart a spinning marker's turn, many times a second while an agent streams.
   const resolved = createMemo(() => resolveRailMarkers(own.markers ?? []), undefined, { equals: sameRailMarkers })
-  const legend = () => resolved().legend
+  const legend = () =>
+    own.notice ? [...resolved().legend, { l: own.notice, g: 'circle-alert', t: 'warn' as const }] : resolved().legend
   const describedBy = createUniqueId()
+  // Resolved once: reading an element prop twice would draw two of it.
+  const artwork = children(() => own.artwork)
+  // What the description says, in the order the tooltip draws it.
+  const description = () =>
+    [own.info?.title, own.info?.detail, ...legend().map((item) => item.l)].filter(Boolean).join('. ')
 
   // Not `disabled` while busy: a disabled button swallows the mouseover the tooltip needs, and the
   // archive control deliberately stays hoverable and focusable while its teardown runs.
@@ -79,13 +96,22 @@ export function RailTab(props: RailTabProps) {
       }
       data-tone={own.tone && own.tone !== 'neutral' ? own.tone : undefined}
       data-tip={tipLabel()}
+      data-tip-sub={own.info?.title}
+      data-tip-detail={own.info?.detail}
       data-tip-legend={legend().length ? JSON.stringify(legend()) : undefined}
       aria-label={tipLabel()}
       aria-busy={own.busy || undefined}
-      aria-describedby={legend().length ? describedBy : undefined}
+      aria-describedby={description() ? describedBy : undefined}
       onClick={onClick}
     >
-      <Show when={own.busy} fallback={<Show when={own.glyph}>{(name) => <Icon name={name()} />}</Show>}>
+      <Show
+        when={own.busy}
+        fallback={
+          <Show when={artwork()} fallback={<Show when={own.glyph}>{(name) => <Icon name={name()} />}</Show>}>
+            {artwork()}
+          </Show>
+        }
+      >
         <Icon name="loader-circle" spin />
       </Show>
       {own.children}
@@ -109,12 +135,11 @@ export function RailTab(props: RailTabProps) {
           </span>
         )}
       </For>
-      {/* The states, in words, without changing the button's accessible name. */}
-      <Show when={legend().length}>
+      {/* The words and states, without changing the button's accessible name. Not a live region, so
+          a new song does not interrupt whatever a screen reader is saying. */}
+      <Show when={description()}>
         <span id={describedBy} class="sr-only">
-          {legend()
-            .map((item) => item.l)
-            .join('. ')}
+          {description()}
         </span>
       </Show>
     </button>

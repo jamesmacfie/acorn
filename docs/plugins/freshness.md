@@ -13,11 +13,16 @@ it again. There are three answers, and they aren't interchangeable:
   value, so a short interval would spend every other plugin's budget too. Declare it for data that
   changes with nothing to trigger on.
 - **`ctx.events.status()`** means "read my descriptors again". The host binds it to the calling
-  plugin's id, so it refetches that plugin's rail rows, badges, and agent contexts on every connected
-  client, and nobody else's. Use it after an action, not on a timer. `bumpChrome` in
+  plugin's id, so it refetches that plugin's rail rows, rail presentations, badges, and agent contexts on
+  every connected client, and nobody else's. Use it after an action, not on a timer. `bumpChrome` in
   `packages/client-core/src/host/chrome/chromeData.ts` keeps one revision per plugin.
 - **The plugin's own channel** is the fast path when data streams. See [the live
   channel](#the-live-channel).
+
+A [rail presentation](./rail-presentation.md#rail-presentation), such as a playing song, uses the same
+three. A plugin that polls its provider does it in its Node half and pushes on its channel when the
+answer changes. The shared interval stays at the lowest declared `refresh`, and no rail button keeps
+a timer of its own.
 
 ## Raising a notification
 
