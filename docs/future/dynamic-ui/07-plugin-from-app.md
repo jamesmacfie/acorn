@@ -1,7 +1,8 @@
-# Phase 4: turn an app into a plugin
+# Phase 7: turn an app into a plugin
 
-Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang: a program isn't a plugin package, so
-this phase rebuilds the app instead of copying it. Depends on [phase 3](./03-project-apps.md).
+Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang and plans: a program isn't a plugin
+package, so this phase rebuilds the app instead of copying it. Depends on
+[phase 5](./05-project-apps.md).
 
 ## Goal
 
@@ -14,11 +15,13 @@ anything else a plugin can have. An agent rebuilds the UI as a tree pane, with t
 - **Turn into a plugin** on a project app, which writes a plugin package folder and starts an agent
   session that rebuilds the app's UI in it.
 - A package that installs through the normal flow and trust prompt, and does the job the app did.
-- `requires.plugins` filled in from the app's data sources.
+- `requires.plugins` filled in from the data sources the app's plans read.
 
 ## Starting point
 
-- Phase 3's project apps, each with dependencies the host reads from its program.
+- Phase 5's project apps, each with dependencies the host reads from its plans.
+- Plugin regions, where a plugin's own surface holds dashboard panels
+  ([placements](../../dashboards/placements.md#plugin-regions)).
 - The scaffold, `plugin_authoring`, and dev mode, which an agent already uses to write a plugin
   ([start from the scaffold](../../plugin-authoring/start-from-the-scaffold.md),
   [activation](../../plugins/activation.md)).
@@ -32,9 +35,10 @@ anything else a plugin can have. An agent rebuilds the UI as a tree pane, with t
 2. The host writes the scaffold's package into the folder, with a manifest that declares one pane and
    `requires.plugins` listing each data source's plugin with its running major version as the range.
 3. The host starts an agent session in a task whose working folder is the destination, with the brief
-   attached: the app's head program, its revision notes, its data sources, and a picture of the app.
+   attached: the app's head program, its plans, its revision notes, and a picture of the app.
 4. The agent rebuilds the UI as a tree pane over the same data sources, using `plugin_authoring` and
-   dev mode.
+   dev mode. Where the app drew a plan with `Panel`, the plugin can reserve a dashboard region and the
+   owner can publish the plan as a panel there.
 5. The app's state is written beside the package as a seed file the owner can load or discard. The
    plugin does not read it automatically.
 6. The package installs through **Install from folder** and shows the ordinary trust prompt.

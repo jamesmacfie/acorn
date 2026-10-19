@@ -1,9 +1,10 @@
-# Research: Lemma's widgets and apps, OpenUI, and Acorn's seams
+# Research: Lemma's widgets and apps, OpenUI, dashboards, and Acorn's seams
 
 Status: research notes. Lemma was read on 2026-10-01 from the clone at `references/lemma-platform` in
 the main checkout, which is not part of the repository. OpenUI was read on 2026-10-19 from
 [thesysdev/openui](https://github.com/thesysdev/openui) at commit `8d9c4c3`, dated October 16, 2026,
-with `@openuidev/lang-core` at version 1.0.1. Treat version-specific details as dated.
+with `@openuidev/lang-core` at version 1.0.1. Acorn's dashboards were read on 2026-10-19. Treat
+version-specific details as dated.
 
 ## What Lemma does
 
@@ -121,12 +122,48 @@ OpenUI claims up to 67% fewer tokens than JSON formats. The benchmarks are its o
 - OpenUI calls itself "the open standard for generative UI". Other formats compete: Google's A2UI and
   Vercel's json-render are JSON formats, and MCP Apps draws HTML in iframes.
 
+## What dashboards already do
+
+Dashboards already cover most of what an agent-made view of data needs. For the contract, read
+[dashboards](../../dashboards.md).
+
+- **Plans.** A version 2 `PanelPlan` names saved or inline typed queries, binds source fields into
+  columns, and runs up to eight filter, compute, summarize, expand, and overlap stages, with sorting,
+  grouping, limits, and a time policy. Summaries group by up to three columns and give counts, sums,
+  averages, percentiles, and distinct counts. Time buckets fill gaps. A plan names one view: stat,
+  list, table, board, or chart.
+- **One run route.** `POST /v1/core/dashboards/run` takes a published revision or a draft plan, in
+  preview or execution mode, and returns rows, groups, a plain-language description, and diagnostics.
+  Placed panels cache runs and refetch when the window regains focus, after a reported account or
+  plugin change, and at the plan's interval, held between 30 seconds and a day. The Node shares
+  identical reads across panels.
+- **An AI that writes plans.** The panel studio's **Ask AI** and the launcher's **Describe it** have a
+  model draft or change a plan. Its instructions are in `packages/node-core/src/server/routes/authoring.ts`,
+  built on `PANEL_CAPABILITIES` from `packages/dashboards-core/src/capabilities.ts`, and evaluation
+  cases check it. It sees records only when the owner ticks **Use preview records to help AI**, and
+  then three records and 16 KiB at most.
+- **Publishing from a view.** The drill-down's **Add as panel** publishes a derived plan and offers
+  **Edit…**.
+- **Who may call what.** Every dashboard route needs a device principal
+  (`packages/node-core/src/server/routes/dashboards.ts`). The query library refuses task principals.
+  The agent's data source tools return descriptors, schemas, and option pages, never records.
+- **Persistence.** Placed panel definitions live in the `dashboards` Node preference. The shared codec,
+  `packages/dashboards-core/src/definition.ts`, drops a definition with no publication.
+- **The terminal.** The terminal client draws no dashboard panels (`apps/tui/src/plugins/SourcePanel.tsx`).
+
+A request such as "graph pull requests over the last month by person" is a plan today: the GitHub pull
+requests source, a relative 30-day window, a count by author, and a bar chart. What's missing is a
+way for a chat agent to draft one and for the owner to keep it.
+
 ## What Acorn already has
 
 Almost every piece this programme needs has shipped for another reason.
 
 | Need | Acorn seam | Where it is documented |
 | --- | --- | --- |
+| Shaping data into a view | Dashboard plans, the run route, and the five views | [Dashboards](../../dashboards.md) |
+| A model that writes plans | The panel studio's AI and its evaluation cases | [Mapping and the editor](../../dashboards/mapping-and-editor.md) |
+| Keeping a panel | Publication, Home tabs, and placements | [Placements](../../dashboards/placements.md) |
 | Host components that draw in both clients | The kit, through `@acorn/plugin-api/ui`, which the terminal build resolves to its own kit | `apps/tui/vite.config.ts` |
 | A plugin with no build step, for turning an app into a plugin | The scaffold inlines the bridge handshake and tree protocol | [Start from the scaffold](../../plugin-authoring/start-from-the-scaffold.md) |
 | An agent writing a plugin without a prompt per save | Dev mode, a device-side grant that records acceptances as `dev` and `partial` | [Activation](../../plugins/dev-loop.md#the-dev-loop) |
@@ -141,22 +178,35 @@ Almost every piece this programme needs has shipped for another reason.
 
 ## What is missing
 
+For panels:
+
+- **Agent tools for plans.** A guide built from the studio AI's instructions, and a tool that
+  validates a draft plan and draws it in the conversation.
+- **A panel card.** The dashboard views drawn in a transcript, with versions.
+- **Add to dashboard.** Publishing and placing a plan from a card, under the owner's device.
+
+For apps:
+
 - **A Solid renderer for OpenUI.** `lang-core` does the language. Acorn writes the renderer, and
   OpenUI's conformance cases test it.
-- **A library over the kit.** The schemas, descriptions, and kit bindings for the components agents
-  use, plus any library functions phase 0 shows they need.
-- **Tools over Acorn's data.** Data sources, row actions, task context, compose, and links as OpenUI
-  tools and actions.
-- **Lifecycle.** Nothing ties a UI to a task, archives it with the task, or promotes it.
-- **Revisions.** Apps need numbered revisions and a head.
+- **A library.** Layout and form components over the kit, `Panel` over the dashboard views, and any
+  library functions phase 2 shows agents need.
+- **Plans inside an app.** Running an app's plans through the run route, and possibly taking inputs
+  from the program.
+- **Tools over the rest of Acorn.** Row actions, task context, compose, and links as OpenUI tools and
+  actions.
+- **Lifecycle and revisions.** Nothing ties a UI to a task, archives it with the task, promotes it, or
+  numbers its versions.
+- **App cells on dashboards,** and a codec that keeps definitions it doesn't recognize.
 - **Worked examples.** `lang-core` generates the language prompt from the library. It doesn't know
-  which components suit a board, a chart, or a form in Acorn.
+  which components suit a checklist or a form in Acorn.
 
 Apps need neither a narrow trust grant nor a headless worker. A program runs no code, and `lang-core`
 validates it on the Node.
 
 ## What the spike must answer
 
-Whether an agent, given the library and a handful of examples, writes a useful program in one or two
-tries. Everything else in this programme is plumbing that already has a pattern. That one question
-does not, which is why [phase 0](./00-spike.md) exists.
+Whether an agent, given the library, the plan guide, and a handful of examples, writes a useful app in
+one or two tries for requests a panel can't serve. Panels need no spike, because the studio's AI
+already writes plans. Everything else in this programme is plumbing that already has a pattern. That
+one question does not, which is why [phase 2](./02-renderer-and-spike.md) exists.

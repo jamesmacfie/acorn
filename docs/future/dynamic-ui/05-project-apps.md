@@ -1,7 +1,7 @@
-# Phase 3: project apps, drafts, and forks
+# Phase 5: project apps, drafts, and forks
 
-Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang. Depends on
-[phase 2](./02-task-pane.md).
+Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang and plans. Depends on
+[phase 4](./04-task-pane.md).
 
 ## Goal
 
@@ -19,7 +19,7 @@ without a task, and edits it later through a draft in any task.
 
 ## Starting point
 
-- Phase 2's pane, drawer, state, and archive behaviour.
+- Phase 4's pane, drawer, state, and archive behaviour.
 - The project-scoped pane pattern of HTTP, Linear, and Rollbar under `/p/:projectId/x/<plugin-id>/`,
   and rail source gating ([frontend](../../frontend.md), [panes](../../panes.md)).
 - The reference panel's find-or-create-a-task action ([panes](../../panes.md#not-a-pane-the-reference-panel)).
@@ -46,7 +46,7 @@ without a task, and edits it later through a draft in any task.
    project app. The owner can hide it like any source.
 8. The list shows the routed project's apps. With none, it shows an empty state naming the project.
 9. A row opens the app at a project route, with `$placement` set to `project`.
-10. An app that queries a task-scoped data source offers **Open in a task** in its project pane
+10. An app whose plans read a task-scoped data source offers **Open in a task** in its project pane
     instead of failing.
 
 ### Editing a project app
@@ -66,7 +66,8 @@ without a task, and edits it later through a draft in any task.
 ## Out of scope
 
 - Workspace-scoped apps. See [refused](./refused.md#workspace-scoped-apps).
-- Several people editing a project app. That is [phase 5](./05-teams.md).
+- Apps on dashboards. That is [phase 6](./06-apps-on-dashboards.md).
+- Several people editing a project app. That is [phase 8](./08-teams.md).
 
 ## Steps and checkpoints
 

@@ -1,7 +1,63 @@
-# What agent-built apps refuse
+# What agent-built panels and apps refuse
 
-Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang. Each entry says what was considered,
-why it is out, and what would make it worth revisiting.
+Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang and plans. Each entry says what was
+considered, why it is out, and what would make it worth revisiting.
+
+## Programs that query data sources directly
+
+An app's `Query` calls a data source and the program filters, counts, and groups the rows itself. That
+is a second way to fetch and shape data, beside dashboard plans, and a weaker one: OpenUI has no
+grouping, joins, or time buckets. It would run outside the Node's cache and shared reads, skip the
+honest partial and unavailable states, and make **Add to dashboard** a conversion instead of a
+publish. [Dashboards](../../dashboards.md) already says the client doesn't run queries itself. An
+app's queries run its plans instead.
+
+Revisit never. A shape a plan can't express goes into the plan vocabulary, where dashboards get it too.
+
+## Charts of the library's own
+
+OpenUI chart and table components in the library, beside the dashboard's views. A chart in an app
+would look and behave differently from the same chart on Home, with its own series colors, tones, and
+empty states, and it would have no drill-down or row menus. The library draws charts and tables only
+through `Panel`.
+
+Revisit if an app needs a chart a plan can't express. Then add it to the dashboard views, so panels
+get it too.
+
+## Rebuilding the dashboard views in OpenUI
+
+Drawing every dashboard panel as an OpenUI program, so there is one way to draw as well as one way to
+shape. It would lose or have to rebuild drill-down, board moves with their write values, row menus,
+provenance badges, and stat trends, for no gain the owner could see. `Panel` puts the real views inside
+apps instead.
+
+Revisit never.
+
+## Agents that publish or place panels
+
+An agent that adds its panel to a dashboard by itself. A dashboard is the owner's surface, and every
+dashboard route needs a device principal. The agent drafts, and the owner's click publishes and
+places.
+
+Revisit if a workflow needs to keep a dashboard up to date on a schedule, and then as a workflow step
+the owner approved.
+
+## The chat agent asking the studio's AI
+
+`panel_show` could hand the request to the panel studio's AI, a second model call. The chat agent
+already holds the conversation, and a second model would need it retold and would answer at second
+hand. The two share one set of instructions and one validator instead.
+
+Revisit if the studio's AI does measurably better on the authoring evaluation cases than the chat
+agent with the same guide.
+
+## Panels only, with no apps
+
+Stop after phase 1, and answer every request with a panel. Panels can't hold state, draw a form, or
+put several plans in one layout with buttons that act on them. Many requests are a single panel, which
+is why phase 1 comes first.
+
+Revisit after phase 2. If most spike requests could have been panels, the programme ends at phase 1.
 
 ## Agent-written JavaScript trees
 
@@ -11,7 +67,7 @@ worker per card, a headless boot on the Node to validate, a reserved plugin ID p
 revision, and a per-Node trust grant that waives the per-hash prompt, with its own security review. An
 OpenUI program needs none of that, because it runs no code.
 
-Revisit if phase 0 shows agents can't express common apps in OpenUI Lang, even with library functions
+Revisit if phase 2 shows agents can't express common apps in OpenUI Lang, even with library functions
 added. Turning the app into a plugin covers a single case first.
 
 ## A UI language of our own
@@ -47,9 +103,9 @@ wait enough to matter.
 Lemma's model. The agent writes markup and styles, and the host frames it. It is quick to start and
 unlimited in what it can draw, but nothing looks native, the host's keyboard and focus rules do not
 reach inside, every app restyles itself from tokens, and nothing renders in the terminal client. An
-OpenUI program over the kit gives an agent the host's own components instead.
+OpenUI program over the kit and the dashboard views gives an agent the host's own components instead.
 
-Revisit if phase 0 shows agents cannot express common apps with the library. The frame tier exists for
+Revisit if phase 2 shows agents cannot express common apps with the library. The frame tier exists for
 pixels the host cannot draw, and an app that needs a canvas can become a plugin and use it there.
 
 ## A static component schema
@@ -80,7 +136,7 @@ Revisit by growing the descriptor vocabulary, not by opening a slot to apps.
 ## Access to every plugin's capabilities
 
 An app would become as powerful as the strongest plugin on the Node, and the trust prompt would have
-nothing specific to show. Apps read through data source tools and act through row actions. See
+nothing specific to show. Apps read through their plans and act through row actions. See
 [what an app can reach](./design.md#what-an-app-can-reach).
 
 Revisit per capability, by turning a useful capability into a data source or a row action.
@@ -116,7 +172,8 @@ Revisit if owners turn apps into plugins often and the rebuilt plugins drift fro
 ## Workspace-scoped apps
 
 The data sources, tasks, and memory an app relates to are project-scoped. A workspace scope would add a
-second owner type, a second rail rule, and a second route.
+second owner type, a second rail rule, and a second route. An app cell on a workspace's Home tab names
+its project instead.
 
 Revisit when someone needs one app across the projects of a workspace, with an example.
 
@@ -126,13 +183,3 @@ An app could post to the conversation on the owner's behalf. `@ToAssistant` puts
 instead, so the owner decides.
 
 Revisit never. A message the owner did not send is a message the owner did not write.
-
-## Dashboard panels as the only answer
-
-A dashboard panel already draws a list, table, board, stat, or chart over typed data sources, with no
-code. Many apps an agent builds would be one of those. Panels cannot hold state, combine sources with
-logic, or draw a form, and there is no agent tool that creates one.
-
-Revisit after phase 0. If most spike apps turn out to be single-source tables or charts, an agent tool
-that creates a dashboard panel is cheaper than an app, and the authoring guide should send agents there
-first.

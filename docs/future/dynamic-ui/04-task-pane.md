@@ -1,7 +1,7 @@
-# Phase 2: the task Apps pane, editing, and archive
+# Phase 4: the task Apps pane, editing, and archive
 
-Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang. Depends on
-[phase 1](./01-inline-cards.md).
+Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang and plans. Depends on
+[phase 3](./03-inline-cards.md).
 
 ## Goal
 
@@ -19,7 +19,7 @@ the task.
 
 ## Starting point
 
-- Phase 1's host plugin, library, tools, cards, and revisions.
+- Phase 3's host plugin, library, tools, cards, and revisions.
 - The `agents.conversation` client capability in `plugins/agents/src/contract/conversation.ts`, used
   by the workflows run pane.
 - Pane gating with `when`, and archived previews through `readsArchived` ([panes](../../panes.md)).
@@ -40,7 +40,8 @@ the task.
 5. The detail has an **Edit with agent** drawer that draws the building session's conversation through
    `agents.conversation`, composer included.
 6. When the building session is unavailable, the drawer offers **Start an editing session**, which
-   creates a session in this task with the app's name, description, program, and head attached.
+   creates a session in this task with the app's name, description, program, plans, and head
+   attached.
 7. A new head from either the drawer or the main Agent pane moves the detail to it without a reload.
 
 ### App state
@@ -49,7 +50,7 @@ the task.
    seeds them when the app mounts.
 9. State survives revisions by variable name. A variable a revision drops is discarded, and a new one
    starts at its declared default. The host does not migrate.
-10. `app_guide` says which variables persist and includes the checklist example from phase 0.
+10. `app_guide` says which variables persist and includes the checklist example from phase 2.
 
 ### Archive and restore
 
@@ -61,7 +62,7 @@ the task.
 
 ## Out of scope
 
-- **Publish to project** on the archive confirmation. It arrives with [phase 3](./03-project-apps.md).
+- **Publish to project** on the archive confirmation. It arrives with [phase 5](./05-project-apps.md).
 - Deleting a task app on its own. A task app goes when its task is deleted.
 
 ## Steps and checkpoints

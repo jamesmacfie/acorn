@@ -1,6 +1,7 @@
-# Phase 5: apps on a team
+# Phase 8: apps on a team
 
-Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang. Waits on
+Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang and plans. Depends on
+[phase 5](./05-project-apps.md), and waits on
 [cloud phase 9](../cloud/phases/09-teams.md), which brings roles and route classification. Nothing
 here changes a local Node with no account.
 
@@ -19,7 +20,7 @@ person's role.
 
 ## Starting point
 
-- Phases 1 to 3.
+- Phases 1 to 5, and phase 6 if it has shipped.
 - From the cloud programme: the team Node owns shared projects, a worker is a full Node for one task
   attempt whose data root is archived at teardown, and grants carry `admin`, `member`, or `viewer`
   ([cloud architecture](../cloud/architecture.md), [cloud identity](../cloud/identity.md)).
@@ -47,8 +48,8 @@ person's role.
 7. A viewer can open project apps and task apps they can read. Their row actions, compose calls, and
    state writes are refused, and the app shows that it is read only.
 8. A member can edit, draft, publish, delete, and restore.
-9. Every data source call runs under the viewing person's grant. An app never carries its author's
-   access.
+9. Every plan runs under the viewing person's grant, as dashboard panels do. An app never carries its
+   author's access.
 10. The app routes and tool calls declare `read` or `mutate`, as cloud phase 9 requires of every route
     and bridge verb.
 11. Every revision and publish records the account that made it.
