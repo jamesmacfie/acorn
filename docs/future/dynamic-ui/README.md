@@ -1,9 +1,10 @@
 # Agent-built panels and apps
 
 Status: proposed, 2026-10-01. Revised 2026-10-19: agent-made dashboard panels come first, apps are
-OpenUI Lang programs, and every agent-built UI reads its data through dashboard plans. Nothing in this
-programme is built or scheduled. Where a file here disagrees with a shipped contract, the owning
-reference document wins until the implementation changes that contract.
+OpenUI Lang programs, and every agent-built UI reads its data through dashboard plans. Phases 1 to 7
+were built on October 19 and 20, 2026, and each phase file opens with a completion note. Phase 8 waits
+on the cloud programme. Where a file here disagrees with a shipped contract, the owning reference
+document wins.
 
 ## What this is
 
@@ -83,9 +84,8 @@ alternative a reader might expect.
 
 ## Open questions
 
-- **Plans that take inputs from an app.** A date range or repository the owner picks in an app should
-  change what its plan reads. Phase 2 finds out whether the run route can take those inputs from a
-  program, or whether plans need a way to declare them.
+- **Plans that take inputs from an app.** Settled in phase 3: the run route takes `inputs`, which fill
+  a plan's `{ from: 'input' }` comparison values and nothing else.
 - **Panels in the terminal.** The terminal client draws no dashboard panels, so panel cards and
   `Panel` components show one line there. A terminal view for the dashboard's five views would fix
   both, and isn't scheduled in this programme.
@@ -100,13 +100,14 @@ alternative a reader might expect.
   is where a worktree task's real cost is. The open part is the trade: the editing agent runs in the
   project's own checkout. The app tools keep its edits in the data root, but nothing stops it writing
   repository files. A scratch-folder session would close that, and is a product decision.
-- **The host plugin's name.** "Apps" is the product word, but `apps/` is also the repository's folder of
-  runnable programs. Phase 3 picks a code name.
+- **The host plugin's name.** Settled in phase 3: `trellis`, because `apps/` is the repository's folder
+  of runnable programs.
 - **The renderer package's name and home.** It could be published unscoped from this repository, or
   offered to OpenUI's repository as its Solid renderer. OpenUI's Vue, Svelte, and Angular renderers
   trail its core by a major version, which argues for keeping it here. Decide after phase 3.
-- **Security review.** Phase 3 cannot ship without a review of the interpreter and the tool mapping.
-  See [no trust grant](./design.md#no-trust-grant).
+- **Security review.** Done in phase 3 and recorded in [its completion note](./03-inline-cards.md). One
+  finding stays open: lang-core's evaluator can call a built-in function with no arguments, which only
+  a change to lang-core removes.
 
 ## Owning documents this programme extends
 
