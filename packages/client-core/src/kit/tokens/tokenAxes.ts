@@ -44,8 +44,8 @@ export const DERIVED_THEME_TOKENS = [
 export const SERIES_TOKENS = ['--viz-series-1', '--viz-series-2', '--viz-series-3'] as const
 
 /** A heatmap's sequential scale, lowest to highest, kept apart from status for the reason the series
- * slots are. Each is a light and dark pair, because a shade must darken on a light ground and lighten
- * on a dark one. */
+ * slots are. Each step mixes the first series hue into the card's ground, so a shade darkens on a light
+ * theme and lightens on a dark one. */
 export const SCALE_TOKENS = [
   '--viz-scale-1',
   '--viz-scale-2',

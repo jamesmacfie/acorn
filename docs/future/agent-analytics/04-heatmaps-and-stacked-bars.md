@@ -17,7 +17,8 @@ What landed:
 - `heatmap` view kind and `view.y`. `heatmap.ts` shapes the cells, with tests. `HeatmapView.tsx`
   draws an HTML table with `role="grid"`, one tab stop, arrow keys, and Home and End, with a DOM test.
   The grid scrolls sideways and the row labels stay pinned. Each cell's name reads "Tuesday, 14:00:
-  3". `--viz-scale-1..5` are `light-dark()` pairs on `:root`, listed as `SCALE_TOKENS`.
+  3". `--viz-scale-1..5` mix `--viz-series-1` into `--card-bg` at 20% to 100%, listed as
+  `SCALE_TOKENS`. A heatmap's default size is 8 of 12 columns by 4 rows.
 - `view.stacked`, valid only on a `bar` with `series`. `chart.ts` stacks the series and sizes the
   axis to the largest total. **View as** offers **Bars side by side** and **Stacked bars** where a bar
   has a series. The Look inspector has a **Bars** pick and the heatmap's **Down** and **Across**.
@@ -44,20 +45,35 @@ Decisions and deviations:
   `heatmap.ts`.
 - The terminal client draws no panels, so the terminal heatmap isn't built.
 
-Open:
+Checked in `pnpm dev:agent` on October 20, 2026, after the Node service's ceiling went to 1,906,400
+bytes on `dynamic-ui` (4279185c1):
 
-- The Node service's startup bundle is 1,904,421 bytes, over its 1,903,000-byte ceiling in
-  `apps/node/scripts/check-service-budget.mjs`. It grew by about 1.9 KB, all in `dashboards-core` and
-  the protocol schema, which the Node loads at startup to run and validate plans. This blocks
-  `pnpm dev:agent` and the Node build. Either raise the ceiling to about 1,906,400 bytes with that
-  reason, or move plan validation out of the startup bundle, which is its own piece of work.
-- The `pnpm dev:agent` acceptance checks didn't run, because the Node build fails on that ceiling.
-  Still to check by hand: the heatmap on Home, in a panel card, and in an app's `Panel`, in light and
-  dark; a `panel_show` heatmap with no edits; and an old client drawing a heatmap panel as inert.
+- "When agents work" draws on Home, in a `panel_show` card, and in an app's `Panel`, in light and dark.
+  The session used the `delegation-checks` fixture's task with 120 turn facts inserted into its
+  `agents.sqlite`. The card and the app were recorded into its session through `AgentStore` by a
+  scratch script, as an agent's `panel_show` and `app_show` calls would be.
+- `panel_show`: no live agent ran. A plan written from the panel guide's heatmap advice passed
+  `validatePanelPlan` against **Agent turns**' description with no problems, which is the check
+  `panel_show` runs after the schema parse. The same plan then drew in the card.
+- The keyboard reached all 168 cells with one tab stop. **View as** **Table** showed 40 rows whose
+  per-weekday totals equal the heatmap's, 83,661,010 ms in all.
+- An older client: `persist.test.ts` shows a published placement of a view kind the build doesn't know
+  keeps its publication, and `PanelBody.test.tsx` shows `PanelBody` draws that kind as the inert
+  notice. A client reads the published plan's view from the run, which it doesn't schema-parse, so an
+  older build draws "This version of acorn has no heatmap view" and keeps the panel.
+- "Spend by day by model" drew in the studio, stacked, oldest day first.
 
-Full `pnpm test` on October 20, 2026: every suite passes except three. `@acorn/desktop` fails on the
-ceiling above. `@acorn/plugin-examples` failed on the known packing race and passes alone. `@acorn/site`
-fails "searching for Show workspace rail", which is red on `main` too.
+Fixed by these checks: the scale tokens first used `light-dark()`, which the CSS build rewrites into
+variables nothing sets, so every shade was transparent. The heatmap's table also squeezed its cells to
+nothing in a narrow panel, because WebKit ignores a cell's `min-width`.
+
+Found and left alone: the `--syntax-*` tokens use `light-dark()` too and compute to two colors run
+together, such as `#d73a49#f97583`, in the built app.
+
+Full `pnpm test` on October 20, 2026, before the ceiling moved: every suite passes except three.
+`@acorn/desktop` failed on the Node service's size ceiling. `@acorn/plugin-examples` failed on the
+known packing race and passes alone. `@acorn/site` fails "searching for Show workspace rail", which is
+red on `main` too.
 
 For later phases:
 

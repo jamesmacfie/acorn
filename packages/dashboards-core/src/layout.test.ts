@@ -235,7 +235,7 @@ describe('the wizard size presets', () => {
   })
 
   it("never offers a rect below the kind's minimum or past the grid", () => {
-    for (const kind of ['stat', 'list', 'table', 'board', 'chart', 'made-up']) {
+    for (const kind of ['stat', 'list', 'table', 'board', 'chart', 'heatmap', 'made-up']) {
       const size = sizeFor(kind)
       for (const rect of Object.values(sizePresets(kind))) {
         expect(rect.w).toBeGreaterThanOrEqual(size.minW)

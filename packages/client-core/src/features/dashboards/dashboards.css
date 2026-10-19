@@ -734,20 +734,27 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   font-size: var(--fs-2xs);
   color: var(--text-muted);
 }
 
+/* Gives way to the legend only down to about two rows, then scrolls. */
 .dash-heatmap-scroll {
-  overflow-x: auto;
+  flex: 1 1 auto;
+  overflow: auto;
   min-width: 0;
+  min-height: 4rem;
 }
 
+/* Its own width: WebKit ignores a cell's min-width, so a table held to the panel's width squeezes its
+   cells to nothing instead of scrolling, and one stretched to it widens only the label column. */
 .dash-heatmap {
   border-collapse: separate;
   border-spacing: 2px;
-  width: 100%;
+  width: max-content;
   font-variant-numeric: var(--tabular);
 }
 
@@ -773,6 +780,7 @@
 }
 
 .dash-heatmap-cell {
+  width: 1.25rem;
   min-width: 1.25rem;
   height: 1.25rem;
   border-radius: var(--radius-xs);

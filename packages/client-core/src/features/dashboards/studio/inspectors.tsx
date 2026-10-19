@@ -1568,7 +1568,7 @@ export function PanelGuide(props: { plan: PanelPlan; onSelect: (key: PlanPartKey
         key: 'look',
         label: 'Look',
         icon: VIEW_ICONS[props.plan.view.kind],
-        help: 'A list, table, board, number, or chart, and what a click does.',
+        help: 'A list, table, board, number, chart, or heatmap, and what a click does.',
       },
     ]
   }

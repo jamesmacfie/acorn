@@ -133,6 +133,18 @@ describe('codec', () => {
     expect(parsePersistedDashboards(saved)).toEqual(parsed)
   })
 
+  it('keeps a published panel whose view kind this build does not know', () => {
+    // How a build from before a view kind existed reads a placement of it: the publication survives,
+    // and the drawing comes from the published plan, which PanelBody draws inert.
+    const placed = {
+      id: 'h1',
+      title: 'When agents work',
+      view: { kind: 'later-kind', y: 'day' },
+      publication: { dashboardId: 'd1' },
+    }
+    expect(parsePanelDefinition(placed)).toMatchObject({ id: 'h1', publication: { dashboardId: 'd1' } })
+  })
+
   it('drops a malformed publication from a kept definition', () => {
     expect(parsePanelDefinition({ id: 'c1', view: { kind: 'later-kind' }, publication: 'x' })).not.toHaveProperty(
       'publication',

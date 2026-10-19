@@ -63,9 +63,9 @@ axis draws every value it declares in order, including empty ones, so a summary 
 first. "When agents work" is `y` a weekday and `x` an hour, both bound to the same start time.
 
 A cell's shade is one of five steps of `--viz-scale-1..5`, from the lowest nonzero value to the
-highest, carried as `data-step`. Zero, or an average of nothing, draws the empty step. The scale is
-one hue in five lightness steps, with a light and a dark value each, and is kept apart from status and
-series colors. A legend under the grid names the measure and shows the low and high values in its
+highest, carried as `data-step`. Zero, or an average of nothing, draws the empty step. Each step mixes
+the first series hue into the card's ground at a higher strength, so it works on light and dark themes,
+and is kept apart from status colors. A legend under the grid names the measure and shows the low and high values in its
 units.
 
 The grid is one tab stop. Arrow keys move between cells, and Home and End jump along a row. Each cell
