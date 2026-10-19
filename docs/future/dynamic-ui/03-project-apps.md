@@ -1,6 +1,7 @@
 # Phase 3: project apps, drafts, and forks
 
-Status: proposed, 2026-10-01. Depends on [phase 2](./02-task-pane.md).
+Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang. Depends on
+[phase 2](./02-task-pane.md).
 
 ## Goal
 
@@ -44,9 +45,9 @@ without a task, and edits it later through a draft in any task.
 7. The host plugin contributes one left-rail source, **Apps**, shown when the workspace has at least one
    project app. The owner can hide it like any source.
 8. The list shows the routed project's apps. With none, it shows an empty state naming the project.
-9. A row opens the app at a project route, with placement `project`.
-10. An app that declares a task-scoped data source offers **Open in a task** in its project pane instead
-    of failing.
+9. A row opens the app at a project route, with `$placement` set to `project`.
+10. An app that queries a task-scoped data source offers **Open in a task** in its project pane
+    instead of failing.
 
 ### Editing a project app
 
