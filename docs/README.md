@@ -439,28 +439,9 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 ## Node, client, and plugin split proposal
 
-- [Keep the Node, client, and plugin splits honest](./future/split/README.md), with phases for
-  [standalone plugins](./future/split/01-standalone-plugins.md), [a remote test
-  rig](./future/split/02-remote-test-rig.md), [Node paths and
-  addresses](./future/split/03-node-paths-and-addresses.md), [version skew](./future/split/04-version-skew.md),
-  [repository identity](./future/split/05-repository-identity.md), [change
-  requests](./future/split/06-change-requests.md), [a plugin API audit](./future/split/07-plugin-api-audit.md)
-  and [its table](./future/split/07-plugin-api-audit-table.md), [app plugin imports](./future/split/08-app-plugin-imports.md), [remote
-  preview](./future/split/09-remote-preview.md), and [the remote preview
+- [Keep the Node, client, and plugin splits honest](./future/split/README.md), with phases for [remote
+  preview](./future/split/09-remote-preview.md) and [the remote preview
   proxy](./future/split/10-remote-preview-proxy.md).
-
-## GitLab and Bitbucket parity proposal
-
-- [Give GitLab and Bitbucket the same experience as GitHub](./future/github/README.md), with phases
-  for [agent context](./future/github/01-change-request-agent-context.md), [workflow
-  CI](./future/github/02-workflow-ci-by-provider.md), [GitHub assumptions outside the
-  plugin](./future/github/03-github-assumptions-outside-the-plugin.md), [shared review
-  views](./future/github/04-shared-change-request-ui.md), [a GitLab plugin](./future/github/05-gitlab-plugin.md),
-  [self-hosted hosts](./future/github/06-self-hosted-hosts.md), [fork
-  checkout](./future/github/07-fork-checkout.md), and [a Bitbucket plugin](./future/github/08-bitbucket-plugin.md).
-
-## Plugin rail and artwork proposal
-
 
 ## Browser extension panels proposal
 
@@ -477,9 +458,7 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 ## Node for other machines proposal
 
-- [Run a Node for clients on other machines](./future/node-tray/README.md), with phases for [the
-  device token in logs](./future/node-tray/01-token-out-of-logs.md), [terminal
-  pairing](./future/node-tray/02-terminal-pairing.md), [reachability](./future/node-tray/03-reachability.md),
+- [Run a Node for clients on other machines](./future/node-tray/README.md), with phases for
   [platform archives](./future/node-tray/04-platform-archives.md), [installing and running at
   login](./future/node-tray/05-install-and-service.md), [tray mode](./future/node-tray/06-tray-mode.md),
   [keeping the machine awake](./future/node-tray/07-keep-awake.md), and [acceptance on real

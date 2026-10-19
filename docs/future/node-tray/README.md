@@ -1,6 +1,8 @@
 # Run a Node for clients on other machines
 
 Date: October 18, 2026. Status: phases 1 to 7 landed on October 18, 2026. Phase 8, acceptance on real machines, is still to do.
+The plans for phases 1 to 3 were removed on October 20, 2026, and are in Git history at commit
+`ffe59144b`, under `docs/future/node-tray/`.
 
 This programme lets a person run an acorn Node on one machine and drive it from a client on another.
 It gives two ways to do that. A Node-only download for macOS, Linux, and Windows, built by a GitHub
@@ -68,9 +70,9 @@ These facts hold at `bac75f17c`, on October 18, 2026:
 
 | Phase | What changes |
 | --- | --- |
-| [1](./01-token-out-of-logs.md) | The handshake carries the device token only over a launcher's private pipe. |
-| [2](./02-terminal-pairing.md) | `acorn node start --foreground`, `pair`, `devices`, `revoke`, `restart`, and a draining stop that works on Windows. |
-| [3](./03-reachability.md) | A route, `acorn node reach`, and a desktop setting choose which addresses the Node answers on. |
+| 1 | The handshake carries the device token only over a launcher's private pipe. |
+| 2 | `acorn node start --foreground`, `pair`, `devices`, `revoke`, `restart`, and a draining stop that works on Windows. |
+| 3 | A route, `acorn node reach`, and a desktop setting choose which addresses the Node answers on. |
 | [4](./04-platform-archives.md) | A GitHub Actions workflow builds and smoke-tests a self-contained archive for five platforms. |
 | [5](./05-install-and-service.md) | An installer per operating system, a default data root, `acorn node service`, upgrades, and removal. |
 | [6](./06-tray-mode.md) | Desktop tray mode: the Node keeps running when the window closes. |
