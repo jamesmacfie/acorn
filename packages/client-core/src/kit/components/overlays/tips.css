@@ -39,6 +39,14 @@
   color: var(--text-muted);
   line-height: 1.35;
 }
+/* Several lines a plugin wrote, such as an artist and an album. Kept as written, and wrapped. */
+.rail-tip-detail {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.35;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
 /* A help mark's tip is an explanation, not a label: body weight, a paragraph's line height, and room
    for a sentence or three. */
 .rail-tip[data-kind='help'] { max-width: min(22rem, 90vw); }

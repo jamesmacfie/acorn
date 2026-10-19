@@ -83,6 +83,9 @@ export type { MentionSegment, MentionSource } from '@acorn/client-core/kit/compo
 export { Modal, ModalActions, ModalBody } from '@acorn/client-core/kit/components/overlays'
 export { Tabs, TabPanel } from '@acorn/client-core/kit/components/layout'
 export { UserAvatar } from '@acorn/client-core/kit/components/content'
+// A plugin's picture from its own Node routes, such as an album cover. Pass `owner`, your plugin id and
+// the Node you read from; the host reads and checks the bytes and draws the kit's square.
+export { Artwork } from '@acorn/client-core/host/artwork/Artwork.tsx'
 // Provider markdown, sanitized, with a Shiki grammar per fence and a copy button on each.
 export { default as Markdown } from '@acorn/client-core/kit/components/content/Markdown.tsx'
 

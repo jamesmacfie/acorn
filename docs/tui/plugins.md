@@ -47,6 +47,15 @@ pre-flight check, `apply()`, the prop sanitizer, and the coalescer, with no JSX,
 a shell over it. The coalescer ticks on the renderer here and on `requestAnimationFrame` on the
 desktop.
 
+### Rail presentation and artwork
+
+A source's [rail presentation](../plugins/rail-presentation.md#rail-presentation) reaches the terminal as
+words. **Menu** draws its title after the source's name, as in `Music · Example song`, and the menu
+key opens a list of the title, each line of the detail, a stale notice when there is one, and the
+marker labels. The terminal reads the presentation route and never the artwork route. An `Artwork`
+node or component draws its `fallback` in brackets, and nothing without one, so no empty box takes
+cells.
+
 ### Client worker lifetime
 
 The worker factory gives each sandbox its own stdout and stderr pipes and drains them without keeping

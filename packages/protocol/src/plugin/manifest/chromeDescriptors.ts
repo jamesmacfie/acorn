@@ -289,6 +289,18 @@ export const sourceDescriptor = z
       .describe(
         'A dashboard region beside the list, which the person fills with panels. Not with a `navigate` `onSelect`.',
       ),
+    // Live artwork and words on the rail button, read while the button is drawn, whatever source is
+    // open. It changes only what the button shows: identity, order and the click stay the fields
+    // above (docs/plugins/rail-presentation.md § Rail presentation).
+    railPresentation: z
+      .strictObject({
+        data: pluginRoute.describe(
+          'A GET route that answers `PluginRailPresentation`: artwork and tooltip text, or `null` for the static glyph.',
+        ),
+        refresh,
+      })
+      .optional()
+      .describe('Live artwork and tooltip text for the rail button, such as the cover and title of a playing song.'),
     refresh,
   })
   .superRefine((source, ctx) => {

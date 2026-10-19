@@ -135,6 +135,9 @@ export const STYLE_TOKENS = [
   '--icon-box',
   '--avatar-sm',
   '--avatar-md',
+  '--artwork-rail',
+  '--artwork-thumbnail',
+  '--artwork-detail',
   '--diff-line-h',
   '--term-fs',
   // typography

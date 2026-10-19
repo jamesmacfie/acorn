@@ -77,6 +77,15 @@ pressed or typed inside that contributor's tree in the last second. Preview's `r
 terminal's `interrupt` refuse without it, so a timer or a mount can't act for a person. Sends, gate
 answers, trust, and destructive operations have no contributed action at all.
 
+**A picture is read by the host, never by an image element.** An `Artwork` node's `owner` is the
+mount's own Node and plugin, whatever the tree sent. Its path must resolve inside the plugin's
+`/v1/p/<id>/` namespace with no other origin, credentials, or fragment. The host reads the bytes
+through the broker under the plugin's own route gates, checks that they are a static PNG, JPEG, or
+WebP picture within the workspace image ceilings, and hands the image element a local object URL.
+No renderer or worker network policy widens for it, and a provider download is the plugin's Node
+half's, under its declared network permission
+([artwork bytes](../plugins/rail-presentation.md#artwork-bytes)).
+
 **Going to a task rides the task read scope.** `ui.openTask` needs `core.tasks:read`, the scope that
 already lets a surface list tasks. Like `openUrl`, the surface must have focus, and the two share one
 navigation per second.

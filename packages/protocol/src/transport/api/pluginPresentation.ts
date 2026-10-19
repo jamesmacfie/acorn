@@ -88,3 +88,5 @@ export type PluginAttentionWireItem = {
 }
 export type PluginAttentionItems = { items: PluginAttentionWireItem[] }
 export type PluginNodeStatValue = { value: number }
+// What a source's `railPresentation` route answers. The schema the client reads it with is beside it.
+export type { PluginRailPresentation } from '../../chrome/railPresentation.ts'

@@ -89,6 +89,7 @@ acorn-plugin-sdk/remote: type PaneProps
 acorn-plugin-sdk/remote: type StackProps
 acorn-plugin-sdk/remote: type TabPanelProps
 acorn-plugin-sdk/remote: value Alert
+acorn-plugin-sdk/remote: value Artwork
 acorn-plugin-sdk/remote: value Badge
 acorn-plugin-sdk/remote: value Button
 acorn-plugin-sdk/remote: value Card

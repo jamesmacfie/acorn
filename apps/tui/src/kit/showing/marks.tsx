@@ -101,6 +101,16 @@ export function UserAvatar(props: { login: string | null | undefined; src?: stri
   return <Line role="muted">{`[${initials()}]`}</Line>
 }
 
+/** A plugin's picture, as its fallback words in brackets. A terminal has no pixels, so it reads no
+ *  bytes, and with no words it draws nothing rather than an empty box. */
+export function Artwork(props: { fallback?: string }) {
+  return (
+    <Show when={typeof props.fallback === 'string' && props.fallback}>
+      {(text) => <Line role="muted">{`[${text()}]`}</Line>}
+    </Show>
+  )
+}
+
 /** A shared icon name rendered as one cell. The host resolves its shape; callers keep their domain
  * state, tone and title in the same shared component they use on desktop. */
 export function Icon(props: {

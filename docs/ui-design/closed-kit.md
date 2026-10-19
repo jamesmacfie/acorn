@@ -89,6 +89,17 @@ others draw their `<Fallback>`. `mount` hands the element to whatever draws insi
 drawer, Docker's exec tab, the browser preview, the editor pane, and the host's document surface ship
 no element or CSS of their own.
 
+**`Artwork` is a picture a plugin serves.** It takes an `image` reference to the plugin's own Node
+routes, a `preset` of `rail`, `thumbnail`, or `detail`, `fallback` words, and an optional stand-in
+`icon`. The kit sets each preset's square through `--artwork-rail`, `--artwork-thumbnail`, and
+`--artwork-detail`, which follow the rail and row heights a pack sets. The square keeps its size while
+the picture loads and after it fails, and the picture is fitted whole, never cropped or animated. A
+replaced picture shows the placeholder until its own bytes load, never the one before it. Props carry
+no size, style, or handler, so a parent `Button` or `Row` owns the click. The host reads and checks
+the bytes ([artwork bytes](../plugins/rail-presentation.md#artwork-bytes)): `host/artwork/Artwork.tsx`
+resolves the reference and `kit/components/content/ArtworkFrame.tsx` draws the square. In a terminal
+it's the `fallback` in brackets, with no image read.
+
 **`Only` and `Fallback` are the host wrappers.** `Only hosts={['dom']}` draws its children only on the
 named hosts. `Fallback forNode="Grid"` draws its children where the matrix says this host can't draw
 that node.

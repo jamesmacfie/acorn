@@ -521,6 +521,15 @@ describe('webview surfaces', () => {
     ).toBe(false)
   })
 
+  it('confines a rail presentation route to the plugin and floors its refresh', () => {
+    const source = { id: 'cards', label: 'Cards', order: 1, items: '/v1/p/board/items' }
+    const presenting = (railPresentation: unknown) => manifest({ sources: [{ ...source, railPresentation }] })
+    expect(presenting({ data: '/v1/p/board/now', refresh: 60 }).success).toBe(true)
+    expect(messages(presenting({ data: '/v1/p/other/now' }))).toContain('route must be inside /v1/p/board/')
+    expect(presenting({ data: '/v1/p/board/now', refresh: 5 }).success).toBe(false)
+    expect(presenting({ data: '/v1/p/board/now', label: 'Now' }).success).toBe(false)
+  })
+
   it('validates hosts and requires a literal URL to stay inside them', () => {
     expect(
       webviewManifest({

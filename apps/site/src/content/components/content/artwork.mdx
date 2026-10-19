@@ -1,0 +1,39 @@
+---
+title: Artwork
+description: A picture from your plugin's own Node routes, such as an album cover, in a square of a named size.
+sources:
+  - packages/client-core/src/host/artwork/Artwork.tsx
+  - packages/client-core/src/kit/components/content/ArtworkFrame.tsx
+  - docs/ui-design/every-node.md
+checked: 94c846590
+---
+
+Use `Artwork` for a picture your plugin serves, such as an album cover or a project logo. Pass
+`image` with the `path` of a GET route on your Node half, the `revision` of the bytes it answers, and
+`alt` text. Give `preset` as `thumbnail` for a row, `detail` for a detail column, or `rail` for an
+icon-sized picture. The kit sets the size, keeps the square while the picture loads, and fits the
+whole picture inside it.
+
+The host reads the bytes through your own routes and checks them before it draws anything. A tree's
+picture always comes from the Node and plugin the tree was mounted for. A compiled pane passes
+`owner`, its plugin id and the Node it reads from. Give `fallback` words for when there is no picture,
+and the terminal draws those words in brackets.
+
+<Specimen id="artwork" />
+
+{/* facts */}
+
+## Example
+
+<SpecimenCode id="artwork" />
+
+## Related
+
+- [`UserAvatar`](/docs/components/content/user-avatar/), for a person's picture.
+- [`Icon`](/docs/components/content/icon/), for a mark rather than a picture.
+
+## Mistakes
+
+- Serving whichever picture is current from one address. Give each picture its own path and
+  `revision`, because the host keeps one copy per address.
+- Leaving out `fallback`. Without it, the terminal draws nothing in the picture's place.

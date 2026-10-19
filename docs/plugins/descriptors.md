@@ -93,6 +93,9 @@ plugins](./client-half.md#device-held-plugins)). The list's mount props carry `c
 `true` while the reader has the list at icon width. Give each row a `collapsedIcon` and a `label`
 for its tooltip then, and leave out headers and toolbars.
 
+A source can also put live artwork and words on its rail button. See [rail
+presentation](./rail-presentation.md).
+
 ## Content links
 
 The external `open?url=` and `new-task?url=` forms use these recognisers. For their dispatch and

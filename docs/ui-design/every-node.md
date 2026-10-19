@@ -147,6 +147,7 @@ paint containment would clip a card's focus ring.
 | `Spinner` | none | Reduced: a braille spinner, or `…` where motion is off |
 | `Kbd` | none | `⌘K` or `ctrl+k`, per host |
 | `UserAvatar` | none | Reduced: initials in brackets. No image |
+| `Artwork` | none | Reduced: the fallback text in brackets, or nothing without one. No image is read and no box is reserved |
 | `Icon` | none | A one-cell mapped mark. Unmapped names and desktop hover `title` draw nothing |
 
 ### Asking

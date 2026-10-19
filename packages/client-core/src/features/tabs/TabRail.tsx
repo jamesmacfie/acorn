@@ -71,6 +71,8 @@ import { sourceRegistry } from '../../host/registries/sources/sources'
 import { loadIconNodes } from '../../kit/tokens/iconNodes'
 import './tabrail.css'
 import { RailTab } from './RailTab'
+import { createSourcePresentation } from './railPresentation'
+import { Artwork } from '../../host/artwork/Artwork'
 import { localTaskGlyph, taskOriginAppearance } from '../tasks/origin'
 import { Menu } from '../../kit/components/overlays/Menu'
 import { workflowTaskHierarchy } from '../tasks/taskHierarchy'
@@ -677,24 +679,47 @@ export default function TabRail() {
     return (
       <nav class="tabrail" data-collapsed={value().collapsed || undefined}>
         <div class="tabrail-zone tabrail-sources">
-          <For each={value().sources}>
-            {(source) => (
-              <RailTab
-                class="tabrail-source"
-                data-source-id={source.id}
-                label={source.label}
-                glyph={source.icon}
-                active={source.selected}
-                markers={[...source.markers]}
-                aria-current={source.selected ? 'page' : undefined}
-                onClick={() => value().selectSource(source.id)}
-                onContextMenu={(event) => {
-                  event.preventDefault()
-                  sourceMenuReturnFocus = event.currentTarget
-                  value().openContextMenu?.(source.id, menuPoint(event))
-                }}
-              />
-            )}
+          {/* Keyed by id rather than by row, so a button and the presentation it reads live as long as
+              the source is drawn, not as long as one render of the rail's data. */}
+          <For each={value().sources.map((source) => source.id)}>
+            {(id) => {
+              const presentation = createSourcePresentation(id)
+              return (
+                <Show when={value().sources.find((source) => source.id === id)}>
+                  {(source) => (
+                    <RailTab
+                      class="tabrail-source"
+                      data-source-id={id}
+                      label={source().label}
+                      glyph={source().icon}
+                      active={source().selected}
+                      markers={[...source().markers]}
+                      // The tooltip already says what the picture shows, so the picture says nothing.
+                      artwork={
+                        presentation.artwork() && (
+                          <Artwork
+                            preset="rail"
+                            image={presentation.artwork()!.image}
+                            owner={presentation.artwork()!.owner}
+                            icon={source().icon}
+                            decorative
+                          />
+                        )
+                      }
+                      info={presentation.tooltip()}
+                      notice={presentation.notice()}
+                      aria-current={source().selected ? 'page' : undefined}
+                      onClick={() => value().selectSource(id)}
+                      onContextMenu={(event) => {
+                        event.preventDefault()
+                        sourceMenuReturnFocus = event.currentTarget
+                        value().openContextMenu?.(id, menuPoint(event))
+                      }}
+                    />
+                  )}
+                </Show>
+              )
+            }}
           </For>
         </div>
         <div class="tabrail-sep" />

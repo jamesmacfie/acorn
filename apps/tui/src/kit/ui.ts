@@ -38,6 +38,7 @@ export {
 } from './grouping'
 export {
   Alert,
+  Artwork,
   Badge,
   ChipRow,
   Chip,

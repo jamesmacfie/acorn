@@ -285,6 +285,35 @@ describe('the shell', () => {
     }
   }, 30_000)
 
+  it('puts a source’s live title in its Menu row and every line of its words behind its menu key', async () => {
+    const registration = sourceRegistry.register({
+      id: 'music-fixture',
+      order: 1,
+      glyph: 'music',
+      label: 'Music',
+      createRailPresentation: () => () => ({
+        artwork: {
+          owner: { nodeId: 'node-a', pluginId: 'music' },
+          image: { path: '/v1/p/music/art/42', revision: '42', alt: 'Cover' },
+        },
+        tooltip: { title: 'Example song', detail: 'Example artist\nExample album' },
+        freshness: 'stale',
+      }),
+    })
+    const screen = await renderFixture({ width: 120, height: 40 })
+    try {
+      expect(await screen.until('Music · Example song')).toContain('Music · Example song')
+      await screen.press('F10', { shift: true })
+      const frame = await screen.until('Example artist')
+      expect(frame).toContain('Example song')
+      await screen.press('END')
+      expect(await screen.until('Not updating')).toContain('Not updating')
+    } finally {
+      screen.done()
+      registration.dispose()
+    }
+  }, 30_000)
+
   it('puts pane markers after the label, lists the shown pane’s, and asks only consenting panes', async () => {
     const asked: PluginAnnotationKey[][] = []
     const pane = (id: string, label: string, statusAnnotations?: boolean) =>

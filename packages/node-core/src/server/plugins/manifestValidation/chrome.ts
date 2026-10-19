@@ -7,6 +7,8 @@ export function validateChrome(refs: ManifestReferences): void {
   sources.forEach((entry, i) => {
     if (entry.items !== undefined) route(entry.items, ['contributions', 'sources', i, 'items'])
     if (entry.search !== undefined) route(entry.search, ['contributions', 'sources', i, 'search'])
+    if (entry.railPresentation)
+      route(entry.railPresentation.data, ['contributions', 'sources', i, 'railPresentation', 'data'])
     if (entry.tree && !manifest.client) {
       ctx.addIssue({
         code: 'custom',

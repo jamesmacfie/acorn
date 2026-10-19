@@ -2,6 +2,12 @@
 // account or network, and a restart puts them back. A real plugin reads its service, and keeps what it
 // writes with `ctx.storage`.
 
+// A one-pixel PNG, so the example ships no image file.
+const LOGO = Uint8Array.from(
+  atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='),
+  (c) => c.charCodeAt(0),
+)
+
 /** @typedef {{ id: string, key: string, title: string, state: 'Todo' | 'In progress' | 'In review', summary: string }} Issue */
 
 /** @returns {Issue[]} */
@@ -70,6 +76,23 @@ export function createTracker(events, deployOf = () => null) {
         if (body.value !== 'state' && body.value !== 'key') return new Response('bad value', { status: 400 })
         sort = body.value
         return Response.json({ value: sort })
+      // #endregion
+
+      // #region rail-presentation
+      // What the rail button shows while another view is open: a picture and the issue being worked
+      // on. Answer `null` for the plain glyph. Each picture has its own path and revision, because
+      // clients keep one copy per address.
+      case 'GET /rail/now': {
+        const working = issues.find((issue) => issue.state === 'In progress')
+        if (!working) return Response.json(null)
+        return Response.json({
+          artwork: { path: '/v1/p/acme-tracker/rail/art/logo-1', revision: 'logo-1', alt: '' },
+          tooltip: { title: `${working.key} in progress`, detail: `${working.title}\n${open().length} open` },
+        })
+      }
+      // The bytes: a static PNG, JPEG, or WebP picture, sent with its own content type.
+      case 'GET /rail/art/logo-1':
+        return new Response(LOGO, { headers: { 'content-type': 'image/png' } })
       // #endregion
 
       // #region badges

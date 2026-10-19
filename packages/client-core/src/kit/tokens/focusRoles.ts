@@ -98,6 +98,7 @@ export const NODE_FOCUS = {
   Spinner: 'none',
   Kbd: 'none',
   UserAvatar: 'none',
+  Artwork: 'none',
   Icon: 'none',
 
   // Asking

@@ -182,6 +182,11 @@ export const NODE_SUPPORT = {
     tui: 'reduced',
     loss: 'initials in brackets; no image',
   },
+  Artwork: {
+    dom: 'full',
+    tui: 'reduced',
+    loss: 'the fallback text in brackets, and nothing without one; no image is read',
+  },
   Icon: {
     dom: 'full',
     tui: 'reduced',

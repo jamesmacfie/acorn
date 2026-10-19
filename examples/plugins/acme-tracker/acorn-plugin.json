@@ -59,7 +59,8 @@
         "order": 400,
         "tree": { "list": "list", "detail": "detail" },
         "showInRailByDefault": true,
-        "statusAnnotations": true
+        "statusAnnotations": true,
+        "railPresentation": { "data": "/v1/p/acme-tracker/rail/now" }
       }
     ],
     "contentLinks": [

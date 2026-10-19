@@ -38,6 +38,7 @@ import {
   watchChrome,
 } from './chromeData'
 import { descriptorPromotion } from './promotion'
+import { createPluginRailPresentation } from './railPresentation'
 import { registerPluginContextMenu } from './chromeContextMenus'
 import { registerPluginExtension, registerPluginExtensionPoint } from './chromeExtensionPoints'
 import { registerPluginTheme } from './chromeThemes'
@@ -290,6 +291,7 @@ function registerChrome(
 
   for (const rawSource of contributions.sources ?? []) {
     note(rawSource.refresh)
+    note(rawSource.railPresentation?.refresh)
     // The empty state's action is re-checked on the device for the same reason a command's is: it came
     // off a roster row.
     const emptyState = usableEmptyState(pluginId, surfaces, rawSource.emptyState)
@@ -318,6 +320,14 @@ function registerChrome(
         ...(descriptor.requiresGitProject ? { requiresGitProject: true } : {}),
         ...(descriptor.statusAnnotations ? { statusAnnotations: true } : {}),
         ...(defaultPane ? { defaultPane } : {}),
+        // Re-checked for the reason every route here is: the roster row is bytes a node sent. A route
+        // outside the plugin's namespace leaves the button static rather than failing the source.
+        ...(descriptor.railPresentation && ownsRoute(pluginId, descriptor.railPresentation.data)
+          ? {
+              createRailPresentation: () =>
+                createPluginRailPresentation(pluginId, hash, descriptor.id, descriptor.railPresentation!.data),
+            }
+          : {}),
         when: () => pluginEnabledOnNode(chromeNode(), pluginId),
         // The rail list, from whichever host is drawing (./sourcePanel.ts). The DOM's is the fallback and
         // hands over two halves, so `SourceSurface` composes the same `ListDetail` split every other
