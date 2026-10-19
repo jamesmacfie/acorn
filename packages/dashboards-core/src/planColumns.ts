@@ -1,18 +1,32 @@
 import type { PanelPlan, PanelPlanColumn } from '@acorn/protocol/dashboards.ts'
+import { isCalendarBucket, repeatingBucketChoices } from './planBuckets'
 
 /** The column a one-segment item pointer such as `/state` names, or undefined for any other pointer. */
 export const pointerColumn = (pointer: string): string | undefined =>
   /^\/[A-Za-z0-9_-]{1,100}$/.test(pointer) ? pointer.slice(1) : undefined
 
-/** Whether a column can be a chart's category axis. Text qualifies only as a summary's group key, which
- *  bounds its values to the groups the summary made. */
+/** Whether a column can be a chart's category axis. Text qualifies only as a summary's group key, and a
+ *  date only as a summary's day, week, or month, which bounds their values to the groups the summary
+ *  made. */
 export function isChartAxis(plan: PanelPlan, column: PanelPlanColumn | undefined, types: readonly string[]): boolean {
   if (!column) return false
   if (types.includes(column.type ?? '')) return true
-  return (
-    column.type === 'text' &&
-    plan.stages.some((stage) => stage.op === 'summarize' && stage.by.some((by) => by.column === column.id))
+  return plan.stages.some(
+    (stage) =>
+      stage.op === 'summarize' &&
+      stage.by.some(
+        (by) =>
+          by.column === column.id &&
+          (column.type === 'text' || (column.type === 'datetime' && isCalendarBucket(by.bucket))),
+      ),
   )
+}
+
+/** A summary's hour or weekday is a choice column, with every value declared in order, so a chart or
+ *  heatmap draws a quiet hour as empty instead of leaving it out. */
+const repeatingColumn = (plan: PanelPlan, column: PanelPlanColumn, bucket: 'hour' | 'weekday'): PanelPlanColumn => {
+  const { precision: _precision, ...rest } = column
+  return { ...rest, type: 'enum', choices: repeatingBucketChoices(bucket, plan.time.weekStart) }
 }
 
 export function outputPlanColumns(plan: PanelPlan): PanelPlanColumn[] {
@@ -34,7 +48,13 @@ export function outputPlanColumns(plan: PanelPlan): PanelPlanColumn[] {
       columns = [
         ...stage.by
           .filter((by) => by.column !== stage.pivot?.column)
-          .flatMap((by) => columns.filter((column) => column.id === by.column)),
+          .flatMap((by) =>
+            columns
+              .filter((column) => column.id === by.column)
+              .map((column) =>
+                by.bucket === 'hour' || by.bucket === 'weekday' ? repeatingColumn(plan, column, by.bucket) : column,
+              ),
+          ),
         ...stage.measures.flatMap((measure) => [
           {
             id: measure.id,

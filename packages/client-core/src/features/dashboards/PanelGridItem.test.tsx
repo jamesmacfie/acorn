@@ -142,6 +142,7 @@ describe('PanelGridItem menu', () => {
       'Table',
       'Board',
       'Chart',
+      'Heatmap',
       '-',
       'Sort by',
       'Title',

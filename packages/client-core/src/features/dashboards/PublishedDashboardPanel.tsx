@@ -14,6 +14,7 @@ import type { DataRecordAction } from '@acorn/protocol/dataActions.ts'
 import type { DashboardRevision, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { PlanRecordItem } from '@acorn/dashboards-core/plan.ts'
 import { planPartLabel } from '@acorn/dashboards-core/labels.ts'
+import { isCalendarBucket } from '@acorn/dashboards-core/planBuckets.ts'
 import { integrationsOptions } from '../../infra/queries'
 import { dataSourceCatalogOptions } from '../dataSources/queries'
 import { failureContext } from './planInputs'
@@ -417,6 +418,11 @@ export default function PublishedDashboardPanel(props: {
       .then((result) => setDrill({ plan, snapshot, result, loading: false }))
       .catch(() => setDrill({ plan, snapshot, loading: false, error: 'Could not prepare this as a panel.' }))
   }
+  // An hour or weekday is no one range of time, so its cell shows its value and has no rows to open.
+  const measureDrillable = () =>
+    !run()?.plan.stages.some(
+      (stage) => stage.op === 'summarize' && stage.by.some((by) => by.bucket === 'hour' || by.bucket === 'weekday'),
+    )
   const openMeasureDrilldown = (row: DashboardDisplayRow, measure: string): void => {
     const current = run()
     const source = current?.rows.find((item) => item.id === row.id)
@@ -436,7 +442,7 @@ export default function PublishedDashboardPanel(props: {
         .map((by) => [by.column, source.values[by.column] ?? null]),
     )
     const buckets = stage.by.flatMap((by) =>
-      by.bucket && by.bucket !== 'value'
+      isCalendarBucket(by.bucket)
         ? [{ column: by.column, bucket: by.bucket, value: source.values[by.column] ?? null }]
         : [],
     )
@@ -482,7 +488,7 @@ export default function PublishedDashboardPanel(props: {
           .map((by) => [by.column, source.values[by.column] ?? null]),
       ),
       summaryBuckets: stage.by.flatMap((by) =>
-        by.bucket && by.bucket !== 'value'
+        isCalendarBucket(by.bucket)
           ? [{ column: by.column, bucket: by.bucket, value: source.values[by.column] ?? null }]
           : [],
       ),
@@ -794,7 +800,7 @@ export default function PublishedDashboardPanel(props: {
                   onButton={activateButton}
                   onOpenRecord={openRecordItem}
                   onDrilldown={openDrilldown}
-                  onMeasureDrilldown={openMeasureDrilldown}
+                  onMeasureDrilldown={measureDrillable() ? openMeasureDrilldown : undefined}
                   onCorrect={(row) => {
                     setCorrecting(row)
                     setCorrection('null')

@@ -1172,7 +1172,7 @@
                   "views": {
                     "description": "The views a person may pick for a panel here. Leave it out to allow every view.",
                     "minItems": 1,
-                    "maxItems": 5,
+                    "maxItems": 6,
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -1181,7 +1181,8 @@
                         "list",
                         "table",
                         "board",
-                        "chart"
+                        "chart",
+                        "heatmap"
                       ]
                     }
                   },
@@ -3132,7 +3133,7 @@
                   "views": {
                     "description": "The views a person may pick for a panel here. Leave it out to allow every view.",
                     "minItems": 1,
-                    "maxItems": 5,
+                    "maxItems": 6,
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -3141,7 +3142,8 @@
                         "list",
                         "table",
                         "board",
-                        "chart"
+                        "chart",
+                        "heatmap"
                       ]
                     }
                   },

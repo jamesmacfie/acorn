@@ -76,7 +76,7 @@ export const PANEL_CAPABILITIES = {
   ],
   units: ['percent', 'ms', 's', 'bytes', 'ISO 4217 currency'],
   precisions: ['instant', 'day'],
-  buckets: ['value', 'day', 'week', 'month', 'relative'],
+  buckets: ['value', 'day', 'week', 'month', 'hour', 'weekday', 'relative'],
   groupOrders: ['declared', 'label', 'count', 'explicit'],
   boardWrites: {
     path: '/columns/<columnId>/choices/<choiceId>/writeValues/<sourceId>',
@@ -100,6 +100,7 @@ export const PANEL_CAPABILITIES = {
     list: { needs: [], options: [] },
     table: { needs: [], options: [] },
     board: { needs: ['enum group'], options: [] },
-    chart: { needs: ['date, enum, person, or summarized text axis'], options: ['shape', 'x', 'series'] },
+    chart: { needs: ['date, enum, person, or summarized text axis'], options: ['shape', 'x', 'series', 'stacked'] },
+    heatmap: { needs: ['two enum, person, or bucketed date axes'], options: ['x', 'y'] },
   },
 } as const

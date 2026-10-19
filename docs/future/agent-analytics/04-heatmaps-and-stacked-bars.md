@@ -1,5 +1,68 @@
 # Phase 4: add heatmaps, stacked bars, and hour and weekday buckets
 
+## Completion note
+
+Built on October 20, 2026, on branch `phase-4-heatmaps-and-stacked-bars`.
+
+What landed:
+
+- `hour` and `weekday` buckets in both bucket enums, `capabilities.ts`, `BUCKET_LABELS`, and the
+  studio's summarize form. `bucketValue` reads them in the plan's zone. `repeatingBucketChoices` lists
+  every value in order, the week from `weekStart`. `isCalendarBucket` tells day, week, and month apart
+  from the repeating two, and fill, previous change, and drill-down use it.
+- After a summary, an hour or weekday column is an `enum` with every value declared
+  (`outputPlanColumns`). Bars, boards, and the heatmap then draw empty hours and days through the
+  choice-column code they already had. A Home group by hour or weekday orders and names its groups
+  the same way.
+- `heatmap` view kind and `view.y`. `heatmap.ts` shapes the cells, with tests. `HeatmapView.tsx`
+  draws an HTML table with `role="grid"`, one tab stop, arrow keys, and Home and End, with a DOM test.
+  The grid scrolls sideways and the row labels stay pinned. Each cell's name reads "Tuesday, 14:00:
+  3". `--viz-scale-1..5` are `light-dark()` pairs on `:root`, listed as `SCALE_TOKENS`.
+- `view.stacked`, valid only on a `bar` with `series`. `chart.ts` stacks the series and sizes the
+  axis to the largest total. **View as** offers **Bars side by side** and **Stacked bars** where a bar
+  has a series. The Look inspector has a **Bars** pick and the heatmap's **Down** and **Across**.
+- The gate: a bar's axis may be a date the plan summarizes by day, week, or month, drawn oldest
+  first. A series may be a text column the plan summarizes by. **Agent turns**' `model` is text, so
+  "spend by day stacked by model" needs this.
+- The two starters on **Agent turns**. Both validate in `sourceStarters.test.ts`.
+- The panel guide's advice on choosing a view, the outline's words ("Total of Run time by Weekday and
+  Hour"), trellis's `Panel` description, [views and trends](../../dashboards/views.md), the tokens
+  doc, and the site's dashboards page.
+
+Decisions and deviations:
+
+- The plan-level gate is `availableViews` in `outline.ts`, which **View as** and the studio read.
+  `viewsForSchema` gets the heatmap too, as a looser check over the display schema, because it can't
+  see whether a date is bucketed.
+- A heatmap axis follows `isChartAxis`, so a text column the plan summarizes by also qualifies.
+- "When agents work" binds two plan columns, `weekday` and `hour`, to `/startedAt`, because a summary
+  keys its groups by column. It filters on `completedAt`, the field the source pushes into SQL.
+- A cell's value uses the dashboard's units, so run time reads in milliseconds, not "3 hours 20
+  minutes". A duration format would change every view.
+- Hour and weekday cells offer no drill-down at all. The table shows the measure as plain text.
+- `@acorn/dashboards-core` publishes 18 entry points. The boundaries test's cap went from 17 to 18 for
+  `heatmap.ts`.
+- The terminal client draws no panels, so the terminal heatmap isn't built.
+
+Open:
+
+- The Node service's startup bundle is 1,904,421 bytes, over its 1,903,000-byte ceiling in
+  `apps/node/scripts/check-service-budget.mjs`. It grew by about 1.9 KB, all in `dashboards-core` and
+  the protocol schema, which the Node loads at startup to run and validate plans. This blocks
+  `pnpm dev:agent` and the Node build. Either raise the ceiling to about 1,906,400 bytes with that
+  reason, or move plan validation out of the startup bundle, which is its own piece of work.
+- The `pnpm dev:agent` acceptance checks didn't run, because the Node build fails on that ceiling.
+  Still to check by hand: the heatmap on Home, in a panel card, and in an app's `Panel`, in light and
+  dark; a `panel_show` heatmap with no edits; and an old client drawing a heatmap panel as inert.
+
+Full `pnpm test` on October 20, 2026: every suite passes except three. `@acorn/desktop` fails on the
+ceiling above. `@acorn/plugin-examples` failed on the known packing race and passes alone. `@acorn/site`
+fails "searching for Show workspace rail", which is red on `main` too.
+
+For later phases:
+
+- Phase 8 can place both starters in its region as they are.
+
 Date: October 19, 2026. Status: proposed. Needs nothing. [Phase 1](./01-dynamic-ui-fit.md) confirms
 the views reach panel cards and apps.
 

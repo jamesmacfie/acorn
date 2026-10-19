@@ -26,8 +26,14 @@ describe('views are derived from the schema', () => {
   it('gates board on an enum field, and offers it exactly when the gate passes', () => {
     expect(viewSupportedBy('board', withEnum)).toBe(true)
     expect(viewSupportedBy('board', withoutEnum)).toBe(false)
-    expect(viewsForSchema(withEnum)).toEqual([...PANEL_VIEW_KINDS])
+    expect(viewsForSchema(withEnum)).toEqual(['stat', 'list', 'table', 'board', 'chart'])
     expect(viewsForSchema(withoutEnum)).not.toContain('board')
+  })
+
+  it('gates heatmap on two axes', () => {
+    const twoAxes = { fields: [...withEnum.fields, { id: 'hour', name: 'Hour', type: 'enum' as const }] }
+    expect(viewsForSchema(twoAxes)).toEqual([...PANEL_VIEW_KINDS])
+    expect(viewSupportedBy('heatmap', withEnum)).toBe(false)
   })
 
   it('gates chart on an axis to draw against, which a text-only collection has not got', () => {

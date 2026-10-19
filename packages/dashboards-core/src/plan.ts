@@ -13,7 +13,7 @@ import { evaluateExpression, expandRows, overlapRows, summarizeRows } from './an
 import { relatePanelRows } from './relations'
 import type { DashboardDisplayField, DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import { dashboardFields } from './typedProjection'
-import { bucketBounds } from './planBuckets'
+import { bucketBounds, isCalendarBucket } from './planBuckets'
 import { columnLabel, describePredicate, pressTarget, sourceReach } from './outline'
 
 export { PANEL_CAPABILITIES } from './capabilities'
@@ -377,11 +377,11 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
           add(`/stages/${index}/measures/${at}/percentile`, 'Choose a percentile from 1 to 99.')
         if (measure.kind === 'count-where' && !measure.where)
           add(`/stages/${index}/measures/${at}/where`, 'Count where needs a filter.')
-        if (measure.previous && !stage.by.some((by) => by.bucket && by.bucket !== 'value'))
-          add(`/stages/${index}/measures/${at}/previous`, 'Previous change needs a time bucket.')
+        if (measure.previous && !stage.by.some((by) => isCalendarBucket(by.bucket)))
+          add(`/stages/${index}/measures/${at}/previous`, 'Previous change needs a day, week, or month bucket.')
       }
-      if (stage.fill && (stage.by.length !== 1 || !stage.by[0]?.bucket || stage.by[0].bucket === 'value'))
-        add(`/stages/${index}/fill`, 'Filling empty buckets needs one time group.')
+      if (stage.fill && (stage.by.length !== 1 || !isCalendarBucket(stage.by[0]?.bucket)))
+        add(`/stages/${index}/fill`, 'Filling empty buckets needs one day, week, or month group.')
       if (stage.pivot) {
         const column = plan.columns.find((column) => column.id === stage.pivot?.column)
         if (!column?.choices || !stage.by.some((by) => by.column === stage.pivot?.column))
@@ -521,7 +521,7 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
   }
   if (plan.view.kind === 'board' && (plan.group?.length !== 1 || finalColumn(plan.group[0]!.column)?.type !== 'enum'))
     add('/view/kind', 'A board needs one enum group.')
-  for (const key of ['field', 'x', 'series'] as const) {
+  for (const key of ['field', 'x', 'y', 'series'] as const) {
     const ref = plan.view[key]
     if (ref !== undefined && !finalColumn(ref)) add(`/view/${key}`, `View column ${ref} is unavailable.`)
   }
@@ -552,9 +552,24 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
   )
     add('/view/x', 'A line chart counts the rows by day itself; chart the rows, not a summary bucketed by time.')
   if (plan.view.shape === 'bar' && !isChartAxis(plan, finalColumn(plan.view.x ?? ''), ['enum', 'person']))
-    add('/view/x', 'A bar chart needs an enum or person axis, or a text column the plan summarizes by.')
-  if (plan.view.series && finalColumn(plan.view.series)?.type !== 'enum')
-    add('/view/series', 'A series needs an enum column.')
+    add(
+      '/view/x',
+      'A bar chart needs an enum or person axis, a text column the plan summarizes by, or a date it summarizes by day, week, or month.',
+    )
+  const split = plan.view.series === undefined ? undefined : finalColumn(plan.view.series)
+  if (plan.view.series && split?.type !== 'enum' && !(split?.type === 'text' && isChartAxis(plan, split, [])))
+    add('/view/series', 'A series needs an enum column, or a text column the plan summarizes by.')
+  if (plan.view.stacked && (plan.view.kind !== 'chart' || plan.view.shape !== 'bar' || !plan.view.series))
+    add('/view/stacked', 'Only bars split by a series can stack.')
+  if (plan.view.kind === 'heatmap') {
+    for (const key of ['x', 'y'] as const)
+      if (!isChartAxis(plan, finalColumn(plan.view[key] ?? ''), ['enum', 'person']))
+        add(
+          `/view/${key}`,
+          'A heatmap axis needs an enum or person column, a text column the plan summarizes by, or a date it buckets.',
+        )
+    if (plan.view.x && plan.view.x === plan.view.y) add('/view/y', 'A heatmap needs two different axes.')
+  }
   if (plan.view.trend && plan.view.kind !== 'stat') add('/view/trend', 'A trend belongs on a stat view.')
   const checkReference = (reference: NonNullable<PanelPlan['actions']>['press'], path: string): void => {
     if (!reference) return

@@ -10,7 +10,7 @@ sources:
   - docs/dashboards/panels.md
   - docs/tui/sources-and-settings.md
   - packages/client-core/src/features/dashboards/studio/PanelLauncher.tsx
-checked: 'e75eab5e3'
+checked: '41ca4611c'
 ---
 
 A dashboard is a grid of panels, and each panel shows records from your data sources: open pull
@@ -75,7 +75,8 @@ whole panel as JSON.
 | List | One row per record | Nothing |
 | Table | Rows and columns | Nothing |
 | Board | A column per value, like a kanban board | A field with a fixed set of values, such as a state |
-| Chart | Bars by category or person, or a line over time | A field with a fixed set of values, a person, a date, or a text field the panel groups by |
+| Chart | Bars by category or person, side by side or stacked by a series, or a line over time | A field with a fixed set of values, a person, a date, or a text field the panel groups by |
+| Heatmap | A grid of shaded cells across two fields, such as weekday by hour of day | Two fields with a fixed set of values or people, or a summary by weekday, hour, or another time bucket |
 
 The editor offers only views the panel's fields allow. On a board, dragging a card to another column,
 or choosing **Move to** in its row's menu, changes that record in its source, when the source allows it. A

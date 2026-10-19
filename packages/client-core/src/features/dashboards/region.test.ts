@@ -35,7 +35,7 @@ describe('panel region constraints', () => {
     const region = panelRegion('tracker', { max: 4 })
     expect(regionAllows(region, panel(['tracker:issues']))).toBe(true)
     expect(regionAllows(region, panel(['github:pulls']))).toBe(false)
-    expect(regionViews(region)).toHaveLength(5)
+    expect(regionViews(region)).toHaveLength(6)
   })
 
   it('supports explicit sources, field roles, and views', () => {

@@ -73,6 +73,13 @@ const sortedTowards = (plan: PanelPlan, direction: Direction): PanelPlan => ({
   sort: (plan.sort ?? []).map((entry, index) => (index === 0 ? { ...entry, direction } : entry)),
 })
 
+/** The bars stacked, or side by side again. Stacking needs the shape spelled out, which the default
+ *  left absent. */
+const stackedBars = (plan: PanelPlan, stacked: boolean): PanelPlan => {
+  const { stacked: _stacked, ...view } = plan.view
+  return { ...plan, view: stacked ? { ...view, shape: 'bar', stacked } : view }
+}
+
 /**
  * One placed panel's render boundary and chrome. Geometry remains owned by PanelGrid and arrives as a
  * small layout port; this component owns no placement state and cannot commit a gesture itself.
@@ -133,6 +140,22 @@ export default function PanelGridItem(props: {
             </Menu.Item>
           )}
         </For>
+        <Show when={plan.view.kind === 'chart' && plan.view.shape !== 'line' && plan.view.series}>
+          <For each={[false, true]}>
+            {(stacked) => (
+              <Menu.Item
+                context={menu}
+                kind="radio"
+                checked={!!plan.view.stacked === stacked}
+                onSelect={() => {
+                  if (!!plan.view.stacked !== stacked) quickEdit((current) => stackedBars(current, stacked))
+                }}
+              >
+                {stacked ? 'Stacked bars' : 'Bars side by side'}
+              </Menu.Item>
+            )}
+          </For>
+        </Show>
         <Menu.Separator />
         <Menu.Label>Sort by</Menu.Label>
         <For each={columns()}>

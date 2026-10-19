@@ -831,7 +831,7 @@ describe('architecture boundaries', () => {
       // so the Claude harness can let an agent read the folder where a cut tool result's full text goes.
       '@acorn/node-core': 68,
       '@acorn/custody': 10,
-      '@acorn/dashboards-core': 17, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, its outline, and the plan-writing guide the studio and panel_guide share.
+      '@acorn/dashboards-core': 18, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, its outline, the plan-writing guide the studio and panel_guide share, and the heatmap's cells HeatmapView draws.
       // The document model, and the store a code host's Node half keeps documents in.
       '@acorn/diff-document': 3,
     }

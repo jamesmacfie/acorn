@@ -518,6 +518,7 @@ describe('what can be added', () => {
       table: undefined,
       board: undefined,
       chart: undefined,
+      heatmap: 'Needs two Choice or Person columns, or a summary by two of them or a time bucket.',
     })
     expect(views({ ...joined(), group: [{ column: 'title' }] }).board).toBe('Group by a Choice column first.')
     expect(views({ ...joined(), columns: joined().columns.filter((column) => column.id === 'title') }).chart).toBe(

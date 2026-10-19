@@ -27,7 +27,7 @@ function ensureBucketFunction(db: AppDatabase) {
     (value, kind, zone, weekStart) =>
       bucketValue(
         value as string | number | null,
-        kind as 'day' | 'week' | 'month',
+        kind as Parameters<typeof bucketValue>[1],
         String(zone),
         String(weekStart) as PanelPlan['time']['weekStart'],
       ) as string | number | null,

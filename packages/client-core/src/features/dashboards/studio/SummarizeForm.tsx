@@ -2,6 +2,7 @@ import { Index, Show } from 'solid-js'
 import { newColumnId } from '@acorn/dashboards-core/plan.ts'
 import { BUCKET_LABELS, MEASURE_LABELS, PREVIOUS_CHANGE_LABELS, labelOptions } from '@acorn/dashboards-core/labels.ts'
 import { describePredicate } from '@acorn/dashboards-core/outline.ts'
+import { isCalendarBucket } from '@acorn/dashboards-core/planBuckets.ts'
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import { Button, Card, Checkbox, Field } from '../../../kit/components/primitives'
 import { Fold } from '../../../kit/components/layout/Fold'
@@ -42,7 +43,7 @@ const MEASURE_READS: Record<Measure['kind'], 'number' | 'datetime' | 'any' | und
   earliest: 'datetime',
   latest: 'datetime',
 }
-const TIME_BUCKETS = ['day', 'week', 'month'] as const
+const TIME_BUCKETS = ['day', 'week', 'month', 'hour', 'weekday'] as const
 const isTimeGroup = (group: Group) => !!group.bucket && group.bucket !== 'value'
 const editable = (predicate: DataPredicate) => (editableComparison(predicate) ? predicate : undefined)
 
@@ -60,7 +61,8 @@ export default function SummarizeForm(props: StageFormProps<'summarize'>) {
       options,
     )
   const columnType = (id: string | undefined) => props.columns.find((column) => column.id === id)?.type
-  const timeGrouped = () => props.stage.by.some(isTimeGroup)
+  // Fill and previous change walk a calendar, which an hour or weekday doesn't.
+  const timeGrouped = () => props.stage.by.some((group) => isCalendarBucket(group.bucket))
   const viewer = (columnId: string | undefined) => viewerPointer(props.plan, props.sources, columnId)
   const splitColumns = () => props.columns.filter((column) => column.type === 'enum' && column.choices?.length)
 

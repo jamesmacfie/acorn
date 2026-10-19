@@ -168,6 +168,47 @@ const turnStarterPlans: PanelPlan[] = [
     sort: [{ column: 'cost', direction: 'desc' }],
     view: { kind: 'chart', shape: 'bar', x: 'projectName', aggregate: 'sum', field: 'cost' },
   }),
+  plan('When agents work, last four weeks', {
+    // Two columns read the same start time: one buckets it by weekday, the other by hour.
+    columns: [
+      finished,
+      { id: 'weekday', label: 'Weekday', type: 'datetime', bind: { turns: { field: '/startedAt' } } },
+      { id: 'hour', label: 'Hour', type: 'datetime', bind: { turns: { field: '/startedAt' } } },
+      column('activeMs', 'Run time', 'number', 'ms'),
+    ],
+    stages: [
+      after('/completedAt', { address: { from: 'context', name: 'now', offset: '-P28D' } }),
+      {
+        op: 'summarize',
+        by: [
+          { column: 'weekday', bucket: 'weekday' },
+          { column: 'hour', bucket: 'hour' },
+        ],
+        measures: [{ id: 'active', label: 'Run time', kind: 'sum', column: 'activeMs' }],
+      },
+    ],
+    view: { kind: 'heatmap', y: 'weekday', x: 'hour', aggregate: 'sum', field: 'active' },
+  }),
+  plan('Spend by day by model, last 30 days', {
+    columns: [finished, column('model', 'Model', 'text'), column('costUsd', 'Cost', 'number', 'USD')],
+    stages: [
+      last30Days,
+      {
+        op: 'summarize',
+        by: [{ column: 'completedAt', bucket: 'day' }, { column: 'model' }],
+        measures: [{ id: 'cost', label: 'Cost', kind: 'sum', column: 'costUsd' }],
+      },
+    ],
+    view: {
+      kind: 'chart',
+      shape: 'bar',
+      x: 'completedAt',
+      series: 'model',
+      stacked: true,
+      aggregate: 'sum',
+      field: 'cost',
+    },
+  }),
   plan('Time agents waited on you, last 30 days', {
     columns: [finished, column('approvalWaitMs', 'Waiting on you', 'number', 'ms')],
     stages: [last30Days],

@@ -600,3 +600,51 @@ describe('dayBucket', () => {
     expect(dayBucket(3 * DAY)).toBe(3 * DAY)
   })
 })
+
+describe('stacked bars', () => {
+  const model = { id: 'model', name: 'Model', type: 'text' as const }
+  const day = { id: 'day', name: 'Day', type: 'datetime' as const }
+  const cost = { id: 'cost', name: 'Cost', type: 'number' as const }
+  const rows = [
+    row('1', { day: '2026-10-13', model: 'opus', cost: 3 }),
+    row('2', { day: '2026-10-12', model: 'opus', cost: 1 }),
+    row('3', { day: '2026-10-12', model: 'sonnet', cost: 2 }),
+  ]
+  const view = {
+    kind: 'chart',
+    shape: 'bar' as const,
+    x: 'day',
+    series: 'model',
+    aggregate: 'sum' as const,
+    field: 'cost',
+  }
+
+  it('stacks each day’s series on one bar, oldest day first, with the axis sized to the total', () => {
+    const chart = buildChart(rows, schema(day, model, cost), { ...view, stacked: true }, {})
+    if (chart?.shape !== 'bar') throw new Error('expected bars')
+    expect(chart.xTicks.map((tick) => tick.label)).toEqual([
+      new Date(Date.parse('2026-10-12T00:00:00Z')).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      }),
+      expect.any(String),
+    ])
+    const [opus12, opus13, sonnet12] = chart.bars.filter((bar) => bar.value > 0)
+    expect([opus12?.value, opus13?.value, sonnet12?.value]).toEqual([1, 3, 2])
+    // Same column, same width, the second series sitting on the first.
+    expect(sonnet12!.x).toBe(opus12!.x)
+    expect(sonnet12!.w).toBe(opus12!.w)
+    expect(sonnet12!.y + sonnet12!.h).toBeCloseTo(opus12!.y)
+    expect(chart.yTicks.at(-1)?.label).toBe('3')
+    expect(chart.legend?.map((key) => key.label)).toEqual(['opus', 'sonnet'])
+  })
+
+  it('draws the same series side by side without the flag', () => {
+    const chart = buildChart(rows, schema(day, model, cost), view, {})
+    if (chart?.shape !== 'bar') throw new Error('expected bars')
+    const [opus12, , sonnet12] = chart.bars.filter((bar) => bar.value > 0)
+    expect(sonnet12!.x).toBeCloseTo(opus12!.x + opus12!.w)
+    expect(sonnet12!.y + sonnet12!.h).toBeCloseTo(opus12!.y + opus12!.h)
+  })
+})

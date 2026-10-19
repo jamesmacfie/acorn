@@ -36,6 +36,7 @@ import {
 } from '@acorn/dashboards-core/labels.ts'
 import {
   availableViews,
+  heatmapAxes,
   countsByPart,
   planSummary,
   problemsByPart,
@@ -1128,7 +1129,7 @@ function LookInspector(props: InspectorProps) {
   const columns = createMemo(() => outputPlanColumns(plan()))
   const editView = (update: (view: PanelPlan['view']) => PanelPlan['view']) =>
     change((current) => editViewIn(current, update))
-  const setOption = <K extends 'field' | 'x' | 'series' | 'trend' | 'compare' | 'good'>(key: K, value: string) =>
+  const setOption = <K extends 'field' | 'x' | 'y' | 'series' | 'trend' | 'compare' | 'good'>(key: K, value: string) =>
     editView((current) => (value ? { ...current, [key]: value } : (without(current, key) as PanelPlan['view'])))
   const views = () =>
     availableViews(plan()).map((entry) => {
@@ -1241,6 +1242,38 @@ function LookInspector(props: InspectorProps) {
           options={[{ value: '', label: 'Nothing' }, ...columnOptions(columns())]}
           onChange={(series) => setOption('series', series)}
         />
+        <Show when={view().series && view().shape !== 'line'}>
+          <LabeledSelect
+            label="Bars"
+            value={view().stacked ? 'stacked' : 'side'}
+            options={[
+              { value: 'side', label: 'Side by side' },
+              { value: 'stacked', label: 'Stacked' },
+            ]}
+            onChange={(bars) =>
+              editView((current) =>
+                bars === 'stacked'
+                  ? { ...current, shape: 'bar', stacked: true }
+                  : (without(current, 'stacked') as PanelPlan['view']),
+              )
+            }
+          />
+        </Show>
+      </Show>
+      <Show when={view().kind === 'heatmap'}>
+        <For each={[{ key: 'y', label: 'Down' } as const, { key: 'x', label: 'Across' } as const]}>
+          {(axis) => (
+            <LabeledSelect
+              label={axis.label}
+              value={view()[axis.key] ?? ''}
+              options={[
+                ...(view()[axis.key] ? [] : [{ value: '', label: 'Choose a column' }]),
+                ...columnOptions(columns().filter((column) => heatmapAxes(plan()).includes(column.id))),
+              ]}
+              onChange={(id) => setOption(axis.key, id)}
+            />
+          )}
+        </For>
       </Show>
       <Show when={view().kind === 'board'}>
         <Text emphasis="muted" wrap>

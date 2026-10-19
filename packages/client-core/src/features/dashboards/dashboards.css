@@ -725,6 +725,87 @@
 .dash-chart-line[data-series='3'] { stroke: var(--viz-series-3); }
 .dash-chart-line[data-series='other'] { stroke: var(--text-faint); }
 
+/* ── Heatmap ─────────────────────────────────────────────────────────────────────────────── */
+
+/* A grid of cells shaded by `data-step` from dashboards/heatmap.ts: 0 is empty, 1 to 5 the sequential
+   scale (tokens-theme.css), kept apart from status and series colour. At narrow widths the grid
+   scrolls sideways inside its panel and the row labels stay pinned on the left. */
+.dash-heatmap-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+.dash-heatmap-scroll {
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.dash-heatmap {
+  border-collapse: separate;
+  border-spacing: 2px;
+  width: 100%;
+  font-variant-numeric: var(--tabular);
+}
+
+.dash-heatmap th {
+  font-weight: normal;
+  white-space: nowrap;
+  text-align: left;
+}
+
+/* A label shows only every few columns, so it may run over the empty headers beside it. */
+.dash-heatmap-column {
+  overflow: visible;
+  max-width: 0;
+}
+
+.dash-heatmap-corner,
+.dash-heatmap-row {
+  position: sticky;
+  left: 0;
+  z-index: var(--z-sticky);
+  background: var(--card-bg);
+  padding-right: var(--space-2);
+}
+
+.dash-heatmap-cell {
+  min-width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--radius-xs);
+  background: var(--bg-subtle);
+}
+.dash-heatmap-cell:focus-visible {
+  outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus);
+  outline-offset: 1px;
+}
+.dash-heatmap-cell[data-step='1'] { background: var(--viz-scale-1); }
+.dash-heatmap-cell[data-step='2'] { background: var(--viz-scale-2); }
+.dash-heatmap-cell[data-step='3'] { background: var(--viz-scale-3); }
+.dash-heatmap-cell[data-step='4'] { background: var(--viz-scale-4); }
+.dash-heatmap-cell[data-step='5'] { background: var(--viz-scale-5); }
+
+.dash-heatmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--gap-inline);
+}
+
+.dash-heatmap-ramp {
+  display: inline-flex;
+  gap: 2px;
+}
+.dash-heatmap-ramp > .dash-heatmap-cell {
+  display: inline-block;
+  min-width: 0;
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
 /* ── Cells ───────────────────────────────────────────────────────────────────────────────── */
 
 .dash-cell-enum,

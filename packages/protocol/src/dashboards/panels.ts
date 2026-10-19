@@ -131,10 +131,11 @@ const rowButton = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('createTask'), label, icon: id.optional() }).strict(),
 ])
 const panelPlanViewSchema = dashboardViewSchema
-  .omit({ field: true, x: true, series: true })
+  .omit({ field: true, x: true, y: true, series: true })
   .extend({
     field: columnId.optional(),
     x: columnId.optional(),
+    y: columnId.optional(),
     series: columnId.optional(),
   })
   .strict()
@@ -271,7 +272,14 @@ const stageSchema = z.discriminatedUnion('op', [
     .object({
       op: z.literal('summarize'),
       by: z
-        .array(z.object({ column: columnId, bucket: z.enum(['value', 'day', 'week', 'month']).optional() }).strict())
+        .array(
+          z
+            .object({
+              column: columnId,
+              bucket: z.enum(['value', 'day', 'week', 'month', 'hour', 'weekday']).optional(),
+            })
+            .strict(),
+        )
         .max(3),
       measures: z.array(measureSchema).min(1).max(30),
       pivot: z.object({ column: columnId, measure: columnId }).strict().optional(),
@@ -356,7 +364,7 @@ export const panelPlanSchema = z
         z
           .object({
             column: columnId,
-            bucket: z.enum(['value', 'day', 'week', 'month', 'relative']).optional(),
+            bucket: z.enum(['value', 'day', 'week', 'month', 'hour', 'weekday', 'relative']).optional(),
             order: z.enum(['declared', 'label', 'count', 'explicit']).optional(),
             values: z.array(z.string()).max(100).optional(),
           })

@@ -183,6 +183,7 @@ export const VIEW_ICONS: Record<PanelPlan['view']['kind'], string> = {
   table: 'table',
   board: 'kanban',
   chart: 'chart-column',
+  heatmap: 'grid-3x3',
 }
 const COLUMN_ICONS: Record<NonNullable<PanelPlanColumn['type']>, string> = {
   text: 'type',
@@ -231,6 +232,10 @@ const refreshWords = (seconds: number): string =>
     : seconds % 60 === 0
       ? plural(seconds / 60, 'minute')
       : plural(seconds, 'second')
+
+/** "Total of Run time": a stat's or heatmap's measure. */
+const measureWords = (plan: PanelPlan): string =>
+  `${AGGREGATE_LABELS[plan.view.aggregate ?? 'count']}${plan.view.field ? ` of ${columnLabel(plan, plan.view.field)}` : ''}`
 
 /** The top-level parts, in outline order. Column parts come from `columnParts`. Pass `sources` after
  *  a run to name each source's account and reach; before one, a source is named by its own label.
@@ -326,12 +331,16 @@ export function planOutline(plan: PanelPlan, sources: readonly PlanSource[] = []
       title: VIEW_LABELS[view.kind],
       detail:
         view.kind === 'chart'
-          ? sentence(view.shape && CHART_SHAPE_LABELS[view.shape], view.x && `by ${columnLabel(plan, view.x)}`)
+          ? sentence(
+              view.shape && CHART_SHAPE_LABELS[view.shape],
+              view.x && `by ${columnLabel(plan, view.x)}`,
+              view.series && `${view.stacked ? 'stacked' : 'split'} by ${columnLabel(plan, view.series)}`,
+            )
           : view.kind === 'stat'
-            ? sentence(
-                `${AGGREGATE_LABELS[view.aggregate ?? 'count']}${view.field ? ` of ${columnLabel(plan, view.field)}` : ''}`,
-              )
-            : undefined,
+            ? sentence(measureWords(plan))
+            : view.kind === 'heatmap' && view.x && view.y
+              ? sentence(`${measureWords(plan)} by ${columnLabel(plan, view.y)} and ${columnLabel(plan, view.x)}`)
+              : undefined,
     },
     {
       key: 'behaviour',
@@ -500,7 +509,17 @@ const VIEW_NEEDS: Record<ViewNeed, { met: (plan: PanelPlan) => boolean; reason: 
     met: (plan) => outputPlanColumns(plan).some((column) => isChartAxis(plan, column, ['datetime', 'enum', 'person'])),
     reason: 'Needs a date, Choice, or Person column, or a text column the plan summarizes by.',
   },
+  'two enum, person, or bucketed date axes': {
+    met: (plan) => heatmapAxes(plan).length >= 2,
+    reason: 'Needs two Choice or Person columns, or a summary by two of them or a time bucket.',
+  },
 }
+
+/** The columns a heatmap can draw along, a summary's own groups first. */
+export const heatmapAxes = (plan: PanelPlan): string[] =>
+  outputPlanColumns(plan)
+    .filter((column) => isChartAxis(plan, column, ['enum', 'person']))
+    .map((column) => column.id)
 
 /** Each view, and why the plan can't use it yet when it can't. */
 export function availableViews(plan: PanelPlan): Availability<PanelPlan['view']['kind']>[] {
@@ -523,15 +542,22 @@ export function switchView(plan: PanelPlan, kind: PanelPlan['view']['kind']): Pa
     view: {
       ...kept,
       kind,
-      ...(summary?.op === 'summarize' && (kind === 'stat' || kind === 'chart')
+      ...(summary?.op === 'summarize' && (kind === 'stat' || kind === 'chart' || kind === 'heatmap')
         ? {
             aggregate: 'sum' as const,
             ...(summary.measures[0] ? { field: summary.measures[0].id } : {}),
             ...(kind === 'chart' && summary.by[0] ? { x: summary.by[0].column } : {}),
           }
         : {}),
+      ...(kind === 'heatmap' ? heatmapAxisPick(plan) : {}),
     },
   }
+}
+
+/** The first two heatmap axes, down then across, so a summary by weekday then hour reads as weekday rows. */
+function heatmapAxisPick(plan: PanelPlan): { y?: string; x?: string } {
+  const [y, x] = heatmapAxes(plan)
+  return { ...(y ? { y } : {}), ...(x ? { x } : {}) }
 }
 
 export type PartChange = 'added' | 'removed' | 'changed' | 'same'

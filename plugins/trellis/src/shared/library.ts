@@ -109,7 +109,7 @@ export const COMPONENTS: DefinedComponent<z.ZodObject, null>[] = [
   spec(
     'Panel',
     z.object({ plan: z.string(), inputs: z.record(z.string(), z.any()).optional() }),
-    "Draws one of the app's plans with the dashboard's own view: its table, list, board, chart, or stat, with row menus and drill-down. The only chart or table there is. `inputs` fills the plan's input addresses.",
+    "Draws one of the app's plans with the dashboard's own view: its table, list, board, chart, heatmap, or stat, with row menus and drill-down. The only chart or table there is. `inputs` fills the plan's input addresses.",
   ),
 ]
 

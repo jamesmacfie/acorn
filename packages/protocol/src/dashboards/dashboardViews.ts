@@ -3,7 +3,7 @@ import { z } from 'zod'
 // Shared by loaded-plugin manifest validation and the full dashboard protocol. Keep this vocabulary
 // independent of dashboard publication/query schemas so parsing a plugin manifest does not load the
 // complete dashboard authoring contract.
-export const dashboardViewKinds = ['stat', 'list', 'table', 'board', 'chart'] as const
+export const dashboardViewKinds = ['stat', 'list', 'table', 'board', 'chart', 'heatmap'] as const
 
 const pointer = z.string().refine((value) => value === '' || value.startsWith('/'), 'Expected a JSON Pointer')
 
@@ -14,7 +14,9 @@ export const dashboardViewSchema = z
     field: pointer.optional(),
     shape: z.enum(['bar', 'line']).optional(),
     x: pointer.optional(),
+    y: pointer.optional(),
     series: pointer.optional(),
+    stacked: z.boolean().optional(),
     trend: z.enum(['history', 'activity']).optional(),
     compare: z.enum(['day', 'week']).optional(),
     good: z.enum(['up', 'down']).optional(),

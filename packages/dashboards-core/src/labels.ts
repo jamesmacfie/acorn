@@ -122,6 +122,8 @@ export const BUCKET_LABELS: Record<NonNullable<NonNullable<PanelPlan['group']>[n
   day: 'Day',
   week: 'Week',
   month: 'Month',
+  hour: 'Hour of day',
+  weekday: 'Day of week',
   relative: 'How long ago',
 }
 
@@ -131,6 +133,7 @@ export const VIEW_LABELS: Record<PanelPlan['view']['kind'], string> = {
   table: 'Table',
   board: 'Board',
   chart: 'Chart',
+  heatmap: 'Heatmap',
 }
 
 /** What each view is good for, under its name where a person picks one. */
@@ -140,6 +143,7 @@ export const VIEW_HELP: Record<PanelPlan['view']['kind'], string> = {
   table: 'Every column side by side, one row per line.',
   board: 'Cards in columns, one column per choice.',
   chart: 'Bars or a line across dates or choices.',
+  heatmap: 'A grid of shaded cells across two sets of choices, such as weekday by hour.',
 }
 
 /** What each step does, in the Add menu and at the top of its form. The capability list's own

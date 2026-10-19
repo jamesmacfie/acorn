@@ -2,6 +2,7 @@ import { Match, Switch } from 'solid-js'
 import { EmptyState } from '../../../kit/components/primitives'
 import BoardView from './BoardView'
 import ChartView from './ChartView'
+import HeatmapView from './HeatmapView'
 import ListView from './ListView'
 import type { PanelViewProps } from './props'
 import StatView from './StatView'
@@ -35,6 +36,9 @@ export default function PanelBody(props: PanelViewProps) {
       </Match>
       <Match when={props.view.kind === 'chart'}>
         <ChartView {...props} />
+      </Match>
+      <Match when={props.view.kind === 'heatmap'}>
+        <HeatmapView {...props} />
       </Match>
     </Switch>
   )

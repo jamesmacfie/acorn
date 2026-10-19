@@ -43,6 +43,17 @@ export const DERIVED_THEME_TOKENS = [
  * Three, hard cap. Series four onwards folds into `other`. */
 export const SERIES_TOKENS = ['--viz-series-1', '--viz-series-2', '--viz-series-3'] as const
 
+/** A heatmap's sequential scale, lowest to highest, kept apart from status for the reason the series
+ * slots are. Each is a light and dark pair, because a shade must darken on a light ground and lighten
+ * on a dark one. */
+export const SCALE_TOKENS = [
+  '--viz-scale-1',
+  '--viz-scale-2',
+  '--viz-scale-3',
+  '--viz-scale-4',
+  '--viz-scale-5',
+] as const
+
 /** Colour, and only colour. Restated per theme in `styles/tokens-theme.css`. See docs/ui-design/appearance.md
  * § Plugin themes for why the palette half also lives in `@acorn/protocol/themeTokens.ts`. */
 export const THEME_TOKENS = [
@@ -50,6 +61,7 @@ export const THEME_TOKENS = [
   ...SELF_DESCRIPTION_TOKENS,
   ...DERIVED_THEME_TOKENS,
   ...SERIES_TOKENS,
+  ...SCALE_TOKENS,
 ] as const
 
 /** Shape, typography, space, density, chrome, motion. Defaults in `styles/tokens-style.css`. */

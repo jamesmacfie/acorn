@@ -84,10 +84,14 @@ export type PanelView = {
   /** `chart` only: which of the two shapes. Absent falls back to whatever the schema supports
    *  (chart.ts, `buildChart`), so an older definition never draws nothing. */
   shape?: 'bar' | 'line'
-  /** `chart` only: the category field (bar) or the time field (line). */
+  /** `chart`: the category field (bar) or the time field (line). `heatmap`: the field across. */
   x?: string
+  /** `heatmap` only: the field down. */
+  y?: string
   /** `chart` only, and optional there: the enum whose values split one line into several. */
   series?: string
+  /** A bar with `series` only: the series sit on top of each other, so a bar's height is the total. */
+  stacked?: boolean
   /** `stat` only; other kinds ignore all three. See docs/dashboards/views.md § Trends.
    *
    *  `activity` is "when did these rows change", bucketed from the rows already on screen and needing
@@ -192,6 +196,11 @@ const VIEW_REQUIRES: Record<PanelViewKind, (schema: DashboardDisplaySchema) => b
   // keeps no dependency on the chart module. `chartShapesFor` is the same predicate, and chart.test.ts
   // holds the two together.
   chart: (schema) => schema.fields.some((field) => field.type === 'enum' || field.type === 'datetime'),
+  // Two axes to draw a grid against. A date counts here because the plan's summary buckets it, which
+  // the plan validator checks and this schema can't see.
+  heatmap: (schema) =>
+    schema.fields.filter((field) => field.type === 'enum' || field.type === 'person' || field.type === 'datetime')
+      .length >= 2,
 }
 
 export const viewSupportedBy = (kind: PanelViewKind, schema: DashboardDisplaySchema): boolean =>

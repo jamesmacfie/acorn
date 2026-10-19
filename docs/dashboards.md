@@ -36,8 +36,8 @@ violations warn with the relation and key and never multiply rows.
 A plan has at most eight ordered stages, three summaries, and one overlap. Summaries group by up to
 three columns and can calculate filtered counts, sums, averages, extrema, median, percentiles,
 distinct counts or lists, and earliest or latest values. Measures can be shares of their total;
-time buckets can fill gaps and show previous-bucket changes; an enum can pivot a measure. A compute
-stage uses a closed, typed expression set. Expand and overlap carry row and pair limits. Stage
+calendar buckets can fill gaps and show previous-bucket changes; an enum can pivot a measure. A
+compute stage uses a closed, typed expression set. Expand and overlap carry row and pair limits. Stage
 diagnostics report both row counts and what one row means after each step. An incomplete source or
 unknown measure input marks the affected measure partial, with a reason; mixed per-row units fail
 the measure rather than making an invented total. The history sampler skips a run with partial
@@ -189,8 +189,8 @@ See also [data layer](./data-layer.md), [schedules](./schedules.md), and
 - [Panels](./dashboards/panels.md) covers a panel's layers, the field vocabulary, provenance, and row
   actions.
 
-- [Views and trends](./dashboards/views.md) covers which views a schema allows, charts, and stat
-  trends.
+- [Views and trends](./dashboards/views.md) covers which views a schema allows, charts, heatmaps,
+  hour and weekday buckets, and stat trends.
 
 - [Mapping and the editor](./dashboards/mapping-and-editor.md) covers cross-source panels and the
   editor.

@@ -1,6 +1,7 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { PanelPlan, PanelPlanColumn } from '@acorn/protocol/dashboards.ts'
 import type { PlanGroup, PlanRow } from './plan'
+import { bucketValue, repeatingBucketChoices } from './planBuckets'
 import { outputPlanColumns } from './planColumns'
 
 const columnAt = (plan: PanelPlan, id: string): PanelPlanColumn | undefined =>
@@ -59,12 +60,19 @@ export function groupPlanRows(plan: PanelPlan, rows: readonly PlanRow[], evaluat
     const spec = keys[depth]
     if (!spec) return []
     const buckets = new Map<string, PlanRow[]>()
+    // An hour or weekday group reads in its own order, with its own names.
+    const repeating =
+      spec.bucket === 'hour' || spec.bucket === 'weekday'
+        ? repeatingBucketChoices(spec.bucket, plan.time.weekStart)
+        : undefined
     for (const row of items) {
       const value = row.values[spec.column]
       const date = spec.bucket && spec.bucket !== 'value' ? datePart(value, zone) : undefined
       let key = value == null ? 'No value' : String(value)
       if (spec.bucket === 'day') key = date?.day ?? 'No date'
       if (spec.bucket === 'month') key = date?.month ?? 'No date'
+      if (spec.bucket === 'hour' || spec.bucket === 'weekday')
+        key = String(bucketValue(value, spec.bucket, zone, plan.time.weekStart) ?? 'No date')
       if (spec.bucket === 'week' && date) {
         const day = new Date(`${date.day}T12:00:00Z`)
         const start = { sunday: 0, monday: 1, saturday: 6 }[plan.time.weekStart]
@@ -83,11 +91,11 @@ export function groupPlanRows(plan: PanelPlan, rows: readonly PlanRow[], evaluat
                 : 'Later'
       buckets.set(key, [...(buckets.get(key) ?? []), row])
     }
-    const declared = columnAt(plan, spec.column)?.choices?.map((choice) => choice.id) ?? []
+    const declared = (repeating ?? columnAt(plan, spec.column)?.choices)?.map((choice) => choice.id) ?? []
     const ordered = [...buckets].sort(([a, ar], [b, br]) =>
       spec.order === 'count'
         ? br.length - ar.length
-        : spec.order === 'declared' || spec.order === 'explicit'
+        : spec.order === 'declared' || spec.order === 'explicit' || (repeating && spec.order !== 'label')
           ? (() => {
               const order = spec.order === 'explicit' ? (spec.values ?? []) : declared
               const ai = order.indexOf(a),
@@ -98,7 +106,7 @@ export function groupPlanRows(plan: PanelPlan, rows: readonly PlanRow[], evaluat
     )
     return ordered.map(([key, members]) => ({
       key,
-      label: key,
+      label: repeating?.find((choice) => choice.id === key)?.label ?? key,
       count: members.length,
       rows: members,
       ...(depth + 1 < keys.length ? { children: group(members, depth + 1) } : {}),

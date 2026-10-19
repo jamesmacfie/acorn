@@ -21,6 +21,8 @@ import {
 import { PANEL_CAPABILITIES } from './capabilities'
 import { aggregateRows } from './shaping'
 import { buildChart } from './chart'
+import { buildHeatmap } from './heatmap'
+import { availableViews, planOutline, switchView } from './outline'
 import { bucketBounds } from './planBuckets'
 
 const description = dataSourceDescriptionSchema.parse({
@@ -374,6 +376,70 @@ describe('panel plan', () => {
     expect(errors(summarized)).toEqual([])
   })
 
+  it('draws a weekday by hour heatmap from a summary, with every weekday and hour in order', () => {
+    const plan = base()
+    plan.columns.push(
+      { id: 'started', label: 'Started', type: 'datetime', bind: {} },
+      { id: 'hour', label: 'Hour', type: 'datetime', bind: {} },
+    )
+    plan.stages = [
+      {
+        op: 'summarize',
+        by: [
+          { column: 'started', bucket: 'weekday' },
+          { column: 'hour', bucket: 'hour' },
+        ],
+        measures: [{ id: 'n', label: 'Turns', kind: 'count' }],
+      },
+    ]
+    expect(availableViews(plan).find((view) => view.id === 'heatmap')?.available).toBe(true)
+    const switched = switchView(plan, 'heatmap')
+    expect(switched.view).toEqual({ kind: 'heatmap', aggregate: 'sum', field: 'n', y: 'started', x: 'hour' })
+    expect(
+      validatePanelPlan(switched, [source('a', []), source('b', [])]).filter((p) => p.severity === 'error'),
+    ).toEqual([])
+    // Tuesday 14:30 in Auckland, twice.
+    const at = Date.parse('2026-10-20T01:30:00Z')
+    const rows: PlanRow[] = ['1', '2'].map((id) => ({ id, values: { started: at, hour: at }, records: [] }))
+    const display = displayPlanRun(switched, runPlanStages(switched, rows, 0).rows)
+    const map = buildHeatmap(display.rows, display.schema, switched.view)!
+    expect(map.rows.map((row) => row.id)).toEqual(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
+    expect(map.columns).toHaveLength(24)
+    expect(map.rows[1]!.cells[14]).toEqual({ value: 2, step: 5, name: 'Tuesday, 14:00: 2' })
+    expect(planOutline(switched).find((part) => part.key === 'look')?.detail).toBe('Total of Turns by Started and Hour')
+  })
+
+  it('refuses to fill or compare repeating buckets, and stacks only split bars', () => {
+    const errors = (plan: ReturnType<typeof base>) =>
+      validatePanelPlan(plan, [source('a', []), source('b', [])])
+        .filter((problem) => problem.severity === 'error')
+        .map((problem) => problem.path)
+    const hourly = base()
+    hourly.stages = [
+      {
+        op: 'summarize',
+        by: [{ column: 'due', bucket: 'hour' }],
+        measures: [{ id: 'n', label: 'N', kind: 'count', previous: 'amount' }],
+        fill: true,
+      },
+    ]
+    expect(errors(hourly)).toEqual(['/stages/0/measures/0/previous', '/stages/0/fill'])
+
+    const byDay = base()
+    byDay.stages = [
+      {
+        op: 'summarize',
+        by: [{ column: 'due', bucket: 'day' }, { column: 'title' }],
+        measures: [{ id: 'n', label: 'N', kind: 'count' }],
+      },
+    ]
+    byDay.view = { kind: 'chart', shape: 'bar', x: 'due', series: 'title', stacked: true, aggregate: 'sum', field: 'n' }
+    expect(errors(byDay)).toEqual([])
+    expect(errors({ ...byDay, view: { ...byDay.view, series: undefined } })).toEqual(['/view/stacked'])
+    expect(errors({ ...byDay, view: { ...byDay.view, shape: 'line' } })).toContain('/view/stacked')
+    expect(errors({ ...byDay, view: { kind: 'heatmap', x: 'due', y: 'due' } })).toEqual(['/view/y'])
+  })
+
   it('example 9: keeps unmatched lookups and warns on a many-to-one cardinality violation', () => {
     const plan = base()
     plan.sources[1]!.role = 'lookup'
@@ -708,6 +774,21 @@ describe('panel plan', () => {
     const missing: PlanRow = { id: 'missing', records: [], values: {} }
     const filter = plan.stages[0]!
     expect(filter.op === 'filter' && matchesPlanFilter(missing, filter.where)).toBe(false)
+  })
+
+  it('groups by weekday in the week order, under the day names', () => {
+    const plan = base()
+    plan.group = [{ column: 'due', bucket: 'weekday' }]
+    const rows = bindPanelRows(plan, [
+      source('a', [
+        { recordId: '1', data: { title: 'One', amount: 1, currency: 'NZD', due: '2026-10-25' } },
+        { recordId: '2', data: { title: 'Two', amount: 1, currency: 'NZD', due: '2026-10-20' } },
+      ]),
+    ])
+    expect(groupPlanRows(plan, rows, 0).map((group) => [group.key, group.label])).toEqual([
+      ['tue', 'Tuesday'],
+      ['sun', 'Sunday'],
+    ])
   })
 
   it('keeps calendar days in their named zone and refuses mixed-currency ordering', () => {

@@ -83,6 +83,18 @@
   --viz-series-3: oklch(0.62 0.11 195);
 }
 
+/* Sequential scale: a heatmap cell's shade, from the lowest nonzero value (1) to the highest (5).
+   One hue, the first series slot's, so it never reads as a status, and stepped in lightness, so the
+   order survives without colour: light ground runs pale to deep, dark ground dim to bright. The
+   empty step is no token; it draws --bg-subtle. See SCALE_TOKENS in kit/tokens/tokenAxes.ts. */
+:root {
+  --viz-scale-1: light-dark(oklch(0.93 0.03 255), oklch(0.33 0.05 255));
+  --viz-scale-2: light-dark(oklch(0.84 0.07 255), oklch(0.43 0.09 255));
+  --viz-scale-3: light-dark(oklch(0.73 0.11 255), oklch(0.54 0.13 255));
+  --viz-scale-4: light-dark(oklch(0.61 0.15 255), oklch(0.66 0.14 255));
+  --viz-scale-5: light-dark(oklch(0.48 0.17 255), oklch(0.79 0.11 255));
+}
+
 /* Dark token values, defined once as --dark-* (inert until mapped below). Two paths apply them:
    the manual data-theme="dark" toggle and the OS preference (unless forced light); the mappings
    are thin var() indirections so a dark tweak is made in exactly one place. */

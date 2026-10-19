@@ -118,7 +118,9 @@ export const panelGuide = (workspaceId: string) => ({
     'table: records compared across several columns.',
     'board: records grouped by one enum column, such as issues by state.',
     'chart: a bar counts or sums across categories, with an enum, person, or text axis: summarize by it, then chart the measure with aggregate sum. A line counts the rows by day over a date axis: chart the rows themselves, not a summary.',
-    'Totals per week or month are a table over a summary bucketed by week or month; a line only draws days.',
+    'Totals per week or month are a table over a summary bucketed by week or month; a line only draws days. A bar can also draw a summary by day, week, or month.',
+    'Bars split by series sit side by side; set stacked: true to stack them, so each bar is the total, such as spend by day stacked by model.',
+    'heatmap: use one for "when" questions across two repeating time axes, such as weekday by hour. Bind two columns to the same date, summarize by one with bucket weekday and the other with bucket hour, then set y to the weekday column, x to the hour column, and aggregate sum of the measure.',
   ],
   examples: panelGuideExamples(workspaceId),
 })

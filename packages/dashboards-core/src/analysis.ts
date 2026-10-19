@@ -1,7 +1,7 @@
 import type { PanelPlan, PlanExpression } from '@acorn/protocol/dashboards.ts'
 import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataValues.ts'
 import type { PairRow, PlanRow, StageRow, SummaryRow } from './plan'
-import { bucketValue, instant } from './planBuckets'
+import { bucketValue, instant, isCalendarBucket } from './planBuckets'
 
 type Stage = PanelPlan['stages'][number]
 type Summary = Extract<Stage, { op: 'summarize' }>
@@ -165,7 +165,7 @@ export function summarizeRows(
 
 /** Shared final shaping after either in-memory or SQLite grouped reductions. */
 export function finishSummaryRows(plan: PanelPlan, stage: Summary, output: SummaryRow[]): SummaryRow[] {
-  if (stage.fill && stage.by.length === 1 && stage.by[0]?.bucket && stage.by[0].bucket !== 'value' && output.length) {
+  if (stage.fill && stage.by.length === 1 && isCalendarBucket(stage.by[0]?.bucket) && output.length) {
     const bucket = stage.by[0]
     const byDay = new Map(output.map((row) => [String(row.values[bucket.column]), row]))
     const dates = [...byDay.keys()].toSorted()
@@ -227,7 +227,7 @@ export function finishSummaryRows(plan: PanelPlan, stage: Summary, output: Summa
       for (const choice of choiceColumn?.choices ?? []) row.values[`${stage.pivot.measure}_${choice.id}`] ??= null
     output.splice(0, output.length, ...grouped.values())
   }
-  if (stage.by.length === 1 && stage.by[0]?.bucket && stage.by[0].bucket !== 'value') {
+  if (stage.by.length === 1 && isCalendarBucket(stage.by[0]?.bucket)) {
     const column = stage.by[0].column
     const ordered = output.toSorted((a, b) => String(a.values[column]).localeCompare(String(b.values[column])))
     for (const measure of stage.measures)

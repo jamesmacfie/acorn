@@ -29,7 +29,9 @@ Three color tokens are neither primitive nor derived: `--viz-series-1`, `--viz-s
 `--viz-series-3` say "which one" on a chart, not status. They're real values on `:root`, one set that
 clears 3:1 contrast on light and dark grounds. A pack can restate them. A plugin theme can't, for the
 same reason it can't restate a derived token. [Dashboards](../dashboards.md) covers how a chart uses
-them.
+them. `--viz-scale-1` to `--viz-scale-5` are the same kind of token for a heatmap's shades, lowest to
+highest, one hue in five lightness steps. Each is a `light-dark()` pair, because a shade darkens on a
+light ground and lightens on a dark one.
 
 The kit's `MentionTextarea` colors `@file`, `/command`, and `$skill` runs from role tokens the caller
 passes as `segments`, so the composer needs no tokens of its own.

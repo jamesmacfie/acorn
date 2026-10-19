@@ -6,6 +6,7 @@ import {
   FRAME_TOKENS,
   INVARIANT_TOKENS,
   SELF_DESCRIPTION_TOKENS,
+  SCALE_TOKENS,
   SERIES_TOKENS,
   STYLE_TOKENS,
   STYLE_TOKEN_FAMILIES,
@@ -69,7 +70,12 @@ describe('token axes are complete', () => {
     // docs/ui-design/tokens.md § Token axes covers why derived and series tokens are excluded here. The
     // split is data in the token-axes module rather than a list in this file, because a
     // plugin-contributed theme is validated against the same primitives.
-    const derived = new Set<string>([...DERIVED_THEME_TOKENS, ...SELF_DESCRIPTION_TOKENS, ...SERIES_TOKENS])
+    const derived = new Set<string>([
+      ...DERIVED_THEME_TOKENS,
+      ...SELF_DESCRIPTION_TOKENS,
+      ...SERIES_TOKENS,
+      ...SCALE_TOKENS,
+    ])
     const primitives = [...theme].filter((t) => !derived.has(t))
     expect(primitives).toEqual([...THEME_PALETTE_TOKENS])
     const blocks = declaredByBlock(sheet('tokens-theme.css'))

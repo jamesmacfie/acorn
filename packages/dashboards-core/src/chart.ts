@@ -2,7 +2,7 @@ import type { DashboardDisplayField, DashboardDisplayRow, DashboardDisplaySchema
 import { cellText, formatCell } from './format'
 import { dayBucket } from './planBuckets'
 import type { PanelShaping, PanelTone, PanelView } from './model'
-import { aggregateRows, boardColumns, groupField } from './shaping'
+import { aggregateRows, boardColumns, groupField, UNGROUPED_COLUMN_ID, type PanelBoardColumn } from './shaping'
 
 // The chart view's arithmetic: buckets, aggregates, scales, ticks and path data. Which shapes exist,
 // which schemas can draw them and where a mark's colour comes from are all in
@@ -246,7 +246,7 @@ const fieldById = (schema: DashboardDisplaySchema, id: string | undefined) =>
   id ? schema.fields.find((field) => field.id === id) : undefined
 
 /** The measure's own name, so the axis says what it is counting rather than just carrying numbers. */
-function measureLabel(schema: DashboardDisplaySchema, view: PanelView): string {
+export function measureLabel(schema: DashboardDisplaySchema, view: PanelView): string {
   const aggregate = view.aggregate ?? 'count'
   if (aggregate === 'count') return 'Rows'
   const field = fieldById(schema, view.field)
@@ -255,7 +255,7 @@ function measureLabel(schema: DashboardDisplaySchema, view: PanelView): string {
 
 /** A number on an axis, in the units the field declared. The same `format.ts` a cell goes through, so
  *  an "MB" column's axis says MB without the chart knowing what MB is. */
-function axisNumber(schema: DashboardDisplaySchema, view: PanelView, value: number): string {
+export function axisNumber(schema: DashboardDisplaySchema, view: PanelView, value: number): string {
   const field = (view.aggregate ?? 'count') === 'count' ? undefined : fieldById(schema, view.field)
   return field ? cellText(formatCell(field, value)) : String(value)
 }
@@ -293,11 +293,38 @@ function barCategoryField(
   shaping: PanelShaping,
 ): DashboardDisplayField | undefined {
   const chosen = fieldById(schema, view.x)
-  // A person axis buckets by login, the way an enum with no declared values does. A text axis does the
-  // same; the plan validator admits one only as a summary's group key, so its values are bounded.
-  return chosen?.type === 'enum' || chosen?.type === 'person' || chosen?.type === 'text'
+  // A person axis buckets by login, the way an enum with no declared values does. A text or date axis
+  // does the same; the plan validator admits one only as a summary's group key, and a date only as its
+  // day, week, or month, so their values are bounded.
+  return chosen?.type === 'enum' || chosen?.type === 'person' || chosen?.type === 'text' || chosen?.type === 'datetime'
     ? chosen
     : groupField(schema, shaping)
+}
+
+/** A calendar bucket's label: "Oct 12" for a day or week, "Oct 2026" for a month. */
+const bucketLabel = (bucket: string): string => {
+  const at = Date.parse(`${bucket.length === 7 ? `${bucket}-01` : bucket}T00:00:00Z`)
+  if (!Number.isFinite(at)) return bucket
+  return new Date(at).toLocaleDateString(
+    undefined,
+    bucket.length === 7
+      ? { month: 'short', year: 'numeric', timeZone: 'UTC' }
+      : { month: 'short', day: 'numeric', timeZone: 'UTC' },
+  )
+}
+
+/** The categories along an axis, in the board's order. A summary's dates read oldest first instead,
+ *  as a calendar does, because the summary keeps the source's order. Shared with the heatmap. */
+export function axisColumns(rows: readonly DashboardDisplayRow[], field: DashboardDisplayField): PanelBoardColumn[] {
+  const columns = boardColumns(rows, field)
+  if (field.type !== 'datetime') return columns
+  const dated = columns.filter((column) => column.id !== UNGROUPED_COLUMN_ID)
+  return [
+    ...dated
+      .toSorted((left, right) => left.id.localeCompare(right.id))
+      .map((column) => ({ ...column, label: bucketLabel(column.id) })),
+    ...columns.filter((column) => column.id === UNGROUPED_COLUMN_ID),
+  ]
 }
 
 /** The tone the plugin declared for one of a field's values, or `undefined`, which is the question the
@@ -343,13 +370,15 @@ function buildBar(
   //
   // A split naming the category axis itself is dropped rather than drawn. It would put one bar in each
   // cluster, which is this chart with extra steps.
+  // A text split is bounded the way a text axis is, as a summary's group key.
   const split = fieldById(schema, view.series)
-  const series = split?.type === 'enum' && split.id !== field.id ? split : undefined
+  const series = (split?.type === 'enum' || split?.type === 'text') && split.id !== field.id ? split : undefined
+  const stacked = !!series && !!view.stacked
 
   // The board's own bucketing, reused whole for both axes: declared values in declaration order
   // (present even when empty), then undeclared ones in first-appearance order, then one catch-all.
   // The ungrouped bar is the one-group case of the same layout rather than a second code path.
-  const columns = boardColumns(rows, field)
+  const columns = axisColumns(rows, field)
   const groups = series
     ? boardColumns(rows, series)
     : [{ id: '', label: '', tone: 'muted' as PanelTone, declared: false, rows: [...rows] }]
@@ -363,19 +392,25 @@ function buildBar(
         aggregateRows(series ? column.rows.filter((row) => inGroup.has(row)) : column.rows, schema, view) ?? 0,
     )
   })
-  const max = Math.max(0, ...values.flat())
+  // A stack is as tall as its total. A negative value draws nothing, as it does unstacked.
+  const totals = columns.map((_, index) => values.reduce((sum, row) => sum + Math.max(0, row[index]), 0))
+  const max = Math.max(0, ...(stacked ? totals : values.flat()))
   const { ticks: yTicks, frame, top } = yAxisFor(schema, view, max, tickFont)
 
   const slot = frame.plotWidth / Math.max(1, columns.length)
   // The cluster keeps the width a single bar has, and the series divide it, so a chart with no split
-  // lays out exactly like an ungrouped bar.
+  // lays out exactly like an ungrouped bar. A stack keeps the whole width.
   const cluster = slot * 0.7
-  const width = cluster / groups.length
+  const width = stacked ? cluster : cluster / groups.length
+  // How high each category's stack has reached, the first series at the bottom.
+  const stackedBelow = columns.map(() => 0)
 
   const bars = groups.flatMap((group, groupIndex) =>
     columns.map((column, index): ChartBar => {
       const value = values[groupIndex][index]
       const height = Math.max(0, (value / top) * frame.plotHeight)
+      const below = stacked ? stackedBelow[index] : 0
+      if (stacked) stackedBelow[index] += height
       return {
         key: `${group.id} ${column.id}`,
         label: column.label,
@@ -389,8 +424,8 @@ function buildBar(
         ...(series
           ? toneOrSlot(declaredTone(series, group.id), groupIndex)
           : { tone: declaredTone(field, column.id) ?? 'accent' }),
-        x: frame.plotLeft + index * slot + (slot - cluster) / 2 + groupIndex * width,
-        y: frame.plotTop + frame.plotHeight - height,
+        x: frame.plotLeft + index * slot + (slot - cluster) / 2 + (stacked ? 0 : groupIndex * width),
+        y: frame.plotTop + frame.plotHeight - below - height,
         w: width,
         h: height,
       }
