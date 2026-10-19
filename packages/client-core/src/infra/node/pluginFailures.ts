@@ -19,13 +19,14 @@ import { nodes } from './fleet'
 //
 // Three cases the wording has to keep apart. 'load' means the package never ran: its manifest did not
 // parse, its bundle did not import, or its apiVersion is not this node's. 'failed' means it started
-// and threw. A reason on a row whose state is not 'failed' means the copy on disk claimed a name
+// and threw, or with stage 'run', ran and then its worker died. A reason on a row whose state is not 'failed' means the copy on disk claimed a name
 // something else answers to, so what is running is fine and the installed copy is not.
 //
 // These rows use the plugin's name. The two waiting rows below keep the id, because they lead to a
 // trust decision and a loaded plugin chooses its own name.
 const titleFor = (row: NodePluginRow): string => {
   if (row.state !== 'failed') return `Plugin ${pluginLabel(row)}: the copy installed on this node did not load`
+  if (row.stage === 'run') return `Plugin ${pluginLabel(row)} stopped`
   return `Plugin ${pluginLabel(row)} failed to ${row.stage === 'load' ? 'load' : 'start'}`
 }
 

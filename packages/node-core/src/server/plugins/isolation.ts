@@ -96,6 +96,14 @@ export function disposeUnstartedPlugin(plugin: NodePlugin): Promise<void> | unde
   return dispose?.()
 }
 
+const stopListeners = new WeakMap<NodePlugin, (listener: (error: Error) => void) => void>()
+
+/** Call `listener` once if this loaded plugin's worker dies on its own, from a throw nothing caught,
+ *  rather than because the host disposed it. A compiled plugin has no worker, so nothing happens. */
+export function onWorkerStopped(plugin: NodePlugin, listener: (error: Error) => void): void {
+  stopListeners.get(plugin)?.(listener)
+}
+
 export async function isolateNodePlugin(options: {
   entrypoint: string
   pluginDir: string
@@ -235,14 +243,17 @@ export async function isolateNodePlugin(options: {
     closing = worker.terminate().then(() => {})
     return closing
   }
-  worker.on('error', (error) => {
-    if (!closed) endpoint.close(error instanceof Error ? error : new Error(String(error)))
+  // Kept, not just passed on, so a host that subscribes after the worker already died still hears.
+  const stopped: { error?: Error; listener?: (error: Error) => void } = {}
+  const stoppedOnItsOwn = (error: Error): void => {
+    if (closed) return
     closed = true
-  })
-  worker.on('exit', (code) => {
-    if (!closed) endpoint.close(new Error(`Plugin '${options.plugin}' worker exited with code ${code}.`))
-    closed = true
-  })
+    endpoint.close(error)
+    stopped.error = error
+    stopped.listener?.(error)
+  }
+  worker.on('error', (error) => stoppedOnItsOwn(error instanceof Error ? error : new Error(String(error))))
+  worker.on('exit', (code) => stoppedOnItsOwn(new Error(`Plugin '${options.plugin}' worker exited with code ${code}.`)))
   let disposing: Promise<void> | undefined
   const plugin: NodePlugin & Record<string, unknown> = {
     ...handshake.metadata,
@@ -263,6 +274,10 @@ export async function isolateNodePlugin(options: {
     },
   }
   unstarted.set(plugin, close)
+  stopListeners.set(plugin, (listener) => {
+    stopped.listener = listener
+    if (stopped.error) queueMicrotask(() => listener(stopped.error!))
+  })
   return plugin
 }
 

@@ -62,6 +62,11 @@ describe('pluginFailureAttention', () => {
     })
   })
 
+  it('says "stopped" for a plugin whose worker died after it started', async () => {
+    serve([row({ state: 'failed', stage: 'run', failedAt: 5, reason: 'Its worker stopped: boom' })])
+    expect((await items())[0]).toMatchObject({ title: 'Plugin ntfy stopped', detail: 'Its worker stopped: boom' })
+  })
+
   it('falls back to the generic sentence when the node is older than the reason field', async () => {
     serve([row({ state: 'failed', failedAt: 5 })])
     expect((await items())[0]?.detail).toContain('its start-up threw')

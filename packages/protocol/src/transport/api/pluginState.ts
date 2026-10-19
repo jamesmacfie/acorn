@@ -37,8 +37,9 @@ export type NodePluginRow = {
   // Untrusted display text. It comes from a loaded plugin's own throw, so render it as text, never as
   // markup. node-core's `pluginState` caps it.
   reason?: string
-  // Which pass it died in, so the UI can say "failed to load" rather than "failed to start".
-  stage?: 'load' | 'init' | 'ready'
+  // Which pass it died in, so the UI can say "failed to load" rather than "failed to start". 'run'
+  // means it started and its worker died later.
+  stage?: 'load' | 'init' | 'ready' | 'run'
   // Present exactly when this plugin came off the node's disk rather than the app binary, which makes
   // it the client's answer to "is this third-party?" (docs/plugins/activation.md).
   installed?: InstalledPluginRow

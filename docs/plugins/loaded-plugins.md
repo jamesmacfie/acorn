@@ -42,8 +42,14 @@ A compiled plugin that throws from `init` fails the boot, because a Node that ca
 code should say so. A loaded plugin that throws has its registrations rolled back, is reported
 through the roster as `state: 'failed'` and in the attention inbox, and the Node keeps starting.
 
+A plugin whose worker dies after it started, from a throw nothing caught, is stopped the same way:
+its routes and contributions are taken back and its row turns failed with `stage: 'run'` and the
+worker's error as the reason. The Node doesn't restart it. Turning it off and on again in
+**Settings > Plugins** does.
+
 A failed roster row carries `reason` and `stage` beside `failedAt`. `stage` is `'init'` or `'ready'`
-for a plugin that ran and threw, and `'load'` for a package that never ran:
+for a plugin that ran and threw, `'run'` for one whose worker died later, and `'load'` for a package
+that never ran:
 
 - A manifest that doesn't parse. The reason names the failing field paths, up to three, then
   "and N more".

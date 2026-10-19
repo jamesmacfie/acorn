@@ -10,7 +10,7 @@ import type { CompiledCoreServices } from '../core'
 import { builtinPluginStorage, type PluginDatabase } from '../plugins/storage'
 import type { CapabilityRegistry } from './capabilities'
 import { buildPluginContext, revokePluginContext, type LoadedPluginBinding } from './context'
-import { disposeUnstartedPlugin } from '../plugins/isolation'
+import { disposeUnstartedPlugin, onWorkerStopped } from '../plugins/isolation'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 import { declareEmits } from './emits'
 import { declareBrowserHandoffs } from './browserHandoffs'
@@ -96,8 +96,9 @@ export type PluginRosterEntry = {
   // display-only, rendered as text and capped at the wire boundary (server/pluginHost/state.ts).
   reason?: string
   // Which pass it died in. 'load' never comes from the host, because that is the loader's failure
-  // folded in one layer up, but the client renders all three from one field.
-  stage?: 'load' | 'init' | 'ready'
+  // folded in one layer up, but the client renders all four from one field. 'run' is a loaded plugin
+  // whose worker died after it started.
+  stage?: 'load' | 'init' | 'ready' | 'run'
 }
 
 type PluginFailure = { name: string; error: string; at: number; stage: 'init' | 'ready' }
@@ -444,7 +445,7 @@ export async function initPlugins(
 
   // The roster row is where a reload's outcome is reported, because the settings page and the attention
   // bell already read it. Written in place: the bridge holds `roster` by reference.
-  const markFailed = (name: string, stage: 'init' | 'ready', error: string): void => {
+  const markFailed = (name: string, stage: 'init' | 'ready' | 'run', error: string): void => {
     const row = roster.find((entry) => entry.name === name)
     if (!row) return
     row.state = 'failed'
@@ -628,13 +629,13 @@ export async function initPlugins(
     if (candidate.db) opened.set(name, candidate.db)
 
     markActive(name)
+    watchWorker(next.plugin)
     return { ok: true }
   }
 
-  const unload = async (name: string, reason: PluginUnloadReason): Promise<PluginReloadOutcome> => {
-    if (builtins.has(name)) return { ok: false, error: `'${name}' is built in. Turning it off needs a restart.` }
-    // The same order as a reload's commit: stop serving, let it release what it holds, close its database
-    // after that, and revoke its context last so a leaked reference fails loudly.
+  // The same order as a reload's commit: stop serving, let it release what it holds, close its database
+  // after that, and revoke its context last so a leaked reference fails loudly.
+  const stopInstance = async (name: string): Promise<void> => {
     clearRegistrations(name)
     const instance = started.find((plugin) => plugin.name === name)
     if (instance) {
@@ -648,6 +649,23 @@ export async function initPlugins(
     const ctx = contexts.get(name)
     if (ctx) revokePluginContext(ctx)
     forget(name)
+  }
+
+  // A loaded plugin's worker can die after it started, from a throw in a timer or a child-process
+  // callback that nothing caught. Its routes would stay registered and answer every request with a bare
+  // 500. Instead it is stopped like a turned-off plugin and its row says why. No automatic restart: a
+  // plugin that dies on every sample would only loop. Turning it off and on again restarts it.
+  const watchWorker = (plugin: NodePlugin): void =>
+    onWorkerStopped(plugin, (error) => {
+      // A later reload or unload already replaced or stopped this instance.
+      if (!started.includes(plugin)) return
+      pluginLog(plugin.name).error(`its worker stopped while running: ${describeError(error).message}`)
+      void stopInstance(plugin.name).then(() => markFailed(plugin.name, 'run', `Its worker stopped: ${error.message}`))
+    })
+
+  const unload = async (name: string, reason: PluginUnloadReason): Promise<PluginReloadOutcome> => {
+    if (builtins.has(name)) return { ok: false, error: `'${name}' is built in. Turning it off needs a restart.` }
+    await stopInstance(name)
 
     const index = roster.findIndex((entry) => entry.name === name)
     if (reason === 'removed') {
@@ -667,6 +685,9 @@ export async function initPlugins(
     }
     return { ok: true }
   }
+
+  // Every plugin this boot started. A compiled one has no worker, so watching it does nothing.
+  for (const plugin of started) watchWorker(plugin)
 
   return {
     enabled,
