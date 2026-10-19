@@ -3,6 +3,7 @@
 // the platforms it serves, so the script below can move the visitor's ahead of the rest. With no
 // release, Build from source comes first, because it's the one way that works.
 import BuildFromSource from '../components/BuildFromSource.astro'
+import Hero from '../components/Hero.astro'
 import InstallBlock from '../components/InstallBlock.astro'
 import SoftwareApplication from '../components/SoftwareApplication.astro'
 import { installMethods } from '../install'
@@ -31,6 +32,9 @@ const released = release && new Date(release.publishedAt).toLocaleDateString('en
 
 <Marketing title="Download acorn" meta={meta}>
   <SoftwareApplication slot="head" release={release} />
+  <Hero slot="hero" title="Download acorn">
+    <p>The desktop app, the terminal client, a standalone Node for a server, and the browser extension.</p>
+  </Hero>
   {
     release ? (
       <p>
@@ -216,3 +220,10 @@ const released = release && new Date(release.publishedAt).toLocaleDateString('en
 <script>
   import '../scripts/platform'
 </script>
+
+<style>
+  /* A page you work down rather than read through, so its sections sit closer than a landing chapter's. */
+  [data-platform-order] > :global(.section) {
+    padding-block-start: clamp(3rem, 2rem + 3vw, 5rem);
+  }
+</style>

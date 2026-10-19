@@ -148,7 +148,9 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [site.md](./site.md) | The public site in `apps/site`: running, building, checking, and deploying it, and adding a page. |
 | [site/agent-outputs.md](./site/agent-outputs.md) | The public site's search palette, page titles and descriptions, social cards, the Markdown copy of each docs page, `llms.txt`, and the agent guide. |
 | [site/built-in-plugins.md](./site/built-in-plugins.md) | The public site's list of the plugins acorn ships, each plugin's facts box, and the test that keeps both whole. |
-| [site/design.md](./site/design.md) | How the public site looks: its stylesheet on acorn's tokens, fonts, mark, Appearance control, components, contrast check, and the landing page's Lighthouse scores. |
+| [site/design.md](./site/design.md) | How the public site looks: its stylesheet on acorn's tokens, the mark, the light and dark themes, the dark stage that opens and closes a marketing page, components, motion, and the contrast checks. |
+| [site/design/fonts.md](./site/design/fonts.md) | The public site's faces: JetBrains Mono and its subsets, Inter for marketing paragraphs and its fallback, and the preloads. |
+| [site/design/lighthouse.md](./site/design/lighthouse.md) | The landing page's Lighthouse target, the command that checks it, and its scores. |
 | [site/marketing-copy.md](./site/marketing-copy.md) | How the marketing pages read: the landing page's one joke, and the marks of a generated page they leave out. |
 | [site/specimens.md](./site/specimens.md) | Specimens on the public site: plugin tree code both hosts draw, the generators that commit and check it, and the scoped stylesheet. |
 | [site/plugin-guides.md](./site/plugin-guides.md) | The public site's plugin guides: the example plugins in `examples/plugins/`, the harness that installs and runs them, and how a guide shows their code and pictures. |

@@ -2,6 +2,7 @@
 // The features index: a card per feature page, each with its sentence and a small picture. The cards
 // are links, so the pictures inside them are inert.
 import Card from '../../components/Card.astro'
+import Hero from '../../components/Hero.astro'
 import Snapshot from '../../components/Snapshot.astro'
 import Specimen from '../../components/Specimen.astro'
 import { FEATURES, type FeatureId } from '../../features'
@@ -32,9 +33,10 @@ const ids = Object.keys(FEATURES) as FeatureId[]
 ---
 
 <Marketing title="Features" meta={meta}>
-  <p class="lede">What acorn does, one part at a time. Each page shows the part and links to its docs.</p>
-  <section class="section">
-    <h2>Every part of acorn</h2>
+  <Hero slot="hero" title="Features">
+    <p>What acorn does, one part at a time. Each page shows the part and links to its docs.</p>
+  </Hero>
+  <section class="section" aria-label="Every part of acorn">
     <ul class="cards">
       {
         ids.map((id) => {
@@ -56,9 +58,6 @@ const ids = Object.keys(FEATURES) as FeatureId[]
 </Marketing>
 
 <style>
-  .lede {
-    max-inline-size: var(--site-measure);
-  }
   .cards {
     grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr));
   }

@@ -1,7 +1,9 @@
 ---
 import 'virtual:acorn-ui.css'
 import '../styles/site.css'
+import inter from '@acorn/client-core/infra/styles/fonts/inter-var.woff2?url'
 import AppearanceScript from '../components/AppearanceScript.astro'
+import Hero from '../components/Hero.astro'
 import SiteFooter from '../components/SiteFooter.astro'
 import SiteHeader from '../components/SiteHeader.astro'
 import { pageMeta, type PageMeta } from '../meta'
@@ -24,9 +26,10 @@ const card = new URL(`/og/${marketingCard(Astro.url.pathname)}.png`, Astro.site)
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- The two faces the first screen draws in. Found only through the stylesheet, they'd start late. -->
+    <!-- The three faces the first screen draws in. Found only through the stylesheet, they'd start late. -->
     <link rel="preload" href="/fonts/JetBrainsMono-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/JetBrainsMono-Bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={inter} as="font" type="font/woff2" crossorigin />
     <AppearanceScript />
     <title>{title} · acorn</title>
     <meta name="description" content={meta.description} />
@@ -45,12 +48,13 @@ const card = new URL(`/og/${marketingCard(Astro.url.pathname)}.png`, Astro.site)
     <slot name="head" />
   </head>
   <body>
-    <header class="site-bar"><SiteHeader /></header>
+    {/* The header, the hero under it, and the footer draw dark in either scheme (docs/site/design.md). */}
+    <header class="site-bar site-dark"><SiteHeader /></header>
     <main class="site-page">
       {/* A page with a hero lets it carry the page's heading. */}
-      {Astro.slots.has('hero') ? <slot name="hero" /> : <h1>{title}</h1>}
+      {Astro.slots.has('hero') ? <slot name="hero" /> : <Hero title={title} />}
       <slot />
     </main>
-    <footer class="site-foot"><SiteFooter /></footer>
+    <footer class="site-foot site-dark"><SiteFooter /></footer>
   </body>
 </html>
