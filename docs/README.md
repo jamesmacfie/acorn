@@ -469,6 +469,16 @@ Each plugin landing page above has topic pages in a folder of the same name:
 - [Pull request panel in the browser extension](./future/extension-github-panel.md) and [Docker
   panel in the browser extension](./future/extension-docker-panel.md).
 
+## Agent analytics proposal
+
+- [Show how a workspace's agents spend time and money](./future/agent-analytics/README.md), with phases
+  for [fitting dynamic UI](./future/agent-analytics/01-dynamic-ui-fit.md), [turn
+  facts](./future/agent-analytics/02-turn-facts.md), [agent sources](./future/agent-analytics/03-agent-sources.md),
+  [heatmaps and stacked bars](./future/agent-analytics/04-heatmaps-and-stacked-bars.md),
+  [workspace rail sources](./future/agent-analytics/05-workspace-rail-sources.md), [session
+  marks](./future/agent-analytics/06-session-marks.md), [message links](./future/agent-analytics/07-message-links.md),
+  and [the analytics plugin](./future/agent-analytics/08-analytics-plugin.md).
+
 ## Mobile web app proposal
 
 - [Build a mobile web app](./future/mobile/README.md), with phases for [the
