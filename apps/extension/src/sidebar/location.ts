@@ -57,6 +57,10 @@ export function createLocation(options: {
     // A step's conversation needs its run to show, so its task stands in for it.
     const sessionId = next.level === 'conversation' && next.from === 'agents' ? next.sessionId : null
     void saveDestination(storage, nodeId, { projectId: projectOf(taskId), taskId, sessionId })
+    const view = taskViews[taskId]
+    if ((view?.sessionId ?? null) === sessionId) return
+    taskViews = rememberTaskView(taskViews, taskId, { tab: view?.tab ?? 'agents', ...(sessionId && { sessionId }) })
+    void saveTaskViews(storage, nodeId, taskViews)
   }
 
   const taskAt = (taskId: string, tab?: TaskTab): Location => ({
@@ -70,10 +74,10 @@ export function createLocation(options: {
   const goHome = () => go({ level: 'home' })
 
   // The page beside the panel moved, or the Node's task list arrived. A stored task the list doesn't
-  // have, archived while the panel was closed, gives way to Home. A page of a task opens that task,
-  // unless Settings or a conversation is open: pages are often visited to capture them into the
-  // conversation. A page of no task, reached from the page of the task the panel shows, goes Home.
-  // Any other page of no task leaves the panel where it is.
+  // have, archived while the panel was closed, gives way to Home. A page of a task opens that task, on
+  // the conversation it last showed or else its tab, unless Settings or a conversation is open. A page
+  // of no task, reached from the page of the task the panel shows, goes Home. Any other page of no task
+  // leaves the panel where it is.
   const followPage = (taskId: string | null) => {
     if (restoring) return
     const list = tasks()
@@ -84,10 +88,14 @@ export function createLocation(options: {
     const left = pageTask
     pageTask = taskId
     const here = location()
-    if (here.level === 'settings' || here.level === 'conversation') return
+    if (here.level === 'settings') return
     if (!taskId) {
-      if (here.level === 'task' && here.taskId === left) goHome()
-    } else if (here.level !== 'task' || here.taskId !== taskId) openTask(taskId)
+      if (left && locationTask(here) === left) goHome()
+    } else if (here.level === 'home' || (here.level === 'task' && here.taskId !== taskId)) {
+      const sessionId = taskViews[taskId]?.sessionId
+      if (sessionId) openConversation(taskId, sessionId)
+      else openTask(taskId)
+    }
   }
 
   return {

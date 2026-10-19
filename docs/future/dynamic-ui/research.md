@@ -1,7 +1,10 @@
-# Research: Lemma's widgets and apps, and Acorn's seams
+# Research: Lemma's widgets and apps, OpenUI, dashboards, and Acorn's seams
 
-Status: research notes, 2026-10-01. Lemma was read from the clone at `references/lemma-platform` in
-the main checkout, which is not part of the repository. Treat version-specific details as dated.
+Status: research notes. Lemma was read on 2026-10-01 from the clone at `references/lemma-platform` in
+the main checkout, which is not part of the repository. OpenUI was read on 2026-10-19 from
+[thesysdev/openui](https://github.com/thesysdev/openui) at commit `8d9c4c3`, dated October 16, 2026,
+with `@openuidev/lang-core` at version 1.0.1. Acorn's dashboards were read on 2026-10-19. Treat
+version-specific details as dated.
 
 ## What Lemma does
 
@@ -56,15 +59,114 @@ What costs Lemma:
   `unauthenticated` often does not mean signed out, because browsers withhold the cookie.
 - **No keyboard or focus model** shared with the host, and no terminal rendering.
 
+## What OpenUI does
+
+OpenUI is a specification and a set of packages for model-written UI, maintained by Thesys under the
+MIT license. Thesys also sells a hosted Gateway that repairs model output and a hosted observability
+service.
+
+### The language
+
+OpenUI Lang 1.0 is defined in three documents in the repository's `spec` folder: an overview, the
+language rules, and the prompt and message protocol.
+
+- A program is one statement per line, `name = Expression`. Rendering starts at `root`, a name can be
+  used before its statement, and the last statement for a name wins.
+- Component arguments are positional, in the key order of the component's Zod schema. `null` skips an
+  optional argument.
+- `$` variables hold state. Passing one to an input binds it both ways, and `@Set` and `@Reset` change
+  it.
+- Expressions cover arithmetic, comparison, logic, `? :`, member access, and indexing. Member access on
+  a list gives that field of every element.
+- The built-in functions are `@Count`, `@Sum`, `@Avg`, `@Min`, `@Max`, `@First`, `@Last`, `@Filter`,
+  `@Sort`, `@Round`, `@Abs`, `@Floor`, `@Ceil`, and `@Each`. There is none for grouping or joining. A
+  library adds pure, synchronous functions of its own.
+- `Query(tool, args, defaults)` reads from a tool the host provides, and runs again when a `$`
+  variable written in its arguments changes. `Mutation` writes, and runs only through `@Run`. The host
+  supplies tools as a map of async functions or as an MCP client.
+- The built-in actions are `@ToAssistant`, `@OpenUrl`, `@Set`, `@Reset`, and `@Run`. A library adds
+  custom actions, which reach the host as events.
+- Editing is a patch of statements merged by name. `name = null` deletes a statement, and statements
+  nothing reaches are dropped.
+- Errors carry a code, the statement, and a hint for the model: `unknown-component`,
+  `missing-required`, `null-required`, `type-mismatch`, `excess-args`, `inline-reserved`,
+  `unknown-function`, `no-root`, `parse-failed`, `runtime-error`, and `tool-not-found`. The client
+  drops the smallest broken piece and draws the rest.
+- Stored programs keep working while a library changes if the library adds props only at the end,
+  never reorders or removes one, and gives a new required prop a default.
+
+The conformance suite holds 58 cases. Every case checks parsing and evaluation without a UI, and 12
+also check interaction: a runner mounts the program, replays clicks and typing, and compares the host
+events and final state.
+
+OpenUI claims up to 67% fewer tokens than JSON formats. The benchmarks are its own.
+
+### The packages
+
+- `@openuidev/lang-core` is the framework-free core: parser, validation, evaluator, query manager, and
+  prompt generation. It takes Zod 4 as a peer dependency, the same major Acorn's catalog pins.
+- `@openuidev/react-lang` is the React renderer, at 1.0.1. Its source outside tests is about 3,200
+  lines, including devtools and observability hooks.
+- The Vue, Svelte, and Angular renderers are at 0.4.2 and depend on `lang-core` 0.4. There is no Solid
+  renderer.
+- The rest are React chat components, an email library, a LangChain adapter, an A2UI client, a
+  browser bundle, server helpers, and a CLI.
+
+### What to watch
+
+- `lang-core` runs an install script that sends an anonymous install event to PostHog unless
+  `DO_NOT_TRACK` or `OPENUI_TELEMETRY_DISABLED` is set. Runtime telemetry is opt-in through
+  `OPENUI_RUNTIME_TELEMETRY_ENABLED`, and never sends from a browser.
+- The evaluator's member access reads any property of a value, including `constructor`. There is no
+  way to call a value from a program.
+- OpenUI calls itself "the open standard for generative UI". Other formats compete: Google's A2UI and
+  Vercel's json-render are JSON formats, and MCP Apps draws HTML in iframes.
+
+## What dashboards already do
+
+Dashboards already cover most of what an agent-made view of data needs. For the contract, read
+[dashboards](../../dashboards.md).
+
+- **Plans.** A version 2 `PanelPlan` names saved or inline typed queries, binds source fields into
+  columns, and runs up to eight filter, compute, summarize, expand, and overlap stages, with sorting,
+  grouping, limits, and a time policy. Summaries group by up to three columns and give counts, sums,
+  averages, percentiles, and distinct counts. Time buckets fill gaps. A plan names one view: stat,
+  list, table, board, or chart.
+- **One run route.** `POST /v1/core/dashboards/run` takes a published revision or a draft plan, in
+  preview or execution mode, and returns rows, groups, a plain-language description, and diagnostics.
+  Placed panels cache runs and refetch when the window regains focus, after a reported account or
+  plugin change, and at the plan's interval, held between 30 seconds and a day. The Node shares
+  identical reads across panels.
+- **An AI that writes plans.** The panel studio's **Ask AI** and the launcher's **Describe it** have a
+  model draft or change a plan. Its instructions are in `packages/node-core/src/server/routes/authoring.ts`,
+  built on `PANEL_CAPABILITIES` from `packages/dashboards-core/src/capabilities.ts`, and evaluation
+  cases check it. It sees records only when the owner ticks **Use preview records to help AI**, and
+  then three records and 16 KiB at most.
+- **Publishing from a view.** The drill-down's **Add as panel** publishes a derived plan and offers
+  **Edit…**.
+- **Who may call what.** Every dashboard route needs a device principal
+  (`packages/node-core/src/server/routes/dashboards.ts`). The query library refuses task principals.
+  The agent's data source tools return descriptors, schemas, and option pages, never records.
+- **Persistence.** Placed panel definitions live in the `dashboards` Node preference. The shared codec,
+  `packages/dashboards-core/src/definition.ts`, drops a definition with no publication.
+- **The terminal.** The terminal client draws no dashboard panels (`apps/tui/src/plugins/SourcePanel.tsx`).
+
+A request such as "graph pull requests over the last month by person" is a plan today: the GitHub pull
+requests source, a relative 30-day window, a count by author, and a bar chart. What's missing is a
+way for a chat agent to draft one and for the owner to keep it.
+
 ## What Acorn already has
 
 Almost every piece this programme needs has shipped for another reason.
 
 | Need | Acorn seam | Where it is documented |
 | --- | --- | --- |
-| Sandboxed UI in host components | Remote component trees, run in a worker, drawn by the host on desktop and in the terminal | [Descriptors, trees, rectangles](../../plugins/ui-tiers.md) |
-| A plugin with no build step | The scaffold inlines the bridge handshake and tree protocol | [Start from the scaffold](../../plugin-authoring/start-from-the-scaffold.md) |
-| Agent-written bundles without a prompt per save | Dev mode, a device-side grant that records acceptances as `dev` and `partial` | [Activation](../../plugins/dev-loop.md#the-dev-loop) |
+| Shaping data into a view | Dashboard plans, the run route, and the five views | [Dashboards](../../dashboards.md) |
+| A model that writes plans | The panel studio's AI and its evaluation cases | [Mapping and the editor](../../dashboards/mapping-and-editor.md) |
+| Keeping a panel | Publication, Home tabs, and placements | [Placements](../../dashboards/placements.md) |
+| Host components that draw in both clients | The kit, through `@acorn/plugin-api/ui`, which the terminal build resolves to its own kit | `apps/tui/vite.config.ts` |
+| A plugin with no build step, for turning an app into a plugin | The scaffold inlines the bridge handshake and tree protocol | [Start from the scaffold](../../plugin-authoring/start-from-the-scaffold.md) |
+| An agent writing a plugin without a prompt per save | Dev mode, a device-side grant that records acceptances as `dev` and `partial` | [Activation](../../plugins/dev-loop.md#the-dev-loop) |
 | Teaching an agent the contract from the running host | `plugin_authoring` | [Agent tools](../../agent-tools.md) |
 | A custom card in the transcript | `agents:tool-card`, a `replace` remote point keyed by tool name | [Cooperative extension points](../../plugins/cooperative-extension-points.md) |
 | The conversation inside another pane | The `agents.conversation` client capability | `plugins/agents/src/contract/conversation.ts` |
@@ -72,22 +174,39 @@ Almost every piece this programme needs has shipped for another reason.
 | A read-only archived view | Panes that declare `readsArchived` | [Workspaces and tasks](../../workspaces-and-tasks/archive.md#restoring-a-task) |
 | Project-scoped panes beside a rail list | The `/p/:projectId/x/<plugin-id>/` routes | [Panes](../../panes.md) |
 | Find or create a task for an item | The reference panel action | [Panes](../../panes.md#not-a-pane-the-reference-panel) |
+| Publishing a package from this repository | Three unscoped MIT packages with a pinned published surface | [Published packages](../../plugins/publishing.md) |
 
 ## What is missing
 
-- **A light authoring format.** The scaffold is close, but it assumes a person running a command and
-  a package with a node half.
-- **Lifecycle.** Nothing ties a plugin to a task, archives it with the task, or promotes it.
-- **Revisions.** A plugin has one installed version. Apps need numbered revisions and a head.
-- **Narrow trust.** Dev mode waives prompts for one plugin with its full permissions. Apps need a
-  waiver that covers a namespace and only a narrow profile.
-- **Validation before display.** Nothing boots a tree headlessly and reports errors to the agent.
-- **An authoring guide for the kit.** `plugin_authoring` covers the manifest and the bridge. It does
-  not teach an agent which kit components to use for a board, a chart, or a form, and it has no worked
-  examples.
+For panels:
+
+- **Agent tools for plans.** A guide built from the studio AI's instructions, and a tool that
+  validates a draft plan and draws it in the conversation.
+- **A panel card.** The dashboard views drawn in a transcript, with versions.
+- **Add to dashboard.** Publishing and placing a plan from a card, under the owner's device.
+
+For apps:
+
+- **A Solid renderer for OpenUI.** `lang-core` does the language. Acorn writes the renderer, and
+  OpenUI's conformance cases test it.
+- **A library.** Layout and form components over the kit, `Panel` over the dashboard views, and any
+  library functions phase 2 shows agents need.
+- **Plans inside an app.** Running an app's plans through the run route, and possibly taking inputs
+  from the program.
+- **Tools over the rest of Acorn.** Row actions, task context, compose, and links as OpenUI tools and
+  actions.
+- **Lifecycle and revisions.** Nothing ties a UI to a task, archives it with the task, promotes it, or
+  numbers its versions.
+- **App cells on dashboards,** and a codec that keeps definitions it doesn't recognize.
+- **Worked examples.** `lang-core` generates the language prompt from the library. It doesn't know
+  which components suit a checklist or a form in Acorn.
+
+Apps need neither a narrow trust grant nor a headless worker. A program runs no code, and `lang-core`
+validates it on the Node.
 
 ## What the spike must answer
 
-Whether an agent, given the kit vocabulary and a handful of examples, writes a useful tree in one or
-two tries. Everything else in this programme is plumbing that already has a pattern. That one question
-does not, which is why [phase 0](./00-spike.md) exists.
+Whether an agent, given the library, the plan guide, and a handful of examples, writes a useful app in
+one or two tries for requests a panel can't serve. Panels need no spike, because the studio's AI
+already writes plans. Everything else in this programme is plumbing that already has a pattern. That
+one question does not, which is why [phase 2](./02-renderer-and-spike.md) exists.

@@ -1,6 +1,7 @@
-# Phase 2: the task Apps pane, editing, and archive
+# Phase 4: the task Apps pane, editing, and archive
 
-Status: proposed, 2026-10-01. Depends on [phase 1](./01-inline-cards.md).
+Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang and plans. Depends on
+[phase 3](./03-inline-cards.md).
 
 ## Goal
 
@@ -18,7 +19,7 @@ the task.
 
 ## Starting point
 
-- Phase 1's packages, tools, cards, revisions, and app trust.
+- Phase 3's host plugin, library, tools, cards, and revisions.
 - The `agents.conversation` client capability in `plugins/agents/src/contract/conversation.ts`, used
   by the workflows run pane.
 - Pane gating with `when`, and archived previews through `readsArchived` ([panes](../../panes.md)).
@@ -31,7 +32,7 @@ the task.
 1. The host plugin contributes one `list-detail` task pane, gated by `when` so a task with no app has no
    button.
 2. The list shows each app's name, description, head revision, and when it last changed.
-3. The detail runs the app's head with placement `pane`.
+3. The detail runs the app's head with `$placement` set to `pane`.
 4. A card's **Open** goes to the app in this pane.
 
 ### Editing
@@ -39,27 +40,29 @@ the task.
 5. The detail has an **Edit with agent** drawer that draws the building session's conversation through
    `agents.conversation`, composer included.
 6. When the building session is unavailable, the drawer offers **Start an editing session**, which
-   creates a session in this task with the app's name, description, file list, and head attached.
+   creates a session in this task with the app's name, description, program, plans, and head
+   attached.
 7. A new head from either the drawer or the main Agent pane moves the detail to it without a reload.
 
 ### App state
 
-8. The bridge offers `state.read` and `state.write` for the app's own JSON document, at most 256 KiB.
-9. State survives revisions. A revision that changes the state's shape handles the old shape itself;
-   the host does not migrate.
-10. `app_guide` documents state and includes the checklist example from phase 0.
+8. The host saves the program's `$` variables to the app's own JSON document, at most 256 KiB, and
+   seeds them when the app mounts.
+9. State survives revisions by variable name. A variable a revision drops is discarded, and a new one
+   starts at its declared default. The host does not migrate.
+10. `app_guide` says which variables persist and includes the checklist example from phase 2.
 
 ### Archive and restore
 
 11. The archive confirmation lists the task's apps and says they are archived with the task.
-12. Archive unregisters the task's apps and keeps their files, revisions, and state.
+12. Archive keeps the task's apps, revisions, and state.
 13. The pane declares `readsArchived`. In an archived preview it lists apps, their revisions, and their
-    files, read only, and does not run them.
-14. Restore registers the apps again, at the head they had.
+    programs, read only, and does not draw them.
+14. Restore brings the apps back at the head they had.
 
 ## Out of scope
 
-- **Publish to project** on the archive confirmation. It arrives with [phase 3](./03-project-apps.md).
+- **Publish to project** on the archive confirmation. It arrives with [phase 5](./05-project-apps.md).
 - Deleting a task app on its own. A task app goes when its task is deleted.
 
 ## Steps and checkpoints
@@ -95,5 +98,4 @@ does not run it. Restore the task. The app runs at the same head with its ticks.
 
 - How the workflows run pane mounts `agents.conversation`, including the layout rule that the
   conversation must reach the pane region as a fragment.
-- Whether archive has a hook the host plugin can use to unregister apps, or whether registration should
-  follow the task's archived state on each read.
+- How an archived task's transcript draws tool cards, so app cards there don't run queries.

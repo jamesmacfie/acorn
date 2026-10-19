@@ -121,8 +121,9 @@ export const saveDestination = (storage: Storage, nodeId: string, destination: D
 
 // A tab under a task. A plugin's panel is `panel:<pluginId>`.
 export type TaskTab = 'agents' | 'runs' | `panel:${string}`
-// What the sidebar remembers of a task: the tab the person last picked there, which the task opens on.
-export type TaskView = { tab: TaskTab }
+// What the sidebar remembers of a task: the tab the person last picked there, which the task opens on,
+// and the conversation it last showed, which the task's page opens again.
+export type TaskView = { tab: TaskTab; sessionId?: string }
 
 // The most tasks remembered on a Node. The oldest is forgotten first.
 const TASK_VIEWS_MAX = 50
@@ -133,9 +134,12 @@ export async function loadTaskViews(storage: Storage, nodeId: string): Promise<R
   if (!stored || typeof stored !== 'object') return {}
   // Views stored by older builds name the Runs tab `workflows`.
   return Object.fromEntries(
-    Object.entries(stored as Record<string, { tab: string }>).map(([taskId, view]) => [
+    Object.entries(stored as Record<string, { tab: string; sessionId?: unknown }>).map(([taskId, view]) => [
       taskId,
-      { tab: (view.tab === 'workflows' ? 'runs' : view.tab) as TaskTab },
+      {
+        tab: (view.tab === 'workflows' ? 'runs' : view.tab) as TaskTab,
+        ...(typeof view.sessionId === 'string' && { sessionId: view.sessionId }),
+      },
     ]),
   )
 }

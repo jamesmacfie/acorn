@@ -555,11 +555,10 @@ describe('This page', () => {
     expect(button(root.querySelector('.view[aria-label="Agents"]')!, 'Start a chat')).toBeDefined()
     expect(root.querySelector('.strip')).toBeNull()
     expect(fake.storage.get('destination:n1')).toMatchObject({ taskId: 't2' })
-    // With no conversation open, the panel follows the page to its task.
+    // With no conversation open, the panel follows the page to its task, on the conversation it showed.
     fake.navigate('https://github.com/acme/web/pull/7/files')
     await settle(30)
-    expect(shownTask(root)).toBe('Fix login')
-    expect(agentRows(root)).toEqual(['Chat s1'])
+    expect(conversationTitle(root)).toBe('Chat s1')
   })
 
   it("draws one strip: the Node offline before another task's page", async () => {

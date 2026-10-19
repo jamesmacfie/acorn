@@ -1,12 +1,15 @@
-# Phase 5: apps on a team
+# Phase 8: apps on a team
 
-Status: proposed, 2026-10-01. Waits on [cloud phase 9](../cloud/phases/09-teams.md), which brings
-roles and route classification. Nothing here changes a local Node with no account.
+Status: proposed, 2026-10-01. Revised 2026-10-19 for OpenUI Lang and plans. Depends on
+[phase 5](./05-project-apps.md), and waits on
+[cloud phase 9](../cloud/phases/09-teams.md), which brings roles and route classification. Nothing
+here changes a local Node with no account.
 
 ## Goal
 
-Teammates share project apps. Anyone on the project opens them, members edit and publish them, viewers
-only look, and each person's device decides for itself whether to run agent-built code.
+Teammates share project apps. Anyone on the project opens them, members edit and publish them, and
+viewers only look. Each person's device draws a teammate's app with its own library, under its own
+person's role.
 
 ## What a team gets at the end
 
@@ -17,7 +20,7 @@ only look, and each person's device decides for itself whether to run agent-buil
 
 ## Starting point
 
-- Phases 1 to 4.
+- Phases 1 to 5, and phase 6 if it has shipped.
 - From the cloud programme: the team Node owns shared projects, a worker is a full Node for one task
   attempt whose data root is archived at teardown, and grants carry `admin`, `member`, or `viewer`
   ([cloud architecture](../cloud/architecture.md), [cloud identity](../cloud/identity.md)).
@@ -32,21 +35,22 @@ only look, and each person's device decides for itself whether to run agent-buil
 3. **Publish to project** from a worker sends the head revision to the team Node through a versioned
    contract. The team Node applies the same conflict rule as a local publish.
 
-### Trust on each device
+### What each device draws
 
-4. App trust stays per device and per Node. A teammate's device prompts once for the team Node, and
-   once per worker Node unless the cloud programme gives workers a shared identity for this purpose.
-5. The prompt names the team and says apps are built by the team's agents.
-6. **End app trust** works the same way for team Nodes.
+4. No device prompts to trust an app, from a team Node or a worker, because a program runs no code.
+5. Each device draws a program with its own library. A device on an older library drops the
+   components it doesn't know and draws the rest, as OpenUI's error recovery does, and the card
+   names the library version the program needs.
+6. App cards and panes say which teammate's session built the revision.
 
 ### Roles
 
 7. A viewer can open project apps and task apps they can read. Their row actions, compose calls, and
    state writes are refused, and the app shows that it is read only.
 8. A member can edit, draft, publish, delete, and restore.
-9. Every data source call runs under the viewing person's grant. An app never carries its author's
-   access.
-10. The app routes and bridge calls declare `read` or `mutate`, as cloud phase 9 requires of every route
+9. Every plan runs under the viewing person's grant, as dashboard panels do. An app never carries its
+   author's access.
+10. The app routes and tool calls declare `read` or `mutate`, as cloud phase 9 requires of every route
     and bridge verb.
 11. Every revision and publish records the account that made it.
 
@@ -62,15 +66,15 @@ only look, and each person's device decides for itself whether to run agent-buil
 
 ## Risks
 
-A teammate's agent can put an app on your screen. The profile still bounds what it can do, row actions
-still need your confirm, and data still flows under your own role. The new risk is misleading UI, such
+A teammate's agent can put an app on your screen. The host's tools still bound what it can do, row
+actions and links still need your confirm, and data still flows under your own role. The new risk is misleading UI, such
 as a button labelled one thing that fires another row action. The host's risk confirm names the action
 itself, not the app's label, which is what bounds it.
 
 ## Steps and checkpoints
 
 **Checkpoint 1.** A member publishes an app from a cloud task. A second member sees it in the left rail
-after the team Node acknowledges it, and their device prompts for app trust once.
+after the team Node acknowledges it, and opens it with no trust prompt.
 
 **Checkpoint 2.** A viewer opens the same app. It renders read only. Calling the state write route with
 the viewer's grant fails.
@@ -83,12 +87,12 @@ rail shows the apps as disabled.
 
 ## Docs that change
 
-- [Security](../../security.md): app trust on team Nodes and workers.
+- [Security](../../security.md): apps on team Nodes and workers, under each viewer's role.
 - The cloud programme's [plugins and secrets](../cloud/plugins-and-secrets.md) and
   [identity](../cloud/identity.md): the app routes, policy, and route classes.
 
 ## Verify before building
 
 - Cloud phase 8's plugin policy, and whether **Allow agent-built apps** belongs in it.
-- How a worker's identity appears to a client's trust store, and whether a trust grant can cover every
-  worker of one team.
+- How a client learns the library version of the device that wrote a program, so a mismatch is named
+  rather than guessed.

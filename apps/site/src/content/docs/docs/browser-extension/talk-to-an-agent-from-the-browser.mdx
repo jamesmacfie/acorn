@@ -10,7 +10,7 @@ sources:
   - apps/extension/src/sidebar/Composer.tsx
   - apps/extension/src/sidebar/Conversation.tsx
   - apps/extension/src/sidebar/Requests.tsx
-checked: 'fba6712a5'
+checked: '41fbecc66'
 ---
 
 import Keys from '../../../../components/Keys.astro'
@@ -61,10 +61,11 @@ Each conversation keeps its own draft, in the browser, until the Node accepts it
 switching conversation, or losing the connection keeps it. Page text or a page link you add waits in
 the draft as a chip ([Send pages, selections, and screenshots](/docs/browser-extension/send-pages-selections-and-screenshots/)).
 
-An open conversation stays open as you move between pages, so you can add the page you're on to it. On a
-page of another task, a line under the top bar names that task, and **Switch** opens it. With no
-conversation open, a page of another task opens that task, on the tab you last used there, and a page
-that belongs to no task, reached from the page of the task the panel shows, goes back to Home.
+An open conversation stays open on a page of another task, so you can add that page to it. A line
+under the top bar names the page's task, and **Switch** opens it. With no conversation open, a page of
+another task opens that task, on the conversation you last had open there, or else the tab you last
+used. A page that belongs to no task, reached from the page of the task the panel shows, goes back to
+Home, even from a conversation. Going back to the task's page returns you to where you were.
 
 ## When a send doesn't go through
 
