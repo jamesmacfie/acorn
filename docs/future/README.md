@@ -12,6 +12,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | Folder | Developer handoff | Status |
 | --- | --- | --- |
+| [agent-analytics/](./agent-analytics/README.md) | Eight phases toward a workspace view of agent time, spend, and struggle: dynamic UI fitted for plugin regions, facts for each finished turn, agent turn and session sources, heatmaps and stacked bars, workspace-scoped rail sources, session marks, links to a message, and the `acorn-analytics` plugin in its own repository. | Proposed October 19, 2026. Assumes dynamic UI has merged. Implementation not started. |
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
 | [dynamic-ui/](./dynamic-ui/README.md) | Eight phases for agent-built UI: dashboard panels an agent drafts in the conversation and the owner adds to a dashboard, then a Solid renderer for OpenUI, a spike, and apps written in OpenUI Lang over dashboard plans, with project publishing, apps on dashboards, turning an app into a plugin, and team use. | Proposed October 1, 2026, and revised October 19, 2026 for agent-made panels, OpenUI Lang, and plans. Implementation not started. |
