@@ -80,6 +80,11 @@ export default defineConfig({
         find: /^@acorn\/plugin-api\/ui\/data-sources$/,
         replacement: resolve(import.meta.dirname, 'src/kit/dataSources.ts'),
       },
+      // An agent's dashboard panel card, as the one line this host can draw (src/kit/dashboards.tsx).
+      {
+        find: /^@acorn\/plugin-api\/ui\/dashboards$/,
+        replacement: resolve(import.meta.dirname, 'src/kit/dashboards.tsx'),
+      },
       {
         find: /^@acorn\/client-core\/features\/dataSources\/kit\.ts$/,
         replacement: resolve(import.meta.dirname, 'src/kit/dataSourceKit.ts'),

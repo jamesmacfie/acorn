@@ -458,3 +458,12 @@ export const dashboardLibraryRequestSchema = z.discriminatedUnion('operation', [
     .strict(),
   z.object({ operation: z.literal('delete'), scope: queryScopeSchema, id, expectedRevision: revision }).strict(),
 ])
+
+/** The `panel_show` agent tool's input, which the transcript's panel card reads back. The plan is only
+ *  an object here: the tool checks it itself, so a bad plan comes back as problems with paths into it. */
+export const panelShowInputSchema = z
+  .object({ title: label, panelId: columnId.optional(), plan: z.record(z.string(), z.unknown()) })
+  .strict()
+export type PanelShowInput = z.infer<typeof panelShowInputSchema>
+/** What `panel_show` returns. Never records: the card runs the plan itself, under the owner's device. */
+export type PanelShowResult = { panelId: string; shownAt: number; description: string[] }

@@ -882,3 +882,15 @@
   gap: var(--space-1);
 }
 
+
+/* An agent's panel card in a conversation: capped, with Expand, so one chart doesn't push the
+   conversation off screen (PanelToolCard.tsx). */
+.dash-card-frame:not([data-expanded]) {
+  max-height: 480px;
+  overflow: hidden;
+}
+
+/* A grid cell gives a chart its height; a card has none, so a chart would scale to the card's width. */
+.dash-card-frame .dash-chart-wrap {
+  height: 240px;
+}

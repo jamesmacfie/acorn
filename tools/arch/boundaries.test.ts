@@ -800,14 +800,14 @@ describe('architecture boundaries', () => {
       // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
       // `LinkPreviewHost` (docs/frontend/startup-budget.md). The token and style pack stylesheets, which
       // the browser extension loads without the app's own stylesheet.
-      '@acorn/client-core': 196, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, and the anchored popover and focus restore the sidebar's Go to task draws on.
+      '@acorn/client-core': 198, // Includes the agent panel card the agents plugin draws and the terminal's reader for it, the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, and the anchored popover and focus restore the sidebar's Go to task draws on.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
       // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
       // public site's plugin reference reads to check its examples and list the grants. `mcp/toolOutputDir`,
       // so the Claude harness can let an agent read the folder where a cut tool result's full text goes.
       '@acorn/node-core': 68,
       '@acorn/custody': 10,
-      '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.
+      '@acorn/dashboards-core': 17, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, its outline, and the plan-writing guide the studio and panel_guide share.
       // The document model, and the store a code host's Node half keeps documents in.
       '@acorn/diff-document': 3,
     }
@@ -971,6 +971,10 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/features/dashboards/dashboardClient.ts', 'preview is a dashboard run mode'],
       ['packages/client-core/src/features/dataSources/fieldPickerModel.ts', 'context is a binding address'],
       ['packages/dashboards-core/src/outline.ts', 'context is a binding address; database is a Lucide icon name'],
+      [
+        'packages/dashboards-core/src/panelGuide.ts',
+        "context is a binding address; 'github' is a worked example's source, which the GitHub plugin's tests keep valid",
+      ],
       ['packages/node-core/src/server/dashboards/run.ts', 'context is a binding address and preview is a run mode'],
       ['packages/node-core/src/server/dataSources/coreTasks.ts', 'context is a binding address in a starter plan'],
       ['packages/node-core/src/server/queries/sourceContext.ts', 'context is a host binding'],
@@ -1333,6 +1337,7 @@ describe('architecture boundaries', () => {
     // instant and names the offending specifier.
     const componentEntrypoints = new Set([
       'packages/plugin-api/src/ui/index.ts',
+      'packages/plugin-api/src/ui/dashboards.ts',
       'packages/plugin-api/src/ui/data-sources.ts',
       'packages/plugin-api/src/ui/host.ts',
     ])

@@ -34,14 +34,14 @@ import { Alert, Button, Card, EmptyState, Textarea } from '../../kit/components/
 import { Modal } from '../../kit/components/overlays/Modal'
 import { Heading } from '../../kit/components/content/Heading'
 import Icon from '../../kit/components/content/Icon'
+import { Text } from '../../kit/components/content/Text'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
 import { createWorkspaceWords } from '../workspaces/words'
 import { TitleField } from './fields'
-import { publishNewPanel } from './panelPublish'
+import { addNewPanel } from './panelPublish'
 import { toast } from '../notifications/toast'
-import { placePanelAt, savePanel, type PlacementScope } from './persist'
-import { sizePresets } from './layout'
+import type { PlacementScope } from './persist'
 import type { PanelDefinition } from './model'
 import PanelBody from './views/PanelBody'
 import { boardMove, type BoardMove } from './boardMoves'
@@ -58,7 +58,13 @@ const opensRecord = (action: DataRecordAction | undefined): action is DataRecord
 export default function PublishedDashboardPanel(props: {
   definition: PanelDefinition
   workspaceId?: string
-  placement: PlacementScope
+  /** An unpublished plan to run instead of the definition's published revision, such as an agent's
+   *  panel card in a conversation. */
+  plan?: PanelPlan
+  /** False pauses the run, such as while the panel is scrolled out of view. */
+  active?: boolean
+  /** Where the drill-down's Add as panel puts a panel. Without one, the drill-down doesn't offer it. */
+  placement?: PlacementScope
   /** The header's actions, given the live published revision so a menu can offer edits to it. */
   actions?: (published: Accessor<DashboardRevision | undefined>) => JSX.Element
   headProps?: JSX.HTMLAttributes<HTMLDivElement>
@@ -72,30 +78,35 @@ export default function PublishedDashboardPanel(props: {
   const scope = () => ({ workspaceId: props.workspaceId ?? '' })
   const client = dashboardClient(nodeId, scope())
   const published = createQuery(() => ({
-    queryKey: ['dashboard-revision', nodeId, scope().workspaceId, props.definition.publication!.dashboardId],
+    queryKey: ['dashboard-revision', nodeId, scope().workspaceId, props.definition.publication?.dashboardId],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       client.published(props.definition.publication!.dashboardId, undefined, signal),
+    enabled: !props.plan,
     staleTime: 30_000,
   }))
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const loaded = createQuery(() => ({
-    queryKey: publishedDashboardPanelKey(
-      nodeId,
-      scope(),
-      props.definition.publication!.dashboardId,
-      published.data?.revision,
-      zone,
-    ),
+    queryKey: props.plan
+      ? ['dashboard-plan-run', nodeId, scope().workspaceId, props.plan, zone]
+      : publishedDashboardPanelKey(
+          nodeId,
+          scope(),
+          props.definition.publication!.dashboardId,
+          published.data?.revision,
+          zone,
+        ),
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       client.run(
-        { kind: 'published', id: props.definition.publication!.dashboardId, revision: published.data!.revision },
+        props.plan
+          ? { kind: 'draft', content: props.plan }
+          : { kind: 'published', id: props.definition.publication!.dashboardId, revision: published.data!.revision },
         'execution',
         zone,
         signal,
       ),
-    enabled: !!published.data,
+    enabled: (!!props.plan || !!published.data) && props.active !== false,
     staleTime: 30_000,
-    refetchInterval: (published.data?.content.refresh ?? 0) * 1000 || false,
+    refetchInterval: ((props.plan ?? published.data?.content)?.refresh ?? 0) * 1000 || false,
   }))
   const fresh = createMemo(() =>
     loaded.data ? (JSON.parse(JSON.stringify(loaded.data)) as NonNullable<typeof loaded.data>) : undefined,
@@ -486,25 +497,18 @@ export default function PublishedDashboardPanel(props: {
       setDrill((value) => (value ? { ...value, loading: false, error: 'Could not load the stored rows.' } : value))
     }
   }
-  const addDrilldownPanel = async (): Promise<void> => {
+  const addDrilldownPanel = async (placement: PlacementScope): Promise<void> => {
     const value = drill()
     if (!value?.result || value.result.diagnostics.problems.some((problem) => problem.severity === 'error')) return
     try {
-      const saved = await publishNewPanel({
+      const saved = await addNewPanel({
         nodeId,
         scope: scope(),
         plan: value.plan,
+        placement,
         queryClient,
         recovery: dashboardRecoveryStore(typeof localStorage === 'undefined' ? undefined : localStorage),
       })
-      savePanel({
-        id: saved.id,
-        title: value.plan.title,
-        shaping: {},
-        view: value.plan.view,
-        publication: { dashboardId: saved.id, sources: saved.sources, fieldRoles: saved.fieldRoles },
-      })
-      placePanelAt(props.placement, saved.id, sizePresets(value.plan.view.kind).m)
       setDrill(undefined)
       toast(
         'Panel added.',
@@ -621,7 +625,7 @@ export default function PublishedDashboardPanel(props: {
                       integrations.data?.integrations ?? [],
                     )}
                     onRetry={() => void loaded.refetch()}
-                    {...(props.onEditPanel
+                    {...(props.onEditPanel && props.definition.publication
                       ? { onChooseAccount: () => props.onEditPanel!(props.definition.publication!.dashboardId) }
                       : {})}
                   />
@@ -732,6 +736,14 @@ export default function PublishedDashboardPanel(props: {
               >{`This asks ${pluginLabel(item().row.pluginId)} to ${RISK_CONFIRM[item().action.risk ?? '']?.says ?? 'act'}.`}</Alert>
             )}
           </Show>
+          {/* An unpublished plan says what it shows, because nobody has read it in the studio. */}
+          <Show when={props.plan && run()?.description.length ? run()!.description : undefined}>
+            {(lines) => (
+              <Text tone="muted" wrap>
+                {lines().join(' ')}
+              </Text>
+            )}
+          </Show>
           <Show
             when={display()}
             fallback={
@@ -832,16 +844,20 @@ export default function PublishedDashboardPanel(props: {
                 fields={displayPlanRun(value().plan, value().snapshot.rows).fields}
                 rows={displayPlanRun(value().plan, value().snapshot.rows).rows}
               />
-              <Button
-                size="sm"
-                disabled={
-                  !value().result ||
-                  value().result!.diagnostics.problems.some((problem) => problem.severity === 'error')
-                }
-                onPress={() => void addDrilldownPanel()}
-              >
-                Add as panel
-              </Button>
+              <Show when={props.placement}>
+                {(placement) => (
+                  <Button
+                    size="sm"
+                    disabled={
+                      !value().result ||
+                      value().result!.diagnostics.problems.some((problem) => problem.severity === 'error')
+                    }
+                    onPress={() => void addDrilldownPanel(placement())}
+                  >
+                    Add as panel
+                  </Button>
+                )}
+              </Show>
             </aside>
           </Portal>
         )}

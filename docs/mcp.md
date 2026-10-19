@@ -51,8 +51,8 @@ register for the addressed task. [Agent tools](./agent-tools.md) owns each tool'
   `issue_comment` posts on a linked one, and `issue_image` returns an image from a linked one. They're
   core's tools, so one name covers every tracker and the provider's key stays in core's secret scope.
 - Plugin authoring and the install request, from core: `plugin_authoring` and `plugin_request`.
-- Typed-source metadata, from core: `data_sources_list`, `data_sources_discover`,
-  `data_source_describe`, and `data_source_options`.
+- Typed-source metadata and panels, from core: `data_sources_list`, `data_sources_discover`,
+  `data_source_describe`, `data_source_options`, and the panel tools `panel_guide` and `panel_show`.
 - Task script reads, from core: `task_scripts_status`, `task_scripts_wait`, and `task_scripts_logs`.
 - Local Git reads, from `git`: `local_changes`, `local_diff`, and `git_log`.
 - Notes, from `notes`, and memory, from `memory`.

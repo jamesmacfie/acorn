@@ -6,6 +6,8 @@ import { queriesClient } from '../queries/queriesClient'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import type { dashboardRecoveryStore } from './dashboardRecovery'
 import { regionRefusal, type PanelRegion } from './region'
+import { placePanelAt, savePanel, type PlacementScope } from './persist'
+import { sizePresets } from './layout'
 
 // Publishing a panel plan, shared by the studio, the panel menu's quick edits and Duplicate, and the
 // drill-down's Add as panel (docs/dashboards/placements.md § The panel menu). The caller keeps the panel
@@ -120,4 +122,21 @@ export async function publishQuickEdit(
 export async function publishNewPanel(input: PublishContext & { plan: PanelPlan }): Promise<PublishedPanel> {
   const client = dashboardClient(input.nodeId, input.scope)
   return { plan: input.plan, ...(await publishPanelPlan({ ...input, flush: client.create })) }
+}
+
+/** Publishes a plan as a new panel and places it, as the drill-down's Add as panel and an agent's panel
+ *  card do. */
+export async function addNewPanel(
+  input: PublishContext & { plan: PanelPlan; placement: PlacementScope },
+): Promise<PublishedPanel> {
+  const saved = await publishNewPanel(input)
+  savePanel({
+    id: saved.id,
+    title: input.plan.title,
+    shaping: {},
+    view: input.plan.view,
+    publication: { dashboardId: saved.id, sources: saved.sources, fieldRoles: saved.fieldRoles },
+  })
+  placePanelAt(input.placement, saved.id, sizePresets(input.plan.view.kind).m)
+  return saved
 }

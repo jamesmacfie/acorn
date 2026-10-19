@@ -20,6 +20,7 @@ const PKG = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json')
 const BROWSER_REALM = new Set([
   './client/task-draft', // task draft store reaches the TSX icon picker through its client dependencies
   './ui', // frame-safe presentation components, .tsx, so Solid-compiled
+  './ui/dashboards', // the dashboard panel an agent's card draws, .tsx
   './ui/data-sources', // connected typed-data authoring components, .tsx
   './ui/host', // registration and connected shell surfaces, also .tsx
 ])

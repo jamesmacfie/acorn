@@ -496,9 +496,9 @@ const VIEW_NEEDS: Record<ViewNeed, { met: (plan: PanelPlan) => boolean; reason: 
       outputPlanColumns(plan).find((column) => column.id === plan.group![0]!.column)?.type === 'enum',
     reason: 'Group by a Choice column first.',
   },
-  'date or enum axis': {
-    met: (plan) => outputPlanColumns(plan).some((column) => column.type === 'datetime' || column.type === 'enum'),
-    reason: 'Needs a date or Choice column.',
+  'date, enum, or person axis': {
+    met: (plan) => outputPlanColumns(plan).some((column) => ['datetime', 'enum', 'person'].includes(column.type ?? '')),
+    reason: 'Needs a date, Choice, or Person column.',
   },
 }
 

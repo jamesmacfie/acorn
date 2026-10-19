@@ -30,7 +30,7 @@ The registry is the authority on this list. These tools ship:
 
 | Owner | Tools |
 | --- | --- |
-| Core | `task_current`, `task_context`, `repo_info`, `linked_issues`, `issue_detail`, `issue_comment`, `issue_image`, `pr_current`, `pr_changed_files`, `pr_checks`, `pr_review_comments`, `pr_create`, `data_sources_list`, `data_sources_discover`, `data_source_describe`, `data_source_options`, `dataset_write`, `task_scripts_status`, `task_scripts_wait`, `task_scripts_logs`, `plugin_authoring`, `plugin_request`, `run_script` |
+| Core | `task_current`, `task_context`, `repo_info`, `linked_issues`, `issue_detail`, `issue_comment`, `issue_image`, `pr_current`, `pr_changed_files`, `pr_checks`, `pr_review_comments`, `pr_create`, `data_sources_list`, `data_sources_discover`, `data_source_describe`, `data_source_options`, `dataset_write`, `panel_guide`, `panel_show`, `task_scripts_status`, `task_scripts_wait`, `task_scripts_logs`, `plugin_authoring`, `plugin_request`, `run_script` |
 | `github` | `github_pull_create`, the older name for `pr_create` |
 | `git` | `local_changes`, `local_diff`, `git_log` |
 | `notes` | `notes_list`, `notes_read`, `notes_write`, `notes_append` |
@@ -54,6 +54,26 @@ credentials, or change provider state.
 reason. The Node derives workspace and project from the authenticated task and rejects other
 datasets, stale schema versions, and malformed rows. A person can correct an agent row from a
 published panel; that correction is stored separately and survives later feeder writes.
+
+## Panels
+
+`panel_guide` and `panel_show` let a chat agent answer "graph me X" with a dashboard panel in the
+conversation ([dashboards](./dashboards.md#panels-from-a-conversation)).
+
+- `panel_guide` is read-only. It returns the plan instructions the panel studio's AI gets, which both
+  read from `PANEL_AUTHORING_INSTRUCTIONS` in `packages/dashboards-core/src/panelGuide.ts`, so a change
+  there changes both writers. It adds the task's workspace, the rules for plans that work on Home,
+  advice on choosing a view, and two worked plans for the GitHub pull requests source.
+- `panel_show` is write-risk, and takes a title, a draft plan, and the `panelId` of an earlier card when
+  it revises one. It runs the check publication runs: each source is described and the plan validated
+  against it, as the Node, with no records read. A plan with problems fails the call with every
+  problem and its path into the plan, such as `/view/x: A bar chart needs an enum or person axis.`, and
+  draws nothing. A valid plan returns `{ panelId, shownAt, description }`, where `description` is the
+  plan in plain words. It never returns records, and stores nothing: the plan lives in the call, and
+  the card runs it.
+
+A plan can't name the task it was made in. Context bindings resolve the viewer and the workspace's
+linked items, never the task, so a plan the card draws is the plan a Home tab draws.
 
 ## Scripts
 

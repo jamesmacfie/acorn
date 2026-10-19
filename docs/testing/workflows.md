@@ -217,6 +217,22 @@ shared runner. Run the editor in an isolated Tauri window with `pnpm dev:agent -
 use `pnpm dev:agent:ui -- --session <name> snapshot` after each transition and stop the session when
 done. Check account choice, starter cards, stages, rebind notices, preview, publish, and a placed run.
 
+Panels from a conversation ([dashboards](../dashboards.md#panels-from-a-conversation)) have unit tests
+in `panelTools.test.ts`, `PanelToolCard.test.tsx`, and the GitHub plugin's
+`pullSourceDescription.test.ts`, which checks that `panel_guide`'s worked plans fit the real source.
+The manual checks, in a `pnpm dev:agent` session with GitHub connected:
+
+1. Call `panel_show` through MCP with a pull requests plan. A card draws. Call it with a plan that
+   groups by a column the plan lacks. The call fails with the path to the group, and no panel draws.
+2. Call it again with the first card's `panelId`. The first card collapses to one line, and **Show**
+   draws it again. A row's menu offers the same actions as on a dashboard.
+3. **Add to dashboard** the second version on a second Home tab. The panel appears there, refreshes
+   when the window regains focus, and survives a restart. The toast's **Edit…** opens the studio.
+4. In a managed Claude chat, ask for "pull requests over the last month by person, as a chart". The
+   agent reads `panel_guide` and shows a bar chart over a relative 30-day window, counted by author.
+   Ask "make it weekly", then add it to Home. The next day, the panel's window has moved.
+5. Run the same chat in the terminal client with `pnpm dev:tui:agent`. Each card is one line.
+
 Dashboard authoring evaluation has scripted cases in
 `packages/dashboards-core/src/authoringEvaluation.test.ts`. Run the real-model layer on demand with
 `node scripts/dashboard-authoring-eval.mjs <output.jsonl>` after setting `ACORN_EVAL_URL`,

@@ -1,7 +1,78 @@
 # Phase 1: agent-made panels
 
-Status: proposed, 2026-10-19. Depends on nothing. Read [design.md](./design.md#agent-made-panels)
+Status: built, 2026-10-19. Depends on nothing. Read [design.md](./design.md#agent-made-panels)
 first.
+
+## Completion note, October 19, 2026
+
+**What landed.** Core registers `panel_guide` (read) and `panel_show` (write) beside the data source
+tools. Their declarations are in `agentTools/panelTools.ts`, and their handlers load on first call
+from `agentTools/panelShow.ts`, because the core tools are on the Node's boot path. The studio's
+plan instructions moved to `PANEL_AUTHORING_INSTRUCTIONS` in `packages/dashboards-core/src/panelGuide.ts`.
+Both `routes/authoring.ts` and `panel_guide` read them there, along with the view advice and two worked
+GitHub examples. `panel_show` runs `dashboardContentProblems` (describe and validate, no record reads)
+as the Node's service principal, as the data source tools do. It fails with every problem as
+`<path>: <message>`, and returns `{ panelId, shownAt, description }`.
+
+The card is `PanelToolCard` in `packages/client-core/src/features/dashboards/`. It reaches the agents
+plugin through a new `@acorn/plugin-api/ui/dashboards` entry, and the agents plugin places it in
+`agents:tool-card` for `panel_show`, as it does the `run_script` card. The card runs the plan through
+`PublishedDashboardPanel`, which takes an optional unpublished `plan` and an `active` flag. The
+drill-down's publish-and-place steps are `addNewPanel` in `panelPublish.ts`, which both callers use.
+The terminal client aliases the entry to `apps/tui/src/kit/dashboards.tsx`, a one-line card.
+
+**Decisions and deviations.**
+
+- Versions need no Node storage. `panel_show` stamps `shownAt`, and a client-side map keeps the newest
+  per task and panel ID. An older card collapses when a newer one with its ID exists, even after it
+  scrolls away and back.
+- Harnesses record a refused MCP call as *completed*, with an `api-error` envelope as its output. So
+  both cards treat any finished call without a valid result as a plan that didn't pass.
+- The phase's headline chart, "by person", couldn't validate: a bar chart accepted only an enum axis,
+  and an author is a person field. Bar charts take a `person` axis (validator, `barCategoryField`,
+  and the view-needs table). The studio gains this too.
+- A line chart buckets raw instants by day, so a line over a summary bucketed by week drew nothing
+  while passing validation. The validator refuses that plan at `/view/x`, and the guide says weekly
+  totals are a table. Bucket-aware lines are chart work, not this phase's.
+- Inside a card, a chart is 240 pixels high, because no grid cell bounds it.
+- A drill-down inside a card doesn't offer **Add as panel**. The card's own **Add to dashboard** does
+  that job.
+- The tasks run under `{ workspaceId }` only, the scope of a Home tab, so a plan's queries must leave
+  out `projectId`. The guide says so and hands the agent the workspace ID.
+- The guide's examples name the GitHub plugin from core, under an exception in
+  `tools/arch/boundaries.test.ts`. The GitHub plugin's `pullSourceDescription.test.ts` keeps both
+  examples valid against its real description.
+- The Node's boot bundle had about 1,500 bytes of headroom. This phase uses about 990 of them.
+
+**Verify-before-building answers.** Plan checks run on the Node for a task's agent under the service
+principal. No query binding resolves from the task: context bindings are the viewer and workspace
+links. A core feature fills `agents:tool-card` through the agents plugin. The studio's evaluation
+cases can't run against `panel_guide`: the scripted cases check the shared validator, not the prompt,
+and the real-model script drives the studio's own turn protocol.
+
+**Checks run** in a `pnpm dev:agent` session with a managed Claude Code session on the core tasks
+source, because the session has no GitHub account:
+
+- Checkpoint 1: by hand through MCP, a valid plan drew a card, and a plan grouped by `team` failed
+  with `/stages/1/by/0/column` and drew none.
+- Checkpoint 2: a revision with the same `panelId` collapsed the first card, and **Show** drew it
+  again.
+- Checkpoint 3: **Add to dashboard** placed the panel on a second Home tab, and **Open** selected
+  it. **Edit…** from the panel menu opened the studio, and the panel survived a restart. The toast's
+  **Edit…** wasn't caught before the toast closed. Refresh on focus is the placed panel's unchanged
+  query and wasn't checked.
+- Checkpoint 4: asked for "tasks over the last month by status, as a chart", the agent read
+  `panel_guide` and drew a bar chart over a relative 30-day window. For "make it weekly", two refused
+  charts led it to a weekly table on the same panel ID. "The next day, the window has moved" needs a
+  second day and wasn't checked; the plan holds `now` minus `P30D`, which the run evaluates.
+- Checkpoint 5: not run live. The isolated terminal driver starts its own Node, which has no managed
+  transcript with these calls. `apps/tui/src/kit/dashboards.test.tsx` renders the one-line card in the
+  terminal renderer.
+
+**For later phases.** `describePanelPlan` text is long. It includes the source's reach sentence, and
+it phrases `gte now-P30D` as "at least 30 days ago", which reads backwards. Phase 3's app cards will
+want a shorter sentence. A source failure in the card can't offer **Choose an account**, because that
+button opens the studio on a published panel.
 
 ## Goal
 

@@ -342,6 +342,22 @@ describe('panel plan', () => {
     ])
   })
 
+  it('refuses a line over a summary bucketed by time, which the line cannot place', () => {
+    const errors = (plan: ReturnType<typeof base>) =>
+      validatePanelPlan(plan, [source('a', []), source('b', [])])
+        .filter((problem) => problem.severity === 'error')
+        .map((problem) => problem.path)
+    const weekly = base()
+    weekly.stages = [
+      { op: 'summarize', by: [{ column: 'due', bucket: 'week' }], measures: [{ id: 'n', label: 'N', kind: 'count' }] },
+    ]
+    weekly.view = { kind: 'chart', shape: 'line', x: 'due', aggregate: 'sum', field: 'n' }
+    expect(errors(weekly)).toEqual(['/view/x'])
+    const daily = base()
+    daily.view = { kind: 'chart', shape: 'line', x: 'due' }
+    expect(errors(daily)).toEqual([])
+  })
+
   it('example 9: keeps unmatched lookups and warns on a many-to-one cardinality violation', () => {
     const plan = base()
     plan.sources[1]!.role = 'lookup'

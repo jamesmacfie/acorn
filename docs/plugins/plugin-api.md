@@ -26,6 +26,7 @@ The facade has 14 entrypoints:
 | `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, plus `mountFrame` and `mountTree` |
 | `@acorn/plugin-api/ui/tree` | The kit as nodes a remote tree writes in JSX, and the Solid adapter behind them |
 | `@acorn/plugin-api/ui/tokens` | `HOST`, the host this build draws on |
+| `@acorn/plugin-api/ui/dashboards` | The dashboard panel card for an agent's `panel_show` call |
 | `@acorn/plugin-api/ui/data-sources` | Connected typed-data authoring components |
 | `@acorn/plugin-api/ui/model-provider-failure` | Shared model-provider failure presentation |
 | `@acorn/plugin-api/testkit` | A real plugin context and request context, temporary databases, the auth gate, core's tables for fixtures, and the manifest validator |

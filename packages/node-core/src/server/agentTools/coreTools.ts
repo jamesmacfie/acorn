@@ -5,6 +5,7 @@ import { changeRequestChecks, changeRequestCreated, changeRequestFeedback } from
 import { assembleContext, changeRequestSection, parseInclude, registerContextSection } from './contextSections.ts'
 import { pluginAuthoringTool } from './pluginAuthoringContribution.ts'
 import { pluginRequestTool } from './pluginRequests.ts'
+import { panelTools } from './panelTools.ts'
 import { RUN_SCRIPT_TOOL } from './callTool.ts'
 import {
   registerAgentTool,
@@ -497,6 +498,8 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
     issueImageTool(deps),
     ...changeRequestTools(deps),
     ...sourceTools(deps),
+    // Dashboard panels drafted in the conversation, checked like the data source reads above.
+    ...(deps.env ? panelTools({ db, env: deps.env }) : []),
     // Read tier, because it reads nothing itself. Each call the program makes passes that tool's own
     // gates, and only read-tier tools pass (./callTool.ts).
     {

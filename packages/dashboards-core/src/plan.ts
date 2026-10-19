@@ -536,12 +536,25 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
     )
   )
     add('/view/field', 'An aggregate needs one fixed unit; filter by currency first.')
-  if (plan.view.kind === 'chart' && !['datetime', 'enum'].includes(finalColumn(plan.view.x ?? '')?.type ?? ''))
-    add('/view/x', 'A chart needs a date or enum axis.')
+  if (
+    plan.view.kind === 'chart' &&
+    !['datetime', 'enum', 'person'].includes(finalColumn(plan.view.x ?? '')?.type ?? '')
+  )
+    add('/view/x', 'A chart needs a date, enum, or person axis.')
   if (plan.view.shape === 'line' && finalColumn(plan.view.x ?? '')?.type !== 'datetime')
     add('/view/x', 'A line chart needs a date axis.')
-  if (plan.view.shape === 'bar' && finalColumn(plan.view.x ?? '')?.type !== 'enum')
-    add('/view/x', 'A bar chart needs an enum axis.')
+  // A time bucket turns the axis into date labels, which the line, bucketing instants by day, can't place.
+  if (
+    plan.view.shape === 'line' &&
+    plan.stages.some(
+      (stage) =>
+        stage.op === 'summarize' &&
+        stage.by.some((by) => by.column === plan.view.x && by.bucket && by.bucket !== 'value'),
+    )
+  )
+    add('/view/x', 'A line chart counts the rows by day itself; chart the rows, not a summary bucketed by time.')
+  if (plan.view.shape === 'bar' && !['enum', 'person'].includes(finalColumn(plan.view.x ?? '')?.type ?? ''))
+    add('/view/x', 'A bar chart needs an enum or person axis.')
   if (plan.view.series && finalColumn(plan.view.series)?.type !== 'enum')
     add('/view/series', 'A series needs an enum column.')
   if (plan.view.trend && plan.view.kind !== 'stat') add('/view/trend', 'A trend belongs on a stat view.')

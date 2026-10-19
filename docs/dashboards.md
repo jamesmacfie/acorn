@@ -88,6 +88,29 @@ plain-language description, and diagnostics for sources, stages, and budgets. Da
 `list-accounts` metadata operation returns account IDs, provider IDs, and display names without
 reading provider records.
 
+## Panels from a conversation
+
+A chat agent answers "graph me X" with `panel_show`, which draws a panel card in the transcript
+([agent tools](./agent-tools.md#panels)). The card is `PanelToolCard` in
+`packages/client-core/src/features/dashboards/`, which the agents plugin places in its `tool-card` point.
+It runs the plan through the run route above, as a draft, under this device, and draws it with the
+same panel a dashboard places, so its rows, buttons, row menu, and unavailable and failed states are a
+placed panel's. Above the view it shows the run's plain-language description. A drill-down in a card
+doesn't offer **Add as panel**, because the card's own **Add to dashboard** does that job.
+
+A card caps at 480 pixels with **Expand**, and runs its plan only while it's on screen. A card shown
+with the `panelId` of an earlier one is a new version. The earlier card collapses to one line with
+its title and **Show**, which draws that version again, because the plan is in its own call.
+
+**Add to dashboard** lists the Home tabs of the task's workspace. Choosing one publishes the plan as a
+new panel and places it there, through the drill-down's path (`addNewPanel` in `panelPublish.ts`),
+under this device. The card then names the tab and offers **Open**, and a toast offers **Edit…**.
+**Edit in studio** creates a new draft from the plan and opens the studio on it. Changes there don't
+flow back to the card. An agent never publishes or places a panel itself.
+
+The terminal client draws no dashboard views, so there a card is one line: the plan's description
+from the `panel_show` result, and a note that the panel draws in the desktop app.
+
 ## Datasets and history
 
 **Keep history** in the editor creates a workspace-scoped or project-scoped dataset from a query and

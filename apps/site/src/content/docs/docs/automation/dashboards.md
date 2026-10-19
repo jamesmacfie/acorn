@@ -34,6 +34,19 @@ history.
 
 The editor saves as you go, so closing it loses nothing. Changes reach Home only when you publish.
 
+## Ask an agent for a panel
+
+In a task's agent chat, ask for a view of your data, such as "graph pull requests over the last month
+by person". The agent draws a panel card in the conversation, with a line above it saying what it
+shows. Ask it to change the panel, such as "make it weekly", and it draws a new card; the old one
+shrinks to one line with **Show**.
+
+- **Add to dashboard** asks which Home tab, then puts the panel there. It stays live: a window you
+  stated as "last month" moves with time, and "my" means whoever looks at the panel.
+- **Edit in studio** opens the panel editor on a copy. Changes there don't change the card.
+
+The agent never adds a panel to a dashboard itself. A card runs only while it's on screen.
+
 ## The panel editor
 
 The editor has an outline on the left, a live preview, and a form for the selected part. The outline's
@@ -62,7 +75,7 @@ whole panel as JSON.
 | List | One row per record | Nothing |
 | Table | Rows and columns | Nothing |
 | Board | A column per value, like a kanban board | A field with a fixed set of values, such as a state |
-| Chart | Bars by category, or a line over time | A field with a fixed set of values, or a date |
+| Chart | Bars by category or person, or a line over time | A field with a fixed set of values, a person, or a date |
 
 The editor offers only views the panel's fields allow. On a board, dragging a card to another column,
 or choosing **Move to** in its row's menu, changes that record in its source, when the source allows it. A
@@ -119,7 +132,7 @@ what it captured.
 ## In the terminal
 
 The terminal client doesn't draw dashboards. Home and the panel spaces in plugins' views are in the
-desktop app only.
+desktop app only, and an agent's panel card in a chat is one line saying what the panel shows.
 
 ## Limits
 

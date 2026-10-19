@@ -15,6 +15,7 @@
     "paths": {
       "@acorn/plugin-api/ui": ["./src/kit/ui.ts"],
       "@acorn/plugin-api/ui/data-sources": ["./src/kit/dataSources.ts"],
+      "@acorn/plugin-api/ui/dashboards": ["./src/kit/dashboards.tsx"],
       "@acorn/client-core/features/dataSources/kit.ts": ["./src/kit/dataSourceKit.ts"],
       "@acorn/plugin-api/ui/host": ["./src/kit/host.tsx"],
       "@acorn/plugin-api/ui/editor": ["./src/kit/editor.ts"],

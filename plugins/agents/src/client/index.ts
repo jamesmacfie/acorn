@@ -53,6 +53,9 @@ const LoopCoverageSection = lazy(() => import('./settings/LoopCoverageSection'))
 const RunScriptToolCard = lazy(async () => ({
   default: (await import('./sessions/RunScriptToolCard')).RunScriptToolCard,
 }))
+const PanelToolCard = lazy(() =>
+  import('@acorn/plugin-api/ui/dashboards').then(({ PanelToolCard }) => ({ default: PanelToolCard })),
+)
 
 export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
@@ -322,6 +325,16 @@ export const agentsClientPlugin: ClientPlugin = {
       order: 10,
       matches: ['run_script'],
       component: RunScriptToolCard,
+    })
+    // Core's panel_show draws a dashboard panel, and the dashboards are core's, so core supplies the
+    // component and the transcript's owner places it.
+    ctx.extensions.register({
+      id: 'agents.panel-card',
+      point: AGENT_TOOL_CARD_POINT,
+      label: 'Dashboard panels',
+      order: 10,
+      matches: ['panel_show'],
+      component: PanelToolCard,
     })
     // Which harnesses a plugin's tool hooks reach, on that plugin's own page.
     ctx.extensions.register({

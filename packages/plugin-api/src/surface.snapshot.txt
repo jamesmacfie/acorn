@@ -478,6 +478,7 @@ testkit: testEnv
 testkit: testGate
 testkit: testSecretEnv
 testkit: validatePluginConfig
+ui/dashboards: PanelToolCard
 ui/data-sources: AuthoringConversation
 ui/data-sources: AuthoringConversationProps
 ui/data-sources: SourceQueryEditor

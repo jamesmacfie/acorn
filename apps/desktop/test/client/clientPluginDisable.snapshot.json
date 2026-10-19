@@ -105,6 +105,7 @@
       "agents.storage",
       "agents.security",
       "agents.run-script-card",
+      "agents.panel-card",
       "agents.loop-coverage",
       "bitbucket.push-actions",
       "github.push-actions",

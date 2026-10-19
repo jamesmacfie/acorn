@@ -100,6 +100,6 @@ export const PANEL_CAPABILITIES = {
     list: { needs: [], options: [] },
     table: { needs: [], options: [] },
     board: { needs: ['enum group'], options: [] },
-    chart: { needs: ['date or enum axis'], options: ['shape', 'x', 'series'] },
+    chart: { needs: ['date, enum, or person axis'], options: ['shape', 'x', 'series'] },
   },
 } as const

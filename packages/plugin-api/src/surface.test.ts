@@ -18,6 +18,7 @@ const ENTRYPOINTS = {
   'testkit/client': 'testkit/client.ts',
   'testkit/ws-client': 'testkit/wsClient.client.ts',
   ui: 'ui/index.ts',
+  'ui/dashboards': 'ui/dashboards.ts',
   'ui/data-sources': 'ui/data-sources.ts',
   'ui/diff': 'ui/diff.ts',
   'ui/editor': 'ui/editor.ts',

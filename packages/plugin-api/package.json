@@ -13,6 +13,7 @@
     "./testkit/client": "./src/testkit/client.ts",
     "./testkit/ws-client": "./src/testkit/wsClient.client.ts",
     "./ui": "./src/ui/index.ts",
+    "./ui/dashboards": "./src/ui/dashboards.ts",
     "./ui/data-sources": "./src/ui/data-sources.ts",
     "./ui/diff": "./src/ui/diff.ts",
     "./ui/editor": "./src/ui/editor.ts",

@@ -13,6 +13,7 @@
     "./mapping.ts": "./src/mapping.ts",
     "./model.ts": "./src/model.ts",
     "./outline.ts": "./src/outline.ts",
+    "./panelGuide.ts": "./src/panelGuide.ts",
     "./plan.ts": "./src/plan.ts",
     "./planBuckets.ts": "./src/planBuckets.ts",
     "./analysis.ts": "./src/analysis.ts",

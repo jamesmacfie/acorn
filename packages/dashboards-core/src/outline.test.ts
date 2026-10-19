@@ -521,7 +521,7 @@ describe('what can be added', () => {
     })
     expect(views({ ...joined(), group: [{ column: 'title' }] }).board).toBe('Group by a Choice column first.')
     expect(views({ ...joined(), columns: joined().columns.filter((column) => column.id === 'title') }).chart).toBe(
-      'Needs a date or Choice column.',
+      'Needs a date, Choice, or Person column.',
     )
   })
 

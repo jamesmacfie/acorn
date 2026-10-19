@@ -91,6 +91,15 @@ Some presentation rules:
 - `ExitPlanMode`'s plan posts as an assistant message, read from the opening `tool_call` only.
 - A plan update is a full snapshot, and one turn's snapshots fold into one card.
 
+### Panel cards
+
+Core's `panel_show` draws a dashboard panel: the agents plugin places core's `PanelToolCard` in the
+slot for it, as it does the `run_script` card. The card runs the plan under this device, collapses to
+one line when a newer version of the same panel follows it, and offers **Add to dashboard** and
+**Edit in studio**. A call that failed its checks shows the problems and no panel. In the terminal
+client the card is one line with the plan's description. See
+[dashboards](../dashboards.md#panels-from-a-conversation).
+
 ### File tool cards
 
 A file tool opens onto its recorded diffs. The transcript matches per-file changes to a tool by turn
