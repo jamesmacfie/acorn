@@ -1,6 +1,9 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { WillConfirmationHost } from '../../host/registries/shell/willPhase'
+import { activeCacheId } from '../../infra/node/activeNode'
+import { clientFor } from '../../infra/node/fleet'
+import { tasksKey } from '../../infra/queries'
 import { confirmTaskArchive, confirmTaskDelete } from './confirmTaskArchive'
 
 describe('confirmTaskArchive', () => {
@@ -68,6 +71,21 @@ describe('confirmTaskArchive', () => {
 
     footer()[0]!.click()
     await expect(decision).resolves.toEqual({ confirmed: false, checked: [], action: 'archive' })
+  })
+
+  it('closes once another client archives the task', async () => {
+    const client = clientFor(activeCacheId()).client
+    client.setQueryData(tasksKey, [{ id: 'task-4' }, { id: 'task-5' }])
+    const decision = confirmTaskArchive(
+      { id: 'task-4', title: 'Archived elsewhere', branch: null, worktreePath: '/tmp/project' },
+      [],
+    )
+    await expect.poll(() => dialog()?.textContent).toContain('Archived elsewhere')
+
+    client.setQueryData(tasksKey, [{ id: 'task-5' }])
+    await expect(decision).resolves.toEqual({ confirmed: false, checked: [], action: 'archive' })
+    expect(dialog()).toBeNull()
+    client.removeQueries({ queryKey: tasksKey })
   })
 
   it('switches the confirm button to Delete task from its menu, with the warning', async () => {

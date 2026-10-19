@@ -1,6 +1,8 @@
 import type { ArchiveResult, DeleteOpts } from '@acorn/protocol/task.ts'
 import { confirmWillEvent, type WillAction, type WillDecision } from '../../host/registries/shell/willPhase'
-import type { Task } from '../../infra/queries'
+import { activeCacheId } from '../../infra/node/activeNode'
+import { clientFor } from '../../infra/node/fleet'
+import { tasksKey, type Task } from '../../infra/queries'
 import { taskBridge } from './taskBridge'
 import { archiveTask } from './taskMutations'
 
@@ -21,30 +23,45 @@ const deleteTask: WillAction = {
  *
  * The message says what happens to the files. Archive deletes a worktree only when acorn made it: a
  * task with a branch and a checkout of its own. A task in the project folder leaves that folder as it
- * is (`ownsWorktree`). */
-export const confirmTaskArchive = (
+ * is (`ownsWorktree`).
+ *
+ * Another client can archive or delete the task while this asks, such as the browser sidebar. The
+ * dialog cancels itself once the task list stops listing the task. */
+export async function confirmTaskArchive(
   task: Pick<Task, 'id' | 'title' | 'branch' | 'worktreePath'>,
   tasks: readonly Pick<Task, 'parentId'>[],
-): Promise<WillDecision> =>
-  confirmWillEvent({
-    kind: 'task:archive',
-    payload: { taskId: task.id },
-    title: 'Archive task',
-    subject: task.title,
-    actions: [{ id: ARCHIVE_TASK_ACTION, label: 'Archive task' }, deleteTask],
-    message: [
-      task.branch && task.worktreePath
-        ? "acorn stops this task's sessions and deletes its worktree."
-        : "acorn stops this task's sessions and leaves the project folder as it is.",
-      tasks.some((child) => child.parentId === task.id)
-        ? 'All subtasks, including nested subtasks, will also be archived.'
-        : '',
-      'You can restore tasks from Archive.',
-    ]
-      .filter(Boolean)
-      .join(' '),
-    alwaysConfirm: true,
+): Promise<WillDecision> {
+  const client = clientFor(activeCacheId()).client
+  const gone = new AbortController()
+  const stopWatching = client.getQueryCache().subscribe(() => {
+    const listed = client.getQueryData<Task[]>(tasksKey)
+    if (listed && !listed.some((candidate) => candidate.id === task.id)) gone.abort()
   })
+  try {
+    return await confirmWillEvent({
+      kind: 'task:archive',
+      payload: { taskId: task.id },
+      title: 'Archive task',
+      subject: task.title,
+      actions: [{ id: ARCHIVE_TASK_ACTION, label: 'Archive task' }, deleteTask],
+      message: [
+        task.branch && task.worktreePath
+          ? "acorn stops this task's sessions and deletes its worktree."
+          : "acorn stops this task's sessions and leaves the project folder as it is.",
+        tasks.some((child) => child.parentId === task.id)
+          ? 'All subtasks, including nested subtasks, will also be archived.'
+          : '',
+        'You can restore tasks from Archive.',
+      ]
+        .filter(Boolean)
+        .join(' '),
+      alwaysConfirm: true,
+      signal: gone.signal,
+    })
+  } finally {
+    stopWatching()
+  }
+}
 
 /** The Archive page's Delete: the same dialog, with deleting as the only action. */
 export const confirmTaskDelete = (task: Pick<Task, 'id' | 'title'>): Promise<WillDecision> =>
