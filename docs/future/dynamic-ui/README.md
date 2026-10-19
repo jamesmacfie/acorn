@@ -92,9 +92,14 @@ alternative a reader might expect.
 - **Where Add to dashboard can put things.** Phase 1 offers Home tabs only. Plugin regions constrain
   panels by source, field role, and view, and could be added for panels later. App cells can't go
   there until regions understand an app's plans.
-- **A whole task to edit an app.** Editing a project app in a new task creates a worktree when the
-  session starts. That may be too slow for changing a UI. The options are a lighter task kind with no
-  worktree, a session that runs in a scratch folder, or accepting the cost. Phase 5 measures it.
+- **A whole task to edit an app.** Phase 5 measured it on October 19, 2026. **Edit in a new task**
+  makes a project-folder task, the kind the reference panel's **Create task** makes, so no worktree is
+  created at all. From the click, the task was open on its Apps pane with the draft in 1.16 seconds,
+  and the editing session was ready for its first message. For comparison, a worktree of this
+  repository (6,462 files) takes 1.0 to 1.3 seconds to create with no setup script, so a setup script
+  is where a worktree task's real cost is. The open part is the trade: the editing agent runs in the
+  project's own checkout. The app tools keep its edits in the data root, but nothing stops it writing
+  repository files. A scratch-folder session would close that, and is a product decision.
 - **The host plugin's name.** "Apps" is the product word, but `apps/` is also the repository's folder of
   runnable programs. Phase 3 picks a code name.
 - **The renderer package's name and home.** It could be published unscoped from this repository, or

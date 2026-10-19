@@ -22,7 +22,9 @@ import {
   type AppShowResult,
   type AppSummary,
 } from '../shared/api'
+import { appById } from './appsStore'
 import AppView from './AppView'
+import { PublishButton } from './PublishButton'
 
 // The transcript card for `app_show` (docs/agent-built-apps.md § Cards). Each card pins the revision
 // its call published. Only the card showing the app's head is interactive; the others collapse to a
@@ -150,13 +152,16 @@ function AppCard(props: { taskId: string; shown: AppShowResult; note: string }) 
         >
           <Inline spread wrap>
             <Text emphasis="strong">{label()}</Text>
-            <Button
-              size="sm"
-              variant="ghost"
-              onPress={() => openPane(props.taskId, APPS_PANE_ID, { kind: 'plugin:select', item: props.shown.appId })}
-            >
-              Open
-            </Button>
+            <Inline gap="inline">
+              <Show when={appById(props.shown.appId)}>{(app) => <PublishButton app={app()} />}</Show>
+              <Button
+                size="sm"
+                variant="ghost"
+                onPress={() => openPane(props.taskId, APPS_PANE_ID, { kind: 'plugin:select', item: props.shown.appId })}
+              >
+                Open
+              </Button>
+            </Inline>
           </Inline>
         </Show>
         <Show when={restoreError()}>{(message) => <Alert tone="danger">{message()}</Alert>}</Show>
@@ -183,15 +188,16 @@ export const revisionFilesOptions = (nodeId: string, appId: string, revision: nu
   staleTime: Infinity,
 })
 
-/** One revision of an app, running, once its files are read. The card and the Apps pane draw it. */
+/** One revision of an app, running, once its files are read. The card, the Apps pane, and the Apps
+ *  source draw it. A project app has no task. */
 export function Revision(props: {
   appId: string
   revision: number
-  taskId: string
+  taskId?: string
   workspaceId: string
   nodeId: string
   readOnly: boolean
-  placement: 'card' | 'pane'
+  placement: 'card' | 'pane' | 'project'
 }) {
   const files = createQuery(() => revisionFilesOptions(props.nodeId, props.appId, props.revision))
   return (

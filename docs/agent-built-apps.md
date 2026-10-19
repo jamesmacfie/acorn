@@ -17,7 +17,7 @@ never carries one.
 
 ```text
 apps/<appId>/
-  app.json              the task, name, description, head revision, and building session
+  app.json              the owner, name, description, head revision, building session, and draft link
   working/program.oui   the program the tools edit
   working/plans/<name>.json
   revisions/<n>/        what app_show published: program, plans, and revision.json
@@ -26,14 +26,17 @@ apps/<appId>/
 
 `revision.json` records the library ID and version the program was written against, the agent's
 one-line note, and, for a restore, the revision it copied. Revisions never change. The building session
-is the session that last showed the app, or the editing session the person started for it. Every app
-belongs to one task. Archiving the task keeps its apps, revisions, and state, restoring it brings them
-back at the head they had, and deleting the task deletes them. The archive dialog names the task's
-apps, through trellis's task check.
+is the session that last showed the app, or the editing session the person started for it.
+
+An app belongs to a task or to a project. `app.json` names one, as `taskId` or `projectId`. Archiving a
+task keeps its apps, revisions, and state, restoring it brings them back at the head they had, and
+deleting the task deletes them. A project app stays when the task that published it is archived or
+deleted. The archive dialog names the task's apps, through trellis's task check.
 
 ## Tools
 
-Seven task-scoped tools build an app ([agent tools](./agent-tools.md#apps)). An agent reads
+Seven task-scoped tools build an app ([agent tools](./agent-tools.md#apps)). They work on the task's own
+apps and drafts, never on a project app. An agent reads
 `app_guide`, creates the app with `app_create`, writes plans and the program with `app_write`, changes
 the program with `app_patch`, and shows it with `app_show`. `app_write` and `app_patch` need the hash
 of the file as it was last read, so two sessions editing one app don't overwrite each other. A file is
@@ -90,7 +93,8 @@ the renderer with it. The card reads the revision's files through `/v1/p/trellis
 device-only route.
 
 Each card pins the revision its call published. Only the card that shows the app's head is
-interactive, and it has **Open**, which shows the app in the task's Apps pane. Older cards collapse to "v2: added owners. Replaced by v3." with two buttons:
+interactive, and it has **Open**, which shows the app in the task's Apps pane, and the app's publish
+button ([project apps](./agent-built-apps/project-apps.md)). Older cards collapse to "v2: added owners. Replaced by v3." with two buttons:
 
 - **Show v2** draws that revision read only. Its buttons and fields are off and its actions do nothing.
   It draws with current data.
@@ -110,8 +114,10 @@ The task's **Apps** pane is `plugins/trellis/src/client/paneContribution.ts`, a 
 `app-changed` frame whenever a head moves, from `app_show` or **Restore**, and the client reads the
 list again. A two-minute schedule is the backstop.
 
-The list shows each app's name, description, head revision, and when it last changed. The detail runs
-the head with `$placement` set to `pane`, at full size. A new head redraws it without a reload.
+The list shows each app's name, description, head revision, and when it last changed. A draft also says
+which project app it edits and at which revision: "Draft of Release checklist v3". The detail runs the
+head with `$placement` set to `pane`, at full size, with the publish button above it. A new head
+redraws it without a reload.
 
 **Edit with agent** opens the building session's conversation under the app, through the agents
 plugin's `agents.conversation` capability, composer included. The app then sits in a section capped at
@@ -123,6 +129,12 @@ names that session as its building session.
 
 In an archived task's preview, the pane lists the apps, each revision's note, program, and plans,
 read only, and runs none of them.
+
+## Project apps
+
+**Publish to project** turns a task app into a project app, which opens from the left rail's **Apps**
+source and is edited through drafts in tasks. [Project apps](./agent-built-apps/project-apps.md) covers
+publishing, drafts and their conflicts, the Apps source, editing, and deleting.
 
 ## App state
 
@@ -147,7 +159,7 @@ A program reaches only what its view hands it, a card or the pane, and the view 
 | --- | --- | --- |
 | The app's plans | `Query("name", inputs, defaults)`, `Panel("name", inputs)` | Runs the plan from the revision's files through the dashboard run route, under the viewer's device. A query's rows are each row's values plus `_id` and `_actions`. |
 | Plan inputs | The second argument to `Query` or `Panel` | Sent as the run's `inputs`. The Node fills the plan's `{ from: "input" }` addresses with them, and the run fails if a plan reads one that wasn't passed. |
-| The task | `Query("task", {}, {})` | Returns the ID, title, and branch of the task the app is drawn in. |
+| The task | `Query("task", {}, {})` | Returns the ID, title, and branch of the task the app is drawn in. A project app drawn in the Apps source has no task, and the query fails. |
 | Row actions | `Mutation("rowAction", {plan, row, action})` and `@Run` | Finds the row and action in its own last run of that plan, shows a confirm, and then calls the data source's action route. A program can't name a record or an action the source didn't offer. |
 | Compose | `@ToAssistant(text, context)` | Puts the text in the task's agent composer as a draft. It never sends. |
 | Links | `@OpenUrl(url)` | Opens HTTP and HTTPS URLs only, after a confirm that shows the full URL. Anything else does nothing and says why. In the terminal, the confirm copies the link instead. |

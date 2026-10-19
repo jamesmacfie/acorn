@@ -273,6 +273,23 @@ gate, run a script in the window that redefines `document.hidden` as `false` and
    and their programs, and runs nothing, and its cards in the transcript draw one line. Restore the
    task. The app runs at the same head with its ticks.
 
+Project apps, in the same kind of session. `routes.test.ts` covers publishing, drafts, the conflict,
+state, and delete, and `PublishButton.test.tsx` covers the conflict's two choices.
+
+1. **Publish to project** on a task app's card. The rail gains **Apps**, its list shows the app for
+   that project, and another project in the workspace shows "\<name\> has no apps". The task's Apps
+   pane marks the app as a draft.
+2. Ask the building session for a change, then **Publish** in the Apps pane. The project app moves to
+   the new head, and its ticks stay.
+3. Make drafts of one project app in two tasks, and give each a new head. Publish the first. The
+   second asks: **Replace anyway** publishes over the new head, and **Publish as a new app** adds a
+   second project app.
+4. **Edit in a new task** from the rail. The task opens on its Apps pane with the draft, and its Agent
+   pane holds an editing session with the app attached. Ask for a change without naming the app.
+5. **Delete** a project app, then **Restore** it, then delete it and **Remove for good**.
+6. Give a draft a new head with **Restore** on an old card, archive its task, and tick **Publish to
+   the project first**. The project app moves to that head and opens from the rail.
+
 Dashboard authoring evaluation has scripted cases in
 `packages/dashboards-core/src/authoringEvaluation.test.ts`. Run the real-model layer on demand with
 `node scripts/dashboard-authoring-eval.mjs <output.jsonl>` after setting `ACORN_EVAL_URL`,

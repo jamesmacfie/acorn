@@ -83,6 +83,7 @@ client: createTask
 client: createTextSetting
 client: createWorkspace
 client: createWorkspaceWords
+client: currentWorkspaceId
 client: debounce
 client: defaultDeliveryContext
 client: deletedTasksOptions

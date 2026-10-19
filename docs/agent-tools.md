@@ -92,7 +92,7 @@ Each one works only on the calling task's apps.
 | `app_write` | write | Replaces one working file, or deletes a plan when `content` is null. Needs the file's hash when it exists. |
 | `app_patch` | write | Merges statements into the program by name. A statement replaces the one with its name, a new name adds one, and `name = null` deletes one. Needs the program's hash. |
 | `app_show` | write | Runs the seven checks, publishes the next revision with a one-line note, and returns `{ appId, name, revision }`. A failure lists every problem with its code, path, and hint, and publishes nothing. |
-| `app_list` | read | Lists the task's apps with their IDs and head revisions. |
+| `app_list` | read | Lists the task's apps with their IDs and head revisions. A draft names its project app and the project revision it started from in `draftOf`. |
 
 ## Scripts
 

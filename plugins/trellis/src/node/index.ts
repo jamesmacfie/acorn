@@ -34,16 +34,24 @@ export const trellisPlugin = (dataDir: string): NodePlugin => ({
     }))
       ctx.tools.register(tool)
     ctx.routes.register(
-      lazyRouter(async () => (await import('../server/routes')).appRoutes(await store(), changed)),
-      { prefix: '', note: '/apps — what an app card and the Apps pane read, Restore, and saved state' },
+      lazyRouter(async () =>
+        (await import('../server/routes')).appRoutes({
+          store: await store(),
+          changed,
+          loadTask: (taskId) => ctx.core.tasks.load(taskId),
+        }),
+      ),
+      { prefix: '', note: '/apps — what cards, the Apps pane, and the Apps source read and change' },
     )
     // Archive keeps a task's apps where they are, so restore brings them back at the head they had.
-    // The dialog says so, which is all this check is for.
+    // The dialog says so, and offers to publish the ones the project doesn't have yet.
+    const shownApps = async (taskId: string) => (await (await store()).forTask(taskId)).filter((meta) => meta.head > 0)
     ctx.taskChecks.register({
       id: 'apps',
       check: async (task) => {
-        const apps = (await (await store()).forTask(task.id)).filter((meta) => meta.head > 0)
+        const apps = await shownApps(task.id)
         if (!apps.length) return null
+        const { unpublished } = await import('../server/projectApps')
         return {
           id: 'apps',
           severity: 'warn' as const,
@@ -53,7 +61,14 @@ export const trellisPlugin = (dataDir: string): NodePlugin => ({
               : `${apps.length} apps belong to this task. They're archived with it and come back if you restore it.`,
           details: apps.slice(0, 5).map((meta) => meta.name),
           ...(apps.length > 5 ? { detailsMore: apps.length - 5 } : {}),
+          ...(apps.some(unpublished) ? { action: { label: 'Publish to the project first', checked: false } } : {}),
         }
+      },
+      // A draft whose project app moved since it started stays unpublished, rather than replacing it.
+      apply: async (task) => {
+        const { publishToProject, unpublished } = await import('../server/projectApps')
+        for (const meta of (await shownApps(task.id)).filter(unpublished))
+          await publishToProject({ store: await store(), changed }, meta.appId, task.projectId, 'safe')
       },
     })
     registerDeletedTaskPurge(ctx, async (taskIds) => (await store()).removeTasks(taskIds))

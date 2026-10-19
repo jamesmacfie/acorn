@@ -12,7 +12,11 @@ selection, persistence, workspace restore, and task fallbacks. Provider navigati
 the owning plugin.
 
 A rail source can gate itself with `when`. Core's Fleet home uses it: it shows only once more than one
-Node is registered.
+Node is registered. Trellis's **Apps** source shows only while the open workspace has a project app
+([project apps](../agent-built-apps/project-apps.md#the-apps-source)). A gate has no route to read, so
+it asks `currentWorkspaceId()` from `@acorn/plugin-api/client`. A gate that answers from data loaded after
+startup is false at first, so a window that reopens on that source's address draws the default source
+until the data arrives.
 
 A rail source behind a provider that lists projects (`supportsProjects`, see
 [integrations](../integrations.md)) has one more gate: the active workspace has to link one of that

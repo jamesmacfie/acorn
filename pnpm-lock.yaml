@@ -2251,6 +2251,9 @@ importers:
       '@openuidev/lang-core':
         specifier: 1.0.0
         version: 1.0.0(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))(zod@4.4.3)
+      '@solidjs/router':
+        specifier: ^0.16.1
+        version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-query':
         specifier: ^5.101.0
         version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))

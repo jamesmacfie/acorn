@@ -42,22 +42,37 @@ export type AppShowResult = z.infer<typeof appShowResultSchema>
 
 export type AppRevisionSummary = { revision: number; note: string; restoredFrom?: number }
 /** An app's name, head, and revisions, as the card's route returns them. */
-export type AppSummary = { appId: string; taskId: string; name: string; head: number; revisions: AppRevisionSummary[] }
+export type AppSummary = { appId: string; taskId?: string; name: string; head: number; revisions: AppRevisionSummary[] }
 export type AppRevisionFiles = { program: string; plans: Record<string, unknown> }
-/** One shown app, as the Apps pane lists it. `sessionId` is the session its drawer draws. */
+/** One shown app, as the Apps pane and the Apps source list it. A task app or draft has `taskId`, and
+ *  a project app has `projectId`. `sessionId` is the session its drawer draws. A draft's `draftOf`
+ *  names its project app, the project revision it's at, and its own head when it got there. */
 export type AppListing = {
   appId: string
-  taskId: string
+  taskId?: string
+  projectId?: string
   name: string
   description: string
   head: number
   updatedAt: number
   sessionId?: string
+  draftOf?: { appId: string; revision: number; head: number }
+  deletedAt?: number
 }
+
+/** How Publish treats a draft whose project app moved since the draft started: refuse with 409,
+ *  replace its head anyway, or publish the draft as a new project app. */
+export const publishModeSchema = z.enum(['safe', 'replace', 'new'])
+export type PublishMode = z.infer<typeof publishModeSchema>
 
 /** The frame the Node sends when an app's head moves, so the Apps pane and its gate follow. */
 export const APP_CHANGED_VERB = 'app-changed'
 export const APPS_PANE_ID = 'apps'
+export const APPS_SOURCE_ID = 'apps'
+
+/** Where the Apps source shows a project's apps, and one of them. */
+export const projectAppsPath = (projectId: string, appId?: string) =>
+  `/p/${encodeURIComponent(projectId)}/apps${appId ? `/${encodeURIComponent(appId)}` : ''}`
 
 export const appsRoute = '/v1/p/trellis/apps'
 
@@ -66,3 +81,6 @@ export const appRevisionRoute = (appId: string, revision: number) => `${appRoute
 export const appRestoreRoute = (appId: string) => `${appRoute(appId)}/restore`
 export const appStateRoute = (appId: string) => `${appRoute(appId)}/state`
 export const appSessionRoute = (appId: string) => `${appRoute(appId)}/session`
+export const appPublishRoute = (appId: string) => `${appRoute(appId)}/publish`
+export const appDraftsRoute = (appId: string) => `${appRoute(appId)}/drafts`
+export const appDeletedRoute = (appId: string) => `${appRoute(appId)}/deleted`

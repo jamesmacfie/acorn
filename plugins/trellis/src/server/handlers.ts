@@ -44,7 +44,7 @@ const conflict = <T>(work: Promise<T>): Promise<T> =>
 export async function createApp(deps: AppToolDeps, raw: unknown, ctx: ToolContext) {
   const input = appCreateInput.parse(raw)
   const store = await deps.store()
-  const meta = await store.create(ctx.taskId, input.name, input.description, ctx.sessionId)
+  const meta = await store.create({ taskId: ctx.taskId }, input.name, input.description, ctx.sessionId)
   return { appId: meta.appId, program: { hash: (await store.read(meta.appId, 'program'))!.hash } }
 }
 
@@ -131,11 +131,13 @@ export async function showApp(deps: AppToolDeps, raw: unknown, ctx: ToolContext)
 }
 
 export async function listApps(deps: AppToolDeps, ctx: ToolContext) {
-  return (await (await deps.store()).forTask(ctx.taskId)).map(({ appId, name, description, head }) => ({
+  return (await (await deps.store()).forTask(ctx.taskId)).map(({ appId, name, description, head, draftOf }) => ({
     appId,
     name,
     description,
     head,
+    // A draft's project app, and the project revision the draft started from.
+    ...(draftOf ? { draftOf: { appId: draftOf.appId, revision: draftOf.revision } } : {}),
   }))
 }
 

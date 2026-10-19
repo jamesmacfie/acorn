@@ -1,11 +1,14 @@
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
-import { appsSchedule } from './appsStore'
+import { APPS_SOURCE_ID } from '../shared/api'
+import { appsSchedule, workspaceHasProjectApps } from './appsStore'
 import { appsPaneContribution } from './paneContribution'
 
 // The card loads with the first app_show in a transcript, and lang-core and the renderer with it.
 const AppToolCard = lazy(() => import('./AppToolCard'))
+const ProjectAppList = lazy(async () => ({ default: (await import('./ProjectApps')).ProjectAppList }))
+const ProjectAppDetail = lazy(async () => ({ default: (await import('./ProjectApps')).ProjectAppDetail }))
 
 export const trellisClientPlugin: ClientPlugin = {
   name: 'trellis',
@@ -20,6 +23,22 @@ export const trellisClientPlugin: ClientPlugin = {
       component: AppToolCard,
     })
     ctx.panes.register(appsPaneContribution)
+    // One left-rail source for every project app, never one icon per app
+    // (docs/agent-built-apps/project-apps.md § The Apps source). It lists the routed project's apps,
+    // and shows once the workspace has one.
+    ctx.sources.register({
+      id: APPS_SOURCE_ID,
+      order: 75,
+      glyph: 'app-window',
+      label: 'Apps',
+      when: workspaceHasProjectApps,
+      regions: { list: ProjectAppList, detail: ProjectAppDetail, scroll: true },
+      projectScoped: true,
+      routes: [
+        { id: 'trellis.apps', path: '/p/:projectId/apps', order: 60 },
+        { id: 'trellis.app', path: '/p/:projectId/apps/:appId', order: 61 },
+      ],
+    })
     ctx.schedules.register(appsSchedule)
   },
 }

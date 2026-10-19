@@ -22,14 +22,14 @@ import {
   clientCapability,
   formatRelativeTime,
   readJson,
-  writeJson,
   type Task,
 } from '@acorn/plugin-api/client'
-import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { AGENTS_CONVERSATION } from '@acorn/plugin-agents/contract/conversation.ts'
-import { appRoute, appSessionRoute, type AppListing, type AppRevisionFiles, type AppSummary } from '../shared/api'
-import { refreshApps, taskApps } from './appsStore'
+import { appRoute, type AppListing, type AppSummary } from '../shared/api'
+import { appById, taskApps } from './appsStore'
 import { Revision, revisionFilesOptions } from './AppToolCard'
+import { startEditingSession } from './editingSession'
+import { PublishButton } from './PublishButton'
 import type { AppsPaneModel } from './paneContribution'
 
 // The Apps pane's two regions (./paneContribution.ts).
@@ -60,6 +60,11 @@ export function AppList(props: { task: Task; model: AppsPaneModel }) {
               {entry.app.description}
             </Text>
           </Show>
+          <Show when={entry.app.draftOf}>
+            {(draftOf) => (
+              <Text emphasis="muted">{`Draft of ${appById(draftOf().appId)?.name ?? 'a removed app'} v${draftOf().revision}`}</Text>
+            )}
+          </Show>
           <Text emphasis="muted">{`Changed ${formatRelativeTime(entry.app.updatedAt)}`}</Text>
         </Row>
       )}
@@ -88,6 +93,7 @@ export function AppDetail(props: { task: Task; model: AppsPaneModel }) {
             <Toolbar ariaLabel="App">
               <Heading level={2}>{app().name}</Heading>
               <Toolbar.Spacer />
+              <PublishButton app={app()} />
               <ToggleButton size="sm" pressed={props.model.editing()} onPressedChange={props.model.setEditing}>
                 Edit with agent
               </ToggleButton>
@@ -133,26 +139,10 @@ function EditingConversation(props: { task: Task; app: () => AppListing }) {
   const [error, setError] = createSignal('')
 
   const start = async () => {
-    const app = props.app()
     setStarting(true)
     setError('')
     try {
-      const files = await queryClient.fetchQuery(revisionFilesOptions(nodeId, app.appId, app.head))
-      const sessionId = await surface!.startSession({
-        taskId: props.task.id,
-        title: `Edit ${app.name}`,
-        context: appContext(app, files),
-        ...(app.sessionId ? { like: app.sessionId } : {}),
-      })
-      await writeJson(appSessionRoute(app.appId), {
-        method: 'PUT',
-        nodeId,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sessionId }),
-      })
-      // The listing names the session the drawer draws, so read it again. The new session is open.
-      queryClient.setQueryData(['trellis-session-open', nodeId, sessionId], true)
-      await refreshApps()
+      await startEditingSession(surface!, queryClient, nodeId, props.task.id, props.app())
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Couldn't start an editing session.")
     } finally {
@@ -194,24 +184,6 @@ function EditingConversation(props: { task: Task; app: () => AppListing }) {
       )}
     </Show>
   )
-}
-
-/** What an editing session starts with: the app's name, description, head, and files. */
-function appContext(app: AppListing, files: AppRevisionFiles): AgentContextSnapshot {
-  const content = [
-    `The app "${app.name}" (${app.appId}) at v${app.head}. ${app.description}`.trim(),
-    'Change it with the app tools: app_read for the working files and their hashes, then app_patch or app_write, then app_show. Read app_guide first if you have not.',
-    `program:\n${files.program}`,
-    ...Object.entries(files.plans).map(([name, plan]) => `plans/${name}:\n${JSON.stringify(plan, null, 2)}`),
-  ].join('\n\n')
-  return {
-    type: 'context',
-    contextId: `trellis:${app.appId}:${app.head}`,
-    label: `${app.name} · v${app.head}`,
-    content,
-    source: 'trellis.app',
-    capturedAt: Date.now(),
-  }
 }
 
 /** An archived task's app: its revisions and their programs, read only, never run. */

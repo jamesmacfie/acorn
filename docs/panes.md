@@ -36,7 +36,7 @@ Some panes appear only when the task has something to show:
 - `apps` uses `list-detail` and a `when` gate, so a task where no agent has shown an app gets no button
   ([agent-built apps](./agent-built-apps.md#the-apps-pane)). It declares the 640px minimum width too,
   for the editing conversation's composer, and `readsArchived`, so an archived task's preview lists
-  its apps without running them.
+  its apps without running them. A draft of a project app is listed with the app it edits.
 - `preview` has a `when` gate too. A task with no run-target URL and no project preview setting gets
   no button ([shell](./shell/webviews.md) § Host-owned webviews has the check).
 - `database` is gated through its manifest's `availability` route. A task with no connection script
@@ -113,6 +113,10 @@ list at `/p/:projectId`, has no task, and never enters a task layout. None of th
 `?pane=` and `?item=` addressing, or `paneRegistry` applies to it. It lives in its own registry,
 `packages/client-core/src/host/registries/panes/projectSurfaces.ts`, so those consumers don't branch
 on a scope they can't act on.
+
+A compiled plugin's project page is a source with `regions` and its own routes instead. Trellis's
+**Apps** source draws a project app at `/p/:projectId/apps/:appId` with no task
+([project apps](./agent-built-apps/project-apps.md#the-apps-source)).
 
 A project-scoped pane exists because a rail row click often has no task, and `openPane` needs one.
 It has no layout state to keep a selection in, so its selection lives in the URL. Each pane gets one

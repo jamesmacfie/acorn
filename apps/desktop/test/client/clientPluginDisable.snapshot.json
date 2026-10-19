@@ -51,6 +51,7 @@
       "gitlab",
       "git",
       "memory",
+      "apps",
       "workflows"
     ],
     "settingsPages": [
@@ -407,6 +408,9 @@
     },
     "trellis": {
       "panes": [
+        "apps"
+      ],
+      "sources": [
         "apps"
       ],
       "extensions": [

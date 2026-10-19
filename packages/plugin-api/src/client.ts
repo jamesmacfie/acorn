@@ -216,6 +216,8 @@ export { taskById } from '@acorn/client-core/features/tasks'
 
 // ── Workspaces and projects ───────────────────────────────────────────────────────────────────
 export { workspaceForProject } from '@acorn/client-core/features/workspaces'
+// The workspace open now, for a gate that isn't a component and so can't read the route.
+export { currentWorkspaceId } from '@acorn/client-core/features/workspaces'
 export { createWorkspaceWords } from '@acorn/client-core/features/workspaces'
 
 export { canAddProjectFromFolder, pickNodeFolder } from '@acorn/client-core/features/workspaces'

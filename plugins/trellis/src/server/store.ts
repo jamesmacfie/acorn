@@ -5,7 +5,7 @@ import type { AppFile, AppRevisionFiles, AppRevisionSummary, AppSummary } from '
 
 // An app's files under the Node's data root (docs/agent-built-apps.md § Files):
 //
-//   apps/<appId>/app.json                    the task, name, description, head, and building session
+//   apps/<appId>/app.json                    the owner, name, description, head, building session, draft link
 //   apps/<appId>/working/program.oui         what the tools edit
 //   apps/<appId>/working/plans/<name>.json
 //   apps/<appId>/revisions/<n>/              what app_show published; never changed again
@@ -14,9 +14,15 @@ import type { AppFile, AppRevisionFiles, AppRevisionSummary, AppSummary } from '
 // Ids and file names are checked by the tool schemas before they reach a path here. Every change to
 // one app runs in that app's queue, so a hash check and the write after it can't interleave.
 
+/** A draft's project app: the project revision the draft is at, and the draft's own head when it got
+ *  there, so a later head is a change not yet published. */
+type DraftLink = { appId: string; revision: number; head: number }
+
+/** Exactly one of `taskId` and `projectId` is set: a task app or draft, or a project app. */
 export type AppMeta = {
   appId: string
-  taskId: string
+  taskId?: string
+  projectId?: string
   name: string
   description: string
   head: number
@@ -25,8 +31,17 @@ export type AppMeta = {
   updatedAt?: number
   /** The session that last showed the app, or the one the person started to edit it. */
   sessionId?: string
+  draftOf?: DraftLink
+  /** When a project app was deleted. It stays, listed as archived, until it's restored or removed. */
+  deletedAt?: number
 }
-export type RevisionMeta = AppRevisionSummary & { library: { id: string; version: number }; shownAt: number }
+export type RevisionMeta = AppRevisionSummary & {
+  library: { id: string; version: number }
+  shownAt: number
+  /** On a project app's revision: the task app revision it was published from, and the session that
+   *  last showed that app. */
+  publishedFrom?: { taskId: string; appId: string; revision: number; sessionId?: string }
+}
 
 export class AppConflict extends Error {}
 
@@ -53,10 +68,15 @@ export class AppStore {
     return next
   }
 
-  async create(taskId: string, name: string, description: string, sessionId?: string): Promise<AppMeta> {
+  async create(
+    owner: { taskId: string } | { projectId: string },
+    name: string,
+    description: string,
+    sessionId?: string,
+  ): Promise<AppMeta> {
     const meta: AppMeta = {
       appId: `app-${randomBytes(6).toString('hex')}`,
-      taskId,
+      ...owner,
       name,
       description,
       head: 0,
@@ -94,13 +114,19 @@ export class AppStore {
     return (await this.all()).filter((meta) => meta.taskId === taskId)
   }
 
-  /** Names the session the drawer draws, for an editing session the person started. */
-  setSession(appId: string, sessionId: string): Promise<boolean> {
+  /** Changes fields of app.json other than the head, which only `publish` moves. Answers whether the
+   *  app exists. */
+  update(appId: string, change: Partial<Pick<AppMeta, 'sessionId' | 'draftOf' | 'deletedAt'>>): Promise<boolean> {
     return this.serial(appId, async () => {
       const meta = await this.meta(appId)
-      if (meta) await this.saveMeta({ ...meta, sessionId })
+      if (meta) await this.saveMeta({ ...meta, ...change })
       return !!meta
     })
+  }
+
+  /** Deletes an app's files. */
+  remove(appId: string): Promise<void> {
+    return this.serial(appId, () => rm(this.dir(appId), { recursive: true, force: true }))
   }
 
   /** The saved $ variables, or none. */
@@ -168,16 +194,19 @@ export class AppStore {
 
   /** Publishes files as the next revision and makes it head. A restore copies them into the working
    *  files too, so the agent's next edit starts from what is on screen. `sessionId` is the session that
-   *  showed it, which becomes the app's building session. */
+   *  showed it, which becomes the app's building session. With `expectedHead`, it publishes only while
+   *  the head is still that revision, and throws AppConflict otherwise. */
   publish(
     appId: string,
     files: { program: string; plans: Record<string, string> },
     revision: Omit<RevisionMeta, 'revision' | 'shownAt'>,
-    options: { toWorking?: boolean; sessionId?: string } = {},
+    options: { toWorking?: boolean; sessionId?: string; expectedHead?: number } = {},
   ): Promise<number> {
     return this.serial(appId, async () => {
       const meta = await this.meta(appId)
       if (!meta) throw new Error(`No app ${appId}.`)
+      if (options.expectedHead !== undefined && meta.head !== options.expectedHead)
+        throw new AppConflict(`${meta.name} moved to v${meta.head} since v${options.expectedHead}.`)
       const number = meta.head + 1
       const target = join(this.dir(appId), 'revisions', String(number))
       const staging = `${target}.tmp`
@@ -252,7 +281,7 @@ export class AppStore {
     let removed = 0
     for (const id of await readdir(this.root).catch(() => [] as string[])) {
       const meta = await this.meta(id)
-      if (!meta || !doomed.has(meta.taskId)) continue
+      if (!meta?.taskId || !doomed.has(meta.taskId)) continue
       await rm(this.dir(id), { recursive: true, force: true })
       removed += 1
     }

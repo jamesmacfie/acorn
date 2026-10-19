@@ -32,12 +32,13 @@ const canOpen = typeof window !== 'undefined' && typeof window.open === 'functio
 
 export default function AppView(props: {
   appId: string
-  taskId: string
+  /** The task it's drawn in. A project app has none, so it has no task to read or composer to fill. */
+  taskId?: string
   workspaceId: string
   files: AppRevisionFiles
   nodeId: string
   readOnly: boolean
-  placement: 'card' | 'pane'
+  placement: 'card' | 'pane' | 'project'
 }) {
   const inCard = props.placement === 'card'
   // A card's plans first run when it is first on screen, so a long conversation reads only what is
@@ -134,6 +135,7 @@ export default function AppView(props: {
       ]),
     ),
     [TASK_TOOL]: async () => {
+      if (!props.taskId) throw new Error('This app is open in a project, so there is no task to read.')
       const task = taskById(props.taskId)
       return { id: props.taskId, title: task?.title ?? '', branch: task?.branch ?? null }
     },
@@ -144,10 +146,13 @@ export default function AppView(props: {
     if (props.readOnly) return
     if (event.type === BuiltinActionType.OpenUrl) void openUrl(plainText(event.params.url))
     if (event.type === BuiltinActionType.ContinueConversation) {
+      if (!props.taskId)
+        return setNotice('This app is open in a project, so there is no agent to ask. Edit it in a task.')
+      const taskId = props.taskId
       const message = plainText(event.humanFriendlyMessage)
       const context = plainData(event.params.context)
       const text = context === undefined ? message : `${message}\n\n${JSON.stringify(context)}`
-      void composeForAgent(props.taskId, text).then(
+      void composeForAgent(taskId, text).then(
         (result) => !result.ok && setNotice(result.reason ?? "Couldn't reach the agent."),
       )
     }

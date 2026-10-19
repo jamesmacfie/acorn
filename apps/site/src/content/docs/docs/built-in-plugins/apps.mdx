@@ -3,6 +3,7 @@ title: Apps
 description: An agent answers with a small app in the conversation, with lists, forms, ticks, and buttons over your data, and keeps every version it shows.
 sources:
   - docs/agent-built-apps.md
+  - docs/agent-built-apps/project-apps.md
   - docs/agent-tools.md
   - plugins/trellis/src/shared/library.ts
 checked: '500839a27'
@@ -18,7 +19,7 @@ reads your data through the same plans a dashboard panel uses, and the agent's v
 stays a panel.
 
 <PluginFacts id="trellis">
-  <Fragment slot="adds">Seven agent tools that build an app, the card that draws it in the conversation, and the task's Apps pane.</Fragment>
+  <Fragment slot="adds">Seven agent tools that build an app, the card that draws it in the conversation, the task's Apps pane, and an Apps source in the left rail for apps you publish to a project.</Fragment>
   <Fragment slot="needs">A managed agent session in a task.</Fragment>
 </PluginFacts>
 
@@ -62,6 +63,32 @@ If the session that built the app is archived, **Edit with agent** offers **Star
 session**. The new session's first message carries the app, so you don't have to say which one you
 mean.
 
+## Share an app with the project
+
+An app you want to keep past its task can belong to the project instead.
+
+<Steps>
+
+1. Select **Publish to project** on the app's card or in the Apps pane.
+
+   <Checkpoint>An **Apps** source appears in the left rail. It lists the project's apps, and selecting
+   one draws it at full size.</Checkpoint>
+
+2. Ask the agent in the same task for a change, then select **Publish** in the Apps pane.
+
+   <Checkpoint>The project's app shows the change. Ticks you made in it stay.</Checkpoint>
+
+</Steps>
+
+To change a project app later, open it from **Apps** and select **Edit in a new task**, or **Edit in
+this task** when the task you were in belongs to the same project. The task gets a draft of the app
+and, for a new task, an agent session that already has the app. If someone published the app after
+your draft started, **Publish** asks whether to publish your draft as a new app or replace theirs.
+
+**Delete** moves a project app to **Archived apps** at the bottom of the list, where **Restore** brings it
+back and **Remove for good** deletes it. When you archive a task whose app has changes the project
+doesn't have, the archive dialog offers to publish them first.
+
 ## Earlier versions
 
 Only the newest card is live. An older card's line offers two buttons:
@@ -86,9 +113,12 @@ An app can't reach the network, read a secret, or start a program.
 
 - An app remembers what you tick or type, up to 256 KiB, after a reload or a restart. When the agent
   changes the app, it keeps what you set as long as the agent keeps the names it stores it under.
-- An app belongs to the task it was built in. Archiving the task keeps it, and the archive dialog says
-  so. While the task is archived, its preview lists the app's versions and doesn't run them.
-  Restoring the task brings the app back. Deleting the task deletes it.
+- An app belongs to the task it was built in until you publish it. Archiving the task keeps it, and the
+  archive dialog says so. While the task is archived, its preview lists the app's versions and doesn't
+  run them. Restoring the task brings the app back. Deleting the task deletes it, and leaves the
+  project's copy.
+- A project app has no task, so it can't ask the agent anything or read which task it's in. Edit it in
+  a task to do either.
 
 ## In the terminal
 
