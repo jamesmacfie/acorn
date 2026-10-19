@@ -291,6 +291,8 @@
     "GET /v1/p/notes/workspaces/:wsId/notes/:slug",
     "GET /v1/p/terminal/profiles",
     "GET /v1/p/terminal/sessions",
+    "GET /v1/p/terminal/sessions/:sid/output",
+    "GET /v1/p/terminal/sessions/:sid/output",
     "GET /v1/p/terminal/tasks/:taskId/run-targets",
     "GET /v1/p/workflows/catalog",
     "GET /v1/p/workflows/catalog",

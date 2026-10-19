@@ -49,11 +49,33 @@ const fake = (over: Partial<TerminalBridge> = {}): TerminalBridge => ({
   resize: async () => true,
   sendToAgent: async () => ({ ok: true }),
   runSetup: async () => ({ sessionId: 's1' }),
+  output: async () => '',
   ...over,
 })
 
 describe('terminal control routes', () => {
   afterEach(() => setTerminalBridge(null))
+
+  it('answers output redacted, to a device only', async () => {
+    const lines: number[] = []
+    setTerminalBridge(
+      fake({
+        output: async (_id, count) => (
+          lines.push(count),
+          'ok\nexport TOKEN=sk-live-abcdefghijkl\nAuthorization: Bearer abc.def.ghi'
+        ),
+      }),
+    )
+    const res = await authed().fetch(req('/api/sessions/s1/output'), {} as Env)
+    expect(await res.json()).toEqual({ text: 'ok\nexport TOKEN=<redacted>\nAuthorization: <redacted>' })
+    expect(lines).toEqual([200])
+    expect((await asTask1().fetch(req('/api/sessions/s1/output'), {} as Env)).status).toBe(403)
+  })
+
+  it('answers 404 for a session the engine does not know', async () => {
+    setTerminalBridge(fake({ output: async () => null }))
+    expect((await authed().fetch(req('/api/sessions/nope/output'), {} as Env)).status).toBe(404)
+  })
 
   it('starts setup for the task in the path and answers the new session', async () => {
     let asked: string | null = null

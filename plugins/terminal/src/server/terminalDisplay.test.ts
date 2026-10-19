@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
-import { DISPLAY_RESET, HeadlessTerminalScreen, TerminalDisplay, type TerminalScreen } from './terminalDisplay'
+import {
+  DISPLAY_RESET,
+  HeadlessTerminalScreen,
+  outputText,
+  TerminalDisplay,
+  type TerminalScreen,
+} from './terminalDisplay'
 import { OutputRing } from './terminalUtils'
 
 const session: TerminalSession = {
@@ -347,5 +353,20 @@ describe('TerminalDisplay emulates only while an attach is restoring', () => {
     expect(restored).toBe(live)
     cold.dispose()
     throughout.dispose()
+  })
+})
+
+describe('outputText', () => {
+  it('keeps the last lines of a long history as plain text, colour and blank screen gone', async () => {
+    const history = Array.from({ length: 1_000 }, (_, i) => `\x1b[32mline ${i + 1}\x1b[0m`).join('\r\n')
+    const text = await outputText(history, 80, 24, 200)
+    const lines = text.split('\n')
+    expect(lines).toHaveLength(200)
+    expect(lines[0]).toBe('line 801')
+    expect(lines.at(-1)).toBe('line 1000')
+  })
+
+  it('joins a line the terminal wrapped back into one', async () => {
+    expect(await outputText(`${'x'.repeat(30)}\r\nnext`, 20, 5, 10)).toBe(`${'x'.repeat(30)}\nnext`)
   })
 })

@@ -29,6 +29,8 @@ export type TerminalApi = {
   interrupt(id: string): Promise<boolean>
   remove(id: string): Promise<boolean>
   resize(id: string, cols: number, rows: number): Promise<boolean>
+  /** The session's last output lines as plain text, redacted on the Node. */
+  output(id: string): Promise<{ text: string }>
   send(id: string, text: string, submit: SendSubmit): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
   /** Start the setup script in the task's worktree. A refusal rejects with the node's reason. */
   runSetup(taskId: string): Promise<{ sessionId: string }>
@@ -64,6 +66,7 @@ export const terminalApi = (nodeId: string | null = activeNodeId()): TerminalApi
       return post<boolean>(terminalSessionActionRoute(id, 'resize'), { cols, rows })
     },
     send: (id, text, submit) => post(terminalSessionActionRoute(id, 'send'), { text, submit }),
+    output: (id) => readJson<{ text: string }>(terminalSessionActionRoute(id, 'output'), { nodeId }),
     runSetup: (taskId) => post<{ sessionId: string }>(terminalTaskSetupRoute(taskId)),
     write: (id, data) => wsWrite(id, data, nodeId),
     attach: (id, on, size) => wsAttach(id, on, size, nodeId),

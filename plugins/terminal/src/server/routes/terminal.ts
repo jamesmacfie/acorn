@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { CreateOpts, TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import {
   type AppEnv,
+  BridgeError,
   isTaskConfined,
   mayActOnTask,
   requireDevice,
@@ -11,10 +12,15 @@ import {
   routeCapability,
   routeCapabilityFor,
   RUN_TARGETS,
+  scrub,
   setRouteTestCapability,
   viaBridge,
 } from '@acorn/plugin-api/node'
+import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 import type { SendSubmit } from '../../shared/send'
+
+/** Enough for a failing build or a stack trace: about 16 KB at 80 columns. */
+const TERMINAL_CONTEXT_LINES = 200
 
 export type TerminalBridge = {
   // Which task owns a session, for the ownership check every /sessions/:sid route below runs.
@@ -29,6 +35,8 @@ export type TerminalBridge = {
   interrupt(id: string): Promise<boolean>
   remove(id: string): Promise<boolean>
   resize(id: string, cols: number, rows: number): Promise<boolean>
+  /** The session's last output lines as plain text, before redaction. Null for an unknown session. */
+  output(id: string, lines: number): Promise<string | null>
   sendToAgent(
     sessionId: string,
     text: string,
@@ -125,6 +133,16 @@ export const terminal = new Hono<AppEnv>()
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, TERMINAL_ROUTE, (t) => t.resize(c.req.param('sid'), p.data.cols, p.data.rows))
   })
+  // What an agent composer attaches for `#terminal:<session>` (docs/managed-agents/attachments.md).
+  // Device-only, because output can hold anything the person ran, and redacted here, before the text
+  // leaves the Node. Pattern redaction catches common token shapes, not every secret.
+  .get('/sessions/:sid/output', requireDevice, (c) =>
+    viaBridge(c, TERMINAL_ROUTE, async (t) => {
+      const text = await t.output(c.req.param('sid'), TERMINAL_CONTEXT_LINES)
+      if (text === null) throw new BridgeError(404, 'not_found')
+      return { text: scrub(text, '', MAX_AGENT_CONTEXT_BYTES) }
+    }),
+  )
   .post('/sessions/:sid/send', requireDevice, async (c) => {
     const p = sendBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
