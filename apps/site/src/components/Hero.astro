@@ -1,20 +1,25 @@
 ---
-// The top of a marketing page: an optional eyebrow, the headline, a paragraph in the default slot, the
-// actions, and a picture under them at the page's full width.
+// The top of a marketing page, on the dark stage under the header: an optional eyebrow, the headline, a
+// paragraph in the default slot, the actions, and a picture under them at the page's full width. The
+// picture hangs over the stage's bottom edge onto the page.
 interface Props {
   eyebrow?: string
   title: string
+  /** The end of the title, set in the accent. */
+  highlight?: string
   /** On a wide screen, sets the paragraph and the actions beside the headline, so the picture starts higher. */
   split?: boolean
 }
 
-const { eyebrow, title, split = false } = Astro.props
+const { eyebrow, title, highlight, split = false } = Astro.props
+if (highlight && !title.endsWith(highlight)) throw new Error(`The hero title "${title}" doesn't end with "${highlight}".`)
+const lead = highlight ? title.slice(0, -highlight.length) : title
 ---
 
-<section class="hero" data-split={split || undefined}>
+<section class="hero stage site-dark" data-split={split || undefined}>
   {eyebrow && <p class="eyebrow">{eyebrow}</p>}
-  <h1>{title}</h1>
-  <div class="hero-text"><slot /></div>
+  <h1>{lead}{highlight && <span class="accent">{highlight}</span>}</h1>
+  {Astro.slots.has('default') && <div class="hero-text"><slot /></div>}
   {Astro.slots.has('actions') && <div class="actions"><slot name="actions" /></div>}
   {Astro.slots.has('picture') && <div class="hero-picture"><slot name="picture" /></div>}
 </section>

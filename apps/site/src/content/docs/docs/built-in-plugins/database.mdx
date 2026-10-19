@@ -15,7 +15,7 @@ sources:
   - plugins/database/src/server/workflowSteps.ts
   - packages/node-core/src/server/core/data.ts
   - packages/client-core/src/features/settings/ProjectConfigTabs.tsx
-checked: 'ca5de41ca'
+checked: 'b88b42b6b'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -29,7 +29,7 @@ queries you save for the project, and SQL written for you from a description.
 <Snapshot id="database" />
 
 <PluginFacts id="database">
-  <Fragment slot="adds">The **Database** pane, three palette commands, a source for the agent's **Context** picker, two workflow steps, and the `acorn plugin database query` command.</Fragment>
+  <Fragment slot="adds">The **Database** pane, three palette commands, `#db` references in the agent's message box, two workflow steps, and the `acorn plugin database query` command.</Fragment>
   <Fragment slot="needs">A PostgreSQL connection URL, from the worktree's `.env`, the Node's environment, or a command you give it. To generate SQL: an API key or an agent command line, such as Claude Code.</Fragment>
 </PluginFacts>
 
@@ -138,10 +138,10 @@ The commands sit in a **Database** group.
 
 ## For agents
 
-To hand an agent your saved queries, open **Context** below the agent's message box, choose **Saved
-database queries**, and pick the queries. The agent gets their SQL and notes with your next message.
+To hand an agent a saved query, type `#db:` in the agent's message box and pick the query, or tick it
+under **Context**. The agent gets its SQL and notes with your message.
 Connection details are never in it.
-[Files, attachments, and context](/docs/agents/files-attachments-and-context/) covers the picker.
+[Files, attachments, and context](/docs/agents/files-attachments-and-context/) covers `#` references.
 
 ## In workflows
 

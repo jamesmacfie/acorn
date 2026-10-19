@@ -8,6 +8,7 @@ export { formatRelativeTime } from './rendering/formatRelativeTime.ts'
 export { formatChord } from './rendering/formatChord.ts'
 export { bytesOf, formatBytes, formatSize } from './rendering/formatSize.ts'
 export { fuzzyScore } from './controls/fuzzy.ts'
+export { mentionList } from './controls/mentions.ts'
 export { latestSignal } from './state/latestSignal.ts'
 export type { LatestSignal } from './state/latestSignal.ts'
 

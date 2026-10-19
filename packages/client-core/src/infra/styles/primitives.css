@@ -1876,6 +1876,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-mentionfield-token[data-tone='warn'] { color: var(--state-warn); }
 .ui-mentionfield-token[data-tone='danger'] { color: var(--state-bad); }
 .ui-mentionfield-token[data-tone='muted'] { color: var(--text-muted); }
+/* An Acorn context reference: the text's own colour, underlined, so it reads apart from the three
+   coloured kinds. An underline moves no glyph, so the mirror stays aligned. */
+.ui-mentionfield-token[data-tone='neutral'] { text-decoration: underline dotted; text-underline-offset: 3px; }
 /* Anything drawn inside the box rather than above it, on the code block's rule: an expand toggle
    belongs over the text it grows, not on a line of its own that the mirror would then be offset by. */
 .ui-mentionfield-overlay {

@@ -30,6 +30,7 @@ const agentInputPartSchema = z.discriminatedUnion('type', [
     freshness: z.enum(['live', 'cached', 'stale', 'unknown']).optional(),
     sensitivity: z.enum(['public', 'workspace', 'private', 'secret']).optional(),
     capturedAt: z.number().int().nonnegative(),
+    ref: z.string().min(2).max(300).optional(),
   }),
   z.object({
     type: z.literal('image'),

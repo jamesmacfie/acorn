@@ -1,5 +1,11 @@
 import { children, createEffect, createMemo, createSignal, For, Index, Show, type JSX } from 'solid-js'
-import { activeMention, completeMention, scrollDeltaFor, type ActiveMention } from '../../lib/controls/mentions'
+import {
+  activeMention,
+  completeMention,
+  mentionList,
+  scrollDeltaFor,
+  type ActiveMention,
+} from '../../lib/controls/mentions'
 import { Alert } from '../content/Alert'
 import { Textarea } from './Textarea'
 import PickerRow from './PickerRow'
@@ -15,8 +21,17 @@ import type { Tone } from '../../tokens/tokens'
 // which runs of the text are already a mention and what tone to draw them in. Neither is a DOM
 // concern, so a terminal host draws the same field from the same props.
 
-/** One row of the list. `value` is the text that replaces the mention under the caret. */
-export type MentionSuggestion = { value: string; label: string; detail?: string }
+/** One row of the list. `value` is the text that replaces the mention under the caret. `continue`
+ *  writes it with no space after and keeps the list open, for a first step such as `#agent:`. */
+export type MentionSuggestion = { value: string; label: string; detail?: string; continue?: boolean }
+
+/** A source's answer when it is more than a list: still fetching for this query, or empty for a
+ *  reason of its own. */
+type MentionAnswer = {
+  suggestions: readonly MentionSuggestion[]
+  loading?: boolean
+  emptyText?: string
+}
 
 /** What may be completed after one sigil. */
 export type MentionSource = {
@@ -29,7 +44,11 @@ export type MentionSource = {
   loading?: boolean
   /** Why there is nothing to offer, when the reason is worth saying out loud. */
   error?: string
-  suggest: (query: string) => readonly MentionSuggestion[]
+  /** `null` when the text after the sigil is not a mention after all, such as `#123`: the list stays
+   *  closed instead of saying nothing matched. */
+  suggest: (query: string) => readonly MentionSuggestion[] | MentionAnswer | null
+  /** A suggestion was written into the text. */
+  onChoose?: (suggestion: MentionSuggestion) => void
 }
 
 /** A run of the draft, as the mirror draws it. A segment with no `tone` is prose. */
@@ -104,12 +123,9 @@ export default function MentionTextarea(props: MentionTextareaProps) {
   const [selected, setSelected] = createSignal(0)
 
   const source = () => sources().find((candidate) => candidate.sigil === mention()?.sigil)
-  const suggestions = createMemo<readonly MentionSuggestion[]>(() => {
-    const active = mention()
-    const found = source()
-    return active && found ? found.suggest(active.query) : []
-  })
-  const open = () => focused() && !dismissed() && mention() != null
+  const answer = createMemo(() => mentionList(source(), mention()?.query))
+  const suggestions = () => answer()?.suggestions ?? []
+  const open = () => focused() && !dismissed() && answer() != null
 
   let field: HTMLTextAreaElement | undefined
   let mirror: HTMLPreElement | undefined
@@ -131,9 +147,12 @@ export default function MentionTextarea(props: MentionTextareaProps) {
   const choose = (suggestion: MentionSuggestion) => {
     const active = mention()
     if (!active) return
-    const completed = completeMention(props.value, active, suggestion.value)
+    const completed = completeMention(props.value, active, suggestion.value, suggestion.continue)
+    source()?.onChoose?.(suggestion)
     props.onInput(completed.text)
-    setMention(null)
+    // A first step leaves the caret in the mention, so the list reopens on what follows it.
+    if (suggestion.continue) update(completed.text, completed.cursor)
+    else setMention(null)
     setDismissed(false)
     queueMicrotask(() => putCaret(completed.cursor))
   }
@@ -294,9 +313,9 @@ export default function MentionTextarea(props: MentionTextareaProps) {
         {/* Only a source that fetches waits. A list that arrived with the session must not be held
             behind one that has not, or told that somebody else's fetch failed. */}
         <div class="ui-mentionfield-list" role="listbox" aria-label={source()?.label}>
-          <Show when={!source()?.loading} fallback={<p class="repo-picker-empty">Loading…</p>}>
-            <Show when={!source()?.error} fallback={<Alert>{source()?.error}</Alert>}>
-              <Show when={suggestions().length} fallback={<p class="repo-picker-empty">{source()?.emptyText}</p>}>
+          <Show when={!answer()?.loading} fallback={<p class="repo-picker-empty">Loading…</p>}>
+            <Show when={!answer()?.error} fallback={<Alert>{answer()?.error}</Alert>}>
+              <Show when={suggestions().length} fallback={<p class="repo-picker-empty">{answer()?.emptyText}</p>}>
                 <ul ref={list} class="repo-picker-list">
                   <For each={suggestions()}>
                     {(suggestion, index) => (

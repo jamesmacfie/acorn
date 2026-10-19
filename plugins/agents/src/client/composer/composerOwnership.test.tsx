@@ -276,6 +276,8 @@ it('keeps a held automatic capture with its originating session and discards it 
     {
       id: 'acorn-task-context',
       source: 'context.task',
+      keyword: 'task',
+      itemless: true,
       label: 'Task context',
       options: async () => [],
       capture,

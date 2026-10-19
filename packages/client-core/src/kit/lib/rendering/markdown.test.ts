@@ -28,6 +28,11 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown('`curl https://x.com`')).toBe('<p><code>curl https://x.com</code></p>')
   })
 
+  it('keeps an in-page fragment link in the page, and nothing that only starts like one', () => {
+    expect(renderMarkdown('[#agent:x](#ref-0)')).toBe('<p><a href="#ref-0">#agent:x</a></p>')
+    expect(renderMarkdown('[x](#a"onclick=y)')).not.toContain('href')
+  })
+
   it('is XSS-safe: escapes raw HTML and drops dangerous link schemes', () => {
     expect(renderMarkdown('<script>alert(1)</script>')).toBe('<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>')
     // javascript: link → href dropped, text kept

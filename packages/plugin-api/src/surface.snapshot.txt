@@ -724,6 +724,7 @@ ui: Log
 ui: Markdown
 ui: MentionSegment
 ui: MentionSource
+ui: MentionSuggestion
 ui: MentionTextarea
 ui: Menu
 ui: Meter

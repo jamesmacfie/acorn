@@ -150,6 +150,7 @@ export default {
     ],
     agentContexts: [{
       id: 'saved-requests',
+      keyword: 'http',
       label: 'Saved API requests',
       description: 'Capture request shapes with authorization, header values, variables and bodies redacted.',
       options: '/v1/p/http/context-options',

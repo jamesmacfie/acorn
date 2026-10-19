@@ -1,4 +1,5 @@
 import { createMemo, createSignal, For, Index, Show } from 'solid-js'
+import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import type { AgentConversationItem } from './conversationItems'
 import {
   DELEGATED_NOTES_SOURCE,
@@ -27,10 +28,11 @@ import {
 } from '@acorn/plugin-api/ui'
 import { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
-import { selectManagedSubagent } from './managedSelection'
+import { openManagedSession, selectManagedSubagent } from './managedSelection'
 import { visibleConversationItems } from './conversationItems'
 import { asPlainText } from './copyFormats'
 import { messageAttachments, shownMessageText } from './messageText'
+import { contextLinkIndex, linkContextReferences } from '../composer/contextReferences'
 import {
   ContributedTranscriptRows,
   MessageSelectionActions,
@@ -59,6 +61,13 @@ import type { CheckResults } from '../../shared/delegationSchemas'
 
 // Builds its whole string in one call, so the card can read the item through a getter rather than
 // freezing a copy of it. See the note on Show's children below.
+// A context part's way back to what it was taken from. An agent session opens itself, not just the pane.
+function followContext(taskId: string, context: AgentContextSnapshot): void {
+  const sessionId = context.deepLink?.intent?.sessionId
+  if (context.deepLink?.pane === 'agents' && typeof sessionId === 'string') openManagedSession(taskId, sessionId)
+  else if (context.deepLink) dispatchLayout(taskId, { type: 'show', pane: context.deepLink.pane })
+}
+
 const contextLine = (context: { used: number; size?: number }): string =>
   context.size === undefined
     ? `${context.used.toLocaleString()} tokens`
@@ -211,6 +220,11 @@ export default function AgentEventCard(props: {
           const message = () => event() as Extract<ReturnType<typeof event>, { type: 'user_message' }>
           const time = createMemo(() => eventTime(props.item.createdAt))
           const attachments = () => messageAttachments(message(), props.turn)
+          // The context the message named with `#`, in the order its links point at.
+          const referencedContexts = () =>
+            (props.turn?.input ?? []).filter(
+              (part): part is AgentContextSnapshot & { ref: string } => part.type === 'context' && !!part.ref,
+            )
           return (
             <Card pad="sm" stripe="accent">
               <Stack gap="row">
@@ -247,7 +261,21 @@ export default function AgentEventCard(props: {
                   </Show>
                 </Inline>
                 <MessageSelectionActions target={messageTarget} text={() => shownMessageText(message(), props.turn)}>
-                  <AgentMarkdown text={shownMessageText(message(), props.turn)} taskId={props.taskId} />
+                  <AgentMarkdown
+                    text={linkContextReferences(
+                      shownMessageText(message(), props.turn),
+                      referencedContexts().map((context) => context.ref!),
+                    )}
+                    taskId={props.taskId}
+                    onLink={(href) => {
+                      const index = contextLinkIndex(href)
+                      if (index === null) return false
+                      // A source that has gone keeps its link and does nothing when pressed.
+                      const context = referencedContexts()[index]
+                      if (context) followContext(props.taskId, context)
+                      return true
+                    }}
+                  />
                 </MessageSelectionActions>
                 <Show
                   when={
@@ -317,11 +345,7 @@ export default function AgentEventCard(props: {
                           <Row
                             variant="stacked"
                             density="compact"
-                            onPress={
-                              context.deepLink
-                                ? () => dispatchLayout(props.taskId, { type: 'show', pane: context.deepLink!.pane })
-                                : undefined
-                            }
+                            onPress={context.deepLink ? () => followContext(props.taskId, context) : undefined}
                             meta={<Text emphasis="muted">~{(context.estimatedTokens ?? 0).toLocaleString()} tok</Text>}
                           >
                             <Text emphasis="strong">{context.label}</Text>

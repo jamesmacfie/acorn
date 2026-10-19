@@ -33,10 +33,10 @@ import that package and a packaged Node has no copy of the surface snapshot. And
 `permissions.api` scope names, because that allowlist is in the client, which the Node can't import.
 
 It also answers through the `plugin-authoring` context section, with `defaultIncluded: false`, so a
-task that isn't writing a plugin pays nothing. Tick **Plugin authoring** in the composer's context
-picker, or call `task_context { include: 'plugin-authoring' }`. It isn't an `agentContexts`
-descriptor, because that's a manifest key with a picker contract, and core would be pretending to be a
-plugin. Neither path is a new route. A frame can reach the text only through
+task that isn't writing a plugin pays nothing. Tick **Plugin authoring** in the Context pane and
+write `#task` in the message, or call `task_context { include: 'plugin-authoring' }`. It isn't an
+`agentContexts` descriptor, because that's a manifest key with a composer contract, and core would be
+pretending to be a plugin. Neither path is a new route. A frame can reach the text only through
 `GET /v1/core/tasks/:id/context` with `include=plugin-authoring`.
 
 ## plugin_request

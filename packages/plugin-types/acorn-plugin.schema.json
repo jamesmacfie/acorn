@@ -2544,11 +2544,26 @@
                 "minLength": 1,
                 "maxLength": 240
               },
+              "keyword": {
+                "description": "What follows `#` in the composer, such as `db` in `#db:monthly-revenue`. Defaults to the entry ID.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "itemless": {
+                "description": "No items to pick. The entry is referenced as a bare `#keyword` and captured with no `optionIds`.",
+                "type": "boolean"
+              },
+              "search": {
+                "description": "Send the typed text to `options` as `query`, so the route can search past what it would list.",
+                "type": "boolean"
+              },
               "options": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256,
-                "description": "A GET route sent `taskId` that answers the options the person can pick."
+                "description": "A GET route sent `taskId`, and `query` when `search` is set, that answers the options the person can pick."
               },
               "capture": {
                 "type": "string",

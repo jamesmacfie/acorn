@@ -1,12 +1,24 @@
 /* The site's stylesheet, written against acorn's own design tokens, which virtual:acorn-ui.css puts on
    <html>. The site draws in Catppuccin Latte or Mocha (AppearanceScript.astro) in the Terminal style
-   pack, and those tokens style the site and every specimen together. A color, font, or length the app has a token for comes from that token. The few
-   the app has no token for are the --site-* ones below. scripts/siteCss.test.mjs fails on a color
-   written here, and scripts/contrast.test.mjs checks the pairs of colors the site sets text in. */
+   pack, and those tokens style the site and every specimen together. A `.site-dark` element draws in
+   Mocha whichever the page is in, from a token block virtual:acorn-ui.css builds from the app's own.
+   A color, font, or length the app has a token for comes from that token. The few the app has no token
+   for are the --site-* ones below. scripts/siteCss.test.mjs fails on a color written here, and
+   scripts/contrast.test.mjs checks the pairs of colors the site sets text in. */
 
-/* Inter, Literata, and Nunito, for the Modern, Cozy, and Cute packs. A browser fetches a face only when
-   a rule uses it, so a visitor who never picks those packs downloads none of them. */
+/* The app's own faces. Inter sets a marketing page's paragraphs. The other two belong to style packs
+   the site never sets, and a browser fetches a face only when a rule uses it. */
 @import '@acorn/client-core/infra/styles/fonts.css';
+
+/* Arial, stretched to Inter's size, so a paragraph keeps its lines when Inter arrives and swaps in. */
+@font-face {
+  font-family: 'Inter fallback';
+  src: local('Arial');
+  ascent-override: 90.49%;
+  descent-override: 22.56%;
+  line-gap-override: 0%;
+  size-adjust: 107.06%;
+}
 
 /* JetBrains Mono, served from public/fonts with its license (OFL.txt). */
 @font-face {
@@ -31,7 +43,9 @@
   font-display: swap;
 }
 
-:root {
+/* `html:root`, not `:root`: a marketing page can load the app's sheet after this one, and the app's
+   `:root` would win a tie. */
+html:root {
   /* The app's mono stack, with the face the site serves first. No style pack moves it. */
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 
@@ -46,13 +60,25 @@
   --site-measure: 70ch;
   --site-lh-prose: 1.7;
   /* The space between two sections of a marketing page. */
-  --site-section: calc(3 * var(--space-11));
+  --site-section: clamp(5rem, 3rem + 6vw, 9rem);
+  /* A marketing page's paragraphs: a sans face for reading, beside the mono headings, labels, and code. */
+  --site-font-body: 'Inter', 'Inter fallback', ui-sans-serif, system-ui, sans-serif;
+  --site-fs-body: 1.0625rem;
+  --site-lh-body: 1.65;
   /* Type above the app's largest size, --fs-xl, which no app surface needs. */
-  --site-fs-hero: clamp(2.5rem, 1.25rem + 4.5vw, 4.75rem);
+  --site-fs-hero: clamp(2.75rem, 1.2rem + 5.4vw, 6rem);
   /* A landing page chapter's heading: under the hero's, well over a section's. */
-  --site-fs-display: clamp(2rem, 1.4rem + 2.2vw, 3.25rem);
+  --site-fs-display: clamp(2.25rem, 1.4rem + 2.8vw, 4rem);
+  /* The paragraph under a display heading. */
+  --site-fs-lede: clamp(1.125rem, 1rem + 0.45vw, 1.375rem);
   --site-fs-h1: 2rem;
   --site-fs-h2: 1.5rem;
+  /* How far a hero's picture hangs below the stage onto the page. */
+  --site-overhang: clamp(4rem, 2rem + 12vw, 14rem);
+  /* A window is rounder than a pane, as a desktop draws one. */
+  --site-radius-window: var(--radius-xl);
+  /* Lets a closing <details> animate to and from its content's height. */
+  interpolate-size: allow-keywords;
 }
 
 @media (max-width: 49.99rem) {
@@ -64,8 +90,8 @@
 /* The app's motion tokens are the site's only motion, and reduced motion stops them. `[data-style]`
    matches a pack's own block, which sets these too. */
 @media (prefers-reduced-motion: reduce) {
-  :root,
-  :root[data-style] {
+  html:root,
+  html:root[data-style] {
     --dur-short: 0ms;
     --dur-med: 0ms;
     --dur-long: 0ms;
@@ -181,6 +207,10 @@
     outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus);
     outline-offset: var(--focus-ring-offset);
   }
+  /* The browser's own monospace isn't the site's. */
+  :where(code, kbd, samp, pre):not(.acorn-ui *) {
+    font-family: var(--font-mono);
+  }
 }
 [hidden] {
   display: none !important;
@@ -213,6 +243,7 @@
   min-block-size: var(--control-h);
   padding: var(--pad-control-lg);
   font: inherit;
+  font-family: var(--font-mono);
   font-size: var(--fs-sm);
   line-height: var(--lh-tight);
   color: var(--text);
@@ -222,23 +253,46 @@
   border: var(--control-border);
   border-radius: var(--radius-control);
   cursor: pointer;
-  transition: var(--transition-color);
+  transition:
+    var(--transition-color),
+    box-shadow var(--dur-short) var(--ease-out),
+    translate var(--dur-short) var(--ease-out);
 }
 .button:hover {
   border-color: var(--accent);
-  transform: var(--hover-lift);
 }
 .button:active {
-  transform: var(--press-scale);
+  translate: 0 1px;
 }
-/* Inverse, not the accent: text on the accent fails contrast in some themes. */
+/* Inverse, not the accent: text on Latte's accent is under 4.5:1. */
 .button[data-variant='primary'] {
+  font-weight: var(--fw-bold);
   color: var(--bg);
   background: var(--text);
   border-color: var(--text);
 }
 .button[data-variant='primary']:hover {
-  opacity: 0.9;
+  translate: 0 -1px;
+  box-shadow:
+    0 0 0 var(--bw-strong) var(--accent),
+    0 8px 24px -8px var(--shadow-popover);
+}
+.button[data-variant='primary']:active {
+  translate: 0 1px;
+}
+/* A page's main actions: the hero's, and the closing band's. */
+.button[data-size='lg'] {
+  min-block-size: 3rem;
+  padding: 0 var(--space-10);
+  font-size: var(--fs-md);
+  border-radius: var(--radius-lg);
+}
+/* An arrow after a primary action, which leans toward where the link goes. */
+.button .arrow {
+  transition: translate var(--dur-short) var(--ease-out);
+}
+.button:hover .arrow {
+  translate: var(--space-1) 0;
 }
 .actions {
   display: flex;
@@ -286,13 +340,14 @@ select {
 
 /* ── Header ────────────────────────────────────────────────────────────────────────────────────
    A chrome bar, as the app's top bar is. On a docs page Starlight's frame draws the bar itself, full
-   width over the sidebars. On a marketing page the bar's contents line up with the page's. Below
-   Starlight's 50rem breakpoint the links fold into a menu, so the two kinds of page fold together. */
+   width over the sidebars. On a marketing page the bar's contents line up with the page's, and the bar
+   is the top of the dark stage, so it runs into the hero with no rule between them. Below Starlight's
+   50rem breakpoint the links fold into a menu, so the two kinds of page fold together. */
 .site-bar {
   position: relative;
+  z-index: 2;
   padding-inline: var(--site-gutter);
   background: var(--bg-subtle);
-  border-block-end: var(--chrome-divider);
 }
 .site-bar > .site-header {
   /* The page's width less its gutters, because .site-page's width includes them. */
@@ -428,9 +483,11 @@ select {
   display: none;
 }
 
-/* ── Footer ──────────────────────────────────────────────────────────────────────────────────── */
+/* ── Footer ────────────────────────────────────────────────────────────────────────────────────
+   On a marketing page, the dark stage again, closing the page as the header opens it. */
 .site-foot {
   padding-inline: var(--site-gutter);
+  background: var(--bg-subtle);
   border-block-start: var(--chrome-divider);
 }
 .site-foot > .site-footer {
@@ -477,11 +534,15 @@ select {
   margin: 0;
 }
 
-/* ── Marketing pages ─────────────────────────────────────────────────────────────────────────── */
+/* ── Marketing pages ───────────────────────────────────────────────────────────────────────────
+   Paragraphs read in the sans face. Headings, labels, buttons, and code stay mono, as the app's are. */
 .site-page {
   max-inline-size: var(--site-width);
   margin-inline: auto;
-  padding: calc(2 * var(--space-11)) var(--site-gutter) var(--site-section);
+  padding: 0 var(--site-gutter) var(--site-section);
+  font-family: var(--site-font-body);
+  font-size: var(--site-fs-body);
+  line-height: var(--site-lh-body);
 }
 .site-page > * + * {
   margin-block-start: var(--space-8);
@@ -495,6 +556,16 @@ select {
 .site-page h2 {
   font-size: var(--site-fs-h2);
 }
+/* A display heading's closing words, in the accent. Display sizes count as large text, where Latte's
+   accent clears 3:1. */
+.accent {
+  color: var(--accent);
+}
+.lede {
+  max-inline-size: 60ch;
+  font-size: var(--site-fs-lede);
+  line-height: 1.55;
+}
 .section {
   display: grid;
   gap: var(--space-10);
@@ -507,57 +578,164 @@ select {
   margin: 0;
 }
 
+/* An element in the dark theme whatever the page is in. virtual:acorn-ui.css sets the theme's tokens
+   on it, built from the app's own token blocks. */
+.site-dark {
+  color-scheme: dark;
+  color: var(--text);
+}
+
+/* ── Stage ─────────────────────────────────────────────────────────────────────────────────────
+   The dark band that opens and closes a marketing page. `.site-dark` sets the dark theme's tokens on
+   it. A border image's outset paints the band out to the window's edges in one piece, and paint outside
+   an element's box never widens the page. The background under it is what a contrast checker reads. */
+.stage {
+  position: relative;
+  isolation: isolate;
+  background: var(--bg-subtle);
+  border-image: conic-gradient(var(--bg-subtle) 0 0) fill 0 / / 0 100vmax;
+}
+
 .hero {
   display: grid;
-  gap: var(--space-8);
+  gap: var(--space-10);
   justify-items: start;
+  padding-block: clamp(3rem, 1.5rem + 5vw, 6.5rem) clamp(4rem, 2rem + 6vw, 7rem);
 }
 .hero > * {
   margin: 0;
   min-inline-size: 0;
 }
+.hero > .eyebrow {
+  color: var(--accent);
+}
 .hero h1 {
-  max-inline-size: 18ch;
+  max-inline-size: 16ch;
   font-size: var(--site-fs-hero);
+  font-weight: var(--fw-bold);
   /* Mono at display size reads loose, so the hero's own line pulls in. */
-  letter-spacing: -0.04em;
-  line-height: 1.05;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+/* A page whose hero is only a heading, such as the changelog, keeps it at a section heading's scale. */
+.hero:not(:has(> .hero-text, > .hero-picture)) h1 {
+  font-size: var(--site-fs-display);
 }
 .hero-text {
-  max-inline-size: 58ch;
-  font-size: var(--fs-xl);
+  display: grid;
+  gap: var(--space-8);
+  max-inline-size: 60ch;
+  font-size: var(--site-fs-lede);
+  line-height: 1.55;
 }
 .hero-text > * {
   margin: 0;
 }
 .hero-picture {
   justify-self: stretch;
-  margin-block-start: var(--space-10);
+  margin-block-start: var(--space-11);
+}
+/* The picture hangs below the stage onto the page, and whatever follows the hero starts below it. */
+.hero:has(> .hero-picture) {
+  padding-block-end: 0;
+}
+.hero > .hero-picture {
+  margin-block-end: calc(-1 * var(--site-overhang));
+}
+.hero:has(> .hero-picture) + * {
+  margin-block-start: var(--site-overhang);
+}
+/* Under a hero with no picture, the page starts a short way below the stage, not a whole section's gap. */
+.hero:not(:has(> .hero-picture)) + * {
+  margin-block-start: clamp(3rem, 2rem + 3vw, 5rem);
+}
+.hero:not(:has(> .hero-picture)) + .section {
+  padding-block-start: 0;
 }
 /* A split hero: the headline on the left, and the paragraph and actions in a column beside it, both
    starting under the eyebrow when there is one. */
 @media (min-width: 64rem) {
   .hero[data-split] {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
     column-gap: calc(2 * var(--space-11));
+    align-items: end;
   }
   .hero[data-split] > .eyebrow {
     grid-column: 1 / -1;
   }
   .hero[data-split] > h1 {
     grid-row: span 2;
+    align-self: start;
   }
   .hero[data-split] > .hero-text {
-    font-size: var(--fs-lg);
+    font-size: var(--fs-xl);
   }
   .hero[data-split] > .hero-picture {
     grid-column: 1 / -1;
   }
 }
+/* The hero comes in once, as the page loads: each part rises a little after the one before. */
+@media (prefers-reduced-motion: no-preference) {
+  .hero > * {
+    animation: site-enter 700ms var(--ease-out) both;
+  }
+  .hero > :nth-child(2) {
+    animation-delay: 60ms;
+  }
+  .hero > :nth-child(3) {
+    animation-delay: 120ms;
+  }
+  .hero > :nth-child(4) {
+    animation-delay: 180ms;
+  }
+  .hero > :nth-child(n + 5) {
+    animation-delay: 240ms;
+  }
+  /* The headline is the largest thing on the first screen, and a browser counts the page as drawn once
+     it shows, so it's there from the first frame and only rises. */
+  .hero > h1 {
+    animation-name: site-rise;
+  }
+}
+@keyframes site-enter {
+  from {
+    opacity: 0;
+    translate: 0 var(--space-10);
+  }
+}
+@keyframes site-rise {
+  from {
+    translate: 0 var(--space-10);
+  }
+}
+/* Further down, each block rises the same way as it scrolls into view, finishing before it's a third of
+   the way in, so nothing is still faint where you'd read it. Without scroll timelines it just shows. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    :is(.chapter-head, .loop > li, .tour, .xray, .wall, .build > *, .trust, .faq, .feature, .cards > li) {
+      animation: site-enter linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 30%;
+    }
+  }
+}
+
+/* The closing band: the dark stage at the foot of a page, running into the footer. It takes up the
+   page's own bottom padding so the two meet. */
+.section.closing {
+  margin-block: var(--site-section) calc(-1 * var(--site-section));
+  padding-block: var(--site-section);
+}
+.closing h2 {
+  font-size: var(--site-fs-display);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+}
 
 .features {
   display: grid;
-  gap: var(--site-section);
+  gap: clamp(4rem, 2rem + 5vw, 7rem);
 }
 .feature {
   display: grid;
@@ -599,14 +777,22 @@ select {
   }
 }
 
-.tour > .tabs {
+/* The tour: its tabs down the side, as a list of what acorn has, and the selected one's words and window
+   beside them. On a narrow screen the tabs lie flat over the window and scroll sideways. */
+.tour {
+  display: grid;
+  gap: var(--space-10) calc(2 * var(--space-11));
+}
+.tour > * {
+  min-inline-size: 0;
+}
+.tour-tabs {
   overflow-x: auto;
   border-block-end: var(--chrome-divider);
 }
 .tour-panel {
   display: grid;
   gap: var(--space-10);
-  padding-block-start: var(--space-10);
 }
 .tour-panel > * {
   min-inline-size: 0;
@@ -614,15 +800,35 @@ select {
 .tour-text {
   display: grid;
   gap: var(--space-6);
-  align-content: start;
   justify-items: start;
 }
 .tour-text > * {
   margin: 0;
 }
+.tour-text > p {
+  max-inline-size: 64ch;
+}
 @media (min-width: 64rem) {
-  .tour-panel {
-    grid-template-columns: 3fr 2fr;
+  .tour {
+    grid-template-columns: 13rem minmax(0, 1fr);
+  }
+  .tour-tabs {
+    flex-direction: column;
+    align-self: start;
+    overflow: visible;
+    border-block-end: 0;
+    border-inline-start: var(--chrome-divider);
+  }
+  .tour-tabs [role='tab'] {
+    min-block-size: auto;
+    padding: var(--space-6) var(--space-9);
+    font-size: var(--fs-xl);
+    text-align: start;
+  }
+  /* The selected tab takes the accent rule the sidebar marks the current page with, on the strip's own line. */
+  .tabs.tour-tabs [aria-selected='true'] {
+    box-shadow: inset var(--stripe-w) 0 var(--accent);
+    margin-inline-start: calc(-1 * var(--chrome-divider-w));
   }
 }
 
@@ -674,6 +880,19 @@ ul.cards {
 .card:has(a:focus-visible) {
   border-color: var(--accent);
 }
+/* On a marketing page a card is rounder, and it lifts under the pointer. */
+.site-page .card {
+  border-radius: var(--radius-lg);
+  transition:
+    var(--transition-color),
+    translate var(--dur-med) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out);
+}
+.site-page .card:hover,
+.site-page .card:has(a:focus-visible) {
+  translate: 0 calc(-1 * var(--space-1));
+  box-shadow: 0 16px 32px -16px var(--shadow-popover);
+}
 .card > * {
   margin: 0;
 }
@@ -697,15 +916,21 @@ ul.cards {
 
 /* ── Frames ──────────────────────────────────────────────────────────────────────────────────
    A picture of acorn sits in a frame drawn like a pane: a chrome bar, the divider under it, and the
-   picture. Specimens, snapshots, and the install block share it. */
+   picture. Specimens, snapshots, and the install block share it. A frame lifts off the page a little;
+   a snapshot is a whole window, so it's rounder, has a window's buttons, and lifts further. */
 .frame {
   margin: 0;
   overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--fs);
+  line-height: var(--lh);
   color: var(--text);
   background: var(--pane-bg);
   border: var(--surface-border);
-  border-radius: var(--radius-surface);
-  box-shadow: var(--elev-card);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 1px 2px var(--shadow-popover),
+    0 12px 32px -16px var(--shadow-popover);
 }
 .frame-bar {
   display: flex;
@@ -717,6 +942,50 @@ ul.cards {
   line-height: var(--lh-tight);
   background: var(--bg-subtle);
   border-block-end: var(--chrome-divider);
+}
+.snapshot {
+  border: 0;
+  border-radius: var(--site-radius-window);
+  box-shadow:
+    0 0 0 var(--bw) var(--border-strong),
+    0 2px 4px var(--shadow-popover),
+    0 24px 48px -24px var(--shadow-popover),
+    0 48px 96px -48px var(--shadow-popover);
+}
+/* A window's title sits in the middle of its bar, between its buttons and the host's name, as a
+   desktop draws a title bar. */
+.window-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  min-block-size: var(--space-11);
+}
+.window-buttons {
+  display: flex;
+  gap: var(--space-4);
+}
+.window-buttons > i {
+  inline-size: var(--space-6);
+  block-size: var(--space-6);
+  background: var(--border-strong);
+  border-radius: var(--radius-circle);
+}
+.window-buttons > i:nth-child(1) {
+  background: var(--danger);
+}
+.window-buttons > i:nth-child(2) {
+  background: var(--warn);
+}
+.window-buttons > i:nth-child(3) {
+  background: var(--success);
+}
+.window-title {
+  overflow: hidden;
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.window-bar > .frame-size {
+  justify-self: end;
 }
 .frame-bar .tabs {
   align-self: stretch;
@@ -741,6 +1010,15 @@ ul.cards {
   line-height: var(--lh);
   border-block-start: var(--chrome-divider);
 }
+/* Under the hero's window the page's own words say what it shows, so its caption is for screen readers. */
+.hero .frame-caption {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .snapshot-body {
   overflow: auto;
 }
@@ -755,6 +1033,7 @@ ul.cards {
   padding-inline: var(--space-5);
   min-block-size: var(--tab-h);
   font: inherit;
+  font-family: var(--font-mono);
   white-space: nowrap;
   color: var(--text);
   background: none;
@@ -764,6 +1043,36 @@ ul.cards {
 .tabs [aria-selected='true'] {
   font-weight: var(--fw-semibold);
   box-shadow: inset 0 calc(-1 * var(--tab-active-w)) var(--accent);
+}
+.tabs [role='tab']:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+/* A switch between two or three views of one thing, such as the hero's desktop and terminal: buttons in
+   a tray, the selected one inverse. */
+.segmented {
+  justify-self: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--bg);
+  border: var(--surface-border);
+  border-radius: var(--radius-lg);
+}
+.segmented [role='tab'] {
+  min-block-size: var(--control-h);
+  padding-inline: var(--space-9);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  border-radius: var(--radius-control);
+  transition: var(--transition-color);
+}
+.segmented [aria-selected='true'] {
+  color: var(--bg);
+  background: var(--text);
+  box-shadow: none;
+}
+.segmented [role='tab']:hover {
+  text-decoration: none;
 }
 
 .install {

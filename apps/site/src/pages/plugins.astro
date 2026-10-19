@@ -2,6 +2,7 @@
 // The plugins acorn ships: a card per plugin from src/data/plugins.ts, each linking to its docs page.
 import Badge from '../components/Badge.astro'
 import Card from '../components/Card.astro'
+import Hero from '../components/Hero.astro'
 import { PLUGINS, SHIPS_AS } from '../data/plugins.ts'
 import Marketing from '../layouts/Marketing.astro'
 import { lucideIcon } from '../lib/icons'
@@ -21,10 +22,12 @@ const plugins = Object.values(PLUGINS).sort((a, b) => a.name.localeCompare(b.nam
 ---
 
 <Marketing title="Plugins" meta={meta}>
-  <p class="lede">
-    Most of acorn is plugins. These are the ones it ships, and every one is on when you install it. Each card
-    links to its docs page, which says what it needs from you and what it can reach.
-  </p>
+  <Hero slot="hero" title="Plugins">
+    <p>
+      Most of acorn is plugins. These are the ones it ships, and every one is on when you install it. Each card
+      links to its docs page, which says what it needs from you and what it can reach.
+    </p>
+  </Hero>
   <section class="section">
     <h2>What ships with acorn</h2>
     <ul class="cards">
@@ -56,9 +59,6 @@ const plugins = Object.values(PLUGINS).sort((a, b) => a.name.localeCompare(b.nam
 </Marketing>
 
 <style>
-  .lede {
-    max-inline-size: var(--site-measure);
-  }
   .plugin-icon {
     display: block;
     order: -1;

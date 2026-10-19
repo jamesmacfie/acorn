@@ -6,7 +6,10 @@ import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract
 // syntactically invalid even though TypeScript and the unbundled unit tests both pass.
 const nodeRequire = createRequire(import.meta.url)
 
-type HeadlessTerminal = {
+type BufferLine = { isWrapped: boolean; translateToString(trimRight?: boolean): string }
+
+export type HeadlessTerminal = {
+  buffer: { active: { length: number; getLine(index: number): BufferLine | undefined } }
   write(data: string, callback?: () => void): void
   resize(cols: number, rows: number): void
   loadAddon(addon: { activate(terminal: unknown): void; dispose(): void }): void
@@ -19,7 +22,7 @@ type SerializeAddon = {
   dispose(): void
 }
 
-const { Terminal } = nodeRequire('@xterm/headless') as {
+export const { Terminal } = nodeRequire('@xterm/headless') as {
   Terminal: new (options: {
     cols: number
     rows: number
@@ -31,7 +34,7 @@ const { SerializeAddon } = nodeRequire('@xterm/addon-serialize') as {
   SerializeAddon: new () => SerializeAddon
 }
 
-const DISPLAY_SCROLLBACK_LINES = 1_000
+export const DISPLAY_SCROLLBACK_LINES = 1_000
 export const DISPLAY_RESET = '\x1bc'
 
 export type TerminalScreen = {

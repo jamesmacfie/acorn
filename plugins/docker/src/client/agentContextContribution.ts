@@ -5,6 +5,7 @@ import { fetchTaskContainers } from './dockerClient'
 export const dockerAgentContextContribution: AgentContextContribution = {
   id: 'acorn-docker',
   source: 'docker',
+  keyword: 'docker',
   label: 'Docker service state',
   description: 'Capture task-linked container state and ports without environment values or logs.',
   async options(scope) {

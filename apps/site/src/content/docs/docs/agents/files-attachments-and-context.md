@@ -7,7 +7,7 @@ sources:
   - docs/agent-tools/context-sections.md
   - plugins/agents/src/server/sessions/attachmentStore.ts
   - plugins/agents/src/client/composer/attachmentOperations.ts
-checked: 52225e24f
+checked: 'b88b42b6b'
 ---
 
 This page covers the three ways something reaches an agent besides what you type: files you attach,
@@ -55,23 +55,39 @@ your next message.
 
 An agent can also read the context at any time with the `task_context` tool.
 
-## Add another session
+## Reference Acorn context with #
 
-To give an agent what happened in another session of the same task:
+Type `#` in the message box to name something in acorn: another session, a terminal, a container, the
+task's context, or a plugin's saved items.
 
-1. Open **Context** below the message box, and choose **Agent sessions**.
-2. Pick one or more sessions. The list shows up to 50, newest activity first, and leaves out the session
-   you're writing to.
-3. Send.
+1. Type `#`. The list shows each source, such as `#agent` for sessions and `#terminal` for terminals.
+2. Choose one. The list shows its items: for `#agent`, the task's other sessions, newest activity
+   first, without the one you're writing to or any subagent.
+3. Choose an item. Its token, such as `#agent:refactor-login`, goes into your message, underlined.
+4. Send.
 
-Each session adds a copy of its conversation: messages, plans, and file changes, without tool output,
-up to its last 200 events and 100,000 characters. The agent gets it marked as reference material, not
-as your instructions. **Send** turns off when the context you picked passes 512 KiB.
+**Context** below the message box opens the same list. Tick the items you want, and their tokens go
+in at the caret. Untick one, or delete its token, and it's no longer attached.
+
+acorn reads what each token names when you send, and the agent gets it next to your message, marked
+with the token:
+
+- `#agent:…` sends a copy of that session's conversation: messages, plans, and file changes, without
+  tool output, up to its last 200 events and 100,000 characters. The agent gets it as reference
+  material, not as your instructions.
+- `#terminal:…` sends the terminal's last 200 lines of output, with token-shaped values such as
+  `sk-…` and `Bearer …` redacted. It catches common shapes, not every secret, and you don't see the
+  output first.
+- `#docker:…` sends a container's image, state, and ports, without environment values or logs.
+- `#task` sends the task's context as it stands, the same as a new session's first message.
+
+If acorn can't read one, the message isn't sent, and the error names the token. A message's context
+can't pass 512 KiB. In the transcript, a sent token is a link back to what it named.
 
 ## In the terminal
 
 The terminal client has no file picker, so **Attach** does nothing there. `@` mentions, task context,
-and adding another session work the same way.
+and `#` references work the same way, completing the last word you typed.
 
 ## Limits
 

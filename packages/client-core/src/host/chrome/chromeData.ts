@@ -606,25 +606,28 @@ export async function readAnnotationMarks(
 // than the badges above: a real parser (@acorn/protocol/agentContext.ts) rather than a field-by-field
 // sniff, and a refusal instead of a truncation when it is too big.
 //
-// No `AbortSignal`, because there is no query. The composer calls these on a click and its own
-// capture-version guard discards a stale answer.
+// No `AbortSignal`. The composer debounces a search query and discards an answer for a session it
+// has left, so a late answer costs a request and nothing else.
 
 /** Scope rides as query parameters, minted here so a plugin route cannot see a node or a task the
  * composer did not name. */
-const scopedContextPath = (path: string, scope: AgentContextCaptureScope): string => {
+const scopedContextPath = (path: string, scope: AgentContextCaptureScope, search?: string): string => {
   const separator = path.includes('?') ? '&' : '?'
   const query = new URLSearchParams({ taskId: scope.taskId })
   if (scope.workspaceId) query.set('workspaceId', scope.workspaceId)
+  if (search) query.set('query', search)
   return `${path}${separator}${query.toString()}`
 }
 
+/** `query` is what follows `#keyword:` in the composer, sent only to a source that declares `search`. */
 export async function readAgentContextOptions(
   pluginId: string,
   path: string,
   nodeId: string,
   scope: AgentContextCaptureScope,
+  query?: string,
 ): Promise<AgentContextOption[]> {
-  const body = await read<unknown>(pluginId, scopedContextPath(path, scope), nodeId)
+  const body = await read<unknown>(pluginId, scopedContextPath(path, scope, query), nodeId)
   const parsed = pluginAgentContextOptionsSchema.safeParse(body)
   if (!parsed.success) {
     // All-or-nothing rather than per-row, because an option list with holes in it silently hides

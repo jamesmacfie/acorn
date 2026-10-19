@@ -8,9 +8,10 @@ const implementPlan = vi.fn(async () => ({}))
 
 let markdownMounts = 0
 vi.mock('./ManagedAgentMarkdown', () => ({
-  default: (props: { text: string }) => {
+  default: (props: { text: string; onLink?: (href: string) => boolean }) => {
     markdownMounts++
-    return <span>{props.text}</span>
+    // Pressing the text presses the first fragment link in it, which is all a test here needs.
+    return <span onClick={() => props.onLink?.(/\]\((#[\w-]+)\)/.exec(props.text)?.[1] ?? '')}>{props.text}</span>
   },
 }))
 
@@ -35,6 +36,11 @@ vi.mock('./managedClient', () => ({
 
 const dispatchLayout = vi.fn()
 const openPane = vi.fn()
+const openManagedSession = vi.fn()
+vi.mock('./managedSelection', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  openManagedSession,
+}))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...(await original<Record<string, unknown>>()),
   dispatchLayout,
@@ -312,6 +318,43 @@ it('drops the attachment placeholder only when there is an attachment to draw in
     await vi.waitFor(() => expect(host.textContent).toContain('notes.pdf'))
   } finally {
     dispose()
+  }
+})
+
+it('links each # reference the message sent, and opens the session it names', () => {
+  const item: AgentConversationItem = {
+    key: 'turn',
+    firstSeq: 1,
+    lastSeq: 1,
+    createdAt: 1,
+    turnId: 'turn-1',
+    event: { type: 'user_message', text: 'Compare with #agent:login and #agent:gone' },
+  }
+  const turn = {
+    id: 'turn-1',
+    input: [
+      {
+        type: 'context',
+        contextId: 'c1',
+        label: 'Login',
+        content: '',
+        source: 'agents.sessions',
+        ref: '#agent:login',
+        deepLink: { pane: 'agents', intent: { sessionId: 's9' } },
+        capturedAt: 1,
+      },
+    ],
+  } as unknown as AgentTurn
+  const host = document.createElement('div')
+  document.body.append(host)
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" turn={turn} />, host)
+  try {
+    expect(host.textContent).toContain('Compare with [#agent:login](#context-ref-0) and #agent:gone')
+    ;[...host.querySelectorAll('span')].find((span) => span.textContent?.startsWith('Compare'))!.click()
+    expect(openManagedSession).toHaveBeenCalledWith('task', 's9')
+  } finally {
+    dispose()
+    host.remove()
   }
 })
 

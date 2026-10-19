@@ -1,6 +1,7 @@
 ---
-// The landing page's feature tour: a tab per feature group, each with a picture, a paragraph, and a
-// link. Each tab's picture goes in the slot named for its id. Without script every panel shows.
+// The landing page's feature tour: a tab per feature group down the side, and beside it the selected
+// group's paragraph, link, and picture. Each tab's picture goes in the slot named for its id. Without
+// script every panel shows.
 interface Props {
   tabs: { id: string; label: string; text: string; href: string; link: string }[]
 }
@@ -10,7 +11,7 @@ const panels = await Promise.all(tabs.map(async (tab) => ({ ...tab, picture: awa
 ---
 
 <div class="tour">
-  <div class="tabs" role="tablist" aria-label="Features" data-tabs hidden>
+  <div class="tabs tour-tabs" role="tablist" aria-label="Features" aria-orientation="vertical" data-tabs hidden>
     {
       tabs.map((tab) => (
         <button type="button" role="tab" aria-controls={`tour-${tab.id}`}>
@@ -19,17 +20,19 @@ const panels = await Promise.all(tabs.map(async (tab) => ({ ...tab, picture: awa
       ))
     }
   </div>
-  {
-    panels.map((tab) => (
-      <div class="tour-panel" id={`tour-${tab.id}`} role="tabpanel" aria-label={tab.label}>
-        <div class="tour-picture" set:html={tab.picture} />
-        <div class="tour-text">
-          <p>{tab.text}</p>
-          <a href={tab.href}>{tab.link}</a>
+  <div class="tour-panels">
+    {
+      panels.map((tab) => (
+        <div class="tour-panel" id={`tour-${tab.id}`} role="tabpanel" aria-label={tab.label}>
+          <div class="tour-text">
+            <p>{tab.text}</p>
+            <a href={tab.href}>{tab.link}</a>
+          </div>
+          <div class="tour-picture" set:html={tab.picture} />
         </div>
-      </div>
-    ))
-  }
+      ))
+    }
+  </div>
 </div>
 
 <script>

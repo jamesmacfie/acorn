@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createSignal, For, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, on, Show, type JSX } from 'solid-js'
 import type { ButtonProps, SelectProps } from '@acorn/client-core/kit/components/primitives.tsx'
 import type { PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 import type { Size } from '@acorn/client-core/kit/tokens'
@@ -161,6 +161,13 @@ export function SegmentedControl<T extends string>(props: {
 /** A field that opens a `Menu` filtered by typing. */
 export function Picker<T>(props: PickerProps<T>) {
   const [query, setQuery] = createSignal('')
+  createEffect(
+    on(
+      () => !!props.onBack,
+      () => setQuery(''),
+      { defer: true },
+    ),
+  )
   // Each row carries its own pick, because the two forms this node takes identify a row differently:
   // the data form by id, the callback form by the caller's own opaque item. The DOM half maps an index
   // back to the item for the same reason; keeping the closure is the same answer with less arithmetic.
@@ -193,6 +200,7 @@ export function Picker<T>(props: PickerProps<T>) {
     <Menu
       ariaLabel={props.ariaLabel ?? flatten(props.label)}
       disabled={() => !!props.disabled}
+      onBack={props.onBack}
       trigger={(state) => (
         <Line {...litControl({ focused: state.focused(), disabled: props.disabled })}>
           {`[ ${flatten(props.label)} ▾ ]`}
@@ -233,6 +241,7 @@ export function Picker<T>(props: PickerProps<T>) {
               )}
             </For>
           </Show>
+          <Show when={props.footer}>{(footer) => slot(footer()(context.close))}</Show>
         </box>
       )}
     </Menu>
