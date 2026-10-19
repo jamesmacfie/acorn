@@ -1,7 +1,7 @@
 ---
 // A feature page: the title and its one sentence, a picture, three to six sections in the default slot,
-// what the terminal client does differently, related features, and the way to start. Each section is a
-// `Feature` that links to the docs page that owns its detail.
+// what the terminal client does differently, related features, and the way to start, on the dark band
+// that closes the page. Each section is a `Feature` that links to the docs page that owns its detail.
 import Card from '../components/Card.astro'
 import Hero from '../components/Hero.astro'
 import { FEATURES, type FeatureId } from '../features'
@@ -51,11 +51,13 @@ const getAcorn = (await readGithub()).release ? 'Download' : 'Get acorn'
     </ul>
   </section>
 
-  <section class="section">
+  <section class="section closing stage site-dark">
     <h2>Get started</h2>
     <div class="actions">
-      <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
-      <a class="button" href={docs.href}>{docs.label}</a>
+      <a class="button" data-variant="primary" data-size="lg" href="/download/">
+        {getAcorn} <span class="arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="button" data-size="lg" href={docs.href}>{docs.label}</a>
     </div>
   </section>
 </Marketing>

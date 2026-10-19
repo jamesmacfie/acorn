@@ -148,7 +148,9 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [site.md](./site.md) | The public site in `apps/site`: running, building, checking, and deploying it, and adding a page. |
 | [site/agent-outputs.md](./site/agent-outputs.md) | The public site's search palette, page titles and descriptions, social cards, the Markdown copy of each docs page, `llms.txt`, and the agent guide. |
 | [site/built-in-plugins.md](./site/built-in-plugins.md) | The public site's list of the plugins acorn ships, each plugin's facts box, and the test that keeps both whole. |
-| [site/design.md](./site/design.md) | How the public site looks: its stylesheet on acorn's tokens, fonts, mark, Appearance control, components, contrast check, and the landing page's Lighthouse scores. |
+| [site/design.md](./site/design.md) | How the public site looks: its stylesheet on acorn's tokens, the mark, the light and dark themes, the dark stage that opens and closes a marketing page, components, motion, and the contrast checks. |
+| [site/design/fonts.md](./site/design/fonts.md) | The public site's faces: JetBrains Mono and its subsets, Inter for marketing paragraphs and its fallback, and the preloads. |
+| [site/design/lighthouse.md](./site/design/lighthouse.md) | The landing page's Lighthouse target, the command that checks it, and its scores. |
 | [site/marketing-copy.md](./site/marketing-copy.md) | How the marketing pages read: the landing page's one joke, and the marks of a generated page they leave out. |
 | [site/specimens.md](./site/specimens.md) | Specimens on the public site: plugin tree code both hosts draw, the generators that commit and check it, and the scoped stylesheet. |
 | [site/plugin-guides.md](./site/plugin-guides.md) | The public site's plugin guides: the example plugins in `examples/plugins/`, the harness that installs and runs them, and how a guide shows their code and pictures. |
@@ -185,6 +187,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/session-revisit-2026-10-13.md](./testing/session-revisit-2026-10-13.md) | Dated cost of returning to a long agent session, measured in jsdom, and the real-window numbers still to take. |
 | [testing/idle-cost-2026-10-13.md](./testing/idle-cost-2026-10-13.md) | Dated count of the work an idle desktop window asks for, measured in tests, and the real-window idle numbers still to take. |
 | [testing/rail-artwork-2026-10-19.md](./testing/rail-artwork-2026-10-19.md) | One desktop check of a plugin's live rail artwork and tooltip words, using the acme-tracker example. |
+| [testing/context-references-2026-10-19.md](./testing/context-references-2026-10-19.md) | One check of `#` context references in the desktop and terminal clients, with real Claude Code and Codex sessions. |
 | [testing/sentry-baseline-2026-10-13.md](./testing/sentry-baseline-2026-10-13.md) | A day of Sentry telemetry from real use: git calls, session-open timing, agent process and renderer memory, and response sizes. The before numbers for UI performance phases 06 to 10. |
 | [testing/ui-performance-open-checks-2026-10-14.md](./testing/ui-performance-open-checks-2026-10-14.md) | The real-window and Sentry checks still to run for all ten UI performance phases. |
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by the October 2026 runtime packaging work. |
@@ -447,6 +450,16 @@ Each plugin landing page above has topic pages in a folder of the same name:
 
 - [Pull request panel in the browser extension](./future/extension-github-panel.md) and [Docker
   panel in the browser extension](./future/extension-docker-panel.md).
+
+## Agent analytics proposal
+
+- [Show how a workspace's agents spend time and money](./future/agent-analytics/README.md), with phases
+  for [fitting dynamic UI](./future/agent-analytics/01-dynamic-ui-fit.md), [turn
+  facts](./future/agent-analytics/02-turn-facts.md), [agent sources](./future/agent-analytics/03-agent-sources.md),
+  [heatmaps and stacked bars](./future/agent-analytics/04-heatmaps-and-stacked-bars.md),
+  [workspace rail sources](./future/agent-analytics/05-workspace-rail-sources.md), [session
+  marks](./future/agent-analytics/06-session-marks.md), [message links](./future/agent-analytics/07-message-links.md),
+  and [the analytics plugin](./future/agent-analytics/08-analytics-plugin.md).
 
 ## Mobile web app proposal
 

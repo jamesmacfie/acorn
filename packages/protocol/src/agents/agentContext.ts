@@ -20,13 +20,15 @@ export type AgentContextSnapshot = {
   freshness?: 'live' | 'cached' | 'stale' | 'unknown'
   sensitivity?: 'public' | 'workspace' | 'private' | 'secret'
   capturedAt: number
+  /** The `#keyword:slug` token in the message that asked for this snapshot. The composer sets it at
+   *  send, so the model can tell which block a reference in the text means. */
+  ref?: string
 }
 
 export type AgentContextOption = {
   id: string
   label: string
   description?: string
-  defaultSelected?: boolean
 }
 
 // Portable Acorn-side ceiling. Providers may advertise a smaller turn limit, which their driver
@@ -55,12 +57,32 @@ export const agentContextBudget = (
 export type AgentContextContribution = {
   id: string
   source: string
+  /** What follows `#` in the composer, such as `agent` in `#agent:refactor-login`. Lowercase letters,
+   *  digits, and hyphens, starting with a letter. The host binds it for a loaded plugin. */
+  keyword: string
   label: string
   description?: string
+  /** No items: referenced as a bare `#keyword`, and captured with no option ids. */
+  itemless?: boolean
+  /** The source answers `query` itself, instead of listing everything for the composer to filter. */
+  search?: boolean
   revision?(scope: AgentContextCaptureScope): number
-  options(scope: AgentContextCaptureScope): Promise<AgentContextOption[]>
+  options(scope: AgentContextCaptureScope, query?: string): Promise<AgentContextOption[]>
   capture(scope: AgentContextCaptureScope, optionIds?: readonly string[]): Promise<AgentContextSnapshot[]>
 }
+
+/** The shape a keyword takes. The host checks a loaded plugin's against it. */
+export const AGENT_CONTEXT_KEYWORD = /^[a-z][a-z0-9-]*$/
+
+/** Keywords only first-party sources may use. A loaded plugin asking for one gets it qualified. */
+export const RESERVED_AGENT_CONTEXT_KEYWORDS: ReadonlySet<string> = new Set([
+  'agent',
+  'terminal',
+  'docker',
+  'task',
+  'file',
+  'skill',
+])
 
 // What a loaded plugin's agent-context routes may answer. See docs/plugins/client-half.md § Loaded plugins: the
 // client half (the `agentContexts` entry) for the full contract: why this is the one descriptor
@@ -74,7 +96,6 @@ export const pluginAgentContextOptionsSchema = z
       id: z.string().min(1).max(200),
       label: z.string().min(1).max(200),
       description: z.string().min(1).max(500).optional(),
-      defaultSelected: z.boolean().optional(),
     }),
   )
   .max(MAX_PLUGIN_AGENT_CONTEXT_OPTIONS)

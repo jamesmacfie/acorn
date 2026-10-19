@@ -10,7 +10,7 @@ import { isPluginShortcutChord, qualifiedPluginCommandId } from '@acorn/protocol
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { DISCLOSED_NODE_POINTS } from '@acorn/protocol/extensionPoints.ts'
 import { activeNodeId } from '../../infra/node/activeNode'
-import { agentContextRegistry } from '../registries/sources/agentContexts'
+import { agentContextRegistry, loadedAgentContextKeyword } from '../registries/sources/agentContexts'
 import { attentionRegistry, type AttentionItem } from '../registries/rail/attention'
 import { nodeStatRegistry } from '../registries/rail/nodeStats'
 import { commandRegistry } from '../registries/commands/commands'
@@ -522,15 +522,36 @@ function registerChrome(
     const source = `${pluginId}:${descriptor.id}`
     // No `revision`. It's synchronous and a descriptor answers across a fetch, so there's no number to
     // return in time; the invalidation ping the rest of the chrome rides covers the same freshness.
-    add('agent context', descriptor.id, () =>
-      own(agentContextRegistry, {
+    add('agent context', descriptor.id, () => {
+      const wanted = descriptor.keyword ?? descriptor.id
+      const keyword = loadedAgentContextKeyword(pluginId, wanted)
+      if (keyword !== wanted) {
+        log.info(
+          `${pluginId} agent context '${descriptor.id}' is #${keyword}: #${wanted} is reserved, taken, or malformed`,
+          undefined,
+          {
+            'plugin.id': pluginId,
+          },
+        )
+      }
+      return own(agentContextRegistry, {
         id: descriptor.id,
         source,
+        keyword,
         label: descriptor.label,
         ...(descriptor.description ? { description: descriptor.description } : {}),
-        options: async (scope) =>
+        ...(descriptor.itemless ? { itemless: true } : {}),
+        ...(descriptor.search ? { search: true } : {}),
+        // The query rides only to a route that asked for it, so a listing route never sees typing.
+        options: async (scope, query) =>
           pluginEnabledOnNode(chromeNode(), pluginId)
-            ? readAgentContextOptions(pluginId, descriptor.options, chromeNode(), scope)
+            ? readAgentContextOptions(
+                pluginId,
+                descriptor.options,
+                chromeNode(),
+                scope,
+                descriptor.search ? query : undefined,
+              )
             : [],
         capture: async (scope, optionIds) =>
           pluginEnabledOnNode(chromeNode(), pluginId)
@@ -539,8 +560,8 @@ function registerChrome(
                 panes: taskPanes,
               })
             : [],
-      }),
-    )
+      })
+    })
   }
 
   for (const descriptor of contributions.themes ?? []) {

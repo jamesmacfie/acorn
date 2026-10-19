@@ -1,13 +1,21 @@
 import { readLocal, writeLocal, clearLocal } from '@acorn/plugin-api/client'
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
+import type { ContextItem, ContextReferenceMap } from './contextReferences.ts'
 
-export type StoredComposerDraft = { text: string; attachmentIds: string[]; contexts: AgentContextSnapshot[] }
+export type StoredComposerDraft = {
+  text: string
+  attachmentIds: string[]
+  contexts: AgentContextSnapshot[]
+  /** Which item each completed `#` token means. Meaningless without the text, so it never keeps a
+   *  draft alive on its own. */
+  references: ContextReferenceMap
+}
 type DraftField = keyof StoredComposerDraft
 const claims = new Map<string, string>()
 const pendingMigrations = new Map<string, string>()
 export const composerDraftKey = (nodeId: string | null, sessionId: string): string =>
   `acorn.agent-payload.${JSON.stringify([nodeId, sessionId])}`
-const fields: readonly DraftField[] = ['text', 'attachmentIds', 'contexts']
+const fields: readonly DraftField[] = ['text', 'attachmentIds', 'contexts', 'references']
 const fieldKey = (key: string, field: DraftField) => `${key}.${field}`
 // Where an earlier build kept a draft, keyed by session alone. Reading a draft there moves it.
 // Mixed-version path until 2026-12-31.
@@ -31,6 +39,15 @@ const contextsFrom = (value: unknown): AgentContextSnapshot[] =>
   )
 const idsFrom = (value: unknown): string[] =>
   arrayFrom(value).filter((item): item is string => typeof item === 'string')
+const isItem = (value: unknown): value is ContextItem =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as ContextItem).id === 'string' &&
+  typeof (value as ContextItem).label === 'string'
+const referencesFrom = (value: unknown): ContextReferenceMap =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value).filter((entry): entry is [string, ContextItem] => isItem(entry[1])))
+    : {}
 
 export function readComposerPayload(nodeId: string | null, sessionId: string): StoredComposerDraft {
   const key = composerDraftKey(nodeId, sessionId)
@@ -53,6 +70,7 @@ export function readComposerPayload(nodeId: string | null, sessionId: string): S
     text: storedText === null ? legacy.text : typeof text === 'string' ? text : '',
     attachmentIds: storedAttachments === null ? legacy.attachmentIds : idsFrom(parse(storedAttachments)),
     contexts: storedContexts === null ? legacy.contexts : contextsFrom(parse(storedContexts)),
+    references: referencesFrom(parse(readLocal(fieldKey(key, 'references')))),
   }
   if (legacy.text || legacy.attachmentIds.length || legacy.contexts.length) {
     // Claim before any asynchronous metadata read. Failed storage still leaves one in-memory owner.

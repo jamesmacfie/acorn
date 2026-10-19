@@ -7,7 +7,7 @@ sources:
   - plugins/context/src/client/ContextPane.tsx
   - plugins/context/src/client/agentContextContribution.ts
   - plugins/context/src/client/selectionStore.ts
-checked: 68d4f3b5a
+checked: 'b88b42b6b'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -22,7 +22,7 @@ it to a running session.
 <Snapshot id="context" />
 
 <PluginFacts id="context">
-  <Fragment slot="adds">The **Context** pane, the **Open the Context pane** command, and **Task context** in the agent's **Context** picker.</Fragment>
+  <Fragment slot="adds">The **Context** pane, the **Open the Context pane** command, and `#task` in the agent's message box.</Fragment>
   <Fragment slot="needs">Nothing.</Fragment>
   <Fragment slot="reach">What the Node already holds for the task. It runs in your client and adds nothing on the Node.</Fragment>
 </PluginFacts>
@@ -56,7 +56,7 @@ Your section choices are saved on this device, per task.
 ## For agents
 
 A new managed session gets the task's context with its first message. To add it to a message yourself,
-open **Context** below the agent's message box and choose **Task context**. Plugins can add their own
+type `#task` in the agent's message box. Plugins can add their own
 sections, and other plugins can add a summary under a section.
 
 ## Settings

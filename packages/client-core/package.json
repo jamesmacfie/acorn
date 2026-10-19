@@ -152,6 +152,7 @@
     "./infra/queries.ts": "./src/infra/queries.ts",
     "./infra/styles/styles.css": "./src/infra/styles/styles.css",
     "./infra/styles/fonts.css": "./src/infra/styles/fonts.css",
+    "./infra/styles/fonts/inter-var.woff2": "./src/infra/styles/fonts/inter-var.woff2",
     "./infra/styles/tokens-invariant.css": "./src/infra/styles/tokens-invariant.css",
     "./infra/styles/primitives.css": "./src/infra/styles/primitives.css",
     "./infra/styles/overlays.css": "./src/infra/styles/overlays.css",

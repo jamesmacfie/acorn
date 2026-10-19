@@ -1194,6 +1194,28 @@
                   }
                 }
               },
+              "railPresentation": {
+                "description": "Live artwork and tooltip text for the rail button, such as the cover and title of a playing song.",
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "description": "A GET route that answers `PluginRailPresentation`: artwork and tooltip text, or `null` for the static glyph."
+                  },
+                  "refresh": {
+                    "description": "Seconds between rereads of the route, at least 30. A fallback: push changes with `ctx.events.status()` instead of polling.",
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 86400
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "additionalProperties": false
+              },
               "refresh": {
                 "description": "Seconds between rereads of the route, at least 30. A fallback: push changes with `ctx.events.status()` instead of polling.",
                 "type": "integer",
@@ -2522,11 +2544,26 @@
                 "minLength": 1,
                 "maxLength": 240
               },
+              "keyword": {
+                "description": "What follows `#` in the composer, such as `db` in `#db:monthly-revenue`. Defaults to the entry ID.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "itemless": {
+                "description": "No items to pick. The entry is referenced as a bare `#keyword` and captured with no `optionIds`.",
+                "type": "boolean"
+              },
+              "search": {
+                "description": "Send the typed text to `options` as `query`, so the route can search past what it would list.",
+                "type": "boolean"
+              },
               "options": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256,
-                "description": "A GET route sent `taskId` that answers the options the person can pick."
+                "description": "A GET route sent `taskId`, and `query` when `search` is set, that answers the options the person can pick."
               },
               "capture": {
                 "type": "string",

@@ -54,7 +54,7 @@ or unaccepted runtime leaves nothing visible ([distribution](./plugins/distribut
 | Attention sources | Both | `ctx.attentionSources` / `contributions.attention` | The notification inbox. An `info` item can be acknowledged, and `warn` and `danger` stay until resolved ([the notification gate](./notifications/gate.md)). A loaded plugin's items get their target from the host |
 | Node stats | Both | `ctx.nodeStats` / `contributions.nodeStats` | A Node card on Fleet home |
 | Content links | Both | `ctx.contentLinks` / `contributions.contentLinks` | The in-app link router |
-| Agent contexts | Both | `ctx.agentContexts` / `contributions.agentContexts` | The context tray on an agent launch. The capture scope includes the task ID and optional workspace and target session IDs; the agents contribution uses the session ID to exclude the receiving session |
+| Agent contexts | Both | `ctx.agentContexts` / `contributions.agentContexts` | A `#keyword` source in the agent composer, captured when the message is sent. The capture scope includes the task ID and optional workspace and target session IDs; the agents contribution uses the session ID to exclude the receiving session |
 | Ref resolvers | Both | `ctx.contribute(refResolverRegistry)` / `contributions.refResolvers` | External-item label resolution |
 | Themes | Both | `ctx.contribute(themeRegistry)` / `contributions.themes` | The appearance picker |
 | Style packs | Loaded | `contributions.styles` | **Settings > Appearance**. The host validates token data and generates the CSS. **Direction: stays loaded, as validated data.** |

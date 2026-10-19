@@ -5,8 +5,10 @@
 const ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESC[c])
 
-// Allow only http(s) and mailto; the input is already HTML-escaped when this runs.
-const safeHref = (u: string): string | null => (/^(https?:\/\/|mailto:)/i.test(u) ? u : null)
+// Allow only http(s), mailto, and an in-page fragment; the input is already HTML-escaped when this
+// runs. A fragment navigates nowhere, so a caller's `onSelect` can read it as a key: the agent
+// transcript links each sent `#agent:…` reference this way.
+const safeHref = (u: string): string | null => (/^(https?:\/\/|mailto:|#[\w-]+$)/i.test(u) ? u : null)
 // A Node-provided markdown body can name an arbitrary URL. Loading it as an image would issue a
 // request from the client's machine without a click, including to private-network services. Images
 // therefore arrive as raster bytes over the broker and are displayed as bounded data URLs.
@@ -63,7 +65,8 @@ function inline(raw: string, opts: MarkdownOptions): string {
   const hrefs: string[] = []
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text: string, url: string) => {
     const href = safeHref(url) // url is already escaped, so don't re-escape it
-    return href ? `<a href="${S}l${hrefs.push(href) - 1}${S}" target="_blank" rel="noreferrer">${text}</a>` : text
+    const opens = href?.startsWith('#') ? '' : ' target="_blank" rel="noreferrer"'
+    return href ? `<a href="${S}l${hrefs.push(href) - 1}${S}"${opens}>${text}</a>` : text
   })
   // A pasted URL is a link too. Nobody writing in a note or a commit message reaches for the bracket
   // form, and a model writes one far less often than it writes the bare address, so without this the

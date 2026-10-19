@@ -13,7 +13,7 @@ sources:
   - plugins/http/src/tree/SaveRequestModal.tsx
   - plugins/http/src/server/send.ts
   - plugins/http/src/server/workflowStep.ts
-checked: 68d4f3b5a
+checked: 'b88b42b6b'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -24,7 +24,7 @@ The HTTP plugin adds the **API** pane, where you build and send HTTP requests an
 or with the project.
 
 <PluginFacts id="http">
-  <Fragment slot="adds">The **API** pane in each task, an **API** source in the left rail that lists the project's saved requests, three palette commands, **Variables** under **Settings** > **Features** > **API requests**, a source for the agent's **Context** picker, and a workflow step.</Fragment>
+  <Fragment slot="adds">The **API** pane in each task, an **API** source in the left rail that lists the project's saved requests, three palette commands, **Variables** under **Settings** > **Features** > **API requests**, `#http` references in the agent's message box, and a workflow step.</Fragment>
   <Fragment slot="needs">Nothing. Requests go out from the Node's machine.</Fragment>
 </PluginFacts>
 
@@ -122,8 +122,8 @@ The commands sit in an **API** group.
 
 ## For agents
 
-To show an agent the shape of your saved requests, open **Context** below the agent's message box,
-choose **Saved API requests**, and pick the requests. The agent gets each request's method, URL path,
+To show an agent the shape of a saved request, type `#http:` in the agent's message box and pick the
+request, or tick it under **Context**. The agent gets each request's method, URL path,
 query keys, folder, header names, and auth and body modes. Header values, auth, bodies, variables, and
 query values are left out.
 

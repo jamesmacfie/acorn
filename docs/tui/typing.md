@@ -10,6 +10,11 @@ A `MentionTextarea` sends on a bare `⏎`, and `⇧⏎` is a newline, as the sha
 first and completes, as on the desktop. On a terminal that ignores the kitty keyboard protocol, both
 keys send the same byte, so `⇧⏎` sends too and a newline has to be pasted.
 
+The list completes the last word, because the terminal field has no caret position to read, and it
+draws no inline colour. A two-step completion such as `#agent:` writes the first step with no space,
+so the list stays open on that source's items, and `⏎` on a category steps in rather than finishing.
+While a source is still fetching, or has nothing that matches, a muted line under the field says so.
+
 `ctrl+⏎` is `commit` and submits the `Composer` or `Input` that has the keys. It's typing-exempt, so
 it fires from inside the text. A `Composer`'s submit button is a plain stop that Tab reaches.
 

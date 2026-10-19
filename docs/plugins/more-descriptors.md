@@ -8,13 +8,14 @@ It's part of the [plugin reference](../plugins.md). Rail sources, content links,
 ## Agent contexts
 
 An `agentContexts` entry names two routes, `options` (GET) and `capture` (POST), and puts a row in
-the agent composer's context picker:
+the agent composer's `#` list and its **Context** list:
 
 ```json
 {
   "contributions": {
     "agentContexts": [{
       "id": "http-requests",
+      "keyword": "http",
       "label": "HTTP requests",
       "description": "Saved requests and their latest responses",
       "options": "/v1/p/http/agent-context/options",
@@ -24,10 +25,21 @@ the agent composer's context picker:
 }
 ```
 
-`options` answers `[{ id, label, description?, defaultSelected? }]`. `capture` receives
+Someone references an item as `#<keyword>:<slug>` in the composer, or ticks it under **Context**
+([the composer](../managed-agents/composer.md#reference-acorn-context)). `keyword` is lowercase
+letters, digits, and hyphens, starting with a letter, and defaults to the entry's `id`. `agent`,
+`terminal`, `docker`, `task`, `file`, and `skill` are reserved for first-party sources. The host binds
+a reserved or taken keyword as `<pluginId>-<keyword>`, numbered if that is taken too, and logs it,
+rather than refusing the manifest. `itemless: true` makes the entry a bare `#keyword` with no items,
+captured with no `optionIds`. `search: true` sends what was typed after the colon to `options` as
+`query`, debounced, so the route can answer matches beyond what it would list. Without it, the host
+never sends `query`, and the composer filters the list itself.
+
+`options` answers `[{ id, label, description? }]`. `capture` receives
 `{ taskId, workspaceId?, optionIds? }` and answers
 `[{ contextId, label, content, resourceId?, provenance?, deepLink?, freshness?, sensitivity? }]`
-(`@acorn/protocol/agentContext.ts`). The capture answer ends up inside a model's prompt, so the host
+(`@acorn/protocol/agentContext.ts`). The composer captures when the message is sent, once per source,
+and matches each snapshot to its item by `resourceId`, so set it when you capture more than one. The capture answer ends up inside a model's prompt, so the host
 parses it against a schema. The host stamps `source` from the plugin id, stamps the capture time, and
 measures the bytes itself, so the shared 512 KiB `MAX_AGENT_CONTEXT_BYTES` ceiling can't be talked
 past. An over-budget capture is refused whole, never trimmed. The compiled contract's synchronous

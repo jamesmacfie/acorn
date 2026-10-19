@@ -2,6 +2,7 @@
 // The changelog: every entry in src/data/changelog.ts on one page, newest first, each with an anchor.
 // An entry that changes the plugin API carries a callout for plugin authors.
 import Badge from '../components/Badge.astro'
+import Hero from '../components/Hero.astro'
 import { changelog, textToHtml } from '../data/changelog'
 import Marketing from '../layouts/Marketing.astro'
 import type { PageMeta } from '../meta'
@@ -24,7 +25,9 @@ const longDate = (date: string) =>
 ---
 
 <Marketing title="Changelog" meta={meta}>
-  <p>What changed in acorn, newest first. <a href="/changelog/rss.xml">Follow the RSS feed</a></p>
+  <Hero slot="hero" title="Changelog">
+    <p>What changed in acorn, newest first. <a href="/changelog/rss.xml">Follow the RSS feed</a></p>
+  </Hero>
   {
     changelog.map((entry) => (
       <article class="section" id={entry.date}>
@@ -54,3 +57,37 @@ const longDate = (date: string) =>
     ))
   }
 </Marketing>
+
+<style>
+  /* An entry is a row: its date down the left, held in view while its changes scroll past, and the
+     changes beside it. On a narrow screen the date sits on top. */
+  article {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  article + article {
+    margin-block-start: calc(var(--site-section) / 2);
+    padding-block-start: calc(var(--site-section) / 2);
+    border-block-start: var(--divider);
+  }
+  article > * {
+    margin: 0;
+  }
+  article h2 {
+    font-size: var(--site-fs-h2);
+  }
+  @media (min-width: 64rem) {
+    article {
+      grid-template-columns: 14rem minmax(0, 1fr);
+      column-gap: calc(2 * var(--space-11));
+    }
+    article > .eyebrow {
+      position: sticky;
+      inset-block-start: var(--space-10);
+      grid-row: 1 / span 5;
+    }
+    article > :not(.eyebrow) {
+      grid-column: 2;
+    }
+  }
+</style>

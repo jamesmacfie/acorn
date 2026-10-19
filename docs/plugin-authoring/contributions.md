@@ -26,7 +26,7 @@ for pixels.
 | `nodeStats` | 4 | A Node statistic, with a singular and plural label pair so a card reads "1 card stuck" |
 | `contentLinks` | 16 | An optional `https://` URL recognizer or named record target that opens your task pane, reference panel, or overlay ([content links](../plugins/descriptors.md#content-links)) |
 | `routes` | 8 | A renderer URL for a project-scoped pane, confined to `/p/:projectId/x/<id>/` |
-| `agentContexts` | 4 | An entry in the agent composer's context picker ([agent contexts](../plugins/more-descriptors.md#agent-contexts)) |
+| `agentContexts` | 4 | A `#keyword` source in the agent composer and its **Context** list ([agent contexts](../plugins/more-descriptors.md#agent-contexts)) |
 | `refResolvers` | 4 | A batch enrichment route that turns identifiers of your items into a label and a state chip |
 | `themes` | 8 | A color theme ([UI contributions](./ui-contributions.md#themes)) |
 | `styles` | 8 | A style pack of shape, density, and typography tokens ([style packs](./ui-contributions.md#style-packs)) |

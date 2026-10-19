@@ -3,6 +3,7 @@ import type { AgentAttachment, AgentConfigOption, AgentSession } from '../../con
 import {
   agentContextBudget,
   type AgentContextContribution,
+  type AgentContextOption,
   type AgentContextSnapshot,
 } from '@acorn/protocol/agentContext.ts'
 import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
@@ -30,6 +31,7 @@ import {
   Toolbar,
   type MentionSegment,
   type MentionSource,
+  type MentionSuggestion,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { consumeComposerFocus } from '../sessions/managedSelection'
@@ -39,9 +41,27 @@ import { agentComposerDisabledMessage } from './agentComposerState'
 import { composerExpanded, toggleComposerExpanded } from './composerPrefs'
 import { canStopAgent } from '../sessions/agentActivity'
 import { fileMentionSuggestions, formatFileMention } from './fileMentions'
-import { advertisedSuggestions, composerSegments, MAX_HIGHLIGHT_LENGTH } from './composerTokens'
+import {
+  advertisedSuggestions,
+  composerSegments,
+  MAX_HIGHLIGHT_LENGTH,
+  type ComposerContexts,
+  type ComposerToken,
+} from './composerTokens'
 import { useWorktreeFiles } from './worktreeFiles'
-import AgentContextPickerModal from './AgentContextPickerModal'
+import ContextReferencePicker from './ContextReferencePicker'
+import { createContextCatalog } from './contextCatalog'
+import {
+  categorySuggestions,
+  contextCompletion,
+  contextToken,
+  insertContextToken,
+  itemSuggestions,
+  removeContextTokens,
+  resolveContextReferences,
+  type ContextItem,
+  type ContextReference,
+} from './contextReferences'
 import { AttachmentSlot } from './AttachmentSlot'
 import TerminalComposerShortcut from './TerminalComposerShortcut'
 import {
@@ -50,7 +70,7 @@ import {
   removeDraftAttachment,
   replaceDraftAttachment,
 } from './attachmentOperations'
-import { captureContext, contextBelongsTo, refreshAutomaticContext } from './contextOperations'
+import { captureReferences, refreshAutomaticContext } from './contextOperations'
 import { submitTurn } from './submitOperation'
 import { unguardedCommandsWarning } from './unguardedCommands'
 import {
@@ -74,8 +94,8 @@ type InsertChoice = {
 // this file owns is what those three mean here: the worktree walk, the commands the session
 // advertised, and which spans of the draft the turn will actually send as file parts.
 //
-// A colour per kind, so a path does not read as a command.
-const TOKEN_TONE = { file: 'accent', command: 'warn', skill: 'ok' } as const
+// A colour per kind, so a path does not read as a command. A context reference is underlined instead.
+const TOKEN_TONE = { file: 'accent', command: 'warn', skill: 'ok', context: 'neutral' } as const
 
 export default function AgentComposer(props: {
   session: AgentSession
@@ -120,10 +140,9 @@ export default function AgentComposer(props: {
   const sending = () => shared().sending()
   const uploading = () => shared().uploading()
   const replacing = () => shared().replacing()
-  // Picker visibility and automatic-context dismissal belong to this surface. The guard
-  // over context capture belongs to the shared draft, so another surface cannot send midway through it.
+  // Automatic-context dismissal belongs to this surface. The guard over context capture belongs to the
+  // shared draft, so another surface cannot send midway through it.
   const capturingContext = () => shared().capturing()
-  const [contextPickerId, setContextPickerId] = createSignal('')
   const [dismissedAutomaticPayload, setDismissedAutomaticPayload] = createSignal<string>()
   const expanded = () => composerExpanded(props.session.taskId, props.session.id)
   const toggleExpanded = () => toggleComposerExpanded(props.session.taskId, props.session.id)
@@ -171,12 +190,6 @@ export default function AgentComposer(props: {
   ])
   const contextBudget = createMemo(() => agentContextBudget(contexts()))
   const disabledMessage = createMemo(() => agentComposerDisabledMessage(props.session, props.disabled))
-  const contextPicker = createMemo(() =>
-    agentContextContributions().find((contribution) => contribution.id === contextPickerId()),
-  )
-  const taskContextAdded = createMemo(() =>
-    contexts().some((context) => context.source === AUTOMATIC_TASK_CONTEXT_SOURCE || context.source === 'context.task'),
-  )
   const automaticContextKey = createMemo(() => {
     const contribution = agentContextContributions().find((item) => item.id === TASK_CONTEXT_CONTRIBUTION_ID)
     const revision = contribution?.revision?.({ taskId: props.session.taskId }) ?? 0
@@ -212,13 +225,9 @@ export default function AgentComposer(props: {
 
   // Reset transient presentation on navigation. Draft hydration runs once per session, however
   // many composers are mounted, since it fetches attachment metadata.
-  let pickerTimer: ReturnType<typeof setTimeout> | undefined
-  onCleanup(() => clearTimeout(pickerTimer))
   createEffect(
     on(shared, (state) => {
-      clearTimeout(pickerTimer)
       const owner = capture()
-      setContextPickerId('')
       setDismissedAutomaticPayload(undefined)
       hydrateComposerDraft(
         state.sessionId,
@@ -303,6 +312,8 @@ export default function AgentComposer(props: {
       props.submitDisabled
     )
       return
+    // Resolved now, from the same reading that coloured them, so what was underlined is what is sent.
+    const references = contextReferences()
     const automaticKey = automaticContextKey()
     const previousAutomaticContext = props.previousAutomaticContext
     const dismissedPayload = dismissedAutomaticPayload()
@@ -311,6 +322,8 @@ export default function AgentComposer(props: {
       paths: files.paths(),
       policy: effectivePolicy(),
       refreshContext: () => refreshAutomaticContext(owner, automaticKey, previousAutomaticContext, dismissedPayload),
+      captureReferences: () =>
+        captureReferences({ taskId: owner.session.taskId, sessionId: owner.session.id }, references),
       onSent: props.onSent,
       steer,
     })
@@ -364,13 +377,70 @@ export default function AgentComposer(props: {
     setContexts((current) => current.filter((item) => item.contextId !== context.contextId))
   }
 
-  const selectedContextOptionIds = (contribution: AgentContextContribution): string[] =>
-    contexts().flatMap((context) =>
-      context.source === contribution.source && context.resourceId ? [context.resourceId] : [],
-    )
-
-  const captureSelectedContext = (contributionId: string, optionIds: readonly string[]) =>
-    captureContext(capture(), contributionId, optionIds, () => setContextPickerId(''))
+  // `#` references (docs/managed-agents/composer.md § Reference Acorn context). The catalog reads each
+  // source's items when someone asks for them, and the draft's map says which item each completed
+  // token means.
+  const catalog = createContextCatalog(() => ({ taskId: props.session.taskId, sessionId: props.session.id }))
+  const composerContexts = createMemo<ComposerContexts>(() => {
+    const text = draft()
+    // A token typed by hand resolves against its source's list, so a draft holding one reads it.
+    for (const contribution of catalog.contributions())
+      if (!contribution.itemless && !contribution.search && text.includes(`#${contribution.keyword}:`))
+        catalog.listing(contribution)
+    return { categories: catalog.categories(), map: shared().references() }
+  })
+  const contextReferences = createMemo(() =>
+    resolveContextReferences(draft(), composerContexts().categories, composerContexts().map),
+  )
+  const recordReference = (token: string, item: ContextItem) =>
+    shared().setReferences((current) => (current[token]?.id === item.id ? current : { ...current, [token]: item }))
+  const tokenFor = (contribution: AgentContextContribution, option?: AgentContextOption) =>
+    option ? contextCompletion(contribution, option, shared().references()) : contextToken(contribution.keyword)
+  // Not reactive: the item behind each suggestion the `#` list last offered, read back on a pick.
+  const offered = new Map<string, ContextItem>()
+  const contextSuggestions = (query: string) => {
+    const colon = query.indexOf(':')
+    if (colon < 0) {
+      const matches = categorySuggestions(catalog.contributions(), query)
+      if (!matches.length) return null
+      return matches.map((contribution): MentionSuggestion => ({
+        value: contribution.itemless ? contextToken(contribution.keyword) : `${contextToken(contribution.keyword)}:`,
+        label: `#${contribution.keyword}`,
+        detail: contribution.label,
+        continue: !contribution.itemless,
+      }))
+    }
+    const contribution = catalog.contributions().find((item) => item.keyword === query.slice(0, colon))
+    if (!contribution || contribution.itemless) return null
+    const typed = query.slice(colon + 1)
+    const listing = catalog.listing(contribution, typed)
+    if (listing.error) return { suggestions: [], emptyText: listing.error }
+    if (!listing.items) return { suggestions: [], loading: true }
+    offered.clear()
+    const items = contribution.search ? listing.items : itemSuggestions(listing.items, typed)
+    return {
+      suggestions: items.map((option): MentionSuggestion => {
+        const token = tokenFor(contribution, option)
+        offered.set(token, option)
+        return { value: token, label: option.label, detail: option.description }
+      }),
+      emptyText: `No matching ${contribution.label.toLowerCase()}.`,
+    }
+  }
+  // The **Context** popover writes at the caret, and each token after the one before it.
+  const caret = () => {
+    const at = field?.selectionStart
+    return typeof at === 'number' ? at : draft().length
+  }
+  const addReference = (contribution: AgentContextContribution, option?: AgentContextOption) => {
+    const token = tokenFor(contribution, option)
+    if (option) recordReference(token, option)
+    const inserted = insertContextToken(draft(), caret(), token)
+    setDraft(inserted.text)
+    queueMicrotask(() => field?.setSelectionRange?.(inserted.cursor, inserted.cursor))
+  }
+  const removeReferences = (references: readonly ContextReference[]) =>
+    setDraft((current) => removeContextTokens(current, references))
 
   // Read when the field first takes focus, so the list is there by the time somebody types `@`. A
   // visit that never writes to the agent never pays for the worktree walk.
@@ -410,6 +480,16 @@ export default function AgentComposer(props: {
       emptyText: 'No matching skills.',
       suggest: (query) => advertised('$', skills(), query),
     },
+    {
+      sigil: '#',
+      label: 'Acorn context',
+      emptyText: 'No matching context.',
+      suggest: contextSuggestions,
+      onChoose: (suggestion) => {
+        const item = offered.get(suggestion.value)
+        if (item) recordReference(suggestion.value, item)
+      },
+    },
   ])
   const advertisedNames = createMemo(() => ({
     commands: commands().map((command) => command.name),
@@ -417,17 +497,27 @@ export default function AgentComposer(props: {
   }))
   const describe = (kind: 'command' | 'skill', name: string) =>
     (kind === 'command' ? commands() : skills()).find((item) => item.name === name)?.description
+  const sourceLabel = (keyword: string) =>
+    catalog.contributions().find((contribution) => contribution.keyword === keyword)?.label
+  const tokenTip = (token: ComposerToken) => {
+    if (token.kind === 'file') return undefined
+    if (token.kind === 'context') {
+      const source = sourceLabel(token.name.split(':')[0]!)
+      return source && source !== token.label ? `${token.label} · ${source}` : token.label
+    }
+    return describe(token.kind, token.name)
+  }
   // Above the cap the mirror is dropped and the field paints its own text again: a pasted stack trace
   // is still a draft somebody has to be able to type into.
   const segments = (value: string): MentionSegment[] | null =>
     value.length > MAX_HIGHLIGHT_LENGTH
       ? null
-      : composerSegments(value, advertisedNames(), files.paths()).map((segment) =>
+      : composerSegments(value, advertisedNames(), files.paths(), composerContexts()).map((segment) =>
           segment.token
             ? {
                 text: segment.text,
                 tone: TOKEN_TONE[segment.token.kind],
-                tip: segment.token.kind === 'file' ? undefined : describe(segment.token.kind, segment.token.name),
+                tip: tokenTip(segment.token),
                 caret: segment.token.end,
               }
             : { text: segment.text },
@@ -557,12 +647,15 @@ export default function AgentComposer(props: {
         tone={unguardedWarning() ? 'danger' : undefined}
         value={draft()}
         disabled={props.disabled}
-        placeholder={disabledMessage() ?? 'Ask the agent…  @file  /command  $skill'}
+        placeholder={disabledMessage() ?? 'Ask the agent…  @file  /command  $skill  #context'}
         rows={expanded() ? 18 : 3}
         sources={sources()}
         segments={segments}
         onInput={setDraft}
-        onFocus={files.want}
+        onFocus={() => {
+          files.want()
+          catalog.refresh()
+        }}
         onFiles={addFiles}
         onSubmit={() => void send()}
         onCancel={canStopAgent(props.session) ? () => void stop() : undefined}
@@ -607,39 +700,13 @@ export default function AgentComposer(props: {
         >
           Attach
         </Button>
-        <Picker<AgentContextContribution>
-          label="Context"
-          ariaLabel="Add Acorn context"
-          size="sm"
-          placeholder="Filter context sources…"
-          emptyText="No context sources available."
-          results={(query) =>
-            agentContextContributions().filter((contribution) =>
-              contribution.label.toLowerCase().includes(query.trim().toLowerCase()),
-            )
-          }
-          rowLabel={(contribution) => contribution.label}
-          rowDescription={(contribution) => contribution.description}
-          isActive={(contribution) => contexts().some((context) => contextBelongsTo(context, contribution))}
-          isDisabled={(contribution) =>
-            !!capturingContext() || (contribution.id === TASK_CONTEXT_CONTRIBUTION_ID && taskContextAdded())
-          }
-          onSelect={(contribution) => {
-            // Solid delegates click handlers at the document. Mounting a backdrop synchronously
-            // lets the selecting click reach the new backdrop and dismiss the modal immediately.
-            //
-            // Bare, not `window.setTimeout`: the terminal host defines `window` as an object holding
-            // `acorn` and nothing else (docs/tui/host-switch.md § Booting client-core under Node), so
-            // reaching through it throws a TypeError out of a keymap handler. The global is the same
-            // function on both hosts, and only the DOM has the delegation this defers past.
-            clearTimeout(pickerTimer)
-            const owner = capture()
-            pickerTimer = setTimeout(() => {
-              if (owner.visible()) setContextPickerId(contribution.id)
-            }, 0)
-          }}
+        <ContextReferencePicker
+          catalog={catalog}
+          references={contextReferences}
           disabled={props.disabled}
-          placement="top-start"
+          onAdd={addReference}
+          onRemove={removeReferences}
+          onDone={() => field?.focus?.()}
         />
         <Picker<InsertChoice>
           label="Insert"
@@ -722,19 +789,6 @@ export default function AgentComposer(props: {
       </Toolbar>
 
       <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-      <Show when={contextPicker()}>
-        {(contribution) => (
-          <AgentContextPickerModal
-            contribution={contribution()}
-            taskId={props.session.taskId}
-            sessionId={props.session.id}
-            initialSelectedIds={selectedContextOptionIds(contribution())}
-            attaching={capturingContext() === contribution().id}
-            onAttach={(optionIds) => void captureSelectedContext(contribution().id, optionIds)}
-            onClose={() => setContextPickerId('')}
-          />
-        )}
-      </Show>
     </Stack>
   )
 }

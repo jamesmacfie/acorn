@@ -2,6 +2,7 @@ import { createSignal } from 'solid-js'
 import { activeNodeId, latestSignal } from '@acorn/plugin-api/client'
 import type { AgentAttachment } from '../../contract/wire.ts'
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
+import type { ContextReferenceMap } from './contextReferences'
 import {
   composerDraftKey,
   deleteComposerPayload,
@@ -19,6 +20,7 @@ function createDraft(nodeId: string | null, sessionId: string) {
   const [text, setText] = createSignal(stored.text)
   const [attachments, setAttachments] = createSignal<AgentAttachment[]>([])
   const [contexts, setContexts] = createSignal(stored.contexts)
+  const [references, setReferences] = createSignal(stored.references)
   const [error, setError] = createSignal('')
   const [sending, setSending] = createSignal(false)
   const [uploading, setUploading] = createSignal(false)
@@ -34,7 +36,7 @@ function createDraft(nodeId: string | null, sessionId: string) {
   let holders = 0
   let preserveHydration = false
   const [hydrated, setHydrated] = createSignal(false)
-  const payload = () => ({ text: text(), attachmentIds, contexts: contexts() })
+  const payload = () => ({ text: text(), attachmentIds, contexts: contexts(), references: references() })
   const persist = (field: keyof ReturnType<typeof payload>) => valid && writeComposerPayload(key, payload(), field)
   const reap = () => {
     if (!valid || preserveHydration || holders || sending() || uploading() || replacing() || capturing() || !hydrated())
@@ -48,6 +50,7 @@ function createDraft(nodeId: string | null, sessionId: string) {
     text,
     attachments,
     contexts,
+    references,
     error,
     sending,
     uploading,
@@ -76,6 +79,11 @@ function createDraft(nodeId: string | null, sessionId: string) {
       contextRevision++
       setContexts(next as never)
       persist('contexts')
+    },
+    setReferences(next: Update<ContextReferenceMap>) {
+      if (!valid) return
+      setReferences(next as never)
+      persist('references')
     },
     setError(next: string) {
       if (valid) setError(next)
@@ -128,7 +136,10 @@ function createDraft(nodeId: string | null, sessionId: string) {
       submittedContexts: readonly AgentContextSnapshot[],
     ) {
       if (!valid) return
-      if (textRevision === revisions[0]) state.setText('')
+      if (textRevision === revisions[0]) {
+        state.setText('')
+        state.setReferences({})
+      }
       state.setAttachments(
         attachmentRevision === revisions[1] ? [] : attachments().filter((item) => !submittedAttachments.includes(item)),
       )

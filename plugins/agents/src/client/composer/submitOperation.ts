@@ -2,6 +2,7 @@ import { agentContextBudget, type AgentContextSnapshot } from '@acorn/protocol/a
 import type { AgentInputPart } from '../../contract/wire.ts'
 import { managedAgentApi } from '../sessions/managedClient.ts'
 import { parseFileMentions } from './fileMentions.ts'
+import { AUTOMATIC_TASK_CONTEXT_SOURCE } from './automaticTaskContext.ts'
 import type { ComposerOrigin } from './composerOrigin.ts'
 import { operationError } from './composerOrigin.ts'
 
@@ -10,12 +11,22 @@ type Submission = {
   paths: readonly string[]
   policy: Record<string, unknown>
   refreshContext: () => Promise<AgentContextSnapshot[]>
+  /** The message's `#` references, captured now (`captureReferences`). */
+  captureReferences: () => Promise<AgentContextSnapshot[]>
   onSent: () => void
   /** Hand the queued turn to the running one (docs/managed-agents/steering.md § What a steer does). */
   steer?: boolean
 }
 
-export async function submitTurn({ origin, paths, policy, refreshContext, onSent, steer }: Submission): Promise<void> {
+export async function submitTurn({
+  origin,
+  paths,
+  policy,
+  refreshContext,
+  captureReferences,
+  onSent,
+  steer,
+}: Submission): Promise<void> {
   const { state, session } = origin
   const text = state.text().trim()
   const revisions = [...state.revisions()]
@@ -27,7 +38,16 @@ export async function submitTurn({ origin, paths, policy, refreshContext, onSent
     if (!state.valid()) return
     // A capture made by this send is part of the submitted revision. Later edits remain in the draft.
     if (state.contexts() === turnContexts) revisions[2] = state.revisions()[2]
-    if (agentContextBudget(turnContexts).overLimit) {
+    const referenced = await captureReferences()
+    if (!state.valid()) return
+    // A typed `#task` is the same snapshot the automatic chip carries, and the person asked for it.
+    const sentContexts = [
+      ...(referenced.some((context) => context.source === 'context.task')
+        ? turnContexts.filter((context) => context.source !== AUTOMATIC_TASK_CONTEXT_SOURCE)
+        : turnContexts),
+      ...referenced,
+    ]
+    if (agentContextBudget(sentContexts).overLimit) {
       state.setError('Remove some context before sending; Acorn snapshots are limited to 512 KiB per turn.')
       return
     }
@@ -39,7 +59,7 @@ export async function submitTurn({ origin, paths, policy, refreshContext, onSent
           ? { type: 'image', attachmentId: attachment.id, alt: attachment.filename }
           : { type: 'attachment', attachmentId: attachment.id },
       ),
-      ...turnContexts,
+      ...sentContexts,
     ]
     const turn = await managedAgentApi.enqueue(
       session.id,

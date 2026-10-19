@@ -5,6 +5,8 @@
 // mention" — the one that opens the list and the one that colours the text — would drift, and the
 // visible one would start lying about what the field will actually complete.
 
+import type { MentionSource, MentionSuggestion } from '../../components/inputs/MentionTextarea.tsx'
+
 /** The character that opens a completion. `@` for a name or a path, `/` for a command, `$` for a
  *  skill: the field never assumes which, and takes the set from whoever declared the sources. */
 type MentionSigil = string
@@ -41,12 +43,20 @@ export function activeMention(text: string, cursor: number, sigils: readonly str
 }
 
 /** Swap the mention under the caret for a chosen one, landing the caret past the space that follows
- *  it. One space, never two: a mention completed mid-sentence already has one. */
+ *  it. One space, never two: a mention completed mid-sentence already has one. A `partial` one, such
+ *  as `#agent:`, gets no space and leaves the caret at its end, so typing goes on inside it. */
 export function completeMention(
   text: string,
   mention: { start: number; end: number },
   replacement: string,
+  partial = false,
 ): { text: string; cursor: number } {
+  if (partial) {
+    return {
+      text: `${text.slice(0, mention.start)}${replacement}${text.slice(mention.end)}`,
+      cursor: mention.start + replacement.length,
+    }
+  }
   const hasFollowingSpace = /\s/.test(text[mention.end] ?? '')
   const inserted = `${replacement}${hasFollowingSpace ? '' : ' '}`
   return {
@@ -68,4 +78,27 @@ export function scrollDeltaFor(list: { top: number; bottom: number }, row: { top
   if (row.top < list.top) return row.top - list.top
   if (row.bottom > list.bottom) return row.bottom - list.bottom
   return 0
+}
+
+/** What the list under the field shows for one query, from either form of a source's answer. */
+export type MentionList = {
+  suggestions: readonly MentionSuggestion[]
+  loading: boolean
+  emptyText: string
+  error?: string
+}
+
+/** `null` when there is no list to show: no mention at the caret, or a source that said this text
+ *  is not one. Both hosts draw from this, so they open and close on the same keystrokes. */
+export function mentionList(source: MentionSource | undefined, query: string | undefined): MentionList | null {
+  if (!source || query === undefined) return null
+  const answer = source.suggest(query)
+  if (answer === null) return null
+  const full = 'suggestions' in answer ? answer : { suggestions: answer }
+  return {
+    suggestions: full.suggestions,
+    loading: full.loading ?? !!source.loading,
+    emptyText: full.emptyText ?? source.emptyText,
+    ...(source.error ? { error: source.error } : {}),
+  }
 }

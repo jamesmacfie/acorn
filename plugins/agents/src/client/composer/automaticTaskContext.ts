@@ -13,13 +13,15 @@ export function automaticTaskContextPayload(context: AgentContextSnapshot): stri
   return separator < 0 ? context.content : context.content.slice(separator + SNAPSHOT_SEPARATOR.length)
 }
 
+/** The task context the session last received, automatically or through a typed `#task`. Either
+ *  one means the agent already has it, so the chip only comes back when the Context pane changes. */
 export function latestAutomaticTaskContext(turns: AgentTurn[]): AgentContextSnapshot | undefined {
   for (const turn of [...turns].sort((left, right) => right.ordinal - left.ordinal)) {
     const context = [...turn.input]
       .reverse()
       .find(
         (part): part is AgentContextSnapshot =>
-          part.type === 'context' && part.source === AUTOMATIC_TASK_CONTEXT_SOURCE,
+          part.type === 'context' && (part.source === AUTOMATIC_TASK_CONTEXT_SOURCE || part.source === 'context.task'),
       )
     if (context) return context
   }

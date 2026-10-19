@@ -60,7 +60,8 @@ written routine that keeps it true release after release.
    desktop. Record the numbers and the date in the site's internal page.
 5. Check the site in Safari, Firefox, and Chrome, at 375 pixels wide and at 1440.
 6. Use the landing page and one docs page with the keyboard alone, and with VoiceOver.
-7. Switch through all 12 themes and 4 style packs on the landing page and a component page.
+7. Switch between light and dark on the landing page and a component page. The header, hero, and
+   footer of a marketing page stay dark in both.
 8. Paste an `acorn.sh` link into a chat app and check that its card shows.
 9. Check the staleness report's job summary on a real pull request.
 

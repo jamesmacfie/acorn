@@ -111,6 +111,7 @@ export default {
     }],
     agentContexts: [{
       id: 'saved-queries',
+      keyword: 'db',
       label: 'Saved database queries',
       description: 'Saved SQL and its notes. Connection details are never included.',
       options: '/v1/p/database/context-options',

@@ -1,6 +1,11 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { For, Show, type JSX } from 'solid-js'
-import type { MentionTextareaProps } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
+import type {
+  MentionSource,
+  MentionSuggestion,
+  MentionTextareaProps,
+} from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
+import { mentionList } from '@acorn/client-core/kit/lib'
 import type { Renderable } from '../../tree/compat'
 import { focusRenderable, markEntry, stopsIn } from '../../keys/regions'
 import { bindKeys } from '../../keys/install'
@@ -80,24 +85,38 @@ export function MentionTextarea(props: MentionTextareaProps) {
     const sigil = sigils.find((candidate) => word.startsWith(candidate))
     return sigil ? { sigil, query: word.slice(sigil.length) } : null
   }
-  const suggestions = () => {
+  const source = (): MentionSource | undefined => {
     const current = active()
-    if (!current) return []
-    const source = props.sources?.find((candidate) => candidate.sigil === current.sigil)
-    if (source) return source.suggest(current.query)
-    return (props.mentions ?? [])
-      .filter((name) => name.toLowerCase().includes(current.query.toLowerCase()))
-      .slice(0, 8)
-      .map((name) => ({ value: `@${name}`, label: name }))
+    if (!current) return undefined
+    return (
+      props.sources?.find((candidate) => candidate.sigil === current.sigil) ??
+      (props.mentions && current.sigil === '@'
+        ? {
+            sigil: '@',
+            label: 'Mentions',
+            emptyText: 'No matching names.',
+            suggest: (query) =>
+              (props.mentions ?? [])
+                .filter((name) => name.toLowerCase().includes(query.toLowerCase()))
+                .slice(0, 8)
+                .map((name) => ({ value: `@${name}`, label: name })),
+          }
+        : undefined)
+    )
   }
+  const list = () => mentionList(source(), active()?.query)
+  const suggestions = () => list()?.suggestions ?? []
   // Completing the word being typed, which is what choosing a suggestion means. The DOM half splices
   // by cursor offset; there is no cursor to ask here, so it replaces the trailing word — which is the
-  // same edit for every case `active()` recognises, because that is the word it found.
-  const complete = (value: string) => {
-    if (!active()) return
-    props.onInput(props.value.replace(/\S+$/, `${value} `))
+  // same edit for every case `active()` recognises, because that is the word it found. A first step
+  // such as `#agent:` gets no space, so the next keystroke goes on inside it and the list stays open.
+  const complete = (suggestion: MentionSuggestion) => {
+    const chosen = source()
+    if (!chosen) return
+    chosen.onChoose?.(suggestion)
+    props.onInput(props.value.replace(/\S+$/, suggestion.continue ? suggestion.value : `${suggestion.value} `))
   }
-  let list: Renderable | undefined
+  let rows: Renderable | undefined
   return (
     <box flexDirection="column">
       {slot(props.overlay)}
@@ -121,9 +140,9 @@ export function MentionTextarea(props: MentionTextareaProps) {
               {
                 key: 'down',
                 cmd: () => {
-                  if (!list || !suggestions().length) return false
+                  if (!rows || !suggestions().length) return false
                   // The field is outside the list's stops, so enter at its first row.
-                  return focusRenderable(stopsIn(list)[0])
+                  return focusRenderable(stopsIn(rows)[0])
                 },
               },
               {
@@ -134,7 +153,7 @@ export function MentionTextarea(props: MentionTextareaProps) {
                   // An open suggestion list takes Enter before the submit handler.
                   const [first] = suggestions()
                   if (first) {
-                    complete(first.value)
+                    complete(first)
                     return true
                   }
                   if (!props.onSubmit) return false
@@ -154,18 +173,24 @@ export function MentionTextarea(props: MentionTextareaProps) {
           flexDirection="column"
           paddingLeft={2}
           ref={(element: Renderable) => {
-            list = element
+            rows = element
           }}
         >
           <For each={suggestions()}>
             {(suggestion) => (
               <PickerRow
                 label={suggestion.label}
-                description={'detail' in suggestion ? suggestion.detail : undefined}
-                onSelect={() => complete(suggestion.value)}
+                description={suggestion.detail}
+                onSelect={() => complete(suggestion)}
               />
             )}
           </For>
+        </box>
+      </Show>
+      {/* Muted rather than a row, so the arrows still have nothing to walk into. */}
+      <Show when={list() && !suggestions().length}>
+        <box paddingLeft={2}>
+          <Line role="muted">{list()!.loading ? 'Loading…' : (list()!.error ?? list()!.emptyText)}</Line>
         </box>
       </Show>
     </box>
