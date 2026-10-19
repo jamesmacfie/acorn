@@ -3,8 +3,10 @@ import type { DashboardRevision, PanelPlan } from '@acorn/protocol/dashboards.ts
 import { availableViews, switchView } from '@acorn/dashboards-core/outline.ts'
 import { outputPlanColumns } from '@acorn/dashboards-core/plan.ts'
 import { sortDirectionLabel } from '@acorn/dashboards-core/labels.ts'
+import { Heading } from '../../kit/components/content/Heading'
 import { Kbd } from '../../kit/components/content/Kbd'
 import { Text } from '../../kit/components/content/Text'
+import { Card, EmptyState } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Menu, type MenuContext } from '../../kit/components/overlays/Menu'
 import { formatChord } from '../../kit/lib/rendering/formatChord'
@@ -72,7 +74,8 @@ const sortedTowards = (plan: PanelPlan, direction: Direction): PanelPlan => ({
  * small layout port; this component owns no placement state and cannot commit a gesture itself.
  *
  * The menu's quick edits, About, and Duplicate read the published revision the panel already loaded
- * (docs/dashboards/placements.md § The panel menu).
+ * (docs/dashboards/placements.md § The panel menu). A definition with no publication, which this
+ * build can't draw, gets an inert cell whose menu only arranges and removes it.
  */
 export default function PanelGridItem(props: {
   definition: PanelDefinition
@@ -180,32 +183,34 @@ export default function PanelGridItem(props: {
     >
       {(menu) => (
         <>
-          <Menu.Item
-            context={menu}
-            onSelect={props.actions.edit}
-            trailing={<Kbd size="xs">{formatChord('enter')}</Kbd>}
-          >
-            Edit…
-          </Menu.Item>
-          <Menu.Item context={menu} onSelect={props.actions.editWithAi}>
-            Edit with AI…
-          </Menu.Item>
-          <Menu.Item context={menu} disabled={!published()} onSelect={() => setRenaming(true)}>
-            Rename
-          </Menu.Item>
-          <Show when={published()}>{(revision) => quickEditItems(menu, revision().content)}</Show>
-          <Menu.Separator />
-          <Menu.Item context={menu} disabled={!published()} onSelect={() => setAbout(published())}>
-            About this panel
-          </Menu.Item>
-          <Menu.Item
-            context={menu}
-            disabled={!published() || !props.actions.canDuplicate()}
-            onSelect={() => props.actions.duplicate(published()!.content)}
-          >
-            Duplicate
-          </Menu.Item>
-          <Menu.Separator />
+          <Show when={props.definition.publication}>
+            <Menu.Item
+              context={menu}
+              onSelect={props.actions.edit}
+              trailing={<Kbd size="xs">{formatChord('enter')}</Kbd>}
+            >
+              Edit…
+            </Menu.Item>
+            <Menu.Item context={menu} onSelect={props.actions.editWithAi}>
+              Edit with AI…
+            </Menu.Item>
+            <Menu.Item context={menu} disabled={!published()} onSelect={() => setRenaming(true)}>
+              Rename
+            </Menu.Item>
+            <Show when={published()}>{(revision) => quickEditItems(menu, revision().content)}</Show>
+            <Menu.Separator />
+            <Menu.Item context={menu} disabled={!published()} onSelect={() => setAbout(published())}>
+              About this panel
+            </Menu.Item>
+            <Menu.Item
+              context={menu}
+              disabled={!published() || !props.actions.canDuplicate()}
+              onSelect={() => props.actions.duplicate(published()!.content)}
+            >
+              Duplicate
+            </Menu.Item>
+            <Menu.Separator />
+          </Show>
           <Show when={!props.layout.collapsed()}>
             <Menu.Item context={menu} onSelect={props.actions.beginLayout}>
               Move or resize
@@ -233,14 +238,16 @@ export default function PanelGridItem(props: {
           <Menu.Item context={menu} onSelect={props.actions.remove}>
             Remove from this dashboard
           </Menu.Item>
-          <Menu.Item
-            context={menu}
-            tone="danger"
-            confirm="Delete panel?"
-            onSelect={() => void props.actions.delete().catch(props.actions.deleteFailed)}
-          >
-            Delete panel
-          </Menu.Item>
+          <Show when={props.definition.publication}>
+            <Menu.Item
+              context={menu}
+              tone="danger"
+              confirm="Delete panel?"
+              onSelect={() => void props.actions.delete().catch(props.actions.deleteFailed)}
+            >
+              Delete panel
+            </Menu.Item>
+          </Show>
         </>
       )}
     </Menu>
@@ -254,6 +261,8 @@ export default function PanelGridItem(props: {
       onPointerDown={(event) => props.layout.onBeginResize(edge, event)}
     />
   )
+
+  const headProps = () => (props.layout.collapsed() ? {} : { onPointerDown: props.layout.onBeginDrag })
 
   onCleanup(props.layout.unregister)
 
@@ -273,7 +282,22 @@ export default function PanelGridItem(props: {
       onKeyDown={props.layout.onKeyDown}
       onBlur={props.layout.onBlur}
     >
-      <Show when={props.definition.publication}>
+      <Show
+        when={props.definition.publication}
+        fallback={
+          <Card>
+            <div class="dash-panel-head" {...headProps()}>
+              <Heading level={3}>{props.definition.title}</Heading>
+              {chrome(() => undefined)}
+            </div>
+            <div class="dash-panel-body">
+              <EmptyState align="start" size="sm">
+                Acorn can't show this here. It may need a newer version of Acorn, or a plugin that's turned off.
+              </EmptyState>
+            </div>
+          </Card>
+        }
+      >
         <PublishedDashboardPanel
           definition={props.definition}
           workspaceId={props.workspaceId}
@@ -283,7 +307,7 @@ export default function PanelGridItem(props: {
             ? { rename: { onDone: (title: string | undefined) => rename(title, props.definition.title) } }
             : {})}
           onEditPanel={props.actions.openStudio}
-          headProps={props.layout.collapsed() ? {} : { onPointerDown: props.layout.onBeginDrag }}
+          headProps={headProps()}
         />
       </Show>
       <Show when={about()}>

@@ -63,13 +63,16 @@ export async function readDashboardPrefs(db: AppDatabase, env: Env): Promise<unk
   }
 }
 
-/** Which panels a pass samples: every definition asking for a history trend that is placed in at
- *  least one scope. See docs/dashboards/sampling.md § Sampling and retention for why an unplaced panel is
- *  skipped and what happens when it is placed again. */
+/** Which panels a pass samples: every published definition asking for a history trend that is placed
+ *  in at least one scope. A definition with no publication has no measure of its own. See
+ *  docs/dashboards/sampling.md § Sampling and retention for why an unplaced panel is skipped and what
+ *  happens when it is placed again. */
 export function panelsToSample(prefs: unknown): PanelDefinition[] {
   const { panels, placements } = parsePanels(prefs)
   const placed = new Set(Object.values(placements).flat())
-  return Object.values(panels).filter((panel) => panel.view.trend === 'history' && placed.has(panel.id))
+  return Object.values(panels).filter(
+    (panel) => panel.publication && panel.view.trend === 'history' && placed.has(panel.id),
+  )
 }
 
 /** Every panel id the blob defines, for compaction's orphan sweep. See docs/dashboards/sampling.md § Sampling

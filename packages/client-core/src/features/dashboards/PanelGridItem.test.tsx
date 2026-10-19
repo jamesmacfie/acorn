@@ -2,6 +2,7 @@ import { render } from 'solid-js/web'
 import type { Accessor, JSX } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardRevision, PanelPlan } from '@acorn/protocol/dashboards.ts'
+import type { PanelDefinition } from './model'
 import type { PanelGridItemActions } from './PanelGridItem'
 
 // The placed panel loads its own revision and runs. Here it only hands the menu a revision.
@@ -46,22 +47,30 @@ let revision: DashboardRevision
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
 const quickEdit = vi.fn<PanelGridItemActions['quickEdit']>()
+const menuRows = () =>
+  [...document.querySelectorAll('.ui-menu > *')].map((entry) =>
+    entry.matches('.ui-menu-separator')
+      ? '-'
+      : (entry.querySelector('.ui-menu-label')?.textContent ?? entry.textContent),
+  )
 const item = (text: string) =>
   [...document.querySelectorAll<HTMLButtonElement>('.ui-menu-item')].find(
     (entry) => entry.querySelector('.ui-menu-label')?.textContent === text,
   )
 
-const openMenu = () => {
+const published: PanelDefinition = {
+  id: 'd1',
+  title: 'Pulls',
+  shaping: {},
+  view: { kind: 'list' },
+  publication: { dashboardId: 'd1' },
+}
+
+const openMenu = (definition = published) => {
   dispose = render(
     () => (
       <PanelGridItem
-        definition={{
-          id: 'd1',
-          title: 'Pulls',
-          shaping: {},
-          view: { kind: 'list' },
-          publication: { dashboardId: 'd1' },
-        }}
+        definition={definition}
         scope={{ surface: 'home' }}
         layout={{
           collapsed: () => false,
@@ -120,12 +129,7 @@ afterEach(() => {
 describe('PanelGridItem menu', () => {
   it('lists the edits, then About and Duplicate, then the layout moves', () => {
     openMenu()
-    const rows = [...document.querySelectorAll('.ui-menu > *')].map((entry) =>
-      entry.matches('.ui-menu-separator')
-        ? '-'
-        : (entry.querySelector('.ui-menu-label')?.textContent ?? entry.textContent),
-    )
-    expect(rows).toEqual([
+    expect(menuRows()).toEqual([
       'Edit…',
       'Edit with AI…',
       'Rename',
@@ -169,5 +173,11 @@ describe('PanelGridItem menu', () => {
     openMenu()
     item('Title')!.click()
     expect(quickEdit.mock.calls[1]![0](plan).sort).toEqual([{ column: 'title', direction: 'desc' }])
+  })
+
+  it('draws a definition this build does not know inert, with a menu that only arranges and removes it', () => {
+    openMenu({ id: 'c1', title: 'Pulls', shaping: {}, view: { kind: 'later-kind' } })
+    expect(host.textContent).toContain("Acorn can't show this here.")
+    expect(menuRows()).toEqual(['Move or resize', 'Move up', 'Move down', '-', 'Remove from this dashboard'])
   })
 })

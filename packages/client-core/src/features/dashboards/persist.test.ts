@@ -118,6 +118,25 @@ describe('codec', () => {
     expect(parsePersistedDashboards(legacy)).toEqual(emptyDashboards())
     expect(parsePanelDefinition(legacy.panels.p1)).toBeUndefined()
   })
+
+  it('keeps a definition of a kind this build does not know, exactly as written', () => {
+    const unknown = { id: 'c1', title: 'Checklist', view: { kind: 'later-kind' }, later: { nested: [1, 'two'] } }
+    const blob = { version: 1, panels: { c1: unknown, p1: panel('p1') }, placements: { home: ['c1', 'p1'] } }
+    const parsed = parsePersistedDashboards(JSON.stringify(blob))
+    expect(parsed.panels.c1).toMatchObject(unknown)
+    expect(parsed.placements.home).toEqual(['c1', 'p1'])
+    hydrateDashboards(parsed)
+    expect(panelsAt(HOME_PLACEMENT).map((entry) => entry.id)).toEqual(['c1', 'p1'])
+    const saved = JSON.parse(JSON.stringify(dashboardsSlice.codec.serialize(dashboards())))
+    expect(saved.panels.c1).toMatchObject(unknown)
+    expect(parsePersistedDashboards(saved)).toEqual(parsed)
+  })
+
+  it('drops a malformed publication from a kept definition', () => {
+    expect(parsePanelDefinition({ id: 'c1', view: { kind: 'later-kind' }, publication: 'x' })).not.toHaveProperty(
+      'publication',
+    )
+  })
 })
 
 describe('the geometry codec', () => {

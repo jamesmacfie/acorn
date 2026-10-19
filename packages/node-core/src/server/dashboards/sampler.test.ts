@@ -153,6 +153,14 @@ describe('dashboard measure sampler', () => {
     expect(panelsToSample(prefs).map((panel) => panel.id)).toEqual(['p1'])
     expect([...definedPanelIds(prefs)]).toEqual(['p1'])
     expect(panelsToSample({ ...prefs, version: 2 })).toEqual([])
+    // A definition with no publication has nothing to sample, but stays defined.
+    const withCell = {
+      ...prefs,
+      panels: { ...prefs.panels, c1: { id: 'c1', title: 'Checklist', view: { kind: 'later-kind', trend: 'history' } } },
+      placements: { ...prefs.placements, home: [...Object.values(prefs.placements).flat(), 'c1'] },
+    }
+    expect(panelsToSample(withCell).map((panel) => panel.id)).toEqual(['p1'])
+    expect([...definedPanelIds(withCell)]).toEqual(['p1', 'c1'])
   })
 
   it('resolves the immutable dashboard and shared Node source with no client attached', async () => {

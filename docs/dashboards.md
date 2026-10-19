@@ -160,7 +160,11 @@ Definitions are separate from placements, so one panel can appear on several sur
 geometry on each. An unknown placement owner or a missing panel ID stays inert, so a plugin that's
 briefly unavailable doesn't destroy composition. A malformed definition is dropped, and an envelope
 that isn't version 1 resets to the empty model (`packages/client-core/src/features/dashboards/persist.ts`).
-A placement ID with no rect is normal: it renders in reading order.
+A placement ID with no rect is normal: it renders in reading order. A definition with no publication
+and a view kind that isn't a plan's comes from a newer build. The shared codec (`parsePanels` in
+`packages/dashboards-core/src/definition.ts`) keeps it as written, so an older client saves it back
+unchanged and draws it inert, and the Node's sampler skips it. A flat definition from before
+publications has a plan view, and is still dropped.
 
 Home tabs are placement scopes. Their names and order live in the same preference, at most eight per
 workspace with names trimmed to 60 characters ([placements](./dashboards/placements.md)).

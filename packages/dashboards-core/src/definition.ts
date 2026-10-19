@@ -1,4 +1,4 @@
-import { dashboardViewSchema } from '@acorn/protocol/dashboardViews.ts'
+import { dashboardViewKinds, dashboardViewSchema } from '@acorn/protocol/dashboardViews.ts'
 import type { PanelDefinition } from './model'
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -7,9 +7,11 @@ export const isRecord = (value: unknown): value is Record<string, unknown> =>
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0) : []
 
-/** Parse a published dashboard panel. Flat panel definitions have no publication and are refused. */
+/** Parse one stored panel definition: a published panel, or a definition this build can't draw. Flat
+ *  panel definitions, with no publication and a plan view, are refused. */
 export function parsePanelDefinition(raw: unknown): PanelDefinition | undefined {
-  if (!isRecord(raw) || !isRecord(raw.publication)) return undefined
+  if (!isRecord(raw)) return undefined
+  if (!isRecord(raw.publication)) return parseUnknownDefinition(raw)
   const id = typeof raw.id === 'string' && raw.id ? raw.id : undefined
   const dashboardId =
     typeof raw.publication.dashboardId === 'string' && raw.publication.dashboardId
@@ -29,6 +31,25 @@ export function parsePanelDefinition(raw: unknown): PanelDefinition | undefined 
       ...(sources.length ? { sources } : {}),
       ...(fieldRoles.length ? { fieldRoles } : {}),
     },
+  }
+}
+
+/** A definition with no publication and a view kind that isn't a plan's, kept as written. It's a kind
+ *  a newer build added, so a client that can't draw it draws it inert, and a save writes it back
+ *  unchanged rather than deleting it for every client (docs/dashboards.md § Persistence). */
+function parseUnknownDefinition(raw: Record<string, unknown>): PanelDefinition | undefined {
+  const view = isRecord(raw.view) ? raw.view : {}
+  const kind = typeof view.kind === 'string' ? view.kind : undefined
+  if (typeof raw.id !== 'string' || !raw.id || !kind || (dashboardViewKinds as readonly string[]).includes(kind))
+    return undefined
+  // A malformed publication must not reach code that reads one as published.
+  const { publication: _malformed, ...fields } = raw
+  return {
+    ...fields,
+    id: raw.id,
+    title: typeof raw.title === 'string' ? raw.title : '',
+    shaping: {},
+    view: { ...view, kind },
   }
 }
 
