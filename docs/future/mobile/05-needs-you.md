@@ -18,8 +18,9 @@ code.
   **Stop** (`plugins/agents/src/client/paneContribution.ts`).
 - `packages/client-core/src/features/tabs/TaskDraftDialog.tsx` is the desktop's draft flow for a task.
 - The extension's sidebar has its own **Needs you** list
-  ([Needs you](../extension-ux/04-needs-you.md)). Read it for the wording and the order of items, not
-  the code. The extension's list reads a bridge operation, and the phone reads the inbox.
+  ([the Needs you list](../../browser-extension/notifications.md#the-needs-you-list)). Read it for the
+  wording and the order of items, not the code. The extension's list reads a bridge operation, and the
+  phone reads the inbox.
 
 ## The design
 

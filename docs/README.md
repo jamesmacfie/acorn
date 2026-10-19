@@ -466,20 +466,6 @@ Each plugin landing page above has topic pages in a folder of the same name:
 - [Pull request panel in the browser extension](./future/extension-github-panel.md) and [Docker
   panel in the browser extension](./future/extension-docker-panel.md).
 
-## Browser extension sidebar rework proposal
-
-- [Rework the browser extension's sidebar](./future/extension-ux/README.md), with phases for
-  [navigation](./future/extension-ux/01-navigation.md), [Go to task and
-  menus](./future/extension-ux/02-go-to-task-and-menus.md), [Home](./future/extension-ux/03-home.md),
-  [Needs you](./future/extension-ux/04-needs-you.md), [This page](./future/extension-ux/05-this-page.md),
-  [the Agents tab](./future/extension-ux/06-agents-tab.md), [the
-  conversation](./future/extension-ux/07-conversation.md), [the Runs tab](./future/extension-ux/08-runs-tab.md),
-  [plugin panels](./future/extension-ux/09-plugin-panels.md), [Settings](./future/extension-ux/10-settings.md),
-  [connecting](./future/extension-ux/11-connect.md), [the page's chip and
-  marker](./future/extension-ux/12-on-the-page.md), and [a Context
-  picker](./future/extension-ux/13-context-picker.md), then [plugin reuse
-  passes](./future/extension-ux/plugin-reuse.md).
-
 ## Mobile web app proposal
 
 - [Build a mobile web app](./future/mobile/README.md), with phases for [the
