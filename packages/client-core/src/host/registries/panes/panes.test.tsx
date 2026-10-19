@@ -166,20 +166,23 @@ describe('the model a pane’s regions share', () => {
     expect(shown?.()).toBe(true)
   })
 
-  it('disposes the previous task’s model when another task asks, and on eviction', async () => {
-    const { paneModel } = await import('./paneModels')
+  it('keeps the most recent tasks’ models, disposes the oldest past the limit, and disposes on eviction', async () => {
+    const { DEFAULT_KEPT_TASKS, paneModel } = await import('./paneModels')
     const disposed: string[] = []
     const build = (id: string) => () => {
       onCleanup(() => disposed.push(id))
       return { id }
     }
-    expect(paneModel('notes', 't1', build('t1'))).toBe(paneModel('notes', 't1', build('t1-again')))
-    paneModel('notes', 't2', build('t2'))
-    // One task is on screen at a time, so the one before it is a task somebody navigated away from,
-    // and disposing eagerly is what flushes its pending save.
-    expect(disposed).toEqual(['t1'])
-    evictScope({ scope: 'task', taskId: 't2' })
-    expect(disposed).toEqual(['t1', 't2'])
+    const t1 = paneModel('notes', 't1', build('t1'))
+    expect(paneModel('notes', 't1', build('t1-again'))).toBe(t1)
+    for (let n = 2; n <= DEFAULT_KEPT_TASKS; n++) paneModel('notes', `t${n}`, build(`t${n}`))
+    // Going back to t1 makes it the most recent, so the next task pushes out t2 instead.
+    expect(paneModel('notes', 't1', build('t1-again'))).toBe(t1)
+    expect(disposed).toEqual([])
+    paneModel('notes', 'next', build('next'))
+    expect(disposed).toEqual(['t2'])
+    evictScope({ scope: 'task', taskId: 't1' })
+    expect(disposed).toEqual(['t2', 't1'])
   })
 })
 

@@ -94,7 +94,8 @@ export type PaneContribution = PaneCommon & {
 export type PaneLayoutContribution<M = undefined> = PaneCommon & {
   layout: PaneLayoutName
   /**
-   * What every region of this pane shares, built once per task and disposed when the task is evicted
+   * What every region of this pane shares, built once per task. The host keeps it for the last few
+   * tasks the pane drew and disposes it when the task falls out of that list or is evicted
    * (./paneModels.ts, docs/panes/models.md § Pane models).
    *
    * Regions are separate components the host mounts side by side, so a selection, a draft or an
@@ -137,7 +138,8 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
 /** What the host tells a pane's model about the pane it belongs to. */
 export type PaneModelContext = {
   /** Whether this pane is drawing the model's task right now. False on another task, a rail source,
-   *  or another pane of the same task. */
+   *  or another pane of the same task. The host keeps models for several recent tasks, so a model
+   *  that polls, runs a timer, or re-reads on an event waits while this is false. */
   shown: Accessor<boolean>
 }
 
@@ -147,7 +149,7 @@ export type PaneModelContext = {
 export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
 
 // There is no `keepAlive` here. What keeps a pane cheap to leave and come back to is ./paneModels.ts
-// within a task and the query cache across tasks, warmed by `prefetch` above. A hidden element tree per
+// for recent tasks and the query cache for the rest, warmed by `prefetch` above. A hidden element tree per
 // task is the memory shape this codebase declined for the agent transcript
 // (docs/managed-agents/transcript.md).
 //

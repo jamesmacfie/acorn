@@ -1,5 +1,10 @@
 // One pane's shared state, built once per task and handed to every region of its layout.
 //
+// Each pane keeps the models of the last few tasks it drew, so leaving a task and coming back finds
+// the note, the undo history and the filter as they were. How many is the reader's choice
+// (`keptTasks`). A model kept for a task that's out of view must stay quiet, which is what `shown`
+// on `PaneModelContext` is for (./panes.ts).
+//
 // A layout's regions are separate components the host mounts side by side, so anything two of them
 // share has to outlive both of them: collapsing a library unmounts the list, and the note being
 // edited must not go with it. Several panes need that (notes, changes, agents and context), so the
@@ -18,6 +23,8 @@
 // own to share.
 import { createContext, createRoot, createSignal, useContext } from 'solid-js'
 import { activeNodeId } from '../../../infra/node/activeNode'
+import { readDevicePrefs } from '../../../infra/persistence/devicePrefs'
+import { PrefKeys } from '../../../infra/persistence/prefKeys'
 import { startSpan } from '../../../infra/telemetry/emitter'
 import { onScopeEvicted } from '../shell/scopeEviction'
 
@@ -54,13 +61,31 @@ export function acquirePaneModelHost(nodeId: string | null): { scope: PaneModelS
   }
 }
 
-type Held = { taskId: string; scope: PaneModelScope; model: unknown; dispose: () => void }
-// One current task per pane, shared by its independently mounted regions.
-const held = new Map<string, Held>()
+/** How many tasks each pane keeps a model for: Settings > General > Performance. */
+export const KEPT_TASK_CHOICES: readonly number[] = [1, 3, 5, 10]
+export const DEFAULT_KEPT_TASKS = 5
+// Straight from the device store, because this isn't a component and has no query client to hand.
+// The key never reaches a Node, so `localStorage` is the whole truth.
+export function keptTasks(prefs: Readonly<Record<string, string>> | undefined = readDevicePrefs()): number {
+  const value = Number(prefs?.[PrefKeys.keptTasks])
+  return KEPT_TASK_CHOICES.includes(value) ? value : DEFAULT_KEPT_TASKS
+}
 
-function releaseModel(paneId: string, entry: Held): void {
-  if (held.get(paneId) === entry) held.delete(paneId)
+type Held = { scope: PaneModelScope; model: unknown; dispose: () => void }
+// Per pane, the kept models by task, least recently used first. A use moves its task to the end.
+const held = new Map<string, Map<string, Held>>()
+
+function releaseModel(paneId: string, taskId: string, entry: Held): void {
+  const tasks = held.get(paneId)
+  if (tasks?.get(taskId) === entry) {
+    tasks.delete(taskId)
+    if (!tasks.size) held.delete(paneId)
+  }
   entry.dispose()
+}
+
+function* heldEntries(): Generator<[paneId: string, taskId: string, entry: Held]> {
+  for (const [paneId, tasks] of [...held]) for (const [taskId, entry] of [...tasks]) yield [paneId, taskId, entry]
 }
 
 /** Build in a detached root that inherits provider context and retires with its captured shell. */
@@ -71,9 +96,14 @@ export function paneModel<M>(
   owner = 'core',
   scope = paneModelScope(),
 ): M {
-  const entry = held.get(paneId)
-  if (entry && entry.taskId === taskId && entry.scope === scope && !scope.retired) return entry.model as M
-  if (entry) releaseModel(paneId, entry)
+  const kept = held.get(paneId)
+  const entry = kept?.get(taskId)
+  if (kept && entry && entry.scope === scope && !scope.retired) {
+    kept.delete(taskId)
+    kept.set(taskId, entry)
+    return entry.model as M
+  }
+  if (entry) releaseModel(paneId, taskId, entry)
   if (scope.retired) throw new Error('Cannot build a pane model in a retired Node shell.')
   const span = startSpan(owner, {
     name: 'pane.model',
@@ -83,10 +113,18 @@ export function paneModel<M>(
   try {
     const next = createRoot((dispose) => {
       disposeRoot = dispose
-      return { taskId, scope, model: build(), dispose }
+      return { scope, model: build(), dispose }
     })
     if (scope.retired) throw new Error('The Node shell retired while building its pane model.')
-    held.set(paneId, next)
+    const tasks = held.get(paneId) ?? new Map<string, Held>()
+    held.set(paneId, tasks)
+    tasks.set(taskId, next)
+    // Disposing the oldest is what flushes its pending saves (the editor's document pool, notes' autosave).
+    const limit = keptTasks()
+    for (const [oldest, dropped] of tasks) {
+      if (tasks.size <= limit) break
+      releaseModel(paneId, oldest, dropped)
+    }
     span.end()
     return next.model as M
   } catch (error) {
@@ -130,7 +168,7 @@ function retireScope(scope: PaneModelScope): void {
   if (scope.retired) return
   scope.retired = true
   if (scopes.get(scope.nodeId) === scope) scopes.delete(scope.nodeId)
-  for (const [paneId, entry] of held) if (entry.scope === scope) releaseModel(paneId, entry)
+  for (const [paneId, taskId, entry] of heldEntries()) if (entry.scope === scope) releaseModel(paneId, taskId, entry)
   setDrawn((current) => new Map([...current].filter(([key]) => !key.startsWith(`${scope.id}\u0000`))))
 }
 
@@ -141,8 +179,8 @@ onScopeEvicted((event) => {
     }
   }
   if (event.scope === 'task') {
-    for (const [paneId, entry] of held) {
-      if (entry.taskId === event.taskId && entry.scope.nodeId === activeNodeId()) releaseModel(paneId, entry)
+    for (const [paneId, taskId, entry] of heldEntries()) {
+      if (taskId === event.taskId && entry.scope.nodeId === activeNodeId()) releaseModel(paneId, taskId, entry)
     }
   }
 })
@@ -150,6 +188,6 @@ onScopeEvicted((event) => {
 /** Test seam; production shells release their own lease. */
 export const _resetPaneModels = (): void => {
   for (const scope of [...scopes.values()]) retireScope(scope)
-  for (const [paneId, entry] of held) releaseModel(paneId, entry)
+  for (const [paneId, taskId, entry] of heldEntries()) releaseModel(paneId, taskId, entry)
   setDrawn(new Map())
 }

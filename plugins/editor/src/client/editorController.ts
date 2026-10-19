@@ -170,6 +170,9 @@ export function createEditorController(input: EditorControllerInput) {
   const fileStatus = createFileStatusReader(api, taskId, () => !disposed && activeNodeId() === nodeId)
   // The pane model retains open view states; the document owner retains failed dirty work.
   const pool = paneModel<EditorPool>('editor', taskId, () => createEditorDocumentPool(api, taskId))
+  // A kept pool missed every worktree event while no mount listened, so each file is read again
+  // when it's next shown.
+  for (const entry of pool.files.values()) entry.stale = true
   const saved = pool.saved
   // This mount's identity. A pooled state carries extensions — the update listener, the save chord —
   // that close over the mount that built them, and after a remount those closures point at a

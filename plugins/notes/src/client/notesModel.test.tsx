@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -28,7 +29,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-async function mount(taskId: string, empty = false) {
+async function mount(taskId: string, empty = false, shown = () => true) {
   setActiveNode(null)
   Object.assign(api, {
     list: vi.fn(async () => (empty ? [] : [summary])),
@@ -42,7 +43,7 @@ async function mount(taskId: string, empty = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   let model!: NotesModel
   const Model = () => {
-    model = createNotesModel(taskId, null)
+    model = createNotesModel(taskId, null, shown)
     return null
   }
   const stop = render(
@@ -60,6 +61,25 @@ async function mount(taskId: string, empty = false) {
   await tick()
   return { model, stop }
 }
+
+it('reads the open note and the lists again when the task is shown again, unless the note has unsaved edits', async () => {
+  const [shown, setShown] = createSignal(true)
+  const { model } = await mount('kept', false, shown)
+  await model.open('task', 'agent-note')
+  setShown(false)
+  api.read = vi.fn(async (_location, slug) => ({ ...note(slug), body: 'written while away' }))
+  const listsBefore = vi.mocked(api.list).mock.calls.length
+  setShown(true)
+  await tick()
+  expect(model.body()).toBe('written while away')
+  expect(vi.mocked(api.list).mock.calls.length).toBeGreaterThan(listsBefore)
+
+  model.onBodyInput('typed, not saved yet')
+  setShown(false)
+  setShown(true)
+  await tick()
+  expect(model.body()).toBe('typed, not saved yet')
+})
 
 it('saves edits made during a held read on the outgoing document and ignores an older read', async () => {
   const { model } = await mount('held-read')

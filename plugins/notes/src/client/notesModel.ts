@@ -1,4 +1,4 @@
-import { createEffect, createResource, createSignal, onCleanup, onMount } from 'solid-js'
+import { createEffect, createResource, createSignal, on, onCleanup, onMount, type Accessor } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activeNodeId,
@@ -34,7 +34,7 @@ import { notesSelectionFor, rememberNotesSelection } from './notesPaneState'
 export type Selected = { scope: NoteScope; slug: string; virtual?: boolean }
 export type NotesModel = ReturnType<typeof createNotesModel>
 
-export function createNotesModel(taskId: string, projectId: string | null) {
+export function createNotesModel(taskId: string, projectId: string | null, shown: Accessor<boolean> = () => true) {
   const owner = queryOwner(useQueryClient())
   const nodeId = owner === undefined ? activeNodeId() : owner
   const api = notesApi(nodeId)
@@ -152,6 +152,23 @@ export function createNotesModel(taskId: string, projectId: string | null) {
     landScratchpad()
   })
 
+  // The host keeps this model after the reader leaves the task, and nothing tells it about notes an
+  // agent wrote meanwhile. So coming back reads the lists again, and the open note too unless it has
+  // unsaved edits. A save doesn't check for a newer copy, so typing into a stale body would overwrite it.
+  createEffect(
+    on(
+      shown,
+      (visible) => {
+        if (!visible) return
+        void refetchTask()
+        void refetchWs()
+        void refetchGlobal()
+        void reread()
+      },
+      { defer: true },
+    ),
+  )
+
   // Live intents arriving while mounted (openPane after the pane is already up).
   onMount(() => {
     const off = clientEvents.on('presentation:pane-intent', (event) => {
@@ -238,6 +255,20 @@ export function createNotesModel(taskId: string, projectId: string | null) {
       rememberNotesSelection(taskId, { scope, slug }, nodeId)
     } catch (error) {
       if (live() && !ticket.aborted) setActionError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  async function reread() {
+    const target = document
+    if (!target || target.virtual || target.draft.dirty) return
+    const ticket = selection.signal
+    try {
+      const result = await api.read(target.location, target.slug)
+      if (!live() || ticket.aborted || document !== target || 'error' in result) return
+      setBody(target.draft.body ?? result.body)
+      setNoteTitle(target.draft.title ?? result.title)
+    } catch {
+      // The note on screen stays as it was. The next open or save reports a real failure.
     }
   }
 

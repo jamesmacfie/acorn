@@ -24,8 +24,9 @@ for it, and the task rail warms the same key when the pointer rests on a row
 same tick. A missing path is always awaited, because "this task has no checkout yet" can change.
 
 Each open file's `EditorState`, with its text, undo history, and grammar, lives on the pane's model
-([pane models](../panes/models.md)). Closing the pane and opening it again costs no requests and keeps
-undo history. A state built by an earlier mount is reconfigured before it goes on screen, because its
+([pane models](../panes/models.md)), which the host keeps for recent tasks. Closing the pane, or
+leaving the task, and coming back keeps undo history and costs one disk read: a new mount marks every
+kept file stale, because no mount heard the worktree's events in between. A state built by an earlier mount is reconfigured before it goes on screen, because its
 update listener and save chord close over that mount. Closing the pane still flushes a pending
 autosave, and that write finishes its own bookkeeping after the mount is gone.
 

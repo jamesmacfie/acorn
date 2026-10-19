@@ -41,6 +41,7 @@
     "./features/settings/McpSettings.tsx": "./src/features/settings/McpSettings.tsx",
     "./features/settings/NotificationSettings.tsx": "./src/features/settings/NotificationSettings.tsx",
     "./features/settings/OverflowMenu.tsx": "./src/features/settings/OverflowMenu.tsx",
+    "./features/settings/PerformanceSettings.tsx": "./src/features/settings/PerformanceSettings.tsx",
     "./features/settings/ProjectSettings.tsx": "./src/features/settings/ProjectSettings.tsx",
     "./features/settings/RunsSettings.tsx": "./src/features/settings/RunsSettings.tsx",
     "./features/settings/SchedulesSettings.tsx": "./src/features/settings/SchedulesSettings.tsx",

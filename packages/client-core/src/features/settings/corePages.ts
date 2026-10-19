@@ -56,6 +56,10 @@ const cli: SearchDeclaration = {
   keywords: ['PATH', 'shell', 'install', 'headless'],
   sections: [{ id: 'command', label: 'acorn command', rows: ['Location'] }],
 }
+const performance: SearchDeclaration = {
+  keywords: ['memory', 'undo history', 'task switch', 'subtask', 'keep'],
+  sections: [{ id: 'task-state', label: 'Task state', rows: ['Keep task state in memory'] }],
+}
 const workspaces: SearchDeclaration = {
   keywords: [
     'add folder',
@@ -452,6 +456,15 @@ export const CORE_SETTINGS_PAGES = [
     scope: 'device',
     icon: 'square-terminal',
     order: 40,
+  },
+  {
+    id: 'performance',
+    ...performance,
+    label: 'Performance',
+    category: 'general',
+    scope: 'device',
+    icon: 'gauge',
+    order: 50,
   },
 
   // Workspaces and projects. Overview is the node's whole map; the workspace page and the project page

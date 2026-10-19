@@ -1,7 +1,7 @@
 # Phase 6: keep the desktop's Node running in the tray
 
 Date: October 18, 2026. Status: done on macOS, with the Windows and Linux trays unproven until phase 8.
-Shows the Node's address, because [phase 3](./03-reachability.md) has landed.
+Shows the Node's address, because phase 3 has landed.
 
 ## Completion note
 

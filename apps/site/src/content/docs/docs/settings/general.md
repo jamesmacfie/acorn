@@ -14,12 +14,15 @@ sources:
   - apps/desktop/src/client/CliSettings.tsx
   - apps/desktop/src/client/BackgroundSettings.tsx
   - docs/shell/process.md
+  - packages/client-core/src/features/settings/PerformanceSettings.tsx
+  - packages/client-core/src/host/registries/panes/paneModels.ts
 covers:
   - appearance
   - notifications
   - shortcuts
   - cli
   - background
+  - performance
 checked: 'e7c7447f7'
 ---
 
@@ -88,8 +91,21 @@ What happens when you close the desktop window.
 While the window is closed, this computer shows no acorn notifications, sounds, or icon count. On
 Linux with GNOME, the icon needs the AppIndicator extension.
 
+## Performance
+
+How much this device keeps in memory so that going back to a task is instant.
+
+| Setting | What it changes | Stored on | Default |
+| --- | --- | --- | --- |
+| **Keep task state in memory** | How many recent tasks each pane keeps as you left them: open files with their undo history and scroll, the note you were editing, and lists you filtered. **Only the task on screen** keeps none but the one you're looking at. | This device | The last 5 tasks |
+
+A task past that number opens from what was saved. Its open files, active file, scroll, and cursor come
+back, and its undo history doesn't. Unsaved edits are saved before a task's state is dropped.
+Archiving a task drops its state straight away.
+
 ## In the terminal
 
 The terminal client draws its own **Notifications** page, which shows how it alerts you in the
 terminal. **Appearance** and **Keyboard shortcuts** name the terminal client's own `acorn.json`, where
-you set them by hand. **Command line** and **Background** don't apply.
+you set them by hand. **Command line** and **Background** don't apply. **Performance** isn't drawn there,
+and the terminal keeps the last 5 tasks.

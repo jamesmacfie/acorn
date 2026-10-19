@@ -1,7 +1,7 @@
 # Phase 5: install, run at login, upgrade, and remove
 
 Date: October 18, 2026. Status: done on macOS, with the Linux and Windows paths unproven until phase 8.
-Depends on [phase 2](./02-terminal-pairing.md) and [phase 4](./04-platform-archives.md).
+Depends on phase 2 and [phase 4](./04-platform-archives.md).
 
 ## Completion note
 
@@ -108,7 +108,7 @@ data.
   ([boot order](../../node-distribution.md#boot-order)). A service manager hands it a short default
   `PATH`, so `claude` or `codex` in the person's home folder isn't found.
 - `acorn agent providers` lists the harnesses the Node found ([the CLI](../../cli.md#commands)).
-- [Version skew](../split/04-version-skew.md): a client and a Node from different builds still work
+- Version skew, from phase 4 of the [split programme](../split/README.md): a client and a Node from different builds still work
   together, but the client asks to trust every bundled plugin again.
 
 ## Design

@@ -190,11 +190,10 @@ Nothing else branches on github.com. These read the facet or a code host's decla
 `ProjectRef.github`, the wire `Project.github` and `Task.github`, `byGithub`, the `github` and
 `githubRepoId` inputs, and the `githubRepository` field of the local branches source predate the
 facet. Each is now read off a `github.com` repository whose path is an owner and a name, so it stays
-correct. The next plugin API major removes them. The checklist is in
-[phase 5 of the split programme](../future/split/05-repository-identity.md).
+correct. The next plugin API major removes them. The checklist is in the split programme's phase 5
+plan, in Git history at commit `ffe59144b` under `docs/future/split/`.
 
 `pullNumber` on the wire task, `TaskRef`, a task seed, and a patch, and `pulls`, `attachPull`, and
 `adoptPullNumbers` on the task service, are the same for change requests on `github.com`. The
 `tasks.pull_number` column copies the primary's number there, and `task_pulls` is no longer read. The
-next major removes those too, with the checklist in
-[phase 6](../future/split/06-change-requests.md).
+next major removes those too, with the checklist in the phase 6 plan at the same commit.
