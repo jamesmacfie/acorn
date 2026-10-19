@@ -358,6 +358,22 @@ describe('panel plan', () => {
     expect(errors(daily)).toEqual([])
   })
 
+  it('charts a bar over a text column only when the plan summarizes by it', () => {
+    const errors = (plan: ReturnType<typeof base>) =>
+      validatePanelPlan(plan, [source('a', []), source('b', [])])
+        .filter((problem) => problem.severity === 'error')
+        .map((problem) => problem.path)
+    const raw = base()
+    raw.view = { kind: 'chart', shape: 'bar', x: 'title' }
+    expect(errors(raw)).toEqual(['/view/x', '/view/x'])
+    const summarized = base()
+    summarized.stages = [
+      { op: 'summarize', by: [{ column: 'title' }], measures: [{ id: 'n', label: 'N', kind: 'count' }] },
+    ]
+    summarized.view = { kind: 'chart', shape: 'bar', x: 'title', aggregate: 'sum', field: 'n' }
+    expect(errors(summarized)).toEqual([])
+  })
+
   it('example 9: keeps unmatched lookups and warns on a many-to-one cardinality violation', () => {
     const plan = base()
     plan.sources[1]!.role = 'lookup'

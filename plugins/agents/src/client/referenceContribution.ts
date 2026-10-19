@@ -7,7 +7,7 @@ import { openManagedSession } from './sessions/managedSelection'
 export const managedReferenceTarget: ReferenceTargetContribution = {
   id: 'agents.managed-session',
   priority: 100,
-  deliver: async (taskId, reference) => {
+  deliver: async (taskId, reference, as) => {
     const deactivate = managedAgentStore.activate()
     try {
       const sessions = await managedAgentStore.loadTask(taskId)
@@ -15,7 +15,7 @@ export const managedReferenceTarget: ReferenceTargetContribution = {
         (session) => session.controller === 'acorn' && !session.archivedAt && session.runtimeState !== 'failed',
       )
       if (!target) return null
-      appendManagedDraft(target.id, `@${reference}`)
+      appendManagedDraft(target.id, as === 'text' ? reference : `@${reference}`)
       openManagedSession(taskId, target.id)
       return { ok: true }
     } finally {

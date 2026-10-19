@@ -100,6 +100,14 @@ one line when a newer version of the same panel follows it, and offers **Add to 
 client the card is one line with the plan's description. See
 [dashboards](../dashboards.md#panels-from-a-conversation).
 
+### App cards
+
+The `trellis` plugin places its card in the slot for `app_show`. The card draws the revision the call
+published, with the kit and the dashboard's panels. Only the card for the app's head is interactive.
+Older cards collapse to one line with **Show** and **Restore**. In the terminal client the card draws
+with the terminal's kit, capped in rows, and each `Panel` is one line. See
+[agent-built apps](../agent-built-apps.md#cards).
+
 ### File tool cards
 
 A file tool opens onto its recorded diffs. The transcript matches per-file changes to a tool by turn

@@ -14,6 +14,7 @@ import { memoryPlugin } from '@acorn/plugin-memory/node/index.ts'
 import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
 import { previewPlugin } from '@acorn/plugin-preview/node/index.ts'
 import { terminalPlugin, type TerminalPluginDeps } from '@acorn/plugin-terminal/node/index.ts'
+import { trellisPlugin } from '@acorn/plugin-trellis/node/index.ts'
 import { workflowsPlugin, type WorkflowsPluginDeps } from '@acorn/plugin-workflows/node/index.ts'
 import type { InternalEnvFactory } from '@acorn/node-core/server/auth'
 
@@ -28,8 +29,8 @@ export type NodePluginDeps = {
   workflows: WorkflowsPluginDeps
 }
 
-// `dataDir` is threaded in for the three plugins that write files of their own under the data root:
-// agents' attachments and artifacts, memory's index sources, notes' markdown. A plugin does not need
+// `dataDir` is threaded in for the plugins that write files of their own under the data root: agents'
+// attachments and artifacts, memory's index sources, notes' markdown, and trellis's apps. A plugin does not need
 // it to open a database, because the host does that behind `ctx.storage` from the plugin's declared
 // `migrationsModule`. Cross-plugin dependencies resolve through the capability and provider
 // registries at call time, and array order is not a feature contract.
@@ -46,5 +47,6 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   notesPlugin(dataDir, deps.notes),
   previewPlugin(),
   terminalPlugin(deps.terminal),
+  trellisPlugin(dataDir),
   workflowsPlugin(deps.workflows),
 ]

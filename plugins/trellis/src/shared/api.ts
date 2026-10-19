@@ -1,0 +1,50 @@
+import { z } from 'zod'
+
+// The app tools' inputs and results, and the routes the card reads, shared by the Node and both
+// clients. No lang-core here: the client's tool-card registration imports this eagerly.
+
+export const appIdSchema = z.string().regex(/^app-[0-9a-f]{12}$/, 'An app id looks like app-0123456789ab.')
+/** A plan name is the file name under plans/, and the name a program's Query and Panel use. */
+const planNameSchema = z
+  .string()
+  .regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/, 'A plan name is a letter, then letters, digits, or _.')
+/** `program`, or `plans/<name>`. */
+const appFileSchema = z.union([z.literal('program'), z.templateLiteral(['plans/', planNameSchema])])
+export type AppFile = z.infer<typeof appFileSchema>
+
+// Generous beside app_show's 64 KiB program limit, so a draft can be too long and still be fixed, but
+// bounded, so a tool call can't fill the disk.
+const fileText = z.string().max(256 * 1024)
+
+export const appCreateInput = z.strictObject({
+  name: z.string().trim().min(1).max(80),
+  description: z.string().max(500),
+})
+export const appReadInput = z.strictObject({ appId: appIdSchema, file: appFileSchema.optional() })
+export const appWriteInput = z.strictObject({
+  appId: appIdSchema,
+  file: appFileSchema,
+  /** The new text, or null to delete a plan. */
+  content: fileText.nullable(),
+  /** The hash app_read returned. Needed when the file exists. */
+  hash: z.string().optional(),
+})
+export const appPatchInput = z.strictObject({ appId: appIdSchema, statements: fileText.min(1), hash: z.string() })
+export const appShowInput = z.strictObject({ appId: appIdSchema, note: z.string().trim().min(1).max(200) })
+
+/** What `app_show` returns, and what the card reads back from the transcript. */
+export const appShowResultSchema = z.object({
+  appId: appIdSchema,
+  name: z.string(),
+  revision: z.number().int().positive(),
+})
+export type AppShowResult = z.infer<typeof appShowResultSchema>
+
+export type AppRevisionSummary = { revision: number; note: string; restoredFrom?: number }
+/** An app's name, head, and revisions, as the card's route returns them. */
+export type AppSummary = { appId: string; taskId: string; name: string; head: number; revisions: AppRevisionSummary[] }
+export type AppRevisionFiles = { program: string; plans: Record<string, unknown> }
+
+export const appRoute = (appId: string) => `/v1/p/trellis/apps/${encodeURIComponent(appId)}`
+export const appRevisionRoute = (appId: string, revision: number) => `${appRoute(appId)}/revisions/${revision}`
+export const appRestoreRoute = (appId: string) => `${appRoute(appId)}/restore`

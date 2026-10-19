@@ -88,6 +88,7 @@
     "@acorn/plugin-onboarding": "workspace:*",
     "@acorn/plugin-preview": "workspace:*",
     "@acorn/plugin-terminal": "workspace:*",
+    "@acorn/plugin-trellis": "workspace:*",
     "@acorn/plugin-workflows": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@tauri-apps/cli": "^2.12.0",

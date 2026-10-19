@@ -14,9 +14,9 @@ import {
 } from './index.ts'
 
 // Level 2 of OpenUI's conformance cases: each case with interactions.json, mounted through `Renderer` and
-// replayed. It follows OpenUI's reference runner (packages/react-lang/src/__tests__/conformance.interactions.test.tsx
-// at the copied commit): the test components register a handler under their statement name, and a step
-// calls it.
+// replayed. It follows OpenUI's reference runner at the copied commit,
+// https://github.com/thesysdev/openui/blob/8d9c4c3/packages/react-lang/src/__tests__/conformance.interactions.test.tsx:
+// the test components register a handler under their statement name, and a step calls it.
 
 type Dict = Record<string, unknown>
 

@@ -66,6 +66,7 @@ client: clearLocal
 client: clientCapability
 client: clientCapabilityId
 client: clientEvents
+client: composeForAgent
 client: consumePaneIntent
 client: consumeTerminalFocusIntent
 client: contentLinkRegistry
@@ -478,7 +479,9 @@ testkit: testEnv
 testkit: testGate
 testkit: testSecretEnv
 testkit: validatePluginConfig
+ui/dashboards: CardFrame
 ui/dashboards: PanelToolCard
+ui/dashboards: PlanPanel
 ui/data-sources: AuthoringConversation
 ui/data-sources: AuthoringConversationProps
 ui/data-sources: SourceQueryEditor

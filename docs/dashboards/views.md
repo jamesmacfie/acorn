@@ -13,7 +13,9 @@ predicate over the schema (`viewsForSchema`):
 - `stat`, `list`, and `table` ask nothing of the schema.
 - `board` needs an `enum` field.
 - `chart` needs an axis: an `enum` or `person` for a bar's categories, or a `datetime` for a line's
-  time axis. A line counts rows by day itself, so it can't chart a summary bucketed by time.
+  time axis. A `text` column is a bar's axis only when the plan summarizes by it, which bounds its
+  values to the summary's groups. A line counts rows by day itself, so it can't chart a summary
+  bucketed by time.
 
 The editor offers only what passes, so a panel that can't draw is unrepresentable rather than
 validated. A view kind this build doesn't know survives in the definition and renders inert.

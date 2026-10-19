@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setActiveNode } from '../../infra/node/activeNode'
 import { registerSessionSource } from '../../host/registries/sessions/sessionSources'
-import { formatFileReference, referenceTargetRegistry, sendReferenceToAgent } from './reference'
+import { composeForAgent, formatFileReference, referenceTargetRegistry, sendReferenceToAgent } from './reference'
 
 describe('formatFileReference', () => {
   it('formats path, path:line and path:start-end', () => {
@@ -32,8 +32,15 @@ describe('sendReferenceToAgent', () => {
     disposals.push(referenceTargetRegistry.register({ id: 'higher', priority: 30, deliver: passes }))
 
     expect(await sendReferenceToAgent('task', 'a.ts:4')).toEqual({ ok: true, reason: 'high' })
-    expect(passes).toHaveBeenCalledWith('task', 'a.ts:4')
+    expect(passes).toHaveBeenCalledWith('task', 'a.ts:4', 'reference')
     expect(low).not.toHaveBeenCalled()
+  })
+
+  it('hands plain text to the targets as text, so none marks it as a reference', async () => {
+    const takes = vi.fn(async () => ({ ok: true }))
+    disposals.push(referenceTargetRegistry.register({ id: 'takes', priority: 20, deliver: takes }))
+    await composeForAgent('task', 'Why are the checks failing?')
+    expect(takes).toHaveBeenCalledWith('task', 'Why are the checks failing?', 'text')
   })
 
   it("falls back to the task's latest running agent session as a draft", async () => {

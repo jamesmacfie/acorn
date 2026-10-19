@@ -1,0 +1,35 @@
+{
+  "name": "@acorn/plugin-trellis",
+  "version": "1.0.0",
+  "description": "Agent-built apps: an agent's OpenUI Lang program and the dashboard plans it reads, checked, kept in revisions, and drawn in the conversation.",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./node/index.ts": "./src/node/index.ts",
+    "./client/index.ts": "./src/client/index.ts",
+    "./testkit/client": "./src/testkit/client.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@acorn/openui-solid": "workspace:*",
+    "@acorn/plugin-api": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "@openuidev/lang-core": "1.0.0",
+    "@tanstack/solid-query": "^5.101.0",
+    "hono": "catalog:",
+    "solid-js": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@acorn/client-core": "workspace:*",
+    "@acorn/node-core": "workspace:*",
+    "@types/node": "^26.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.11"
+  }
+}

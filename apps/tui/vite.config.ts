@@ -39,6 +39,9 @@ const isReactiveRuntime = (id: string) => id === 'solid-js' || id.startsWith('so
 // Validation stays on the client boundary. Bundle it so unused Zod exports and locales can be
 // removed instead of making Node load the entire package before the first frame.
 const isValidationRuntime = (id: string) => id === 'zod' || id.startsWith('zod/')
+// OpenUI's language core, which the app card loads with its first card. Its Zod import has to be the
+// copy bundled above, so it is bundled with it.
+const isOpenUI = (id: string) => id.startsWith('@openuidev/')
 // Aliased to something local, and therefore not externalisable — see `externalizeBareImports` below.
 // The `@codemirror`, `@xterm` and `shiki` entries are the packages this host has no way to run and
 // does not install; every one of them is matched by a pattern in `resolve.alias`, so the list here
@@ -67,6 +70,7 @@ const externalizeBareImports = (id: string) =>
   !isWorkspacePackage(id) &&
   !isReactiveRuntime(id) &&
   !isValidationRuntime(id) &&
+  !isOpenUI(id) &&
   !isAliased(id)
 
 export default defineConfig({

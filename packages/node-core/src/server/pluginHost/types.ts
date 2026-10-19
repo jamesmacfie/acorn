@@ -510,6 +510,16 @@ export type NodePluginContext = {
 // for free and the two can never disagree about the part they share.
 export type CompiledNodePluginContext = NodePluginContext & {
   datasets: { writeForTask(taskId: string, input: import('@acorn/protocol/datasets.ts').DatasetWrite): Promise<number> }
+  // The plan checks `panel_show` runs, as `<path>: <message>` lines, and the plan-writing guide, for a
+  // first-party plugin whose agents write plans too. Both load on first call.
+  dashboards: {
+    planProblems(
+      workspaceId: string,
+      plan: unknown,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<string[]>
+    guide(workspaceId: string): Promise<ReturnType<typeof import('@acorn/dashboards-core/panelGuide.ts').panelGuide>>
+  }
   core: CompiledCoreServices
   schedules: CompiledPluginScheduleRegistry
   routes: CompiledPluginRouteRegistry

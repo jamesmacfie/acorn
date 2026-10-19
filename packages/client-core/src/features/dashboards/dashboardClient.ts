@@ -73,10 +73,17 @@ export function dashboardClient(nodeId: string, scope: DashboardScope) {
       viewerZone?: string,
       signal?: AbortSignal,
       evaluationTime?: number,
+      inputs?: Record<string, unknown>,
     ) =>
       request<DashboardRun>(
         'run',
-        { target, mode, viewerZone, ...(evaluationTime === undefined ? {} : { evaluationTime }) },
+        {
+          target,
+          mode,
+          viewerZone,
+          ...(evaluationTime === undefined ? {} : { evaluationTime }),
+          ...(inputs ? { inputs } : {}),
+        },
         signal,
       ),
     delete: (id: string, expectedRevision: number) => request<{ ok: true }>('delete', { id, expectedRevision }),

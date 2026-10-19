@@ -332,6 +332,15 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
             return writeWorkflowDataset(options.env.DB, taskId, input)
           },
         },
+    dashboards: permissions
+      ? (undefined as never)
+      : {
+          planProblems: async (workspaceId, plan, invocation) => {
+            if (!options.env) throw new Error('Plan checks require host bindings')
+            return (await import('../agentTools/panelShow')).planProblems(options.env, workspaceId, plan, invocation)
+          },
+          guide: async (workspaceId) => (await import('@acorn/dashboards-core/panelGuide.ts')).panelGuide(workspaceId),
+        },
     // Owner-bound. This is the list anything unattended picks an action from, such as a person arming a
     // schedule, and the tier beside each entry drives the confirmation
     // accepted at that moment. Filing one under a stranger's name borrows that plugin's reputation for

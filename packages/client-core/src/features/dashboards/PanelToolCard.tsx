@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { useLocation, useNavigate } from '@solidjs/router'
 import { useQueryClient } from '@tanstack/solid-query'
 import { panelPlanSchema, type PanelPlan, type PanelShowResult } from '@acorn/protocol/dashboards.ts'
@@ -16,6 +16,7 @@ import { taskById } from '../tasks/taskLookup'
 import { toast } from '../notifications/toast'
 import { dashboardClient } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
+import CardFrame from './CardFrame'
 import DashboardPanelHost from './DashboardPanelHost'
 import { setActiveHomeTab } from './homeTab'
 import { addNewPanel } from './panelPublish'
@@ -142,21 +143,6 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
 
   // Runs only while on screen, so a long conversation of cards doesn't keep reading its sources.
   const [inView, setInView] = createSignal(false)
-  const [expanded, setExpanded] = createSignal(false)
-  const [overflows, setOverflows] = createSignal(false)
-  const watchFrame = (frame: HTMLDivElement) => {
-    if (typeof IntersectionObserver === 'undefined' || typeof ResizeObserver === 'undefined')
-      return void setInView(true)
-    const visibility = new IntersectionObserver(([entry]) => setInView(!!entry?.isIntersecting))
-    visibility.observe(frame)
-    const size = new ResizeObserver(() => setOverflows(frame.scrollHeight > frame.clientHeight))
-    size.observe(frame)
-    queueMicrotask(() => frame.firstElementChild && size.observe(frame.firstElementChild))
-    onCleanup(() => {
-      visibility.disconnect()
-      size.disconnect()
-    })
-  }
 
   return (
     <>
@@ -172,7 +158,7 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
         }
       >
         <Stack gap="row">
-          <div ref={watchFrame} class="dash-card-frame" data-expanded={expanded() ? '' : undefined}>
+          <CardFrame onVisible={setInView}>
             <PublishedDashboardPanel
               definition={{ id: props.result.panelId, title: props.plan.title, shaping: {}, view: props.plan.view }}
               workspaceId={workspaceId()}
@@ -205,12 +191,7 @@ function PanelCard(props: { taskId: string; result: PanelShowResult; plan: Panel
                 </>
               )}
             />
-          </div>
-          <Show when={overflows() || expanded()}>
-            <Button size="sm" variant="ghost" onPress={() => setExpanded((value) => !value)}>
-              {expanded() ? 'Collapse' : 'Expand'}
-            </Button>
-          </Show>
+          </CardFrame>
           <Show when={added()}>
             {(tab) => (
               <Inline spread>

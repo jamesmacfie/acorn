@@ -4,6 +4,17 @@ import type { PanelPlan, PanelPlanColumn } from '@acorn/protocol/dashboards.ts'
 export const pointerColumn = (pointer: string): string | undefined =>
   /^\/[A-Za-z0-9_-]{1,100}$/.test(pointer) ? pointer.slice(1) : undefined
 
+/** Whether a column can be a chart's category axis. Text qualifies only as a summary's group key, which
+ *  bounds its values to the groups the summary made. */
+export function isChartAxis(plan: PanelPlan, column: PanelPlanColumn | undefined, types: readonly string[]): boolean {
+  if (!column) return false
+  if (types.includes(column.type ?? '')) return true
+  return (
+    column.type === 'text' &&
+    plan.stages.some((stage) => stage.op === 'summarize' && stage.by.some((by) => by.column === column.id))
+  )
+}
+
 export function outputPlanColumns(plan: PanelPlan): PanelPlanColumn[] {
   let columns = [...plan.columns]
   for (const stage of plan.stages) {

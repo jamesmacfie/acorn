@@ -94,15 +94,19 @@ const sourceTools = (deps: AgentToolsDeps): AgentToolContribution[] => {
     {
       name: 'data_sources_list',
       description:
-        'List typed data sources available to the current task project. Read-only; returns descriptors, never credentials.',
+        "List typed data sources available to the current task project, each with the provider whose account it reads, and the person's accounts for those providers: the ids a plan's connectionId takes. Read-only; never credentials.",
       input: z.object(scopeInput).strict(),
       scope: 'task',
       risk: 'read',
       handler: async (input, ctx) =>
-        listDataSources(deps.env!, await sourceScope(deps, ctx, input as never), {
-          principal: principal(ctx),
-          signal: new AbortController().signal,
-        }),
+        (await import('./sourceAccounts.ts')).withSourceAccounts(
+          deps.db,
+          ctx.userLogin,
+          await listDataSources(deps.env!, await sourceScope(deps, ctx, input as never), {
+            principal: principal(ctx),
+            signal: new AbortController().signal,
+          }),
+        ),
     },
     {
       name: 'data_source_describe',

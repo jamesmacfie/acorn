@@ -28,7 +28,7 @@
       "entry": [
         "scripts/**/*.mjs",
         "src/kit/{ui,dataSources,dataSourceKit,editor,router,iconNodes,codemirrorGrammars,xterm,shiki}.ts",
-        "src/kit/host.tsx",
+        "src/kit/{host,dashboards}.tsx",
         "src/tree/jsx-runtime.ts"
       ],
       "includeEntryExports": false

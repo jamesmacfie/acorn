@@ -341,6 +341,8 @@ const NOT_REGISTRATIONS = new Set([
   'dataSources.queryPublication',
   'dataSources.resolveQuery',
   'dataSources.invoke',
+  'dashboards.planProblems',
+  'dashboards.guide',
   'extensionPoints.handlers',
   'hooks.run',
   'hooks.handlers',

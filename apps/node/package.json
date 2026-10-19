@@ -32,6 +32,7 @@
     "@acorn/plugin-notes": "workspace:*",
     "@acorn/plugin-preview": "workspace:*",
     "@acorn/plugin-terminal": "workspace:*",
+    "@acorn/plugin-trellis": "workspace:*",
     "@acorn/plugin-workflows": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@hono/node-server": "^2.0.11",

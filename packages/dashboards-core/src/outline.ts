@@ -17,7 +17,7 @@ import {
   operatorLabel,
   sortDirectionLabel,
 } from './labels'
-import { outputPlanColumns, pointerColumn } from './planColumns'
+import { isChartAxis, outputPlanColumns, pointerColumn } from './planColumns'
 import type { DashboardRun, PlanProblem, PlanSource, PlanStageCount } from './plan'
 
 /** A plan as the named parts the studio selects, in plain words. The plan schema has no ids for
@@ -496,9 +496,9 @@ const VIEW_NEEDS: Record<ViewNeed, { met: (plan: PanelPlan) => boolean; reason: 
       outputPlanColumns(plan).find((column) => column.id === plan.group![0]!.column)?.type === 'enum',
     reason: 'Group by a Choice column first.',
   },
-  'date, enum, or person axis': {
-    met: (plan) => outputPlanColumns(plan).some((column) => ['datetime', 'enum', 'person'].includes(column.type ?? '')),
-    reason: 'Needs a date, Choice, or Person column.',
+  'date, enum, person, or summarized text axis': {
+    met: (plan) => outputPlanColumns(plan).some((column) => isChartAxis(plan, column, ['datetime', 'enum', 'person'])),
+    reason: 'Needs a date, Choice, or Person column, or a text column the plan summarizes by.',
   },
 }
 

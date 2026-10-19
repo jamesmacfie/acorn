@@ -55,6 +55,7 @@
       "notes",
       "preview",
       "terminal",
+      "trellis",
       "workflows",
       "workflows",
       "workflows/workflows/invocation",
@@ -69,6 +70,13 @@
       "agent_session_search",
       "agent_spawn",
       "agent_wait",
+      "app_create",
+      "app_guide",
+      "app_list",
+      "app_patch",
+      "app_read",
+      "app_show",
+      "app_write",
       "browser_click",
       "browser_console",
       "browser_fill",
@@ -341,6 +349,20 @@
       ],
       "capabilities": [
         "preview.urls"
+      ]
+    },
+    "trellis": {
+      "routes": [
+        "trellis"
+      ],
+      "tools": [
+        "app_create",
+        "app_guide",
+        "app_list",
+        "app_patch",
+        "app_read",
+        "app_show",
+        "app_write"
       ]
     },
     "workflows": {

@@ -11,18 +11,19 @@ import { notesClientPlugin } from '@acorn/plugin-notes/client/index.ts'
 import { onboardingClientPlugin } from '@acorn/plugin-onboarding/client/index.ts'
 import { previewClientPlugin } from '@acorn/plugin-preview/client/index.ts'
 import { terminalClientPlugin } from '@acorn/plugin-terminal/client/index.ts'
+import { trellisClientPlugin } from '@acorn/plugin-trellis/client/index.ts'
 import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
-// because that is where a pane comes from on the desktop too. It is the same fourteen the desktop
+// because that is where a pane comes from on the desktop too. It is the same fifteen the desktop
 // registers (docs/tui/plugin-losses.md § What a plugin loses here). A loaded plugin is not on this
 // list: it arrives from a node as a bundle, and the client runtime's `watchPluginChanges` finds it
 // once a node is reachable.
 //
 // ## Why this is its own module, imported after the first frame
 //
-// These imports pull in every pane, source and query module in fourteen plugins. `main.tsx` awaits
+// These imports pull in every pane, source and query module in fifteen plugins. `main.tsx` awaits
 // `App` before it creates a renderer, so holding them in `App.tsx` would evaluate all of that before
 // a cell is drawn. ../scripts/check-startup-graph.mjs fails the build if the roster reaches the
 // startup graph.
@@ -47,6 +48,7 @@ export function installRoster(): void {
     onboardingClientPlugin,
     previewClientPlugin,
     terminalClientPlugin,
+    trellisClientPlugin,
     workflowsClientPlugin,
   ])
 }

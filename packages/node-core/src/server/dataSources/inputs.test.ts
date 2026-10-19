@@ -22,6 +22,7 @@ import { pluginListStore } from '../plugins/disabled'
 import { DEVELOPMENT_FILE } from '../plugins/developmentState'
 import { invokeDataSource } from './runtime'
 import { runDashboard } from '../dashboards/run'
+import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 
 // A derived source end to end: an upstream provider source, a derived source that reads it through
 // its request context's `inputs`, and a loaded copy that needs the person's grant.
@@ -374,15 +375,20 @@ it('lets a loaded plugin read only the inputs its grant covers, and never invoke
   ).toThrow('Source belongs to another plugin')
 })
 
-it('runs a panel on a derived source with structured problems and per-input counts', async () => {
-  const { env, upstream } = await world()
-  const panel = (scope: DataSourceScope, evaluationTime = 1_000_000) =>
+const derivedPanel =
+  (env: Awaited<ReturnType<typeof world>>['env']) =>
+  (
+    scope: DataSourceScope,
+    evaluationTime = 1_000_000,
+    plan: { stages?: PanelPlan['stages']; inputs?: Record<string, unknown> } = {},
+  ) =>
     runDashboard(
       env,
       {
         scope: { workspaceId: 'w' },
         mode: 'execution',
         evaluationTime,
+        ...(plan.inputs ? { inputs: plan.inputs } : {}),
         target: {
           kind: 'draft',
           content: {
@@ -411,13 +417,17 @@ it('runs a panel on a derived source with structured problems and per-input coun
               },
             ],
             columns: [{ id: 'id', label: 'ID', type: 'text', bind: { rows: { field: '/id' } } }],
-            stages: [],
+            stages: plan.stages ?? [],
             view: { kind: 'table' },
           },
         },
       },
       invocation(),
     )
+
+it('runs a panel on a derived source with structured problems and per-input counts', async () => {
+  const { env, upstream } = await world()
+  const panel = derivedPanel(env)
   // An unbound input names itself and points at its own binding, so the studio marks the input's row.
   // The fixture describes no fields, so the column also warns; these assertions look only at the source.
   expect((await panel({ parameters: {} })).diagnostics.problems).toContainEqual(
@@ -437,6 +447,36 @@ it('runs a panel on a derived source with structured problems and per-input coun
       path: '/sources/0/reference/content/query/scope/inputs/records',
       severity: 'warning',
       failure: { code: 'incomplete', source: 'derived-test:derived', reason: 'upstream-cap', input: 'records' },
+    }),
+  )
+})
+
+it("narrows a plan by the run's inputs, and names an input the run didn't pass", async () => {
+  // A copy of the input that describes its `id`, so the plan's column reads it.
+  const describedCopy: PluginFetchHandler = async (request, context) => {
+    const input = dataSourceRequestSchema.parse(await request.clone().json())
+    if (input.operation !== 'describe') return copyInput()(request, context)
+    return Response.json({ ...description('own-1'), fields: [{ pointer: '/id', label: 'ID', origin: 'declared' }] })
+  }
+  const panel = derivedPanel((await world({ derived: describedCopy })).env)
+  const stages: PanelPlan['stages'] = [
+    {
+      op: 'filter',
+      where: {
+        kind: 'comparison',
+        left: { address: { from: 'item', pointer: '/id' } },
+        operator: 'eq',
+        right: { address: { from: 'input', name: 'picked', pointer: '' } },
+      },
+    },
+  ]
+  const picked = await panel(bound('selected'), 1_000_000, { stages, inputs: { picked: '2' } })
+  expect(picked.rows.map((row) => row.values.id)).toEqual(['2'])
+  expect((await panel(bound('selected'), 1_000_000, { stages })).diagnostics.problems).toContainEqual(
+    expect.objectContaining({
+      path: '/stages',
+      message: 'This plan reads the input "picked", and the run didn\'t pass it.',
+      severity: 'error',
     }),
   )
 })

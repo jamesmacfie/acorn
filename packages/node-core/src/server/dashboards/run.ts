@@ -5,6 +5,7 @@ import {
   MISSING,
   parseDataValue,
   readDataPointer,
+  type DataValue,
 } from '@acorn/protocol/dataValues.ts'
 import type { DashboardContent, DashboardScope, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataSourceQuery, DataSourceRef, DataSourceResult } from '@acorn/protocol/dataSources.ts'
@@ -162,6 +163,7 @@ async function resolvePlanContexts(
   sources: PlanSource[],
   evaluationTime: number,
   zone: string,
+  inputs: Record<string, DataValue>,
   invocation: DataSourceInvocation,
 ): Promise<PanelPlan> {
   const usesViewerBinding = (predicate: DataPredicate): boolean =>
@@ -177,11 +179,14 @@ async function resolvePlanContexts(
         invocation,
       )
     : undefined
-  const context = { evaluationTime, timePolicy: { zone, weekStart: plan.time.weekStart }, viewer }
+  const context = { evaluationTime, timePolicy: { zone, weekStart: plan.time.weekStart }, viewer, inputs }
   const resolve = (predicate: DataPredicate): DataPredicate => {
     if (predicate.kind !== 'comparison') return { ...predicate, predicates: predicate.predicates.map(resolve) }
-    if (predicate.right?.address.from !== 'context') return predicate
-    let value = resolveDataBinding(predicate.right, context)
+    const right = predicate.right?.address
+    if (right?.from === 'input' && !Object.hasOwn(inputs, right.name))
+      throw new Error(`This plan reads the input "${right.name}", and the run didn't pass it.`)
+    if (right?.from !== 'context' && right?.from !== 'input') return predicate
+    let value = resolveDataBinding(predicate.right!, context)
     const left = predicate.left.address
     const column = left.from === 'item' ? plan.columns.find((item) => `/${item.id}` === left.pointer) : undefined
     if (column?.precision === 'day' && typeof value === 'number') {
@@ -247,6 +252,7 @@ export async function runDashboard(
     mode: 'preview' | 'execution'
     viewerZone?: string
     evaluationTime?: number
+    inputs?: Record<string, unknown>
   },
   invocation: DataSourceInvocation,
 ): Promise<DashboardRun> {
@@ -327,6 +333,7 @@ export async function runDashboard(
       sources,
       evaluationTime,
       plan.time.mode === 'viewer' && args.viewerZone ? args.viewerZone : plan.time.zone,
+      Object.fromEntries(Object.entries(args.inputs ?? {}).map(([name, value]) => [name, parseDataValue(value)])),
       runInvocation,
     )
   } catch (error) {

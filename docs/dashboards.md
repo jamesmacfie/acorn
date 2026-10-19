@@ -18,7 +18,10 @@ A placed `PanelDefinition` carries the publication ID and derived indexing metad
 There is one execution path:
 
 1. Resolve the dashboard publication in its workspace or project scope.
-2. Resolve each saved or inline query, including typed parameter bindings.
+2. Resolve each saved or inline query, including typed parameter bindings. A filter's
+   `{ from: "input" }` address takes its value from the run's `inputs`, which an agent-built app passes
+   ([agent-built apps](./agent-built-apps.md#what-an-app-can-reach)). A run that leaves out an input the
+   plan reads fails with the input's name.
 3. Ask the Node data-source runtime to describe each source and validate column bindings.
 4. Plan and share authorized reads, query each source, and run the plan on the Node.
 5. Render the declared list, table, board, stat, or chart view.

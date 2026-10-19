@@ -293,8 +293,11 @@ function barCategoryField(
   shaping: PanelShaping,
 ): DashboardDisplayField | undefined {
   const chosen = fieldById(schema, view.x)
-  // A person axis buckets by login, the way an enum with no declared values does.
-  return chosen?.type === 'enum' || chosen?.type === 'person' ? chosen : groupField(schema, shaping)
+  // A person axis buckets by login, the way an enum with no declared values does. A text axis does the
+  // same; the plan validator admits one only as a summary's group key, so its values are bounded.
+  return chosen?.type === 'enum' || chosen?.type === 'person' || chosen?.type === 'text'
+    ? chosen
+    : groupField(schema, shaping)
 }
 
 /** The tone the plugin declared for one of a field's values, or `undefined`, which is the question the

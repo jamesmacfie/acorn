@@ -81,6 +81,10 @@ create a child task with a lazy worktree. Aider runs through its terminal profil
 prompt as its title, because its profile has no contained one-shot mode. [Managed
 agents](./managed-agents.md) covers sessions.
 
+An agent can answer in the conversation with a dashboard panel, or with an app: a small program over
+dashboard plans with forms, ticks, and buttons that ask the agent, drawn as a card that keeps its
+revisions. [Agent-built apps](./agent-built-apps.md) covers apps.
+
 Custom agents are saved starting points for a session: a harness, its model, effort, and mode,
 instructions for its system prompt, and a ceiling on acorn's own tools. The owner keeps them under
 Settings > Custom agents, and a plugin can ship them. Each one is listed under New, in the palette,

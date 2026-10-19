@@ -12,6 +12,7 @@ import { notesClientPlugin } from '@acorn/plugin-notes/client/index.ts'
 import { onboardingClientPlugin } from '@acorn/plugin-onboarding/client/index.ts'
 import { previewClientPlugin } from '@acorn/plugin-preview/client/index.ts'
 import { terminalClientPlugin } from '@acorn/plugin-terminal/client/index.ts'
+import { trellisClientPlugin } from '@acorn/plugin-trellis/client/index.ts'
 import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 
 export const clientPlugins: readonly ClientPlugin[] = [
@@ -28,5 +29,6 @@ export const clientPlugins: readonly ClientPlugin[] = [
   onboardingClientPlugin,
   previewClientPlugin,
   terminalClientPlugin,
+  trellisClientPlugin,
   workflowsClientPlugin,
 ]

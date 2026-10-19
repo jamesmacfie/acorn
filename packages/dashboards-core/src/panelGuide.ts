@@ -117,7 +117,7 @@ export const panelGuide = (workspaceId: string) => ({
     'list: records a person reads and opens, such as their open pull requests.',
     'table: records compared across several columns.',
     'board: records grouped by one enum column, such as issues by state.',
-    'chart: a bar counts or sums across categories, with an enum or person axis: summarize by it, then chart the measure with aggregate sum. A line counts the rows by day over a date axis: chart the rows themselves, not a summary.',
+    'chart: a bar counts or sums across categories, with an enum, person, or text axis: summarize by it, then chart the measure with aggregate sum. A line counts the rows by day over a date axis: chart the rows themselves, not a summary.',
     'Totals per week or month are a table over a summary bucketed by week or month; a line only draws days.',
   ],
   examples: panelGuideExamples(workspaceId),

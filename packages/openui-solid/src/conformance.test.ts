@@ -20,7 +20,8 @@ import { describe, expect, it } from 'vitest'
 import { caseFiles, caseIds, json, propsOf, same, spec } from '../test/conformanceCases.ts'
 
 // Level 1 of OpenUI's conformance cases: every case's program check, through lang-core alone. It follows
-// OpenUI's reference runner (packages/lang-core/src/__tests__/conformance.test.ts at the copied commit),
+// OpenUI's reference runner at the copied commit,
+// https://github.com/thesysdev/openui/blob/8d9c4c3/packages/lang-core/src/__tests__/conformance.test.ts,
 // so a case reads the same way here as there.
 
 type Dict = Record<string, unknown>

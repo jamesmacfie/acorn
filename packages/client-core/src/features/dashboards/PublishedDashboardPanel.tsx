@@ -61,6 +61,8 @@ export default function PublishedDashboardPanel(props: {
   /** An unpublished plan to run instead of the definition's published revision, such as an agent's
    *  panel card in a conversation. */
   plan?: PanelPlan
+  /** Values for the plan's input addresses, such as an app's picked task. */
+  inputs?: Record<string, unknown>
   /** False pauses the run, such as while the panel is scrolled out of view. */
   active?: boolean
   /** Where the drill-down's Add as panel puts a panel. Without one, the drill-down doesn't offer it. */
@@ -87,7 +89,7 @@ export default function PublishedDashboardPanel(props: {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const loaded = createQuery(() => ({
     queryKey: props.plan
-      ? ['dashboard-plan-run', nodeId, scope().workspaceId, props.plan, zone]
+      ? ['dashboard-plan-run', nodeId, scope().workspaceId, props.plan, props.inputs, zone]
       : publishedDashboardPanelKey(
           nodeId,
           scope(),
@@ -103,6 +105,8 @@ export default function PublishedDashboardPanel(props: {
         'execution',
         zone,
         signal,
+        undefined,
+        props.inputs,
       ),
     enabled: (!!props.plan || !!published.data) && props.active !== false,
     staleTime: 30_000,
@@ -402,7 +406,14 @@ export default function PublishedDashboardPanel(props: {
     const snapshot = { ...current, plan, rows: sourceRows, groups: [] }
     setDrill({ plan, snapshot, loading: true })
     void client
-      .run({ kind: 'draft', content: plan }, 'execution', zone, undefined, current.diagnostics.evaluationTime)
+      .run(
+        { kind: 'draft', content: plan },
+        'execution',
+        zone,
+        undefined,
+        current.diagnostics.evaluationTime,
+        props.inputs,
+      )
       .then((result) => setDrill({ plan, snapshot, result, loading: false }))
       .catch(() => setDrill({ plan, snapshot, loading: false, error: 'Could not prepare this as a panel.' }))
   }
@@ -439,7 +450,14 @@ export default function PublishedDashboardPanel(props: {
     const snapshot = { ...current, plan, rows, groups: [] }
     setDrill({ plan, snapshot, loading: true })
     void client
-      .run({ kind: 'draft', content: plan }, 'execution', zone, undefined, current.diagnostics.evaluationTime)
+      .run(
+        { kind: 'draft', content: plan },
+        'execution',
+        zone,
+        undefined,
+        current.diagnostics.evaluationTime,
+        props.inputs,
+      )
       .then((result) => setDrill({ plan, snapshot, result, loading: false }))
       .catch(() => setDrill({ plan, snapshot, loading: false, error: 'Could not prepare this as a panel.' }))
   }
@@ -490,7 +508,14 @@ export default function PublishedDashboardPanel(props: {
       const snapshot = { ...current, plan, rows: result.rows, groups: [] }
       setDrill({ plan, snapshot, loading: false, total: result.total, truncated: result.truncated })
       void client
-        .run({ kind: 'draft', content: plan }, 'execution', zone, undefined, current.diagnostics.evaluationTime)
+        .run(
+          { kind: 'draft', content: plan },
+          'execution',
+          zone,
+          undefined,
+          current.diagnostics.evaluationTime,
+          props.inputs,
+        )
         .then((prepared) => setDrill((value) => (value?.plan === plan ? { ...value, result: prepared } : value)))
         .catch(() => {})
     } catch {

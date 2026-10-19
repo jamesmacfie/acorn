@@ -71,7 +71,10 @@ function toolProvider(tools: Tools): ToolProvider {
       if (typeof (tools as McpClientLike).callTool === 'function') {
         return extractToolResult(await (tools as McpClientLike).callTool({ name, arguments: args }))
       }
-      const fn = (tools as Record<string, (a: Record<string, unknown>) => Promise<unknown>>)[name]
+      // Own names only, so a program naming `toString` or `constructor` finds no tool.
+      const fn = Object.hasOwn(tools, name)
+        ? (tools as Record<string, (a: Record<string, unknown>) => Promise<unknown>>)[name]
+        : undefined
       if (!fn) throw new ToolNotFoundError(name, Object.keys(tools))
       return fn(args)
     },

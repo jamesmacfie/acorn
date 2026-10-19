@@ -114,6 +114,7 @@
     "ALL /v1/p/notes/workspaces/:wsId/notes",
     "ALL /v1/p/notes/workspaces/:wsId/notes/*",
     "ALL /v1/p/terminal/sessions/:sid/*",
+    "ALL /v1/p/trellis/*",
     "ALL /v1/p/workflows/defs",
     "ALL /v1/p/workflows/defs/*",
     "ALL /v1/p/workflows/workflows/invocation/*",

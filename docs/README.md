@@ -94,6 +94,7 @@ the whole plugin system in one page.
 | [terminal.md](./terminal.md) | The terminal drawer: raw PTY sessions, run targets, and provider profiles. |
 | [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, managed-session orchestration, and workflow tools. |
 | [dashboards.md](./dashboards.md) | Published dashboard panels over typed data sources, placements, datasets, coverage, and measure history. |
+| [agent-built-apps.md](./agent-built-apps.md) | Apps an agent builds in a conversation: OpenUI Lang programs over dashboard plans, their files, tools, checks, cards, and what they can reach. |
 | [Dashboard followups](./future/dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision after the implemented studio and derived sources. |
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |

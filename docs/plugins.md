@@ -79,6 +79,8 @@ chooses the destination and keeps panel plans outside plugin frames.
 - [Harnesses](./plugins/harnesses.md): how the host delivers a managed agent declared as data.
 - [Code hosts](./plugins/code-hosts.md): claiming Git hosts, a project's repository facet, and change
   requests.
+- [Agent-built apps](./agent-built-apps.md): the `trellis` plugin, which hosts apps an agent writes as
+  OpenUI Lang programs over dashboard plans, and the compiled `ctx.dashboards` plan checks it uses.
 
 ## Working together
 

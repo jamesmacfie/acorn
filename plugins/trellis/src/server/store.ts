@@ -1,0 +1,216 @@
+import { createHash, randomBytes } from 'node:crypto'
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import type { AppFile, AppRevisionFiles, AppRevisionSummary, AppSummary } from '../shared/api'
+
+// An app's files under the Node's data root (docs/agent-built-apps.md § Files):
+//
+//   apps/<appId>/app.json                    the task, name, description, and head
+//   apps/<appId>/working/program.oui         what the tools edit
+//   apps/<appId>/working/plans/<name>.json
+//   apps/<appId>/revisions/<n>/              what app_show published; never changed again
+//
+// Ids and file names are checked by the tool schemas before they reach a path here. Every change to
+// one app runs in that app's queue, so a hash check and the write after it can't interleave.
+
+export type AppMeta = {
+  appId: string
+  taskId: string
+  name: string
+  description: string
+  head: number
+  createdAt: number
+}
+export type RevisionMeta = AppRevisionSummary & { library: { id: string; version: number }; shownAt: number }
+
+export class AppConflict extends Error {}
+
+export const fileHash = (text: string) => createHash('sha256').update(text).digest('hex').slice(0, 16)
+
+const fileName = (file: AppFile) => (file === 'program' ? 'program.oui' : `${file}.json`)
+
+export class AppStore {
+  private queues = new Map<string, Promise<unknown>>()
+
+  constructor(private readonly root: string) {}
+
+  private dir = (appId: string) => join(this.root, appId)
+
+  private serial<T>(appId: string, work: () => Promise<T>): Promise<T> {
+    const next = (this.queues.get(appId) ?? Promise.resolve()).then(work, work)
+    this.queues.set(
+      appId,
+      next.catch(() => undefined),
+    )
+    return next
+  }
+
+  async create(taskId: string, name: string, description: string): Promise<AppMeta> {
+    const meta: AppMeta = {
+      appId: `app-${randomBytes(6).toString('hex')}`,
+      taskId,
+      name,
+      description,
+      head: 0,
+      createdAt: Date.now(),
+    }
+    await mkdir(join(this.dir(meta.appId), 'working', 'plans'), { recursive: true })
+    await writeFile(join(this.dir(meta.appId), 'working', 'program.oui'), '')
+    await this.saveMeta(meta)
+    return meta
+  }
+
+  async meta(appId: string): Promise<AppMeta | null> {
+    try {
+      return JSON.parse(await readFile(join(this.dir(appId), 'app.json'), 'utf8')) as AppMeta
+    } catch {
+      return null
+    }
+  }
+
+  private async saveMeta(meta: AppMeta) {
+    const path = join(this.dir(meta.appId), 'app.json')
+    await writeFile(`${path}.tmp`, JSON.stringify(meta, null, 2))
+    await rename(`${path}.tmp`, path)
+  }
+
+  async forTask(taskId: string): Promise<AppMeta[]> {
+    const ids = await readdir(this.root).catch(() => [] as string[])
+    const metas = await Promise.all(ids.map((id) => this.meta(id)))
+    return metas.filter((meta): meta is AppMeta => meta?.taskId === taskId)
+  }
+
+  private async readText(path: string): Promise<string | null> {
+    try {
+      return await readFile(path, 'utf8')
+    } catch {
+      return null
+    }
+  }
+
+  /** The working files: the program, and each plan's text by name. */
+  async working(appId: string): Promise<{ program: string; plans: Record<string, string> }> {
+    const dir = join(this.dir(appId), 'working')
+    const names = (await readdir(join(dir, 'plans')).catch(() => [] as string[])).filter((name) =>
+      name.endsWith('.json'),
+    )
+    const plans: Record<string, string> = {}
+    for (const name of names.sort())
+      plans[name.slice(0, -'.json'.length)] = await readFile(join(dir, 'plans', name), 'utf8')
+    return { program: (await this.readText(join(dir, 'program.oui'))) ?? '', plans }
+  }
+
+  async read(appId: string, file: AppFile): Promise<{ content: string; hash: string } | null> {
+    const content = await this.readText(join(this.dir(appId), 'working', fileName(file)))
+    return content === null ? null : { content, hash: fileHash(content) }
+  }
+
+  /** Replaces one working file, or deletes a plan when `content` is null. A file that exists needs the
+   *  hash it was read with. */
+  write(
+    appId: string,
+    file: AppFile,
+    content: string | null,
+    hash: string | undefined,
+  ): Promise<{ hash: string | null }> {
+    return this.serial(appId, async () => {
+      const path = join(this.dir(appId), 'working', fileName(file))
+      const current = await this.readText(path)
+      if (current !== null && hash !== fileHash(current))
+        throw new AppConflict(`${file} changed since it was read. Read it again, then write.`)
+      if (content === null) {
+        await rm(path, { force: true })
+        return { hash: null }
+      }
+      await writeFile(path, content)
+      return { hash: fileHash(content) }
+    })
+  }
+
+  /** Publishes files as the next revision and makes it head. A restore copies them into the working
+   *  files too, so the agent's next edit starts from what is on screen. */
+  publish(
+    appId: string,
+    files: { program: string; plans: Record<string, string> },
+    revision: Omit<RevisionMeta, 'revision' | 'shownAt'>,
+    options: { toWorking?: boolean } = {},
+  ): Promise<number> {
+    return this.serial(appId, async () => {
+      const meta = await this.meta(appId)
+      if (!meta) throw new Error(`No app ${appId}.`)
+      const number = meta.head + 1
+      const target = join(this.dir(appId), 'revisions', String(number))
+      const staging = `${target}.tmp`
+      await rm(staging, { recursive: true, force: true })
+      await mkdir(join(staging, 'plans'), { recursive: true })
+      await writeFile(join(staging, 'program.oui'), files.program)
+      for (const [name, text] of Object.entries(files.plans))
+        await writeFile(join(staging, 'plans', `${name}.json`), text)
+      const record: RevisionMeta = { ...revision, revision: number, shownAt: Date.now() }
+      await writeFile(join(staging, 'revision.json'), JSON.stringify(record, null, 2))
+      await rename(staging, target)
+      if (options.toWorking) {
+        const working = join(this.dir(appId), 'working')
+        await rm(working, { recursive: true, force: true })
+        await mkdir(join(working, 'plans'), { recursive: true })
+        await writeFile(join(working, 'program.oui'), files.program)
+        for (const [name, text] of Object.entries(files.plans))
+          await writeFile(join(working, 'plans', `${name}.json`), text)
+      }
+      await this.saveMeta({ ...meta, head: number })
+      return number
+    })
+  }
+
+  async revision(
+    appId: string,
+    number: number,
+  ): Promise<{ files: { program: string; plans: Record<string, string> }; meta: RevisionMeta } | null> {
+    const dir = join(this.dir(appId), 'revisions', String(number))
+    const meta = await this.readText(join(dir, 'revision.json'))
+    if (meta === null) return null
+    const names = (await readdir(join(dir, 'plans'))).filter((name) => name.endsWith('.json')).sort()
+    const plans: Record<string, string> = {}
+    for (const name of names) plans[name.slice(0, -'.json'.length)] = await readFile(join(dir, 'plans', name), 'utf8')
+    return {
+      files: { program: await readFile(join(dir, 'program.oui'), 'utf8'), plans },
+      meta: JSON.parse(meta) as RevisionMeta,
+    }
+  }
+
+  /** The program and parsed plans of one revision, as the card draws them. */
+  async revisionFiles(appId: string, number: number): Promise<AppRevisionFiles | null> {
+    const found = await this.revision(appId, number)
+    if (!found) return null
+    return {
+      program: found.files.program,
+      plans: Object.fromEntries(Object.entries(found.files.plans).map(([name, text]) => [name, JSON.parse(text)])),
+    }
+  }
+
+  async summary(appId: string): Promise<AppSummary | null> {
+    const meta = await this.meta(appId)
+    if (!meta) return null
+    const revisions: AppRevisionSummary[] = []
+    for (let number = 1; number <= meta.head; number++) {
+      const text = await this.readText(join(this.dir(appId), 'revisions', String(number), 'revision.json'))
+      if (!text) continue
+      const { note, restoredFrom } = JSON.parse(text) as RevisionMeta
+      revisions.push({ revision: number, note, ...(restoredFrom ? { restoredFrom } : {}) })
+    }
+    return { appId, taskId: meta.taskId, name: meta.name, head: meta.head, revisions }
+  }
+
+  /** Deletes the apps of tasks that were deleted, and answers how many went. Archiving keeps them. */
+  async removeTasks(taskIds: readonly string[]): Promise<number> {
+    const doomed = new Set(taskIds)
+    let removed = 0
+    for (const id of await readdir(this.root).catch(() => [] as string[])) {
+      const meta = await this.meta(id)
+      if (!meta || !doomed.has(meta.taskId)) continue
+      await rm(this.dir(id), { recursive: true, force: true })
+      removed += 1
+    }
+    return removed
+  }
+}

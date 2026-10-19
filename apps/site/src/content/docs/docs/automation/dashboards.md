@@ -75,7 +75,7 @@ whole panel as JSON.
 | List | One row per record | Nothing |
 | Table | Rows and columns | Nothing |
 | Board | A column per value, like a kanban board | A field with a fixed set of values, such as a state |
-| Chart | Bars by category or person, or a line over time | A field with a fixed set of values, a person, or a date |
+| Chart | Bars by category or person, or a line over time | A field with a fixed set of values, a person, a date, or a text field the panel groups by |
 
 The editor offers only views the panel's fields allow. On a board, dragging a card to another column,
 or choosing **Move to** in its row's menu, changes that record in its source, when the source allows it. A

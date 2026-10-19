@@ -1,0 +1,74 @@
+---
+title: Apps
+description: An agent answers with a small app in the conversation, with lists, forms, ticks, and buttons over your data, and keeps every version it shows.
+sources:
+  - docs/agent-built-apps.md
+  - docs/agent-tools.md
+  - plugins/trellis/src/shared/library.ts
+checked: 619d5aaa9
+---
+
+import { Steps } from '@astrojs/starlight/components'
+import Checkpoint from '../../../../components/Checkpoint.astro'
+import PluginFacts from '../../../../components/PluginFacts.astro'
+
+The Apps plugin lets an agent answer with a small app in the conversation: a list you can narrow, a form
+that fills in a message, a checklist, or rows with a button that asks the agent about each one. An app
+reads your data through the same plans a dashboard panel uses, and the agent's view of one chart or table
+stays a panel.
+
+<PluginFacts id="trellis">
+  <Fragment slot="adds">Seven agent tools that build an app, and the card that draws it in the conversation.</Fragment>
+  <Fragment slot="needs">A managed agent session in a task.</Fragment>
+</PluginFacts>
+
+## Build an app
+
+There's nothing to set up.
+
+<Steps>
+
+1. In a task's managed agent session, ask for something one chart can't show, such as "my tasks grouped
+   by status, with a tick to mark each one reviewed and a button that asks you what's left on it".
+
+   <Checkpoint>The agent reads the app guide, builds the app, and a card draws it below the agent's
+   message.</Checkpoint>
+
+2. Ask for a change, such as "only show active tasks".
+
+   <Checkpoint>A second card draws the new version. The first collapses to one line, such as "v1: Tasks
+   grouped by status. Replaced by v2."</Checkpoint>
+
+</Steps>
+
+## Earlier versions
+
+Only the newest card is live. An older card's line offers two buttons:
+
+- **Show** draws that version read only, with today's data.
+- **Restore** makes that version the newest again, as the next version, and the card you pressed draws
+  it.
+
+## What an app can do
+
+An app arranges Acorn's own components and panels. Nothing an agent writes runs as code, so an app needs
+no trust prompt. An app can:
+
+- Read the plans it was built with, under your account, the way a dashboard panel does.
+- Put text in the agent's message box. It never sends a message. You send, edit, or delete it.
+- Open a web link, after you confirm the full address. It can't open a file or any other kind of link.
+- Run an action a data source offers on one of its rows, after you confirm it.
+
+An app can't reach the network, read a secret, or start a program.
+
+## Limits
+
+- What you tick or type in an app lasts while its card is open. It isn't saved.
+- An app belongs to the task it was built in. Archiving the task keeps it, and deleting the task
+  deletes it.
+
+## In the terminal
+
+The terminal client draws an app's text, buttons, and fields with its own components, in a card up to 24
+rows tall. A chart or table inside an app draws as one line, as a dashboard panel card does. A link's
+confirm copies the address instead of opening it.

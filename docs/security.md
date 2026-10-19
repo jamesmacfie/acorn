@@ -110,6 +110,21 @@ user, which no desktop app can rule out. The audit trail records a key check tha
 **Check this node** shows which case applies to the Node it checks
 ([security diagnostics](./security/security-diagnostics.md)).
 
+## Agent-built apps
+
+An agent-built app is a program and its plans, not a bundle, so no device asks to trust one
+([agent-built apps](./agent-built-apps.md)). Acorn's interpreter, library, and dashboard views draw it,
+and the device already trusts those as part of the client. A program reaches its own plans, run under
+the viewer's device, the task it's drawn in, row actions, the composer, and web links. The card
+confirms each row action and link with the person, and compose only fills the draft.
+
+`app_show` validates a program before it publishes it. That check keeps broken cards out of the
+conversation and isn't the security boundary. An agent can write into the data root, so it can plant
+a revision that skipped the checks. The boundary is the card: it hands a program only the tools above,
+looks up a row action in its own last run rather than trusting the program, and copies every value a
+program hands it into plain data before it uses it. A planted revision reaches nothing more than one
+that passed.
+
 ## Instruction file checks and review
 
 [Instruction checks and review](./security/instruction-review.md) covers hidden characters, changed

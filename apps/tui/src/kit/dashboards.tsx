@@ -1,4 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
+import { onMount, type JSX } from 'solid-js'
+import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { readPanelShowCall } from '@acorn/client-core/features/dashboards/panelShowCall.ts'
 import { Text } from './showing'
@@ -17,4 +19,29 @@ export function PanelToolCard(props: AgentToolCardProps) {
       : `${title}: the plan didn't pass its checks, so nothing was drawn.`
   }
   return <Text emphasis="muted">{line()}</Text>
+}
+
+/** How many rows a transcript card takes before it cuts off, the terminal's version of 480 pixels. */
+const CARD_ROWS = 24
+
+/** A card's body, capped in rows. A terminal transcript draws only what is on screen, so the card counts
+ *  as visible once it mounts. */
+export function CardFrame(props: { onVisible?: (visible: boolean) => void; children: JSX.Element }) {
+  onMount(() => props.onVisible?.(true))
+  return (
+    <box flexDirection="column" flexShrink={0} maxHeight={CARD_ROWS} overflow="hidden">
+      {props.children}
+    </box>
+  )
+}
+
+/** A plan as a panel: one line here, since this host draws no dashboard views. */
+export function PlanPanel(props: {
+  id: string
+  plan: PanelPlan
+  workspaceId: string
+  inputs?: Record<string, unknown>
+  active?: boolean
+}) {
+  return <Text emphasis="muted">{`${props.plan.title}: this panel draws in the desktop app.`}</Text>
 }

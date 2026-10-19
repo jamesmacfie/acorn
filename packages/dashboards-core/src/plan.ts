@@ -120,6 +120,7 @@ const pathPart = (value: string): string => value.replaceAll('~', '~0').replaceA
 const columnAt = (plan: PanelPlan, id: string): PanelPlanColumn | undefined =>
   plan.columns.find((column) => column.id === id)
 export { newColumnId, outputPlanColumns } from './planColumns'
+import { isChartAxis } from './planColumns'
 const bindingColumns = (binding: DataBinding): string[] =>
   binding.address.from === 'item' ? [pointerColumn(binding.address.pointer) ?? ''] : []
 const fixesUnit = (predicate: DataPredicate, unit: string): boolean =>
@@ -536,11 +537,8 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
     )
   )
     add('/view/field', 'An aggregate needs one fixed unit; filter by currency first.')
-  if (
-    plan.view.kind === 'chart' &&
-    !['datetime', 'enum', 'person'].includes(finalColumn(plan.view.x ?? '')?.type ?? '')
-  )
-    add('/view/x', 'A chart needs a date, enum, or person axis.')
+  if (plan.view.kind === 'chart' && !isChartAxis(plan, finalColumn(plan.view.x ?? ''), ['datetime', 'enum', 'person']))
+    add('/view/x', 'A chart needs a date, enum, or person axis, or a text column the plan summarizes by.')
   if (plan.view.shape === 'line' && finalColumn(plan.view.x ?? '')?.type !== 'datetime')
     add('/view/x', 'A line chart needs a date axis.')
   // A time bucket turns the axis into date labels, which the line, bucketing instants by day, can't place.
@@ -553,8 +551,8 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
     )
   )
     add('/view/x', 'A line chart counts the rows by day itself; chart the rows, not a summary bucketed by time.')
-  if (plan.view.shape === 'bar' && !['enum', 'person'].includes(finalColumn(plan.view.x ?? '')?.type ?? ''))
-    add('/view/x', 'A bar chart needs an enum or person axis.')
+  if (plan.view.shape === 'bar' && !isChartAxis(plan, finalColumn(plan.view.x ?? ''), ['enum', 'person']))
+    add('/view/x', 'A bar chart needs an enum or person axis, or a text column the plan summarizes by.')
   if (plan.view.series && finalColumn(plan.view.series)?.type !== 'enum')
     add('/view/series', 'A series needs an enum column.')
   if (plan.view.trend && plan.view.kind !== 'stat') add('/view/trend', 'A trend belongs on a stat view.')

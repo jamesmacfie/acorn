@@ -233,6 +233,27 @@ The manual checks, in a `pnpm dev:agent` session with GitHub connected:
    Ask "make it weekly", then add it to Home. The next day, the panel's window has moved.
 5. Run the same chat in the terminal client with `pnpm dev:tui:agent`. Each card is one line.
 
+Agent-built apps ([agent-built apps](../agent-built-apps.md)) have unit tests in `plugins/trellis`:
+`validate.test.ts` for the seven checks, `handlers.test.ts` for files, hashes, revisions, and task
+ownership, and `AppView.test.tsx` and `AppToolCard.test.tsx` for what a program can reach and how cards
+pin revisions. `apps/tui/src/trellis.test.tsx` draws an app in the terminal kit. The manual checks, in
+a `pnpm dev:agent` session:
+
+1. Through MCP, create an app, write a plan and a program that draws a heading above `Panel` of that
+   plan, and show it. The card draws with the dashboard's view. The files are under the data root's
+   `apps/`, and the task's worktree has no new files.
+2. Show a program that names a component the library lacks, one that leaves out a required prop, one
+   whose `Query` names a plan the app doesn't have, one that sets `$placement`, and one that is a
+   single `Panel`. Each fails with its code and hint, the last points to `panel_show`, and no card
+   draws.
+3. Show three revisions. Only the third card is interactive. **Show v1** draws v1 read only.
+   **Restore v1** makes v4 with v1's files.
+4. A button with `@ToAssistant` fills the composer and sends nothing. A row action shows its confirm.
+   `@OpenUrl` with a `file:` URL does nothing and says why, and an HTTPS URL shows the full URL first.
+5. In a managed Claude chat, ask for an app, then a change. A second card draws and the first
+   collapses. Ask for one chart, and the agent uses `panel_show`.
+6. Run the same chat in the terminal client with `pnpm dev:tui:agent`.
+
 Dashboard authoring evaluation has scripted cases in
 `packages/dashboards-core/src/authoringEvaluation.test.ts`. Run the real-model layer on demand with
 `node scripts/dashboard-authoring-eval.mjs <output.jsonl>` after setting `ACORN_EVAL_URL`,

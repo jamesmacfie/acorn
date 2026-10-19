@@ -233,7 +233,7 @@ export { previewUrlForClient, remotePreviewBlocked } from '@acorn/client-core/in
 
 // ── Agent context and references ──────────────────────────────────────────────────────────────
 export { contextSnapshot } from '@acorn/client-core/features/agent'
-export { formatFileReference, sendReferenceToAgent } from '@acorn/client-core/features/agent'
+export { composeForAgent, formatFileReference, sendReferenceToAgent } from '@acorn/client-core/features/agent'
 export type { ReferenceTargetContribution } from '@acorn/client-core/features/agent'
 
 // ── The platform seam ─────────────────────────────────────────────────────────────────────────

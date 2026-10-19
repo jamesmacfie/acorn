@@ -6,12 +6,13 @@ import { agentSessionsFor, sendToSession } from '../tasks/agentSessions'
 type ReferenceResult = { ok: boolean; reason?: string }
 
 // A place a reference can land. `deliver` answers null when it has nowhere to put it for this task,
-// and the next target gets a turn.
+// and the next target gets a turn. `as: 'text'` is a draft to put in as written, with no reference
+// marker, such as an agent-built app's `@ToAssistant`.
 export type ReferenceTargetContribution = {
   id: string
   // Higher goes first. Core's fallback, the task's latest running agent session, is 0.
   priority: number
-  deliver(taskId: string, reference: string): Promise<ReferenceResult | null>
+  deliver(taskId: string, reference: string, as?: 'reference' | 'text'): Promise<ReferenceResult | null>
 }
 
 export const referenceTargetRegistry = new Registry<ReferenceTargetContribution>('reference target')
@@ -34,11 +35,19 @@ export function formatFileReference(path: string, startLine?: number | null, end
 }
 
 // Deliver as a draft to the first target, by priority, that takes it.
-export async function sendReferenceToAgent(taskId: string, ref: string): Promise<ReferenceResult> {
+export async function sendReferenceToAgent(
+  taskId: string,
+  ref: string,
+  as: 'reference' | 'text' = 'reference',
+): Promise<ReferenceResult> {
   const targets = [...referenceTargetRegistry.entries()].sort((a, b) => b.priority - a.priority)
   for (const target of targets) {
-    const result = await target.deliver(taskId, ref)
+    const result = await target.deliver(taskId, ref, as)
     if (result) return result
   }
   return { ok: false, reason: 'No running agent session for this task.' }
 }
+
+/** Puts text in the task's agent composer as written. It never sends: the person sends, edits, or
+ *  discards it. */
+export const composeForAgent = (taskId: string, text: string) => sendReferenceToAgent(taskId, text, 'text')

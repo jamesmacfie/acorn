@@ -454,6 +454,8 @@ export const dashboardLibraryRequestSchema = z.discriminatedUnion('operation', [
       mode: z.enum(['preview', 'execution']),
       viewerZone: z.string().max(100).optional(),
       evaluationTime: z.number().finite().optional(),
+      /** Values for the plan's `{ from: 'input' }` addresses, by input name, such as an app's picked task. */
+      inputs: z.record(z.string().min(1).max(200), z.unknown()).optional(),
     })
     .strict(),
   z.object({ operation: z.literal('delete'), scope: queryScopeSchema, id, expectedRevision: revision }).strict(),

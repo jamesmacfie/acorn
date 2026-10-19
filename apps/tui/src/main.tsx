@@ -24,6 +24,10 @@ import { openTerminalRenderer, type Renderer } from './renderer'
 // The boot account and the held lines are `./boot.ts`, which says why they are held and how they
 // also become spans.
 const log = createLogger('acorn')
+// An agent-built app card runs OpenUI's language core here, which reads this process's environment
+// for its opt-in usage telemetry. Someone who opted in for their own OpenUI project from this shell
+// mustn't have Acorn report too.
+process.env.OPENUI_TELEMETRY_DISABLED = '1'
 
 const { values } = parseArgs({
   options: {

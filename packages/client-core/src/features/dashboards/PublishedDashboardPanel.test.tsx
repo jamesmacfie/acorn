@@ -32,5 +32,12 @@ it('runs an unpublished plan as a draft, without a publication', () => {
     host,
   )
   expect(host.querySelector('h3')?.textContent).toBe('By author')
-  expect(run).toHaveBeenCalledWith({ kind: 'draft', content: plan }, 'execution', expect.any(String), expect.anything())
+  expect(run).toHaveBeenCalledWith(
+    { kind: 'draft', content: plan },
+    'execution',
+    expect.any(String),
+    expect.anything(),
+    undefined,
+    undefined,
+  )
 })

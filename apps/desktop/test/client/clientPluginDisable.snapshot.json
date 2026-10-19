@@ -114,6 +114,7 @@
       "changes.diff-fence",
       "line-blame",
       "memory.tool-card",
+      "trellis.app-card",
       "workflows.tool-card"
     ],
     "refPanels": [
@@ -400,6 +401,11 @@
       ],
       "schedules": [
         "preview.configured"
+      ]
+    },
+    "trellis": {
+      "extensions": [
+        "trellis.app-card"
       ]
     },
     "workflows": {

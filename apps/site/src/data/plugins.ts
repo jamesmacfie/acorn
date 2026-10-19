@@ -262,6 +262,16 @@ export const PLUGINS = {
     worksInNote: 'The terminal client has no drawer.',
     docs: '/docs/built-in-plugins/terminal/',
   },
+  trellis: {
+    name: 'Apps',
+    sentence:
+      'Lets an agent answer with a small app in the conversation: lists, forms, ticks, and buttons over your data.',
+    icon: 'layout-panel-left',
+    ships: 'compiled',
+    worksIn: both,
+    worksInNote: 'The terminal draws a panel inside an app as one line.',
+    docs: '/docs/built-in-plugins/apps/',
+  },
   workflows: {
     name: 'Workflows',
     sentence: 'Runs a graph of steps, such as an agent, a command, and a gate for you, and shows each run.',

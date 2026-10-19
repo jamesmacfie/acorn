@@ -59,7 +59,7 @@ const packageExports = new Map(
 
 function exportedFile(pkg: Pkg, subpath: string): string | null {
   const exports = packageExports.get(pkg.name)!
-  const key = `./${subpath}`
+  const key = subpath ? `./${subpath}` : '.'
   const exact = exports[key]
   if (exact) return resolveFile(join(pkg.dir, exact))
   for (const [pattern, target] of Object.entries(exports)) {
@@ -708,7 +708,15 @@ describe('architecture boundaries', () => {
     // (docs/diff-rendering/document.md § The document). `@acorn/change-request-ui`: the review views
     // every code host plugin draws over a neutral model, built only on the facade
     // (docs/plugins/change-request-ui.md).
-    const SHARED = new Set(['@acorn/plugin-api', '@acorn/protocol', '@acorn/diff-document', '@acorn/change-request-ui'])
+    // `@acorn/openui-solid`: the OpenUI renderer, which imports nothing from Acorn, and which the apps host
+    // plugin binds to the kit (docs/architecture/packages.md § A renderer built to publish).
+    const SHARED = new Set([
+      '@acorn/plugin-api',
+      '@acorn/protocol',
+      '@acorn/diff-document',
+      '@acorn/change-request-ui',
+      '@acorn/openui-solid',
+    ])
     const offenders = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))
       .filter((e) => !SHARED.has(e.target.pkg!.name))
@@ -812,7 +820,7 @@ describe('architecture boundaries', () => {
       // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
       // `LinkPreviewHost` (docs/frontend/startup-budget.md). The token and style pack stylesheets, which
       // the browser extension loads without the app's own stylesheet.
-      '@acorn/client-core': 198, // Includes the agent panel card the agents plugin draws and the terminal's reader for it, the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, and the anchored popover and focus restore the sidebar's Go to task draws on.
+      '@acorn/client-core': 200, // Includes the agent panel card the agents plugin draws and the terminal's reader for it, the card frame and plan panel an app card draws with, the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, and the anchored popover and focus restore the sidebar's Go to task draws on.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
       // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
       // public site's plugin reference reads to check its examples and list the grants. `mcp/toolOutputDir`,
