@@ -141,7 +141,7 @@ export function removeContextTokens(text: string, references: readonly { start: 
 }
 
 /** The fragment a sent message's link carries for its `index`th referenced context part. */
-export const contextLinkHref = (index: number): string => `#context-ref-${index}`
+const contextLinkHref = (index: number): string => `#context-ref-${index}`
 
 /** The index behind a link `linkContextReferences` wrote, or null for any other link. */
 export const contextLinkIndex = (href: string): number | null => {
