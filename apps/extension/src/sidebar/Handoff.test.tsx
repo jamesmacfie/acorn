@@ -565,7 +565,7 @@ describe('a handoff in the sidebar', () => {
     expect(root.querySelector<HTMLTextAreaElement>('textarea[name="input-focus"]')!.value).toBe('The retry loop')
   })
 
-  it("goes Home from the page's task on any tab, but keeps a conversation, when the tab moves to a page no task holds", async () => {
+  it("goes Home from the page's task when the tab moves to a page no task holds, and back to where it was", async () => {
     const { fake, root, state } = mount({ url: PAGE })
     state.pageTasks = [
       {
@@ -591,10 +591,15 @@ describe('a handoff in the sidebar', () => {
     await openChat(root, 'Chat s2')
     fake.navigate('https://elsewhere.example/')
     await settle(30)
+    expect(root.querySelector('.view[aria-label="Home"]')).not.toBeNull()
+    // The task's page opens the conversation it last showed, after the panel opens again too.
+    fake.navigate(PAGE)
+    await settle(30)
     expect(conversationTitle(root)).toBe('Chat s2')
+    expect(fake.storage.get('taskViews:n1')).toMatchObject({ 't-new': { sessionId: 's2' } })
   })
 
-  it('keeps a conversation open on an item no task holds, and Start task goes Home to look it up', async () => {
+  it('names an item no task holds under a conversation opened from Home, and Start task goes Home to it', async () => {
     const { fake, root, state } = mount({ url: PAGE })
     state.pageTasks = [
       {
@@ -606,16 +611,16 @@ describe('a handoff in the sidebar', () => {
       },
     ]
     state.sessions['t-new'] = [session('s2', 't-new')]
-    await settle(30)
-    await openChat(root, 'Chat s2')
     fake.navigate('https://tracker.example/items/43')
     await settle(30)
+    await openTask(root, 'Fix the flaky test')
+    await openChat(root, 'Chat s2')
     expect(conversationTitle(root)).toBe('Chat s2')
-    expect(state.requests.filter((request) => request.op === 'handoff.resolve')).toHaveLength(0)
+    expect(root.querySelector('.strip')!.textContent).toBe('This page has no taskStart task')
     button(root.querySelector('.strip')!, 'Start task')!.click()
     await settle(30)
     expect(card(root)).not.toBeNull()
-    expect(resolvedUrls(state)).toEqual(['https://tracker.example/items/43'])
+    expect(new Set(resolvedUrls(state))).toEqual(new Set(['https://tracker.example/items/43']))
   })
 
   it('closes the card when the tab moves to a page it may not read', async () => {

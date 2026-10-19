@@ -89,21 +89,22 @@ you were reading. When the page moves, by navigating or by switching tabs, the p
 rules in order (`followPage` in `apps/extension/src/sidebar/location.ts`):
 
 1. Bridge setup, pairing, and Settings never move.
-2. A page that belongs to no task, reached from the page of the task the panel shows, goes Home, so
-   the panel doesn't keep showing a task the page has nothing to do with. Any other page that belongs
-   to no task leaves the panel where it is, such as one reached while showing a task you opened from
-   Home.
-3. An open conversation stays open, because pages are often visited to capture them into it. The
-   strip under the top bar names the page's task, with **Switch**
+2. A page that belongs to no task, reached from the page of the task the panel shows, goes Home, even
+   from a conversation, so the panel doesn't keep showing a task the page has nothing to do with. Any
+   other page that belongs to no task leaves the panel where it is, such as one reached while showing
+   a task you opened from Home.
+3. An open conversation stays open on another task's page. The strip under the top bar names the
+   page's task, with **Switch**
    ([the strip under the bars](./navigation.md#the-strip-under-the-bars)).
-4. Otherwise, a page that belongs to a task opens that task, on the tab last picked there.
+4. Otherwise, a page that belongs to a task opens that task, on the conversation it last showed, or
+   else on the tab last picked there. Going back to a task's page returns to where you were in it.
 
 The panel applies the same rules once more when the selected Node's task list first arrives, so a
 panel that opens beside a pull request shows its task. A later list moves nothing, such as one with a
 task just made for the page. **Create task** and **Start run** open their new task themselves.
 
-The tab you pick under a task is kept per task in `taskViews:<nodeId>`, and the task or conversation
-the panel last showed in `destination:<nodeId>` ([browser storage](./conversations.md#browser-storage)).
+The tab you pick under a task and the conversation it last showed are kept per task in
+`taskViews:<nodeId>`, and the task or conversation the panel last showed in `destination:<nodeId>` ([browser storage](./conversations.md#browser-storage)).
 When the panel opens, it returns to that task or conversation, then follows the page by the rules
 above. A task the Node no longer lists sends the panel Home.
 

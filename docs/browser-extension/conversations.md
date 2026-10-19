@@ -160,8 +160,10 @@ Besides `selectedNodeId`, the extension keeps these keys in `storage.local`:
   conversation open in it, if any. A workflow step's conversation is kept as its task. Home and
   Settings leave it alone, so a selection always has a conversation to go to. The panel returns to it
   when it opens, and **Add to Acorn chat** saves the conversation it added a selection to.
-- `taskViews:<nodeId>`: the tab last picked under each task, `{ tab }` by task ID, for
-  [moving between pages](./task-pages.md#moving-between-pages). It keeps the 50 tasks used most
+- `taskViews:<nodeId>`: the tab last picked under each task and the conversation it last showed,
+  `{ tab, sessionId? }` by task ID, for [moving between pages](./task-pages.md#moving-between-pages).
+  Leaving the conversation for the task's tabs clears `sessionId`. A workflow step's conversation
+  isn't kept, as in `destination`. It keeps the 50 tasks used most
   recently. A view stored by an older build may name the Runs tab `workflows`, which reads as `runs`.
 - `appearance`: the panel's `{ theme, style }`, with `theme` null to follow the system's light or dark
   ([appearance](./setup.md#appearance)).
