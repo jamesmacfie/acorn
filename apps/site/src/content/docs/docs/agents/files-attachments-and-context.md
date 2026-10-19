@@ -7,7 +7,7 @@ sources:
   - docs/agent-tools/context-sections.md
   - plugins/agents/src/server/sessions/attachmentStore.ts
   - plugins/agents/src/client/composer/attachmentOperations.ts
-checked: 52225e24f
+checked: 'b88b42b6b'
 ---
 
 This page covers the three ways something reaches an agent besides what you type: files you attach,

@@ -10,7 +10,7 @@ sources:
   - docs/terminal.md
   - plugins/agents/src/client/sessions/agentPaneModel.ts
   - plugins/agents/src/shared/schemas.ts
-checked: '05009afda'
+checked: 'b88b42b6b'
 ---
 
 This page covers managed agent sessions: starting one in a task, writing to it, reading its
