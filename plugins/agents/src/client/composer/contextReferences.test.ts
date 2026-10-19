@@ -4,7 +4,9 @@ import {
   categorySuggestions,
   contextCompletion,
   contextSlug,
+  contextLinkIndex,
   insertContextToken,
+  linkContextReferences,
   removeContextTokens,
   resolveContextReferences,
   type ContextCategory,
@@ -172,5 +174,16 @@ describe('colour and send', () => {
         contributions,
       ),
     ).rejects.toThrow("Couldn't capture #agent:refactor-login-v2.")
+  })
+})
+
+describe('linkContextReferences', () => {
+  it('links the sent tokens and leaves code and unsent tokens as they were', () => {
+    const text = 'see #agent:a and #task.\n`#agent:a` #agent:b\n```\n#task\n```'
+    expect(linkContextReferences(text, ['#agent:a', '#task'])).toBe(
+      'see [#agent:a](#context-ref-0) and [#task](#context-ref-1).\n`#agent:a` #agent:b\n```\n#task\n```',
+    )
+    expect(contextLinkIndex('#context-ref-1')).toBe(1)
+    expect(contextLinkIndex('https://example.com/#context-ref-1')).toBeNull()
   })
 })

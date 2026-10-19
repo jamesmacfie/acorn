@@ -17,6 +17,11 @@ describe('provider HTML parsing', () => {
     ])
   })
 
+  it('prints a link target beside its text, unless it is an in-page fragment', () => {
+    const [line] = htmlLines(renderMarkdown('[docs](https://x.com) and [#task](#context-ref-0)'))
+    expect(line.runs.map((run) => run.text).join('')).toBe('docs (https://x.com) and #task')
+  })
+
   it('ignores GitHub custom-element wrappers around tables', () => {
     const text = htmlLines(
       [

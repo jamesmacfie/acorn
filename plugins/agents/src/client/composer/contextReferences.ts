@@ -139,3 +139,43 @@ export function removeContextTokens(text: string, references: readonly { start: 
   }
   return result
 }
+
+/** The fragment a sent message's link carries for its `index`th referenced context part. */
+export const contextLinkHref = (index: number): string => `#context-ref-${index}`
+
+/** The index behind a link `linkContextReferences` wrote, or null for any other link. */
+export const contextLinkIndex = (href: string): number | null => {
+  const match = /^#context-ref-(\d+)$/.exec(href)
+  return match ? Number(match[1]) : null
+}
+
+/**
+ * A sent message as markdown, with each token in `refs` written as a link to its context part. Code
+ * stays as it was, because a token in a code span or a fence is something the person quoted.
+ */
+export function linkContextReferences(text: string, refs: readonly string[]): string {
+  if (!refs.length) return text
+  const link = (prose: string) =>
+    prose.replace(REFERENCE, (match: string, ...rest: unknown[]) => {
+      const [offset, whole] = [rest.at(-2) as number, rest.at(-1) as string]
+      const token = match.slice(match.indexOf('#'))
+      const index = refs.indexOf(token)
+      if (index < 0 || CONTINUES.test(whole[offset + match.length] ?? '')) return match
+      return `${match.slice(0, match.indexOf('#'))}[${token}](${contextLinkHref(index)})`
+    })
+  let fenced = false
+  return text
+    .split('\n')
+    .map((line) => {
+      if (/^\s*```/.test(line)) {
+        fenced = !fenced
+        return line
+      }
+      if (fenced) return line
+      return line
+        .split(/(`+[^`]*`+)/)
+        .map((part, index) => (index % 2 ? part : link(part)))
+        .join('')
+    })
+    .join('\n')
+}
