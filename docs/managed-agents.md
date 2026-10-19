@@ -22,7 +22,8 @@ drive raw terminals or resolve approvals.
 
 The `usage-records` data source exposes one ledger usage event per record, including session, turn,
 task, provider, model recorded on that turn, token deltas, USD cost, and whether cost was reported,
-estimated from the named model price, or unknown. Deltas are computed before a dashboard time filter,
+estimated from the named model price, or unknown. A reported cost is the session's running total for every harness, and Codex's tokens are too, so
+each counts from the session's previous report. Deltas are computed before a dashboard time filter,
 so a session crossing a window boundary contributes only usage inside it. Historical deletion or a
 bounded ledger scan is reported as incomplete event coverage. Session totals are sums of these
 records; any convenience total must use the same pricing and delta policy. The pure per-event token
@@ -99,6 +100,7 @@ These pages cover the client:
   subagent views.
 - [The composer](./managed-agents/composer.md): the message field and its slots.
 - [The transcript store](./managed-agents/transcript-store.md): how the client holds a session.
+- [Turn facts](./managed-agents/turn-facts.md): one row of numbers for each finished turn.
 - [Transcript search](./managed-agents/transcript-search.md): the full-text index.
 - [Cross-session reads](./managed-agents/cross-session-reads.md): the tools that let an agent find
   and read other sessions in its project.

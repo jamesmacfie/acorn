@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm'
 // hand-written into the migration rather than declared here. See docs/data-layer/migrations.md § Migrations.
 // Migration 0005 owns its shape, migration 0012 owns dirty progress, and
 // server/ftsSchema.test.ts checks the actual migrated objects.
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // Managed agent sessions are task-scoped execution records. Provider-specific resumability remains
 // provider-owned (`providerSessionRef`); Acorn owns the normalized local transcript and projections.
@@ -178,6 +178,54 @@ export const agentRequests = sqliteTable(
   (t) => [
     uniqueIndex('agent_requests_session_provider_idx').on(t.sessionId, t.providerRequestId),
     index('agent_requests_status_created_idx').on(t.status, t.createdAt),
+  ],
+)
+
+// One row of numbers per finished turn, written by TurnFactsWriter and rewritten by the backfill pass
+// when the rules' version moves (docs/managed-agents/turn-facts.md). No text: no prompt, tool input or
+// output, or file content. The rows outlive the retention pass, which removes the turns they describe,
+// and go only with their session.
+export const agentTurnFacts = sqliteTable(
+  'agent_turn_facts',
+  {
+    turnId: text('turn_id').primaryKey(),
+    sessionId: text('session_id').notNull(),
+    taskId: text('task_id').notNull(),
+    // Null when core no longer knows the task.
+    projectId: text('project_id'),
+    ordinal: integer('ordinal').notNull(),
+    firstSeq: integer('first_seq'),
+    provider: text('provider').notNull(),
+    model: text('model'),
+    source: text('source').notNull(),
+    status: text('status').notNull(),
+    startedAt: integer('started_at').notNull(),
+    completedAt: integer('completed_at').notNull(),
+    activeMs: integer('active_ms').notNull(),
+    firstOutputMs: integer('first_output_ms'),
+    approvalWaitMs: integer('approval_wait_ms').notNull(),
+    approvals: integer('approvals').notNull(),
+    toolCalls: integer('tool_calls').notNull(),
+    toolFailures: integer('tool_failures').notNull(),
+    longestFailureRun: integer('longest_failure_run').notNull(),
+    failureRunSeq: integer('failure_run_seq'),
+    repeatedCalls: integer('repeated_calls').notNull(),
+    repeatRunSeq: integer('repeat_run_seq'),
+    filesChanged: integer('files_changed').notNull(),
+    filesRewritten: integer('files_rewritten').notNull(),
+    subagents: integer('subagents').notNull(),
+    peakContextUsed: integer('peak_context_used'),
+    contextSize: integer('context_size'),
+    inputTokens: integer('input_tokens').notNull(),
+    outputTokens: integer('output_tokens').notNull(),
+    cacheReadTokens: integer('cache_read_tokens').notNull(),
+    cacheWriteTokens: integer('cache_write_tokens').notNull(),
+    reportedCostUsd: real('reported_cost_usd'),
+    version: integer('version').notNull(),
+  },
+  (t) => [
+    index('agent_turn_facts_task_completed_idx').on(t.taskId, t.completedAt),
+    index('agent_turn_facts_session_started_idx').on(t.sessionId, t.startedAt),
   ],
 )
 

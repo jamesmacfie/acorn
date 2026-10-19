@@ -12,6 +12,7 @@ import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults'
 import { writeAgentSessionDefaults } from '../sessionDefaultsStore'
 import { removeExpiredHistory } from './historyRetention'
 import { ManagedAgentRuntime } from './runtime'
+import { writeTurnFacts } from './turnFactsWriter'
 
 const DAY = 86_400_000
 const OWNER = 'owner'
@@ -88,7 +89,8 @@ describe('removing the agent history of long-archived tasks', () => {
     return id
   }
 
-  // A session with a searchable conversation, a turn holding an attachment, a request, and an artifact.
+  // A session with a searchable conversation, a turn holding an attachment, a request, an artifact, and
+  // the turn's facts.
   const session = async (taskId: string, word: string) => {
     const { id } = await runtime.store.createSession(
       {
@@ -112,6 +114,8 @@ describe('removing the agent history of long-archived tasks', () => {
         inputJson: '[]',
         idempotencyKey: randomUUID(),
         createdAt: now,
+        startedAt: now,
+        completedAt: now + 1_000,
       })
       .run()
     await runtime.store.recordEvent(id, turnId, { type: 'user_message', text: `Please fix the ${word} bug.` })
@@ -148,6 +152,7 @@ describe('removing the agent history of long-archived tasks', () => {
       title: 'Output',
       text: `${word} output`,
     })
+    db.transaction((tx) => writeTurnFacts(tx, turnId, 'project'))
     const stored = db.select().from(schema.agentAttachments).where(eq(schema.agentAttachments.id, attachment.id)).get()!
     const output = db.select().from(schema.agentArtifacts).where(eq(schema.agentArtifacts.id, artifact.id)).get()!
     return {
@@ -157,8 +162,10 @@ describe('removing the agent history of long-archived tasks', () => {
     }
   }
 
-  const count = (table: 'agent_events' | 'agent_turns' | 'agent_requests' | 'agent_artifacts', sessionId: string) =>
-    db.get<{ n: number }>(sql`SELECT count(*) AS n FROM ${sql.identifier(table)} WHERE session_id = ${sessionId}`)!.n
+  const count = (
+    table: 'agent_events' | 'agent_turns' | 'agent_requests' | 'agent_artifacts' | 'agent_turn_facts',
+    sessionId: string,
+  ) => db.get<{ n: number }>(sql`SELECT count(*) AS n FROM ${sql.identifier(table)} WHERE session_id = ${sessionId}`)!.n
   const indexed = (sessionId: string) =>
     db.get<{ n: number }>(sql`SELECT count(*) AS n FROM agent_events_fts WHERE session_id = ${sessionId}`)!.n
   const row = (sessionId: string) =>
@@ -223,6 +230,12 @@ describe('removing the agent history of long-archived tasks', () => {
     }
     expect(existsSync(recent.artifactPath)).toBe(true)
     expect(existsSync(recent.attachmentPath)).toBe(true)
+
+    // The turn's numbers outlive its history, and go with the task.
+    expect(count('agent_turn_facts', old.id)).toBe(1)
+    await runtime.purgeDeletedTasks(['old'])
+    expect(count('agent_turn_facts', old.id)).toBe(0)
+    expect(count('agent_turn_facts', recent.id)).toBe(1)
   })
 
   it('keeps the search index consistent with the events it indexes', async () => {

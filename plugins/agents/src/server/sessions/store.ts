@@ -124,8 +124,9 @@ export class AgentStore {
     private readonly db: PluginDatabase,
     private readonly core: CoreServices,
     publishLifecycle?: AgentLifecyclePublisher,
+    onTurnSettled?: (turnId: string) => void,
   ) {
-    this.lifecycle = new AgentLifecycle(db, publishLifecycle)
+    this.lifecycle = new AgentLifecycle(db, publishLifecycle, onTurnSettled)
   }
 
   // `null` means no workspace filter. An empty array means the workspace has no tasks, so the query
@@ -641,6 +642,8 @@ export class AgentStore {
     const removed = this.db.transaction((tx) => {
       const owned = this.deleteOwnedRows(tx, sessionId)
       tx.delete(schema.agentEvents).where(eq(schema.agentEvents.sessionId, sessionId)).run()
+      // Here and not in deleteOwnedRows, because the retention pass keeps a session's facts.
+      tx.delete(schema.agentTurnFacts).where(eq(schema.agentTurnFacts.sessionId, sessionId)).run()
       tx.delete(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).run()
       return owned
     })

@@ -223,7 +223,7 @@ export class ManagedAgentRuntime {
     // on a provider start, and when a turn settles, none of which happen on their own after a restart.
     // Not awaited, because draining spawns a provider child per session and boot waits on reconcile().
     void this.engine.pump()
-    this.engine.compactLedgersInBackground()
+    this.engine.repairHistoryInBackground()
   }
 
   /** One bridge call, for the session and task the caller's token names. */

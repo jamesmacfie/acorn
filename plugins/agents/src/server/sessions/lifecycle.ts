@@ -25,6 +25,8 @@ import { mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 
 const log = createLogger('agents:lifecycle', 'agents')
 
+const SETTLED: ReadonlySet<string> = new Set(['completed', 'failed', 'cancelled', 'interrupted'])
+
 /**
  * The one post-commit projection from managed-agent rows to the public lifecycle catalogue.
  * Persistence owners call the announce methods only after their transaction has committed; capability
@@ -41,6 +43,9 @@ export class AgentLifecycle {
   constructor(
     private readonly db: PluginDatabase,
     private readonly publish?: AgentLifecyclePublisher,
+    /** A turn reached `completed`, `failed`, `cancelled`, or `interrupted`. Called whether or not anyone
+     *  listens, so the turn's facts don't depend on a publisher. */
+    private readonly onTurnSettled?: (turnId: string) => void,
   ) {}
 
   announceSession(session: AgentSession, changes: AgentSessionChange[], renameSource?: SessionRenameSource): void {
@@ -57,10 +62,11 @@ export class AgentLifecycle {
   }
 
   async announceTurn(turnId: string): Promise<void> {
-    if (!this.publish) return
+    if (!this.publish && !this.onTurnSettled) return
     const row = await this.turnRow(turnId)
     if (!row) return
-    this.publish({
+    if (SETTLED.has(row.turn.status)) this.onTurnSettled?.(turnId)
+    this.publish?.({
       channel: 'plugin:agents:turn-changed',
       taskId: row.taskId,
       sessionId: row.turn.sessionId,

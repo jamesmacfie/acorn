@@ -26,11 +26,13 @@ HTTP wait forwards its request's abort signal without cancelling the session's w
 
 ## Cross-plugin lifecycle
 
-Three plugin events describe the durable model, and a fourth describes what a session is doing
+Four plugin events describe the durable model, and a fifth describes what a session is doing
 ([activity](#activity)):
 
 - `plugin:agents:turn-changed` carries the task, session, turn, source, status, and attempt after a
   turn is queued, dispatched, retried, settled, or repaired at restart.
+- `plugin:agents:turn-facts` carries the task, session, and turn IDs after a finished turn's
+  [facts row](./turn-facts.md) commits. A backfilled row sends none.
 - `plugin:agents:request-changed` carries the task, session, provider request ID, kind, and status
   after a request is created, claimed, acknowledged, expired, cleaned up, or repaired.
 - `plugin:agents:sessions-changed` carries task and session IDs, presence and archive state, and a

@@ -77,6 +77,7 @@ state or scope to avoid an unneeded broad read.
 | `plugin:workflows:child-changed` | A dispatched child run's durable state | Workflow run routes |
 | `plugin:workflows:completed` | A run that reached a terminal status | Workflow run routes |
 | `plugin:agents:turn-changed` | Task, session, turn, source, status, attempt | `agents.turns` |
+| `plugin:agents:turn-facts` | Task, session, turn | The agents plugin's `agent_turn_facts` rows |
 | `plugin:agents:request-changed` | Task, session, request, kind, status | `agents.requests` |
 | `plugin:agents:sessions-changed` | Task, session, present, archived | `agents.sessions` |
 | `plugin:agents:activity` | Task, session, and one tool call's, subagent's, or context count's state | `agents.activity.v1` |

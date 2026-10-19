@@ -1,0 +1,38 @@
+CREATE TABLE `agent_turn_facts` (
+	`turn_id` text PRIMARY KEY NOT NULL,
+	`session_id` text NOT NULL,
+	`task_id` text NOT NULL,
+	`project_id` text,
+	`ordinal` integer NOT NULL,
+	`first_seq` integer,
+	`provider` text NOT NULL,
+	`model` text,
+	`source` text NOT NULL,
+	`status` text NOT NULL,
+	`started_at` integer NOT NULL,
+	`completed_at` integer NOT NULL,
+	`active_ms` integer NOT NULL,
+	`first_output_ms` integer,
+	`approval_wait_ms` integer NOT NULL,
+	`approvals` integer NOT NULL,
+	`tool_calls` integer NOT NULL,
+	`tool_failures` integer NOT NULL,
+	`longest_failure_run` integer NOT NULL,
+	`failure_run_seq` integer,
+	`repeated_calls` integer NOT NULL,
+	`repeat_run_seq` integer,
+	`files_changed` integer NOT NULL,
+	`files_rewritten` integer NOT NULL,
+	`subagents` integer NOT NULL,
+	`peak_context_used` integer,
+	`context_size` integer,
+	`input_tokens` integer NOT NULL,
+	`output_tokens` integer NOT NULL,
+	`cache_read_tokens` integer NOT NULL,
+	`cache_write_tokens` integer NOT NULL,
+	`reported_cost_usd` real,
+	`version` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `agent_turn_facts_task_completed_idx` ON `agent_turn_facts` (`task_id`,`completed_at`);--> statement-breakpoint
+CREATE INDEX `agent_turn_facts_session_started_idx` ON `agent_turn_facts` (`session_id`,`started_at`);

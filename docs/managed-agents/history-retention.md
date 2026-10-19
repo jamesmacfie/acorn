@@ -20,7 +20,8 @@ History is everything the session owns except its row: events and their search r
 attachment references, and artifacts. Attachment and artifact files that nothing else references are
 deleted from disk. The row stays, with one note in place of the transcript, such as "Acorn removed
 this session's history because its task had been archived for more than 90 days." It's marked with
-`history_removed_at`, so a second run does nothing.
+`history_removed_at`, so a second run does nothing. The sessions' [turn facts](./turn-facts.md)
+stay, because they hold numbers only.
 
 The row stays, unlike **Delete**, for these reasons:
 

@@ -186,6 +186,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     required: true,
     emits: [
       { verb: 'turn-changed', description: 'An agent turn changed queue or execution state' },
+      { verb: 'turn-facts', description: 'The numbers of a finished agent turn were recorded' },
       { verb: 'request-changed', description: 'An agent input request was created or changed state' },
       {
         verb: 'sessions-changed',

@@ -7,29 +7,7 @@ import type { AgentUsage } from '../../contract/wire'
 import * as schema from '../../node/schema'
 import { usageSourceDescription } from '../../shared/usageSource'
 import { readAgentPricingPreferences } from '../pricingStore'
-import { usageRecords, type UsageEventInput } from './usageRecords'
-
-const modelAtTurn = (raw: string | null): string | null => {
-  if (!raw) return null
-  try {
-    const policy = JSON.parse(raw) as { model?: unknown; providerAdvertisedPolicy?: unknown }
-    if (typeof policy.model === 'string' && policy.model) return policy.model
-    if (Array.isArray(policy.providerAdvertisedPolicy)) {
-      for (const candidate of policy.providerAdvertisedPolicy) {
-        if (
-          candidate &&
-          typeof candidate === 'object' &&
-          candidate.category === 'model' &&
-          typeof candidate.value === 'string'
-        )
-          return candidate.value
-      }
-    }
-  } catch {
-    /* The historical turn has no usable model declaration. */
-  }
-  return null
-}
+import { modelAtTurn, usageRecords, type UsageEventInput } from './usageRecords'
 
 function matches(record: ReturnType<typeof usageRecords>[number], predicate: DataPredicate): boolean {
   if (predicate.kind !== 'comparison')

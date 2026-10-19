@@ -1,5 +1,76 @@
 # Phase 2: record the facts of each finished turn
 
+## Completion note
+
+Built on October 20, 2026, on branch `phase-2-turn-facts`.
+
+What landed:
+
+- `agent_turn_facts`, migration `0019_agent_turn_facts.sql`, with the columns and indexes below.
+  `project_id` is nullable, for a task core no longer knows.
+- `computeTurnFacts` in `turnFacts.ts` holds the rules. `TurnFactsWriter` in `turnFactsWriter.ts`
+  reads one turn and upserts its row in one transaction. `AgentLifecycle.announceTurn` calls
+  `onTurnSettled` before its publisher check. The engine loads the writer on the first settled turn,
+  then publishes `plugin:agents:turn-facts`, which is in the manifest's `emits` and the lifecycle
+  contract.
+- `backfillTurnFacts` in `turnFactsBackfill.ts` runs after the ledger compaction, from
+  `repairHistoryInBackground`, which replaces `compactLedgersInBackground`.
+- `AgentStore.deleteSession` removes a session's facts. The task purge goes through it. The retention
+  pass keeps them.
+- [Turn facts](../../managed-agents/turn-facts.md) documents the table, the rules, and the
+  measurements. Session events, plugin events, history retention, and `docs/managed-agents.md` link
+  to it.
+
+Decisions and deviations:
+
+- A reported cost is the session's running total for every harness. ACP defines it that way, and the
+  owner's database agrees: one Claude session reported 0.31, 0.64, 3.05, 3.99, then 4.25 USD over five
+  turns. `usageDeltas` in `usageRecords.ts` counts cost from the session's previous report. This also
+  fixes the `usage-records` source, which counted each Claude turn's whole running total. On the copy,
+  Claude's facts summed to 6,583 USD with the fix and 20,116 USD without it, against 6,707 USD in the
+  sessions' final reports.
+- The usage baseline applies to every harness, because cost needs one. It comes from the newest
+  earlier turn's `usage_json` that carries a token count or a cost, so it reads the session's turns,
+  never its events. When the previous turn's last report carries no total, the baseline comes from
+  an older turn, and the turn also counts what the previous one added.
+- Failure runs and repeat runs are counted per stream, the session and each subagent, because parallel
+  subagents interleave their calls. Repeats use the repeated-call warning's identity: kind, MCP name,
+  and input.
+- A blocked request counts toward neither `approvals` nor `approval_wait_ms`. An expired one waited
+  until the turn ended.
+- A turn that never started gets no row, like a `steered` one.
+- A backfilled row publishes no frame. A pass over the owner's history would send about 3,300.
+- A backfill step ends early once its writes have held the database for 100 ms. A step of 50 held it
+  for 208 ms, because one turn has 18,966 events and takes about 62 ms on its own.
+- The writer drops text, tool output, and patches in SQLite with `json_remove`, so a long turn sends
+  about a fifth of its bytes to JavaScript.
+- The Node service's size ceiling went from 1,900,300 to 1,903,000 bytes. The table definition sits
+  in the boot graph, because `schema.ts` is a static import and drizzle-kit reads it. With the engine
+  wiring, the boot graph grew 2,708 bytes. The writer, the rules, and the backfill load on first use.
+
+Acceptance, measured on October 20, 2026:
+
+- A runtime test drives a fake-driver turn and sees the row, then `turn-facts`, within a second. The
+  frame's listener reads the row as it arrives.
+- A test puts 10,000 earlier events in the session. The writer reads the turn's three events, and the
+  query plan is one search of `agent_events_turn_seq_idx`.
+- The canonical session's largest turn has 19 events. Its facts took 0.61 ms at the 95th percentile.
+- The backfill on a copy of the owner's 3.4 GB `agents.sqlite` wrote 3,294 rows in 4.1 seconds, in 68
+  steps. The longest step held the database for 161 ms.
+- The retention test shows a session's facts survive its history removal and go when its task is
+  purged.
+
+For later phases:
+
+- Phase 3 prices tokens at read time. Claude Code reports no token counts, only cost and context, so
+  a Claude turn's spend is `reported_cost_usd` or nothing. Codex reports tokens and no cost.
+- `usageDeltas` is the shared delta rule. The sources should use it rather than copy it.
+- Raise `TURN_FACTS_VERSION` when a rule changes, and the next start rewrites every row.
+- Out of scope, and still wrong: a workflow step's usage sums Claude's per-turn costs
+  (`operationUsage` in `sessionExecute.ts`), and
+  [unattended follow-ups](../../managed-agents/unattended-follow-ups.md#usage) calls Claude a per-turn
+  provider. A step with continuation turns overcounts its cost.
+
 Date: October 19, 2026. Status: proposed. Needs nothing.
 
 ## Goal

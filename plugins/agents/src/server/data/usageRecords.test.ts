@@ -27,6 +27,21 @@ describe('usage records', () => {
     expect(inside[0]?.data).toMatchObject({ model: 'gpt-6-astra', inputTokens: 40, costSource: 'estimated' })
   })
 
+  it("counts a reported cost from the session's previous report, because it is the session's running total", () => {
+    const report = (id: string, turnId: string, amount: number): UsageEventInput => ({
+      ...event(id, 1, 'claude-fable-5-1', 0),
+      provider: 'claude',
+      turnId,
+      usage: { contextUsed: 1_000, cost: { amount, currency: 'USD' } },
+    })
+    const records = usageRecords(
+      [report('first', 'turn-1', 0.31), report('second', 'turn-2', 0.64), report('third', 'turn-2', 0.7)],
+      emptyAgentPricingPreferences(),
+    )
+    expect(records.map((record) => Number(record.data.costUsd?.toFixed(2)))).toEqual([0.31, 0.33, 0.06])
+    expect(records.every((record) => record.data.costSource === 'reported')).toBe(true)
+  })
+
   it('leaves an unpriced model unknown', () => {
     const records = usageRecords([event('one', 1, 'future-model', 100)], emptyAgentPricingPreferences())
     expect(records[0]?.data).toMatchObject({ costUsd: null, costSource: 'unknown', priceName: null })

@@ -57,6 +57,8 @@ import type { AgentDriverSession } from '../drivers/types'
 import { eventSubagentId, isActiveSubagent, quietedSubagents, SUBAGENT_QUIET_MS } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import type { RepeatedToolCallWarnings } from './repeatedToolCalls'
+import type { TurnFactsWriter } from './turnFactsWriter'
+import type { AgentLifecyclePublisher } from '../../contract/lifecycle'
 import type { CommandScope } from './commandLifecycle'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
@@ -268,9 +270,12 @@ export class ManagedAgentEngine {
   private readonly turnSpans = new Map<string, TurnSpan>()
   private readonly queue: QueueCoordinator
   private readonly subagentQuietMs: number
-  // The background pass over rows stored before the ledger fold, started by the runtime's reconcile().
-  // See compactLedgersInBackground().
-  private ledgerCompaction: { controller: AbortController; done: Promise<void> } | null = null
+  // The background passes over stored history, started by the runtime's reconcile(). See
+  // repairHistoryInBackground().
+  private historyRepair: { controller: AbortController; done: Promise<void> } | null = null
+  // Loaded on the first turn that settles.
+  private turnFacts: Promise<TurnFactsWriter> | null = null
+  private readonly publishLifecycle: AgentLifecyclePublisher
   private readonly providerEvents: DurableAgentEventBuffer
   private readonly eventMaterializer: ProviderEventMaterializer
   private readonly shutdown = new AbortController()
@@ -299,8 +304,15 @@ export class ManagedAgentEngine {
     this.accounts = options.accounts ?? new AgentAccounts(agentAccountsRoot(options.dataDir))
     this.registry = options.registry ?? agentDriverRegistry
     const publish = options.publish
-    this.store = new AgentStore(options.db, options.core, (frame) => {
+    this.publishLifecycle = (frame) => {
       if (!this.stopped) publish?.(frame)
+    }
+    this.store = new AgentStore(options.db, options.core, this.publishLifecycle, (turnId) => {
+      this.turnFactsWriter()
+        .then((writer) => {
+          if (!this.stopped) writer.enqueue(turnId)
+        })
+        .catch((error: unknown) => log.warn(`could not load the turn facts writer: ${describeError(error).message}`))
     })
     this.processes = new ProviderSessionLifecycle(
       {
@@ -535,28 +547,56 @@ export class ManagedAgentEngine {
     return { session, input: enqueued.input, outcome }
   }
 
-  // Tool calls and file changes stored before the ledger fold, put into the shape it writes. Startup
-  // repair rather than a schedule: it converges, and each session is done once (docs/schedules.md §
-  // Limits). Not awaited, because a pass over a large database takes many seconds and boot waits on the
-  // runtime's reconcile().
-  compactLedgersInBackground(): void {
-    if (this.stopped || this.ledgerCompaction) return
+  private turnFactsWriter(): Promise<TurnFactsWriter> {
+    return (this.turnFacts ??= import('./turnFactsWriter').then(
+      ({ TurnFactsWriter }) =>
+        new TurnFactsWriter({
+          db: this.db,
+          projectOf: (taskId) => this.projectOf(taskId),
+          written: (facts) =>
+            this.publishLifecycle({
+              channel: 'plugin:agents:turn-facts',
+              taskId: facts.taskId,
+              sessionId: facts.sessionId,
+              turnId: facts.turnId,
+            }),
+        }),
+    ))
+  }
+
+  private async projectOf(taskId: string): Promise<string | null> {
+    return (await this.core.tasks.load(taskId))?.projectId ?? null
+  }
+
+  // Startup repair rather than a schedule: each pass converges, and does a session or a turn once
+  // (docs/schedules.md § Limits). First the tool calls and file changes stored before the ledger fold,
+  // put into the shape it writes, then the facts of finished turns that have none. Not awaited, because
+  // a pass over a large database takes many seconds and boot waits on the runtime's reconcile().
+  repairHistoryInBackground(): void {
+    if (this.stopped || this.historyRepair) return
     const controller = new AbortController()
     const done = compactLedgers(this.db, {
       signal: controller.signal,
       onError: (sessionId, error) =>
         log.warn(`could not compact session ${sessionId}: ${describeError(error).message}`),
-    }).then(
-      (totals) => {
-        if (totals.deleted || totals.rewritten) {
-          log.info(
-            `compacted ${totals.sessions} sessions: removed ${totals.deleted} superseded rows, rewrote ${totals.rewritten}`,
-          )
-        }
-      },
-      (error: unknown) => log.warn(`ledger compaction stopped: ${describeError(error).message}`),
-    )
-    this.ledgerCompaction = { controller, done }
+    })
+      .then(
+        (totals) => {
+          if (totals.deleted || totals.rewritten) {
+            log.info(
+              `compacted ${totals.sessions} sessions: removed ${totals.deleted} superseded rows, rewrote ${totals.rewritten}`,
+            )
+          }
+        },
+        (error: unknown) => log.warn(`ledger compaction stopped: ${describeError(error).message}`),
+      )
+      .then(async () => {
+        if (controller.signal.aborted) return
+        const { backfillTurnFacts } = await import('./turnFactsBackfill')
+        await backfillTurnFacts(this.db, { projectOf: (taskId) => this.projectOf(taskId), signal: controller.signal })
+      })
+      .catch((error: unknown) => log.warn(`turn facts backfill stopped: ${describeError(error).message}`))
+    this.historyRepair = { controller, done }
   }
 
   // Releases what this engine holds, in the order docs/managed-agents/operations.md § Operations and failure
@@ -572,9 +612,9 @@ export class ManagedAgentEngine {
     this.processes.abortAndClearTimers()
     const queueDrain = this.queue.stop()
     // Stops at its next step. Awaited, because the database closes once stop() returns.
-    this.ledgerCompaction?.controller.abort()
-    await this.ledgerCompaction?.done
-    this.ledgerCompaction = null
+    this.historyRepair?.controller.abort()
+    await this.historyRepair?.done
+    this.historyRepair = null
     let retirementFailure: unknown
     try {
       await this.processes.stopAll()
@@ -589,6 +629,7 @@ export class ManagedAgentEngine {
     await this.processes.joinCallbacks()
     await this.providerEvents.flushAll()
     await this.store.flushSearch()
+    await (await this.turnFacts)?.idle()
     await this.frames.stop()
     await this.webhooks.stop()
     this.turnSpans.clear()

@@ -75,8 +75,12 @@ export type AgentActivityEvent = { taskId: string; sessionId: string } & (
   | { kind: 'usage'; usage: AgentActivityUsage }
 )
 
+/** A finished turn's facts row was written. The row holds numbers only, read through the agents sources. */
+type AgentTurnFactsEvent = { taskId: string; sessionId: string; turnId: string }
+
 export type AgentLifecycleFrame =
   | ({ channel: 'plugin:agents:turn-changed' } & AgentTurnChangedEvent)
+  | ({ channel: 'plugin:agents:turn-facts' } & AgentTurnFactsEvent)
   | ({ channel: 'plugin:agents:request-changed' } & AgentRequestChangedEvent)
   | ({ channel: 'plugin:agents:sessions-changed' } & AgentSessionsChangedEvent)
   | ({ channel: 'plugin:agents:activity' } & AgentActivityEvent)

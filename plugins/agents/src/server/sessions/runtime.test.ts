@@ -27,6 +27,7 @@ import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDri
 import { AgentDriverRegistry } from '../drivers/registry'
 import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
+import * as agentSchema from '../../node/schema'
 import { createSessionControl } from './sessionControl'
 import { BIND_CAPABILITY_CALLER } from '@acorn/protocol/plugin/ids.ts'
 import type { AgentSessionControl } from '../../contract/sessionExecute'
@@ -962,6 +963,51 @@ describe('managed agent runtime conformance', () => {
         attempt: 1,
       },
     ])
+  })
+
+  it("writes a finished turn's facts within a second, then publishes turn-facts", async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => new FakeAgentDriver())
+    const announced: Array<{ frame: AgentLifecycleFrame; stored: boolean }> = []
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+      publish: (frame) => {
+        if (frame.channel !== 'plugin:agents:turn-facts') return
+        const stored = pluginDb.db
+          .select()
+          .from(agentSchema.agentTurnFacts)
+          .where(eq(agentSchema.agentTurnFacts.turnId, frame.turnId))
+          .get()
+        announced.push({ frame, stored: stored !== undefined })
+      },
+    })
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
+    const turn = await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Exercise the protocol.' }],
+      source: 'interactive',
+      effectivePolicy: { providerDefault: true },
+      idempotencyKey: randomUUID(),
+    })
+    await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+
+    await vi.waitFor(() => expect(announced).toHaveLength(1), { timeout: 1_000 })
+    expect(announced[0]).toEqual({
+      frame: { channel: 'plugin:agents:turn-facts', taskId: seed.taskId, sessionId: session.id, turnId: turn.id },
+      stored: true,
+    })
   })
 
   it('sends the session row when a recorded event changes it, not after every event', async () => {
