@@ -50,6 +50,17 @@ const keyPrefix = (key: readonly unknown[]): string =>
     .filter((part) => typeof part === 'string')
     .join('.') || 'unknown'
 
+const QUERY_REPORT_INTERVAL_MS = 10 * 60_000
+const lastReported = new Map<string, number>()
+
+// Expired entries go on every call, so a message carrying an id cannot grow the map for the session.
+const firstInWindow = (signature: string, now = Date.now()): boolean => {
+  for (const [key, at] of lastReported) if (now - at >= QUERY_REPORT_INTERVAL_MS) lastReported.delete(key)
+  if (lastReported.has(signature)) return false
+  lastReported.set(signature, now)
+  return true
+}
+
 /**
  * Every failed read and every failed write on one node, as a handled error record.
  *
@@ -60,11 +71,16 @@ const keyPrefix = (key: readonly unknown[]): string =>
  * Handled, always. The UI has already dealt with these: a failed read leaves the last-known data on
  * screen with a stale badge, and a failed write surfaces a notice and keeps the draft
  * (docs/ui-design/states.md § Connection and staleness vocabulary). What the record adds is a count.
+ *
+ * A failed read reports once per distinct error every ten minutes. A polled read fails the same way
+ * on every cycle while its node is down or its schema disagrees with the node's, and on 2026-10-07
+ * and 2026-10-18 that sent thousands of identical events to Sentry from one machine.
  */
 const failureCaches = () => ({
   queryCache: new QueryCache({
     onError: (error, query) => {
       const described = describeError(error)
+      if (!firstInWindow(`${described.name}: ${described.message}`)) return
       emitError('core', {
         ...described,
         handled: true,
@@ -343,6 +359,7 @@ export async function persistedCacheSize(nodeId: string): Promise<{ bytes: numbe
 export function _resetFleet(): void {
   subscribed = false
   chased.clear()
+  lastReported.clear()
   for (const cache of caches.values()) {
     void cache.persistence.retire().catch(() => {})
     cache.client.clear()

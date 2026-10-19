@@ -7,6 +7,9 @@ import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 const idb = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), del: vi.fn(async () => {}) }))
 vi.mock('idb-keyval', () => idb)
 
+const emitError = vi.hoisted(() => vi.fn())
+vi.mock('../telemetry/emitter', async (original) => ({ ...(await original<object>()), emitError }))
+
 const {
   _resetFleet,
   cacheKeyFor,
@@ -53,7 +56,36 @@ beforeEach(() => {
   _resetFleet()
   setActiveNode(null)
   idb.del.mockClear()
+  emitError.mockClear()
   vi.unstubAllGlobals()
+})
+
+describe('query failure reports', () => {
+  const fail = (key: string, message: string) =>
+    clientFor('node-a')
+      .client.fetchQuery({ queryKey: [key], queryFn: () => Promise.reject(new Error(message)), retry: false })
+      .catch(() => {})
+
+  it('reports a repeated failure once and a different failure again', async () => {
+    await fail('attention', 'The node did not answer within 30000ms')
+    await fail('prefs', 'The node did not answer within 30000ms')
+    expect(emitError).toHaveBeenCalledTimes(1)
+
+    await fail('prefs', 'Invalid input')
+    expect(emitError).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports the same failure again once ten minutes have passed', async () => {
+    vi.useFakeTimers({ now: 0, toFake: ['Date'] })
+    try {
+      await fail('attention', 'down')
+      vi.setSystemTime(10 * 60_000)
+      await fail('attention', 'down')
+      expect(emitError).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('per-node cache partitioning', () => {
