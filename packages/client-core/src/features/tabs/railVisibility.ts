@@ -2,8 +2,6 @@ import { createMemo } from 'solid-js'
 import { createQuery, useQueryClient, type QueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '../../infra/queries'
 import { defaultSourceId, sourceRegistry, type SourceContribution } from '../../host/registries/sources/sources'
-import { commandRegistry } from '../../host/registries/commands/commands'
-import type { SourceEntry } from './railSources'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { readDevicePrefs } from '../../infra/persistence/devicePrefs'
 import { saveJsonPref, type SavePrefOptions } from '../settings/savePref'
@@ -93,20 +91,4 @@ export function createRailVisibility() {
     setShown: (pluginId: string, sourceId: string, shown: boolean, options?: SavePrefOptions) =>
       setShownInRail(queryClient, pluginId, sourceId, shown, options),
   }
-}
-
-/** The command id docker, agents and github already use for "open my source". The palette's
- *  generated opener stands aside for it. */
-export const pluginOpenerId = (sourceId: string): string => `source.${sourceId}.open`
-
-/** Which openable sources get a generated palette opener: the ones the rail is not drawing, less any
- *  whose plugin already opens it with its own command. */
-export function hiddenSourcesToOpen(
-  available: readonly SourceEntry[],
-  railVisibility: string | undefined,
-): SourceEntry[] {
-  const visibility = parseRailVisibility(railVisibility)
-  return available.filter(
-    (source) => !shownInRail(source.id, visibility) && !commandRegistry.get(pluginOpenerId(source.id)),
-  )
 }

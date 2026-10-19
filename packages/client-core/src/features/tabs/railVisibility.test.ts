@@ -2,18 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { QueryClient } from '@tanstack/solid-query'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import { sourceRegistry } from '../../host/registries/sources/sources'
-import { commandRegistry } from '../../host/registries/commands/commands'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { selectedSource, setSelectedSource } from '../tasks/tasks'
-import {
-  hiddenSourcesToOpen,
-  parseRailVisibility,
-  pluginOpenerId,
-  pluginSources,
-  railVisibilityKey,
-  setShownInRail,
-  shownInRail,
-} from './railVisibility'
+import { parseRailVisibility, pluginSources, railVisibilityKey, setShownInRail, shownInRail } from './railVisibility'
 
 // Presentation over availability: the user's switch beats the source's default, core's own sources
 // are never hideable, and hiding the source on screen is the one thing that changes the selection.
@@ -55,23 +46,6 @@ describe('rail visibility', () => {
       'board-plugin/board',
     ])
     expect(pluginSources('board-plugin').map((row) => row.source.id)).toEqual(['board'])
-  })
-
-  it('offers a palette opener for a hidden source unless its plugin already has one', () => {
-    const entries = [
-      { id: 'board', glyph: 'kanban', label: 'Board' },
-      { id: 'docker', glyph: 'box', label: 'Docker' },
-    ]
-    const hideDocker = JSON.stringify({ [railVisibilityKey('docker', 'docker')]: false })
-    expect(hiddenSourcesToOpen(entries, hideDocker).map((source) => source.id)).toEqual(['board', 'docker'])
-    const own = commandRegistry.register({
-      id: pluginOpenerId('docker'),
-      title: 'Open Docker',
-      category: 'navigation',
-      run: () => {},
-    })
-    expect(hiddenSourcesToOpen(entries, hideDocker).map((source) => source.id)).toEqual(['board'])
-    own.dispose()
   })
 
   it('goes Home when the source on screen is hidden, and stays put otherwise', async () => {

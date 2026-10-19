@@ -9,7 +9,7 @@ import { createFleetWorkspaces } from '../../features/workspaces/fleetWorkspaces
 import type { CommandExecutionContext } from '../registries/commands/commands'
 import { registerNavigationCommands } from '../registries/commands/navigationCommands'
 import { createRouterNavigation } from './routerNavigation'
-import { registerHiddenSourceOpeners } from './sourceOpeners'
+import { registerDesktopSourceOpeners } from './sourceOpeners'
 import { createCommandPaletteView } from './paletteView'
 import { Alert } from '../../kit/components/primitives'
 import { PaletteSurface } from './PaletteSurface'
@@ -76,8 +76,8 @@ export default function CommandPalette() {
     const commands = registerNavigationCommands(navigation)
     onCleanup(() => commands.dispose())
   })
-  // A way back to every plugin source the rail is not drawing.
-  registerHiddenSourceOpeners(() => context().workspaceId)
+  // Open <label> for every source the rail can draw, each with a shortcut the person can set.
+  registerDesktopSourceOpeners(() => context().workspaceId)
 
   // Back to a frame further up, as Escape would get there one step at a time.
   const popTo = (depth: number) => {

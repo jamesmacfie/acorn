@@ -76,7 +76,8 @@ export function sourceRegistrations() {
   const roots = [...CORE_ROOTS, ...[...compiled, ...bundled].map((id) => `plugins/${id}/src`)]
   return roots.flatMap(files).flatMap((file) => {
     const text = readFileSync(join(ROOT, file), 'utf8')
-    return [...text.matchAll(CHORD)].map((match) => {
+    // An empty default is a shortcut that starts unbound, so it has no row in a list of defaults.
+    return [...text.matchAll(CHORD)].filter((match) => match[2] ?? match[3]).map((match) => {
       const object = enclosingObject(text, match.index)
       return {
         file,

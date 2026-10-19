@@ -47,15 +47,26 @@ Appearance's five choices and the six notification switches are core's, in
 Settings pages registers their commands, so a client with no Appearance page has no Appearance
 command.
 
-### Openers for hidden rail sources
+### Rail source openers
 
-The desktop palette registers **Open \<label\>** at the root for every plugin source that can open
-but that the rail isn't drawing (`packages/client-core/src/host/palette/sourceOpeners.ts`,
-[frontend](../frontend/rail-and-routing.md) § Rail source visibility). The rows follow the availability list, so a
-row disappears when its plugin unloads, loses trust, or its provider or workspace gate closes.
-Picking one follows a rail click's project rule. A project-scoped source with no project to show
-throws, and the palette shows the error. A plugin that ships its own `source.<id>.open` command, as
-Docker, Agent Center, and GitHub do, keeps that row and gets no second one.
+Both palettes register **Open \<label\>** at the root for every source the rail can draw, core's
+Home, Fleet, and Archive included (`packages/client-core/src/features/tabs/sourceOpeners.ts`). The
+host owns every one, as `source.<id>.open`, so a plugin declares none. The rows follow the
+availability list, so a row disappears when its plugin unloads, loses trust, or its provider or
+workspace gate closes, or when the active Node lacks the plugin. A row searches on the source's
+label, `rail`, and `source`.
+
+On the desktop (`packages/client-core/src/host/palette/sourceOpeners.ts`), picking a row follows a
+rail click's project rule. A project-scoped source with no project to show throws, and the palette
+shows the error. A row for a source the rail isn't drawing carries the hint **hidden from the left
+rail** ([frontend](../frontend/rail-and-routing.md) § Rail source visibility). Each row also has a
+shortcut in the **Rail** group of Settings → Shortcuts. It starts unbound, and no source has a
+default chord. The command palette registers the rows, and the overlay slot mounts it for the
+window's life, so a key the person sets works before the palette has opened.
+
+The terminal client registers the same rows from its source menu's list and opens a source by
+selecting it in that menu. It shows no hint, because it has no rail switch, and it registers no
+shortcuts, because its keys are its own keymap's.
 
 ### Last workspace
 

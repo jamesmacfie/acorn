@@ -10,7 +10,6 @@ searches, and [command kinds](../plugins/commands.md#command-kinds) holds the vo
 | --- | --- | --- |
 | New agent session | Search, task-scoped | Lists installed harnesses, then the custom agents on them. Picking one creates the session, selects it, and shows the Agent pane |
 | New *harness* session, New *agent* session | Action, task-scoped | One row per choice New agent session lists, so typing a harness or agent name finds it. IDs are `agents.harness.<provider>` and `agents.custom-agent.<id>`. Desktop only |
-| Open Agent Center | Action, no scope | Selects the `agents` rail source |
 | Mark all agents read | Action, no scope | Clears every finished or failed agent and marks their notices read. Shown only when one exists |
 | Find an agent session | Search, task-scoped | The Node's search over session titles, events, and artifacts, for the captured task |
 | New Claude Code terminal | Action, needs a task | Opens a terminal on the `claude-code` profile and focuses it |

@@ -121,7 +121,7 @@ covers the task side.
 
 ## Agent Center
 
-Agent Center is the **Agents** source in the left rail, or **Open Agent Center** in the palette. It
+Agent Center is the **Agents** source in the left rail, or **Open Agents** in the palette. It
 lists sessions across tasks with their state, counts how many are working and how many need you, and
 shows each harness's health. Search there covers every session's transcript
 ([Search agent history](/docs/agents/search-agent-history/)).

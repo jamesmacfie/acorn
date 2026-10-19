@@ -41,7 +41,7 @@ rebinding the palette in Settings doesn't change this native fallback.
 [The palette session](./command-palette-and-shortcuts/palette.md) covers the one session both hosts
 draw: groups, search, input, and setting commands, scopes, outcomes, and when the session closes.
 
-[Palette commands](./command-palette-and-shortcuts/commands.md) covers core's command tree, hidden
+[Palette commands](./command-palette-and-shortcuts/commands.md) covers core's command tree, the rail
 source openers, the last-workspace toggle, what each plugin contributes, and why every row is a
 command.
 

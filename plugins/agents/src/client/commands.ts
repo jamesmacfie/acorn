@@ -5,7 +5,6 @@ import {
   localSearch,
   readJson,
   registerCommands,
-  setSelectedSource,
   type CommandOutcome,
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
@@ -137,18 +136,6 @@ export const agentsCommands: readonly ContributedCommand[] = [
       )
       return COMMAND_CLOSED
     },
-  },
-  {
-    id: 'source.agents.open',
-    title: 'Open Agent Center',
-    hint: 'every agent session on this computer',
-    keywords: ['agents', 'sessions'],
-    category: 'navigation',
-    palette: true,
-    // The rail is this device's view of the node, not a property of any one task or project.
-    scope: 'none',
-    requires: { plugin: 'agents' },
-    run: () => setSelectedSource('agents'),
   },
   {
     id: 'agents.sessions.mark-read',

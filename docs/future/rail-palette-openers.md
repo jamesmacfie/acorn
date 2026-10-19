@@ -1,6 +1,7 @@
 # Open every rail source from the palette
 
-Date: October 19, 2026. Status: proposed. Baseline: `bf0e4ee8c`.
+Date: October 19, 2026. Status: implemented October 19, 2026, except the check on a second Node
+without Docker. Baseline: `bf0e4ee8c`.
 
 This product requirements document covers palette rows and optional shortcuts for the desktop
 left rail's source icons. It is for implementers of client-core's palette and keybinding hosts.

@@ -141,7 +141,7 @@ in `plugins/agents/src/client/settings/*.test.tsx`, `AgentToolsSettings.test.tsx
      page. Confirm that the strip sits above the page, outside it, and stays in place while the page
      scrolls.
 133. On **Rail and surfaces**, hide a plugin source. Confirm that its icon leaves the rail, that the
-     palette offers **Open <source>** and opens it, that the source stays open after it is opened from
+     palette's **Open <source>** row gains the **hidden from the left rail** hint and opens it, that the source stays open after it is opened from
      the palette, and that hiding it while it is selected returns to Home. Reorder the rail while it is
      hidden, show it again, and confirm that it returns to its slot. In the terminal client, confirm
      that the source is still in the source menu.

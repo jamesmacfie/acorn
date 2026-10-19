@@ -30,8 +30,9 @@ when the annotation or rail contracts change.
     focus it and press `Shift+F10` to inspect every marker label in the **Task markers** list.
 
 145. Install a loaded plugin whose source declares `showInRailByDefault: false` and whose settings page
-     declares `railSourceVisibility`. Confirm that no rail icon appears and the palette offers
-     **Open <label>**, which opens the source without adding the icon.
+     declares `railSourceVisibility`. Confirm that no rail icon appears and the palette's
+     **Open <label>** row carries the **hidden from the left rail** hint and opens the source without
+     adding the icon.
 146. Turn **Show in left rail** on from the plugin's page. Confirm that the icon appears at once, the
      switch under Settings > Plugins agrees, and the current view does not change. Drag the icons, hide
      it again while it is selected, and confirm that the window returns to Home and the drag kept its

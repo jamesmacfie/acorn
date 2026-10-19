@@ -56,8 +56,8 @@ describe('the docker plugin catalogue', () => {
     mocks.fetchNetworks.mockResolvedValue([{ id: 'n1', name: 'acorn_default', driver: 'bridge' }])
   })
 
-  it('is one open action and one node-scoped search, both gated on the plugin', () => {
-    expect(dockerCommands.map((command) => command.id)).toEqual(['source.docker.open', 'docker.find'])
+  it('is one node-scoped search, gated on the plugin', () => {
+    expect(dockerCommands.map((command) => command.id)).toEqual(['docker.find'])
     for (const command of dockerCommands) {
       expect(command.requires, command.id).toEqual({ plugin: 'docker' })
       expect(command.scope, command.id).toBe('none')
@@ -65,11 +65,6 @@ describe('the docker plugin catalogue', () => {
     }
     expect(find().debounceMs).toBe(0)
     expect(find().minQueryLength).toBe(0)
-  })
-
-  it('opens the rail source', () => {
-    ;(at('source.docker.open') as { run: (c: CommandExecutionContext) => void }).run(context())
-    expect(mocks.setSelectedSource).toHaveBeenCalledWith('docker')
   })
 
   it('lists all four kinds, each badged and namespaced by the list it came from', async () => {

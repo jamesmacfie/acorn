@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   providers: vi.fn(),
   startSession: vi.fn(),
   readJson: vi.fn(),
-  setSelectedSource: vi.fn(),
   openManagedSession: vi.fn(),
   requestComposerFocus: vi.fn(),
 }))
@@ -26,13 +25,12 @@ vi.mock('./sessions/managedStore', () => ({
 }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  setSelectedSource: mocks.setSelectedSource,
   readJson: mocks.readJson,
 }))
 
 import { agentsCommands } from './commands'
 
-// Agent Center and the managed-session search. What is pinned is the scope the search asks the node
+// The managed-session commands and search. What is pinned is the scope the search asks the node
 // for, the node it asks, and that picking a row goes through the retained selection path rather than
 // through a second one of this plugin's own.
 
@@ -105,26 +103,19 @@ describe('the agents plugin catalogue', () => {
     mocks.readJson.mockResolvedValue([])
   })
 
-  it('registers session goals, the rail source, mark-all-read, and two task-scoped searches', () => {
+  it('registers session goals, mark-all-read, and two task-scoped searches', () => {
     expect(agentsCommands.map((command) => command.id)).toEqual([
       'agents.goal.set',
       'agents.sessions.new',
-      'source.agents.open',
       'agents.sessions.mark-read',
       'agents.sessions.find',
     ])
     expect(at('agents.goal.set')).toMatchObject({ scope: 'task', palette: true, requires: { plugin: 'agents' } })
     expect(start()).toMatchObject({ kind: 'search', scope: 'task', palette: true, requires: { plugin: 'agents' } })
-    expect(at('source.agents.open')).toMatchObject({ palette: true, scope: 'none', requires: { plugin: 'agents' } })
     expect(find()).toMatchObject({ kind: 'search', scope: 'task', palette: true, requires: { plugin: 'agents' } })
     // Remote, so the defaults apply: it waits for the typing to stop and for two characters.
     expect(find().debounceMs).toBeUndefined()
     expect(find().minQueryLength).toBeUndefined()
-  })
-
-  it('opens the rail source rather than a pane', () => {
-    ;(at('source.agents.open') as { run: (c: CommandExecutionContext) => void }).run(context())
-    expect(mocks.setSelectedSource).toHaveBeenCalledWith('agents')
   })
 
   it('asks the captured node about the captured task, and caps what it asks for', async () => {

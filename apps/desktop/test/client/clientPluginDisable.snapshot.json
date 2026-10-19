@@ -18,12 +18,9 @@
       "task.terminal.new-codex",
       "agents.goal.set",
       "agents.sessions.new",
-      "source.agents.open",
       "agents.sessions.mark-read",
       "agents.sessions.find",
-      "source.bitbucket.open",
       "context.open",
-      "source.docker.open",
       "docker.find",
       "editor.tree.collapse",
       "editor.tree.reveal-active",
@@ -31,8 +28,6 @@
       "editor.files.open",
       "editor.navigation.go-to-line",
       "editor.search.open",
-      "source.github.open",
-      "source.gitlab.open",
       "changes.open",
       "memory.search",
       "notes.find",
@@ -189,9 +184,6 @@
       "panes": [
         "bitbucket-pr"
       ],
-      "commands": [
-        "source.bitbucket.open"
-      ],
       "sources": [
         "bitbucket"
       ],
@@ -240,7 +232,6 @@
         "docker"
       ],
       "commands": [
-        "source.docker.open",
         "docker.find"
       ],
       "sources": [
@@ -301,9 +292,6 @@
       "panes": [
         "pr"
       ],
-      "commands": [
-        "source.github.open"
-      ],
       "sources": [
         "github"
       ],
@@ -337,9 +325,6 @@
     "gitlab": {
       "panes": [
         "mr"
-      ],
-      "commands": [
-        "source.gitlab.open"
       ],
       "sources": [
         "gitlab"

@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import { type ClientPlugin, setSelectedSource } from '@acorn/plugin-api/client'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { changeRequestPoints } from '@acorn/change-request-ui/model'
 import { parsePullRequestRef, sameRepository } from '../shared/pullRequestRef'
 import { bitbucketBrowsePath, bitbucketRouteContributions, taskPullRequest } from './clientRoutes'
@@ -60,13 +60,6 @@ export const bitbucketClientPlugin: ClientPlugin = {
       label: 'Import from Bitbucket',
       glyph: 'brand:bitbucket',
       component: BitbucketImporter,
-    })
-    ctx.commands.register({
-      id: 'source.bitbucket.open',
-      title: 'Open Bitbucket',
-      category: 'navigation',
-      palette: true,
-      run: () => setSelectedSource('bitbucket'),
     })
     ctx.panes.register(prPaneContribution)
     ctx.railMarkers.register(prRailMarkerContribution)

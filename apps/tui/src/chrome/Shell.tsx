@@ -20,12 +20,14 @@ import type { KeyEvent } from '../keyEvent'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { WORKSPACES_PREF_KEY, workspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import { workspaceWords } from '@acorn/client-core/features/workspaces'
+import { registerSourceOpeners } from '@acorn/client-core/features/tabs'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { focusedPane, selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import { setActiveItem } from '@acorn/client-core/kit/keys'
+import { focusedPane, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { isTerminalOpen, setTerminalOpen } from '@acorn/client-core/features/tasks/tasks.ts'
 import {
   buildLink,
@@ -49,7 +51,15 @@ import { EmptyState, keyedRows, Row, Rows } from '../kit/showing'
 import { Modal, ModalBody } from '../kit/grouping'
 import { PanelBody } from '../panel'
 import { installCommandLayer } from '../keys/commandLayer'
-import { focusWithin, regionFocus, scheduleSettle, setPaneCycler, setTopology } from '../keys/regions'
+import {
+  focusWithin,
+  regionFocus,
+  requestRenderableFocus,
+  scheduleSettle,
+  setPaneCycler,
+  setTopology,
+} from '../keys/regions'
+import { itemByIdentity } from '../keys/collectionRegistry'
 import { startSpinner } from '../kit/tick'
 import { createShellModel, type ShellModel } from './model'
 import { installRestore } from './restore'
@@ -65,7 +75,7 @@ import {
   closeWorkflowGitLaunch,
 } from '@acorn/plugin-workflows/contract/gitLaunch.ts'
 import { cyclePane } from './panes'
-import { Rail, railCells } from './Rail'
+import { Rail, railCells, sourceCollectionId } from './Rail'
 import { PANES, SOURCE, topology } from './topology'
 import { Topbar } from './Topbar'
 import { PaneBody, PaneStrip } from './PaneRow'
@@ -141,6 +151,20 @@ export function Shell(props: {
   // One session for the whole shell, not one per open: `./Palette.tsx` is mounted only while the
   // overlay is up, and a shortcut aimed at a group has to be able to open it (./paletteSession.ts).
   const palette = createShellPalette(model)
+  // Open <label> for every source the Menu lists, from the table the desktop's rows come from. No
+  // shortcuts: this shell's keys are its own keymap's. The keys land on the new Menu row once the
+  // palette closes, because the Menu picks whichever row takes focus, and otherwise focus would go
+  // back to the old row and pick the old source again.
+  registerSourceOpeners({
+    sources: model.sources,
+    open: (source) => {
+      const menu = sourceCollectionId(model.workspace()?.id ?? 'loading')
+      setActiveItem(menu, source.id)
+      setSelectedSource(source.id)
+      const row = itemByIdentity(`${menu}\u0000${source.id}`)
+      if (row) requestRenderableFocus(row)
+    },
+  })
   // A navigation search opened during node startup may see an empty roster. Refresh only that
   // frame when its local source changes; the shared session still owns its query and selection.
   createEffect(

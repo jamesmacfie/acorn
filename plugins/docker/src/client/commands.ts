@@ -51,18 +51,6 @@ const origins = new WeakMap<CommandSearchItem, DockerScopeOwner>()
 
 export const dockerCommands: readonly ContributedCommand[] = [
   {
-    id: 'source.docker.open',
-    title: 'Open Docker',
-    hint: 'containers, images, volumes, and networks on this computer',
-    keywords: ['docker', 'containers'],
-    category: 'navigation',
-    palette: true,
-    // The rail is this device's view of the node, not a property of any one task or project.
-    scope: 'none',
-    requires: { plugin: 'docker' },
-    run: () => setSelectedSource('docker'),
-  },
-  {
     id: 'docker.find',
     kind: 'search',
     title: 'Find a Docker resource',

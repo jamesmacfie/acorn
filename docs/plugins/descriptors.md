@@ -38,7 +38,8 @@ can declare:
   and the Node confines it to the plugin's namespace like every other route. See
   [searching a source](#searching-a-source).
 - `showInRailByDefault: false`: the source starts with no desktop rail icon. It still registers, the
-  palette offers **Open <label>**, and the person's **Show in left rail** choice wins.
+  palette's **Open <label>** row still opens it, as it does for every source, and the person's
+  **Show in left rail** choice wins.
 - `requiresGitProject: true`: the source draws only while the active workspace has a Git project.
 - `emptyState`: one bounded message and at most one action, shown when the route answered with no
   items. It isn't shown when the fetch failed, because an unreachable Node has its own banner. It

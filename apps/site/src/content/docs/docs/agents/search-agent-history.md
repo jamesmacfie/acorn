@@ -19,7 +19,7 @@ file changes. The index stays on the Node.
 
 ## Search across tasks
 
-1. Open Agent Center: the **Agents** source in the left rail, or **Open Agent Center** in the palette.
+1. Open Agent Center: the **Agents** source in the left rail, or **Open Agents** in the palette.
 2. Type in **Search sessions**. Narrow it with **Provider**, the scope, and the session state.
 3. Pick a result to open that session in its task.
 

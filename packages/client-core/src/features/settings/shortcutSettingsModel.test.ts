@@ -22,10 +22,11 @@ describe('shortcut settings lifecycle', () => {
 
   it('identifies only unmatched plugin overrides as explicit cleanup candidates', () => {
     expect(
-      orphanedPluginOverrideIds({ core: 'meta+c', 'plugin.board.live': 'meta+l', 'plugin.old.gone': null }, [
-        binding('core'),
-        binding('plugin.board.live', 'enabled'),
-      ]),
+      // A source opener the active Node lacks is still a key the person set, not a removed plugin's.
+      orphanedPluginOverrideIds(
+        { core: 'meta+c', 'source.docker.open': 'meta+d', 'plugin.board.live': 'meta+l', 'plugin.old.gone': null },
+        [binding('core'), binding('plugin.board.live', 'enabled')],
+      ),
     ).toEqual(['plugin.old.gone'])
   })
 

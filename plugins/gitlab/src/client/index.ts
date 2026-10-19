@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import { type ClientPlugin, setSelectedSource } from '@acorn/plugin-api/client'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { changeRequestPoints } from '@acorn/change-request-ui/model'
 import { parseMergeRequestRef, samePath } from '../shared/mergeRequestRef'
 import { gitlabBrowsePath, gitlabRouteContributions, taskMergeRequest } from './clientRoutes'
@@ -59,13 +59,6 @@ export const gitlabClientPlugin: ClientPlugin = {
       label: 'Import from GitLab',
       glyph: 'brand:gitlab',
       component: GitlabImporter,
-    })
-    ctx.commands.register({
-      id: 'source.gitlab.open',
-      title: 'Open GitLab',
-      category: 'navigation',
-      palette: true,
-      run: () => setSelectedSource('gitlab'),
     })
     ctx.integrationFlows.register(gitlabIntegrationFlow)
     ctx.panes.register(mrPaneContribution)

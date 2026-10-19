@@ -74,7 +74,8 @@ frames: [{
 ```
 
 - `showInRailByDefault: false` on a source starts its icon hidden. The source still registers, its
-  commands and panes still work, and the palette offers **Open <label>**. The person's choice wins
+  commands and panes still work, and the palette's **Open <label>** row, which every source has, still
+  opens it. The person's choice wins
   over the default. Absent means shown.
 - `railSourceVisibility` lists up to 16 of your own source ids. An id that names a core source or
   another plugin's source is reported in the roster's `unknown` list, as

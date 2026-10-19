@@ -4,15 +4,14 @@ This page covers the GitHub plugin's commands, which of them the palette shows, 
 
 ## From the command palette
 
-Seven commands: six built as a function of what the router says
-(`plugins/github/src/client/commands.ts`) and one registered at boot beside the rail source
-(`plugins/github/src/client/index.ts`). How the palette itself works is
-[command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md); what belongs here is this
-plugin's share of it.
+Six commands, built as a function of what the router says (`plugins/github/src/client/commands.ts`).
+How the palette itself works is [command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md);
+what belongs here is this plugin's share of it. **Open GitHub** (`source.github.open`) isn't one of
+them: the host registers it, as it does for every rail source, with a shortcut that starts unbound
+([palette commands](../command-palette-and-shortcuts/commands.md) § Rail source openers).
 
 | Command | Kind | Chord | In the palette |
 | --- | --- | --- | --- |
-| Open GitHub (`source.github.open`) | action | `⌘0` | Yes |
 | Edit keyboard shortcuts (`help.shortcuts.open`) | action | `?` | No. The reference is a Settings page, and the palette already has a row that opens Settings |
 | Find file in this pull request (`github.files.find`) | `search` | `/` | Yes |
 | Next changed file (`github.files.next`) | action | `]` | No |
@@ -33,7 +32,7 @@ They are registered per mount from `plugins/github/src/client/Shortcuts.tsx` rat
 request is open, and where to navigate. A plugin's `init` runs at boot with no router in scope. The
 decisions are still built in `commands.ts` out of eight accessors the component passes in, for the
 reason `filterChangeRequests` lives in `packages/change-request-ui/src/model/filter.ts`: a decision
-worth testing should not need a DOM to reach. The rail-source command needs no router and is registered the ordinary way.
+worth testing should not need a DOM to reach.
 
 **The changed-file finder is a `search` command on the shared palette session.** These rules hold:
 

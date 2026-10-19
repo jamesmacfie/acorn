@@ -1,5 +1,5 @@
 import { lazy } from 'solid-js'
-import { type ClientPlugin, setSelectedSource } from '@acorn/plugin-api/client'
+import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { pullRefMatchesTask } from '../shared/pullRef'
 import { changeRequestPoints } from '@acorn/change-request-ui/model'
 import { prFiltersSlice } from './pullList/filterStore'
@@ -74,21 +74,6 @@ export const githubClientPlugin: ClientPlugin = {
       label: 'Import from GitHub',
       glyph: 'brand:github',
       component: GithubImporter,
-    })
-    ctx.commands.register({
-      id: 'source.github.open',
-      title: 'Open GitHub',
-      category: 'navigation',
-      palette: true,
-      run: () => setSelectedSource('github'),
-    })
-    ctx.keybindings.register({
-      id: 'source.github.open',
-      command: 'source.github.open',
-      description: 'Open GitHub',
-      category: 'Tasks',
-      defaultChord: 'meta+0',
-      when: 'global',
     })
     ctx.integrationFlows.register(githubIntegrationFlow)
     ctx.panes.register(prPaneContribution)
