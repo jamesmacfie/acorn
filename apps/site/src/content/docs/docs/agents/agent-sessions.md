@@ -46,7 +46,8 @@ ones. A change applies from the next turn.
   The lists are what the harness reported when the session last started.
 - Press ⌘⇧↩ on macOS, or Ctrl+Shift+Enter elsewhere, to grow the box from three rows to 18. acorn
   remembers the size per session.
-- **Attach** adds files and pictures, and **Context** adds task context or another session.
+- **Attach** adds files and pictures. Type `#`, or click **Context**, to reference another session,
+  a terminal, or the task's context.
   [Files, attachments, and context](/docs/agents/files-attachments-and-context/) covers both.
 - **Goal** sets a completion condition the agent keeps working toward.
   [Steering, queues, and follow-ups](/docs/agents/steering-queues-and-follow-ups/) covers goals.
