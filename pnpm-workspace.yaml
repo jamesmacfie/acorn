@@ -9,6 +9,8 @@ packages:
 # To take an urgent security fix sooner, name the package in minimumReleaseAgeExclude.
 minimumReleaseAge: 10080
 allowBuilds:
+  # Its install script only sends an anonymous install event to OpenUI's analytics.
+  "@openuidev/lang-core": false
   esbuild: true
   node-pty: true
   workerd: true

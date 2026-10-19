@@ -1,0 +1,32 @@
+{
+  "name": "@acorn/openui-solid",
+  "version": "0.0.0",
+  "description": "A Solid renderer for OpenUI Lang over @openuidev/lang-core: the renderer, a store of the program's $ variables as signals, form validation, and action dispatch. Imports nothing from Acorn.",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@openuidev/lang-core": "1.0.0"
+  },
+  "peerDependencies": {
+    "solid-js": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "jsdom": "^30.0.1",
+    "solid-js": "catalog:",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.11",
+    "zod": "catalog:"
+  }
+}

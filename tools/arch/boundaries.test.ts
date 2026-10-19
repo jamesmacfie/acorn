@@ -431,6 +431,18 @@ describe('architecture boundaries', () => {
     expect([...new Set([...badExternal, ...badFirstParty])].sort()).toEqual([])
   })
 
+  it('the OpenUI renderer imports nothing from Acorn', () => {
+    // docs/architecture/packages.md § A renderer built to publish: it must build outside this repository.
+    const own = EDGES.filter((e) => e.fromPkg.name === '@acorn/openui-solid')
+    const allowed = new Set(['@openuidev/lang-core', 'solid-js', 'zod', 'vitest'])
+    const offenders = own
+      .filter((e) => (e.target.pkg ? e.target.pkg.name !== '@acorn/openui-solid' : !allowed.has(e.target.external!)))
+      .filter((e) => !(isTestCode(e.fromFile) && e.spec.startsWith('node:')))
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    expect(own.length).toBeGreaterThan(5) // anti-vacuity: the package was scanned
+    expect([...new Set(offenders)].sort()).toEqual([])
+  })
+
   it('spawning a child process is an enumerated exception to the broker', () => {
     // Every entry below is a considered exception to the broker, with its reason inline. See
     // docs/architecture/packages.md § Package boundaries and docs/security/process-and-paths.md § Process, path, and

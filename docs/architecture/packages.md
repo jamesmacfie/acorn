@@ -70,6 +70,14 @@ Three libraries hold code both runtimes import:
 Like protocol, `dashboards-core` and `diff-document` declare no DOM and no Node types, which keeps the
 standalone Node's import graph clean.
 
+## A renderer built to publish
+
+`packages/openui-solid` draws OpenUI Lang programs with Solid. It's written to be published on its own,
+so it imports nothing from `@acorn/*` and nothing outside `@openuidev/lang-core`, `solid-js`, and `zod`,
+except Node built-ins in its tests. It has no JSX and no renderer target, so the desktop app and the
+terminal client each compile it for their own renderer. It stays private until
+[the dynamic UI programme](../future/dynamic-ui/02-renderer-and-spike.md) decides to publish it.
+
 ## Graph shape
 
 There are no cycles. `packages/*` never imports `plugins/*`, because a plugin whose only upstream is

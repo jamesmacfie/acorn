@@ -44,6 +44,10 @@
     "packages/create-acorn-plugin": {
       "includeEntryExports": false
     },
+    "packages/openui-solid": {
+      // A renderer built to publish (docs/architecture/packages.md). Hosts are its callers.
+      "includeEntryExports": false
+    },
     "packages/plugin-api": {
       // The first-party facade. Its names are reviewed through src/surface.snapshot.txt.
       "includeEntryExports": false
