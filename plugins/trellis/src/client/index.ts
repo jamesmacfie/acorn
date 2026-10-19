@@ -1,6 +1,8 @@
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { appsSchedule } from './appsStore'
+import { appsPaneContribution } from './paneContribution'
 
 // The card loads with the first app_show in a transcript, and lang-core and the renderer with it.
 const AppToolCard = lazy(() => import('./AppToolCard'))
@@ -17,5 +19,7 @@ export const trellisClientPlugin: ClientPlugin = {
       matches: ['app_show'],
       component: AppToolCard,
     })
+    ctx.panes.register(appsPaneContribution)
+    ctx.schedules.register(appsSchedule)
   },
 }

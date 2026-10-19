@@ -8,6 +8,7 @@ import type { AppRevisionFiles } from '../shared/api'
 import { ROW_ACTION_TOOL, TASK_TOOL } from '../shared/library'
 import { AppHostContext, library } from './bindings'
 import { plainData, plainText } from './plainData'
+import { createSavedState, keepState } from './appState'
 
 // One revision of an app, running (docs/agent-built-apps.md § What an app can reach). A program reaches
 // nothing but what this hands it: its own plans, run under this device through the dashboard run route;
@@ -36,10 +37,15 @@ export default function AppView(props: {
   files: AppRevisionFiles
   nodeId: string
   readOnly: boolean
+  placement: 'card' | 'pane'
 }) {
-  const [visible, setVisible] = createSignal(false)
-  // Plans first run when the card is first on screen, so a long conversation reads only what is seen.
-  const [seen, setSeen] = createSignal(false)
+  const inCard = props.placement === 'card'
+  // A card's plans first run when it is first on screen, so a long conversation reads only what is
+  // seen. A pane is on screen.
+  const [visible, setVisible] = createSignal(!inCard)
+  const [seen, setSeen] = createSignal(!inCard)
+  // An older revision is read only and remembers nothing.
+  const saved = props.readOnly ? undefined : createSavedState(props.nodeId, props.appId)
   const [notice, setNotice] = createSignal('')
   const [confirm, setConfirm] = createSignal<Confirm>()
   const ask = (request: Omit<Confirm, 'answer'>) =>
@@ -147,15 +153,17 @@ export default function AppView(props: {
     }
   }
 
-  // Created once the card is first seen, under the Show that draws it, and disposed with it.
+  // Created once the app is first seen and its saved state is read, under the Show that draws it, and
+  // disposed with it.
   const Running = () => {
     const runtime = createOpenUIRuntime({
       program: () => props.files.program,
       library,
       tools,
       onAction,
-      initialState: { $placement: 'card' },
+      initialState: { $placement: props.placement },
     })
+    if (saved) keepState(runtime, saved, setNotice)
     return (
       <AppHostContext.Provider
         value={{
@@ -175,18 +183,25 @@ export default function AppView(props: {
     )
   }
 
+  const app = (
+    <Show when={seen() && (!saved || !saved.loading())}>
+      <Running />
+    </Show>
+  )
   return (
     <Stack gap="row">
-      <CardFrame
-        onVisible={(next) => {
-          setVisible(next)
-          if (next) setSeen(true)
-        }}
-      >
-        <Show when={seen()}>
-          <Running />
-        </Show>
-      </CardFrame>
+      {inCard ? (
+        <CardFrame
+          onVisible={(next) => {
+            setVisible(next)
+            if (next) setSeen(true)
+          }}
+        >
+          {app}
+        </CardFrame>
+      ) : (
+        app
+      )}
       <Show when={notice()}>{(text) => <Alert tone="warn">{text()}</Alert>}</Show>
       <Show when={confirm()}>
         {(request) => (

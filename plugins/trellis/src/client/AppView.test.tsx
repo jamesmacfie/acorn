@@ -1,5 +1,6 @@
 import { render } from 'solid-js/web'
-import type { JSX } from 'solid-js'
+import { For, type JSX } from 'solid-js'
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { COMPONENTS } from '../shared/library'
 
@@ -7,10 +8,12 @@ const mocks = vi.hoisted(() => ({
   compose: vi.fn(async () => ({ ok: true })),
   writeJson: vi.fn(),
   panel: vi.fn(),
+  saved: {} as Record<string, unknown>,
 }))
 vi.mock('@acorn/plugin-api/client', () => ({
   composeForAgent: mocks.compose,
   writeJson: mocks.writeJson,
+  readJson: async () => ({ state: mocks.saved }),
   taskById: () => ({ title: 'Migrate billing', branch: 'migrate' }),
 }))
 // The frame reports itself visible at once, and a panel draws a marker naming its plan and inputs.
@@ -34,20 +37,30 @@ afterEach(() => {
   host?.remove()
   document.body.replaceChildren()
   vi.clearAllMocks()
+  mocks.saved = {}
 })
-function draw(program: string, plans: Record<string, unknown> = {}, readOnly = false) {
+/** Draws the app, or several views of it in one window, as a card and the pane would be. */
+function draw(program: string, plans: Record<string, unknown> = {}, readOnly = false, views = 1) {
   host = document.createElement('div')
   document.body.append(host)
+  const queryClient = new QueryClient()
   dispose = render(
     () => (
-      <AppView
-        appId="app-0123456789ab"
-        taskId="task"
-        workspaceId="w"
-        nodeId="n"
-        files={{ program, plans }}
-        readOnly={readOnly}
-      />
+      <QueryClientProvider client={queryClient}>
+        <For each={Array.from({ length: views })}>
+          {() => (
+            <AppView
+              appId="app-0123456789ab"
+              taskId="task"
+              workspaceId="w"
+              nodeId="n"
+              files={{ program, plans }}
+              readOnly={readOnly}
+              placement="card"
+            />
+          )}
+        </For>
+      </QueryClientProvider>
     ),
     host,
   )
@@ -63,6 +76,7 @@ describe('what a program can reach', () => {
 
   it('puts @ToAssistant text in the composer and sends nothing', async () => {
     draw('root = Stack([Button("Ask", @ToAssistant("Why did it fail?"))])')
+    await settle()
     button('Ask').click()
     await settle()
     expect(mocks.compose).toHaveBeenCalledWith('task', 'Why did it fail?')
@@ -73,6 +87,7 @@ describe('what a program can reach', () => {
     draw(
       'root = Stack([Button("Local", @OpenUrl("file:///etc/passwd")), Button("Web", @OpenUrl("https://example.com/a?b=1"))])',
     )
+    await settle()
     button('Local').click()
     await settle()
     expect(host.textContent).toContain('This app tried to open a file: link. Apps open only web links.')
@@ -168,5 +183,41 @@ describe('what a program can reach', () => {
     button('Ask').click()
     await settle()
     expect(mocks.compose).not.toHaveBeenCalled()
+  })
+})
+
+describe('app state', () => {
+  const checklist =
+    'root = Stack([Checkbox("lint", "Lint", $lint), Checkbox("tests", "Tests", $tests)])\n$lint = false\n$tests = false'
+  const boxes = () => [...host.querySelectorAll<HTMLInputElement>('input[type=checkbox]')]
+
+  it('seeds what this revision declares, and saves a tick without what it dropped', async () => {
+    mocks.saved = { $lint: true, $dropped: 'old' }
+    mocks.writeJson.mockResolvedValue(undefined)
+    draw(checklist)
+    await settle()
+    expect(boxes().map((box) => box.checked)).toEqual([true, false])
+    boxes()[1]!.click()
+    await new Promise((resolve) => setTimeout(resolve, 450))
+    expect(mocks.writeJson).toHaveBeenCalledWith(
+      '/v1/p/trellis/apps/app-0123456789ab/state',
+      expect.objectContaining({ method: 'PUT', body: JSON.stringify({ state: { $lint: true, $tests: true } }) }),
+    )
+  })
+
+  it('keeps two views of one app in step', async () => {
+    mocks.writeJson.mockResolvedValue(undefined)
+    draw(checklist, {}, false, 2)
+    await settle()
+    boxes()[0]!.click()
+    await settle()
+    expect(boxes().map((box) => box.checked)).toEqual([true, false, true, false])
+  })
+
+  it('neither reads nor saves state for an older revision', async () => {
+    mocks.saved = { $lint: true }
+    draw(checklist, {}, true)
+    await settle()
+    expect(boxes().map((box) => box.checked)).toEqual([false, false])
   })
 })

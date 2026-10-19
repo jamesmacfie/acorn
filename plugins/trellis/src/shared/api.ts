@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-// The app tools' inputs and results, and the routes the card reads, shared by the Node and both
-// clients. No lang-core here: the client's tool-card registration imports this eagerly.
+// The app tools' inputs and results, and the routes the card and the Apps pane read, shared by the
+// Node and both clients. No lang-core here: the client's tool-card registration imports this eagerly.
 
 export const appIdSchema = z.string().regex(/^app-[0-9a-f]{12}$/, 'An app id looks like app-0123456789ab.')
 /** A plan name is the file name under plans/, and the name a program's Query and Panel use. */
@@ -44,7 +44,25 @@ export type AppRevisionSummary = { revision: number; note: string; restoredFrom?
 /** An app's name, head, and revisions, as the card's route returns them. */
 export type AppSummary = { appId: string; taskId: string; name: string; head: number; revisions: AppRevisionSummary[] }
 export type AppRevisionFiles = { program: string; plans: Record<string, unknown> }
+/** One shown app, as the Apps pane lists it. `sessionId` is the session its drawer draws. */
+export type AppListing = {
+  appId: string
+  taskId: string
+  name: string
+  description: string
+  head: number
+  updatedAt: number
+  sessionId?: string
+}
 
-export const appRoute = (appId: string) => `/v1/p/trellis/apps/${encodeURIComponent(appId)}`
+/** The frame the Node sends when an app's head moves, so the Apps pane and its gate follow. */
+export const APP_CHANGED_VERB = 'app-changed'
+export const APPS_PANE_ID = 'apps'
+
+export const appsRoute = '/v1/p/trellis/apps'
+
+export const appRoute = (appId: string) => `${appsRoute}/${encodeURIComponent(appId)}`
 export const appRevisionRoute = (appId: string, revision: number) => `${appRoute(appId)}/revisions/${revision}`
 export const appRestoreRoute = (appId: string) => `${appRoute(appId)}/restore`
+export const appStateRoute = (appId: string) => `${appRoute(appId)}/state`
+export const appSessionRoute = (appId: string) => `${appRoute(appId)}/session`

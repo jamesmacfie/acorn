@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { EXAMPLES } from './guide'
 import { programProblems } from './validate'
 
 const codes = (program: string, plans: string[] = []) =>
   programProblems(program, plans).problems.map((problem) => `${problem.code} ${problem.path}`)
 
 describe('programProblems', () => {
+  it("passes the guide's checklist", () => {
+    expect(codes(EXAMPLES[0]!.split('\n').slice(1).join('\n'))).toEqual([])
+  })
+
   it('passes a heading above a Panel of the app plan', () => {
     expect(codes('root = Stack([Heading("Open work"), Panel("open")])', ['open'])).toEqual([])
   })

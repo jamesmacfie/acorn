@@ -39,8 +39,8 @@ ordinary pane host and hands each pane a task with `status: 'archived'`. Only pa
 flag appear in that preview's layout and switcher. They draw from stored history and turn off
 anything that would start work, as the Agent pane does with its composer. It's opt-in, because an
 archived task has no worktree. An editor, a diff, a container, or a run target would find nothing,
-and a pane that can start work would start it on a task nobody meant to reopen. Agent and Notes set
-it ([workspaces and tasks](../workspaces-and-tasks.md) § Restoring a task).
+and a pane that can start work would start it on a task nobody meant to reopen. Agent, Notes, and Apps
+set it ([workspaces and tasks](../workspaces-and-tasks.md) § Restoring a task).
 
 A compiled pane sets `readsArchived: true` on its contribution. A loaded plugin sets the same
 optional field on a task-scoped `frames` entry whose `target` is `pane`. It's invalid on a

@@ -11,6 +11,7 @@
       "git",
       "notes",
       "preview",
+      "apps",
       "workflows"
     ],
     "commands": [
@@ -131,6 +132,7 @@
     "schedules": [
       "docker.task-containers",
       "preview.configured",
+      "trellis.apps",
       "workflows.task-runs"
     ],
     "railMarkers": [
@@ -404,8 +406,14 @@
       ]
     },
     "trellis": {
+      "panes": [
+        "apps"
+      ],
       "extensions": [
         "trellis.app-card"
+      ],
+      "schedules": [
+        "trellis.apps"
       ]
     },
     "workflows": {

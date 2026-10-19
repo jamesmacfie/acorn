@@ -5,10 +5,11 @@ import type { AppFile, AppRevisionFiles, AppRevisionSummary, AppSummary } from '
 
 // An app's files under the Node's data root (docs/agent-built-apps.md § Files):
 //
-//   apps/<appId>/app.json                    the task, name, description, and head
+//   apps/<appId>/app.json                    the task, name, description, head, and building session
 //   apps/<appId>/working/program.oui         what the tools edit
 //   apps/<appId>/working/plans/<name>.json
 //   apps/<appId>/revisions/<n>/              what app_show published; never changed again
+//   apps/<appId>/state.json                  the program's saved $ variables
 //
 // Ids and file names are checked by the tool schemas before they reach a path here. Every change to
 // one app runs in that app's queue, so a hash check and the write after it can't interleave.
@@ -20,10 +21,17 @@ export type AppMeta = {
   description: string
   head: number
   createdAt: number
+  /** When head last moved. Absent on an app that has never been shown. */
+  updatedAt?: number
+  /** The session that last showed the app, or the one the person started to edit it. */
+  sessionId?: string
 }
 export type RevisionMeta = AppRevisionSummary & { library: { id: string; version: number }; shownAt: number }
 
 export class AppConflict extends Error {}
+
+/** The most a saved state document may hold, as a working file may. */
+export const MAX_STATE_BYTES = 256 * 1024
 
 export const fileHash = (text: string) => createHash('sha256').update(text).digest('hex').slice(0, 16)
 
@@ -45,7 +53,7 @@ export class AppStore {
     return next
   }
 
-  async create(taskId: string, name: string, description: string): Promise<AppMeta> {
+  async create(taskId: string, name: string, description: string, sessionId?: string): Promise<AppMeta> {
     const meta: AppMeta = {
       appId: `app-${randomBytes(6).toString('hex')}`,
       taskId,
@@ -53,6 +61,7 @@ export class AppStore {
       description,
       head: 0,
       createdAt: Date.now(),
+      ...(sessionId ? { sessionId } : {}),
     }
     await mkdir(join(this.dir(meta.appId), 'working', 'plans'), { recursive: true })
     await writeFile(join(this.dir(meta.appId), 'working', 'program.oui'), '')
@@ -74,10 +83,40 @@ export class AppStore {
     await rename(`${path}.tmp`, path)
   }
 
-  async forTask(taskId: string): Promise<AppMeta[]> {
+  /** Every app on this Node, archived tasks' included. */
+  async all(): Promise<AppMeta[]> {
     const ids = await readdir(this.root).catch(() => [] as string[])
     const metas = await Promise.all(ids.map((id) => this.meta(id)))
-    return metas.filter((meta): meta is AppMeta => meta?.taskId === taskId)
+    return metas.filter((meta): meta is AppMeta => !!meta)
+  }
+
+  async forTask(taskId: string): Promise<AppMeta[]> {
+    return (await this.all()).filter((meta) => meta.taskId === taskId)
+  }
+
+  /** Names the session the drawer draws, for an editing session the person started. */
+  setSession(appId: string, sessionId: string): Promise<boolean> {
+    return this.serial(appId, async () => {
+      const meta = await this.meta(appId)
+      if (meta) await this.saveMeta({ ...meta, sessionId })
+      return !!meta
+    })
+  }
+
+  /** The saved $ variables, or none. */
+  async state(appId: string): Promise<Record<string, unknown>> {
+    const text = await this.readText(join(this.dir(appId), 'state.json'))
+    const value: unknown = text ? JSON.parse(text) : {}
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+  }
+
+  /** Replaces the saved $ variables. The caller has checked the size. */
+  saveState(appId: string, state: Record<string, unknown>): Promise<void> {
+    return this.serial(appId, async () => {
+      const path = join(this.dir(appId), 'state.json')
+      await writeFile(`${path}.tmp`, JSON.stringify(state))
+      await rename(`${path}.tmp`, path)
+    })
   }
 
   private async readText(path: string): Promise<string | null> {
@@ -128,12 +167,13 @@ export class AppStore {
   }
 
   /** Publishes files as the next revision and makes it head. A restore copies them into the working
-   *  files too, so the agent's next edit starts from what is on screen. */
+   *  files too, so the agent's next edit starts from what is on screen. `sessionId` is the session that
+   *  showed it, which becomes the app's building session. */
   publish(
     appId: string,
     files: { program: string; plans: Record<string, string> },
     revision: Omit<RevisionMeta, 'revision' | 'shownAt'>,
-    options: { toWorking?: boolean } = {},
+    options: { toWorking?: boolean; sessionId?: string } = {},
   ): Promise<number> {
     return this.serial(appId, async () => {
       const meta = await this.meta(appId)
@@ -157,7 +197,12 @@ export class AppStore {
         for (const [name, text] of Object.entries(files.plans))
           await writeFile(join(working, 'plans', `${name}.json`), text)
       }
-      await this.saveMeta({ ...meta, head: number })
+      await this.saveMeta({
+        ...meta,
+        head: number,
+        updatedAt: record.shownAt,
+        ...(options.sessionId ? { sessionId: options.sessionId } : {}),
+      })
       return number
     })
   }

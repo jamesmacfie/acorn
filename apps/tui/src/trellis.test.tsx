@@ -1,12 +1,17 @@
 /** @jsxImportSource @acorn/tui/jsx */
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { expect, it, vi } from 'vitest'
 import { renderCells } from './kit/render'
 import { HeaderBodyFooter } from './layouts/HeaderBodyFooter'
 
-const fixture = vi.hoisted(() => ({ compose: vi.fn(async () => ({ ok: true })) }))
+const fixture = vi.hoisted(() => ({
+  compose: vi.fn(async () => ({ ok: true })),
+  writeJson: vi.fn(async () => undefined),
+}))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...(await original<Record<string, unknown>>()),
   composeForAgent: fixture.compose,
+  writeJson: fixture.writeJson,
   taskById: () => ({ title: 'Migrate billing', branch: 'migrate' }),
 }))
 import { AppView } from '@acorn/plugin-trellis/testkit/client'
@@ -17,7 +22,10 @@ it("draws an app's kit components in the terminal, its Panel as one line, and ke
     '$backup = false',
     'done = $backup ? 1 : 0',
   ].join('\n')
-  // Drawn as a pane's body, so the keys land in it the way they do in a transcript.
+  // Drawn as a pane's body, so the keys land in it the way they do in a transcript. Its saved state is
+  // already read, so it draws with the region and the region's focus lands on it.
+  const queryClient = new QueryClient()
+  queryClient.setQueryData(['trellis-state', 'n', 'app-0123456789ab'], {})
   let screen = await renderCells(
     () => (
       <HeaderBodyFooter
@@ -25,14 +33,17 @@ it("draws an app's kit components in the terminal, its Panel as one line, and ke
         label="App"
         regions={{
           body: () => (
-            <AppView
-              appId="app-0123456789ab"
-              taskId="task"
-              workspaceId="w"
-              nodeId="n"
-              files={{ program, plans: { cost: { version: 2, title: 'Agent cost' } } }}
-              readOnly={false}
-            />
+            <QueryClientProvider client={queryClient}>
+              <AppView
+                appId="app-0123456789ab"
+                taskId="task"
+                workspaceId="w"
+                nodeId="n"
+                files={{ program, plans: { cost: { version: 2, title: 'Agent cost' } } }}
+                readOnly={false}
+                placement="card"
+              />
+            </QueryClientProvider>
           ),
         }}
       />

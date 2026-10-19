@@ -23,6 +23,7 @@ The pane switcher on the right edge of the window lists the panes this task can 
 | Agent | The task's agent sessions. |
 | Git | **Changes**, **History**, **Stashes**, and **Worktrees** for the task's branch. |
 | Workflows | Workflow runs on the task. Only once a workflow has run on it. |
+| Apps | The apps an agent built in the task. Only once an agent has shown one. [Apps](/docs/built-in-plugins/apps/) covers it. |
 | Notes | Task, workspace, and global notes. |
 | Context | What an agent gets about the task. [Task context](/docs/using/task-context/) covers it. |
 | Editor | The worktree's files, with find in files. |

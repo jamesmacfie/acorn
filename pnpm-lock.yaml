@@ -2239,6 +2239,9 @@ importers:
       '@acorn/openui-solid':
         specifier: workspace:*
         version: link:../../packages/openui-solid
+      '@acorn/plugin-agents':
+        specifier: workspace:*
+        version: link:../agents
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api

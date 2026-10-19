@@ -1,9 +1,18 @@
 import { createEffect, createMemo, createSignal, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { Alert, Button, CodeBlock, Inline, Stack, Text } from '@acorn/plugin-api/ui'
-import { activeNodeId, allProjects, readJson, taskById, writeJson } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  allProjects,
+  openPane,
+  readJson,
+  taskById,
+  tasksOptions,
+  writeJson,
+} from '@acorn/plugin-api/client'
 import type { AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import {
+  APPS_PANE_ID,
   appRestoreRoute,
   appRevisionRoute,
   appRoute,
@@ -17,7 +26,8 @@ import AppView from './AppView'
 
 // The transcript card for `app_show` (docs/agent-built-apps.md § Cards). Each card pins the revision
 // its call published. Only the card showing the app's head is interactive; the others collapse to a
-// line that can draw their own revision, read only, or restore it.
+// line that can draw their own revision, read only, or restore it. A card in an archived task's
+// transcript draws nothing, because the task's data may not resolve.
 
 /** A call's JSON as a transcript recorded it, unwrapping the MCP content envelope. */
 function json(text: string | undefined): unknown {
@@ -86,6 +96,9 @@ function AppCard(props: { taskId: string; shown: AppShowResult; note: string }) 
   const current = () => drawn() === head()
   const [showOld, setShowOld] = createSignal(false)
   const [restoreError, setRestoreError] = createSignal('')
+  // The active task list holds no archived task. Unknown until it loads, which isn't archived.
+  const tasks = createQuery(() => tasksOptions(true))
+  const archived = () => tasks.isSuccess && !tasks.data.some((task) => task.id === props.taskId)
 
   const projectId = () => taskById(props.taskId)?.projectId
   const workspaceId = () => allProjects().find((project) => project.id === projectId())?.workspaceId ?? ''
@@ -111,57 +124,76 @@ function AppCard(props: { taskId: string; shown: AppShowResult; note: string }) 
   }
 
   return (
-    <Stack gap="row">
-      <Show
-        when={current()}
-        fallback={
-          <Inline spread wrap>
-            <Text
-              tone="muted"
-              wrap
-            >{`v${props.shown.revision}: ${props.note.replace(/([^.!?])$/, '$1.')} Replaced by v${head()}.`}</Text>
-            <Inline gap="inline">
-              <Button size="sm" variant="ghost" onPress={() => setShowOld((value) => !value)}>
-                {showOld() ? `Hide v${props.shown.revision}` : `Show v${props.shown.revision}`}
-              </Button>
-              <Button size="sm" variant="ghost" onPress={() => void restore()}>
-                {`Restore v${props.shown.revision}`}
-              </Button>
+    <Show
+      when={!archived()}
+      fallback={<Text tone="muted" wrap>{`${label()}. This task is archived, so the app isn't drawn.`}</Text>}
+    >
+      <Stack gap="row">
+        <Show
+          when={current()}
+          fallback={
+            <Inline spread wrap>
+              <Text
+                tone="muted"
+                wrap
+              >{`v${props.shown.revision}: ${props.note.replace(/([^.!?])$/, '$1.')} Replaced by v${head()}.`}</Text>
+              <Inline gap="inline">
+                <Button size="sm" variant="ghost" onPress={() => setShowOld((value) => !value)}>
+                  {showOld() ? `Hide v${props.shown.revision}` : `Show v${props.shown.revision}`}
+                </Button>
+                <Button size="sm" variant="ghost" onPress={() => void restore()}>
+                  {`Restore v${props.shown.revision}`}
+                </Button>
+              </Inline>
             </Inline>
+          }
+        >
+          <Inline spread wrap>
+            <Text emphasis="strong">{label()}</Text>
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={() => openPane(props.taskId, APPS_PANE_ID, { kind: 'plugin:select', item: props.shown.appId })}
+            >
+              Open
+            </Button>
           </Inline>
-        }
-      >
-        <Text emphasis="strong">{label()}</Text>
-      </Show>
-      <Show when={restoreError()}>{(message) => <Alert tone="danger">{message()}</Alert>}</Show>
-      <Show when={current() || showOld()}>
-        <Revision
-          appId={props.shown.appId}
-          revision={current() ? drawn() : props.shown.revision}
-          taskId={props.taskId}
-          workspaceId={workspaceId()}
-          nodeId={nodeId}
-          readOnly={!current()}
-        />
-      </Show>
-    </Stack>
+        </Show>
+        <Show when={restoreError()}>{(message) => <Alert tone="danger">{message()}</Alert>}</Show>
+        <Show when={current() || showOld()}>
+          <Revision
+            appId={props.shown.appId}
+            revision={current() ? drawn() : props.shown.revision}
+            taskId={props.taskId}
+            workspaceId={workspaceId()}
+            nodeId={nodeId}
+            readOnly={!current()}
+            placement="card"
+          />
+        </Show>
+      </Stack>
+    </Show>
   )
 }
 
-function Revision(props: {
+/** One revision's files. A revision never changes, so they're read once. */
+export const revisionFilesOptions = (nodeId: string, appId: string, revision: number) => ({
+  queryKey: ['trellis-revision', nodeId, appId, revision],
+  queryFn: () => readJson<AppRevisionFiles>(appRevisionRoute(appId, revision), { nodeId }),
+  staleTime: Infinity,
+})
+
+/** One revision of an app, running, once its files are read. The card and the Apps pane draw it. */
+export function Revision(props: {
   appId: string
   revision: number
   taskId: string
   workspaceId: string
   nodeId: string
   readOnly: boolean
+  placement: 'card' | 'pane'
 }) {
-  // A revision never changes, so its files are read once.
-  const files = createQuery(() => ({
-    queryKey: ['trellis-revision', props.nodeId, props.appId, props.revision],
-    queryFn: () => readJson<AppRevisionFiles>(appRevisionRoute(props.appId, props.revision), { nodeId: props.nodeId }),
-    staleTime: Infinity,
-  }))
+  const files = createQuery(() => revisionFilesOptions(props.nodeId, props.appId, props.revision))
   return (
     <Show
       when={files.data}
@@ -176,6 +208,7 @@ function Revision(props: {
           files={loaded}
           nodeId={props.nodeId}
           readOnly={props.readOnly}
+          placement={props.placement}
         />
       )}
     </Show>

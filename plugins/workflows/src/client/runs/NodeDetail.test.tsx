@@ -118,6 +118,8 @@ const registered: Disposable[] = []
 const provideConversation = (): Array<Partial<AgentConversationProps>> => {
   const drawn: Array<Partial<AgentConversationProps>> = []
   provided = provideClientCapability(AGENTS_CONVERSATION, {
+    sessionOpen: async () => true,
+    startSession: async () => '',
     Conversation: (props) => {
       // Read every field here, because props are getters and the recorded copy has to be the values
       // this render actually passed.

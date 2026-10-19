@@ -17,6 +17,7 @@ These panes ship with acorn:
 | `agents` | 15 | The managed Agent pane |
 | `git` | 20 | Tabs for the worktree diff with staging, commit, and remote actions; history; stashes; and worktrees |
 | `workflows` | 25 | Workflow runs on this task, their nodes, and the selected node's work, which for an agent node is its whole conversation |
+| `apps` | 27 | The apps an agent built in this task, the selected one at full size, and the conversation that edits it |
 | `notes` | 30 | Task, workspace, and global notes |
 | `context` | 40 | Context selection and sync |
 | `editor` | 50 | The worktree editor, with find in files as a sidebar panel |
@@ -32,6 +33,10 @@ Some panes appear only when the task has something to show:
 - `workflows` uses `list-detail` and a `when` gate, so a task that has never run a workflow gets no
   button ([workflows](./workflows.md) § The run pane). It declares the same 640px minimum width as
   `agents`, because an agent node draws the same composer.
+- `apps` uses `list-detail` and a `when` gate, so a task where no agent has shown an app gets no button
+  ([agent-built apps](./agent-built-apps.md#the-apps-pane)). It declares the 640px minimum width too,
+  for the editing conversation's composer, and `readsArchived`, so an archived task's preview lists
+  its apps without running them.
 - `preview` has a `when` gate too. A task with no run-target URL and no project preview setting gets
   no button ([shell](./shell/webviews.md) § Host-owned webviews has the check).
 - `database` is gated through its manifest's `availability` route. A task with no connection script

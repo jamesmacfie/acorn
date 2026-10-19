@@ -10,7 +10,7 @@ import {
 } from '../shared/api'
 import { LIBRARY_ID, LIBRARY_VERSION } from '../shared/library'
 import { appGuide } from './guide'
-import { AppConflict, type AppStore } from './store'
+import { AppConflict, type AppMeta, type AppStore } from './store'
 import { describeProblem, programProblems, type AppProblem } from './validate'
 
 // What the app tools do (./tools.ts declares them). Loaded on the first call, with lang-core, so
@@ -22,6 +22,8 @@ process.env.OPENUI_TELEMETRY_DISABLED = '1'
 
 export type AppToolDeps = {
   store(): Promise<AppStore>
+  /** Tells clients an app's head moved. */
+  changed(meta: AppMeta): void
   workspaceOf(taskId: string): Promise<string>
   planProblems(workspaceId: string, plan: unknown, userId: string, signal: AbortSignal): Promise<string[]>
   planGuide(workspaceId: string): Promise<unknown>
@@ -42,7 +44,7 @@ const conflict = <T>(work: Promise<T>): Promise<T> =>
 export async function createApp(deps: AppToolDeps, raw: unknown, ctx: ToolContext) {
   const input = appCreateInput.parse(raw)
   const store = await deps.store()
-  const meta = await store.create(ctx.taskId, input.name, input.description)
+  const meta = await store.create(ctx.taskId, input.name, input.description, ctx.sessionId)
   return { appId: meta.appId, program: { hash: (await store.read(meta.appId, 'program'))!.hash } }
 }
 
@@ -118,10 +120,13 @@ export async function showApp(deps: AppToolDeps, raw: unknown, ctx: ToolContext)
         .map(describeProblem)
         .join('\n'),
     )
-  const revision = await store.publish(input.appId, files, {
-    note: input.note,
-    library: { id: LIBRARY_ID, version: LIBRARY_VERSION },
-  })
+  const revision = await store.publish(
+    input.appId,
+    files,
+    { note: input.note, library: { id: LIBRARY_ID, version: LIBRARY_VERSION } },
+    { sessionId: ctx.sessionId },
+  )
+  deps.changed(meta)
   return { appId: input.appId, name: meta.name, revision }
 }
 

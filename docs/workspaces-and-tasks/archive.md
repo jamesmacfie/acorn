@@ -84,8 +84,8 @@ including when the task used the project folder instead of a worktree.
 
 Archive removes the worktree folder, stops terminal sessions and agent provider processes, drops the
 terminal plugin's saved sessions, and clears client memory. It keeps the task row, its links and pull
-requests, its branch, its agent sessions, its notes, and every plugin's rows. Plugins store `task_id`
-as a plain ID, and none of them deletes on archive.
+requests, its branch, its agent sessions, its notes, its apps, and every plugin's rows. Plugins store
+`task_id` as a plain ID, and none of them deletes on archive.
 
 Three things delete later or elsewhere:
 
@@ -104,11 +104,11 @@ Selecting a task previews it read-only in the ordinary pane host, without adding
 Each row offers compact **Restore task** and **Delete task** icons with tooltips, leaving room for
 the task title.
 
-Only panes that declare `readsArchived` appear in the preview. The agents and notes panes opt in.
-Every other pane would need the worktree or would start work on an archived task
-([pane contributions](../panes/contributions.md)). The agents pane shows the transcripts and turns
-its composer off. The list uses the shared browse sidebar, which resizes and collapses to task icons
-and remembers its state on the device.
+Only panes that declare `readsArchived` appear in the preview. Agents, notes, and apps opt in. Every
+other pane would need the worktree or would start work on an archived task ([pane
+contributions](../panes/contributions.md)). The agents pane shows the transcripts and turns its
+composer off. The apps pane lists apps without running them. The list uses the shared browse
+sidebar, which resizes and collapses to task icons and remembers its state on the device.
 
 ## Restoring a task
 
@@ -126,8 +126,9 @@ run again. It rebuilds right away because both ways it can fail need you:
 
 Containers, terminal sessions, and scrollback don't come back. Agent sessions do: the list counts a
 session under an archived task as retired, so it returns with its task. Its provider process stopped
-at archive, and the next prompt starts it and resumes the conversation. A session you archived on its
-own comes back from Agent Center ([client surfaces](../managed-agents/client-surfaces.md)).
+at archive, and the next prompt starts it and resumes the conversation. A session you archived on
+its own comes back from Agent Center ([client surfaces](../managed-agents/client-surfaces.md)). Apps
+come back at their head with their state ([apps](../agent-built-apps.md)).
 
 ## Deleting a task
 

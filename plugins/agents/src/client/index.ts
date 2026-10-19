@@ -75,7 +75,32 @@ export const agentsClientPlugin: ClientPlugin = {
     // Anyone with a session id, or with the id of a workflow step that started one, can draw its
     // conversation. The run pane uses it to hold the transcript, the queue and the composer for the
     // node it has selected, so a step reads the same way in either place.
-    ctx.capabilities.provide(AGENTS_CONVERSATION, { Conversation: AgentConversation })
+    ctx.capabilities.provide(AGENTS_CONVERSATION, {
+      Conversation: AgentConversation,
+      sessionOpen: (sessionId) =>
+        managedAgentApi.snapshot(sessionId, 0, 1).then(
+          ({ session }) => session.archivedAt === null,
+          () => false,
+        ),
+      startSession: async ({ taskId, title, context, like }) => {
+        const previous = like ? (await managedAgentApi.snapshot(like, 0, 1).catch(() => undefined))?.session : undefined
+        const providers = (await managedAgentApi.providers()).filter((provider) => provider.installed)
+        const same = previous && providers.find((provider) => provider.id === previous.providerId)
+        const provider = same ?? providers[0]
+        if (!provider) throw new Error('No agent harness is installed on this Node.')
+        const session = await managedAgentApi.createSession({
+          taskId,
+          providerId: provider.id,
+          profileId: same ? previous.profileId : provider.profileId,
+          kind: 'interactive',
+          title,
+          // The composer attaches this to the first draft (AgentComposer).
+          config: { pendingForkContext: context },
+        })
+        managedAgentStore.upsertSession(session)
+        return session.id
+      },
+    })
     ctx.capabilities.provide(AGENTS_INLINE_DIFF, {
       prime: (taskId) => {
         void managedAgentStore.loadTask(taskId).catch(() => undefined)

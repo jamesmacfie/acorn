@@ -234,9 +234,11 @@ The manual checks, in a `pnpm dev:agent` session with GitHub connected:
 5. Run the same chat in the terminal client with `pnpm dev:tui:agent`. Each card is one line.
 
 Agent-built apps ([agent-built apps](../agent-built-apps.md)) have unit tests in `plugins/trellis`:
-`validate.test.ts` for the seven checks, `handlers.test.ts` for files, hashes, revisions, and task
-ownership, and `AppView.test.tsx` and `AppToolCard.test.tsx` for what a program can reach and how cards
-pin revisions. `apps/tui/src/trellis.test.tsx` draws an app in the terminal kit. The manual checks, in
+`validate.test.ts` for the seven checks and the guide's checklist, `handlers.test.ts` for files,
+hashes, revisions, task ownership, and the building session, `routes.test.ts` for the app list, saved
+state and its 256 KiB limit, and device-only access, and `AppView.test.tsx` and `AppToolCard.test.tsx`
+for what a program can reach, saved state, and how cards pin revisions and stay quiet in an archived
+task. `apps/tui/src/trellis.test.tsx` draws an app in the terminal kit. The manual checks, in
 a `pnpm dev:agent` session:
 
 1. Through MCP, create an app, write a plan and a program that draws a heading above `Panel` of that
@@ -253,6 +255,23 @@ a `pnpm dev:agent` session:
 5. In a managed Claude chat, ask for an app, then a change. A second card draws and the first
    collapses. Ask for one chart, and the agent uses `panel_show`.
 6. Run the same chat in the terminal client with `pnpm dev:tui:agent`.
+
+The Apps pane's checks, in the same kind of session. A `dev:agent` window runs hidden, and client
+schedules don't refresh in a hidden window, so the pane's gate never fills there. Before checking the
+gate, run a script in the window that redefines `document.hidden` as `false` and dispatches
+`visibilitychange`.
+
+1. A task with no app has no **Apps** button. After an agent shows one, the button appears, and
+   **Open** on the card lands on the app in the pane.
+2. Ask for a change from **Edit with agent**. The conversation is the one in the Agent pane, and the
+   detail moves to the new head without a reload. Archive the building session in the Agent pane,
+   reopen the drawer, and start an editing session. Its first draft carries the app as context, and
+   the session changes the app without being told which one.
+3. Build a checklist app, tick two items, and ask for a new column. The ticks survive the new revision
+   and a restart of the desktop app.
+4. Archive the task. The confirmation names the app. The archived preview lists it, its revisions,
+   and their programs, and runs nothing, and its cards in the transcript draw one line. Restore the
+   task. The app runs at the same head with its ticks.
 
 Dashboard authoring evaluation has scripted cases in
 `packages/dashboards-core/src/authoringEvaluation.test.ts`. Run the real-model layer on demand with

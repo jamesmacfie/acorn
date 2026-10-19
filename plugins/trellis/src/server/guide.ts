@@ -18,17 +18,20 @@ const RULES = [
   `Query("${TASK_TOOL}", {}, {}) returns the task the app is drawn in: { id, title, branch }.`,
   `A row's actions are listed on it as _actions: [{ id, label, risk }]. Run one with Mutation("${ROW_ACTION_TOOL}", {plan: "myPlan", row: $row, action: $action}) and @Run, after @Set($row, r._id) and @Set($action, "close"). The person confirms it first.`,
   '@ToAssistant(text) puts text in the composer for the person to send; it never sends. @OpenUrl(url) opens only http and https links, after the person confirms the URL.',
-  '$placement is "card" in a conversation. Read it to draw a compact version; never declare or set it.',
-  "$ variables last while the card is open. They aren't saved, so ticks and typed values are gone after a reload. Don't tell the person they're kept.",
+  '$placement is "card" in a conversation and "pane" in the task\'s Apps pane. Read it to draw a compact version in a card; never declare or set it.',
+  "Every $ variable is saved with the app and comes back when it opens again, in a card or the pane, after a reload too. A new revision keeps a variable's value by name: rename or drop one and its value is gone, and a new one starts at its default. Keep the names of what the person set, such as ticks, when you change an app. Saved state is at most 256 KiB.",
   'A chart or table is always a Panel. There is no other.',
 ]
 
-const EXAMPLES = [
-  `A checklist:
-root = Card("Release steps", [Checkbox("lint", "pnpm lint passes", $lint), Checkbox("tests", "pnpm test passes", $tests), progress])
+export const EXAMPLES = [
+  `A checklist that remembers what was ticked, because $lint, $tests, and $notes are saved:
+root = Card("Release steps", [Checkbox("lint", "pnpm lint passes", $lint), Checkbox("tests", "pnpm test passes", $tests), Checkbox("notes", "Update the release notes", $notes, "docs/release-notes.md"), progress, finish])
 $lint = false
 $tests = false
-progress = Text(@Count(@Filter([$lint, $tests], "", "==", true)) + " of 2 done", "muted")`,
+$notes = false
+done = @Count(@Filter([$lint, $tests, $notes], "", "==", true))
+progress = Text(done + " of 3 done", "muted")
+finish = done == 3 ? Button("Tell the agent it's ready", @ToAssistant("The release checklist is done."), "solid") : null`,
   `Rows grouped by a field, each with a tick for its row and a button that asks the agent:
 root = Stack([Heading("Open work"), groups])
 $ticked = []

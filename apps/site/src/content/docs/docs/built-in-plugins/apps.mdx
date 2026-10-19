@@ -18,7 +18,7 @@ reads your data through the same plans a dashboard panel uses, and the agent's v
 stays a panel.
 
 <PluginFacts id="trellis">
-  <Fragment slot="adds">Seven agent tools that build an app, and the card that draws it in the conversation.</Fragment>
+  <Fragment slot="adds">Seven agent tools that build an app, the card that draws it in the conversation, and the task's Apps pane.</Fragment>
   <Fragment slot="needs">A managed agent session in a task.</Fragment>
 </PluginFacts>
 
@@ -40,6 +40,27 @@ There's nothing to set up.
    grouped by status. Replaced by v2."</Checkpoint>
 
 </Steps>
+
+## Open and edit an app
+
+Once an agent shows an app in a task, the task gets an **Apps** pane.
+
+<Steps>
+
+1. Select **Open** on the app's card.
+
+   <Checkpoint>The Apps pane lists the task's apps and draws the one you opened at full size.</Checkpoint>
+
+2. Select **Edit with agent**, and ask for a change in the conversation that opens under the app.
+
+   <Checkpoint>It's the same conversation as in the Agent pane. When the agent shows the change, the
+   pane draws the new version.</Checkpoint>
+
+</Steps>
+
+If the session that built the app is archived, **Edit with agent** offers **Start an editing
+session**. The new session's first message carries the app, so you don't have to say which one you
+mean.
 
 ## Earlier versions
 
@@ -63,12 +84,14 @@ An app can't reach the network, read a secret, or start a program.
 
 ## Limits
 
-- What you tick or type in an app lasts while its card is open. It isn't saved.
-- An app belongs to the task it was built in. Archiving the task keeps it, and deleting the task
-  deletes it.
+- An app remembers what you tick or type, up to 256 KiB, after a reload or a restart. When the agent
+  changes the app, it keeps what you set as long as the agent keeps the names it stores it under.
+- An app belongs to the task it was built in. Archiving the task keeps it, and the archive dialog says
+  so. While the task is archived, its preview lists the app's versions and doesn't run them.
+  Restoring the task brings the app back. Deleting the task deletes it.
 
 ## In the terminal
 
 The terminal client draws an app's text, buttons, and fields with its own components, in a card up to 24
-rows tall. A chart or table inside an app draws as one line, as a dashboard panel card does. A link's
+rows tall or in the Apps pane. A chart or table inside an app draws as one line, as a dashboard panel card does. A link's
 confirm copies the address instead of opening it.

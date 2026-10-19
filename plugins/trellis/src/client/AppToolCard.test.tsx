@@ -4,9 +4,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AppSummary } from '../shared/api'
 
-const mocks = vi.hoisted(() => ({ summary: undefined as unknown as AppSummary, writeJson: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  summary: undefined as unknown as AppSummary,
+  writeJson: vi.fn(),
+  openPane: vi.fn(),
+  activeTasks: [{ id: 'task' }],
+}))
 vi.mock('@acorn/plugin-api/client', () => ({
   activeNodeId: () => 'n',
+  openPane: mocks.openPane,
+  tasksOptions: () => ({ queryKey: ['tasks'], queryFn: async () => mocks.activeTasks }),
   allProjects: () => [{ id: 'p', workspaceId: 'w' }],
   taskById: () => ({ projectId: 'p' }),
   readJson: async (url: string) => (url.includes('/revisions/') ? { program: '', plans: {} } : mocks.summary),
@@ -38,6 +45,7 @@ afterEach(() => {
   dispose?.()
   host?.remove()
   vi.clearAllMocks()
+  mocks.activeTasks = [{ id: 'task' }]
 })
 function draw(tools: ReturnType<typeof call>[]) {
   host = document.createElement('div')
@@ -71,7 +79,7 @@ describe('app cards', () => {
     expect(cards()).toEqual([
       'v1: First version. Replaced by v3.Show v1Restore v1',
       'v2: Added owners. Replaced by v3.Show v2Restore v2',
-      'Checklist · v3interactive',
+      'Checklist · v3Openinteractive',
     ])
     button(0, 'Show v1').click()
     await settle()
@@ -100,7 +108,7 @@ describe('app cards', () => {
       expect.objectContaining({ body: '{"revision":1}' }),
     )
     expect(cards()).toEqual([
-      'Checklist · v4, restored from v1interactive',
+      'Checklist · v4, restored from v1Openinteractive',
       'v2: Added owners. Replaced by v4.Show v2Restore v2',
       'v3: Added a filter. Replaced by v4.Show v3Restore v3',
     ])
@@ -111,5 +119,22 @@ describe('app cards', () => {
     draw([call(1, 'completed', '{"status":"api-error","detail":"400 unknown-component /program/root"}')])
     expect(cards()[0]).toContain("This app didn't pass its checks, so nothing was drawn.")
     expect(cards()[0]).not.toContain('interactive')
+  })
+
+  it("opens the app in the task's Apps pane", async () => {
+    mocks.summary = { appId, taskId: 'task', name: 'Checklist', head: 1, revisions: revisions.slice(0, 1) }
+    draw([call(1)])
+    await settle()
+    button(0, 'Open').click()
+    expect(mocks.openPane).toHaveBeenCalledWith('task', 'apps', { kind: 'plugin:select', item: appId })
+  })
+
+  it("doesn't run an app in an archived task's transcript", async () => {
+    mocks.summary = { appId, taskId: 'task', name: 'Checklist', head: 1, revisions: revisions.slice(0, 1) }
+    mocks.activeTasks = []
+    draw([call(1)])
+    await settle()
+    await settle()
+    expect(cards()).toEqual(["Checklist · v1. This task is archived, so the app isn't drawn."])
   })
 })

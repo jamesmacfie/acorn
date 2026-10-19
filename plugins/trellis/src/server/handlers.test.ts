@@ -1,7 +1,7 @@
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ToolError, type ToolContext } from '@acorn/plugin-api/node'
 import { createApp, patchApp, readApp, showApp, writeApp, type AppToolDeps } from './handlers'
 import { AppStore } from './store'
@@ -20,6 +20,7 @@ function world(planProblems: (plan: unknown) => string[] = () => []) {
     workspaceOf: async () => 'w',
     planProblems: async (_workspace, plan) => planProblems(plan),
     planGuide: async () => ({}),
+    changed: vi.fn(),
   }
   const ctx: ToolContext = { taskId: 't1', userLogin: 'owner' }
   return { root, store, deps, ctx }
@@ -48,6 +49,16 @@ describe('the app tools', () => {
       program: 'root = Stack([Heading("Open work"), Panel("open")])',
       plans: { open: plan },
     })
+  })
+
+  it('records the session that last showed an app as its building session, and says its head moved', async () => {
+    const { store, deps, ctx } = world()
+    const { appId, program } = await createApp(deps, { name: 'A', description: '' }, { ...ctx, sessionId: 's1' })
+    expect((await store.meta(appId))?.sessionId).toBe('s1')
+    await writeApp(deps, { appId, file: 'program', content: 'root = Stack([Text("a")])', hash: program.hash }, ctx)
+    await showApp(deps, { appId, note: 'First.' }, { ...ctx, sessionId: 's2' })
+    expect(await store.meta(appId)).toMatchObject({ sessionId: 's2', head: 1, updatedAt: expect.any(Number) })
+    expect(deps.changed).toHaveBeenCalledWith(expect.objectContaining({ appId }))
   })
 
   it('needs the current hash to replace a file, and patches statements by name', async () => {

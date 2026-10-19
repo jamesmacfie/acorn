@@ -17,15 +17,19 @@ never carries one.
 
 ```text
 apps/<appId>/
-  app.json              the task, name, description, and head revision
+  app.json              the task, name, description, head revision, and building session
   working/program.oui   the program the tools edit
   working/plans/<name>.json
   revisions/<n>/        what app_show published: program, plans, and revision.json
+  state.json            the program's saved $ variables
 ```
 
 `revision.json` records the library ID and version the program was written against, the agent's
-one-line note, and, for a restore, the revision it copied. Revisions never change. Every app belongs to
-one task. Archiving the task keeps its apps, and deleting the task deletes them.
+one-line note, and, for a restore, the revision it copied. Revisions never change. The building session
+is the session that last showed the app, or the editing session the person started for it. Every app
+belongs to one task. Archiving the task keeps its apps, revisions, and state, restoring it brings them
+back at the head they had, and deleting the task deletes them. The archive dialog names the task's
+apps, through trellis's task check.
 
 ## Tools
 
@@ -86,7 +90,7 @@ the renderer with it. The card reads the revision's files through `/v1/p/trellis
 device-only route.
 
 Each card pins the revision its call published. Only the card that shows the app's head is
-interactive. Older cards collapse to "v2: added owners. Replaced by v3." with two buttons:
+interactive, and it has **Open**, which shows the app in the task's Apps pane. Older cards collapse to "v2: added owners. Replaced by v3." with two buttons:
 
 - **Show v2** draws that revision read only. Its buttons and fields are off and its actions do nothing.
   It draws with current data.
@@ -95,19 +99,55 @@ interactive. Older cards collapse to "v2: added owners. Replaced by v3." with tw
   device-only route, so an agent can't call it.
 
 A card caps at 480 pixels with **Expand**. Its plans first run when it comes into view, and its panels
-pause while it's off screen. `$placement` is `card`. A program's `$` variables last while the card is
-open and aren't saved, so ticks and typed values are gone after a reload.
+pause while it's off screen. `$placement` is `card`. A card in an archived task's transcript draws one
+line and not the app, because the task's data may not resolve.
+
+## The Apps pane
+
+The task's **Apps** pane is `plugins/trellis/src/client/paneContribution.ts`, a `list-detail` pane
+([panes](./panes.md)). Its `when` gate reads a list of every shown app on the Node, from
+`GET /v1/p/trellis/apps`, so a task where no agent has shown an app has no button. The Node sends an
+`app-changed` frame whenever a head moves, from `app_show` or **Restore**, and the client reads the
+list again. A two-minute schedule is the backstop.
+
+The list shows each app's name, description, head revision, and when it last changed. The detail runs
+the head with `$placement` set to `pane`, at full size. A new head redraws it without a reload.
+
+**Edit with agent** opens the building session's conversation under the app, through the agents
+plugin's `agents.conversation` capability, composer included. The app then sits in a section capped at
+40% of the column. When the building session is archived or gone, the drawer offers **Start an
+editing session**. That starts an interactive session in the task, on the same harness when it's
+still installed, with the app's name, description, head, program, and plans attached to its first
+draft as context. The person sees the attachment and sends it with whatever they ask. The app then
+names that session as its building session.
+
+In an archived task's preview, the pane lists the apps, each revision's note, program, and plans,
+read only, and runs none of them.
+
+## App state
+
+The host saves a program's `$` variables, except `$placement`, to the app's `state.json`, at most
+256 KiB, through the device-only `/v1/p/trellis/apps/<appId>/state` route. A view seeds them when it
+mounts, so ticks and typed values come back after a reload and a restart. Every interactive view of the
+head saves: the head's card and the pane. Views in one window share one copy, so ticking in the pane
+ticks the card beside it, and the last change wins. A read-only older revision neither reads nor
+saves state.
+
+State survives revisions by variable name. A view seeds only the variables its revision declares, so
+one a revision dropped is gone at the next save, and a new one starts at its declared default. The host
+doesn't migrate. `app_guide` tells agents which variables persist and to keep the names of what the
+person set.
 
 ## What an app can reach
 
-A program reaches only what the card hands it, and the card checks each call. The code is
+A program reaches only what its view hands it, a card or the pane, and the view checks each call. The code is
 `plugins/trellis/src/client/AppView.tsx`.
 
 | What | In a program | What the host does |
 | --- | --- | --- |
 | The app's plans | `Query("name", inputs, defaults)`, `Panel("name", inputs)` | Runs the plan from the revision's files through the dashboard run route, under the viewer's device. A query's rows are each row's values plus `_id` and `_actions`. |
 | Plan inputs | The second argument to `Query` or `Panel` | Sent as the run's `inputs`. The Node fills the plan's `{ from: "input" }` addresses with them, and the run fails if a plan reads one that wasn't passed. |
-| The task | `Query("task", {}, {})` | Returns the ID, title, and branch of the task the card is drawn in. |
+| The task | `Query("task", {}, {})` | Returns the ID, title, and branch of the task the app is drawn in. |
 | Row actions | `Mutation("rowAction", {plan, row, action})` and `@Run` | Finds the row and action in its own last run of that plan, shows a confirm, and then calls the data source's action route. A program can't name a record or an action the source didn't offer. |
 | Compose | `@ToAssistant(text, context)` | Puts the text in the task's agent composer as a draft. It never sends. |
 | Links | `@OpenUrl(url)` | Opens HTTP and HTTPS URLs only, after a confirm that shows the full URL. Anything else does nothing and says why. In the terminal, the confirm copies the link instead. |
@@ -124,7 +164,7 @@ see [security](./security.md#agent-built-apps).
 
 ## In the terminal
 
-The terminal client draws app cards with its own kit, capped at 24 rows. A `Panel` draws as one line
+The terminal client draws app cards and the Apps pane with its own kit. A card caps at 24 rows. A `Panel` draws as one line
 that says the panel draws in the desktop app. The terminal bundles lang-core, as it bundles Zod.
 
 Both the Node and the terminal client set `OPENUI_TELEMETRY_DISABLED`, because lang-core reads the

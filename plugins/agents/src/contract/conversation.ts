@@ -1,4 +1,5 @@
 import { clientCapabilityId } from '@acorn/plugin-api/client'
+import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import type { Component } from 'solid-js'
 
 // One session's conversation, drawn by whoever has a session to draw.
@@ -38,6 +39,13 @@ export type AgentConversationProps = {
 
 export type AgentConversationSurface = {
   Conversation: Component<AgentConversationProps>
+  /** Whether a session can take a message: it exists on the active Node and isn't archived. */
+  sessionOpen(sessionId: string): Promise<boolean>
+  /** Starts an interactive session in a task with `context` attached to its first draft, as a fork's
+   *  copied context is, so the person sees it and sends it with what they type. It runs on the harness
+   *  and profile `like` ran on while that harness is installed, otherwise on the first installed one.
+   *  Answers the new session's id. */
+  startSession(input: { taskId: string; title: string; context: AgentContextSnapshot; like?: string }): Promise<string>
 }
 
 export const AGENTS_CONVERSATION = clientCapabilityId<AgentConversationSurface>('agents.conversation')
