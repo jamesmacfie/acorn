@@ -185,6 +185,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/session-revisit-2026-10-13.md](./testing/session-revisit-2026-10-13.md) | Dated cost of returning to a long agent session, measured in jsdom, and the real-window numbers still to take. |
 | [testing/idle-cost-2026-10-13.md](./testing/idle-cost-2026-10-13.md) | Dated count of the work an idle desktop window asks for, measured in tests, and the real-window idle numbers still to take. |
 | [testing/rail-artwork-2026-10-19.md](./testing/rail-artwork-2026-10-19.md) | One desktop check of a plugin's live rail artwork and tooltip words, using the acme-tracker example. |
+| [testing/context-references-2026-10-19.md](./testing/context-references-2026-10-19.md) | One check of `#` context references in the desktop and terminal clients, with real Claude Code and Codex sessions. |
 | [testing/sentry-baseline-2026-10-13.md](./testing/sentry-baseline-2026-10-13.md) | A day of Sentry telemetry from real use: git calls, session-open timing, agent process and renderer memory, and response sizes. The before numbers for UI performance phases 06 to 10. |
 | [testing/ui-performance-open-checks-2026-10-14.md](./testing/ui-performance-open-checks-2026-10-14.md) | The real-window and Sentry checks still to run for all ten UI performance phases. |
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by the October 2026 runtime packaging work. |

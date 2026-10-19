@@ -5,7 +5,7 @@ import type {
   MentionSuggestion,
   MentionTextareaProps,
 } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
-import { mentionList } from '@acorn/client-core/kit/lib/mentions'
+import { mentionList } from '@acorn/client-core/kit/lib'
 import type { Renderable } from '../../tree/compat'
 import { focusRenderable, markEntry, stopsIn } from '../../keys/regions'
 import { bindKeys } from '../../keys/install'

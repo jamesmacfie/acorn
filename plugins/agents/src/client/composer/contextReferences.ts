@@ -1,7 +1,8 @@
 import { fuzzyScore } from '@acorn/plugin-api/client'
 
-// `#keyword:slug` references to Acorn context (docs/future/context-references.md § Syntax). Pure, with
-// no Solid and no fetches, so the browser extension's composer can read the same tokens later.
+// `#keyword:slug` references to Acorn context (docs/managed-agents/composer.md § Reference Acorn
+// context). Pure, with no Solid and no fetches, so the browser extension's composer can read the same
+// tokens later.
 //
 // The resolver is the one reading of "does this token attach something". The composer colours what it
 // returns and sends what it returns, so a coloured token always attaches and an uncoloured one is prose.

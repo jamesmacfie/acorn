@@ -377,8 +377,9 @@ export default function AgentComposer(props: {
     setContexts((current) => current.filter((item) => item.contextId !== context.contextId))
   }
 
-  // `#` references (docs/future/context-references.md). The catalog reads each source's items when
-  // someone asks for them, and the draft's map says which item each completed token means.
+  // `#` references (docs/managed-agents/composer.md § Reference Acorn context). The catalog reads each
+  // source's items when someone asks for them, and the draft's map says which item each completed
+  // token means.
   const catalog = createContextCatalog(() => ({ taskId: props.session.taskId, sessionId: props.session.id }))
   const composerContexts = createMemo<ComposerContexts>(() => {
     const text = draft()
