@@ -135,6 +135,12 @@ async function taskOwners(core: Core, tasks: readonly TaskRef[]): Promise<Map<st
       const project = await core.projects.byId(task.projectId)
       if (!project?.path) throw new Error('Cannot verify task checkout ownership.')
       const root = await core.git.git(['rev-parse', '--show-toplevel'], { cwd: project.path, maxOutputBytes: 8192 })
+      // A folder outside any Git repository is in no roster, so its tasks own nothing. Any other
+      // failure still refuses, because a missed owner would let cleanup remove a task's checkout.
+      if (root.code === 128 && /not a git repository/i.test(root.stderr)) {
+        projectRoots.set(task.projectId, null)
+        continue
+      }
       if (root.code !== 0 || root.truncated) throw new Error('Cannot verify task checkout ownership.')
       const path = await canonicalPath(root.stdout.trim())
       projectRoots.set(task.projectId, path)

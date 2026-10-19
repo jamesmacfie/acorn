@@ -38,6 +38,7 @@ function core(root: string, tasks: TaskRef[] = [], aliasPath = root) {
   const projects = [
     { id: 'project', name: 'First', path: root, workspaceId: 'workspace', github: null },
     { id: 'alias', name: 'Alias', path: aliasPath, workspaceId: 'workspace', github: null },
+    { id: 'plain', name: 'Plain folder', path: join(folder, 'plain'), workspaceId: 'workspace', github: null },
   ]
   return {
     projects: { byId: async (id: string) => projects.find((project) => project.id === id) ?? null },
@@ -142,6 +143,26 @@ it('removes a clean unowned tree, and refuses ownership that appears after the r
   owners.pop()
   expect((await cleanup(service, 'project', cleanId)).ok).toBe(true)
   expect((await inventory(service, 'project')).worktrees.some((item) => item.path === clean)).toBe(false)
+})
+
+it('lists worktrees while another project is a plain folder with a task in it', async () => {
+  const { root } = fixture()
+  mkdirSync(join(folder, 'plain'))
+  const service = core(root, [
+    {
+      id: 'plain-task',
+      title: 'Plain folder task',
+      projectId: 'plain',
+      branch: null,
+      worktreePath: null,
+      skipSetup: false,
+      pullNumber: null,
+    },
+  ])
+  const result = await inventory(service, 'project')
+  expect(result.error).toBeNull()
+  expect(result.worktrees).toHaveLength(3)
+  expect(result.worktrees.every((entry) => entry.owners.length === 0)).toBe(true)
 })
 
 it('parses worktree paths containing newlines without splitting entries', () => {
