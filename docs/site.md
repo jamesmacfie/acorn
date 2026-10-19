@@ -59,7 +59,7 @@ specimens and shell snapshots, and checks every link on the landing, feature, an
 most docs pages they link to are drafts. The tests use the installed Chrome. `ACORN_SITE_PREVIEW` must
 match the build you're testing.
 
-The landing page also has a Lighthouse target, checked by hand. [The site's design](./site/design.md#lighthouse)
+The landing page also has a Lighthouse target, checked by hand. [The landing page's Lighthouse scores](./site/design/lighthouse.md)
 has the command and the scores.
 
 ## Specimens
@@ -97,8 +97,8 @@ works, and adding a scene.
 
 ## Design
 
-The site is styled from acorn's own design tokens, fonts, and mark, and offers the app's themes and
-style packs under **Appearance**. [The site's design](./site/design.md) covers the stylesheet, the
+The site is styled from acorn's own design tokens, fonts, and mark, in a light and a dark theme, and
+each marketing page opens and closes on a band that's always dark. [The site's design](./site/design.md) covers the stylesheet, the
 components, Starlight's replaced parts, the contrast check, and the design gallery at `/lab/design/`.
 
 ## Keep pages in sync

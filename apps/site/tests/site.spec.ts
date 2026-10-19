@@ -164,8 +164,10 @@ const axeRoutes = [
 // A picture of acorn in a frame is the kit's markup in the site's theme, drawn exactly as the app draws
 // it, so a finding there belongs to the kit or the theme, as on the galleries below. Catppuccin Latte's
 // muted text and accent buttons sit just under 4.5:1 there.
+// With reduced motion, so axe reads each block where it settles, not partway through rising into view.
 for (const route of [...axeRoutes, ...featureRoutes]) {
   test(`${route} has no serious accessibility violations`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto(route)
     const { violations } = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])
@@ -216,6 +218,7 @@ for (const route of ['/lab/specimens/', '/lab/snapshots/']) {
 for (const route of ['/lab/design/', '/lab/design/docs/', '/lab/design/landing/']) {
   test(`${route} has no serious accessibility violations`, async ({ page }) => {
     test.skip(!previewBuild, 'The design gallery is a lab page, which only a preview build has.')
+    await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto(route)
     const { violations } = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])

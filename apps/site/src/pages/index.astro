@@ -237,7 +237,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
 <Marketing title="A workspace for working with coding agents" meta={meta}>
   <SoftwareApplication slot="head" release={release} />
-  <Hero slot="hero" title="Let your agents go nuts." split>
+  <Hero slot="hero" title="Let your agents go nuts." highlight="go nuts." split>
     <p>
       acorn is a workspace for Claude Code and Codex. Each task gets its own branch, worktree, terminals, and agent
       sessions, so your agents make their mess somewhere safe. Read the diff, merge the pull request, and archive the
@@ -248,11 +248,13 @@ const getAcorn = release ? 'Download' : 'Get acorn'
       <a href="/docs/start/desktop-and-terminal/">terminal client</a> · <a href={`${GITHUB}/blob/main/LICENSE`}>MIT</a>
     </p>
     <Fragment slot="actions">
-      <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
-      <a class="button" href="/docs/">Read the docs</a>
+      <a class="button" data-variant="primary" data-size="lg" href="/download/">
+        {getAcorn} <span class="arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="button" data-size="lg" href="/docs/">Read the docs</a>
     </Fragment>
     <div slot="picture" class="hero-shot">
-      <div class="tabs" role="tablist" aria-label="Client" data-tabs hidden>
+      <div class="tabs segmented" role="tablist" aria-label="Client" data-tabs hidden>
         <button type="button" role="tab" aria-controls="hero-shot-desktop">Desktop</button>
         <button type="button" role="tab" aria-controls="hero-shot-terminal">Terminal</button>
       </div>
@@ -263,7 +265,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter" aria-labelledby="loop">
     <header class="chapter-head">
-      <h2 id="loop">Every mess gets its own branch.</h2>
+      <h2 id="loop">Every mess gets <span class="accent">its own branch.</span></h2>
       <p class="lede">
         The usual task gets a branch and a worktree of its own, so agents on different tasks work in different checkouts
         and don't trip over each other.
@@ -285,7 +287,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter" aria-labelledby="window">
     <header class="chapter-head">
-      <h2 id="window">You can close a few windows now.</h2>
+      <h2 id="window">You can close a few windows <span class="accent">now.</span></h2>
       <p class="lede">The pull request, the terminals, and the other tools a task needs open as panes inside it.</p>
     </header>
     <Tour tabs={tour}>
@@ -295,7 +297,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter band" aria-labelledby="plugins">
     <header class="chapter-head">
-      <h2 id="plugins">Take it apart.</h2>
+      <h2 id="plugins">Take it <span class="accent">apart.</span></h2>
       <p class="lede">
         Every pane in that window comes from a plugin, and so do the terminal drawer and most of the icons on its rails.
         A plugin you install uses the same seams, and draws in both clients.{' '}
@@ -376,12 +378,12 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 
   <section class="section chapter" aria-labelledby="trust">
     <header class="chapter-head">
-      <h2 id="trust">The agents don't get your keys.</h2>
+      <h2 id="trust">The agents don't get <span class="accent">your keys.</span></h2>
       <p class="lede">
         Your code stays on the machine that runs the Node, and acorn limits what the agents and plugins there can reach.
       </p>
     </header>
-    <ul class="cells">
+    <ul class="trust">
       {
         trust.map(([href, title, text]) => (
           <li>
@@ -413,13 +415,15 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     </div>
   </section>
 
-  <section class="section finale band" aria-labelledby="get-acorn">
+  <section class="section finale closing stage site-dark" aria-labelledby="get-acorn">
     <div class="finale-text">
-      <h2 id="get-acorn">Give them a task.</h2>
+      <h2 id="get-acorn">Give them <span class="accent">a task.</span></h2>
       <InstallBlock id="footer-install" methods={installMethods} />
       <div class="actions">
-        <a class="button" data-variant="primary" href="/download/">{getAcorn}</a>
-        <a class="button" href="/docs/">Read the docs</a>
+        <a class="button" data-variant="primary" data-size="lg" href="/download/">
+          {getAcorn} <span class="arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="button" data-size="lg" href="/docs/">Read the docs</a>
       </div>
     </div>
     <pre class="finale-art" aria-hidden="true">{ACORN_ART}</pre>
@@ -431,14 +435,25 @@ const getAcorn = release ? 'Download' : 'Get acorn'
 </script>
 
 <style>
-  /* ── Hero ── */
+  /* ── Hero ──
+     A dot grid behind the words, fading out toward the window. */
+  :global(.hero)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: radial-gradient(var(--border-strong) 1px, transparent 1.5px);
+    background-size: var(--space-10) var(--space-10);
+    mask-image: radial-gradient(ellipse 80% 70% at 70% 20%, currentcolor, transparent);
+    pointer-events: none;
+  }
   .hero-meta {
-    margin-block-start: var(--space-8);
+    font-family: var(--font-mono);
     font-size: var(--fs-sm);
   }
   .hero-shot {
     display: grid;
-    gap: var(--space-5);
+    gap: var(--space-10);
   }
   .hero-shot > * {
     margin: 0;
@@ -457,16 +472,14 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     margin: 0;
   }
   .chapter h2,
-  .finale h2 {
-    max-inline-size: 20ch;
+  .finale h2,
+  .faq-head h2 {
+    max-inline-size: 18ch;
     font-size: var(--site-fs-display);
+    font-weight: var(--fw-bold);
     /* Mono at display size reads loose, as the hero's headline does. */
-    letter-spacing: -0.03em;
-    line-height: 1.05;
-  }
-  .lede {
-    max-inline-size: 60ch;
-    font-size: var(--fs-xl);
+    letter-spacing: -0.04em;
+    line-height: 1.02;
   }
   .chapter h3 {
     margin: 0;
@@ -477,14 +490,12 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     font-size: var(--fs-lg);
   }
 
-  /* A chapter on its own band runs the subtle background to the window's edges. The shadow paints past
-     the column without widening the page, and the clip keeps it off the chapters above and below. */
+  /* A chapter on its own band runs the subtle background to the window's edges, as the stage does. */
   .band {
     margin-block-start: var(--site-section);
     padding-block: var(--site-section);
     background: var(--bg-subtle);
-    box-shadow: 0 0 0 100vmax var(--bg-subtle);
-    clip-path: inset(0 -100vmax);
+    border-image: conic-gradient(var(--bg-subtle) 0 0) fill 0 / / 0 100vmax;
   }
 
   /* ── The loop ──
@@ -664,7 +675,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
   /* A hairline grid: each cell draws its own end and bottom rules and the list draws the first ones, so
      a short last row just stops. */
   .wall,
-  .cells {
+  .trust {
     display: grid;
     max-inline-size: none;
     margin: 0;
@@ -674,7 +685,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     border-inline-start: var(--divider);
   }
   .wall > li,
-  .cells > li {
+  .trust > li {
     position: relative;
     border-inline-end: var(--divider);
     border-block-end: var(--divider);
@@ -701,8 +712,8 @@ const getAcorn = release ? 'Download' : 'Get acorn'
   }
   .wall > li:hover,
   .wall > li:has(a:focus-visible),
-  .cells > li:hover,
-  .cells > li:has(a:focus-visible) {
+  .trust > li:hover,
+  .trust > li:has(a:focus-visible) {
     background: var(--bg);
     box-shadow: inset var(--stripe-w) 0 var(--accent);
   }
@@ -806,14 +817,17 @@ const getAcorn = release ? 'Download' : 'Get acorn'
   }
 
   /* ── Trust ── */
-  .cells {
+  .trust {
     grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
   }
-  .cells :global(.card) {
+  /* The cell marks hover, so the card inside it stays flat and still. */
+  .trust :global(.card),
+  .trust :global(.card:hover) {
     block-size: 100%;
     background: none;
     border: 0;
     box-shadow: none;
+    translate: none;
   }
 
   /* ── Questions ── */
@@ -828,25 +842,58 @@ const getAcorn = release ? 'Download' : 'Get acorn'
   .faq-head > * {
     margin: 0;
   }
-  .faq-head h2 {
-    font-size: var(--site-fs-display);
-    letter-spacing: -0.03em;
-    line-height: 1.05;
-  }
   .faq-list {
     border-block-start: var(--divider);
   }
   .faq details {
-    padding-block: var(--space-6);
     border-block-end: var(--divider);
   }
+  /* Each question is a row with a plus that turns to a cross as its answer opens. Where the browser can
+     animate to a height, the answer slides open. */
   .faq summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-10);
+    padding-block: var(--space-9);
+    font-family: var(--font-mono);
     font-weight: var(--fw-semibold);
     cursor: pointer;
+    list-style: none;
+  }
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq summary::after {
+    content: '+';
+    flex: none;
+    font-size: var(--fs-xl);
+    font-weight: var(--fw-normal);
+    line-height: 1;
+    color: var(--accent);
+    transition: rotate var(--dur-med) var(--ease-out);
+  }
+  .faq details[open] summary::after {
+    rotate: 45deg;
+  }
+  .faq summary:hover {
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+  }
+  .faq details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size var(--dur-long) var(--ease-out),
+      content-visibility var(--dur-long) allow-discrete;
+  }
+  .faq details[open]::details-content {
+    block-size: auto;
   }
   .faq details p {
     max-inline-size: var(--site-measure);
-    margin-block-end: 0;
+    margin: 0;
+    padding-block-end: var(--space-9);
   }
   @media (min-width: 64rem) {
     .faq {
@@ -854,11 +901,9 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     }
   }
 
-  /* ── Get acorn ──
-     The last band meets the footer, so it takes up the page's own bottom padding. */
+  /* ── Get acorn ── */
   .finale {
     align-items: center;
-    margin-block-end: calc(-1 * var(--site-section));
   }
   .finale-text {
     display: grid;
@@ -879,6 +924,7 @@ const getAcorn = release ? 'Download' : 'Get acorn'
     font-family: var(--font-mono);
     font-size: clamp(1.75rem, 1rem + 2vw, 2.75rem);
     line-height: 1;
+    color: var(--accent);
   }
   @media (min-width: 64rem) {
     .finale {

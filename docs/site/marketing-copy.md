@@ -13,6 +13,9 @@ removes. Keep a new joke about the product, and keep the claim under it one a re
 A landing page heading is a whole sentence and keeps its period. A caps label is fine where it names
 a group, such as the two over the plugin guides.
 
+A display heading may set its closing words in the accent, as the hero does with "go nuts". Pick the
+words that carry the joke or the claim, keep them at the end, and color one phrase per heading.
+
 ## What the pages leave out
 
 These are the marks people list for a page a model wrote, and none of them is on the landing page:
@@ -21,7 +24,7 @@ These are the marks people list for a page a model wrote, and none of them is on
   "The whole X, in one Y".
 - A caps label above every heading, and numbers on steps that a list already orders.
 - "Not just X, it's Y", groups of three by habit, and words such as seamless, powerful, and unlock.
-- A gradient, a glow, a pill badge over the headline, and a row of identical cards with an icon on
-  top.
+- A gradient wash, a glow, a pill badge over the headline, and a row of identical cards with an icon on
+  top. The landing hero's faint dot grid is texture, and it fades out before the window.
 
 A paragraph that repeats the cards under it is another. Say a thing once, where it's most specific.

@@ -801,7 +801,7 @@ describe('architecture boundaries', () => {
       // page, the model picker popover, `features/editor/documentCustody`, `ContributionBoundary`, and
       // `LinkPreviewHost` (docs/frontend/startup-budget.md). The token and style pack stylesheets, which
       // the browser extension loads without the app's own stylesheet.
-      '@acorn/client-core': 197, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, the anchored popover and focus restore the sidebar's Go to task draws on, and Artwork for the plugin API's components barrel.
+      '@acorn/client-core': 198, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, the Markdown fence model and view, the four stylesheets the extension sidebar loads, TreeHost for the site's component pages, the anchored popover and focus restore the sidebar's Go to task draws on, Artwork for the plugin API's components barrel, and the Inter font file the site preloads.
       // Includes `mcp/fileGuard`, the read block's file guard, a build entry like `mcp/loopHook`
       // (docs/managed-agents/read-block.md). The manifest parser and the core facet list, which the
       // public site's plugin reference reads to check its examples and list the grants. `mcp/toolOutputDir`,

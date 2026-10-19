@@ -6,7 +6,7 @@
 // syntax themes to draw (ec.config.mjs). Goes early in <head>, inline, so it runs before anything paints.
 import appearances from 'virtual:acorn-ui/appearances'
 
-const themes = { light: 'catppuccin-latte', dark: 'catppuccin-mocha' }
+const themes = appearances.site
 // An id the app no longer has would leave the site in its plain default colors, so the build stops.
 for (const id of Object.values(themes)) {
   if (!appearances.themes.some((theme) => theme.id === id)) throw new Error(`acorn has no theme with the id ${id}.`)
