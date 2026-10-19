@@ -2257,6 +2257,9 @@ importers:
       '@tanstack/solid-query':
         specifier: ^5.101.0
         version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
+      create-acorn-plugin:
+        specifier: workspace:*
+        version: link:../../packages/create-acorn-plugin
       hono:
         specifier: 4.13.7
         version: 4.13.7

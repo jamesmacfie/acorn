@@ -710,12 +710,15 @@ describe('architecture boundaries', () => {
     // (docs/plugins/change-request-ui.md).
     // `@acorn/openui-solid`: the OpenUI renderer, which imports nothing from Acorn, and which the apps host
     // plugin binds to the kit (docs/architecture/packages.md § A renderer built to publish).
+    // `create-acorn-plugin`: the published scaffold, which depends on nothing, and which the apps host
+    // writes when an app turns into a plugin (docs/agent-built-apps/project-apps.md § Turn into a plugin).
     const SHARED = new Set([
       '@acorn/plugin-api',
       '@acorn/protocol',
       '@acorn/diff-document',
       '@acorn/change-request-ui',
       '@acorn/openui-solid',
+      'create-acorn-plugin',
     ])
     const offenders = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))

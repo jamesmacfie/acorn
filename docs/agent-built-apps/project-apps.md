@@ -1,8 +1,8 @@
 # Project apps
 
 This page covers publishing a task app to its project, drafts and what happens when two of them
-publish, the left rail's **Apps** source, editing a project app, putting one on a dashboard, and
-deleting one. It's part of
+publish, the left rail's **Apps** source, editing a project app, putting one on a dashboard,
+turning one into a plugin, and deleting one. It's part of
 [agent-built apps](../agent-built-apps.md).
 
 ## Publishing
@@ -66,6 +66,32 @@ cell says so and offers **Restore** and **Remove from this dashboard**. The cell
 **Restore** because the **Apps** source hides when its project has no live app. The Node's
 measure sampler skips app cells, which have no measure of their own. The terminal client draws no
 dashboards, so its **Add to dashboard** menu says they're in the desktop app.
+
+## Turn into a plugin
+
+An app that outgrows the language becomes an ordinary plugin through a rebuild, not a copy. **Turn
+into a plugin**, on a project app's page, asks for a plugin ID, a display name, and a new or empty
+folder on the Node's computer. Then:
+
+1. The Node writes the scaffold's tree package into the folder, the one `npm create acorn-plugin`
+   writes ([start from the scaffold](../plugin-authoring/start-from-the-scaffold.md)). Its manifest's
+   `requires.plugins` names the plugin behind each data source the head's plans read, with that
+   plugin's running major as the range. A compiled plugin has no version, so it gets no range, and
+   core's own sources need nothing. The app's saved state goes beside the manifest as
+   `app-state.seed.json`. The plugin never reads it on its own, so the owner loads it or deletes it.
+2. The folder becomes a project in the app's workspace, and a project-folder task there is created, so
+   its agent works inside the package.
+3. A session starts in that task with the brief attached to its first draft: the head's program and
+   plans, every revision's note, and what to do. The brief tells the agent to call `plugin_authoring`,
+   rebuild the app as the package's tree pane over the same sources, keep `requires`, and ask for the
+   install with `plugin_request` in development mode.
+
+The host can't take a picture of an app, so the dialog asks the owner to paste a screenshot with the
+first message. The package installs through **Install from folder**, or the agent's request, with the
+ordinary trust prompt ([install a hand-written package](../plugin-authoring/installing-a-hand-written-package.md)).
+Nothing about the app changes, and it stays until the owner deletes it. The route,
+`POST /apps/<appId>/plugin`, is device only, and refuses a folder that holds anything. The code is
+`plugins/trellis/src/server/pluginPackage.ts` and `plugins/trellis/src/client/pluginExport.ts`.
 
 ## Deleting
 

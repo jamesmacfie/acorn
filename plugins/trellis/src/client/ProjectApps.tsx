@@ -53,6 +53,7 @@ import {
 import { appById, projectApps, refreshApps } from './appsStore'
 import { Revision } from './AppToolCard'
 import { startEditingSession } from './editingSession'
+import { TurnIntoPluginButton } from './TurnIntoPlugin'
 
 // The Apps source's two regions (./index.ts registers it): the routed project's apps, and the selected one
 // at full size with `$placement` set to `project`. Editing needs a session, and sessions belong to
@@ -297,6 +298,7 @@ function ProjectApp(props: { app: () => AppListing }) {
         <Button size="sm" variant="ghost" busy={busy() === 'new'} onPress={() => void editInNewTask()}>
           Edit in a new task
         </Button>
+        <TurnIntoPluginButton app={props.app()} workspaceId={workspaceId()} />
         <ConfirmButton
           size="sm"
           variant="ghost"

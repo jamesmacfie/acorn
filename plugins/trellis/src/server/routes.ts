@@ -1,13 +1,16 @@
+import { isAbsolute } from 'node:path'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { type AppEnv, requireDevice, respondError } from '@acorn/plugin-api/node'
+import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import { appIdSchema, publishModeSchema, type AppListing } from '../shared/api'
+import { writePluginPackage } from './pluginPackage'
 import { publishToProject, startDraft, type ProjectAppDeps } from './projectApps'
 import { MAX_STATE_BYTES } from './store'
 
-// What the card, the Apps pane, and the Apps source read, Restore, an app's saved state, and publishing
-// to the project (docs/agent-built-apps.md). Device only: an agent works through the app tools, and only
-// the person restores, ticks, publishes, or deletes.
+// What the card, the Apps pane, and the Apps source read, Restore, an app's saved state, publishing to
+// the project, and turning an app into a plugin (docs/agent-built-apps.md). Device only: an agent works
+// through the app tools, and only the person restores, ticks, publishes, deletes, or writes a package.
 
 const revision = z.coerce.number().int().positive()
 const stateBody = z.object({ state: z.record(z.string().regex(/^\$/), z.unknown()) })
@@ -15,6 +18,13 @@ const sessionBody = z.object({ sessionId: z.string().min(1).max(200) })
 const publishBody = z.object({ mode: publishModeSchema.default('safe') })
 const draftBody = z.object({ taskId: z.string().min(1).max(200) })
 const deletedBody = z.object({ deleted: z.boolean() })
+// The manifest's own rules for the ID, the name, and `requires`, so the package parses as it's written.
+const pluginBody = z.object({
+  pluginId: pluginManifestShape.shape.id,
+  name: pluginManifestShape.shape.name,
+  folder: z.string().max(4096).refine(isAbsolute, 'The folder must be an absolute path.'),
+  requires: pluginManifestShape.shape.requires,
+})
 
 export type AppRouteDeps = ProjectAppDeps & {
   /** The task's project, or undefined when there's no such task. */
@@ -116,6 +126,18 @@ export const appRoutes = (deps: AppRouteDeps) => {
         await store.update(appId.data, { deletedAt: body.data.deleted ? Date.now() : undefined })
         changed(meta)
         return c.body(null, 204)
+      })
+      // Turn into a plugin: the scaffold's package in an empty folder, for an agent session to fill.
+      .post('/apps/:appId/plugin', async (c) => {
+        const appId = appIdSchema.safeParse(c.req.param('appId'))
+        const body = pluginBody.safeParse(await c.req.json().catch(() => null))
+        if (!appId.success) return respondError(c, 400, 'bad_request')
+        if (!body.success)
+          return respondError(c, 400, 'bad_request', [body.error.issues.map((issue) => issue.message).join(' ')])
+        const outcome = await writePluginPackage(store, appId.data, body.data)
+        if (outcome === 'not-empty')
+          return respondError(c, 409, 'conflict', [`${body.data.folder} isn't an empty folder. Choose a new one.`])
+        return outcome ? c.body(null, 204) : respondError(c, 404, 'not_found')
       })
       // Remove for good, only once deleted.
       .delete('/apps/:appId', async (c) => {

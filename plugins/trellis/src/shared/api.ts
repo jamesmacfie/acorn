@@ -90,3 +90,15 @@ export const appSessionRoute = (appId: string) => `${appRoute(appId)}/session`
 export const appPublishRoute = (appId: string) => `${appRoute(appId)}/publish`
 export const appDraftsRoute = (appId: string) => `${appRoute(appId)}/drafts`
 export const appDeletedRoute = (appId: string) => `${appRoute(appId)}/deleted`
+export const appPluginRoute = (appId: string) => `${appRoute(appId)}/plugin`
+
+/** What Turn into a plugin asks the Node to write: the scaffold's package in an empty `folder`, with
+ *  `requires` in its manifest. */
+export type PluginPackageRequest = {
+  pluginId: string
+  name: string
+  folder: string
+  requires: { plugins: { id: string; version?: string }[] }
+}
+/** The app's saved state, written into the package folder. The plugin never reads it on its own. */
+export const PLUGIN_SEED_STATE_FILE = 'app-state.seed.json'

@@ -891,5 +891,6 @@ async function askDataSource(ask) {
   return { row, inputs: reads.map((source, index) => ({ source, ...(index && optional.has(source) ? { optional: true } : {}) })) }
 }
 
-// Importable from a test without running.
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) await main(process.argv.slice(2))
+// Importable from a test, or from the Node, without running. Whatever started the process may not
+// name a file, and realpathSync throws on a path that isn't there.
+if (process.argv[1] && existsSync(process.argv[1]) && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) await main(process.argv.slice(2))

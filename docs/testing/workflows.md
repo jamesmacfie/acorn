@@ -305,6 +305,24 @@ dashboard**.
 4. In a chat, build a task app and choose **Publish and add to dashboard** on its card. It appears on
    the chosen Home tab and in the project's **Apps** source.
 
+Turning a project app into a plugin, in the same kind of session. `routes.test.ts` covers the package
+the Node writes and the folders it refuses, and `pluginExport.test.tsx` covers the `requires` list. A
+`dev:agent` session has no account-free source from a loaded plugin, so put two small source plugins
+with different versions in `apps/desktop/dist/bundled-plugins/` before the Node boots, and give a
+project app a plan over each.
+
+1. **Turn into a plugin** on the app's page, with a new folder. Before you send anything, the folder
+   holds the scaffold's files and `app-state.seed.json` with the app's ticks, and `acorn-plugin.json`
+   lists both source plugins under `requires.plugins`, each with its major. A new task opens in the
+   folder's project, with the plugin brief attached to its session's first draft.
+2. Send the first turn and let the session finish. Install the folder, from the agent's
+   `plugin_request` or **Install from folder**. The trust prompt lists what the manifest declares, and
+   the plugin's pane shows the app's data.
+3. Remove one source plugin and restart the Node. The new plugin's row reads "requires the plugin
+   '\<id\>', which is not installed on this node", as any plugin with an unmet `requires` does. Turning
+   a source plugin off instead leaves the new plugin loading, because the loader doesn't check
+   disabled plugins. The project app is unchanged either way.
+
 Dashboard authoring evaluation has scripted cases in
 `packages/dashboards-core/src/authoringEvaluation.test.ts`. Run the real-model layer on demand with
 `node scripts/dashboard-authoring-eval.mjs <output.jsonl>` after setting `ACORN_EVAL_URL`,

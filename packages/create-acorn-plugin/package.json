@@ -8,7 +8,8 @@
   },
   "exports": "./index.mjs",
   "files": [
-    "index.mjs"
+    "index.mjs",
+    "index.d.mts"
   ],
   "engines": {
     "node": ">=22.18"

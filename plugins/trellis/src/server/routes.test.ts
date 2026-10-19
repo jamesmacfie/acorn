@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '@acorn/plugin-api/node'
+import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import { appRoutes } from './routes'
 import { AppStore } from './store'
 
@@ -39,7 +40,7 @@ async function world(kind: 'device' | 'internal' = 'device') {
   await store.create({ taskId: 't1' }, 'Draft', '')
   const send = (method: string) => (path: string, body: unknown) =>
     app.request(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-  return { app, store, changed, appId: shown.appId, put: send('PUT'), post: send('POST') }
+  return { app, root, store, changed, appId: shown.appId, put: send('PUT'), post: send('POST') }
 }
 
 describe('the app routes', () => {
@@ -157,6 +158,53 @@ describe('the app routes', () => {
     await put(`/apps/${project.appId}/deleted`, { deleted: true })
     expect((await app.request(`/apps/${project.appId}`, { method: 'DELETE' })).status).toBe(204)
     expect(await store.meta(project.appId)).toBeNull()
+  })
+
+  it('writes the scaffold with requires and the seed state into an empty folder, and never over anything', async () => {
+    const { root, store, appId, post } = await world()
+    const project = await store.create({ projectId: 'p1' }, 'Release checklist', '')
+    await store.publish(
+      project.appId,
+      { program: 'root = Text("x")', plans: {} },
+      { note: 'First.', library: { id: 'l', version: 1 } },
+    )
+    await store.saveState(project.appId, { $ticked: ['lint'] })
+    const folder = join(root, 'out', 'release-checklist')
+    const request = {
+      pluginId: 'release-checklist',
+      name: 'Release checklist',
+      folder,
+      requires: { plugins: [{ id: 'agents' }, { id: 'linear', version: '2' }] },
+    }
+
+    expect((await post(`/apps/${project.appId}/plugin`, request)).status).toBe(204)
+    expect(readdirSync(folder).sort()).toEqual([
+      'README.md',
+      'acorn-plugin.json',
+      'app-state.seed.json',
+      'client.js',
+      'node',
+      'server',
+    ])
+    const manifest = pluginManifestShape.parse(JSON.parse(readFileSync(join(folder, 'acorn-plugin.json'), 'utf8')))
+    expect(manifest).toMatchObject({ id: 'release-checklist', name: 'Release checklist', requires: request.requires })
+    expect(manifest.contributions.frames).toEqual([
+      expect.objectContaining({ target: 'pane', id: 'release-checklist' }),
+    ])
+    expect(JSON.parse(readFileSync(join(folder, 'app-state.seed.json'), 'utf8'))).toEqual({ $ticked: ['lint'] })
+
+    // Once written, the folder isn't empty, and neither is one holding anything else.
+    expect((await post(`/apps/${project.appId}/plugin`, request)).status).toBe(409)
+    mkdirSync(join(root, 'busy'))
+    writeFileSync(join(root, 'busy', 'notes.txt'), 'mine')
+    expect((await post(`/apps/${project.appId}/plugin`, { ...request, folder: join(root, 'busy') })).status).toBe(409)
+    expect(readFileSync(join(root, 'busy', 'notes.txt'), 'utf8')).toBe('mine')
+
+    const elsewhere = { ...request, folder: join(root, 'other') }
+    expect((await post(`/apps/${project.appId}/plugin`, { ...elsewhere, pluginId: 'Not An Id' })).status).toBe(400)
+    expect((await post(`/apps/${project.appId}/plugin`, { ...elsewhere, folder: 'relative/path' })).status).toBe(400)
+    // A task app is turned into a plugin only once it's published to the project.
+    expect((await post(`/apps/${appId}/plugin`, elsewhere)).status).toBe(404)
   })
 
   it("refuses an agent's token", async () => {

@@ -30,6 +30,8 @@ workspace links, or chosen items.
 
 - [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md): create a package and check
   it.
+- [Turn an app into a plugin](./agent-built-apps/project-apps.md#turn-into-a-plugin): start from a
+  project app. Acorn writes the scaffold with `requires` filled in, and an agent rebuilds the app.
 - [A complete example](./plugin-authoring/complete-example.md): a node half in two files and one
   frame pane.
 - [Install a hand-written package](./plugin-authoring/installing-a-hand-written-package.md):

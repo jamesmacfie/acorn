@@ -9,8 +9,6 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { parsePluginManifest } from '@acorn/node-core/server/plugins'
 import { loadExternalPlugins, pluginInstallDir } from '@acorn/node-core/server/plugins'
 import { copyNodeTypes, linkTool, run, TSC, unpackPublishedPackage } from '@acorn/plugin-examples/packed.ts'
-// @ts-expect-error: the scaffold is published standalone with zero dependencies, so it's plain
-// JavaScript with no declarations. This suite is the only thing in the repository that imports it.
 import {
   API_VERSION,
   BASELINE,

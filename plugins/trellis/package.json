@@ -21,6 +21,7 @@
     "@openuidev/lang-core": "1.0.0",
     "@solidjs/router": "^0.16.1",
     "@tanstack/solid-query": "^5.101.0",
+    "create-acorn-plugin": "workspace:*",
     "hono": "catalog:",
     "solid-js": "catalog:",
     "zod": "catalog:"

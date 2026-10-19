@@ -19,7 +19,7 @@ reads your data through the same plans a dashboard panel uses, and the agent's v
 stays a panel.
 
 <PluginFacts id="trellis">
-  <Fragment slot="adds">Seven agent tools that build an app, the card that draws it in the conversation, the task's Apps pane, an Apps source in the left rail for apps you publish to a project, and project apps on Home.</Fragment>
+  <Fragment slot="adds">Seven agent tools that build an app, the card that draws it in the conversation, the task's Apps pane, an Apps source in the left rail for apps you publish to a project, project apps on Home, and Turn into a plugin.</Fragment>
   <Fragment slot="needs">A managed agent session in a task.</Fragment>
 </PluginFacts>
 
@@ -99,6 +99,33 @@ On Home, the app shows its project's name and its latest version, and keeps the 
 **Apps**. It reads its data again when the window comes back into focus, and on each plan's refresh
 interval, as panels do. Its menu has **Open app**, **Edit in a new task**, and **Remove from this
 dashboard**. If you delete the app, its place on Home says so and offers **Restore**.
+
+## Turn an app into a plugin
+
+When an app needs more than an app can do, such as settings, its own data, or a service of its own, an
+agent can rebuild it as an ordinary plugin.
+
+<Steps>
+
+1. Open the app in **Apps** and select **Turn into a plugin**. Give the plugin an ID and a name, and
+   choose a new folder for it.
+
+   <Checkpoint>The folder holds a plugin package. Its manifest lists the plugins behind the app's data
+   as plugins it requires. A new task opens with an agent session that has the app attached.</Checkpoint>
+
+2. Send a message, such as "go ahead". The agent can't see the app, so paste a screenshot of it too.
+
+   <Checkpoint>The agent rebuilds the app as the plugin's pane, over the same data.</Checkpoint>
+
+3. Install the folder when the agent asks, or from **Settings › Plugins › Install… › Local folder**.
+
+   <Checkpoint>Acorn asks you to approve the plugin, listing what it reads and adds. Its pane then
+   shows what the app showed.</Checkpoint>
+
+</Steps>
+
+The app doesn't change, and it stays until you delete it. What the app had ticked or typed is in the
+folder as `app-state.seed.json`. The plugin doesn't read it unless you ask the agent to load it.
 
 ## Earlier versions
 
