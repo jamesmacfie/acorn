@@ -105,3 +105,30 @@ means no delta at all.
 `good`, `up` or `down`, colors that delta, because which direction is good isn't guessable: more open
 pull requests is bad on one board and good on another. With no `good`, the delta draws in neutral ink.
 It's display config on the panel, unlike units and tones, which are the plugin's facts.
+
+## Drawing a run in any client
+
+`RunPanel`, in `packages/client-core/src/features/dashboards/RunPanel.tsx`, draws one finished run of a
+plan. It draws where supplied rows came from, the run's notes, the view through `PanelBody`, and the
+loading and failed states. It takes the run, the plan, and the press handlers as props, and imports
+nothing from the shell, so a client with no router, query client, or Node connection can draw a run.
+The client runs the plan, picks which answer to show, describes the latest answer's problems, and
+passes its own notices and confirms in as children.
+
+`PublishedDashboardPanel` is the desktop's client for it. It reads the published revision or runs a
+draft plan, keeps the last good answer while a source can't answer, and owns drill-downs, board
+writes, and row actions. It passes source failures in as `SourceFailureAlert`, with their settings
+links.
+
+Two views need something from the client, and they get it from one context, `PanelViewHostContext`
+in `views/host.ts`:
+
+- `openLink` opens a link cell's address inside the client. Without it, a link cell is a plain link
+  that the browser opens in a new tab.
+- `measureHistory` reads a stat's history trend. Without it, a stat with `trend: 'history'` draws no
+  trend line and no recording note.
+
+The desktop provides both once, around the shell, with `DesktopPanelViewHost`. A link opens in Acorn
+when a plugin claims its address, and the history comes from the Node. A window without the provider
+would draw plain links and no history trends, with no error, so `DesktopPanelViewHost.test.tsx` pins
+the wiring.
