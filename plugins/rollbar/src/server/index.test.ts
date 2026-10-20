@@ -5,6 +5,7 @@ import {
   itemInstancesPath,
   itemsPath,
   itemsSearchPath,
+  occurrenceMetricsPath,
   projectPath,
   rollbarFetch,
   rollbarOperation,
@@ -23,6 +24,7 @@ it.each([
   [itemByCounterPath('142'), 'item_by_counter'],
   [itemInstancesPath('99', 5), 'item.instances'],
   [instancePath('7'), 'instance'],
+  [occurrenceMetricsPath, 'metrics.occurrences'],
   ['/deploys', 'other'],
 ])('files %s under %s', (path, operation) => {
   expect(rollbarOperation(path)).toBe(operation)

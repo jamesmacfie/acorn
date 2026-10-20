@@ -42,7 +42,9 @@ claims snapshot isolation or incremental checkpoint support.
 
 Rollbar details use the provider's metadata and occurrence resources. The response contains the
 group and a safe projection of its newest occurrence's message, exception, and stack frames.
-Occurrences are not an independent queryable source. Missing items return `not-found`; resource
+Occurrences are not an independent queryable source. The
+[occurrence counts source](../integrations/rollbar.md#occurrence-counts-source) serves their daily
+counts per group. Missing items return `not-found`; resource
 failures and truncated projections fail the read. Projected strings are limited to 8 KiB, and the
 shared detail byte limit applies. Raw request headers, bodies, and person data are excluded.
 Detail calls check cancellation between resource reads; an in-flight provider resource refresh

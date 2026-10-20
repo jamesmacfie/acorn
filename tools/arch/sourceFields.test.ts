@@ -41,6 +41,10 @@ import { projectSource, projectSourceDescription } from '../../plugins/linear/sr
 import { memorySourceDescription } from '../../plugins/memory/src/shared/memorySource.ts'
 import { memorySource } from '../../plugins/memory/src/shared/memorySourceRegistration.ts'
 import { errorSource, errorSourceDescription } from '../../plugins/rollbar/src/shared/errorSource.ts'
+import {
+  occurrenceCountSource,
+  occurrenceCountSourceDescription,
+} from '../../plugins/rollbar/src/shared/occurrenceCountSource.ts'
 import { runSourceDescription as terminalRunSourceDescription } from '../../plugins/terminal/src/shared/runSource.ts'
 import { runSource as terminalRunSource } from '../../plugins/terminal/src/shared/sourceRegistrations.ts'
 import { runSourceDescription } from '../../plugins/workflows/src/shared/runSource.ts'
@@ -90,6 +94,7 @@ async function fieldLists() {
     'linear:projects': [projectSource, projectSourceDescription],
     'memory:memories': [memorySource, memorySourceDescription],
     'rollbar:error-groups': [errorSource, errorSourceDescription],
+    'rollbar:occurrence-counts': [occurrenceCountSource, occurrenceCountSourceDescription],
     'terminal:runs': [terminalRunSource, terminalRunSourceDescription],
     'workflows:runs': [runSource, runSourceDescription],
   }

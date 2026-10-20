@@ -31,6 +31,7 @@ add a source, add its row here.
 | Linear cycles (`linear:cycles`) | Linear | Cycle of a team the account reaches | Yes | [Linear](../integrations/linear.md#data-sources) |
 | Linear projects (`linear:projects`) | Linear | Project the account reaches | Yes | [Linear](../integrations/linear.md#data-sources) |
 | Rollbar error groups (`rollbar:error-groups`) | Rollbar | Error group | No | [Rollbar](../integrations/rollbar.md) |
+| Rollbar occurrence counts (`rollbar:occurrence-counts`) | Rollbar | Error group per UTC day | Yes | [Rollbar](../integrations/rollbar.md#occurrence-counts-source) |
 
 GitLab and Bitbucket serve merge requests, pull requests, CI jobs, pipeline steps, and branches the
 same way the GitHub plugin does.

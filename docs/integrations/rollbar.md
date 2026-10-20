@@ -1,8 +1,8 @@
 # Rollbar
 
 The Rollbar plugin is a loaded, read-focused provider. This page covers what it shows, how it scopes
-to a workspace, the limits on an occurrence, rail search, palette search, and the browser handoff. The plugin is in
-`plugins/rollbar/`.
+to a workspace, the limits on an occurrence, the occurrence counts data source, rail search, palette
+search, and the browser handoff. The plugin is in `plugins/rollbar/`.
 
 ## Rollbar
 
@@ -35,6 +35,43 @@ returns no rows instead of every connection's.
 An occurrence detail is capped at 10 trace chains, 200 frames in total, 7 code lines per frame, 8 KiB
 per string, and 192 KiB per detail (`CAPS` in `plugins/rollbar/src/server/normalize.ts`). Tests assert
 against the same constants.
+
+## Occurrence counts source
+
+`rollbar:occurrence-counts` answers "errors per day" and "which errors spiked this week", which the
+error groups source can't: a group record carries one total. It returns one record per error group
+per UTC day that had at least one occurrence. A record holds the group's item ID, counter, title,
+permalink, level, and environment, the day as the start of that UTC day in epoch milliseconds, and
+the day's occurrence count. It never carries an occurrence's message, stack, request, or person.
+Pressing a record opens the group in Rollbar.
+
+The handler, `plugins/rollbar/src/server/data/occurrenceCountSource.ts`, sends one query to
+Rollbar's [Metrics API](https://docs.rollbar.com/reference/post_api-1-metrics-occurrences),
+`POST /api/1/metrics/occurrences`, with daily granularity in UTC, grouped by item, counter, title,
+level, and environment. The query's lower and upper bounds on `/day` become the Metrics API's start
+and end times, widened to whole UTC days, so each count covers its whole day. A day whose start falls
+outside the bounds then drops out. Equality filters on level, environment, and counter go to Rollbar
+as filters.
+
+Rollbar's other count endpoints don't fit. `GET /reports/occurrence_counts` takes no time window and
+counts one item per call, and `GET /reports/top_active_items` stops at 168 hours. Listing each item's
+occurrences costs a call per 20 occurrences.
+
+The query asks Rollbar for at most 5,001 rows, newest day first. When it gets more than 5,000, the
+read keeps the newest 5,000, answers `more` until the last page, and marks that last page
+`incomplete` with `host-budget`. Pages of one run share the read for 60 seconds, so a run makes one
+call to Rollbar. Rollbar's documentation doesn't say whether the row limit counts rows or groups
+when granularity is set, so the read counts the rows itself. No real token was available to check
+the response against the documentation on October 20, 2026.
+
+The Metrics API needs a token with `read` scope and an account plan that includes it. Rollbar
+answers 403 otherwise, and the source fails with a reason that says so. A 429 passes through as a
+rate limit.
+
+Four starters ship with the source: errors per day stacked by level, errors per day stacked by
+environment, a heatmap of error titles by day over 14 days, and the noisiest errors over seven days.
+They bucket days in UTC, as Rollbar does, so a day's count never shifts to a neighboring day in the
+viewer's time zone.
 
 ## Rail search
 

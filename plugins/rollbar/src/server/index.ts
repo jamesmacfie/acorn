@@ -31,6 +31,7 @@ const OPERATIONS: [RegExp, string][] = [
   [/^\/item\/[^/]+\/instances$/, 'item.instances'],
   [/^\/item\/[^/]+$/, 'item'],
   [/^\/instance\/[^/]+$/, 'instance'],
+  [/^\/metrics\/occurrences$/, 'metrics.occurrences'],
 ]
 
 /** The operation a path names, or `other`. Never any part of the path itself. */
@@ -40,16 +41,24 @@ export const rollbarOperation = (path: string): string => {
   return OPERATIONS.find(([pattern]) => pattern.test(bare!))?.[1] ?? 'other'
 }
 
-export function rollbarFetch(token: string, path: string, signal?: AbortSignal): Promise<Response> {
+/** A GET, or a POST of `body` as JSON for the query endpoints that take one. */
+export function rollbarFetch(token: string, path: string, signal?: AbortSignal, body?: object): Promise<Response> {
+  const method = body ? 'POST' : 'GET'
   const call = () =>
     fetch(`${BASE}${path}`, {
-      headers: { 'X-Rollbar-Access-Token': token, accept: 'application/json' },
+      method,
+      headers: {
+        'X-Rollbar-Access-Token': token,
+        accept: 'application/json',
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
       signal: signal
         ? AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
         : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
   if (!telemetry?.enabled()) return call()
-  const span = telemetry.startSpan('rollbar.api', { attrs: { operation: rollbarOperation(path), method: 'GET' } })
+  const span = telemetry.startSpan('rollbar.api', { attrs: { operation: rollbarOperation(path), method } })
   return call().then(
     (res) => {
       span.end(res.status >= 500 ? 'error' : 'ok', { status: res.status })
@@ -122,3 +131,5 @@ export const itemByIdPath = (itemId: string) => `/item/${encodeURIComponent(item
 export const itemInstancesPath = (itemId: string, limit: number) =>
   `/item/${encodeURIComponent(itemId)}/instances?limit=${limit}`
 export const instancePath = (occurrenceId: string) => `/instance/${encodeURIComponent(occurrenceId)}`
+// Occurrence counts grouped and bucketed in one query (docs/integrations/rollbar.md § Occurrence counts source).
+export const occurrenceMetricsPath = '/metrics/occurrences'

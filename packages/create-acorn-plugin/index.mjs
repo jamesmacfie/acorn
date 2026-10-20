@@ -608,6 +608,7 @@ export const KNOWN_SOURCES = [
   { source: 'linear:projects', name: 'Linear projects', title: 'name' },
   { source: 'memory:memories', name: 'Memories', title: 'name' },
   { source: 'rollbar:error-groups', name: 'Rollbar error groups', title: 'title' },
+  { source: 'rollbar:occurrence-counts', name: 'Rollbar occurrence counts', title: 'title' },
   { source: 'terminal:runs', name: 'Terminal runs', title: 'name' },
   { source: 'workflows:runs', name: 'Workflow runs', title: 'name' },
 ]

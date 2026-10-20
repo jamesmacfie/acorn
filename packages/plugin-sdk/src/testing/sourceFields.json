@@ -6232,6 +6232,141 @@
       }
     ]
   },
+  "rollbar:occurrence-counts": {
+    "name": "Rollbar occurrence counts",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "counter": {
+          "type": "string"
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "level": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "day": {
+          "type": "number"
+        },
+        "occurrences": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "title",
+        "id",
+        "counter",
+        "url",
+        "level",
+        "environment",
+        "day",
+        "occurrences"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "origin": "declared",
+        "label": "Title",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/id",
+        "origin": "declared",
+        "label": "Item"
+      },
+      {
+        "pointer": "/counter",
+        "origin": "declared",
+        "label": "Counter",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/url",
+        "origin": "declared",
+        "label": "URL",
+        "display": {
+          "kind": "link",
+          "role": "url"
+        }
+      },
+      {
+        "pointer": "/level",
+        "origin": "declared",
+        "label": "Level",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/environment",
+        "origin": "declared",
+        "label": "Environment",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/day",
+        "origin": "declared",
+        "label": "Day",
+        "description": "The start of the UTC day the occurrences fell in.",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/occurrences",
+        "origin": "declared",
+        "label": "Occurrences",
+        "display": {
+          "kind": "number"
+        },
+        "query": {
+          "operators": [],
+          "sortable": true
+        }
+      }
+    ]
+  },
   "terminal:runs": {
     "name": "Terminal runs",
     "schema": {
