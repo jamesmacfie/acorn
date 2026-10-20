@@ -596,6 +596,7 @@ export const KNOWN_SOURCES = [
   { source: 'core:local-worktrees', name: 'Local worktrees', title: 'path' },
   { source: 'core:schedules', name: 'Schedules', title: 'name' },
   { source: 'core:tasks', name: 'Tasks', title: 'title' },
+  { source: 'editor:code-matches', name: 'Code matches', title: 'path' },
   { source: 'git:commits', name: 'Git commits', title: 'subject' },
   { source: 'github:actions-jobs', name: 'GitHub Actions jobs', title: 'job' },
   { source: 'github:issues', name: 'GitHub issues', title: 'title' },
