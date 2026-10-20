@@ -68,7 +68,7 @@ import { closeOverlay, isOverlayOpen, openOverlay, topOverlay } from './state'
 import { taskLaunchRequest } from '@acorn/client-core/features/tabs/taskLaunch.ts'
 import { actionPickerRequest } from '@acorn/client-core/host/registries/commands'
 import { closeLinkPreviewOnNodeChange, linkPreview } from '@acorn/client-core/host/linkPreview/linkPreview.ts'
-import { clientCapability } from '@acorn/client-core/infra/node'
+import { clientCapability, pluginRosterKnown } from '@acorn/client-core/infra/node'
 import {
   WORKFLOW_GIT_LAUNCH,
   workflowGitLaunchRequest,
@@ -259,6 +259,8 @@ export function Shell(props: {
   createEffect(() => {
     const link = props.link
     if (!link || loadingLink || !props.linkReady?.() || !placeRestored() || !model.ready() || !settingsReady()) return
+    // A pane that requires a plugin reads as unavailable until the Node's plugin roster arrives.
+    if (link.kind === 'task' && link.pane && !pluginRosterKnown()) return
     loadingLink = true
     cancelLinkRequest = startLinkRequest({
       load: () => import('./link'),

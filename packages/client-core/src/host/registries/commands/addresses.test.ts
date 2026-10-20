@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLink, MAX_LINK_LENGTH, parseLink, type Place } from './addresses'
+import { buildLink, MAX_AT_LENGTH, MAX_LINK_LENGTH, parseLink, type Place } from './addresses'
 
 describe('Acorn addresses', () => {
   it.each<[string, Place]>([
@@ -8,6 +8,14 @@ describe('Acorn addresses', () => {
       { kind: 'task', taskId: 'task 1', pane: 'linear', item: 'ENG-1' },
     ],
     ['acorn://node-a/t/task%2Fone?pane=linear', { kind: 'task', taskId: 'task/one', pane: 'linear' }],
+    [
+      'acorn://node-a/t/task?pane=agents&item=session-1&at=42',
+      { kind: 'task', taskId: 'task', pane: 'agents', item: 'session-1', at: '42' },
+    ],
+    [
+      'acorn://node-a/t/task?pane=agents&item=s&at=%252F',
+      { kind: 'task', taskId: 'task', pane: 'agents', item: 's', at: '%2F' },
+    ],
     ['acorn://node-a/t/task?pane=notes&item=%25', { kind: 'task', taskId: 'task', pane: 'notes', item: '%' }],
     ['acorn://node-a/t/task?pane=notes&item=%252F', { kind: 'task', taskId: 'task', pane: 'notes', item: '%2F' }],
     [
@@ -31,6 +39,7 @@ describe('Acorn addresses', () => {
   it.each<Place>([
     { kind: 'task', taskId: 'task/one', pane: 'linear', item: 'ENG 1' },
     { kind: 'task', taskId: 'task/one', pane: 'linear' },
+    { kind: 'task', taskId: 'task', pane: 'agents', item: 'session 1', at: 'a&b=c' },
     { kind: 'project', projectId: 'project/one', rest: ['x', 'plugin-id', 'item 1'] },
     { kind: 'settings', pageId: 'agents', sectionId: 'general' },
     { kind: 'source', sourceId: 'pulls' },
@@ -50,6 +59,12 @@ describe('Acorn addresses', () => {
     'acorn://node-a/t/task?pane=',
     'acorn://node-a/t/task?pane=notes&item=',
     'acorn://node-a/t/task?pane=a&pane=b&item=c',
+    'acorn://node-a/t/task?pane=agents&at=42',
+    'acorn://node-a/t/task?at=42',
+    'acorn://node-a/t/task?pane=agents&item=s&at=',
+    'acorn://node-a/t/task?pane=agents&item=s&at=1&at=2',
+    'acorn://node-a/t/task?pane=agents&item=s&at=%GG',
+    `acorn://node-a/t/task?pane=agents&item=s&at=${'x'.repeat(MAX_AT_LENGTH + 1)}`,
     'acorn://node-a/t/task?pane=%GG',
     'acorn://node-a/t/task?pane=%E0%A4',
     'acorn://node-a/t/task?%GG=value',
@@ -76,6 +91,16 @@ describe('Acorn addresses', () => {
       buildLink('node-a', { kind: 'task', taskId: 'x'.repeat(MAX_LINK_LENGTH - prefix.length + 1) }),
     ).toThrow(`Acorn link exceeds ${MAX_LINK_LENGTH} characters`)
     expect(() => buildLink('node-a', { kind: 'task', taskId: 'task', item: 'item' })).toThrow('needs a pane')
+    expect(() => buildLink('node-a', { kind: 'task', taskId: 'task', pane: 'agents', at: '1' })).toThrow(
+      'needs an item',
+    )
+    const at = 'x'.repeat(MAX_AT_LENGTH)
+    expect(parseLink(buildLink('node-a', { kind: 'task', taskId: 't', pane: 'p', item: 'i', at }))).toMatchObject({
+      address: { at },
+    })
+    expect(() => buildLink('node-a', { kind: 'task', taskId: 't', pane: 'p', item: 'i', at: `${at}x` })).toThrow(
+      `exceeds ${MAX_AT_LENGTH} characters`,
+    )
     expect(() => buildLink('node-a', { kind: 'open', url: 'javascript:alert(1)' })).toThrow('http or https')
   })
 })

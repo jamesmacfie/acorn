@@ -3,11 +3,13 @@ import type { AgentEventRecord, AgentRequest } from '../../contract/wire.ts'
 import { foldToolEvents } from '../../shared/toolFold'
 import {
   buildConversationItems,
+  cardForSeq,
   cardTurnId,
   createConversationProjection,
   findSubagentItem,
   isChatItem,
   visibleConversationItems,
+  type AgentConversationItem,
 } from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event'], turnId: string | null = 'turn'): AgentEventRecord => ({
@@ -19,6 +21,31 @@ const event = (seq: number, value: AgentEventRecord['event'], turnId: string | n
   event: value,
   searchText: null,
   createdAt: seq,
+})
+
+describe('cardForSeq', () => {
+  const card = (key: string, firstSeq: number, lastSeq: number, children?: AgentConversationItem[]) =>
+    ({ key, firstSeq, lastSeq, children }) as AgentConversationItem
+  const items = [
+    card('tool', 1, 9),
+    card('message', 4, 4),
+    card('subagent', 5, 5, [card('brief', 6, 6), card('report', 12, 12)]),
+    card('closing', 10, 10),
+  ]
+
+  it('names the card an event starts, before a card that spans it', () => {
+    expect(cardForSeq(items, 4)?.key).toBe('message')
+  })
+
+  it('names the card holding an event it folded, and a subagent card for its run', () => {
+    expect(cardForSeq(items, 7)?.key).toBe('tool')
+    expect(cardForSeq(items, 12)?.key).toBe('subagent')
+  })
+
+  it('names nothing for an event no card holds', () => {
+    expect(cardForSeq(items, 11)).toBeUndefined()
+    expect(cardForSeq(items, 99)).toBeUndefined()
+  })
 })
 
 describe('conversation projection', () => {

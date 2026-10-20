@@ -2,7 +2,7 @@ export { postJson, readBytes, readJson, sendForm, writeJson } from './apiClient.
 export { queryOwner } from './queryOwnership.ts'
 export { clientCapability, clientCapabilityId, provideClientCapability } from './clientCapabilities.ts'
 export { createFleetQuery } from './fanout.ts'
-export { hasHostCapability } from './hostCapabilities.ts'
+export { hasHostCapability, pluginRosterKnown } from './hostCapabilities.ts'
 
 export { disabledNodePlugins, refreshNodePlugins } from './nodePlugins.ts'
 export { warnOnceAboutDisk } from './nodeSecurity.ts'

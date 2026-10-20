@@ -107,7 +107,12 @@ export function openTerminalLink(resolved: ResolvedTerminalLink, model: ShellMod
         navigate(`/t/${encodeURIComponent(task.id)}`)
         if (pane) {
           showPane(task, pane.id)
-          if (address.item) openPane(task.id, pane.id, { kind: 'plugin:select', item: address.item })
+          if (address.item)
+            openPane(task.id, pane.id, {
+              kind: 'plugin:select',
+              item: address.item,
+              ...(address.at ? { at: address.at } : {}),
+            })
         }
       })
       // A pending workspace settle can otherwise return focus to the old Menu source.

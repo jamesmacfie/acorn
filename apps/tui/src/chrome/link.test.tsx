@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { createSignal } from 'solid-js'
 import { contentLinkRegistry, projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes'
 import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
+import { consumePaneIntent } from '@acorn/client-core/host/registries/commands'
 import { settingsRegistry } from '@acorn/client-core/host/registries/shell'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { TASK } from '../fixture'
@@ -15,6 +16,15 @@ describe('terminal startup links', () => {
     const frame = await screen.until('Scratchpad')
     expect(frame).toContain('Task: fix-login')
     expect(frame).toContain('[Notes]')
+    screen.done()
+  }, 30_000)
+
+  it('hands the pane its item and the place in it', async () => {
+    const screen = await renderFixture({
+      link: { nodeId: 'node-1', kind: 'task', taskId: TASK.id, pane: 'notes', item: 'session-1', at: '42' },
+    })
+    await screen.until('Scratchpad')
+    expect(consumePaneIntent(TASK.id, 'notes')).toEqual({ kind: 'plugin:select', item: 'session-1', at: '42' })
     screen.done()
   }, 30_000)
 

@@ -10,12 +10,17 @@ The parser and builder live in `packages/client-core/src/host/registries/command
 
 | Form | Destination |
 | --- | --- |
-| `acorn://<node>/t/<taskId>[?pane=<paneId>[&item=<itemId>]]` | Task, optional pane, and optional item in that pane. |
+| `acorn://<node>/t/<taskId>[?pane=<paneId>[&item=<itemId>[&at=<position>]]]` | Task, optional pane, optional item in that pane, and optional place in that item. |
 | `acorn://<node>/p/<projectId>[/<project path>]` | Project or a page under it. |
 | `acorn://<node>/settings[/<pageId>][#<sectionId>]` | Settings root, page, or section. |
 | `acorn://<node>/source/<sourceId>` | Rail source. |
 | `acorn://<node>/open?url=<encoded URL>` | Destination claimed by a content-link recogniser. |
 | `acorn://<node>/new-task?url=<encoded URL>` | Existing task or a confirmed promotion in the desktop app. |
+
+`at` is an opaque string of at most 64 characters, and the pane that owns the item says what it
+means. It reaches the pane on its select intent, `{ kind: 'plugin:select', item, at }`. A pane that
+doesn't read it still selects the item. In the Agent pane, the item is a session ID and `at` is an
+event sequence number ([links to a message](../managed-agents/transcript.md#links-to-a-message)).
 
 The core forms and project root are stable. A plugin owns its path below `/p/<projectId>/` and can
 rename or remove it. A missing plugin page opens the project with an unavailable-page notice. A
@@ -30,7 +35,7 @@ plugin trust, or other authority, and does not carry a credential.
 
 `parseLink` validates the raw address before URL normalization changes its path. It decodes each
 path, query, or fragment component once and refuses malformed escapes, dot traversal segments, bad
-form combinations, and links over 4,096 characters. An item requires a pane. `open` and `new-task`
+form combinations, and links over 4,096 characters. An item requires a pane, and `at` requires an item. `open` and `new-task`
 accept only HTTP or HTTPS URLs with a host. `buildLink` encodes each navigation value once and rejects
 invalid or oversized output. It builds `open` from an HTTP or HTTPS URL only.
 
@@ -52,9 +57,25 @@ the Settings header. When Settings covers another place, its visible page and se
 Otherwise the command uses the visible task, the project route owned by the visible source, or the
 rail source. Row menus use the clicked row even when another row is active. The task link includes
 the focused pane. A pane contribution may report `selectedItem(task)` for its selected item, but no
-production pane reports one. The desktop shows success only after the clipboard write completes and
+production pane reports one. A message in an agent transcript has **Copy link to message**, which
+copies the Agent pane link with the session and the message's first event as `at`. The desktop shows
+success only after the clipboard write completes and
 shows a failure toast if it does not. The terminal uses OSC 52 and shows the link in its palette when
 clipboard delivery is unavailable.
+
+## Links in mark detail
+
+The detail of an annotation mark can hold `acorn://` links. The shared sanitizer keeps only `https`
+links, so mark detail turns the scheme on: `richTooltipDom` and `renderMarkdown` take `acornLinks`, and
+`InlineAnnotationMarks` passes it and hands a pressed link to `handlePluginContentLinkClick`, the opener
+every other in-app `acorn:` link uses. A `javascript:` link is still dropped.
+
+A Node plugin can't name its own Node: nothing in its context returns the Node ID, and `local` names
+the device's home Node, which is wrong for a remote one. So in a mark's detail, the Node segment
+`this` means the Node that answered. The annotation host rewrites `acorn://this/` to the concrete ID
+of the Node it asked when it accepts the mark (`sanitizeAnnotationMark`), before anything draws it.
+Everywhere else, `this` isn't a Node ID. The editor's line marks draw detail through `richTooltipDom`
+without the option, so they still drop `acorn:` links.
 
 ## Open outside items
 
@@ -78,11 +99,13 @@ pairing. The linked place wins over restored task or source selection.
 
 The terminal waits up to 15 seconds for selected-Node contributions when a task names a pane, a
 project names a subpath, a source needs a registered view, an outside URL needs a recogniser, or
-Settings names a page. A task without
-a pane, a project root, and Settings root use the compiled roster directly. Deferred requests belong
-to the mounted shell and selected Node; stale requests do not navigate after either changes. For a
-task or project in another workspace, the terminal selects that workspace before checking source
-visibility and opening the place.
+Settings names a page. A task link that names a pane also waits for the Node's plugin roster, because
+a pane that requires a plugin reads as unavailable until it arrives. A task without a pane, a project
+root, and Settings root use the compiled roster directly. Deferred requests belong to the mounted
+shell and selected Node; stale requests do not navigate after either changes. For a task or project in
+another workspace, the terminal selects that workspace before checking source visibility and opening
+the place. A task link's `at` goes to the pane with its item, and the Agent pane moves the cursor to
+the linked card.
 
 The terminal opens only registered routes with an available terminal view. A plugin page without one
 falls back to its project with a notice. An outside URL with only a reference panel, or no claim,

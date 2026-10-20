@@ -5,6 +5,7 @@ import { StatusDot } from '../../kit/components/content/StatusDot'
 import { createAnchoredPopover } from '../../kit/lib/controls/anchor'
 import { richTooltipDom } from '../../kit/lib/rendering/richTooltip'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
+import { handlePluginContentLinkClick } from '../registries/panes/contentLinks'
 import { pluginLabel } from '../plugins/pluginLabel'
 import { annotationsFor, type StampedMark } from './annotations'
 import './annotations.css'
@@ -15,7 +16,8 @@ import './annotations.css'
 // One button for all of an item's marks, so a row gains one tab stop however many plugins marked it.
 // It draws up to the point's `max`, and its name and the detail it opens on hover and focus list every
 // mark, so a third mark is never lost. Detail goes through `richTooltipDom`, the one sanitizing path
-// for plugin content, with the host's credit under it.
+// for plugin content, with the host's credit under it. It keeps `acorn://` links, which open through the
+// host's link opener like any other (docs/frontend/acorn-links.md).
 
 const DOT_TONE: Record<AnnotationSeverity, 'muted' | 'warn' | 'danger'> = {
   info: 'muted',
@@ -123,6 +125,7 @@ function MarkDetail(props: {
         style={popover.surfaceStyle()}
         onMouseEnter={() => props.onEnter()}
         onMouseLeave={() => props.onLeave()}
+        onClick={(event) => handlePluginContentLinkClick(event)}
       >
         <For each={props.marks}>
           {(mark) => (
@@ -131,7 +134,7 @@ function MarkDetail(props: {
               <Show when={mark.detail}>
                 <span class="annotation-detail-text">{mark.text}</span>
               </Show>
-              {richTooltipDom(mark.detail ?? mark.text, pluginLabel(mark.pluginId))}
+              {richTooltipDom(mark.detail ?? mark.text, pluginLabel(mark.pluginId), { acornLinks: true })}
             </div>
           )}
         </For>

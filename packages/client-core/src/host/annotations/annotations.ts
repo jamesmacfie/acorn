@@ -142,7 +142,7 @@ export function requestAnnotations(pointId: string, keys: readonly PluginAnnotat
       .then((rows) => {
         if (state.contributors.get(contribution.id) !== requestState || controller.signal.aborted) return
         const answer = rows.flatMap((row) => {
-          const mark = sanitizeAnnotationMark(row)
+          const mark = sanitizeAnnotationMark(row, requestScope)
           if (!mark) {
             log.warn(`${contribution.pluginId} returned an unusable annotation mark`, row, {
               'plugin.id': contribution.pluginId,

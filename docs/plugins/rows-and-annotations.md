@@ -153,6 +153,11 @@ accessible name lists every mark with its plugin, including any past the two dra
 opens the detail: each mark's text, its sanitized detail, and the "From <plugin>" credit. With no
 contributor, the three surfaces draw as before.
 
+The detail can link into Acorn, with `this` as the Node, such as
+`acorn://this/t/<task>?pane=agents&item=<session>&at=<seq>`. The host rewrites `this` to the Node that
+answered, and the link opens the session at that event
+([links in mark detail](../frontend/acorn-links.md#links-in-mark-detail)).
+
 The annotation host keeps one set of keys per contributor, so each screen asks once. Agent Center
 asks for its rows on the active Node, and the Agent pane asks for every session of its task, for the
 list and the header together. Keys are sorted, so a list that only reorders asks nothing new. A

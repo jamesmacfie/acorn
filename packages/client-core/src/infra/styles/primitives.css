@@ -2244,6 +2244,14 @@ a.ui-row:hover { background: var(--bg-hover); }
    turn is what drops the marker. */
 .ui-timeline { display: flex; flex-direction: column; gap: var(--gap-stack); min-width: 0; margin: 0; padding: 0; list-style: none; }
 .ui-timeline-turn { display: block; min-width: 0; }
+.ui-timeline-turn:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
+/* A turn a link named, for two seconds (Timeline.Turn `focus`). Its card lights as a selected one does,
+   then fades back. An animation rather than a transition, so hovering a card in a timeline stays instant. */
+.ui-timeline-turn[data-flash] > * { animation: ui-turn-flash 2s ease-in; }
+@keyframes ui-turn-flash { 0%, 50% { background-color: var(--bg-selected); border-color: var(--accent); } }
+@media (prefers-reduced-motion: reduce) {
+  .ui-timeline-turn[data-flash] > * { animation: none; background-color: var(--bg-selected); border-color: var(--accent); }
+}
 /* The rule between turns, not around them: a border on the turn itself would draw one under the
    last card too. */
 .ui-timeline-turn + .ui-timeline-turn { border-top: var(--divider); padding-top: var(--gap-stack); }

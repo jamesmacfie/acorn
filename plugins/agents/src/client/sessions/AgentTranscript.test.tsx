@@ -29,6 +29,12 @@ vi.mock('./AgentEventCard', () => ({
   },
 }))
 
+const toast = vi.fn()
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  toast,
+}))
+
 const { default: AgentTranscript } = await import('./AgentTranscript')
 
 class TestResizeObserver {
@@ -258,7 +264,11 @@ describe('a long transcript', () => {
 
   const mount = (
     snapshot: () => AgentSessionSnapshot,
-    extra: { focusRequestId?: () => string | undefined; onControls?: (api: TimelineControls) => void } = {},
+    extra: {
+      focusRequestId?: () => string | undefined
+      linkedEvent?: () => { seq: number } | undefined
+      onControls?: (api: TimelineControls) => void
+    } = {},
   ) => {
     ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
     const host = document.createElement('div')
@@ -269,6 +279,7 @@ describe('a long transcript', () => {
           taskId="t1"
           snapshot={snapshot()}
           focusRequestId={extra.focusRequestId?.()}
+          linkedEvent={extra.linkedEvent?.()}
           onControls={extra.onControls}
           onExitSubagent={() => {}}
           onRequestResolved={() => {}}
@@ -315,6 +326,34 @@ describe('a long transcript', () => {
     expect(host.querySelector('[data-item="e0"]')).toBeNull()
     setFocus('q1')
     expect(host.querySelector('[data-item="e0"]')).not.toBeNull()
+  })
+
+  it('draws, focuses and marks the card a link named, for two seconds, however far back it is', () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    vi.useFakeTimers()
+    try {
+      const [link, setLink] = createSignal<{ seq: number }>()
+      const host = mount(() => snapshotOf('s1', 1000), { linkedEvent: link })
+      setLink({ seq: 5 })
+      const linked = host.querySelector<HTMLElement>('.ui-timeline-turn[data-turn="e5"]')!
+      expect(document.activeElement).toBe(linked)
+      expect(linked.scrollIntoView).toHaveBeenCalled()
+      expect(linked.hasAttribute('data-flash')).toBe(true)
+      vi.advanceTimersByTime(2_000)
+      expect(linked.hasAttribute('data-flash')).toBe(false)
+      expect(toast).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stays on the newest page and says so when the linked event is gone', () => {
+    const [link, setLink] = createSignal<{ seq: number }>()
+    const host = mount(() => snapshotOf('s1', 300), { linkedEvent: link })
+    setLink({ seq: 301 })
+    expect(toast).toHaveBeenCalledWith("That message's history was removed.")
+    expect(rows(host)[0]?.dataset.turn).toBe('e101')
+    expect(host.querySelector('[data-flash]')).toBeNull()
   })
 
   it('draws every card when the reader goes to the top, which is the oldest turn', () => {

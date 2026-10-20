@@ -3,6 +3,7 @@ title: Links into acorn
 description: Copy an acorn:// link to a task, a pane, a page, or Settings, and open one in the desktop app or the terminal client.
 sources:
   - docs/frontend/acorn-links.md
+  - docs/managed-agents/transcript.md
   - docs/tui/process.md
   - docs/panes.md
   - apps/desktop/src-tauri/tauri.release.json
@@ -19,6 +20,7 @@ desktop app or the terminal client. Use them to keep a task in a note, a ticket,
 | --- | --- |
 | `acorn://<node>/t/<task>` | A task |
 | `acorn://<node>/t/<task>?pane=<pane>` | A task, on one of its panes |
+| `acorn://<node>/t/<task>?pane=agents&item=<session>&at=<event>` | An agent session, at one message |
 | `acorn://<node>/p/<project>` | A project, or a page under it, such as a plugin's view |
 | `acorn://<node>/settings/<page>#<section>` | A Settings page, at a section |
 | `acorn://<node>/source/<source>` | A source in the left rail |
@@ -45,6 +47,11 @@ Any of these copies a link to what's in front of you:
 
 A task's link includes the pane that has focus. acorn says the link was copied only once it's on the
 clipboard.
+
+To link to one message in an agent's conversation, open the message's menu and choose **Copy link to
+message**. Opening that link shows the message, focuses it, and highlights it for two seconds, however
+far back in the session it is. If acorn has since removed that session's history, the link opens the
+session with a notice saying so.
 
 ## Open a link in the desktop app
 

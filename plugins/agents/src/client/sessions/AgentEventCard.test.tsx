@@ -36,6 +36,7 @@ vi.mock('./managedClient', () => ({
 
 const dispatchLayout = vi.fn()
 const openPane = vi.fn()
+const copyLink = vi.fn()
 const openManagedSession = vi.fn()
 vi.mock('./managedSelection', async (original) => ({
   ...(await original<Record<string, unknown>>()),
@@ -43,6 +44,7 @@ vi.mock('./managedSelection', async (original) => ({
 }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...(await original<Record<string, unknown>>()),
+  copyLink,
   dispatchLayout,
   openPane,
 }))
@@ -641,6 +643,7 @@ describe('other plugins’ rows on a message and a turn', () => {
       'Copy as text',
       'Copy as Markdown',
       'Copy as JSON',
+      'Copy link to message',
       'File as note',
     ])
     // Lined up with the Copy rows: a row with no icon reserves no icon slot.
@@ -661,11 +664,24 @@ describe('other plugins’ rows on a message and a turn', () => {
     })
   })
 
-  it('keeps the Copy menu as it was with no rows, and gives the reader’s message none at all', () => {
+  it('keeps the Copy menu with no rows, and gives the reader’s message one for its link', () => {
     const response = draw({ item: said('assistant_message', 'Done.'), turn: turnRow() })
     expect(trigger(response.host)!.getAttribute('aria-label')).toBe('Copy this response')
     const message = draw({ item: said('user_message', 'Fix it.'), turn: turnRow() })
-    expect(trigger(message.host)).toBeNull()
+    expect(trigger(message.host)!.getAttribute('aria-label')).toBe('Copy this message')
+  })
+
+  it('copies a link to the message at its first event', () => {
+    const message = draw({ item: { ...said('user_message', 'Fix it.'), firstSeq: 7 }, turn: turnRow() })
+    trigger(message.host)!.click()
+    row('Copy link to message').click()
+    expect(copyLink).toHaveBeenCalledWith('node-a', {
+      kind: 'task',
+      taskId: 'task',
+      pane: 'agents',
+      item: 'session',
+      at: '7',
+    })
   })
 
   it('matches a row on role, so a user-only row puts the menu on the reader’s message alone', () => {

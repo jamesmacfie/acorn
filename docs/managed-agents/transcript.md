@@ -157,17 +157,35 @@ anything still blocking.
 
 ## Message and turn menus
 
-An agent's message has a **Copy** menu with text, Markdown, and JSON. Another plugin can add rows to
-it through the `agent.message` menu location. The menu's label then reads "Copy this response or act
-on it". Your own message gets the same menu only when a plugin offers a row on it, so with none it has
-no menu. A finished turn's `Turn complete` line gets an actions menu the same way, through
-`agent.turn`. The rows are the same in the desktop and the terminal. The text a row receives is the
-text the card shows, from `messageText.ts`.
+Every message has a menu with **Copy as text**, **Copy as Markdown**, **Copy as JSON**, and **Copy
+link to message**. Another plugin can add rows to it through the `agent.message` menu location. The
+menu's label then reads "Copy this response or act on it". A finished turn's `Turn complete` line gets
+an actions menu the same way, through `agent.turn`. The rows are the same in the desktop and the
+terminal. The text a row receives is the text the card shows, from `messageText.ts`.
 
 Words selected in a message open to other plugins too, through `content.selection`. On the desktop,
 right-click the selection. In the terminal, which has no text selection, a message offers its whole
 text from **Actions for the whole text**. For the contract, see
 [context menus](../plugins/menus-and-markers.md#context-menus).
+
+## Links to a message
+
+**Copy link to message** copies an Agent pane link with the session as its item and the message's
+first event sequence as `at` ([Acorn links](../frontend/acorn-links.md#address-forms)). A plugin's mark
+detail can link to any event the same way.
+
+Opening the link selects the session, and `activateManagedAgentPaneIntents` keeps the sequence for
+that session in place of the composer focus. Once the conversation's read of the session finishes,
+the transcript finds the card that event starts, or else the card holding it (`cardForSeq`), with a
+subagent's card standing for its run. It draws that card's page through the window's reveal, and the
+card's `Timeline.Turn` takes `focus`: the desktop scrolls it into view, focuses it so a screen reader
+announces it, and lights it for two seconds. The terminal moves its cursor to the card's first
+control.
+
+When the store holds no event at that sequence, because it's past the session's end or the retention
+pass removed it ([archived agent history](./history-retention.md)), the transcript stays on its newest
+page and a toast says "That message's history was removed." An event the store holds with no card
+drawn, such as a tool call under **Chats only**, leaves the newest page without a word.
 
 ## Subagent views
 

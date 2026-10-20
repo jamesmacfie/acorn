@@ -9,7 +9,14 @@ import {
   type AgentTurn,
 } from '../../contract/wire.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
-import { dispatchLayout, openPane, requestTerminalFocusIntent, setTerminalOpen } from '@acorn/plugin-api/client'
+import {
+  copyLink,
+  dispatchLayout,
+  openPane,
+  requestTerminalFocusIntent,
+  setTerminalOpen,
+} from '@acorn/plugin-api/client'
+import { AGENT_PANE_ID } from '../paneIdentity'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
   Alert,
@@ -92,8 +99,19 @@ function CopyOutputMenu(props: {
   event: () => AgentNormalizedEvent
   noun: 'response' | 'message'
   target?: () => AgentMessageTarget | undefined
+  /** The message's first event, which its link names. */
+  firstSeq?: number
 }) {
   const copy = (text: string) => void navigator.clipboard.writeText(text)
+  // An `acorn://` link that opens this session at this message (docs/frontend/acorn-links.md).
+  const copyMessageLink = (target: AgentMessageTarget, at: number) =>
+    void copyLink(target.nodeId, {
+      kind: 'task',
+      taskId: target.taskId,
+      pane: AGENT_PANE_ID,
+      item: target.sessionId,
+      at: String(at),
+    })
   const label = () =>
     transcriptMenuRows(props.target?.()).length ? `Copy this ${props.noun} or act on it` : `Copy this ${props.noun}`
   return (
@@ -115,6 +133,13 @@ function CopyOutputMenu(props: {
           <Menu.Item context={menu} onSelect={() => copy(JSON.stringify(props.event(), null, 2))}>
             Copy as JSON
           </Menu.Item>
+          <Show when={props.firstSeq !== undefined && props.target?.()}>
+            {(target) => (
+              <Menu.Item context={menu} onSelect={() => copyMessageLink(target(), props.firstSeq!)}>
+                Copy link to message
+              </Menu.Item>
+            )}
+          </Show>
           <ContributedTranscriptRows context={menu} target={() => props.target?.()} separated />
         </>
       )}
@@ -135,6 +160,7 @@ function AssistantMessageCard(props: {
   createdAt: number
   taskId: string
   target?: () => AgentMessageTarget | undefined
+  firstSeq?: number
 }) {
   const time = createMemo(() => eventTime(props.createdAt))
   return (
@@ -147,7 +173,13 @@ function AssistantMessageCard(props: {
               {time().short}
             </Text>
           </Inline>
-          <CopyOutputMenu text={() => props.text} event={props.event} noun="response" target={props.target} />
+          <CopyOutputMenu
+            text={() => props.text}
+            event={props.event}
+            noun="response"
+            target={props.target}
+            firstSeq={props.firstSeq}
+          />
         </Inline>
         <MessageSelectionActions target={() => props.target?.()} text={() => props.text}>
           <AgentMarkdown text={props.text} taskId={props.taskId} />
@@ -249,14 +281,14 @@ export default function AgentEventCard(props: {
                       {time().short}
                     </Text>
                   </Inline>
-                  {/* The reader's own message has no menu of its own. It gets the Copy menu only when
-                      another plugin offers a row on it. */}
-                  <Show when={transcriptMenuRows(messageTarget()).length}>
+                  {/* The reader's own message gets the menu wherever it has a target to link to. */}
+                  <Show when={messageTarget()}>
                     <CopyOutputMenu
                       text={() => shownMessageText(message(), props.turn)}
                       event={message}
                       noun="message"
                       target={messageTarget}
+                      firstSeq={props.item.firstSeq}
                     />
                   </Show>
                 </Inline>
@@ -374,6 +406,7 @@ export default function AgentEventCard(props: {
               createdAt={props.item.createdAt}
               taskId={props.taskId}
               target={messageTarget}
+              firstSeq={props.item.firstSeq}
             />
           )
         }}

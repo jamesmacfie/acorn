@@ -2672,3 +2672,45 @@ describe('a toolbar', () => {
     }
   }, 30_000)
 })
+
+describe('Timeline.Turn focus', () => {
+  it('puts the cursor on the first stop of the turn a link named', async () => {
+    const [linked, setLinked] = createSignal(false)
+    const pressed: string[] = []
+    const screen = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="linked-turn"
+          label="Linked turn"
+          regions={{
+            body: () => (
+              <Timeline follow>
+                <Timeline.Turn key="first">
+                  <Card>
+                    <Button label="First" onPress={() => pressed.push('first')} />
+                  </Card>
+                </Timeline.Turn>
+                <Timeline.Turn key="second" focus={linked()}>
+                  <Card>
+                    <Button label="Second" onPress={() => pressed.push('second')} />
+                  </Card>
+                </Timeline.Turn>
+              </Timeline>
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 12 },
+    )
+    try {
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['first'])
+      setLinked(true)
+      await screen.frame()
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['first', 'second'])
+    } finally {
+      screen.done()
+    }
+  }, 30_000)
+})

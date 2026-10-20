@@ -76,6 +76,7 @@ client: contentLinkRegistry
 client: contextMenuItems
 client: contextMenuRegistry
 client: contextSnapshot
+client: copyLink
 client: createCredentialForm
 client: createDeviceFlow
 client: createFleetQuery
@@ -538,6 +539,7 @@ ui/host: Acorn
 ui/host: AnnotationMarks
 ui/host: Drawer
 ui/host: IconPicker
+ui/host: InlineAnnotationMarks
 ui/host: McpConfigFiles
 ui/host: ModelPickerPopover
 ui/host: PromoteToTaskModal

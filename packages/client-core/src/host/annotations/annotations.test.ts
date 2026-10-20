@@ -165,6 +165,27 @@ describe('requestAnnotations', () => {
     expect(annotationsFor(POINT, key(1))[0]!.detail).toEqual({ kind: 'markdown', value: '**Fix**' })
   })
 
+  it('names the Node that answered where a mark’s detail links to `this` Node', async () => {
+    point({ acceptsDetail: true })
+    const linked = (line: number) => ({
+      key: key(line),
+      severity: 'warn' as const,
+      text: 'Failed commands',
+      detail: { kind: 'markdown' as const, value: '[First](acorn://this/t/task?pane=agents&item=s&at=4)' },
+    })
+    // The device's home Node and a remote one, each answering for itself.
+    contributor('home', async () => [linked(1)], { scope: () => 'home-node' })
+    contributor('remote', async () => [linked(2)], { scope: () => 'remote-node' })
+    requestAnnotations(POINT, [key(1), key(2)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(2))).toHaveLength(1))
+    expect(annotationsFor(POINT, key(1))[0]!.detail!.value).toBe(
+      '[First](acorn://home-node/t/task?pane=agents&item=s&at=4)',
+    )
+    expect(annotationsFor(POINT, key(2))[0]!.detail!.value).toBe(
+      '[First](acorn://remote-node/t/task?pane=agents&item=s&at=4)',
+    )
+  })
+
   it('says nothing about a point that is not an annotation point, or one nobody declared', async () => {
     const { calls } = contributor('coverage', async () => [])
     requestAnnotations(POINT, [key(1)])

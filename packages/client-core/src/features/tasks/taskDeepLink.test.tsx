@@ -47,4 +47,14 @@ describe('createTaskDeepLink', () => {
     expect(consumePaneIntent('item-task', 'test.deep-link')).toEqual({ kind: 'plugin:select', item: 'ENG-404' })
     expect(navigate).toHaveBeenCalledWith('/t/item-task', { replace: true })
   })
+
+  it('carries a place in the item on the intent', async () => {
+    mount('at-task', { pane: 'test.deep-link', item: 'session-1', at: '42' })
+    await Promise.resolve()
+    expect(consumePaneIntent('at-task', 'test.deep-link')).toEqual({
+      kind: 'plugin:select',
+      item: 'session-1',
+      at: '42',
+    })
+  })
 })

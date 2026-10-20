@@ -23,6 +23,16 @@ describe('parseTaskDeepLink', () => {
     expect(parseTaskDeepLink({ pane: 'test.notes', item: 'ENG-404' })).toEqual({ pane: 'test.notes', item: 'ENG-404' })
   })
 
+  it('reads a place in the item, and drops one with no item', () => {
+    registered = pane('test.notes')
+    expect(parseTaskDeepLink({ pane: 'test.notes', item: 'ENG-404', at: '42' })).toEqual({
+      pane: 'test.notes',
+      item: 'ENG-404',
+      at: '42',
+    })
+    expect(parseTaskDeepLink({ pane: 'test.notes', at: '42' })).toEqual({ pane: 'test.notes' })
+  })
+
   it('rejects a pane no plugin contributed', () => {
     // Otherwise openPane would push an id nothing can render into the task's persisted layout, where it
     // would survive restarts.

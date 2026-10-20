@@ -10,17 +10,23 @@ export type RichTooltipContent = string | { kind: 'markdown' | 'plaintext'; valu
  * A tooltip body for untrusted plugin content, with the host's credit line under it.
  *
  * Markdown is escaped and then sanitized, with every image a placeholder, so a plugin's content can't
- * reach the network or run anything. The host writes the credit, so a plugin can't pass its content
- * off as another plugin's. In an editor, style it by adding `richTooltipTheme` to the view.
+ * reach the network or run anything. Links are `https` only, unless `acornLinks` also keeps `acorn://`
+ * ones for a caller that opens their clicks through the host. The host writes the credit, so a plugin
+ * can't pass its content off as another plugin's. In an editor, style it by adding `richTooltipTheme`
+ * to the view.
  */
-export function richTooltipDom(content: RichTooltipContent, credit: string): HTMLElement {
+export function richTooltipDom(
+  content: RichTooltipContent,
+  credit: string,
+  options: { acornLinks?: boolean } = {},
+): HTMLElement {
   const dom = document.createElement('div')
   dom.className = 'cm-document-hover'
   const body = document.createElement('div')
   if (typeof content === 'string') body.textContent = content
   else if (content.kind === 'markdown') {
     body.className = 'ui-markdown'
-    body.append(sanitizedHtmlFragment(renderMarkdown(content.value, { images: 'placeholder' })))
+    body.append(sanitizedHtmlFragment(renderMarkdown(content.value, { images: 'placeholder', ...options }), options))
   } else body.textContent = content.value
   const from = document.createElement('div')
   from.className = 'cm-document-hover-from'

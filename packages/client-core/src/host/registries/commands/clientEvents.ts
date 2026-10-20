@@ -31,7 +31,9 @@ export type PaneIntent =
   // (docs/plugins/client-half.md § "Loaded plugins: the client half"). It reuses this mechanism rather than
   // inventing one because the problem is identical: the pane may not be mounted yet, and the intent
   // has to survive until it is.
-  | { kind: 'plugin:select'; item: string }
+  // `at` is a place inside the item, from a link's `at` (docs/frontend/acorn-links.md § Address forms).
+  // The pane says what it means, and one that doesn't read it still selects the item.
+  | { kind: 'plugin:select'; item: string; at?: string }
   // Open a workflow run in the workflows pane, at one node when the sender knows which
   // (docs/workflows/routes-and-ui.md § Routes and UI). Sent by a bell row, an attention row, the rail's recent
   // runs and the agent pane's chip, all of which name a run and none of which can be sure the pane

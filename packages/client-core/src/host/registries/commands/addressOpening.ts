@@ -11,7 +11,7 @@ import { claimFor, openInAppUrl } from '../panes/contentLinks'
 import type { Task } from '@acorn/protocol/api.ts'
 import { clientEvents } from './clientEvents'
 import { isProjectPath, projectIdFromPath, projectPath, taskPath } from './corePaths'
-import { buildLink, parseLink, type Address, type LinkRefusal } from './addresses'
+import { buildLink, parseLink, taskQuery, type Address, type LinkRefusal } from './addresses'
 
 export type AddressHost = {
   nodeId: string | null
@@ -129,9 +129,7 @@ async function openAddress(address: Address, link = ''): Promise<LinkRefusal | {
         if (!shell.openTask(address.taskId, path)) return reportLinkFailure(shownLink, 'Task was not found')
         return reportLinkFailure(shownLink, 'Pane is unavailable; opened the task')
       }
-      const query = address.pane
-        ? `?${new URLSearchParams({ pane: address.pane, ...(address.item ? { item: address.item } : {}) })}`
-        : ''
+      const query = address.pane ? `?${taskQuery(address.pane, address.item, address.at)}` : ''
       if (!shell.openTask(address.taskId, `${path}${query}`)) return reportLinkFailure(shownLink, 'Task was not found')
       break
     }

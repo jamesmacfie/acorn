@@ -80,7 +80,9 @@ The toolbar above the transcript has **Show only agent and user messages**, whic
 anything still blocking, and **Collapse every tool card**. Whether tool cards start open is the
 **Tool call display** setting.
 
-An agent's message has a **Copy** menu for its text, Markdown, or JSON.
+Every message has a menu that copies its text, Markdown, or JSON, or a link to it. **Copy link to
+message** copies an `acorn://` link that opens the session at that message and highlights it
+([links into acorn](/docs/using/links-into-acorn/)).
 
 ## The session menu
 

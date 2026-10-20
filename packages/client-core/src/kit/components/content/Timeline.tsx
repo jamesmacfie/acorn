@@ -21,6 +21,7 @@ import { registerSurfaceHealth } from '../../lib/telemetry/surfaceHealth'
 import { TIMELINE_PAGE } from '../../lib/timeline/timelineWindow'
 import { latestSignal } from '../../lib/state/latestSignal'
 import { Button } from '../inputs/Button'
+import { revealOnRisingEdge } from './Card'
 
 /* Timeline: a sequence of turns, the shape the agents transcript and github's PR conversation share.
 
@@ -686,6 +687,9 @@ Timeline.Turn = (props: {
   key?: string
   position?: number
   setSize?: number
+  /** Put the reader on this turn, for a link that named it: scroll it into view, give it focus so a
+   *  screen reader announces it, and mark it for two seconds. Once each time it turns true. */
+  focus?: boolean
   children: JSX.Element | ((near: Accessor<boolean>) => JSX.Element)
 }) => {
   const watch = useContext(NearTurns())
@@ -693,6 +697,22 @@ Timeline.Turn = (props: {
   let item!: HTMLLIElement
   let stop: (() => void) | undefined
   onCleanup(() => stop?.())
+  revealOnRisingEdge(
+    () => props.focus,
+    () => item,
+  )
+  const [flash, setFlash] = createSignal(false)
+  createEffect(
+    on(
+      () => !!props.focus,
+      (focused) => {
+        if (!focused) return
+        setFlash(true)
+        const timer = setTimeout(() => setFlash(false), 2_000)
+        onCleanup(() => clearTimeout(timer))
+      },
+    ),
+  )
   // Read once per evaluation, the way `Show` reads its children: a function child is called, anything
   // else is what the caller wrote.
   const content = () => {
@@ -706,6 +726,8 @@ Timeline.Turn = (props: {
       ref={item}
       class="ui-timeline-turn"
       data-turn={props.key}
+      data-flash={props.focus && flash() ? '' : undefined}
+      tabindex={props.focus ? -1 : undefined}
       aria-posinset={props.position}
       aria-setsize={props.setSize}
     >

@@ -1,10 +1,12 @@
 import { projectPath, taskPath } from './corePaths'
 
 export const MAX_LINK_LENGTH = 4096
+/** The longest `at` a task link carries. The pane that owns the item says what it means. */
+export const MAX_AT_LENGTH = 64
 
 export type Address = { nodeId: string } & Place
 export type Place =
-  | { kind: 'task'; taskId: string; pane?: string; item?: string }
+  | { kind: 'task'; taskId: string; pane?: string; item?: string; at?: string }
   | { kind: 'project'; projectId: string; rest: string[] }
   | { kind: 'settings'; pageId?: string; sectionId?: string }
   | { kind: 'source'; sourceId: string }
@@ -87,13 +89,16 @@ export function parseLink(href: string): LinkResult {
     [...params.keys()].every((key) => names.includes(key)) && names.every((key) => (params.get(key)?.length ?? 0) <= 1)
   const value = (key: string): string | undefined => params.get(key)?.[0]
   let place: Place
-  if (form === 't' && id && !rest.length && !rawFragment && only('pane', 'item')) {
+  if (form === 't' && id && !rest.length && !rawFragment && only('pane', 'item', 'at')) {
     const pane = value('pane')
     const item = value('item')
+    const at = value('at')
     if ((params.has('pane') && !pane) || (params.has('item') && (!pane || !item))) {
       return refuse(href, 'An item needs a pane, and both values must be nonempty')
     }
-    place = { kind: 'task', taskId: id, ...(pane ? { pane } : {}), ...(item ? { item } : {}) }
+    if (params.has('at') && (!item || !at)) return refuse(href, 'A position needs an item, and must be nonempty')
+    if (at && at.length > MAX_AT_LENGTH) return refuse(href, `A position is at most ${MAX_AT_LENGTH} characters`)
+    place = { kind: 'task', taskId: id, ...(pane ? { pane } : {}), ...(item ? { item } : {}), ...(at ? { at } : {}) }
   } else if (form === 'p' && id && !rawQuery && !rawFragment) {
     place = { kind: 'project', projectId: id, rest }
   } else if (form === 'settings' && !rest.length && !rawQuery) {
@@ -113,6 +118,10 @@ export function parseLink(href: string): LinkResult {
   return { kind: 'address', address: { nodeId: authority, ...place } }
 }
 
+/** The query of a task link that names a pane: `pane`, then `item` and `at` when present. */
+export const taskQuery = (pane: string, item?: string, at?: string): URLSearchParams =>
+  new URLSearchParams({ pane, ...(item ? { item } : {}), ...(at ? { at } : {}) })
+
 /** Build the stable, copyable navigation forms, and `open` for an outside item. Node IDs are written
  * explicitly. See docs/frontend/acorn-links.md § Address forms.
  */
@@ -123,7 +132,7 @@ export function buildLink(
   if (!hostPattern.test(nodeId)) throw new Error('Invalid Node ID')
   const values =
     place.kind === 'task'
-      ? [place.taskId, place.pane, place.item]
+      ? [place.taskId, place.pane, place.item, place.at]
       : place.kind === 'project'
         ? [place.projectId, ...place.rest]
         : place.kind === 'settings'
@@ -138,9 +147,11 @@ export function buildLink(
   switch (place.kind) {
     case 'task': {
       if (place.item && !place.pane) throw new Error('A task item needs a pane')
+      if (place.at && !place.item) throw new Error('A task position needs an item')
+      if (place.at && place.at.length > MAX_AT_LENGTH)
+        throw new Error(`A task position exceeds ${MAX_AT_LENGTH} characters`)
       path = taskPath(place.taskId)
-      if (place.pane)
-        path += `?${new URLSearchParams({ pane: place.pane, ...(place.item ? { item: place.item } : {}) })}`
+      if (place.pane) path += `?${taskQuery(place.pane, place.item, place.at)}`
       break
     }
     case 'project':

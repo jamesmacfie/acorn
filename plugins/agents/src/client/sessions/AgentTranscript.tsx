@@ -1,10 +1,21 @@
 import { agentTelemetry } from './agentTelemetry'
-import { createComputed, createMemo, createSignal, For, onCleanup, Show, untrack, type Setter } from 'solid-js'
+import {
+  createComputed,
+  createMemo,
+  createSelector,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+  untrack,
+  type Setter,
+} from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeNodeId, prefsOptions, queryOwner, tasksOptions } from '@acorn/plugin-api/client'
+import { activeNodeId, prefsOptions, queryOwner, tasksOptions, toast } from '@acorn/plugin-api/client'
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '../../contract/wire.ts'
 import AgentEventCard from './AgentEventCard'
 import {
+  cardForSeq,
   cardTurnId,
   findSubagentItem,
   isChatItem,
@@ -36,6 +47,8 @@ export default function AgentTranscript(props: {
   taskId: string
   snapshot: AgentSessionSnapshot
   focusRequestId?: string
+  /** The event a link named. Its card is revealed once per object, so each link is a new one. */
+  linkedEvent?: { seq: number }
   focusSubagentId?: string
   /** Which surface is drawing this, for the scroll place below. Two panes can be open on one session
    *  and a reader can be following live in one while reading history in the other. */
@@ -158,6 +171,27 @@ export default function AgentTranscript(props: {
     revealedFor = wanted
     drawn.reveal(target.key)
   })
+  // The event a link named (docs/managed-agents/transcript.md § Links to a message). Its card is drawn
+  // and focused once per link. An event the store doesn't hold, past the session's end or removed by
+  // the retention pass, leaves the newest page and says so. One it holds with no card drawn, such as a
+  // tool call under Chats only, leaves the newest page without a word.
+  const [linkedKey, setLinkedKey] = createSignal<string>()
+  const isLinked = createSelector(linkedKey)
+  let linkedFor: { seq: number } | undefined
+  createComputed(() => {
+    const link = props.linkedEvent
+    if (!link || link === linkedFor) return
+    linkedFor = link
+    untrack(() => {
+      const held = props.snapshot.events.some(
+        (record) => record.seq <= link.seq && link.seq <= (record.foldedThroughSeq ?? record.seq),
+      )
+      const target = held ? cardForSeq(items(), link.seq) : undefined
+      setLinkedKey(target?.key)
+      if (target) drawn.reveal(target.key)
+      if (!held) toast("That message's history was removed.")
+    })
+  })
   // Read by every drawn turn's position attributes. A memo, so an event that adds no card wakes none.
   const total = createMemo(() => items().length)
   // Initial rows are one batch: aggregate their factory time and the wall time to the next
@@ -186,7 +220,12 @@ export default function AgentTranscript(props: {
   }
   const renderCard = (item: () => AgentConversationItem, index: () => number) => {
     const draw = () => (
-      <Timeline.Turn key={item().key} position={drawn.start() + index() + 1} setSize={total()}>
+      <Timeline.Turn
+        key={item().key}
+        position={drawn.start() + index() + 1}
+        setSize={total()}
+        focus={isLinked(item().key)}
+      >
         <AgentEventCard
           item={item()}
           taskId={props.taskId}

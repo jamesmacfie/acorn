@@ -13,8 +13,10 @@ import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import { managedAgentStore } from './managedStore'
 import {
   clearFocusedManagedRequest,
+  clearLinkedManagedEvent,
   clearManagedSubagent,
   focusedManagedRequest,
+  linkedManagedEvent,
   managedChatsOnly,
   selectedManagedSubagent,
   toggleManagedChatsOnly,
@@ -73,6 +75,9 @@ function SessionConversation(input: {
   const props = input.conversation
   const sessionId = () => input.sessionId
   const [error, setError] = createSignal('')
+  // Whether this mount's read has finished. The store may hold an older read of the session, and a
+  // linked event it lacks would read as removed history.
+  const [loaded, setLoaded] = createSignal(false)
   // Opened by `/mcp` in the composer. Per conversation, which is per session: this owner is keyed by it.
   const [mcpOpen, setMcpOpen] = createSignal(false)
   const [goalEditorTick, setGoalEditorTick] = createSignal(0)
@@ -136,7 +141,10 @@ function SessionConversation(input: {
       // not the transcript again (`loadSnapshot`).
       void managedAgentStore
         .loadSnapshot(id)
-        .then(() => view.ready())
+        .then(() => {
+          view.ready()
+          setLoaded(true)
+        })
         .catch((caught: unknown) => {
           view.fail()
           if (sessionId() !== id) return
@@ -169,6 +177,15 @@ function SessionConversation(input: {
     clearFocusedManagedRequest(id)
   })
 
+  // A link's event, read once like the request above and handed on after the read finishes.
+  const [linkedEvent, setLinkedEvent] = createSignal<{ seq: number }>()
+  createEffect(() => {
+    const linked = linkedManagedEvent(sessionId())
+    if (!linked) return
+    setLinkedEvent(linked)
+    clearLinkedManagedEvent(sessionId())
+  })
+
   return (
     <Show when={sessionId()} fallback={<EmptyState size="sm">{props.noSession ?? 'No session to show.'}</EmptyState>}>
       <Only hosts={['tui']}>
@@ -194,6 +211,7 @@ function SessionConversation(input: {
               taskId={narrowed().session.taskId}
               snapshot={narrowed()}
               focusRequestId={focusRequest()}
+              linkedEvent={loaded() ? linkedEvent() : undefined}
               focusSubagentId={selectedManagedSubagent(sessionId())}
               viewKeyPrefix={props.viewKeyPrefix}
               chatsOnly={chatsOnly()}

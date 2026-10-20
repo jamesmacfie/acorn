@@ -105,6 +105,15 @@ export const findSubagentItem = (
 ): AgentConversationItem | undefined =>
   items.find((item) => item.event.type === 'subagent' && item.event.subagent.id === subagentId)
 
+/** The card a link to event `seq` names: the card that event starts, else the card holding it. A
+ *  subagent's card stands for the events of its run. */
+export function cardForSeq(items: AgentConversationItem[], seq: number): AgentConversationItem | undefined {
+  const starts = (item: AgentConversationItem): boolean => item.firstSeq === seq || !!item.children?.some(starts)
+  const holds = (item: AgentConversationItem): boolean =>
+    (item.firstSeq <= seq && seq <= item.lastSeq) || !!item.children?.some(holds)
+  return items.find(starts) ?? items.find(holds)
+}
+
 type AppendableEvent = Extract<AgentNormalizedEvent, { type: 'assistant_message' | 'reasoning' }>
 const isAppendable = (event: AgentNormalizedEvent): event is AppendableEvent =>
   event.type === 'assistant_message' || event.type === 'reasoning'

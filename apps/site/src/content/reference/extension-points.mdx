@@ -357,7 +357,9 @@ A section on the card for a request an agent is blocked on.
 
 Marks on an agent session, drawn on Agent Center rows, the task's session list, and the Agent pane's
 header. A mark may carry Markdown `detail`, which opens on hover and focus. The terminal draws the dot
-and the text, with no detail.
+and the text, with no detail. The detail can link to one event of a session with
+`acorn://this/t/<task>?pane=agents&item=<session>&at=<seq>`, and acorn replaces `this` with the Node
+that answered.
 
 ```json manifest
 {

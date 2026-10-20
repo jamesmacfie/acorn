@@ -9,6 +9,7 @@ import {
 } from '../registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { InlineAnnotationMarks } from './InlineAnnotationMarks'
+import { clientEvents } from '../registries/commands/clientEvents'
 
 vi.mock('../plugins/surfaceFailures', () => ({ recordSurfaceFailure: vi.fn() }))
 
@@ -127,5 +128,33 @@ describe('InlineAnnotationMarks', () => {
 
     button.blur()
     await vi.waitFor(() => expect(document.querySelector('.annotation-detail')).toBeNull())
+  })
+
+  it('keeps an acorn: link in the detail, on the Node that answered, and opens it through the link opener', async () => {
+    setup([
+      {
+        key: { session: 's1' },
+        severity: 'warn',
+        text: 'Failed commands',
+        detail: {
+          kind: 'markdown',
+          value: '[The first](acorn://this/t/task?pane=agents&item=s1&at=4) [trap](javascript:alert(1))',
+        },
+      },
+    ])
+    const opened = vi.fn()
+    const off = clientEvents.on('presentation:open-link', opened)
+    try {
+      const host = draw()
+      await vi.waitFor(() => expect(host.querySelector('button.annotation-inline')).not.toBeNull())
+      host.querySelector<HTMLButtonElement>('button.annotation-inline')!.focus()
+      const links = [...document.querySelectorAll<HTMLAnchorElement>('.annotation-detail a')]
+      // The contributor has no request scope, so the host asked `local`.
+      expect(links.map((link) => link.getAttribute('href'))).toEqual(['acorn://local/t/task?pane=agents&item=s1&at=4'])
+      links[0]!.click()
+      expect(opened).toHaveBeenCalledWith({ href: 'acorn://local/t/task?pane=agents&item=s1&at=4' })
+    } finally {
+      off()
+    }
   })
 })

@@ -8,7 +8,8 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESC[c])
 // Allow only http(s), mailto, and an in-page fragment; the input is already HTML-escaped when this
 // runs. A fragment navigates nowhere, so a caller's `onSelect` can read it as a key: the agent
 // transcript links each sent `#agent:…` reference this way.
-const safeHref = (u: string): string | null => (/^(https?:\/\/|mailto:|#[\w-]+$)/i.test(u) ? u : null)
+const safeHref = (u: string, acornLinks?: boolean): string | null =>
+  /^(https?:\/\/|mailto:|#[\w-]+$)/i.test(u) || (acornLinks && u.startsWith('acorn://')) ? u : null
 // A Node-provided markdown body can name an arbitrary URL. Loading it as an image would issue a
 // request from the client's machine without a click, including to private-network services. Images
 // therefore arrive as raster bytes over the broker and are displayed as bounded data URLs.
@@ -37,6 +38,8 @@ export type MarkdownOptions = {
    * same `<img>` and the stylesheet does the sizing.
    */
   images?: 'inline' | 'placeholder' | 'thumb'
+  /** Keep `acorn://` links, for content whose clicks the host hands to its link opener. Off by default. */
+  acornLinks?: boolean
 }
 
 // Sentinel wrapping protected inline-token indexes. A private-use char esc() ignores, so tokens
@@ -64,7 +67,7 @@ function inline(raw: string, opts: MarkdownOptions): string {
   // string, so emphasis written inside it still renders.
   const hrefs: string[] = []
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text: string, url: string) => {
-    const href = safeHref(url) // url is already escaped, so don't re-escape it
+    const href = safeHref(url, opts.acornLinks) // url is already escaped, so don't re-escape it
     const opens = href?.startsWith('#') ? '' : ' target="_blank" rel="noreferrer"'
     return href ? `<a href="${S}l${hrefs.push(href) - 1}${S}"${opens}>${text}</a>` : text
   })

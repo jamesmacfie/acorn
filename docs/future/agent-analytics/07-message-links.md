@@ -1,5 +1,68 @@
 # Phase 7: link to one message in a session
 
+## Completion note
+
+Built on October 20, 2026, on branch `phase-7-message-links`.
+
+What landed:
+
+- `at` on the task form, `acorn://<node>/t/<task>?pane=<pane>&item=<item>&at=<position>`. `parseLink`
+  and `buildLink` refuse an `at` without an item, an empty one, a repeated one, and one over
+  `MAX_AT_LENGTH` (64). `taskQuery` builds the query for both the builder and the desktop opener.
+- The pane gets `at` on its select intent, `{ kind: 'plugin:select', item, at }`, from the desktop route
+  (`parseTaskDeepLink`) and from the terminal (`openTerminalLink`). Panes that don't read it are
+  unchanged.
+- The Agent pane: `activateManagedAgentPaneIntents` reads a numeric `at` as an event sequence, keeps it
+  per session (`linkedManagedEvent`), and drops the composer focus selecting asked for. The conversation
+  hands it on after its read finishes. `AgentTranscript` finds the card with `cardForSeq` (the card the
+  event starts, else the card holding it, a subagent card standing for its run), reveals its page, and
+  sets `focus` on its `Timeline.Turn`. An event the store doesn't hold gives the toast "That message's
+  history was removed."
+- `Timeline.Turn` takes `focus`. The desktop scrolls the turn into view, focuses it, and marks it with
+  `data-flash` for two seconds, which lights its card like a selected one and fades. The rising-edge
+  reveal moved out of `Card` into `revealOnRisingEdge`, which both use. The terminal's turn moves the
+  cursor to its first stop.
+- **Copy link to message** in every message's menu, through `copyLink`, now on `@acorn/plugin-api/client`.
+  The reader's own message now always has the menu, not only when another plugin adds a row.
+- Mark detail keeps `acorn://` links: `renderMarkdown`, `sanitizedHtmlFragment`, and `richTooltipDom`
+  take `acornLinks`, and only `InlineAnnotationMarks` passes it. Its popover hands a pressed link to
+  `handlePluginContentLinkClick`, which emits `presentation:open-link`. `sanitizeAnnotationMark` takes
+  the Node it asked and rewrites `acorn://this/` to it.
+- Tests: the parser, the deep link, both openers, the intent, `cardForSeq`, the transcript reveal 1,000
+  cards back and the removed-history toast, the menu row, the terminal turn's cursor, the sanitizer
+  rewrite, a home and a remote Node, and the popover's link and click.
+- Checked in `pnpm dev:agent` on the `large-surfaces --profile scale` fixture (688 cards): the link to
+  card 9 and to card 1 focused and lit the right message, from the same session and from another one;
+  the menu copied a link with the concrete Node ID; a sequence past the end showed the toast. In
+  `pnpm dev:tui:agent` with `--link`, the terminal opened the session on the linked message with the
+  cursor on its menu.
+- Docs: [Acorn links](../../frontend/acorn-links.md), [the transcript](../../managed-agents/transcript.md#links-to-a-message),
+  [session annotations](../../plugins/rows-and-annotations.md#session-annotations), and three site pages.
+
+Decisions and deviations:
+
+- The terminal refused every startup link naming the Agent pane, `at` or not, because it opened the
+  link before the Node's plugin roster arrived and the pane requires the `agents` plugin. The shell now
+  waits for `pluginRosterKnown()` when a task link names a pane. It's a one-line gate in `Shell.tsx`,
+  checked in the real terminal, with no regression test: the harness loads the roster before it draws.
+- The highlight belongs to the turn, not the card, so any card kind can be linked, including a tool
+  card another plugin draws. On the desktop it's a CSS animation on the turn's child, not a transition,
+  so hovering a card in a timeline stays instant.
+- The removed-history check asks whether the store holds the event (`seq` up to `foldedThroughSeq`),
+  not whether a card holds it. A held event with no visible card, such as a tool call under Chats only,
+  opens the newest page with no toast rather than a toast that would be wrong.
+- The editor's line marks still drop `acorn:` links: their tooltip has no click handling for them.
+- `@acorn/plugin-api`'s surface snapshot was already missing phase 6's `InlineAnnotationMarks`.
+  Regenerating it for `copyLink` added both.
+- The acceptance asks for a message 1,000 cards back. The largest fixture checked in the app had 688
+  cards, so the 1,000-card case is covered by the transcript test.
+
+What later phases need to know:
+
+- Phase 8 can link a mark to an event: put `acorn://this/t/<task>?pane=agents&item=<session>&at=<seq>`
+  in markdown `detail`. `<seq>` is any event sequence the session holds. A tool call's sequence lands
+  on its card.
+
 Date: October 19, 2026. Status: proposed. Needs nothing. Phase 8 uses it when it exists, and works
 without it.
 

@@ -11,8 +11,8 @@ import { taskPath } from '../../host/registries/commands/corePaths'
 // moved a pane. What is worth an address is what `PaneIntent` already models: open this pane,
 // select this item.
 //
-// A pane and optional selected item ride as query params, `/t/:taskId?pane=linear&item=ENG-404`,
-// and are consumed once, then stripped. Left in, the URL would keep asserting a pane the owner has
+// A pane, an optional selected item, and an optional place in that item ride as query params,
+// `/t/:taskId?pane=agents&item=<session>&at=42`, and are consumed once, then stripped. Left in, the URL would keep asserting a pane the owner has
 // navigated away from.
 //
 // This gives `openPluginContentTarget` an address. Every pane plugin gets it without contributing a
@@ -20,8 +20,9 @@ import { taskPath } from '../../host/registries/commands/corePaths'
 
 const TASK_PANE_PARAM = 'pane'
 const TASK_ITEM_PARAM = 'item'
+const TASK_AT_PARAM = 'at'
 
-export type TaskDeepLink = { pane: string; item?: string }
+export type TaskDeepLink = { pane: string; item?: string; at?: string }
 
 // Pure, so the parsing rules are testable without a router. An unknown pane id is rejected here rather
 // than dispatched: `openPane` would otherwise push a pane nothing can render into the persisted layout.
@@ -30,8 +31,9 @@ export function parseTaskDeepLink(search: Record<string, string | string[] | und
     Array.isArray(value) ? (value[0] ?? '') : (value ?? '')
   const pane = first(search[TASK_PANE_PARAM])
   const item = first(search[TASK_ITEM_PARAM])
+  const at = first(search[TASK_AT_PARAM])
   if (!pane || !paneContribution(pane)) return null
-  return { pane, ...(item ? { item } : {}) }
+  return { pane, ...(item ? { item, ...(at ? { at } : {}) } : {}) }
 }
 
 export type TaskDeepLinkOptions = {
@@ -52,8 +54,8 @@ export function createTaskDeepLink(options: TaskDeepLinkOptions): void {
       },
       (current) => {
         if (!current?.link) return
-        const { pane, item } = current.link
-        openPane(current.taskId, pane, item ? { kind: 'plugin:select', item } : undefined)
+        const { pane, item, at } = current.link
+        openPane(current.taskId, pane, item ? { kind: 'plugin:select', item, ...(at ? { at } : {}) } : undefined)
         options.navigate(taskPath(current.taskId), { replace: true })
       },
     ),

@@ -110,10 +110,14 @@ const MAX_HTML_LENGTH = 1_000_000
 const MAX_NODES = 20_000
 const MAX_DEPTH = 64
 
-function safeHref(raw: string | null): string | null {
+function safeHref(raw: string | null, acornLinks: boolean): string | null {
   // URL() accepts and strips some controls. Refuse them before parsing, along with relative links,
   // encoded/obfuscated schemes and credentials. Only a user click may open the resulting URL.
-  if (!raw || !/^https:\/\//i.test(raw) || /[\u0000-\u0020\u007f]/.test(raw)) return null
+  if (!raw || /[\u0000-\u0020\u007f]/.test(raw)) return null
+  // An `acorn:` link only navigates or asks first, and its opener parses it again
+  // (docs/frontend/acorn-links.md § Input and authority).
+  if (acornLinks && raw.startsWith('acorn://')) return raw
+  if (!/^https:\/\//i.test(raw)) return null
   try {
     const url = new URL(raw)
     return url.protocol === 'https:' && url.hostname && !url.username && !url.password ? url.href : null
@@ -122,8 +126,9 @@ function safeHref(raw: string | null): string | null {
   }
 }
 
-/** Fresh inert markup for provider-rendered descriptions and diff comments. */
-export function sanitizedHtmlFragment(html: string): DocumentFragment {
+/** Fresh inert markup for provider-rendered descriptions and diff comments. `acornLinks` also keeps
+ *  `acorn://` links, for a caller that hands their clicks to the host's link opener. */
+export function sanitizedHtmlFragment(html: string, options: { acornLinks?: boolean } = {}): DocumentFragment {
   const safe = document.createDocumentFragment()
   if (html.length > MAX_HTML_LENGTH) {
     safe.append('[HTML content exceeds display limit]')
@@ -151,7 +156,7 @@ export function sanitizedHtmlFragment(html: string): DocumentFragment {
     if (DROP_SUBTREE.has(tag)) return
 
     const allowed = FORMATTING_TAGS.has(tag)
-    const href = tag === 'a' ? safeHref(element.getAttribute('href')) : null
+    const href = tag === 'a' ? safeHref(element.getAttribute('href'), !!options.acornLinks) : null
     const output = allowed && (tag !== 'a' || href) ? document.createElement(tag) : target
     if (href && output !== target) {
       const anchor = output as HTMLAnchorElement

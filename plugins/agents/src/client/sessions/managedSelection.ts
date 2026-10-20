@@ -12,6 +12,10 @@ const [selectedSubagentBySession, setSelectedSubagentBySession] = createSignal<R
 // filter should still be on when you come back. Held for the app's lifetime, not across relaunches.
 const [chatsOnlyBySession, setChatsOnlyBySession] = createSignal<Record<string, boolean>>({})
 
+// The event a link named in each session, for the transcript to reveal once. A fresh object per link,
+// so opening the same link again reveals it again.
+const [linkedEventBySession, setLinkedEventBySession] = createSignal<Record<string, { seq: number } | undefined>>({})
+
 export const managedChatsOnly = (sessionId: string): boolean => chatsOnlyBySession()[sessionId] === true
 
 export function toggleManagedChatsOnly(sessionId: string): void {
@@ -21,6 +25,7 @@ export function toggleManagedChatsOnly(sessionId: string): void {
 export const selectedManagedSession = (taskId: string): string | undefined => selectedByTask()[taskId]
 export const focusedManagedRequest = (sessionId: string): string | undefined => focusedRequestBySession()[sessionId]
 export const selectedManagedSubagent = (sessionId: string): string | undefined => selectedSubagentBySession()[sessionId]
+export const linkedManagedEvent = (sessionId: string): { seq: number } | undefined => linkedEventBySession()[sessionId]
 
 // One signal, two readers that agree by construction: it is which subagent's run the main window is
 // showing, and the sidebar row for that subagent is the one drawn as selected. Absent means the
@@ -74,6 +79,7 @@ export function clearManagedSession(taskId: string, expectedSessionId?: string):
       return next
     })
   }
+  clearLinkedManagedEvent(expectedSessionId)
 }
 
 /** Consume the pending reveal for a session. It is a one-shot navigation command, like the composer
@@ -81,6 +87,16 @@ export function clearManagedSession(taskId: string, expectedSessionId?: string):
  *  would replay the scroll-and-focus on every later remount and pull a typing reader back to it. */
 export function clearFocusedManagedRequest(sessionId: string): void {
   setFocusedRequestBySession((current) => {
+    if (current[sessionId] === undefined) return current
+    const next = { ...current }
+    delete next[sessionId]
+    return next
+  })
+}
+
+/** Consume the pending linked event for a session, a one-shot like the request reveal above. */
+export function clearLinkedManagedEvent(sessionId: string): void {
+  setLinkedEventBySession((current) => {
     if (current[sessionId] === undefined) return current
     const next = { ...current }
     delete next[sessionId]
@@ -114,7 +130,14 @@ export function activateManagedAgentPaneIntents(): () => void {
   return clientEvents.on('presentation:pane-intent', (event) => {
     if (event.paneId !== AGENT_PANE_ID || event.intent.kind !== 'plugin:select') return
     consumePaneIntent(event.taskId, event.paneId)
-    selectManagedSession(event.taskId, event.intent.item)
+    const sessionId = event.intent.item
+    selectManagedSession(event.taskId, sessionId)
+    // A link's `at` is an event sequence number in the session (docs/frontend/acorn-links.md). Its card
+    // takes the focus, so drop the composer focus that selecting the session asked for.
+    const at = event.intent.at
+    if (at === undefined || !/^\d+$/.test(at)) return
+    consumeComposerFocus(sessionId)
+    setLinkedEventBySession((current) => ({ ...current, [sessionId]: { seq: Number(at) } }))
   })
 }
 

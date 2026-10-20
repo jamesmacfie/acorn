@@ -30,10 +30,12 @@ export {
   workspacesOptions,
 } from '@acorn/client-core/infra/queries.ts'
 export type { Task } from '@acorn/client-core/infra/queries.ts'
+// `copyLink` writes an `acorn://` link and says whether it worked, as the shell's **Copy link** does.
 export {
   clientEvents,
   consumePaneIntent,
   consumeTerminalFocusIntent,
+  copyLink,
   openPane,
   requestTerminalFocusIntent,
 } from '@acorn/client-core/host/registries/commands'

@@ -12,6 +12,32 @@ const isTyping = (doc: Document): boolean => {
   )
 }
 
+/** Scroll an element into view and focus it each time `when` turns true.
+ *
+ *  A rising edge, not a standing order. `when` is a prop getter, and a pane derives it from a row it
+ *  rebuilds on every streamed event, so this effect is re-notified while the value stays true. Re-running
+ *  the reveal then would yank the reader back and take the caret out of whatever they were typing.
+ *  Reveal once when it turns true; act again only after it has gone false and true again. */
+export function revealOnRisingEdge(when: () => boolean | undefined, element: () => HTMLElement | undefined): void {
+  let revealed = false
+  createEffect(() => {
+    const target = element()
+    if (!when() || !target) {
+      revealed = false
+      return
+    }
+    if (revealed) return
+    revealed = true
+    // And never out of a box someone is typing in. The rising edge above only holds while the element
+    // stays mounted: a list that refetches rebuilds its rows, and the rebuilt row that happens to be
+    // the selected one re-issues a reveal nobody asked for. The reader who finds out is the one whose
+    // sentence lost the caret, so a reveal that would interrupt typing is dropped rather than queued.
+    if (isTyping(target.ownerDocument)) return
+    target.scrollIntoView({ block: 'nearest' })
+    target.focus({ preventScroll: true })
+  })
+}
+
 /* Card: a bordered grouping surface. No mandated Header/Body/Footer slots; acorn's cards are small
    and dense, and slots would get in the way.
 
@@ -47,26 +73,10 @@ export function Card(props: {
     'data-fit': props.fit ? '' : undefined,
     title: props.title,
   })
-  // A rising edge, not a standing order. `focus` is a prop getter, and a pane derives it from a row it
-  // rebuilds on every streamed event, so this effect is re-notified while the value stays true. Re-running
-  // the reveal then would yank the reader back to this card and take the caret out of whatever they were
-  // typing. Reveal once when it turns true; act again only after it has gone false and true again.
-  let revealed = false
-  createEffect(() => {
-    if (!props.focus || !element) {
-      revealed = false
-      return
-    }
-    if (revealed) return
-    revealed = true
-    // And never out of a box someone is typing in. The rising edge above only holds while this card
-    // stays mounted: a list that refetches rebuilds its rows, and the rebuilt row that happens to be
-    // the selected one re-issues a reveal nobody asked for. The reader who finds out is the one whose
-    // sentence lost the caret, so a reveal that would interrupt typing is dropped rather than queued.
-    if (isTyping(element.ownerDocument)) return
-    element.scrollIntoView({ block: 'nearest' })
-    element.focus({ preventScroll: true })
-  })
+  revealOnRisingEdge(
+    () => props.focus,
+    () => element,
+  )
   return (
     <Show
       when={props.interactive || props.onPress}
