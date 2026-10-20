@@ -475,6 +475,16 @@ Each plugin landing page above has topic pages in a folder of the same name:
   date](./future/supplied-data/02-keep-it-updated.md), and [a code search
   source](./future/supplied-data/03-code-search-source.md).
 
+## Workflow triggers proposal
+
+- [Start a workflow when records change](./future/triggers/README.md), with phases for [clearing the
+  ground](./future/triggers/01-clear-the-ground.md), [one trigger
+  model](./future/triggers/02-one-trigger-model.md), [saying when data
+  changed](./future/triggers/03-say-when-data-changed.md), [record
+  triggers](./future/triggers/04-record-triggers.md), [the plugin author
+  kit](./future/triggers/05-plugin-author-kit.md), and [first-party triggers and
+  acceptance](./future/triggers/06-first-party-triggers.md).
+
 ## OpenCode harness proposal
 
 - [OpenCode as a contributed harness](./future/opencode.md), postponed.
