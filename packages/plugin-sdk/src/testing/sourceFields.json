@@ -1,4 +1,515 @@
 {
+  "agents:session-totals": {
+    "name": "Agent session totals",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "taskTitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "taskStatus": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "changeRequests": {
+          "type": "number"
+        },
+        "turns": {
+          "type": "number"
+        },
+        "failedTurns": {
+          "type": "number"
+        },
+        "firstStartedAt": {
+          "type": "number"
+        },
+        "lastCompletedAt": {
+          "type": "number"
+        },
+        "activeMs": {
+          "type": "number"
+        },
+        "approvalWaitMs": {
+          "type": "number"
+        },
+        "toolCalls": {
+          "type": "number"
+        },
+        "toolFailures": {
+          "type": "number"
+        },
+        "filesChanged": {
+          "type": "number"
+        },
+        "filesRewritten": {
+          "type": "number"
+        },
+        "subagents": {
+          "type": "number"
+        },
+        "inputTokens": {
+          "type": "number"
+        },
+        "outputTokens": {
+          "type": "number"
+        },
+        "cacheReadTokens": {
+          "type": "number"
+        },
+        "cacheWriteTokens": {
+          "type": "number"
+        },
+        "costUsd": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "longestFailureRun": {
+          "type": "number"
+        },
+        "longestFailureRunTurn": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "longestFailureRunSeq": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "repeatedCalls": {
+          "type": "number"
+        },
+        "repeatedCallsTurn": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "repeatedCallsSeq": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "maxFilesRewritten": {
+          "type": "number"
+        },
+        "contextPeak": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "sessionId",
+        "title",
+        "provider",
+        "kind",
+        "archived",
+        "taskId",
+        "taskTitle",
+        "taskStatus",
+        "projectId",
+        "projectName",
+        "changeRequests",
+        "turns",
+        "failedTurns",
+        "firstStartedAt",
+        "lastCompletedAt",
+        "activeMs",
+        "approvalWaitMs",
+        "toolCalls",
+        "toolFailures",
+        "filesChanged",
+        "filesRewritten",
+        "subagents",
+        "inputTokens",
+        "outputTokens",
+        "cacheReadTokens",
+        "cacheWriteTokens",
+        "costUsd",
+        "longestFailureRun",
+        "longestFailureRunTurn",
+        "longestFailureRunSeq",
+        "repeatedCalls",
+        "repeatedCallsTurn",
+        "repeatedCallsSeq",
+        "maxFilesRewritten",
+        "contextPeak"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/sessionId",
+        "origin": "declared",
+        "label": "Session",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/title",
+        "origin": "declared",
+        "label": "Title",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/provider",
+        "origin": "declared",
+        "label": "Provider",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/kind",
+        "origin": "declared",
+        "label": "Kind",
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "interactive",
+              "label": "Interactive"
+            },
+            {
+              "id": "workflow",
+              "label": "Workflow"
+            },
+            {
+              "id": "delegated",
+              "label": "Delegated"
+            },
+            {
+              "id": "imported",
+              "label": "Imported"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/archived",
+        "origin": "declared",
+        "label": "Archived"
+      },
+      {
+        "pointer": "/taskId",
+        "origin": "declared",
+        "label": "Task",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/taskTitle",
+        "origin": "declared",
+        "label": "Task title"
+      },
+      {
+        "pointer": "/taskStatus",
+        "origin": "declared",
+        "label": "Task status",
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "active",
+              "label": "Active",
+              "tone": "accent"
+            },
+            {
+              "id": "archived",
+              "label": "Archived",
+              "tone": "ok"
+            },
+            {
+              "id": "cancelled",
+              "label": "Cancelled",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/projectId",
+        "origin": "declared",
+        "label": "Project",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/projectName",
+        "origin": "declared",
+        "label": "Project name"
+      },
+      {
+        "pointer": "/changeRequests",
+        "origin": "declared",
+        "label": "Change requests",
+        "description": "Change requests this session attached to its task.",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/turns",
+        "origin": "declared",
+        "label": "Turns",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/failedTurns",
+        "origin": "declared",
+        "label": "Failed turns",
+        "description": "Turns that failed or were interrupted.",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/firstStartedAt",
+        "origin": "declared",
+        "label": "First turn started",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/lastCompletedAt",
+        "origin": "declared",
+        "label": "Last turn finished",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/activeMs",
+        "origin": "declared",
+        "label": "Run time",
+        "display": {
+          "kind": "number",
+          "unit": "ms"
+        }
+      },
+      {
+        "pointer": "/approvalWaitMs",
+        "origin": "declared",
+        "label": "Waiting on you",
+        "display": {
+          "kind": "number",
+          "unit": "ms"
+        }
+      },
+      {
+        "pointer": "/toolCalls",
+        "origin": "declared",
+        "label": "Tool calls",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/toolFailures",
+        "origin": "declared",
+        "label": "Failed tool calls",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/filesChanged",
+        "origin": "declared",
+        "label": "Files changed",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/filesRewritten",
+        "origin": "declared",
+        "label": "Files rewritten",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/subagents",
+        "origin": "declared",
+        "label": "Subagents",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/inputTokens",
+        "origin": "declared",
+        "label": "Input tokens",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/outputTokens",
+        "origin": "declared",
+        "label": "Output tokens",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/cacheReadTokens",
+        "origin": "declared",
+        "label": "Cache read tokens",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/cacheWriteTokens",
+        "origin": "declared",
+        "label": "Cache write tokens",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/costUsd",
+        "origin": "declared",
+        "label": "Cost",
+        "description": "The sum of the turns with a known cost. Null when no turn has one.",
+        "display": {
+          "kind": "number",
+          "unit": "USD"
+        }
+      },
+      {
+        "pointer": "/longestFailureRun",
+        "origin": "declared",
+        "label": "Most failures in a row",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/longestFailureRunTurn",
+        "origin": "declared",
+        "label": "Failure run turn"
+      },
+      {
+        "pointer": "/longestFailureRunSeq",
+        "origin": "declared",
+        "label": "Failure run start"
+      },
+      {
+        "pointer": "/repeatedCalls",
+        "origin": "declared",
+        "label": "Most repeated calls in a turn",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/repeatedCallsTurn",
+        "origin": "declared",
+        "label": "Repeat run turn"
+      },
+      {
+        "pointer": "/repeatedCallsSeq",
+        "origin": "declared",
+        "label": "Repeat run start"
+      },
+      {
+        "pointer": "/maxFilesRewritten",
+        "origin": "declared",
+        "label": "Most files rewritten in a turn",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/contextPeak",
+        "origin": "declared",
+        "label": "Peak context use",
+        "display": {
+          "kind": "number",
+          "unit": "percent"
+        }
+      }
+    ]
+  },
   "agents:sessions": {
     "name": "Managed agent sessions",
     "schema": {
@@ -153,6 +664,620 @@
           ],
           "sortable": true
         }
+      }
+    ]
+  },
+  "agents:turns": {
+    "name": "Agent turns",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "turnId": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ordinal": {
+          "type": "number"
+        },
+        "firstSeq": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "number"
+        },
+        "completedAt": {
+          "type": "number"
+        },
+        "activeMs": {
+          "type": "number"
+        },
+        "firstOutputMs": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "approvalWaitMs": {
+          "type": "number"
+        },
+        "approvals": {
+          "type": "number"
+        },
+        "toolCalls": {
+          "type": "number"
+        },
+        "toolFailures": {
+          "type": "number"
+        },
+        "longestFailureRun": {
+          "type": "number"
+        },
+        "failureRunSeq": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "repeatedCalls": {
+          "type": "number"
+        },
+        "repeatRunSeq": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "filesChanged": {
+          "type": "number"
+        },
+        "filesRewritten": {
+          "type": "number"
+        },
+        "subagents": {
+          "type": "number"
+        },
+        "peakContextUsed": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "contextSize": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "contextPeak": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "inputTokens": {
+          "type": "number"
+        },
+        "outputTokens": {
+          "type": "number"
+        },
+        "cacheReadTokens": {
+          "type": "number"
+        },
+        "cacheWriteTokens": {
+          "type": "number"
+        },
+        "reportedCostUsd": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "costUsd": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "costSource": {
+          "type": "string"
+        },
+        "taskTitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "turnId",
+        "sessionId",
+        "taskId",
+        "projectId",
+        "ordinal",
+        "firstSeq",
+        "provider",
+        "model",
+        "source",
+        "status",
+        "startedAt",
+        "completedAt",
+        "activeMs",
+        "firstOutputMs",
+        "approvalWaitMs",
+        "approvals",
+        "toolCalls",
+        "toolFailures",
+        "longestFailureRun",
+        "failureRunSeq",
+        "repeatedCalls",
+        "repeatRunSeq",
+        "filesChanged",
+        "filesRewritten",
+        "subagents",
+        "peakContextUsed",
+        "contextSize",
+        "contextPeak",
+        "inputTokens",
+        "outputTokens",
+        "cacheReadTokens",
+        "cacheWriteTokens",
+        "reportedCostUsd",
+        "costUsd",
+        "costSource",
+        "taskTitle",
+        "projectName"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/turnId",
+        "origin": "declared",
+        "label": "Turn"
+      },
+      {
+        "pointer": "/sessionId",
+        "origin": "declared",
+        "label": "Session",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/taskId",
+        "origin": "declared",
+        "label": "Task",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/projectId",
+        "origin": "declared",
+        "label": "Project",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/ordinal",
+        "origin": "declared",
+        "label": "Turn number",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/firstSeq",
+        "origin": "declared",
+        "label": "First event",
+        "description": "The sequence number of the turn's first event in its session."
+      },
+      {
+        "pointer": "/provider",
+        "origin": "declared",
+        "label": "Provider",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "dynamic",
+          "dependsOn": []
+        }
+      },
+      {
+        "pointer": "/model",
+        "origin": "declared",
+        "label": "Model",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "dynamic",
+          "dependsOn": []
+        }
+      },
+      {
+        "pointer": "/source",
+        "origin": "declared",
+        "label": "Started by",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "interactive",
+              "label": "You"
+            },
+            {
+              "id": "workflow",
+              "label": "Workflow"
+            },
+            {
+              "id": "delegation",
+              "label": "Delegation"
+            },
+            {
+              "id": "delegation_report",
+              "label": "Delegation report"
+            },
+            {
+              "id": "automation",
+              "label": "Automation"
+            },
+            {
+              "id": "import",
+              "label": "Import"
+            },
+            {
+              "id": "plugin",
+              "label": "Plugin"
+            },
+            {
+              "id": "goal",
+              "label": "Goal"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/status",
+        "origin": "declared",
+        "label": "Status",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "completed",
+              "label": "Completed",
+              "tone": "ok"
+            },
+            {
+              "id": "failed",
+              "label": "Failed",
+              "tone": "bad"
+            },
+            {
+              "id": "interrupted",
+              "label": "Interrupted",
+              "tone": "warn"
+            },
+            {
+              "id": "cancelled",
+              "label": "Cancelled",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/startedAt",
+        "origin": "declared",
+        "label": "Started",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/completedAt",
+        "origin": "declared",
+        "label": "Finished",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/activeMs",
+        "origin": "declared",
+        "label": "Run time",
+        "display": {
+          "kind": "number",
+          "unit": "ms"
+        }
+      },
+      {
+        "pointer": "/firstOutputMs",
+        "origin": "declared",
+        "label": "Time to first output",
+        "display": {
+          "kind": "number",
+          "unit": "ms"
+        }
+      },
+      {
+        "pointer": "/approvalWaitMs",
+        "origin": "declared",
+        "label": "Waiting on you",
+        "display": {
+          "kind": "number",
+          "unit": "ms"
+        }
+      },
+      {
+        "pointer": "/approvals",
+        "origin": "declared",
+        "label": "Approvals and questions",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/toolCalls",
+        "origin": "declared",
+        "label": "Tool calls",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/toolFailures",
+        "origin": "declared",
+        "label": "Failed tool calls",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/longestFailureRun",
+        "origin": "declared",
+        "label": "Most failures in a row",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/failureRunSeq",
+        "origin": "declared",
+        "label": "Failure run start"
+      },
+      {
+        "pointer": "/repeatedCalls",
+        "origin": "declared",
+        "label": "Repeated calls",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/repeatRunSeq",
+        "origin": "declared",
+        "label": "Repeat run start"
+      },
+      {
+        "pointer": "/filesChanged",
+        "origin": "declared",
+        "label": "Files changed",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/filesRewritten",
+        "origin": "declared",
+        "label": "Files rewritten",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/subagents",
+        "origin": "declared",
+        "label": "Subagents",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/peakContextUsed",
+        "origin": "declared",
+        "label": "Peak context",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/contextSize",
+        "origin": "declared",
+        "label": "Context window",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/contextPeak",
+        "origin": "declared",
+        "label": "Peak context use",
+        "display": {
+          "kind": "number",
+          "unit": "percent"
+        }
+      },
+      {
+        "pointer": "/inputTokens",
+        "origin": "declared",
+        "label": "Input tokens",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/outputTokens",
+        "origin": "declared",
+        "label": "Output tokens",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/cacheReadTokens",
+        "origin": "declared",
+        "label": "Cache read tokens",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/cacheWriteTokens",
+        "origin": "declared",
+        "label": "Cache write tokens",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/reportedCostUsd",
+        "origin": "declared",
+        "label": "Reported cost",
+        "display": {
+          "kind": "number",
+          "unit": "USD"
+        }
+      },
+      {
+        "pointer": "/costUsd",
+        "origin": "declared",
+        "label": "Cost",
+        "display": {
+          "kind": "number",
+          "unit": "USD"
+        }
+      },
+      {
+        "pointer": "/costSource",
+        "origin": "declared",
+        "label": "Cost provenance",
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "reported",
+              "label": "Provider reported"
+            },
+            {
+              "id": "estimated",
+              "label": "Estimated"
+            },
+            {
+              "id": "unknown",
+              "label": "Unknown"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/taskTitle",
+        "origin": "declared",
+        "label": "Task title",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/projectName",
+        "origin": "declared",
+        "label": "Project name"
       }
     ]
   },

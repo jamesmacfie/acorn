@@ -202,6 +202,16 @@ it('reads a bound input, turns `where` into a predicate, opens the upstream reco
   expect((await call(readiness, query())).status).toBe(400)
 })
 
+it('opens the task of an upstream record that belongs to one, whatever pane it opens', async () => {
+  const items = handle(async () => {
+    const page = result([{ id: 'a', data: { title: 'A' } }])
+    page.records[0] = { ...page.records[0]!, taskId: 'task-1', action: { verb: 'openPane', pane: 'agents' } }
+    return page
+  })
+  const { body } = await call(readiness, query(), { items })
+  expect(body.records).toMatchObject([{ recordId: 'a', taskId: 'task-1', action: { verb: 'openTask' } }])
+})
+
 it('pages through an input with `all`, and stops at the record budget', async () => {
   let reads = 0
   const paged = handle(async ({ cursor } = {}) => {

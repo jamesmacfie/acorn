@@ -548,7 +548,7 @@ it('asks what a row is and what it reads under --data-source', () => {
   try {
     execFileSync(process.execPath, [CLI, 'readiness', '--data-source'], {
       cwd,
-      input: 'Issue\n9, 8\n8\n',
+      input: 'Issue\n11, 10\n10\n',
       stdio: 'pipe',
     })
     const manifest = JSON.parse(readFileSync(join(cwd, 'readiness', 'acorn-plugin.json'), 'utf8'))

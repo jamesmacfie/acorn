@@ -18,6 +18,7 @@ table is everything that changes, one row per cooperative extension kind and hos
 | A `frame` region, or a frame-only page, slot, or importer | The plugin's own web page in an iframe | One muted line naming the plugin and pointing at the desktop app | `apps/tui/src/plugins/FrameStandIn.tsx`, through the `setFrameSurface` seam |
 | `hook` | Runs on the Node | Runs on the Node | Nothing to draw on either host |
 | `pane.aside` | A dashboard grid beside the pane | One muted line naming the point | [Dashboards](../dashboards.md) |
+| A rail source's `panels` | A dashboard grid beside the list | The detail says the panels draw in the desktop app | `apps/tui/src/plugins/SourcePanel.tsx` § `SourceDetail` |
 | `rail.taskList` (exclusive slot) | The replacement draws instead of core's list | The same, through the same arbitration | `apps/tui/src/chrome/slot.tsx` |
 | `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [Plugins](../plugins.md) |
 

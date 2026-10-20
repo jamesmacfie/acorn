@@ -153,6 +153,15 @@ describe('descriptor source row parsing', () => {
     ).toEqual({ id: '142', title: 'Checkout failed' })
   })
 
+  it("keeps the row's task id, and drops a row whose task id isn't text", () => {
+    expect(sanitizeRailItem('analytics', { id: 's-1', title: 'Fix login', taskId: 'task-1' })).toEqual({
+      id: 's-1',
+      title: 'Fix login',
+      taskId: 'task-1',
+    })
+    expect(sanitizeRailItem('analytics', { id: 's-1', title: 'Fix login', taskId: 7 })).toBeNull()
+  })
+
   it('strips a malformed task link while retaining valid task fields', () => {
     expect(
       sanitizeRailItem('rollbar', {

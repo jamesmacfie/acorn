@@ -43,6 +43,9 @@ export type PluginRailItem = {
    *  that sends neither this nor `icon` still draws a reachable row, marked with a dot and named by
    *  its tooltip. */
   short?: string
+  /** The task this row is about, such as the task of an agent session. An `openTask` `onSelect` goes
+   *  there. */
+  taskId?: string
   task?: PluginRailTask
 }
 export type PluginRailItems = { items: PluginRailItem[] }

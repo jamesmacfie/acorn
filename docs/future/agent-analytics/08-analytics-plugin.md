@@ -1,5 +1,104 @@
 # Phase 8: build the acorn-analytics plugin
 
+## Completion note
+
+Built on October 20, 2026, on branch `phase-8-analytics-plugin`. The plugin is its own Git repository
+at `/Users/jamesmacfie/Source/acorn-analytics`, commit `002ae9a` "Phase 8: Analytics plugin", with no
+remote and nothing published.
+
+What landed in the plugin:
+
+- The layout below, scaffolded with `dataSourceFiles` from `create-acorn-plugin`, plus
+  `src/rail.test.ts`. `npm test` runs 21 tests in four files, and `npm run check` type-checks.
+- `health.ts` holds the five rules and the outcome as pure functions. `source.ts` holds
+  **Agent session health**, its five starters, and `readHealth`, which reads the source back through
+  `ctx.dataSources.invoke`, 100 records a page. `marks.ts` answers both marks routes from the held
+  read. `rail.ts` answers the rail list.
+- The manifest: `requires.plugins` names `agents` at major 1, `permissions.events` lists
+  `plugin:agents:turn-facts`, `permissions.node` grants nothing, and the rail source is
+  `workspaceScoped` with `openTask`, the empty state, and a region of six panels over the four
+  sources.
+
+What landed in this repository, each because the plugin needs it:
+
+- The SDK's field lists include `agents:turns` and `agents:session-totals`, `KNOWN_SOURCES` lists
+  both, and the SDK is 1.2.0. This is phase 3's deferred step. `acme-review` points at the 1.2.0
+  tarball.
+- A derived row whose input record belongs to a task opens the task (`opening` in the SDK's
+  `derived.ts`). Session totals' records open the Agent pane with `openPane`, which the SDK dropped,
+  so a session health row opened nothing.
+- A rail row can name its task as `taskId`, and `openTask` from a rail row goes there (`goToTask` in
+  `client-core/host/chrome/actions.ts`, and both branches of `sanitizeRailItem`). Before this, a rail
+  row had no way to name a task, so `openTask` only showed "that row names no task".
+- The terminal's source detail says "The panels beside this list draw in the desktop app." for a
+  source with `panels`, instead of "Choose a row.".
+- Docs: [descriptors](../../plugins/descriptors.md#rail-sources),
+  [derived sources for authors](../../plugin-authoring/derived-sources.md#write-the-source),
+  [what a plugin loses in the terminal](../../tui/plugin-losses.md), and the site's rail source guide.
+
+Decisions and deviations:
+
+- The SDK and the types aren't on npm. The plugin installs them from tarballs in
+  `/Users/jamesmacfie/Source/acorn-packs`, the folder `acme-review` and the extension example already
+  use. The README says how to pack them.
+- A row carries more than the doc lists: `taskId`, and the nine facts the judgment reads, copied under
+  their input names. A marks request can only read the plugin's own source back, so the row has to
+  carry what the marks judge again and link from: the task, the turn, and the run's first sequence.
+  `judge` takes either a totals record or a row.
+- Agents numbers turns from zero, and shows `ordinal + 1`. The plugin does the same, so the first turn
+  reads "turn 1".
+- The Agent pane's ID is `agents`, as phase 7 says. This doc's `pane=agent` is wrong.
+- The rewrite rule reads `maxFilesRewritten`, the most in one turn, which is what its text says.
+- "Repeated the same call N times" shows `repeatedCalls + 2`. A turn with two runs reads as one
+  longer run. The README says so.
+- Choice labels are short, because a bar chart's axis labels overlapped: the main reasons are
+  **Failure runs**, **Repeats**, **Failed turns**, **Rewrites**, and **Context**, and the outcomes are
+  **In progress**, **Change request**, **No change request**, and **Cancelled**.
+- A task mark reads "Agent struggling: <title>", with "and N more" for more than one session.
+- The plugin can't import the host's plan validator, so its test checks that each starter binds real
+  fields. The five starters were checked once against `validatePanelPlan` from this repository, with
+  no problems, and the studio reported none.
+- A turn-facts event drops the held read and starts a five-second timer that calls
+  `ctx.events.status()`, so a burst of turns asks the host once. `status()` bumps the plugin's chrome
+  revision, which annotation requests key on.
+- The held read uses the asking request's principal and a 60-second timeout, not the request's signal,
+  because later requests share it. A failed read isn't held.
+- The marks and rail routes refuse a task-confined credential, as the source does. A workspace the
+  Node doesn't know is refused by the Node, and the route answers 502.
+- Agents' major is still 1, so `requires` can't tell an agents plugin without phase 3's sources apart.
+
+Acceptance, checked on October 20, 2026, in `pnpm dev:agent` with the `delegation-checks` fixture and
+the plugin copied into `bundled-plugins`, its session's facts edited to a five-call failure run:
+
+- The trust prompt listed "Read agent session totals". Before approval, both marks routes answered 502
+  with "input-unavailable: input totals: Not approved".
+- Agent Center and the Agent pane showed "Struggling: 5 failed tool calls in a row". Its detail read
+  "5 failed tool calls in a row, in turn 1", the host rewrote `this` to the Node, and pressing the link
+  lit the linked message.
+- **Agent analytics** listed the session with its task and main reason. Pressing it opened its task.
+  The region offered exactly the four sources and the five starters, and each published and drew.
+  Cost by outcome warned about unknown values, because the fixture session has no cost.
+- Switching to the `acorn` workspace showed "No sessions need a look this week." and an empty region.
+  Switching back showed the list and the five panels.
+- The task's rail row showed the struggling mark. With the facts edited back to three failures, the
+  held read answered **Struggling** until it expired, then **Watch**, and the task mark was gone. No
+  live agent ran, so the turn-facts path to a refresh is checked in code, not in the app.
+- In `pnpm dev:tui:agent` with `large-surfaces`, the plugin bundled through
+  `ACORN_BUNDLED_PLUGINS_DIR` and its grant written to `input-grants.json`: the rail listed both
+  sessions, pressing the struggling one opened its task, and the Agent pane header showed the mark.
+  The region text was checked by its test, because that session ran the earlier build.
+- The Node service measured 1,904,763 bytes, under its 1,906,400-byte ceiling. This phase changes
+  nothing in it.
+
+For the owner:
+
+- The agents sources' records name `openPane` with pane `agent`, but the Agent pane's ID is `agents`
+  (`AGENT_PANE_ID`). Pressing a row in an agents source's panel may open nothing. That's outside this
+  phase and wasn't checked in the app.
+- The trust prompt words the `core:task` extension as "Add its own rows to core's “Agent analytics”
+  list", which reads like rows, not marks.
+- The programme README's status line still says "Implementation not started".
+
 Date: October 19, 2026. Status: proposed. Needs phases [1](./01-dynamic-ui-fit.md) to
 [6](./06-session-marks.md). Uses [phase 7](./07-message-links.md) when it exists.
 

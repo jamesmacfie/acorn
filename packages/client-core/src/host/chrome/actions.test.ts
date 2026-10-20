@@ -109,6 +109,23 @@ describe('openPane', () => {
   })
 })
 
+describe('openTask', () => {
+  it('goes to the task a rail row names', () => {
+    setTaskLookup((taskId) => (taskId === 'task-2' ? ({ id: 'task-2', links: [] } as unknown as Task) : undefined))
+    const navigate = vi.fn()
+    runChromeAction(
+      { verb: 'openTask' },
+      { pluginId: 'board', nodeId: 'node-a', item: { ...item, taskId: 'task-2' }, navigate },
+    )
+    expect(navigate).toHaveBeenCalledWith('/t/task-2')
+  })
+
+  it('says so when the row names no task', () => {
+    runChromeAction({ verb: 'openTask' }, { pluginId: 'board', nodeId: 'node-a', item })
+    expect(toasted).toEqual(['board: that row names no task'])
+  })
+})
+
 describe('openOverlay', () => {
   it('opens with no task, unlike openPane, and only one is up at a time', () => {
     // The verb that needs nothing from its click site: an overlay covers the window rather than taking a

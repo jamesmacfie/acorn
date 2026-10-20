@@ -225,7 +225,8 @@ export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem
     !opt(item.subtitle) ||
     !opt(item.icon) ||
     !opt(item.badge) ||
-    !opt(item.short)
+    !opt(item.short) ||
+    !opt(item.taskId)
   )
     return null
   const fields = fieldList(item.fields)
@@ -240,6 +241,7 @@ export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem
       ...(railSeverity(item.severity) ? { severity: railSeverity(item.severity) } : {}),
       ...(str(item.badge) ? { badge: item.badge } : {}),
       ...(str(item.short) ? { short: item.short } : {}),
+      ...(str(item.taskId) ? { taskId: item.taskId } : {}),
     }
   }
   const task = item.task
@@ -254,6 +256,7 @@ export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem
     ...(railSeverity(item.severity) ? { severity: railSeverity(item.severity) } : {}),
     ...(str(item.badge) ? { badge: item.badge } : {}),
     ...(str(item.short) ? { short: item.short } : {}),
+    ...(str(item.taskId) ? { taskId: item.taskId } : {}),
     task: {
       ...(str(task.origin) && ownsTaskOrigin(pluginId, task.origin) ? { origin: task.origin } : {}),
       ...(str(task.title) ? { title: task.title } : {}),

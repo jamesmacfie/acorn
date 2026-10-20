@@ -178,8 +178,10 @@ export type DerivedRun = {
 function opening(ledger: InputLedger, ref: DataRecordRef | undefined): Partial<PageRecord> {
   const upstream = ref && ledger.seen.get(refKey(ref))
   if (!upstream) return {}
-  if (upstream.action?.verb === 'openTask' && upstream.taskId)
-    return { action: upstream.action, taskId: upstream.taskId }
+  // A record in a task, such as an agent session that opens its pane, opens the task. A record whose
+  // own action opens a link keeps the link.
+  if (upstream.taskId && upstream.action?.verb !== 'openUrl')
+    return { action: { verb: 'openTask' }, taskId: upstream.taskId }
   const url = upstream.action?.verb === 'openUrl' ? upstream.action.url : upstream.display?.url
   return url ? { action: { verb: 'openUrl', url }, display: { url } } : {}
 }

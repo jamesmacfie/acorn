@@ -578,14 +578,16 @@ function mount(slot, props, context, bridgePort) {
  * The SDK release that has `acorn-plugin-sdk/data` and `/testing`. Hardcoded for the same reason as
  * API_VERSION; index.test.ts compares it with the SDK's own version.
  */
-export const SDK_VERSION = '1.1.0'
+export const SDK_VERSION = '1.2.0'
 
 /**
  * The built-in and first-party sources a derived source can read, with the field that names a record.
  * A copy, because this package has no dependencies. index.test.ts holds it to the SDK's field lists.
  */
 export const KNOWN_SOURCES = [
+  { source: 'agents:session-totals', name: 'Agent session totals', title: 'title' },
   { source: 'agents:sessions', name: 'Managed agent sessions', title: 'title' },
+  { source: 'agents:turns', name: 'Agent turns', title: 'taskTitle' },
   { source: 'agents:usage-records', name: 'Agent usage records' },
   { source: 'core:local-branches', name: 'Local branches', title: 'name' },
   { source: 'core:local-worktrees', name: 'Local worktrees', title: 'path' },

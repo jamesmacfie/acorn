@@ -58,7 +58,8 @@ can declare:
   against the panes this manifest declares.
 
 A row may give its icon a semantic `severity` and ask for `fieldsFirst` when a stable identifier
-must come before the title. `short` is the row at the width of an icon rail, a few characters such
+must come before the title. A row about a task names it as `taskId`, and an `openTask` `onSelect`
+goes there. A row that names no task gets a toast saying so. `short` is the row at the width of an icon rail, a few characters such
 as a ticket key or an HTTP verb. A row with neither `short` nor `icon` gets a dot and a tooltip. Two
 places in `client-core/host/chrome/chromeData.ts` rebuild a rail row field by field from an
 allowlist, so a field added to `PluginRailItem` must be added to both, or it's dropped silently.

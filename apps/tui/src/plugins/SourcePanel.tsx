@@ -38,7 +38,8 @@ import { openPromotion } from '../chrome/promotionStore'
 // main one (docs/tui/chrome.md § The screen), which is why this exports a `regions` pair rather than a
 // component.
 //
-// The desktop's dashboard panels beside the list are not here: they need a separate cell surface.
+// The desktop's dashboard panels beside the list are not here: they need a separate cell surface, so
+// the detail says where they draw.
 // Row promotion uses the host task picker below. The search field stays in the list, because a hundred
 // issues without a way to narrow them is a list nobody can page through. What it searches, and when it
 // asks the plugin, is shared with the desktop (client-core/host/chrome/sourceSearch.ts).
@@ -234,7 +235,14 @@ function SourceDetail(props: { descriptor: PluginSourceDescriptor }) {
     return onSelect?.verb === 'navigate' ? projectSurfaceRegistry.get(onSelect.surface) : undefined
   }
   return (
-    <Show when={surface()} fallback={<EmptyState title={props.descriptor.label}>Choose a row.</EmptyState>}>
+    <Show
+      when={surface()}
+      fallback={
+        <EmptyState title={props.descriptor.label}>
+          {props.descriptor.panels ? 'The panels beside this list draw in the desktop app.' : 'Choose a row.'}
+        </EmptyState>
+      }
+    >
       {(entry) => (
         <Show when={params.projectId} fallback={<Line role="muted">Choose a project with `p`.</Line>}>
           {(projectId) => (

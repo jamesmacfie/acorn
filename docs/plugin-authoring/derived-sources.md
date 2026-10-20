@@ -100,7 +100,7 @@ for that input on the panel, and the plugin never sees a credential:
   support `eq` on that field. To filter on anything else, filter the records in your code.
 - `describe()` and `identity()` return the input's description and the account's identity.
 
-`opens` is an input record's `ref`. Pressing the row opens that record, using its own link or task.
+`opens` is an input record's `ref`. Pressing the row opens that record's link, or else its task.
 Every record's `id` must be unique and stable, because panels and the record's details find it by id.
 
 ### Fields

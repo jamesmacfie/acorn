@@ -102,8 +102,9 @@ opening a pane or navigating to a project pane:
 }
 ```
 
-The route answers `{ items: [{ id, title, subtitle?, fields?, icon?, severity?, badge?, short? }] }`.
-`short` is what the row shows at icon width, a few characters such as an issue key. The
+The route answers `{ items: [{ id, title, subtitle?, fields?, icon?, severity?, badge?, short?, taskId? }] }`.
+`short` is what the row shows at icon width, a few characters such as an issue key. `taskId` names the
+task a row is about, and an `openTask` `onSelect` goes there. The
 [acme-board](https://github.com/jamesmacfie/acorn/tree/main/examples/plugins/acme-points/acme-board)
 example draws its source this way.
 

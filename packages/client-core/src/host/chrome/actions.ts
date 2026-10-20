@@ -109,8 +109,9 @@ const UNKNOWN_TASK = 'that task is not on this node'
  *  never skip the navigate because it still names this task: a dashboard row for the task you left
  *  behind would look like a dead click, because the pane opens in a task the reader isn't looking at. */
 function goToTask(context: ChromeActionContext): Task | 'unknown-task' | undefined {
-  const named = context.taskId ? taskById(context.taskId) : undefined
-  if (context.taskId && !named) {
+  const taskId = context.taskId ?? context.item?.taskId
+  const named = taskId ? taskById(taskId) : undefined
+  if (taskId && !named) {
     toast(context.pluginId, UNKNOWN_TASK, 'It may have been archived, or the list has not loaded yet.')
     return 'unknown-task'
   }

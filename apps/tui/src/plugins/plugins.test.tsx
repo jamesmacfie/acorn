@@ -241,6 +241,25 @@ test('a descriptor source draws its list and its detail in cells', async () => {
   detail.done()
 }, 30_000)
 
+test("a source with panels says they draw in the desktop app, where the terminal can't", async () => {
+  const { sourcePanel } = await import('./SourcePanel')
+  const descriptor = {
+    id: 'health',
+    label: 'Health',
+    glyph: 'circle',
+    order: 10,
+    items: '/v1/p/region-probe/items',
+    panels: { max: 4 },
+  } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
+  const detail = await renderCells(() =>
+    createComponent(sourcePanel({ pluginId: 'region-probe', descriptor }).regions!.detail, {}),
+  )
+  expect((await detail.frame()).text.replace(/\s+/g, ' ')).toContain(
+    'The panels beside this list draw in the desktop app.',
+  )
+  detail.done()
+})
+
 async function mountProbe(
   source: string,
 ): Promise<{ ops: readonly TreeMutation[]; refusals: string[]; release: () => void }> {
