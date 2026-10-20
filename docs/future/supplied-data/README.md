@@ -1,6 +1,6 @@
 # Panels over data an agent found
 
-Date: October 20, 2026. Status: proposed. Implementation not started.
+Date: October 20, 2026. Status: built through phase 3 on October 20, 2026. Each phase doc starts with its completion note.
 
 This programme lets an agent draw a panel over rows it gathered itself, such as the weather this
 week, commit counts across every repository on disk, or a table it read from a web page. It then

@@ -95,6 +95,6 @@ The `suppliedRows` section of `panel_guide` tells a chat agent to check `data_so
 because a registered source refreshes and supplied rows never do. A question about what's in the code
 goes to the [Code matches source](../editor/find-in-files.md#code-matches-data-source), never to rows
 the agent searched for. It says to supply rows only when no source answers and the agent gathered them
-itself, and to answer a recipe, a how-to, or a single fact
-in words or with an app. It ends with a worked plan that charts commits by repository. The panel
-studio's AI doesn't get this section, because it can't gather rows.
+itself, and to answer a recipe, a how-to, or a single fact in words or with an app. It ends with a
+worked plan that charts commits by repository. The panel studio's AI doesn't get this section,
+because it can't gather rows.
