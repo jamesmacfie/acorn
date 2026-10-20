@@ -9,7 +9,7 @@ sources:
   - plugins/workflows/src/client/triggers/TriggerDialog.tsx
   - plugins/workflows/src/client/triggers/triggerModel.ts
   - plugins/git/src/client/launchWorkflow.ts
-checked: 07aa959a0
+checked: '357778522'
 ---
 
 A run always belongs to a task. This page covers each way to start one, and how to run a workflow on a

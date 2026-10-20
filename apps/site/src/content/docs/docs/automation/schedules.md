@@ -6,7 +6,7 @@ sources:
   - docs/schedules/plugin-schedules.md
   - docs/schedules/user-schedules.md
   - packages/client-core/src/features/settings/SchedulesSettings.tsx
-checked: '70489f534'
+checked: '357778522'
 ---
 
 A schedule is work a Node runs on a timer, whether or not any client is open. acorn runs some of its own
