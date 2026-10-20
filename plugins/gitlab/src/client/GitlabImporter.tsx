@@ -13,7 +13,7 @@ import {
   workspacesKey,
   writeJson,
 } from '@acorn/plugin-api/client'
-import { Alert, Button, Card, EmptyState, Heading, Inline, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, EmptyState, Heading, Inline, Input, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
 import {
   importRoute,
   projectsKey as gitlabProjectsKey,
@@ -45,6 +45,13 @@ export default function GitlabImporter(props: ProjectImporterProps) {
     )
   const [running, setRunning] = createSignal<{ project: GitlabProject; action: 'map' | 'clone' } | null>(null)
   const [error, setError] = createSignal('')
+  const [filter, setFilter] = createSignal('')
+  const shown = () => {
+    const needle = filter().trim().toLowerCase()
+    return (projects.data ?? []).filter((project) =>
+      projectAddress(project.host, project.path).toLowerCase().includes(needle),
+    )
+  }
 
   const importOne = async (project: GitlabProject, action: 'map' | 'clone') => {
     if (running()) return
@@ -144,8 +151,20 @@ export default function GitlabImporter(props: ProjectImporterProps) {
                 <Text emphasis="muted" wrap>
                   Clone asks where to put the copy. Link folder asks where your copy already is.
                 </Text>
+                <Input
+                  kind="filter"
+                  label="Filter projects"
+                  placeholder="Filter projects…"
+                  value={filter()}
+                  onInput={setFilter}
+                />
+                <Show when={!shown().length}>
+                  <EmptyState align="start" size="sm">
+                    Nothing matches that filter.
+                  </EmptyState>
+                </Show>
                 <Stack gap="none">
-                  <For each={projects.data ?? []}>
+                  <For each={shown()}>
                     {(project) => (
                       <SettingRow
                         label={projectAddress(project.host, project.path)}

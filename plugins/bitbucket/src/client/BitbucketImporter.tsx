@@ -13,7 +13,7 @@ import {
   workspacesKey,
   writeJson,
 } from '@acorn/plugin-api/client'
-import { Alert, Button, Card, EmptyState, Heading, Inline, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, EmptyState, Heading, Inline, Input, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
 import {
   importRoute,
   repositoriesKey,
@@ -42,6 +42,11 @@ export default function BitbucketImporter(props: ProjectImporterProps) {
     )
   const [running, setRunning] = createSignal<{ repository: BitbucketRepository; action: 'map' | 'clone' } | null>(null)
   const [error, setError] = createSignal('')
+  const [filter, setFilter] = createSignal('')
+  const shown = () => {
+    const needle = filter().trim().toLowerCase()
+    return (repositories.data ?? []).filter((repository) => repository.path.toLowerCase().includes(needle))
+  }
 
   const importOne = async (repository: BitbucketRepository, action: 'map' | 'clone') => {
     if (running()) return
@@ -145,8 +150,20 @@ export default function BitbucketImporter(props: ProjectImporterProps) {
                 <Text emphasis="muted" wrap>
                   Clone asks where to put the copy. Link folder asks where your copy already is.
                 </Text>
+                <Input
+                  kind="filter"
+                  label="Filter repositories"
+                  placeholder="Filter repositories…"
+                  value={filter()}
+                  onInput={setFilter}
+                />
+                <Show when={!shown().length}>
+                  <EmptyState align="start" size="sm">
+                    Nothing matches that filter.
+                  </EmptyState>
+                </Show>
                 <Stack gap="none">
-                  <For each={repositories.data ?? []}>
+                  <For each={shown()}>
                     {(repository) => (
                       <SettingRow
                         label={repository.path}

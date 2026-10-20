@@ -13,7 +13,7 @@ import {
   workspacesKey,
   writeJson,
 } from '@acorn/plugin-api/client'
-import { Alert, Button, Card, EmptyState, Heading, Inline, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, EmptyState, Heading, Inline, Input, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
 import type { IntegrationsResponse } from '@acorn/protocol/api.ts'
 import {
   githubImportRoute,
@@ -50,6 +50,11 @@ export default function GithubImporter(props: ProjectImporterProps) {
   const [running, setRunning] = createSignal<{ repoId: number; action: GithubImportAction } | null>(null)
   const busy = (repo: Repo, action: GithubImportAction) => running()?.repoId === repo.id && running()?.action === action
   const [error, setError] = createSignal('')
+  const [filter, setFilter] = createSignal('')
+  const shown = () => {
+    const needle = filter().trim().toLowerCase()
+    return (repos.data ?? []).filter((repo) => `${repo.owner}/${repo.name}`.toLowerCase().includes(needle))
+  }
   // Which project already holds each repository, so a row says so. Owner and name compare without
   // case, because GitHub's do.
   const projects = createQuery(() => projectsOptions(true))
@@ -162,8 +167,20 @@ export default function GithubImporter(props: ProjectImporterProps) {
               <Text emphasis="muted" wrap>
                 Clone asks where to put the copy. Link folder asks where your copy already is.
               </Text>
+              <Input
+                kind="filter"
+                label="Filter repositories"
+                placeholder="Filter repositories…"
+                value={filter()}
+                onInput={setFilter}
+              />
+              <Show when={!shown().length}>
+                <EmptyState align="start" size="sm">
+                  Nothing matches that filter.
+                </EmptyState>
+              </Show>
               <Stack gap="none">
-                <For each={repos.data ?? []}>
+                <For each={shown()}>
                   {(repo) => (
                     // Adding the same repository twice is legal, since two clones of one repository
                     // are a supported shape, so a row that already has a project keeps its buttons.
