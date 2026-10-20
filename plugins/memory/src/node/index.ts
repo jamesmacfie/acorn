@@ -6,6 +6,7 @@ import { memoryAgentTools } from '../server/agentTools'
 import { registerKnowledgeChannel } from '../server/knowledgeChannel'
 import { MEMORY_LIBRARY, type MemoryLibraryEntry } from '../contract/library'
 import { knowledge, KNOWLEDGE } from '../server/routes/knowledge'
+import { memorySource } from '../shared/memorySourceRegistration'
 
 // Terminal owns launch delivery; Agents owns the optional standing-context contract.
 export const memoryPlugin = (): NodePlugin => {
@@ -49,6 +50,15 @@ export const memoryPlugin = (): NodePlugin => {
       })
       routeCapability = ctx.capabilities.provide(KNOWLEDGE, runtime.route)
       ctx.routes.register(knowledge, { prefix: '', note: 'memory pane' })
+      ctx.routes.fetch(
+        async (request, context) =>
+          (await import('../server/memorySourceHandler')).createMemorySourceHandler(runtime.list, ctx.core.projects)(
+            request,
+            context,
+          ),
+        { prefix: '/data/memories' },
+      )
+      ctx.dataSources.register(memorySource)
       for (const tool of memoryAgentTools(runtime.store, ctx.core)) ctx.tools.register(tool)
     },
     // Release the route bridge on shutdown.

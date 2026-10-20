@@ -3607,6 +3607,258 @@
       }
     ]
   },
+  "memory:memories": {
+    "name": "Memories",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "writtenBy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sessionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "number"
+        },
+        "superseded": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "type",
+        "scope",
+        "projectId",
+        "projectName",
+        "writtenBy",
+        "sessionId",
+        "createdAt",
+        "updatedAt",
+        "superseded"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/name",
+        "label": "Name",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/description",
+        "label": "Description",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/type",
+        "display": {
+          "kind": "enum"
+        },
+        "label": "Type",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "user",
+              "label": "User"
+            },
+            {
+              "id": "feedback",
+              "label": "Feedback"
+            },
+            {
+              "id": "project",
+              "label": "Project"
+            },
+            {
+              "id": "reference",
+              "label": "Reference"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/scope",
+        "display": {
+          "kind": "enum"
+        },
+        "label": "Scope",
+        "origin": "declared",
+        "description": "A project memory applies to its project. A private one applies to you in every project.",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "project",
+              "label": "Project"
+            },
+            {
+              "id": "private",
+              "label": "Private"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/projectId",
+        "label": "Project",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/projectName",
+        "label": "Project name",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/writtenBy",
+        "display": {
+          "kind": "enum"
+        },
+        "label": "Written by",
+        "origin": "declared",
+        "description": "Who wrote the current version, as the memory file records it. Empty for a file edited by hand.",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "owner",
+              "label": "You"
+            },
+            {
+              "id": "agent",
+              "label": "An agent"
+            },
+            {
+              "id": "import",
+              "label": "Import"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/sessionId",
+        "label": "Agent session",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/createdAt",
+        "label": "Created",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/updatedAt",
+        "label": "Updated",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/superseded",
+        "label": "Superseded",
+        "origin": "declared",
+        "description": "Another memory replaces this one.",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      }
+    ]
+  },
   "rollbar:error-groups": {
     "name": "Rollbar error groups",
     "schema": {

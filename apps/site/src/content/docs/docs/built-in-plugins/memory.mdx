@@ -20,7 +20,7 @@ show, tells each new session what's there, and adds the Memory page where you re
 import them.
 
 <PluginFacts id="memory">
-  <Fragment slot="adds">**Memory** in the left rail, the **Search memory** command, the memory indexes each new session starts with, a card in the transcript when an agent changes a memory, and tools agents use to read and save memories.</Fragment>
+  <Fragment slot="adds">**Memory** in the left rail, the **Search memory** command, the memory indexes each new session starts with, a card in the transcript when an agent changes a memory, the **Memories** data source for dashboards, and tools agents use to read and save memories.</Fragment>
   <Fragment slot="needs">Nothing.</Fragment>
   <Fragment slot="reach">Its own Markdown files on the Node's machine, in `~/.acorn/memory`, or `memory/` in the Node's data folder when `ACORN_DATA_DIR` is set, and, when you import, Claude Code's memory folder and the project's `.acorn/memory` folder, read only.</Fragment>
 </PluginFacts>
@@ -46,6 +46,7 @@ There's nothing to set up. Agents start saving memories in their first sessions.
 - [The Memory page](/docs/using/memory/#the-memory-page): find, read, add, change, delete, and restore.
 - [Undo an agent's change](/docs/using/memory/#undo-an-agents-change) from its transcript card.
 - [Import Claude memory files](/docs/using/memory/#import-claude-memory-files).
+- [Put memories on a dashboard](/docs/using/memory/#on-a-dashboard) with the **Memories** source.
 
 ## From the command palette
 

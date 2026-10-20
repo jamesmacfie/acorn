@@ -106,6 +106,18 @@ The source files aren't changed. Files larger than 64 KiB, links, and `MEMORY.md
 
 **Search memory** searches this project's memories and opens the one you pick on the Memory page.
 
+## On a dashboard
+
+The **Memories** source puts your memories on a [dashboard](/docs/automation/dashboards/). Each record
+is one memory: its name, description, type, scope, project, who last wrote it, and when it was created
+and updated. A memory's body never leaves the Memory page. A panel for one project shows that project's
+memories and your private ones. A panel for the workspace shows every project's memories and your
+private ones once.
+
+Under **Add panel**, the source offers four starters: memories added this month, memories by type,
+memories added each week by type, and memories untouched for 90 days. In the two list starters, click a
+project memory to open it on the Memory page.
+
 ## In the terminal
 
 The terminal client draws the same Memory page: the list, **Recent changes**, history, **Project
@@ -116,7 +128,7 @@ saves it.
 ## Limits
 
 - The Memory page lists only project memories. Private memories reach every session, but you change
-  them through an agent, or as files.
+  them through an agent, or as files. Clicking a private memory in a dashboard panel opens nothing.
 - Each memory keeps 20 earlier versions, and the change log keeps the last 1,000 changes.
 - Undo refuses once anything else has changed that memory, including an edit outside acorn.
 - A note can drop out of a long session when the agent's harness compacts the conversation. The next

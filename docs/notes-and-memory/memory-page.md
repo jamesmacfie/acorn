@@ -1,8 +1,8 @@
 # The Memory page
 
 This page covers the Memory page in the project rail, how you edit and restore memories there, the
-import flow, and the card an agent's memory write draws in the transcript. The store and tools are in
-[notes and memory](../notes-and-memory.md#memory).
+import flow, the card an agent's memory write draws in the transcript, and the Memories data source.
+The store and tools are in [notes and memory](../notes-and-memory.md#memory).
 
 ## The Memory page
 
@@ -64,3 +64,25 @@ The memory plugin renders `memory_write` and `memory_delete` through `agents:too
 calls show the scope, name, description, and **Undo**. Project memories also offer **Open**. Undo calls
 `POST /v1/p/memory/memory/changes/:id/undo`, which requires a paired device. Manual additions also
 require a device and use the same validation, history, and change log as agent writes.
+
+## The Memories data source
+
+`memory:memories` is a [data source](../data-sources.md) with one record per memory. Dashboards use it
+to answer what agents learned this month, how memories split by type, and which ones nobody has
+touched in a long time. It reads the library through the same list as this page.
+
+A record carries the name, the one-line description, the type, the scope, the project ID and name,
+who wrote the current version, the agent session that wrote it, the created and updated times, and
+whether another memory supersedes it. It never carries the body. **Written by** reads `updatedBy` from
+the file: **You**, **An agent**, or **Import**. It's empty for a file edited by hand.
+
+A project scope reads that project's memories and your private ones, because private memories apply in
+every project. A workspace scope reads each of its projects' memories and your private ones once. A read
+must name a workspace or a project. The read keeps the 5,000 most recently updated memories and reports
+the rest as incomplete. A project memory's record targets its place on this page, at
+`/p/PROJECT_ID/memory/NAME`, and the page selects it from that route. The records name no action, so
+the list starters press the record to follow that target. A private memory has no place on this page,
+so its record opens nothing.
+
+The source ships four starter panels: memories added this month, memories by type, memories added
+each week by type, and memories untouched for 90 days.

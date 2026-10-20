@@ -11,6 +11,11 @@ export const memoryProjectAddRoute = (projectId: string) =>
 export const memoryUndoRoute = (changeId: string) => `/v1/p/memory/memory/changes/${encodeURIComponent(changeId)}/undo`
 
 export const MEMORY_SOURCE_ID = 'memory'
+/** The Memory page's address for one project memory, from a data source record's `<projectId>/<name>`. */
+export const memoryEntryPath = (item: string): string | null => {
+  const [projectId, name] = item.split('/')
+  return projectId && name ? `/p/${encodeURIComponent(projectId)}/memory/${encodeURIComponent(name)}` : null
+}
 // '0' stops the notes a running session gets when memory changes. Anything else, or nothing, is on.
 export const MEMORY_LIVE_UPDATES_KEY = 'memory:live-updates:v1'
 

@@ -96,7 +96,7 @@ Undo restores prior content, or deletes a file created by that change, and recor
 It refuses if a later logged mutation or an external edit changed the memory.
 
 [The Memory page](./notes-and-memory/memory-page.md) covers the library, editing, recent changes, what
-agents see, import, and the transcript card.
+agents see, import, the transcript card, and the Memories data source.
 
 ## Context integration
 

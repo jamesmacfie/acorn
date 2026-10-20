@@ -6,10 +6,11 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   get: vi.fn(),
   delete: vi.fn(),
-  params: {} as { projectId?: string; taskId?: string },
+  navigate: vi.fn(),
+  params: {} as { projectId?: string; taskId?: string; name?: string },
 }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: [{ id: 'task-1', projectId: 'project-1' }] }) }))
-vi.mock('@solidjs/router', () => ({ useParams: () => mocks.params, useNavigate: () => vi.fn() }))
+vi.mock('@solidjs/router', () => ({ useParams: () => mocks.params, useNavigate: () => mocks.navigate }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...(await original<Record<string, unknown>>()),
   onPluginFrame: () => () => {},
@@ -35,9 +36,9 @@ import { MemoryCenterDetail, MemoryList } from './MemoryCenter'
 import { selectMemory } from './memorySelection'
 
 let host: HTMLDivElement, dispose: () => void
-let setParams: (value: { projectId?: string; taskId?: string }) => void
+let setParams: (value: { projectId?: string; taskId?: string; name?: string }) => void
 beforeEach(() => {
-  const [params, set] = createStore<{ projectId?: string; taskId?: string }>({ taskId: 'task-1' })
+  const [params, set] = createStore<{ projectId?: string; taskId?: string; name?: string }>({ taskId: 'task-1' })
   mocks.params = params
   setParams = set
   mocks.get.mockImplementation(async (address) => ({
@@ -90,6 +91,15 @@ it('opens project memory when the rail source is selected from a task URL', asyn
   mount()
   await vi.waitFor(() => expect(host.textContent).toContain('Deploy through the release pipeline.'))
   expect(mocks.list).toHaveBeenCalledWith('project-1')
+})
+
+it("opens the memory a route names, then returns to the project's address", async () => {
+  mocks.list.mockResolvedValue([row('deploy', 'project-1')])
+  setParams({ projectId: 'project-1', taskId: undefined, name: 'deploy' })
+  mount()
+  await vi.waitFor(() => expect(host.textContent).toContain('Deploy through the release pipeline.'))
+  expect(mocks.get).toHaveBeenCalledWith(expect.objectContaining({ name: 'deploy', scope: 'project' }), 'project-1')
+  expect(mocks.navigate).toHaveBeenCalledWith('/p/project-1', { replace: true })
 })
 
 it('shows the overview until a memory is chosen, and the reader after', async () => {

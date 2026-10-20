@@ -21,6 +21,8 @@ import { pullSource } from '../../plugins/github/src/shared/pullSource.ts'
 import { pullSourceDescription } from '../../plugins/github/src/shared/pullSourceDescription.ts'
 import { branchDescription } from '../../plugins/github/src/server/data/branchSourceHandler.ts'
 import { issueSource, issueSourceDescription } from '../../plugins/linear/src/shared/issueSource.ts'
+import { memorySourceDescription } from '../../plugins/memory/src/shared/memorySource.ts'
+import { memorySource } from '../../plugins/memory/src/shared/memorySourceRegistration.ts'
 import { errorSource, errorSourceDescription } from '../../plugins/rollbar/src/shared/errorSource.ts'
 import { runSourceDescription } from '../../plugins/workflows/src/shared/runSource.ts'
 import { runSource } from '../../plugins/workflows/src/shared/runSourceRegistration.ts'
@@ -59,6 +61,7 @@ async function fieldLists() {
     'github:issues': [githubIssueSource, githubIssueSourceDescription],
     'github:local-branches': [branchSource, branchDescription(localBranches[1])],
     'linear:issues': [issueSource, issueSourceDescription],
+    'memory:memories': [memorySource, memorySourceDescription],
     'rollbar:error-groups': [errorSource, errorSourceDescription],
     'workflows:runs': [runSource, runSourceDescription],
   }

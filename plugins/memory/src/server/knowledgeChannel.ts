@@ -17,7 +17,7 @@ export type KnowledgeDeps = {
 export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'context' | 'identity' | 'prefs' | 'git'>
 
 export type MemoryKnowledge = {
-  list(projectId: string | null): Promise<MemoryRow[]>
+  list(projectId: string | null, scope?: MemoryScope): Promise<MemoryRow[]>
   // Builds the bounded task and memory block. Terminal owns delivery to its new session.
   launchContext(taskId: string): Promise<string | null>
   // `live` is the read before a running session's turn, which is null when the person switched live

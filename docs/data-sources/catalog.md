@@ -15,6 +15,7 @@ add a source, add its row here.
 | Agent session totals (`agents:session-totals`) | Agents | Session with a finished turn | Yes | [Turn facts](../managed-agents/turn-facts.md#data-sources) |
 | Git commits (`git:commits`) | Git | Commit, once per project | Yes | [History](../git-client/history.md#git-commits-data-source) |
 | Workflow runs (`workflows:runs`) | Workflows | Run, child runs included | Yes | [Workflows](../workflows.md#workflow-runs-source) |
+| Memories (`memory:memories`) | Memory | Memory, private ones included | Yes | [Memory page](../notes-and-memory/memory-page.md#the-memories-data-source) |
 | GitHub pull requests (`github:pull-requests`) | GitHub | Pull request | Yes | [GitHub](../github-integration.md) |
 | GitHub issues (`github:issues`) | GitHub | Issue | Yes | [GitHub](../github-integration.md) |
 | GitHub Actions jobs (`github:actions-jobs`) | GitHub | Actions job | No | [GitHub](../github-integration.md) |

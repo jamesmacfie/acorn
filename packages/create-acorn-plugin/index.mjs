@@ -598,6 +598,7 @@ export const KNOWN_SOURCES = [
   { source: 'github:local-branches', name: 'Local branches with pull requests', title: 'name' },
   { source: 'github:pull-requests', name: 'GitHub pull requests', title: 'title' },
   { source: 'linear:issues', name: 'Linear issues', title: 'title' },
+  { source: 'memory:memories', name: 'Memories', title: 'name' },
   { source: 'rollbar:error-groups', name: 'Rollbar error groups', title: 'title' },
   { source: 'workflows:runs', name: 'Workflow runs', title: 'name' },
 ]

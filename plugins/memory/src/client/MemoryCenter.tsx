@@ -1,5 +1,5 @@
 import { createQuery } from '@tanstack/solid-query'
-import { useParams } from '@solidjs/router'
+import { useNavigate, useParams } from '@solidjs/router'
 import { createEffect, createMemo, createSignal, Match, onCleanup, Show, Switch } from 'solid-js'
 import {
   Button,
@@ -15,7 +15,7 @@ import {
   Text,
   FilterBar,
 } from '@acorn/plugin-api/ui'
-import { formatRelativeTime, onPluginFrame, tasksOptions, type Task } from '@acorn/plugin-api/client'
+import { formatRelativeTime, onPluginFrame, projectPath, tasksOptions, type Task } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { memoryApi } from './memoryClient'
 import { createMemoryResource } from './memoryResource'
@@ -67,6 +67,16 @@ function useMemoryScope() {
 /** The `list` region owns one project's library lifetime. */
 export function MemoryList() {
   const { projectId } = useMemoryScope()
+  const params = useParams()
+  const navigate = useNavigate()
+  // A pressed Memories record arrives at the memory's own route. Select it, then return to the project's
+  // address, so pressing the same record again changes the route and selects it again.
+  createEffect(() => {
+    const { projectId, name } = params
+    if (!projectId || !name) return
+    selectMemory({ name, scope: 'project', projectId })
+    navigate(projectPath(projectId), { replace: true })
+  })
   return (
     <Show when={projectId()} keyed fallback={<EmptyState>Select a project to view its memories.</EmptyState>}>
       {(id) => <ProjectMemoryList projectId={id} />}

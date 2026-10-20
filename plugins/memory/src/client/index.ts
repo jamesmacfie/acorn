@@ -2,7 +2,7 @@ import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { memoryCommands } from './commands'
 import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
-import { MEMORY_SOURCE_ID } from '../shared/api'
+import { MEMORY_SOURCE_ID, memoryEntryPath } from '../shared/api'
 
 // Two lazy chunks off one module, because a terminal draws the list and the detail in two panels
 // (the `regions` of a source in client-core's sources registry).
@@ -27,6 +27,15 @@ export const memoryClientPlugin: ClientPlugin = {
       matches: ['memory_write', 'memory_delete'],
       component: MemoryToolCard,
     })
+    // A Memories data source record names a project memory as `<projectId>/<name>`. Pressing one opens
+    // the Memory page at that memory's route, and the list selects it.
+    ctx.contentLinks.register({
+      id: 'memory.entry',
+      providerId: 'memory',
+      parse: () => null,
+      path: (target) => (typeof target.item === 'string' ? memoryEntryPath(target.item) : null),
+      presentations: ['route'],
+    })
     // The project-scoped Memory library is a rail source.
     ctx.sources.register({
       id: MEMORY_SOURCE_ID,
@@ -36,6 +45,7 @@ export const memoryClientPlugin: ClientPlugin = {
       regions: { list: MemoryList, detail: MemoryCenterDetail, scroll: true },
       // The page shows memory for the selected project.
       projectScoped: true,
+      routes: [{ id: 'memory.entry', path: '/p/:projectId/memory/:name', order: 70 }],
     })
     ctx.settingsPages.register({
       id: 'memory',
