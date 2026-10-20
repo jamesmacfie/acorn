@@ -20,7 +20,7 @@ export type Occurrence = typeof schema.workflowTriggerOccurrences.$inferSelect
 type Run = typeof schema.workflowRuns.$inferSelect
 
 export type OccurrenceRequest = {
-  kind: 'due' | 'catch-up' | 'manual' | 'baseline'
+  kind: 'due' | 'catch-up' | 'wake' | 'manual' | 'baseline'
   requestKey: string
   dueAt?: number
   /** The overlap key with the trigger: occurrences that share both never run at once. */

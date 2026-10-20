@@ -438,6 +438,9 @@ export type NodePluginContext = {
   dataSources: {
     register(source: import('@acorn/protocol/dataSources.ts').DataSourceRegistration): void
     discover(discovery: import('@acorn/protocol/dataSources.ts').DataSourceDiscovery): void
+    // Fire and forget. Core coalesces it per source and publishes `data-source:changed`
+    // (docs/data-sources/changes.md).
+    changed(sourceId: string, hint?: { connectionId?: string }): void
     list(
       scope: import('@acorn/protocol/dataSources.ts').DataSourceScope,
       invocation: import('../dataSources/authority').DataSourceInvocation,

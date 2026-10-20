@@ -36,6 +36,7 @@ export const NODE_EVENT_CHANNELS = [
   'project:changed',
   'terminal:sessions-changed',
   'worktree:status-changed',
+  'data-source:changed',
 ] as const
 
 export type NodeEventChannel = (typeof NODE_EVENT_CHANNELS)[number]
@@ -100,3 +101,9 @@ export type ProjectChangedEvent = { projectId: string }
 // Separate from `head:changed` because a stage or a discard moves the dirty markers without moving
 // HEAD.
 export type WorktreeStatusChangedEvent = { taskId: string | null }
+
+// A plugin said a data source's records changed, through `ctx.dataSources.changed`, or a source it
+// feeds as a derived source's input did (docs/data-sources/changes.md). It names
+// what to read again and carries no records. `connectionId` narrows it to one account when every call
+// in the second it covers named the same one.
+export type DataSourceChangedEvent = { pluginId: string; sourceId: string; connectionId?: string }

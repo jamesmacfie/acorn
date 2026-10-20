@@ -37,7 +37,7 @@ export type TriggerSourceDescriber = (
 ) => Promise<TriggerSourceDescription>
 
 /** How the core scheduler asked for this occurrence. */
-export type ClockContext = { reason: 'due' | 'manual' | 'catch-up'; dueAt?: number; requestKey?: string }
+export type ClockContext = { reason: 'due' | 'manual' | 'catch-up' | 'wake'; dueAt?: number; requestKey?: string }
 
 export function clockWhen(raw: unknown): WorkflowTriggerWhen | null {
   const when = raw as Partial<WorkflowTriggerWhen> | null

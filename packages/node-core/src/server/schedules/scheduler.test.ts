@@ -366,6 +366,164 @@ describe('scheduler', () => {
   })
 })
 
+describe('wake', () => {
+  let test: TestDb
+  beforeEach(() => {
+    test = makeTestDb()
+  })
+  afterEach(() => test.cleanup())
+
+  const state = async (key: string) =>
+    (await test.db.select().from(schema.scheduleState).where(eq(schema.scheduleState.key, key)))[0]
+
+  /** A job that waits for `release` each time it runs, and counts its runs and their reasons. */
+  function slowJob(key: string) {
+    const job = { reasons: [] as (string | undefined)[], release: () => {}, fail: false }
+    return {
+      job,
+      entry: {
+        key,
+        name: key,
+        cadence: { every: 3600 },
+        run: (_signal: AbortSignal, context?: { reason: string }) => {
+          job.reasons.push(context?.reason)
+          return new Promise<void>((resolve, reject) => {
+            job.release = () => (job.fail ? reject(new Error('upstream said no')) : resolve())
+          })
+        },
+      },
+    }
+  }
+
+  it('runs a job early, no sooner than the gap after its last finish, and records the reason', async () => {
+    const time = fakeClock()
+    const scheduler = new Scheduler(test.db, { clock: time.clock })
+    let reasons: string[] = []
+    scheduler.register({
+      key: 'core:hourly',
+      name: 'Hourly',
+      cadence: { every: 3600 },
+      run: async (_signal, context) => void reasons.push(context!.reason),
+    })
+    await scheduler.start()
+    await time.advance(3_600_000)
+    expect(reasons).toEqual(['due'])
+    const finished = time.at()
+
+    await time.advance(5_000)
+    scheduler.wake('core:hourly', { minGapMs: 15_000 })
+    await flush()
+    expect((await state('core:hourly'))!.nextRunAt).toBe(finished + 15_000)
+    await time.advance(9_999)
+    expect(reasons).toEqual(['due'])
+    await time.advance(1)
+    expect(reasons).toEqual(['due', 'wake'])
+    expect((await scheduler.runs('core:hourly'))[0]).toMatchObject({ status: 'ok', detail: 'wake' })
+
+    // Long past the gap, a wake runs it now, and a wake never pushes a run later.
+    reasons = []
+    await time.advance(60_000)
+    scheduler.wake('core:hourly', { minGapMs: 15_000 })
+    await time.advance(0)
+    expect(reasons).toEqual(['wake'])
+    const next = (await state('core:hourly'))!.nextRunAt
+    scheduler.wake('core:hourly', { minGapMs: 2 * 3_600_000 })
+    await flush()
+    expect((await state('core:hourly'))!.nextRunAt).toBe(next)
+    await scheduler.stop()
+  })
+
+  it('runs exactly one follow-up for any number of wakes during a run', async () => {
+    const time = fakeClock()
+    const scheduler = new Scheduler(test.db, { clock: time.clock })
+    const { job, entry } = slowJob('core:slow')
+    scheduler.register(entry)
+    await scheduler.start()
+    scheduler.wake('core:slow', { minGapMs: 15_000 })
+    await time.advance(0)
+    expect(job.reasons).toEqual(['wake'])
+
+    for (let i = 0; i < 5; i++) scheduler.wake('core:slow', { minGapMs: 15_000 })
+    await time.advance(30_000)
+    job.release()
+    await flush()
+    expect((await state('core:slow'))!.nextRunAt).toBe(time.at() + 15_000)
+    await time.advance(15_000)
+    expect(job.reasons).toEqual(['wake', 'wake'])
+
+    job.release()
+    await time.advance(60_000)
+    expect(job.reasons).toEqual(['wake', 'wake'])
+    await scheduler.stop()
+  })
+
+  it('ignores a wake during backoff, including the follow-up of a failed run', async () => {
+    const time = fakeClock()
+    const scheduler = new Scheduler(test.db, { clock: time.clock })
+    const { job, entry } = slowJob('core:flaky')
+    job.fail = true
+    scheduler.register(entry)
+    await scheduler.start()
+    await time.advance(3_600_000)
+    scheduler.wake('core:flaky', { minGapMs: 15_000 })
+    job.release()
+    await flush()
+    const backoff = (await state('core:flaky'))!
+    expect(backoff.backoffUntil).toBeGreaterThan(time.at())
+    expect(backoff.nextRunAt).toBe(backoff.backoffUntil)
+
+    scheduler.wake('core:flaky', { minGapMs: 15_000 })
+    await time.advance(60_000)
+    expect(job.reasons).toEqual(['due'])
+    expect((await state('core:flaky'))!.nextRunAt).toBe(backoff.backoffUntil)
+    await scheduler.stop()
+  })
+
+  it('ignores a wake while paused or for a disabled job', async () => {
+    const time = fakeClock()
+    const scheduler = new Scheduler(test.db, { clock: time.clock })
+    let ran = 0
+    scheduler.register({ key: 'core:a', name: 'A', cadence: { every: 3600 }, run: async () => void (ran += 1) })
+    scheduler.register({
+      key: 'core:off',
+      name: 'Off',
+      cadence: { every: 3600 },
+      enabled: false,
+      run: async () => void (ran += 1),
+    })
+    await scheduler.start()
+    await scheduler.setPaused(true)
+    scheduler.wake('core:a', { minGapMs: 0 })
+    scheduler.wake('core:off', { minGapMs: 0 })
+    await time.advance(60_000)
+    await scheduler.setPaused(false)
+    scheduler.wake('core:off', { minGapMs: 0 })
+    await time.advance(60_000)
+    expect(ran).toBe(0)
+    await scheduler.stop()
+  })
+
+  it('keeps a woken job due while four jobs are running', async () => {
+    const time = fakeClock()
+    const scheduler = new Scheduler(test.db, { clock: time.clock })
+    const jobs = [0, 1, 2, 3, 4].map((i) => slowJob(`core:job-${i}`))
+    for (const { entry } of jobs) scheduler.register(entry)
+    await scheduler.start()
+    for (const i of [0, 1, 2, 3]) scheduler.wake(`core:job-${i}`, { minGapMs: 0 })
+    await time.advance(0)
+    scheduler.wake('core:job-4', { minGapMs: 0 })
+    await time.advance(5_000)
+    expect(jobs[4]!.job.reasons).toEqual([])
+
+    jobs[0]!.job.release()
+    await time.advance(1_000)
+    expect(jobs[4]!.job.reasons).toEqual(['wake'])
+    for (const { job } of jobs) job.release()
+    await flush()
+    await scheduler.stop()
+  })
+})
+
 describe('target calendar timezones', () => {
   it('skips a nonexistent local time at the daylight-saving gap', () => {
     const from = Date.parse('2026-09-26T12:00:00Z')

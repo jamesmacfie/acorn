@@ -17,10 +17,10 @@ which matters on a Node nobody is using. The event must be one core publishes, l
 name it in `permissions.events`, the same grant list its frames subscribe with, so there's one trust
 sentence per grant. Disposal follows unload, as a route registration does.
 
-Core publishes 12 events: `plugins:changed`, `tasks:changed`, `workspace:changed`, `workspaces-mode:changed`,
+Core publishes 13 events: `plugins:changed`, `tasks:changed`, `workspace:changed`, `workspaces-mode:changed`,
 `workspace-projects:changed`, `connection:changed`, `head:changed`, `run:changed`,
-`agent-session:changed`, `project:changed`, `terminal:sessions-changed`, and
-`worktree:status-changed`.
+`agent-session:changed`, `project:changed`, `terminal:sessions-changed`,
+`worktree:status-changed`, and `data-source:changed`.
 
 `workspaces-mode:changed` carries `{ mode: 'on' | 'off' }` after a preference write commits a changed
 grouping mode, including the first-run answer. Repeated values and refused writes publish nothing.
@@ -28,12 +28,16 @@ Both Node halves and frames can subscribe. Desktop and terminal clients refetch 
 preferences, so chrome data and wording update while mounted. Grouped mode can't switch back to
 separate projects. [Workspaces and tasks](../workspaces-and-tasks.md#workspace-and-project) owns that rule.
 
-Two of them are worth knowing:
+Three of them are worth knowing:
 
 - `terminal:sessions-changed` says a session was created, exited, or flipped between working and
   idle. It's the one core event that fires at machine speed, so hear it only if you draw a session
   list.
 - `worktree:status-changed` says something under a task's worktree changed, and carries the `taskId`.
+- `data-source:changed` carries `{ pluginId, sourceId, connectionId? }` and says a source's records
+  changed, so read it again. It never carries records. Only a plugin's node half can hear it, because
+  it fires at machine speed. [Say when records changed](../data-sources/changes.md) says
+  who publishes it.
 
 After your plugin writes under a worktree, drop the Node's coalesced `git status` for the path, then
 announce the change:

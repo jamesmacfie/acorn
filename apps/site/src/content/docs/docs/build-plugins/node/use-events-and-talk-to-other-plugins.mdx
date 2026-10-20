@@ -129,7 +129,7 @@ Events and capabilities live on the Node, so the terminal client sees their effe
 
 ## Limits
 
-- Core publishes 12 events, from `plugins:changed` to `worktree:status-changed`.
+- Core publishes 13 events, from `plugins:changed` to `data-source:changed`.
   [Permissions](/docs/build-plugins/reference/permissions/) lists them under **Event channels**.
 - Some things are never events: file saves, terminal output, keystrokes, and request bodies. A plugin
   that wants file changes watches files on its Node half.

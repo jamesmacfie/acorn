@@ -294,6 +294,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
             delegation?.reports.deliverSafely(frame.turnId)
           }
           if (frame.channel === 'plugin:agents:turn-changed') toolCallers?.turnChanged(frame)
+          if (frame.channel === 'plugin:agents:sessions-changed') ctx.dataSources.changed('sessions')
           if (frame.channel === 'plugin:agents:request-changed' && frame.status === 'pending') {
             delegation?.reports.deliverRequestSafely(frame.sessionId, frame.requestId)
           }

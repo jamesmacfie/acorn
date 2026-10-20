@@ -351,7 +351,7 @@ export const workflowTriggerOccurrences = sqliteTable(
     // The record this occurrence handles. Null for a clock trigger, whose occurrences overlap per trigger.
     recordKey: text('record_key'),
     generation: integer('generation').notNull(),
-    kind: text('kind').notNull(), // due | catch-up | manual | baseline
+    kind: text('kind').notNull(), // due | catch-up | wake | manual | baseline
     dueAt: integer('due_at'),
     requestKey: text('request_key').notNull(),
     payloadFingerprint: text('payload_fingerprint').notNull(),

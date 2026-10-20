@@ -119,6 +119,12 @@ always reports itself visible
   cadence, reset on success. Settings shows it, because a silent retry loop is how rate limits die.
 - **A global pause** stops the loop without touching any row, stored under the reserved `'*'` state
   key.
+- **Wake, an early run that keeps these rules.** `scheduler.wake(key, { minGapMs })` moves a job's
+  next run to the later of now and its last finish plus `minGapMs`. It never moves a run later. A wake
+  during a run asks for one follow-up when the run finishes, at the same gap, however many wakes
+  arrive. A paused scheduler, a disabled job, and a job in backoff ignore it, and a woken job past the
+  cap stays due like any other. The run records `wake`, which the run ring in Settings → Schedules
+  shows. **Run now** is different: a person asked, so it answers at once or says why it can't.
 
 Runs execute in-process and failures are contained per run. The run row and `lastError` are the blast
 radius, never a crashed Node.

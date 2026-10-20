@@ -26,6 +26,7 @@ export type SchedulerBridge = Pick<
   | 'patch'
   | 'remove'
   | 'runNow'
+  | 'wake'
   | 'paused'
   | 'setPaused'
   | 'register'

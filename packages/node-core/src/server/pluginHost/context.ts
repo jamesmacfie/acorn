@@ -26,6 +26,7 @@ import { scopeCapabilities, scopeCore } from '../plugins/permissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { registerDataSource, registerDataSourceDiscovery } from '../dataSources/registry'
 import { discoverDataSources, invokeDataSource, listDataSources } from '../dataSources/runtime'
+import { dataSourceChanged } from '../dataSources/changes'
 import { authorizeQueryScope, resolveQuery } from '../queries/runtime'
 import { queryPublication } from '../queries/publication'
 import { queryStore } from '../queries/store'
@@ -306,6 +307,8 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       },
       register: (source) => recordUndo(registerDataSource(plugin, source, { loaded: !!permissions }).dispose),
       discover: (discovery) => recordUndo(registerDataSourceDiscovery(plugin, discovery).dispose),
+      // Bound to the caller, so a plugin can only say its own sources changed.
+      changed: (sourceId, hint) => dataSourceChanged(plugin, sourceId, hint),
       invoke: (request, invocation) => {
         if (!options.env) throw new Error('Source invocation requires host bindings')
         // Loaded code may invoke its own sources here. It reads another plugin's source only as a

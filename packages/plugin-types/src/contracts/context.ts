@@ -60,6 +60,10 @@ export type NodePluginContext<Conn = unknown, Items = unknown> = {
   dataSources: {
     register(source: DataSourceRegistration): void
     discover(discovery: { discoveryId: string; handler: string; providerId?: string }): void
+    /** Say one of your sources' records changed, including a source you discovered. Pass the account
+     *  when you know which one. Fire and forget: it never throws, and a name that isn't yours is logged
+     *  and dropped. */
+    changed(sourceId: string, hint?: { connectionId?: string }): void
     list(
       scope: DataSourceScope,
       invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal },

@@ -355,7 +355,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   controls](./data-sources/authoring-controls.md), [Source catalog](./data-sources/catalog.md), [Derived
   sources](./data-sources/derived-sources.md), [Provider data
   sources](./data-sources/provider-sources.md), [Workspace query
-  library](./data-sources/query-library.md), [Serve a query](./data-sources/serve-a-query.md).
+  library](./data-sources/query-library.md), [Serve a query](./data-sources/serve-a-query.md), [Say
+  when records changed](./data-sources/changes.md).
 - [github-integration.md](./github-integration.md): [The GitHub
   mirror](./github-integration/mirror.md), [GitHub from the command
   palette](./github-integration/palette.md), [Reads and

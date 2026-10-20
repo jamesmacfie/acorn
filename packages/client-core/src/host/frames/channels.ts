@@ -83,13 +83,17 @@ export const isSubscribable = (channel: string): channel is SubscribableChannel 
 // Every `<noun>:changed` channel in the frame list is in both lists, which is what a node-emitted fact
 // looks like: the same name, the same sentence, one grant, and either half of the plugin may take it up.
 // `plugins:changed` is not in the frame list because a frame has no roster to reconcile. That is the
-// shell's job, and it does it whether or not a plugin asked. The two below are node-only for a
-// different reason each: a session roster moving is machine-rate, and a frame that wanted the dirty
-// markers has core's own task-status route.
+// shell's job, and it does it whether or not a plugin asked. The rest are node-only for a different
+// reason each: a session roster moving and a source's records changing are machine-rate, and a frame
+// that wanted the dirty markers has core's own task-status route.
 const NODE_EVENT_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   'plugins:changed': { text: 'Receive notice when this node’s plugin set changes', icon: 'radio' },
   'terminal:sessions-changed': { text: 'See when a terminal session starts, exits, or goes quiet', icon: 'radio' },
   'worktree:status-changed': { text: 'See when the files in a task’s checkout change, and which task', icon: 'radio' },
+  'data-source:changed': {
+    text: 'See when a plugin’s data source has new or changed records, and which source',
+    icon: 'radio',
+  },
 }
 
 // `ownerId` is the plugin whose manifest names the channel. Without it, every plugin channel reads as the

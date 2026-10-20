@@ -14,6 +14,7 @@ import type { NoticeFrame, PluginNotice } from '@acorn/protocol/notices.ts'
 import { wsBroadcast } from './transport/wsHub'
 import { clearDashboardReadCache } from './dashboards/readCache'
 import { clearSourceIdentity } from './dataSources/identityCache'
+import { dataSourceChanged } from './dataSources/changes'
 
 // "Re-read this plugin's chrome descriptors": rail rows, badges, sources, agent context. One
 // client-side consumer, `bumpChrome` in client-core, and nothing else hears it.
@@ -100,6 +101,7 @@ export function broadcastPluginsChanged(): void {
 // reconnects (docs/plugins/events.md § Hearing a core event).
 export function broadcastTasksChanged(event: TaskChangedEvent): void {
   wsBroadcast({ channel: 'tasks:changed', ...event })
+  dataSourceChanged('core', 'tasks')
 }
 
 // Workspace identity and external-project membership are separate read models. A workspace frame

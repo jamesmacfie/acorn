@@ -191,6 +191,8 @@ intents. [Record processing history](./workflows/record-history.md) has the tran
 - [Authoring controls](./data-sources/authoring-controls.md) covers the client cache, the conformance
   fixture, and the shared source and query editor.
 - [Workspace query library](./data-sources/query-library.md) covers saved queries.
+- [Say when records changed](./data-sources/changes.md) covers `ctx.dataSources.changed` and the
+  `data-source:changed` event.
 - [Provider data sources](./data-sources/provider-sources.md) covers Linear issues and Rollbar error
   groups.
 - [Derived sources](./data-sources/derived-sources.md) covers sources that read other sources as inputs.

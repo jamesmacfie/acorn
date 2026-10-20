@@ -237,8 +237,10 @@ export const createWorkflowExecution = (
         ctx.events.send({ channel: 'workflow:step-changed', runId, stepId, status }),
       statusChanged: ctx.events.status,
       // `plugin:workflows:run-changed` (docs/plugins/events.md § Hearing another plugin).
-      runChanged: (taskId, runId, status) =>
-        ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), taskId, runId, status }),
+      runChanged: (taskId, runId, status) => {
+        ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), taskId, runId, status })
+        ctx.dataSources.changed('runs')
+      },
       gateChanged: (taskId, runId, stepId, status) =>
         ctx.events.send({ channel: pluginChannel('workflows', 'gate-changed'), taskId, runId, stepId, status }),
       emitStepEvent: notices.stepEvent,

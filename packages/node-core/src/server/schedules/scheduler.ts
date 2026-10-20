@@ -28,7 +28,7 @@ import { createLogger } from '../telemetry/logger'
 
 /** What a runner is handed and what it gives back: an abort signal it is expected to honour, and one line
  *  for the run row. The same signal shape source fetches already take. */
-export type ScheduleRunReason = 'due' | 'manual' | 'catch-up'
+export type ScheduleRunReason = 'due' | 'manual' | 'catch-up' | 'wake'
 type ScheduleRunContext = {
   scheduleKey: string
   reason: ScheduleRunReason
@@ -176,6 +176,11 @@ export class Scheduler {
   /** Serialization per schedule: a run whose predecessor is still going is skipped, not overlapped. Two
    *  concurrent runs of one retention job is how a retention job corrupts its own table. */
   readonly #inflight = new Map<string, Promise<void>>()
+  /** Jobs whose next run a wake moved, so that run records `wake`. In memory: after a restart the moved
+   *  time still holds and the run just reads as `due`. */
+  readonly #woken = new Set<string>()
+  /** The gap a wake asked for while its job was running, so the job runs once more when it finishes. */
+  readonly #followUps = new Map<string, number>()
   #abort = new AbortController()
   #timer: unknown = null
   #started = false
@@ -315,6 +320,7 @@ export class Scheduler {
       // changed to "every hour" still fires in the next few minutes, once, for no reason.
       patch.cadenceOverride = JSON.stringify(cadence)
       patch.nextRunAt = nextRunAtForTarget(cadence, this.#clock.now(), this.#clock.random, entry.timezone)
+      this.#woken.delete(key)
     }
     // Resuming a schedule that has been off for a week must not fire the moment it comes back for every
     // interval it slept through. Catch-up-once applies, and the tick loop is where that happens.
@@ -387,6 +393,36 @@ export class Scheduler {
     return (await this.runs(key))[0]!
   }
 
+  /** Run a job early because something it reads changed (docs/schedules.md § Policies). Never sooner
+   *  than `minGapMs` after its last finish, and never past the scheduler's own rules: a paused
+   *  scheduler, a disabled job, or one in backoff ignores it, and the concurrency cap still holds. A
+   *  wake during a run asks for one follow-up run, however many arrive. */
+  wake(key: string, options: { minGapMs: number }): void {
+    void this.#wake(key, options.minGapMs).catch((error: unknown) => log.warn(`${key} wake failed: ${oneLine(error)}`))
+  }
+
+  async #wake(key: string, minGapMs: number): Promise<void> {
+    if (!this.#started || this.#paused) return
+    if (this.#inflight.has(key)) {
+      this.#followUps.set(key, minGapMs)
+      return
+    }
+    const entry = (await this.#entries()).find((candidate) => candidate.key === key)
+    const now = this.#clock.now()
+    if (!entry?.enabled || !entry.registered) return
+    if (entry.state.backoffUntil !== null && entry.state.backoffUntil > now) return
+    // It may have started while the entries were read.
+    if (this.#inflight.has(key)) {
+      this.#followUps.set(key, minGapMs)
+      return
+    }
+    const nextRunAt = Math.max(now, (entry.state.lastRunAt ?? 0) + minGapMs)
+    if (nextRunAt >= entry.state.nextRunAt) return
+    this.#woken.add(key)
+    await this.#writeState(key, { nextRunAt })
+    this.#arm()
+  }
+
   // ── The loop ────────────────────────────────────────────────────────────────────────────────────
   //
   // One timer, armed for the earliest nextRunAt and re-armed after every run and every mutation. Not one
@@ -425,7 +461,7 @@ export class Scheduler {
       // Catch-up, not backfill: a schedule the node slept through runs once and then resumes from now. See
       // docs/schedules.md.
       const late = now - entry.state.nextRunAt > cadencePeriodMs(entry.cadence)
-      void this.#execute(entry, late ? 'catch-up' : 'due')
+      void this.#execute(entry, this.#woken.has(entry.key) ? 'wake' : late ? 'catch-up' : 'due')
     }
     this.#arm()
   }
@@ -436,8 +472,12 @@ export class Scheduler {
       // just a slower overlap.
       return this.#recordSkip(entry, 'the previous run had not finished')
     }
+    this.#woken.delete(entry.key)
     const run = this.#runOnce(entry, reason, requestKey).finally(() => {
       this.#inflight.delete(entry.key)
+      const followUp = this.#followUps.get(entry.key)
+      this.#followUps.delete(entry.key)
+      if (followUp !== undefined) this.wake(entry.key, { minGapMs: followUp })
       this.#arm()
     })
     this.#inflight.set(entry.key, run)
@@ -468,7 +508,7 @@ export class Scheduler {
     const timeout = AbortSignal.timeout(entry.timeoutMs)
     const signal = AbortSignal.any([timeout, this.#abort.signal])
     let status: ScheduleStatus = 'ok'
-    let detail = reason === 'catch-up' ? 'catch-up' : undefined
+    let detail: string | undefined = reason === 'catch-up' || reason === 'wake' ? reason : undefined
     try {
       // Failures are contained per run: the run row and lastError are the blast radius, never a crashed
       // node. A timed-out runner is not killed, since nothing here can kill it, so the signal is a contract

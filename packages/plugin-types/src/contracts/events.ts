@@ -63,3 +63,4 @@ export type NodeEventChannel =
   | 'project:changed'
   | 'terminal:sessions-changed'
   | 'worktree:status-changed'
+  | 'data-source:changed'

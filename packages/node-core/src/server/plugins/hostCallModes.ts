@@ -13,6 +13,7 @@ const modes = {
   dataSources: {
     register: 'sync',
     discover: 'sync',
+    changed: 'sync',
     list: 'async',
     discoverAvailable: 'async',
     invoke: 'async',

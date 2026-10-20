@@ -45,6 +45,7 @@ export type WorkflowTriggerScheduler = {
   create(input: { name: string; kind: string; target: unknown; cadence: Cadence }): Promise<ScheduleRow>
   patch(key: string, input: { enabled?: boolean; cadence?: Cadence; name?: string }): Promise<ScheduleRow>
   runNow(key: string, requestKey?: string): Promise<unknown>
+  wake(key: string, options: { minGapMs: number }): void
   remove(key: string): Promise<void>
 }
 

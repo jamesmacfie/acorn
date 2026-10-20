@@ -84,7 +84,7 @@ export const githubPlugin = (): NodePlugin => {
       })
       // github's own `plugin:github:<verb>` channel (docs/plugins/events.md § Hearing another plugin).
       // Only the routers that write the PR mirror take it.
-      const emit = githubEmitter(ctx.events.send)
+      const emit = githubEmitter(ctx.events.send, ctx.dataSources.changed)
 
       // Bounded startup repair of parent-only mirror evictions. Runs before any route registers.
       const { removedPulls } = await pruneOrphanedGithubMirror(store)

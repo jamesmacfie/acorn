@@ -128,6 +128,16 @@ and [`examples/plugins/acme-readiness`](https://github.com/jamesmacfie/acorn/tre
 - **Discovery.** A plugin whose sources depend on the account, such as one per board, adds
   `dataSourceDiscoveries`, and a discovery route lists them, up to 100 a page.
 
+## Say when records changed
+
+When your plugin knows its records just changed, such as after it writes its own copy of them, call
+`ctx.dataSources.changed('<sourceId>')` from its Node half. Pass `{ connectionId }` as a second
+argument when you know which account changed. acorn waits a second, then tells anything listening
+once, along with every derived source that reads yours.
+
+The call never throws, so you can make it from any write. A source ID your plugin didn't register is
+logged once and ignored. The event only says to read again, and it carries no records.
+
 ## Mistakes
 
 - Advertising an operator you don't apply. acorn trusts the field's `query`, and never filters behind

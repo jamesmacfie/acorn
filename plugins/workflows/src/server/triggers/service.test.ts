@@ -38,6 +38,7 @@ describe('the trigger service', () => {
         },
       ),
       runNow: vi.fn(async () => ({})),
+      wake: vi.fn(),
       remove: vi.fn(async () => {}),
     }
     const managed = t.serviceFor(t.database.db, () => scheduler)

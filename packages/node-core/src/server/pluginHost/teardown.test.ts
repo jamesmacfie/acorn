@@ -357,6 +357,7 @@ const NOT_REGISTRATIONS = new Set([
   'datasets.writeForTask',
   'audit.record',
   // Broadcasts, which are gone once sent.
+  'dataSources.changed',
   'events.send',
   'events.status',
   'events.worktreeStatus',

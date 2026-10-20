@@ -58,7 +58,7 @@ it('keeps loaded worker calls in their declared modes across registration and di
       register: registered,
     },
     schedules: { register: registered, registerTarget: registered },
-    dataSources: { register: registered },
+    dataSources: { register: registered, changed: registered },
     taskChecks: { register: registered },
     runs: { register: registered },
     audit: { declare: registered },

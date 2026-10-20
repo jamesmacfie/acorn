@@ -799,6 +799,7 @@ acorn-plugin-types: member NodePluginContext.codeHosts
 acorn-plugin-types: member NodePluginContext.codeHosts.claim
 acorn-plugin-types: member NodePluginContext.core
 acorn-plugin-types: member NodePluginContext.dataSources
+acorn-plugin-types: member NodePluginContext.dataSources.changed
 acorn-plugin-types: member NodePluginContext.dataSources.discover
 acorn-plugin-types: member NodePluginContext.dataSources.discoverAvailable
 acorn-plugin-types: member NodePluginContext.dataSources.invoke

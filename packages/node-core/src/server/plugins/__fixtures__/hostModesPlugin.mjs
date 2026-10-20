@@ -15,6 +15,7 @@ export default {
     }), 'routes.fetch')
     immediate(ctx.schedules.register({ scheduleId: 'probe', name: 'Probe', cadence: { every: 300 }, run: async () => {} }), 'schedules.register')
     immediate(ctx.dataSources.register({ id: 'probe' }), 'dataSources.register')
+    immediate(ctx.dataSources.changed('probe'), 'dataSources.changed')
     immediate(ctx.taskChecks.register({ id: 'probe' }), 'taskChecks.register')
     immediate(ctx.runs.register({ id: 'probe' }), 'runs.register')
     immediate(ctx.audit.declare({ id: 'probe', label: 'Probe' }), 'audit.declare')
