@@ -12,8 +12,9 @@ checked: '367bb285d'
 
 A data source is a set of records a plugin can read, each with the same known fields: GitHub pull
 requests, issues, and review comments, Linear issues, Rollbar errors, acorn's own tasks and schedules,
-your projects' Git commits, workflow runs, agent sessions, what each agent turn and session spent, or
-your agents' memories. Dashboards and workflows' **Find records** steps read every record through sources.
+your projects' Git commits, workflow runs, the run targets and scripts your terminals ran, agent
+sessions, what each agent turn and session spent, or your agents' memories. Dashboards and workflows'
+**Find records** steps read every record through sources.
 This page covers what a source is, which account and projects a read reaches, saved queries, and
 sources built from other sources.
 

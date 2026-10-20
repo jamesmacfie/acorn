@@ -2,7 +2,8 @@
 
 A run target is a declared command, such as a dev server, that the terminal plugin starts as a
 terminal session. This page covers the process broker every child process goes through, the trust
-gate and ordering for run targets, the two workflow step kinds, and the palette rows. The service is
+gate and ordering for run targets, the run history and its data source, the two workflow step kinds,
+and the palette rows. The service is
 `RuntimeService` in `plugins/terminal/src/server/runtime.ts`.
 
 ## Process broker
@@ -42,6 +43,36 @@ admission. **Stop** and **Restart** keep their place in the queue, and other tar
 A fallback restart starts an absent target, but a failed stop script prevents the replacement. A
 discovered URL is checked against the same live instance after its script finishes. A disposed service
 can't run queued work, and a process that exits at once can't become a running instance.
+
+## Run history
+
+The engine writes one row to `terminal_runs` in `plugins/terminal.sqlite` when a run ends. A run is
+a session the engine started to run a declared command: a run target, the setup script, or the
+teardown script. A shell or an agent isn't a run, because the terminal doesn't know where one typed
+command ends and the next begins. A command a workflow step runs goes through the process broker,
+not a terminal, so it isn't a run either.
+
+A row holds the session ID, the task ID, the kind, the name, the exit code, and the start and finish
+times. The name is the target's declared ID, or `Setup` or `Teardown`. The row never holds the
+command line, because its arguments can carry secrets, or the output or the environment. The exit
+code is null when acorn stopped the run, its tab was closed, or a signal ended it. A run cut off by
+the Node stopping isn't recorded, because the database closes right after. The writer is
+`recordRun` in `plugins/terminal/src/server/runRecords.ts`.
+
+The table keeps the newest 5,000 runs, the host's record budget, so a read always sees the whole
+table. Once the cap has dropped a run, a read reports its covered range from the oldest run kept, and
+a panel whose window starts earlier warns. Runs from before the table existed aren't there. Deleting
+a task removes its rows.
+
+The **Terminal runs** data source, `terminal:runs`, gives one record per row. Its outcome is
+**Succeeded** for exit 0, **Failed** for any other code, and **Killed** for a null code. It adds the
+duration, the task title, and the project name. A read reaches the tasks of the workspace or project
+in scope, and the whole Node when the scope names neither. SQL narrows the read by the finish time
+and the evaluation time. Every other comparison runs over the rows read
+([data sources](../data-sources.md)). It ships four starters: failed runs this week, the slowest runs
+of the last 30 days, runs by day by outcome, and when runs start by weekday and hour. The source is
+`plugins/terminal/src/server/runSource.ts`, and its description is
+`plugins/terminal/src/shared/runSource.ts`.
 
 ## Workflow steps
 

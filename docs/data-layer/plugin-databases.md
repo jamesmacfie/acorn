@@ -16,7 +16,7 @@ These plugins own SQLite files under `<data-root>/plugins/` and a migration chai
 | `git.sqlite` | The Changes tab's review notes. Moved from `changes.sqlite` once at startup when changes became part of git |
 | `github.sqlite` | The repository and pull request mirror, PR children in provider order, file patch state and digest, freshness and file completeness, viewed files, and pinned repositories |
 | `http.sqlite` | Project-scoped requests and variables, with encrypted request fields. A loaded plugin |
-| `terminal.sqlite` | Terminal session metadata. PTY output isn't stored here |
+| `terminal.sqlite` | Terminal session metadata and finished runs. PTY output isn't stored here |
 | `workflows.sqlite` | Drafts and immutable revisions, publication journals, repository-file drafts and write journals, runs, steps, gates, dispatches, schedule bindings and occurrences, processing scopes, selections, record states, attempts, and committed source boundaries |
 
 Docker, editor, Linear, Rollbar, model providers, preview, and onboarding use core services or provider

@@ -12,6 +12,7 @@ sources:
   - plugins/terminal/src/client/terminalPrefs.ts
   - plugins/terminal/src/client/commands.ts
   - plugins/terminal/src/server/workflowSteps.ts
+  - plugins/terminal/src/shared/runSource.ts
 checked: 'b88b42b6b'
 ---
 
@@ -26,7 +27,7 @@ task, running in the task's worktree on the Node, that keep running when you swi
 <Snapshot id="hero" />
 
 <PluginFacts id="terminal">
-  <Fragment slot="adds">The terminal drawer, the **Sessions** view in the terminal client, run targets and layouts, the **Run** commands, three workflow steps, **Settings** > **Features** > **Terminal**, and the task's setup and teardown scripts.</Fragment>
+  <Fragment slot="adds">The terminal drawer, the **Sessions** view in the terminal client, run targets and layouts, the **Run** commands, three workflow steps, a **Terminal runs** data source for dashboards, **Settings** > **Features** > **Terminal**, and the task's setup and teardown scripts.</Fragment>
   <Fragment slot="needs">Nothing. With tmux on the Node's machine, terminals outlive acorn quitting.</Fragment>
   <Fragment slot="reach">Processes on the Node, in the task's worktree. It's the most trusted plugin acorn has, and it can't be turned off.</Fragment>
 </PluginFacts>
@@ -86,6 +87,15 @@ Preview pane at it. From the palette's **Run** group:
 
 A target from a committed `.acorn/config.toml` runs only after you trust that file
 ([Project configuration](/docs/using/project-configuration/)).
+
+## Chart your runs
+
+The **Terminal runs** data source gives a dashboard panel one row per finished run target, setup
+script, or teardown script, with its outcome, exit code, start and finish times, duration, task, and
+project. It keeps the target's name and never the command line, its output, or its environment.
+Shells and agents aren't runs. Pick it from **Add panel** to start from this week's failed runs, the
+slowest runs, runs by day by outcome, or when in the week runs start. acorn keeps the newest 5,000
+runs, and deleting a task removes its runs.
 
 ## Terminals that outlive acorn
 

@@ -28,6 +28,7 @@ import {
   type TerminalChannelDeps,
 } from '../server/terminal'
 import { TERMINAL_ROUTE, terminal } from '../server/routes/terminal'
+import { runSource } from '../shared/sourceRegistrations'
 
 export type TerminalPluginDeps = Pick<TerminalChannelDeps, 'internalEnv' | 'reconciled'>
 
@@ -85,7 +86,8 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       registerDeletedTaskPurge(
         ctx,
         async (taskIds) =>
-          (await db.delete(terminalSessions).where(inArray(terminalSessions.taskId, [...taskIds]))).changes,
+          (await db.delete(terminalSessions).where(inArray(terminalSessions.taskId, [...taskIds]))).changes +
+          (await (await import('../server/runRecords')).deleteTaskRuns(db, taskIds)),
       )
       // The repo's setup script, as a handler on core's `core:worktree-created` hook (docs/plugins/hooks.md
       // § Hooks). `transform` and not `observe` because core awaits the chain: the terminal that opens next
@@ -115,6 +117,12 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         },
       })
       ctx.routes.register(terminal, { prefix: '', note: '/sessions, /profiles — PTY control only' })
+      ctx.routes.fetch(
+        async (request, context) =>
+          (await import('../server/runSource')).createRunSourceHandler(db, ctx.core)(request, context),
+        { prefix: '/data/runs' },
+      )
+      ctx.dataSources.register(runSource)
 
       // Run targets are terminal sessions in the task worktree, so the service can only be built where
       // the session map is. Two projections consume it: the harness RunBridge, behind the client's

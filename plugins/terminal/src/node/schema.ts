@@ -32,3 +32,20 @@ export const terminalSessions = sqliteTable(
     index('terminal_sessions_agent_session_idx').on(t.agentSessionId),
   ],
 )
+
+// One row per finished run: a run target, setup script, or teardown script the engine started. Numbers
+// and identifiers only, never the command line, its output, or its environment (docs/terminal/run-targets.md
+// § Run history).
+export const terminalRuns = sqliteTable(
+  'terminal_runs',
+  {
+    id: text('id').primaryKey(), // the session's id
+    taskId: text('task_id').notNull(), // → core tasks.id (plain ID, not a foreign key)
+    kind: text('kind').notNull(), // target | setup | teardown
+    name: text('name').notNull(), // the target's declared id, or Setup or Teardown
+    exitCode: integer('exit_code'), // null when it was stopped or ended by a signal
+    startedAt: integer('started_at').notNull(),
+    finishedAt: integer('finished_at').notNull(),
+  },
+  (t) => [index('terminal_runs_task_idx').on(t.taskId), index('terminal_runs_finished_idx').on(t.finishedAt)],
+)

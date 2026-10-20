@@ -5593,6 +5593,213 @@
       }
     ]
   },
+  "terminal:runs": {
+    "name": "Terminal runs",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "exitCode": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "startedAt": {
+          "type": "number"
+        },
+        "finishedAt": {
+          "type": "number"
+        },
+        "durationMs": {
+          "type": "number"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "taskTitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "outcome",
+        "exitCode",
+        "startedAt",
+        "finishedAt",
+        "durationMs",
+        "taskId",
+        "taskTitle",
+        "projectName"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/name",
+        "origin": "declared",
+        "label": "Run",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/kind",
+        "origin": "declared",
+        "label": "Kind",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "target",
+              "label": "Run target"
+            },
+            {
+              "id": "setup",
+              "label": "Setup script"
+            },
+            {
+              "id": "teardown",
+              "label": "Teardown script"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/outcome",
+        "origin": "declared",
+        "label": "Outcome",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "succeeded",
+              "label": "Succeeded",
+              "tone": "ok"
+            },
+            {
+              "id": "failed",
+              "label": "Failed",
+              "tone": "bad"
+            },
+            {
+              "id": "killed",
+              "label": "Killed",
+              "tone": "warn"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/exitCode",
+        "origin": "declared",
+        "label": "Exit code",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/startedAt",
+        "origin": "declared",
+        "label": "Started",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/finishedAt",
+        "origin": "declared",
+        "label": "Finished",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/durationMs",
+        "origin": "declared",
+        "label": "Duration",
+        "display": {
+          "kind": "number",
+          "unit": "ms"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/taskId",
+        "origin": "declared",
+        "label": "Task",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/taskTitle",
+        "origin": "declared",
+        "label": "Task title"
+      },
+      {
+        "pointer": "/projectName",
+        "origin": "declared",
+        "label": "Project name"
+      }
+    ]
+  },
   "workflows:runs": {
     "name": "Workflow runs",
     "schema": {

@@ -18,6 +18,7 @@ add a source, add its row here.
 | Agent approvals (`agents:approvals`) | Agents | Permission or question request | Yes | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
 | Git commits (`git:commits`) | Git | Commit, once per project | Yes | [History](../git-client/history.md#git-commits-data-source) |
 | Workflow runs (`workflows:runs`) | Workflows | Run, child runs included | Yes | [Workflows](../workflows.md#workflow-runs-source) |
+| Terminal runs (`terminal:runs`) | Terminal | Run target or setup or teardown script that finished | Yes | [Run targets](../terminal/run-targets.md#run-history) |
 | Memories (`memory:memories`) | Memory | Memory, private ones included | Yes | [Memory page](../notes-and-memory/memory-page.md#the-memories-data-source) |
 | GitHub pull requests (`github:pull-requests`) | GitHub | Pull request | Yes | [GitHub](../github-integration.md) |
 | GitHub issues (`github:issues`) | GitHub | Issue | Yes | [GitHub](../github-integration.md) |

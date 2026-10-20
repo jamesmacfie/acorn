@@ -39,6 +39,8 @@ import { issueSource, issueSourceDescription } from '../../plugins/linear/src/sh
 import { memorySourceDescription } from '../../plugins/memory/src/shared/memorySource.ts'
 import { memorySource } from '../../plugins/memory/src/shared/memorySourceRegistration.ts'
 import { errorSource, errorSourceDescription } from '../../plugins/rollbar/src/shared/errorSource.ts'
+import { runSourceDescription as terminalRunSourceDescription } from '../../plugins/terminal/src/shared/runSource.ts'
+import { runSource as terminalRunSource } from '../../plugins/terminal/src/shared/sourceRegistrations.ts'
 import { runSourceDescription } from '../../plugins/workflows/src/shared/runSource.ts'
 import { runSource } from '../../plugins/workflows/src/shared/runSourceRegistration.ts'
 
@@ -84,6 +86,7 @@ async function fieldLists() {
     'linear:issues': [issueSource, issueSourceDescription],
     'memory:memories': [memorySource, memorySourceDescription],
     'rollbar:error-groups': [errorSource, errorSourceDescription],
+    'terminal:runs': [terminalRunSource, terminalRunSourceDescription],
     'workflows:runs': [runSource, runSourceDescription],
   }
   return Object.fromEntries(

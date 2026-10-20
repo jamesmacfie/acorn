@@ -89,7 +89,13 @@ type Session = {
   admitted: boolean
   persisted: boolean
   discardRow: boolean
+  // Set for a session the engine started to run a declared command, which is recorded when it ends.
+  run?: RunLabel & { db: PluginDatabase }
+  killed: boolean
 }
+
+// A run target's declared id, never its command line, which can carry secrets.
+type RunLabel = { kind: 'target' | 'setup' | 'teardown'; name: string }
 
 // About one frame at 60 fps, the coalescing target (docs/terminal/sessions.md § Sessions).
 const OUTPUT_COALESCE_MS = 16
@@ -240,6 +246,10 @@ function retireSession(s: Session, reason: 'terminal_removed' | 'shutdown' = 'te
   s.pendingOut = ''
   drain([
     ...(wasRunning ? [...stoppedListeners].map((listener) => () => listener(s.meta.id)) : []),
+    // A Node shutdown isn't recorded: the database closes right after.
+    () => {
+      if (wasRunning && reason === 'terminal_removed') finishRun(s, null)
+    },
     () => settleSession(s, null),
     () => s.display.dispose(),
     () => agentSender.clear(s.meta.id),
@@ -252,6 +262,27 @@ function retireSession(s: Session, reason: 'terminal_removed' | 'shutdown' = 'te
       if (reason === 'terminal_removed') revokeCredential(s.meta)
     },
   ])
+}
+
+// The exit code is null when acorn stopped the run or a signal ended it.
+function finishRun(s: Session, exitCode: number | null): void {
+  if (!s.run) return
+  const { db, kind, name } = s.run
+  const run = {
+    id: s.meta.id,
+    taskId: s.meta.taskId,
+    kind,
+    name,
+    exitCode,
+    startedAt: s.meta.createdAt,
+    finishedAt: Date.now(),
+  }
+  // Loaded when the first run ends, which keeps the writer out of the Node's boot.
+  import('./runRecords')
+    .then(({ recordRun }) => recordRun(db, run))
+    .catch((error: unknown) =>
+      drain([() => log.warn(`could not record run ${run.id}: ${describeError(error).message}`)]),
+    )
 }
 
 function revokeCredential(meta: { taskId: string; id: string }): void {
@@ -434,7 +465,13 @@ function rowToMeta(
 
 // --- session lifecycle ---
 
-function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner, script?: Session['script']): Session {
+function wireSession(
+  meta: TerminalSession,
+  pty: IPty,
+  engine: EngineOwner,
+  script?: Session['script'],
+  run?: RunLabel,
+): Session {
   assertOwner(engine)
   const s: Session = {
     meta,
@@ -453,6 +490,8 @@ function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner, scri
     admitted: false,
     persisted: false,
     discardRow: false,
+    run: run && { ...run, db: engine.db },
+    killed: false,
   }
   sessions.set(meta.id, s)
   if (script) engine.core.taskScripts.report(script, { type: 'started', terminalSessionId: meta.id })
@@ -492,6 +531,7 @@ function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner, scri
             if (s.persisted && s.meta.backend === 'tmux') void markExited(s.meta.id, exitCode, engine.db)
           },
           () => worktreeSettled(s),
+          () => finishRun(s, signal || s.killed ? null : exitCode),
           ...[...runSessionExitListeners].map((listener) => () => listener(s.meta.id, exitCode)),
           ...[...stoppedListeners].map((listener) => () => listener(s.meta.id)),
           () => {
@@ -569,6 +609,7 @@ async function maybeRunSetup(t: TaskRef, cwd: string, engine: EngineOwner): Prom
       t,
       engine,
       setup.identity,
+      { kind: 'setup', name: 'Setup' },
     )
   } catch (error) {
     engine.core.taskScripts.report(setup.identity, { type: 'failed', reason: 'spawn_failed' })
@@ -629,6 +670,7 @@ async function spawnOne(
   task?: TaskRef,
   engine = owner(),
   script?: Session['script'],
+  run?: RunLabel,
 ): Promise<TerminalSession> {
   assertOwner(engine)
   const profile = getProfile(opts.profileId)
@@ -717,7 +759,7 @@ async function spawnOne(
       pty = spawn(command, launchArgs, { name: 'xterm-256color', cols, rows, cwd, env })
     }
     assertOwner(engine)
-    session = wireSession(meta, pty, engine, script)
+    session = wireSession(meta, pty, engine, script, run)
     if (backend === 'tmux') {
       persistAttempted = true
       await persistSession(meta, engine.db)
@@ -775,6 +817,7 @@ const mcpLauncher = () =>
 // Killing a tmux session's attach PTY only detaches it and the session keeps running. Stopping a tmux
 // agent means killing the tmux session itself, which then EOFs the PTY and fires onExit.
 function killSession(s: Session) {
+  s.killed = true
   if (s.script) s.evidence.report(s.script, { type: 'interrupted', reason: 'cancelled' })
   if (s.meta.backend === 'tmux' && s.meta.tmuxSession) killTmuxSession(s.meta.tmuxSession)
   s.pty.kill()
@@ -859,6 +902,8 @@ export function terminalRunGlue(): RunSessionGlue {
         taskContext(t),
         t,
         engine,
+        undefined,
+        { kind: 'target', name: target.id },
       )
       return meta.id
     },
@@ -1101,6 +1146,7 @@ export function registerTerminalChannel(
         t,
         engine,
         attempt,
+        { kind: 'teardown', name: 'Teardown' },
       )
       assertOwner(engine)
       const s = sessions.get(meta.id)
@@ -1133,6 +1179,7 @@ export function registerTerminalChannel(
               if (s.persisted) void markExited(s.meta.id, null, engine.db)
             },
             () => worktreeSettled(s),
+            () => finishRun(s, null),
             () => engine.status(),
             () => finish(null, 'timeout'),
           ])

@@ -606,6 +606,7 @@ export const KNOWN_SOURCES = [
   { source: 'linear:issues', name: 'Linear issues', title: 'title' },
   { source: 'memory:memories', name: 'Memories', title: 'name' },
   { source: 'rollbar:error-groups', name: 'Rollbar error groups', title: 'title' },
+  { source: 'terminal:runs', name: 'Terminal runs', title: 'name' },
   { source: 'workflows:runs', name: 'Workflow runs', title: 'name' },
 ]
 

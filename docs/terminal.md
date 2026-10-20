@@ -25,7 +25,8 @@ script. The capability belongs to one Node runtime and is disposed with the term
   edges send, backpressure, and `sendToAgent`.
 
 - [Run targets](./terminal/run-targets.md) covers the process broker, run target trust and
-  serialization, the two workflow step kinds, and the palette rows.
+  serialization, the run history and the **Terminal runs** data source, the two workflow step kinds,
+  and the palette rows.
 
 - [The terminal drawer](./terminal/client.md) covers the drawer, held terminals, the `pty` rectangle,
   and terminal client sessions.
