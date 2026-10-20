@@ -16,7 +16,7 @@ covers:
   - http-variables
   - git
   - git-display
-checked: 52225e24f
+checked: '7dd4aed34'
 ---
 
 This page lists the pages in **Settings** > **Features**. acorn itself adds none: each comes from a
