@@ -17,7 +17,6 @@ export type EditorEntry = {
   entryId?: string
   root?: string
 }
-export type IgnoreEntries = { available: true; ignored: string[] } | { available: false; ignored: []; reason: string }
 export type FileEntryKind = 'file' | 'folder' | 'link'
 export type FileTarget = { path: string; kind: FileEntryKind; identity: string; entryId: string; root: string }
 export type FileActionResult = { ok: true; path: string } | { ok: false; reason: string; partial?: boolean }
@@ -31,7 +30,6 @@ export const editorFilesRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId
 export const editorFileStatusRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/file-status`
 export const editorListRoute = (taskId: string, relPath: string) =>
   `/v1/p/editor/tasks/${taskId}/editor/list?path=${encodeURIComponent(relPath)}`
-export const editorIgnoredRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/ignored`
 export const editorReadRoute = (taskId: string, relPath: string) =>
   `/v1/p/editor/tasks/${taskId}/editor/read?path=${encodeURIComponent(relPath)}`
 export const editorImageRoute = (taskId: string, relPath: string) =>

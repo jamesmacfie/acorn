@@ -1,10 +1,8 @@
 import { useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
 import {
   activeNodeId,
   latestSignal,
-  prefsOptions,
   queryOwner,
   revealCollectionItem,
   wsOnNodeEvent,
@@ -42,8 +40,6 @@ import {
 } from './editorTreeState'
 import { type FileTreeRevealRequest } from './fileTreeReveal'
 import { findInFolder, searchScopePathChanged } from './search/searchState'
-import { pathContains } from './editorState'
-import { readEditorShowIgnored, saveEditorShowIgnored } from './editorPrefs'
 import type { FileStatusProjection } from './fileStatusModel'
 import { ContributedMenuRows, editorMenuTarget } from './contributedMenuRows'
 import { FileMarkGlyphs, fileMarkLegend, fileMarks } from './fileAnnotations'
@@ -72,12 +68,6 @@ export default function FileTree(props: {
   const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
   const treeId = () => editorTreeCollectionId(props.taskId, nodeId)
   const api = editorApi(queryClient)
-  const prefs = createQuery(() => prefsOptions(true))
-  const showIgnored = () => readEditorShowIgnored(prefs.data)
-  const [ignoreByDir, setIgnoreByDir] = createSignal<
-    ReadonlyMap<string, { ignored: ReadonlySet<string>; error?: string }>
-  >(new Map())
-  const [temporaryReveal, setTemporaryReveal] = createSignal<string | null>(null)
   const [listings, setListings] = createSignal<ReadonlyMap<string, EditorEntry[]>>(new Map())
   const [errors, setErrors] = createSignal<ReadonlyMap<string, string>>(new Map())
   const [rootEntry, setRootEntry] = createSignal<FileTarget | null>(null)
@@ -100,8 +90,6 @@ export default function FileTree(props: {
   // The tree's listings. A refresh, a task change, collapsing everything, or unmounting aborts them.
   const listing = latestSignal()
   const loading = new Map<string, { listing: AbortSignal; run: Promise<boolean> }>()
-  // Each directory's newest Git ignore read.
-  const ignoreReads = new Map<string, AbortController>()
   let disposed = false
   let taskId = props.taskId
   const live = (listed: AbortSignal, task: string) =>
@@ -124,58 +112,13 @@ export default function FileTree(props: {
           return next
         })
         setListings((current) => new Map(current).set(dir, entries))
-        ignoreReads.get(dir)?.abort()
-        const read = new AbortController()
-        ignoreReads.set(dir, read)
-        // A fresh listing has no verified ignore classification yet. Show its entries until Git
-        // answers, so a stale hidden set never suppresses names added or changed by this listing.
-        setIgnoreByDir((current) => {
-          const next = new Map(current)
-          next.delete(dir)
-          return next
-        })
-        void Promise.resolve()
-          .then(() =>
-            api.ignored(
-              task,
-              dir,
-              entries.map((entry) => entry.name),
-            ),
-          )
-          .then((result) => {
-            if (!live(listed, task) || read.signal.aborted) return
-            setIgnoreByDir((current) =>
-              new Map(current).set(
-                dir,
-                result.available ? { ignored: new Set(result.ignored) } : { ignored: new Set(), error: result.reason },
-              ),
-            )
-          })
-          .catch((cause: unknown) => {
-            if (live(listed, task) && !read.signal.aborted)
-              setIgnoreByDir((current) =>
-                new Map(current).set(dir, {
-                  ignored: new Set(),
-                  error: cause instanceof Error ? cause.message : 'Git ignore rules are unavailable.',
-                }),
-              )
-          })
         return true
       })
       .catch((cause: unknown) => {
-        if (live(listed, task)) {
-          ignoreReads.get(dir)?.abort()
-          ignoreReads.delete(dir)
-          setIgnoreByDir((current) =>
-            new Map(current).set(dir, {
-              ignored: new Set(),
-              error: 'Ignore filtering unavailable while the directory listing is stale.',
-            }),
-          )
+        if (live(listed, task))
           setErrors((current) =>
             new Map(current).set(dir, cause instanceof Error ? cause.message : 'Unable to read directory.'),
           )
-        }
         return false
       })
       .finally(() => {
@@ -229,11 +172,8 @@ export default function FileTree(props: {
     taskId = next
     listing.next()
     loading.clear()
-    ignoreReads.clear()
     setErrors(new Map())
     setListings(new Map())
-    setIgnoreByDir(new Map())
-    setTemporaryReveal(null)
     setRootEntry(null)
     void load('')
     void api
@@ -276,7 +216,6 @@ export default function FileTree(props: {
       disposed = true
       release()
       listing.abort()
-      ignoreReads.clear()
       offWorktree()
       offReconnect()
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function')
@@ -285,14 +224,6 @@ export default function FileTree(props: {
   })
 
   const isOpen = (path: string) => editorTreeDirectoryOpen(props.taskId, path, nodeId)
-  createEffect(
-    on(
-      () => props.openPath,
-      (path) => {
-        if (temporaryReveal() && temporaryReveal() !== path) setTemporaryReveal(null)
-      },
-    ),
-  )
 
   const targetOf = (item: TreeItem): FileTarget | null => {
     const entry = listings()
@@ -387,7 +318,6 @@ export default function FileTree(props: {
       await refresh()
       props.onStatusChanged()
       if (reveal) {
-        setTemporaryReveal(reveal)
         const segments = reveal.split('/').slice(0, -1)
         let parent = ''
         for (const segment of segments) {
@@ -494,12 +424,9 @@ export default function FileTree(props: {
   const collapseAll = () => {
     listing.next()
     loading.clear()
-    ignoreReads.clear()
     collapseEditorTreeDirectories(taskId, nodeId)
     setListings((current) => new Map([['', current.get('') ?? []]]))
-    setIgnoreByDir((current) => new Map(current.has('') ? [['', current.get('')!]] : []))
     setErrors(new Map())
-    setTemporaryReveal(null)
   }
 
   // The visible rows, flat. A tree is a flat collection with a depth on each row, which is what lets
@@ -512,12 +439,6 @@ export default function FileTree(props: {
     const walk = (dir: string, depth: number): void => {
       for (const entry of listings().get(dir) ?? []) {
         const path = dir ? `${dir}/${entry.name}` : entry.name
-        if (
-          !showIgnored() &&
-          ignoreByDir().get(dir)?.ignored.has(entry.name) &&
-          !pathContains(path, temporaryReveal() ?? '')
-        )
-          continue
         const previous = previousItems.get(path)
         const item =
           previous?.label === entry.name && previous.depth === depth && previous.dir === entry.dir
@@ -575,7 +496,6 @@ export default function FileTree(props: {
         const listed = listing.signal
         const current = () => live(listed, task) && props.reveal === request
         if (!current()) return
-        setTemporaryReveal(request.path)
         void (async () => {
           if (!(await load('')) || !current()) return
           const segments = request.path.split('/').slice(0, -1)
@@ -604,15 +524,6 @@ export default function FileTree(props: {
           disabled={!props.openPath}
           onPress={props.onRevealActive}
         />
-        <IconButton
-          icon="eye"
-          label="Show ignored files"
-          tipSub=".git and node_modules remain excluded."
-          pressed={showIgnored()}
-          onPress={() => {
-            void saveEditorShowIgnored(queryClient, !showIgnored())
-          }}
-        />
         {rootEntry() && (HOST !== 'tui' || (!dialog() && (menuPath() === null || menuPath() === ''))) && (
           <Menu
             ariaLabel="Worktree actions"
@@ -630,13 +541,6 @@ export default function FileTree(props: {
       </Toolbar>
       {actionError() && <Alert tone="danger">{actionError()}</Alert>}
       {props.statusStale() && <Alert tone="warn">Git status may be stale. Files remain available.</Alert>}
-      {Array.from(ignoreByDir())
-        .filter(([, info]) => info.error)
-        .map(([dir, info]) => (
-          <Alert tone="warn">
-            Ignore filtering unavailable for {dir || 'worktree'}: {info.error}. All entries remain visible.
-          </Alert>
-        ))}
       <Only hosts={['tui']}>
         {menuPath() && !dialog() && (
           <Menu
@@ -774,8 +678,6 @@ export default function FileTree(props: {
                 const marks = () => (item.dir ? [] : fileMarks(props.taskId, item.key))
                 const statusLabel = () =>
                   [folderMark()?.label ?? fileMark()?.label, fileMarkLegend(marks())].filter(Boolean).join('; ')
-                const parent = item.key.includes('/') ? item.key.slice(0, item.key.lastIndexOf('/')) : ''
-                const ignored = () => ignoreByDir().get(parent)?.ignored.has(item.label) ?? false
                 return (
                   <TreeRow
                     item={itemProps}
@@ -839,8 +741,8 @@ export default function FileTree(props: {
                         </Only>
                       </>
                     }
-                    title={`${item.key}${ignored() ? ' — ignored by Git' : ''}${statusLabel() ? ` — ${statusLabel()}` : ''}`}
-                    label={`${item.key}${ignored() ? ', ignored by Git' : ''}${statusLabel() ? `, ${statusLabel()}` : ''}`}
+                    title={`${item.key}${statusLabel() ? ` — ${statusLabel()}` : ''}`}
+                    label={`${item.key}${statusLabel() ? `, ${statusLabel()}` : ''}`}
                     meta={
                       item.dir ? (
                         folderMark() && (
@@ -879,9 +781,7 @@ export default function FileTree(props: {
                       )
                     }
                   >
-                    <Text tone={folderMark()?.tone ?? fileMark()?.tone} emphasis={ignored() ? 'muted' : undefined}>
-                      {item.label}
-                    </Text>
+                    <Text tone={folderMark()?.tone ?? fileMark()?.tone}>{item.label}</Text>
                     {inlinePath() === item.key && (
                       <Input
                         label={dialog() === 'rename' ? 'Rename entry' : 'New name'}

@@ -20,7 +20,6 @@ export function lazyEditorBridge(
   return {
     root: (...args) => bridge().then((owner) => owner.root(...args)),
     list: (...args) => bridge().then((owner) => owner.list(...args)),
-    ignored: (...args) => bridge().then((owner) => owner.ignored(...args)),
     files: (...args) => bridge().then((owner) => owner.files(...args)),
     read: (...args) => bridge().then((owner) => owner.read(...args)),
     readImage: (...args) => bridge().then((owner) => owner.readImage(...args)),

@@ -8,8 +8,6 @@ import { evictEditorTreeState, setEditorTreeDirectoryOpen } from './editorTreeSt
 import { projectFileStatus } from './fileStatusModel'
 import type { FileStatusProjection } from './fileStatusModel'
 import type { FileTreeRevealRequest } from './fileTreeReveal'
-import { prefsKey } from '@acorn/protocol/api.ts'
-import { saveEditorShowIgnored } from './editorPrefs'
 import { registerContextMenuItems } from '@acorn/plugin-api/client'
 import {
   extensionPointRegistry,
@@ -37,16 +35,11 @@ const defaultListing = async (_taskId: string, path: string): Promise<EditorEntr
   return []
 }
 const listing = vi.fn(defaultListing)
-const ignored = vi.fn(async (_task: string, _dir: string, _names: string[]) => ({
-  available: true as const,
-  ignored: [] as string[],
-}))
 
 vi.mock('./editorClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./editorClient')>()),
   editorApi: () => ({
     list: listing,
-    ignored,
     entry: async (_taskId: string, path: string) => ({
       root: '/test',
       path,
@@ -73,7 +66,6 @@ afterEach(() => {
   dispose = undefined
   host?.remove()
   listing.mockReset().mockImplementation(defaultListing)
-  ignored.mockReset().mockResolvedValue({ available: true, ignored: [] })
   vi.mocked(actions.arm).mockReset()
   vi.mocked(actions.create).mockReset()
   vi.mocked(actions.rename).mockReset()
@@ -253,17 +245,12 @@ const mount = (
     onRevealed?: (request: FileTreeRevealRequest) => void
     fileStatus?: FileStatusProjection
     openPath?: () => string | null
-    hideIgnored?: boolean
     onVisibleFiles?: (paths: readonly string[]) => void
   },
 ) => {
   host = document.createElement('div')
   document.body.append(host)
   const queryClient = new QueryClient()
-  if (options?.hideIgnored) {
-    queryClient.setQueryData(prefsKey, { editor_show_ignored: '0' })
-    void saveEditorShowIgnored(queryClient, false)
-  }
   dispose = render(
     () => (
       <QueryClientProvider client={queryClient}>
@@ -290,61 +277,6 @@ const mount = (
 }
 
 describe('the editor file tree', () => {
-  it('hides ignored rows, temporarily reveals an ignored active path, and clears it on file change', async () => {
-    listing.mockImplementation(async (_task, dir) =>
-      dir === ''
-        ? [
-            { name: 'build', dir: true },
-            { name: 'source.ts', dir: false },
-          ]
-        : [{ name: 'output.ts', dir: false }],
-    )
-    ignored.mockImplementation(async (_task, dir) => ({ available: true, ignored: dir ? ['output.ts'] : ['build'] }))
-    const [reveal, setReveal] = createSignal<FileTreeRevealRequest | null>(null)
-    const [openPath, setOpenPath] = createSignal<string | null>('build/output.ts')
-    mount(vi.fn(), { hideIgnored: true, reveal, openPath })
-    await vi.waitFor(() => expect(host.textContent).toContain('source.ts'))
-    expect(
-      [...host.querySelectorAll('button')]
-        .find((button) => button.getAttribute('aria-label') === 'Show ignored files')
-        ?.getAttribute('aria-pressed'),
-    ).toBe('false')
-    expect(ignored).toHaveBeenCalled()
-    await vi.waitFor(() => expect(host.textContent).not.toContain('build'))
-    expect(host.textContent).not.toContain('output.ts')
-    setReveal({ path: 'build/output.ts' })
-    await vi.waitFor(() => expect(host.textContent).toContain('output.ts'))
-    setOpenPath('source.ts')
-    await vi.waitFor(() => expect(host.textContent).not.toContain('output.ts'))
-  })
-
-  it('keeps a listing usable when Git ignore metadata fails', async () => {
-    ignored.mockRejectedValue(new Error('Git unavailable'))
-    mount()
-    await vi.waitFor(() => expect(host.textContent).toContain('src'))
-    await vi.waitFor(() => expect(host.textContent).toContain('Ignore filtering unavailable'))
-    expect(host.textContent).toContain('Git unavailable')
-  })
-
-  it('shows a refreshed listing while its replacement ignore metadata is pending', async () => {
-    listing.mockImplementation(async () => [{ name: 'build', dir: true }])
-    let finishIgnore!: (result: { available: true; ignored: string[] }) => void
-    ignored.mockResolvedValueOnce({ available: true, ignored: ['build'] }).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finishIgnore = resolve
-        }),
-    )
-    mount(vi.fn(), { hideIgnored: true })
-    await vi.waitFor(() => expect(ignored).toHaveBeenCalledTimes(1))
-    await vi.waitFor(() => expect(host.textContent).not.toContain('build'))
-    window.dispatchEvent(new Event('focus'))
-    await vi.waitFor(() => expect(ignored).toHaveBeenCalledTimes(2))
-    expect(host.textContent).toContain('build')
-    finishIgnore({ available: true, ignored: [] })
-    await vi.waitFor(() => expect(host.querySelector('[title="build"]')).not.toBeNull())
-  })
-
   it('keeps a large listing virtual and shows a status badge without opening the file', async () => {
     listing.mockResolvedValueOnce(Array.from({ length: 10_000 }, (_, index) => ({ name: `${index}.txt`, dir: false })))
     const status = projectFileStatus({

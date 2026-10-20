@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs'
-import { readdir } from 'node:fs/promises'
 import { basename, join, resolve, sep } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import childProcess from 'node:child_process'
@@ -16,12 +15,10 @@ const opts = { include, exclude, caseSensitive: false, wholeWord: false, regex: 
 const core = { tasks: { root: async () => root } }
 const rgPath = createRequire(resolve('plugins/editor/package.json'))('@vscode/ripgrep').rgPath as string
 let spawned = 0
-let gitSpawned = 0
 const originalSpawn = childProcess.spawn
 const originalExecFileSync = childProcess.execFileSync
 childProcess.spawn = ((...args: Parameters<typeof originalSpawn>) => {
   if (args[0] === rgPath) spawned++
-  if (basename(String(args[0])) === 'git') gitSpawned++
   return originalSpawn(...args)
 }) as typeof originalSpawn
 childProcess.execFileSync = ((...args: Parameters<typeof originalExecFileSync>) => {
@@ -90,25 +87,6 @@ async function main() {
   await measure('unfiltered owner', () =>
     searchInFiles(core, 'task', query, { caseSensitive: false, wholeWord: false, regex: false }),
   )
-  const { ignoredEntries } = await import('../../plugins/editor/src/server/ignoredEntries')
-  const { resolveInRoot } = await import('../../packages/plugin-api/src/node')
-  const metadataCore = { ...core, fs: { resolveInRoot } }
-  for (const directory of ['', 'src', 'src/group-009']) {
-    const names = await readdir(join(root, directory))
-    gitSpawned = 0
-    const result = await ignoredEntries(metadataCore, 'task', directory, names)
-    console.log(
-      JSON.stringify({
-        name: 'directory ignore owner',
-        directory,
-        names: names.length,
-        gitProcesses: gitSpawned,
-        available: result.available,
-        ignored: result.ignored.length,
-        responseBytes: Buffer.byteLength(JSON.stringify(result)),
-      }),
-    )
-  }
 }
 
 main().catch((error: unknown) => {

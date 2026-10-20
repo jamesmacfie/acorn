@@ -29,7 +29,6 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.generatePick,
   PrefKeys.editorMode,
   PrefKeys.editorWordWrap,
-  PrefKeys.editorShowIgnored,
   PrefKeys.editorLineBlame,
   PrefKeys.editorIndentation,
   PrefKeys.diskWarningAcked,
