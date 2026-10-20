@@ -30,9 +30,9 @@ saves as you type, and search across the worktree.
 <Snapshot id="editor" />
 
 <PluginFacts id="editor">
-  <Fragment slot="adds">The **Editor** pane, **Go to file**, **Find in files…**, and other palette commands, and **Settings** > **Features** > **Editor**.</Fragment>
+  <Fragment slot="adds">The **Editor** pane, **Go to file**, **Find in files…**, and other palette commands, the **Code matches** data source, and **Settings** > **Features** > **Editor**.</Fragment>
   <Fragment slot="needs">Nothing. In the terminal client, an editor of your own in `$EDITOR`.</Fragment>
-  <Fragment slot="reach">The files in the task's worktree. Every read and write is held to the worktree, and a link that points outside it is refused.</Fragment>
+  <Fragment slot="reach">The files in the task's worktree. Every read and write is held to the worktree, and a link that points outside it is refused. **Code matches** reads the project folders of a panel's workspace or project.</Fragment>
 </PluginFacts>
 
 ## Set it up
@@ -92,6 +92,12 @@ agent's message box.
 **Select all matches**, and **Replace**. ⌘⇧F opens the pane's **Search** tab, beside **Files**, which searches the whole
 worktree with ripgrep. Right-click a folder and choose **Find in folder** to search inside it.
 
+**Code matches** puts the same search on a [dashboard](/docs/automation/dashboards/). It's a data
+source whose pattern is a setting, so a panel can count the TODOs in each folder, or list the files that
+still import an old module, and refresh on its own. It searches the project folders of the panel's
+workspace or project and skips what `.gitignore` lists. Its starter panels count matches by folder and
+by file type, and list every match. Pressing a match opens the file at its line.
+
 ## See what other plugins mark
 
 Other plugins draw on the editor:
@@ -143,7 +149,8 @@ line blame are desktop only.
 ## Limits
 
 - A file over 256 Ki characters opens without syntax colors.
-- A search keeps the first 2,000 matches.
+- A search keeps the first 2,000 matches. A **Code matches** panel keeps 5,000, from the files changed
+  most recently, and stops after 30 seconds. It says so when it stops early.
 - Files must be UTF-8 text. A file with invalid UTF-8 or a NUL byte doesn't open as text.
 - The editor has no permanent delete. Restore a trashed file from the Node's system Trash.
 - Rename needs a Node on macOS or Linux.

@@ -166,6 +166,7 @@
     "contentLinks": [
       "agents.session",
       "bitbucket.pull-request",
+      "editor.file",
       "github.pull-request",
       "github.repository",
       "gitlab.merge-request",
@@ -293,6 +294,9 @@
       ],
       "persistedStateSlices": [
         "editor.open-files"
+      ],
+      "contentLinks": [
+        "editor.file"
       ]
     },
     "github": {

@@ -196,7 +196,17 @@ function starterForPick(starter: PanelPlan, picked: Pick<DataSourceQuery, 'sourc
             ...entry,
             reference: {
               ...entry.reference,
-              content: { ...entry.reference.content, query: { ...entry.reference.content.query, scope: picked.scope } },
+              content: {
+                ...entry.reference.content,
+                query: {
+                  ...entry.reference.content.query,
+                  // A starter's own settings, such as a search pattern, stay unless the pick set them.
+                  scope: {
+                    ...picked.scope,
+                    parameters: { ...entry.reference.content.query.scope.parameters, ...picked.scope.parameters },
+                  },
+                },
+              },
             },
           },
     ),

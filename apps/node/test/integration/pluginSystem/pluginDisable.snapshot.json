@@ -22,6 +22,7 @@
       "bitbucket/repositories",
       "browser/captures",
       "docker",
+      "editor/data/code-matches",
       "editor/tasks",
       "editor/tasks",
       "git",
@@ -263,6 +264,7 @@
     },
     "editor": {
       "routes": [
+        "editor/data/code-matches",
         "editor/tasks",
         "editor/tasks"
       ],

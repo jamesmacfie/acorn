@@ -46,6 +46,9 @@ shrinks to one line with **Show**.
   stated as "last month" moves with time, and "my" means whoever looks at the panel.
 - **Edit in studio** opens the panel editor on a copy. Changes there don't change the card.
 
+Ask about your code, such as "count the TODOs in each folder", and the agent uses the Editor's
+**Code matches** source, so the panel refreshes like any other.
+
 When none of your data sources has what you asked for, the agent can gather the rows itself. Ask for
 the forecast for this week, or your commits across every repository on disk, and it reads a web page
 or runs `git log`, then draws what it found. The card says where the rows came from and when the

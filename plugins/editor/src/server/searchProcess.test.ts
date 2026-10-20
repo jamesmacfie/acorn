@@ -66,6 +66,25 @@ describe('owned ripgrep search', () => {
     ).rejects.toMatchObject({ code: 'overflow' })
   })
 
+  it('keeps what it found when a lower match cap or, with partialOnTimeout, the clock stops it', async () => {
+    await writeFile(join(root, 'matches.txt'), 'needle\n'.repeat(5))
+    const capped = await runRipgrep(root, args, { maxHits: 3 })
+    expect(capped.truncated).toBe(true)
+    expect(capped.files[0].hits.map((hit) => hit.line)).toEqual([1, 2, 3])
+
+    const records = [
+      { type: 'begin', data: { path: { text: 'a.txt' } } },
+      { type: 'match', data: { lines: { text: 'needle\n' }, line_number: 1, submatches: [{ start: 0, end: 6 }] } },
+    ]
+    const slow = `console.log(${JSON.stringify(records.map((record) => JSON.stringify(record)).join('\n'))}); setInterval(() => {}, 1000)`
+    expect(
+      await runRipgrep(root, ['-e', slow], { executable: process.execPath, timeoutMs: 300, partialOnTimeout: true }),
+    ).toEqual({
+      files: [{ path: 'a.txt', hits: [{ line: 1, col: 1, endCol: 7, preview: 'needle' }] }],
+      truncated: true,
+    })
+  })
+
   it('joins a cancelled child before settling even when SIGTERM is ignored', async () => {
     const pidFile = join(root, 'pid.txt')
     const controller = new AbortController()

@@ -7,7 +7,7 @@ import { EditorSelection } from '@codemirror/state'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
 import { paneCollapseKey, Rectangle, sidebarCollapse } from '@acorn/plugin-api/ui'
-import { activeNodeId, registerContextMenuItems } from '@acorn/plugin-api/client'
+import { activeNodeId, openPane, registerContextMenuItems } from '@acorn/plugin-api/client'
 import {
   commandRegistry,
   documentServiceRegistry,
@@ -777,6 +777,16 @@ describe('the editor pane', () => {
     await vi.waitFor(() => expect(view.state.selection.main.head).toBe(view.state.doc.line(12).from + 3))
     requestEditorReveal(taskId, 'position.ts', 200, 400)
     await vi.waitFor(() => expect(view.state.selection.main.head).toBe(view.state.doc.length))
+  })
+
+  it("opens a pressed data record's file at its line", async () => {
+    disk.set('src/a:b.ts', Array.from({ length: 16 }, (_, index) => `line ${index + 1}`).join('\n'))
+    const { host } = mount()
+    const view = await editor(host)
+    // What the editor.file content link sends for a Code matches row.
+    openPane(taskId, 'editor', { kind: 'plugin:select', item: '12:src/a:b.ts' })
+    await showing(() => view, 'line 12')
+    await vi.waitFor(() => expect(view.state.selection.main.head).toBe(view.state.doc.line(12).from))
   })
 
   it('rejects a held focus reload after typing and does not save an acknowledged reload', async () => {

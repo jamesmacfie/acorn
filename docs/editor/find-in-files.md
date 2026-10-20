@@ -1,6 +1,7 @@
 # Find in files
 
-This page covers the search behind the editor pane's search panel. It's part of
+This page covers the search behind the editor pane's search panel, and the Code matches data source
+that reuses it. It's part of
 [editor](../editor.md). [Pane contributions](../panes/contributions.md#find-in-files) covers where the
 panel sits and how `⌘⇧F` opens it.
 
@@ -49,3 +50,41 @@ leaves a reset action instead of redirecting the search. The focused-folder comm
 tree row whose collection identity includes its Node and task before the palette takes focus.
 Only visible folders in the mounted tree are admitted. Editor resolves the entry through the
 explicit Node and rejects completion after the captured tree owner unmounts.
+
+## Code matches data source
+
+`editor:code-matches` is a [data source](../data-sources.md) with one record per ripgrep match, so a
+dashboard panel can count the TODOs in each folder or list the files that still import an old module.
+It refreshes like any source, with no agent involved. Its settings are:
+
+- `pattern`, required: the text to find. It's fixed text unless `regex` is on.
+- `regex`: read the pattern as a regular expression. Off by default.
+- `glob`: search only files whose name matches, such as `*.ts` or `*.{ts,tsx}`. The source turns it
+  into a ripgrep file type, because a ripgrep `--glob` would bring back files that `.gitignore` lists.
+  A type matches the file name only, so a glob with a folder in it matches nothing.
+- `caseSensitive`: match case. Off by default.
+
+A record holds the project's ID and name, the path inside the project, `folder` (the path's first two
+folders, or `.` for a file at the top), `extension` (lowercase, without its dot), the line, and
+`text`, the matched line cut to 200 characters. The text is code already on the device, and a list of
+matches says nothing without it. A line with two matches is two records.
+
+A workspace scope searches that workspace's project folders, and a project scope searches that one
+folder. A query with neither fails, so the source never reads a path a query names. Projects whose
+folder is missing are left out. Ripgrep skips what `.gitignore` lists and hidden files, as find in
+files does.
+
+One ripgrep process searches every folder, newest-modified files first, and stops at 5,000 matches or
+30 seconds. Either cap keeps what it found and reports `incomplete` with `host-budget` on the last
+page, so the budget keeps the files most likely to be current. The pages of one run share one search
+for 60 seconds.
+
+Each record names a task on the project folder the search read, and an `editor.file` target. That's
+an active task with no branch of its own, or one made on the existing checkout, never a worktree task,
+whose files can differ. The editor's client registers that content link, so pressing a row opens the
+file at its line in that task's editor pane. A project with no such task has nowhere to open. The
+starters chart matches by folder and by file type, and list every match with presses on. Each starts
+with `TODO` as its pattern for the person to change.
+
+`plugins/editor/src/server/codeMatchSource.ts` owns the read. The description and its starters are in
+`plugins/editor/src/shared/codeMatchSource.ts`.

@@ -1,6 +1,81 @@
 # Phase 3: a live code search source
 
-Date: October 20, 2026. Status: proposed. Needs nothing.
+Date: October 20, 2026. Status: built on branch `phase-3-code-search-source`, not merged. Needs nothing.
+
+## Completion note
+
+Built October 20, 2026. The editor plugin serves **Code matches** (`editor:code-matches`), a data
+source whose pattern is a setting. Its starters chart matches by folder and by file type, and list
+every match. Pressing a match opens the file at its line in the editor pane.
+[Find in files](../../editor/find-in-files.md#code-matches-data-source) documents the result.
+
+### What landed
+
+- **Runner.** `runRipgrep` in `plugins/editor/src/server/searchProcess.ts` takes `maxHits` and
+  `partialOnTimeout`. A timeout with `partialOnTimeout` stops ripgrep the way the match cap does,
+  keeping what it found and marking the result truncated. Find in files doesn't change.
+- **Source.** `plugins/editor/src/shared/codeMatchSource.ts` holds the description, parameters, and
+  starters. `plugins/editor/src/server/codeMatchSource.ts` holds the read, loaded on the first query
+  behind a dynamic import. Only the registration in `shared/sourceRegistrations.ts` loads at boot.
+  The read runs one ripgrep process over every project folder with `--sortr modified`, which orders
+  files newest first across all the folders. It shares one search across a run's pages through
+  `createDataSelectionPager`.
+- **Press.** Each record carries `taskId` and an `editor.file` target whose item is `line:path`
+  (`shared/fileTarget.ts`). The editor client registers that content link, and `EditorPane` answers
+  the `plugin:select` intent it sends by revealing the line.
+- **Launcher.** `starterForPick` in the studio keeps a starter's own parameters under the picked
+  scope, with the pick's values winning. Every other source's starters have empty parameters, so
+  nothing else changes.
+- **Guide.** `panel_guide`'s `suppliedRows` section sends a question about the code to this source,
+  with the text to find as `parameters.pattern`.
+- **Tests and fixtures.** `codeMatchSource.test.ts` covers scope, a query with no scope, missing
+  folders, `.gitignore` with and without a glob, fixed text, regex, case, the 5,000 cap across
+  projects, record shape, the task choice, and the starters. `searchProcess.test.ts` covers the two
+  runner options. `EditorPane.test.tsx` covers the press. The SDK field lists and both plugin-disable
+  goldens list the source, its route, and its link.
+
+### Decisions and deviations
+
+- **The starters' pattern is `TODO`, filled in.** The doc asks for a placeholder. A field has no
+  placeholder, and the Node refuses a starter whose required parameter is empty, which hides it from
+  the launcher. So each starter carries `pattern: "TODO"` and the person edits it. The field's hint
+  says "such as TODO".
+- **`glob` matches file names only.** A ripgrep `--glob` brings back files `.gitignore` lists, so the
+  source turns the glob into a ripgrep file type, which matches the file name and honours
+  `.gitignore`. A glob with a folder in it, such as `src/*.ts`, matches nothing. Find in files keeps
+  path globs with its three-process intersection, which this source doesn't need.
+- **One record per match, not per line.** A line with two matches is two records, as find in files
+  counts them. The record ID is a hash of project, path, line, and column, because a long path would
+  pass the 200-character ID limit.
+- **Which task a press opens.** An active task on the project folder: one with no branch, or one made
+  on the existing checkout, which keeps the checkout's branch name. Never a worktree task, whose
+  files can differ. A project with neither has no destination. A record whose `line:path` passes
+  200 characters has no target.
+- **Both caps report `host-budget`.** The 5,000-match cap is the host's record budget, and the
+  30-second cap has no better cause in the protocol.
+- **Folder.** The path's first two folders, or `.` for a file at the project's top.
+- **Extension.** Lowercase and without its dot, an enum with 30 common values. A value outside the
+  list, such as `mdx`, draws as a warning in the plan diagnostics ("File type has new values to
+  map"), the same as any enum with unlisted values.
+- **Decision 4 taken as its default.** The source reads the project folders of the workspace or
+  project and nothing else, and fails with neither. A nested project's files go to the deepest
+  project, and a match ripgrep reports twice counts once.
+
+### What later work needs to know
+
+- **A press from Home opens the file in the task without moving there.** The content link's pane rung
+  calls `openPane`, which lays out the pane in the task and leaves the window where it is. Agent
+  session rows behave the same way. Moving to the task after a pane open is a host change to
+  `openReference` in `PublishedDashboardPanel`, and it would change every pane target, so this phase
+  leaves it.
+- **The Node service budget.** The base measures 1,915,026 bytes, and this branch 1,915,435 bytes,
+  409 more, against a ceiling of 1,914,100 bytes. The added bytes are the registration and the route
+  mount.
+- **Real-app checks.** In `pnpm dev:agent` with `--prepared`, all three starters drew for `TODO`
+  across a workspace with two projects, and a gitignored file never appeared. A press opened the
+  file at its line in the task's editor. With 6,000 matches in an old file, a run kept the newest
+  5,000, every newer file's matches included, and reported `incomplete`. The `panel_show` check
+  didn't run, because it needs a chat agent in the session.
 
 ## Goal
 

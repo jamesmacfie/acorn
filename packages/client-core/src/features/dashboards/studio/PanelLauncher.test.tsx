@@ -14,7 +14,7 @@ vi.mock('../../../infra/node/apiClient', () => ({
 
 const { default: PanelLauncher } = await import('./PanelLauncher')
 
-// A starter as a source ships it: no workspace and no account.
+// A starter as a source ships it: no workspace and no account, and its own settings.
 const starter: PanelPlan = {
   version: 2,
   title: 'My open pull requests',
@@ -31,7 +31,11 @@ const starter: PanelPlan = {
           name: 'Pull requests',
           parameters: { type: 'object', properties: {}, additionalProperties: false },
           sourceParameters: {},
-          query: { source: { pluginId: 'github', sourceId: 'pull-requests' }, scope: { parameters: {} }, sort: [] },
+          query: {
+            source: { pluginId: 'github', sourceId: 'pull-requests' },
+            scope: { parameters: { state: 'open' } },
+            sort: [],
+          },
         },
       },
     },
@@ -215,7 +219,7 @@ describe('PanelLauncher', () => {
     expect(source.kind === 'inline' && source.content.query.scope).toEqual({
       workspaceId: 'w',
       connectionId: 'work',
-      parameters: {},
+      parameters: { state: 'open' },
     })
     // What the Node checked is the plan the studio opens, not the unscoped original.
     expect(bodies('validate')[0]!.content).toEqual(result.starter)

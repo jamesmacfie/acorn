@@ -21,6 +21,8 @@ import { turnSourceDescription } from '../../plugins/agents/src/shared/turnSourc
 import { usageSourceDescription } from '../../plugins/agents/src/shared/usageSource.ts'
 import { commitSourceDescription } from '../../plugins/git/src/shared/commitSource.ts'
 import { commitSource } from '../../plugins/git/src/shared/sourceRegistrations.ts'
+import { codeMatchSourceDescription } from '../../plugins/editor/src/shared/codeMatchSource.ts'
+import { codeMatchSource } from '../../plugins/editor/src/shared/sourceRegistrations.ts'
 import { actionsSource } from '../../plugins/github/src/shared/actionsRegistration.ts'
 import { actionsSourceDescription } from '../../plugins/github/src/shared/actionsSource.ts'
 import { branchSource } from '../../plugins/github/src/shared/branchSource.ts'
@@ -81,6 +83,7 @@ async function fieldLists() {
     'agents:session-totals': [sessionTotalsSource, sessionTotalsSourceDescription],
     'agents:tool-calls': [toolCallSource, toolCallSourceDescription],
     'agents:approvals': [approvalSource, approvalSourceDescription],
+    'editor:code-matches': [codeMatchSource, codeMatchSourceDescription],
     'git:commits': [commitSource, commitSourceDescription],
     'github:pull-requests': [pullSource, pullSourceDescription],
     'github:actions-jobs': [actionsSource, actionsSourceDescription],

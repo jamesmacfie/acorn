@@ -104,7 +104,8 @@ diagnostics for a language. Each gets the case-kept worktree-relative path or th
 revision, never a filesystem grant ([context menus](./plugins/menus-and-markers.md#context-menus),
 [hover and diagnostics](./editor/document-surface.md#hover-and-diagnostics)).
 
-[Find in files](./editor/find-in-files.md) covers the ripgrep search behind the editor's search panel.
+[Find in files](./editor/find-in-files.md) covers the ripgrep search behind the editor's search panel,
+and the Code matches data source that panels read.
 
 [Line markers](./editor/line-markers.md) covers the bars that mark pull request and uncommitted lines.
 

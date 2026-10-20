@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@acorn/client-core": "workspace:*",
+    "@acorn/dashboards-core": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@types/diff": "^8.0.0",
     "@types/node": "^26.0.0",

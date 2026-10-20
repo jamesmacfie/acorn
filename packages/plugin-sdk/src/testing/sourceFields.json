@@ -3110,6 +3110,227 @@
       }
     ]
   },
+  "editor:code-matches": {
+    "name": "Code matches",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "projectName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "extension": {
+          "type": "string"
+        },
+        "line": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "projectName",
+        "path",
+        "folder",
+        "extension",
+        "line",
+        "text"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/project",
+        "origin": "declared",
+        "label": "Project"
+      },
+      {
+        "pointer": "/projectName",
+        "origin": "declared",
+        "label": "Project name"
+      },
+      {
+        "pointer": "/path",
+        "origin": "declared",
+        "label": "File",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/folder",
+        "origin": "declared",
+        "label": "Folder",
+        "description": "The file's first two folders in its project, or . for the project folder itself."
+      },
+      {
+        "pointer": "/extension",
+        "origin": "declared",
+        "label": "File type",
+        "description": "The file name extension without its dot, or empty when it has none.",
+        "display": {
+          "kind": "enum"
+        },
+        "query": {
+          "operators": [
+            "eq",
+            "in"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "ts",
+              "label": "ts"
+            },
+            {
+              "id": "tsx",
+              "label": "tsx"
+            },
+            {
+              "id": "js",
+              "label": "js"
+            },
+            {
+              "id": "jsx",
+              "label": "jsx"
+            },
+            {
+              "id": "mjs",
+              "label": "mjs"
+            },
+            {
+              "id": "cjs",
+              "label": "cjs"
+            },
+            {
+              "id": "json",
+              "label": "json"
+            },
+            {
+              "id": "md",
+              "label": "md"
+            },
+            {
+              "id": "css",
+              "label": "css"
+            },
+            {
+              "id": "scss",
+              "label": "scss"
+            },
+            {
+              "id": "html",
+              "label": "html"
+            },
+            {
+              "id": "vue",
+              "label": "vue"
+            },
+            {
+              "id": "svelte",
+              "label": "svelte"
+            },
+            {
+              "id": "py",
+              "label": "py"
+            },
+            {
+              "id": "rb",
+              "label": "rb"
+            },
+            {
+              "id": "go",
+              "label": "go"
+            },
+            {
+              "id": "rs",
+              "label": "rs"
+            },
+            {
+              "id": "java",
+              "label": "java"
+            },
+            {
+              "id": "kt",
+              "label": "kt"
+            },
+            {
+              "id": "swift",
+              "label": "swift"
+            },
+            {
+              "id": "c",
+              "label": "c"
+            },
+            {
+              "id": "h",
+              "label": "h"
+            },
+            {
+              "id": "cpp",
+              "label": "cpp"
+            },
+            {
+              "id": "cs",
+              "label": "cs"
+            },
+            {
+              "id": "php",
+              "label": "php"
+            },
+            {
+              "id": "sh",
+              "label": "sh"
+            },
+            {
+              "id": "sql",
+              "label": "sql"
+            },
+            {
+              "id": "yml",
+              "label": "yml"
+            },
+            {
+              "id": "yaml",
+              "label": "yaml"
+            },
+            {
+              "id": "toml",
+              "label": "toml"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/line",
+        "origin": "declared",
+        "label": "Line",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/text",
+        "origin": "declared",
+        "label": "Text",
+        "description": "The matched line, cut to 200 characters."
+      }
+    ]
+  },
   "git:commits": {
     "name": "Git commits",
     "schema": {

@@ -13,6 +13,7 @@ import { editorCommands } from './commands'
 import { editorPaneContribution } from './paneContribution'
 import { EDITOR_FILE_KEY, MAX_EDITOR_FILE_MARKS } from '../contract/fileAnnotations'
 import { EDITOR_LINE_KEY } from '../contract/lineAnnotations'
+import { EDITOR_FILE_TARGET } from '../shared/fileTarget'
 
 const EditorSettings = lazy(() => import('./EditorSettings'))
 
@@ -20,6 +21,14 @@ export const editorClientPlugin: ClientPlugin = {
   name: 'editor',
   init: (ctx) => {
     ctx.panes.register(editorPaneContribution)
+    // A data record's file and line, such as a Code matches row, opens in the record's task.
+    ctx.contentLinks.register({
+      id: EDITOR_FILE_TARGET,
+      providerId: 'editor',
+      parse: () => null,
+      target: (item) => ({ kind: EDITOR_FILE_TARGET, item, pane: 'editor' }),
+      presentations: ['pane'],
+    })
     // Another plugin's view of the open file, such as a markdown preview (docs/editor/file-renderers.md).
     // One view replaces the document, and the pane keeps its own text view one Source toggle away.
     ctx.extensionPoints.register({

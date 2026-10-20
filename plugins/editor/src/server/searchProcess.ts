@@ -13,11 +13,12 @@ const MAX_PATH_BYTES = 4 * 1024 * 1024
 type ProcessEnd = { code: number | null; signal: NodeJS.Signals | null; stderr: string; stopped: boolean }
 
 // Both ripgrep passes settle only after the child and its pipes close. A timed out or aborted
-// process gets a grace period before SIGKILL, including when it ignores SIGTERM.
+// process gets a grace period before SIGKILL, including when it ignores SIGTERM. With
+// `partialOnTimeout`, the timeout stops the process like a cap does, keeping what it found.
 function runProcess(
   root: string,
   args: string[],
-  options: { signal?: AbortSignal; executable?: string; timeoutMs?: number },
+  options: { signal?: AbortSignal; executable?: string; timeoutMs?: number; partialOnTimeout?: boolean },
   onStdout: (chunk: Buffer, stop: (failure?: SearchFailure) => void) => void,
 ): Promise<ProcessEnd> {
   if (options.signal?.aborted) return Promise.reject(new SearchFailure('cancelled', 'Search was cancelled.'))
@@ -37,7 +38,7 @@ function runProcess(
     }
     const abort = () => stop(new SearchFailure('cancelled', 'Search was cancelled.'))
     const timeout = setTimeout(
-      () => stop(new SearchFailure('timeout', 'Search timed out.')),
+      () => stop(options.partialOnTimeout ? undefined : new SearchFailure('timeout', 'Search timed out.')),
       options.timeoutMs ?? 10_000,
     )
     options.signal?.addEventListener('abort', abort, { once: true })
@@ -80,11 +81,13 @@ export function runRipgrep(
     signal?: AbortSignal
     executable?: string
     timeoutMs?: number
+    partialOnTimeout?: boolean
     maxRecordBytes?: number
+    maxHits?: number
     allowedPaths?: ReadonlySet<string>
   } = {},
 ): Promise<SearchResult> {
-  const results = new RgResults(options.allowedPaths)
+  const results = new RgResults(options.allowedPaths, options.maxHits)
   const maxRecord = options.maxRecordBytes ?? MAX_RECORD_BYTES
   let partial: Buffer[] = []
   let partialBytes = 0
@@ -116,6 +119,8 @@ export function runRipgrep(
   }).then(({ code, signal, stderr, stopped }) => {
     if (!stopped && partialBytes) record(Buffer.alloc(0), true, () => {})
     partial = []
+    // Only a cap stops ripgrep without a failure: the match cap, or the clock with `partialOnTimeout`.
+    if (stopped) results.truncated = true
     if (results.truncated || code === 0 || code === 1) return results.result()
     throw new SearchFailure(
       code === 2 && stderr.includes('regex parse error:')

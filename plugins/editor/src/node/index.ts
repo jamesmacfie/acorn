@@ -7,6 +7,7 @@ import { search, SEARCH } from '../server/routes/search'
 import { EDITOR_LINE_MARKERS } from '../contract/lineMarkers'
 import { EDITOR_FILE_STATUS } from '../contract/fileStatus'
 import { EDITOR_FILES } from '../contract/files'
+import { codeMatchSource } from '../shared/sourceRegistrations'
 
 export const editorPlugin = (): NodePlugin => {
   let routeDisposables: { dispose(): void }[] = []
@@ -51,6 +52,12 @@ export const editorPlugin = (): NodePlugin => {
       registerEditorWsChannel(ctx.events, ctx.core)
       ctx.routes.register(search, { prefix: '/tasks', note: '/:id/search' })
       ctx.routes.register(editor, { prefix: '/tasks', note: '/:id/editor/*' })
+      ctx.routes.fetch(
+        async (request, context) =>
+          (await import('../server/codeMatchSource')).createCodeMatchSourceHandler(ctx.core)(request, context),
+        { prefix: '/data/code-matches' },
+      )
+      ctx.dataSources.register(codeMatchSource)
     },
     dispose: () => {
       for (const disposable of routeDisposables) disposable.dispose()

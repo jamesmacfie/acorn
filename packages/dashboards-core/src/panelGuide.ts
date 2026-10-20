@@ -164,6 +164,7 @@ export const panelGuide = (workspaceId: string) => ({
   ],
   suppliedRows: [
     'Check data_sources_list first. A registered source beats rows you supply, because its panel refreshes and yours never does.',
+    "A question about what is in the code, such as the TODOs in each folder or which files import a module, reads the editor plugin's Code matches source (editor:code-matches), with the text to find as parameters.pattern. Never search the code yourself and supply the rows. Its starters count matches by folder and by file type, and list every match.",
     'When no source answers the question and you gathered the rows yourself, such as a forecast you read from a web page or commit counts from git log, put them in the plan: a source with role primary whose reference is { kind: "supplied", origin, schema, fields, rows }. It must be the plan\'s only source.',
     'origin says where the rows came from in one line, such as "Open-Meteo forecast for Wellington", lists the https pages you read them from in urls, and gives readAt, when you read them, in milliseconds since the epoch. The panel shows it under its title.',
     `schema is an object schema for one row, and fields describes each field, in the shapes a dataset takes. Write values as text, numbers, and booleans, and a time as an ISO 8601 string whose field has display kind datetime. Every row must fit the schema, at most ${SUPPLIED_ROW_LIMITS.rows} rows and ${SUPPLIED_ROW_LIMITS.bytes / 1024} KiB in all. Bind columns to the fields as you would a source's.`,

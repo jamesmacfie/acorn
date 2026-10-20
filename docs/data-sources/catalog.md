@@ -17,6 +17,7 @@ add a source, add its row here.
 | Agent tool calls (`agents:tool-calls`) | Agents | Tool call of a finished turn | Yes | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
 | Agent approvals (`agents:approvals`) | Agents | Permission or question request | Yes | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
 | Git commits (`git:commits`) | Git | Commit, once per project | Yes | [History](../git-client/history.md#git-commits-data-source) |
+| Code matches (`editor:code-matches`) | Editor | Match of a pattern in a project's files | Yes | [Find in files](../editor/find-in-files.md#code-matches-data-source) |
 | Workflow runs (`workflows:runs`) | Workflows | Run, child runs included | Yes | [Workflows](../workflows.md#workflow-runs-source) |
 | Terminal runs (`terminal:runs`) | Terminal | Run target or setup or teardown script that finished | Yes | [Run targets](../terminal/run-targets.md#run-history) |
 | Memories (`memory:memories`) | Memory | Memory, private ones included | Yes | [Memory page](../notes-and-memory/memory-page.md#the-memories-data-source) |
@@ -37,6 +38,6 @@ GitLab and Bitbucket serve merge requests, pull requests, CI jobs, pipeline step
 same way the GitHub plugin does.
 
 Sources that read Acorn's own database push a time window into SQL and read newest first, so the
-host's 5,000-record budget drops the oldest records ([serve a query](./serve-a-query.md)). Git commits push the window into `git log`.
+host's 5,000-record budget drops the oldest records ([serve a query](./serve-a-query.md)). Git commits push the window into `git log`. Code matches run ripgrep over the project folders and keep the newest-modified files' matches.
 Sources that call a provider page through its API and report `incomplete` when the provider or the
 budget stops them.

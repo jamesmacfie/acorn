@@ -50,6 +50,7 @@ import { EDITOR_ACTIONS } from './editorActions'
 import { languageName } from './editorPresentation'
 import { ContributedMenuRows, editorMenuTarget } from './contributedMenuRows'
 import FileDiagnostics from './FileDiagnostics'
+import { parseFileTargetItem } from '../shared/fileTarget'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
@@ -258,6 +259,11 @@ export default function EditorPane(props: { task: Task }) {
       return
     }
     if (intent.kind === 'editor:reveal') editor.reveal({ path: intent.path, line: intent.line, column: intent.column })
+    // A pressed data record, through the `editor.file` content link.
+    if (intent.kind === 'plugin:select') {
+      const target = parseFileTargetItem(intent.item)
+      if (target) editor.reveal(target)
+    }
   }
   onMount(() => {
     const off = clientEvents.on('presentation:pane-intent', ({ taskId: targetTaskId, paneId, intent }) => {
