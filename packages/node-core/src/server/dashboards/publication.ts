@@ -1,6 +1,11 @@
 import type { DashboardContent, DashboardRevision, DashboardScope } from '@acorn/protocol/dashboards.ts'
 import type { DashboardProblem } from '@acorn/dashboards-core/projection'
-import { upgradePanelContent, validatePanelPlan, type PlanSource } from '@acorn/dashboards-core/plan.ts'
+import {
+  suppliedPlanSource,
+  upgradePanelContent,
+  validatePanelPlan,
+  type PlanSource,
+} from '@acorn/dashboards-core/plan.ts'
 import type { Env } from '../bindings'
 import { getDb } from '../db'
 import type { DataSourceInvocation } from '../dataSources/authority'
@@ -21,6 +26,10 @@ export async function dashboardContentProblems(
   const problems: DashboardProblem[] = []
   const described: PlanSource[] = []
   for (const [index, entry] of plan.sources.entries()) {
+    if (entry.reference.kind === 'supplied') {
+      described.push(suppliedPlanSource(entry, entry.reference, scope.workspaceId))
+      continue
+    }
     try {
       const resolved = await resolveQuery(env, scope, entry.reference, {}, invocation)
       const description = await invokeDataSource(

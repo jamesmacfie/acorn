@@ -1,12 +1,13 @@
-import { createMemo, createSignal, For, Index, Show, type Component } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Index, on, Show, type Component } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
+import { panelPlanSchema, type PanelPlan, type SuppliedRows } from '@acorn/protocol/dashboards.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataSourceDescription, DataSourceQuery } from '@acorn/protocol/dataSources.ts'
 import { dashboardFields } from '@acorn/dashboards-core/projection'
 import {
   newColumnId,
   outputPlanColumns,
+  suppliedPlanSource,
   type DashboardRun,
   type PlanProblem,
   type SourceFailure,
@@ -48,6 +49,7 @@ import {
 } from '@acorn/dashboards-core/outline.ts'
 import type { SourceQueryEditorState } from '../../dataSources/SourceQueryEditor'
 import SourceQueryEditor from '../../dataSources/SourceQueryEditor'
+import SuppliedOrigin from '../SuppliedOrigin'
 import { Alert, Button, Card, Checkbox, Chip, Field, Row } from '../../../kit/components/primitives'
 import { Inline } from '../../../kit/components/layout/Inline'
 import { Rows } from '../../../kit/components/layout/Rows'
@@ -266,6 +268,16 @@ export function SourceInspector(props: InspectorProps) {
   const context = props.context
   const id = () => props.part.slice('source:'.length)
   const source = () => context.plan().sources.find((entry) => entry.id === id())
+  const reference = () => source()?.reference
+  /** Rows an agent supplied have no source for a picker to choose or describe. */
+  const supplied = (): SuppliedRows | undefined => {
+    const value = reference()
+    return value?.kind === 'supplied' ? value : undefined
+  }
+  const queried = (): QueryReference | undefined => {
+    const value = reference()
+    return value?.kind === 'supplied' ? undefined : value
+  }
   const state = () => context.sources.states()[id()]
   const setReference = (reference: QueryReference | undefined): void =>
     context.change((current) => setSourceReference(current, id(), reference))
@@ -295,16 +307,39 @@ export function SourceInspector(props: InspectorProps) {
               </Show>
             )}
           </For>
-          <SourceQueryEditor
-            workspaceId={context.workspaceId}
-            value={current().reference}
-            hideAuthoring
-            hideConditions
-            hidePreview
-            pickSourceAccount
-            onChange={setReference}
-            onStateChange={(next) => context.sources.report(id(), next)}
-          />
+          <Show
+            when={supplied()}
+            fallback={
+              <SourceQueryEditor
+                workspaceId={context.workspaceId}
+                value={queried()}
+                hideAuthoring
+                hideConditions
+                hidePreview
+                pickSourceAccount
+                onChange={setReference}
+                onStateChange={(next) => context.sources.report(id(), next)}
+              />
+            }
+          >
+            {(rows) => {
+              // In place of the picker's report, so the column and step forms read the rows' own fields.
+              createEffect(
+                on(rows, (value) => {
+                  const { query, description } = suppliedPlanSource(current(), value, context.workspaceId)
+                  context.sources.report(id(), { query, description, stale: false })
+                }),
+              )
+              return (
+                <Stack gap="row">
+                  <SuppliedOrigin origin={rows().origin} />
+                  <Text tone="muted" wrap>
+                    An agent supplied these rows, so there's no source to pick and nothing refreshes them.
+                  </Text>
+                </Stack>
+              )
+            }}
+          </Show>
           <Show when={context.plan().sources.length > 1}>
             <LabeledSelect
               label="How it joins"

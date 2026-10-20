@@ -18,7 +18,7 @@ import { ProviderOperationError } from '../integrations/types'
 import { resolveQuery } from '../queries/runtime'
 import { respondError } from '../respond'
 import { createLogger } from '../telemetry/logger'
-import { authoringAccountProblems, PANEL_CAPABILITIES } from '@acorn/dashboards-core/plan.ts'
+import { authoringAccountProblems, PANEL_CAPABILITIES, suppliedPlanSource } from '@acorn/dashboards-core/plan.ts'
 import { PANEL_AUTHORING_INSTRUCTIONS } from '@acorn/dashboards-core/panelGuide.ts'
 import { listConnections } from '../integrations/connections'
 import { invokeDataSource, listDataSources } from '../dataSources/runtime'
@@ -60,6 +60,10 @@ export async function handleAuthoringTurn(c: Context<AppEnv>) {
   const descriptions = basePlan?.success
     ? await Promise.all(
         basePlan.data.sources.map(async (source) => {
+          if (source.reference.kind === 'supplied') {
+            const { description } = suppliedPlanSource(source, source.reference, request.scope.workspaceId)
+            return { id: source.id, description }
+          }
           if (source.reference.kind !== 'inline')
             return { id: source.id, unavailable: 'Resolve the saved query first.' }
           const query = source.reference.content.query

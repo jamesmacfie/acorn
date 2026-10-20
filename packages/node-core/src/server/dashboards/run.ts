@@ -19,6 +19,8 @@ import {
   resolvePlanColumns,
   runPlanStages,
   sortPlanRows,
+  suppliedPlanSource,
+  suppliedRead,
   upgradePanelContent,
   validatePanelPlan,
   type DashboardRun,
@@ -270,6 +272,12 @@ export async function runDashboard(
   let uncoveredWindow = false
   const started = Date.now()
   for (const entry of plan.sources) {
+    if (entry.reference.kind === 'supplied') {
+      const source = suppliedPlanSource(entry, entry.reference, args.scope.workspaceId)
+      sources.push(source)
+      sourceDiagnostics.push({ id: entry.id, label: entry.label, revision: source.description.revision })
+      continue
+    }
     try {
       const resolved = await resolveQuery(
         env,
@@ -448,8 +456,13 @@ export async function runDashboard(
         break
       }
       try {
+        const index = plan.sources.findIndex((entry) => entry.id === source.instanceId)
+        const reference = plan.sources[index]!.reference
         source.query = plannedQuery(source.query, plan, source)
-        source.result = await sharedRead(env, source, args.mode, evaluationTime, runInvocation)
+        source.result =
+          reference.kind === 'supplied'
+            ? suppliedRead(reference, args.mode, evaluationTime)
+            : await sharedRead(env, source, args.mode, evaluationTime, runInvocation)
         const diagnostic = sourceDiagnostics.find((entry) => entry.id === source.instanceId)!
         diagnostic.completeness = source.result.completeness
         diagnostic.readTime = source.result.readTime
@@ -457,7 +470,6 @@ export async function runDashboard(
         diagnostic.observedAt = source.result.observedAt
         if (source.result.inputs) diagnostic.inputs = source.result.inputs
         if (source.result.development) diagnostic.development = source.result.development
-        const index = plan.sources.findIndex((entry) => entry.id === source.instanceId)
         const coverageProblem = sourceCoverageProblem(plan, source, evaluationTime)
         if (coverageProblem) {
           uncoveredWindow = true

@@ -8,6 +8,7 @@ sources:
   - docs/dashboards/views.md
   - docs/dashboards/sampling.md
   - docs/dashboards/panels.md
+  - docs/dashboards/supplied-rows.md
   - docs/tui/sources-and-settings.md
   - packages/client-core/src/features/dashboards/studio/PanelLauncher.tsx
 checked: 'a472c1512'
@@ -44,6 +45,12 @@ shrinks to one line with **Show**.
 - **Add to dashboard** asks which Home tab, then puts the panel there. It stays live: a window you
   stated as "last month" moves with time, and "my" means whoever looks at the panel.
 - **Edit in studio** opens the panel editor on a copy. Changes there don't change the card.
+
+When none of your data sources has what you asked for, the agent can gather the rows itself. Ask for
+the forecast for this week, or your commits across every repository on disk, and it reads a web page
+or runs `git log`, then draws what it found. The card says where the rows came from and when the
+agent read them, with a link to each page it read. Nothing refreshes those rows, so the panel has no
+refresh button, and **Add to dashboard** places it as a snapshot with the same line.
 
 The agent never adds a panel to a dashboard itself. A card runs only while it's on screen.
 

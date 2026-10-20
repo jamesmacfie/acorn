@@ -343,7 +343,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   tools](./agent-tools/workflow-tools.md).
 - [dashboards.md](./dashboards.md): [Mapping and the editor](./dashboards/mapping-and-editor.md),
   [Panels](./dashboards/panels.md), [Placements](./dashboards/placements.md), [Sampling and
-  retention](./dashboards/sampling.md), [Views and trends](./dashboards/views.md).
+  retention](./dashboards/sampling.md), [Supplied rows](./dashboards/supplied-rows.md), [Views and
+  trends](./dashboards/views.md).
 - [integrations.md](./integrations.md): [Connection and integration
   contributions](./integrations/contributions.md), [Linear](./integrations/linear.md), [Model
   providers](./integrations/model-providers.md), [Project

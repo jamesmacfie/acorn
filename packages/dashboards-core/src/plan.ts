@@ -18,6 +18,7 @@ import { columnLabel, describePredicate, pressTarget, sourceReach } from './outl
 
 export { PANEL_CAPABILITIES } from './capabilities'
 export { authoringAccountProblems } from './authoringAccounts'
+export { suppliedPlanSource, suppliedRead } from './supplied'
 
 /** Why a source couldn't answer, as data, so a client can word it and offer the fix
  *  (client-core's dashboards/sourceErrors.ts). `code` is a data source error code, or `incomplete` for a
@@ -195,6 +196,9 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
   for (const [index, source] of plan.sources.entries()) {
     if (!sources.some((candidate) => candidate.instanceId === source.id))
       add(`/sources/${index}`, `${source.label} is unavailable.`)
+    // Joining an agent's rows to Acorn's records would mix what refreshes with what never does.
+    if (source.reference.kind === 'supplied' && (source.role !== 'primary' || plan.sources.length > 1))
+      add(`/sources/${index}/reference`, "Supplied rows must be the plan's only source, with the primary role.")
   }
   for (const [index, column] of plan.columns.entries()) {
     if (column.precision && column.type !== 'datetime')

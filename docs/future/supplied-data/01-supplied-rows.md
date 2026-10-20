@@ -1,6 +1,89 @@
 # Phase 1: let a plan carry its own rows
 
-Date: October 20, 2026. Status: proposed. Needs nothing.
+Date: October 20, 2026. Status: built on branch `phase-1-supplied-rows`, not merged. Needs nothing.
+
+## Completion note
+
+Built October 20, 2026. A plan source can hold rows an agent supplied. `panel_show`, the run route,
+an app's `Panel`, and a dashboard draw them with every view, under a line saying where they came
+from. [Supplied rows](../../dashboards/supplied-rows.md) documents the result.
+
+### What landed
+
+- **Protocol.** `panelPlanSchema` takes a source reference of kind `supplied`, with `origin`,
+  `schema`, `fields`, and `rows` (`SuppliedRows`, `SUPPLIED_ROW_LIMITS` in
+  `packages/protocol/src/dashboards/panels.ts`). The schema checks each row against `schema` and
+  reports up to 10 bad rows, each with a path such as `/sources/0/reference/rows/1/high`. It also
+  checks the 1,000-row and 256 KiB caps, that every field is in the schema, and that each origin URL
+  is `https`.
+- **Runner.** `suppliedPlanSource` and `suppliedRead` in `packages/dashboards-core/src/supplied.ts`
+  describe the source from its own schema and fields and read its rows, complete. `runDashboard`,
+  `dashboardContentProblems` (what `panel_show` and publication run), and the studio AI's authoring
+  route use them. `validatePanelPlan` refuses a supplied source that isn't the plan's only source.
+- **Client.** `SuppliedOrigin` draws the line, with each URL as a link. `PublishedDashboardPanel`
+  shows it and hides **Refresh**, so a card, an app's `Panel`, and a placed panel all get it.
+  **Add to dashboard** publishes the snapshot as it is. The studio shows the line in place of the
+  source picker and feeds the rows' fields to the column forms.
+- **Guide.** `panel_guide` gains a chat-only `suppliedRows` section and a worked plan that charts
+  commits by repository. The studio's `PANEL_AUTHORING_INSTRUCTIONS` doesn't change, because the
+  studio AI can't gather rows. The app guide needed nothing: its `plans` field is the panel guide.
+- **Tests.** `packages/node-core/src/server/dashboards/supplied.test.ts` runs a list, a table, a
+  line, bars, a heatmap, and the guide's example through `runDashboard`, and checks the failure
+  messages. `PublishedDashboardPanel.test.tsx` checks the line, the missing **Refresh**, and that
+  HTML and a `javascript:` link draw as text.
+
+### The two questions
+
+1. **Where a card's plan runs.** On the Node. A card, an app's `Panel` (`PlanPanel`), and a placed
+   panel all draw `PublishedDashboardPanel`, which posts the plan to `POST /v1/core/dashboards/run`
+   (`runDashboard`). Past describing and reading, the run path assumes a registered source in one
+   place: a filter on You asks the first source for the viewer's identity, and a supplied source
+   can't answer, so such a plan fails with a problem. Outside the run, five callers assumed one:
+   `describePanelSources` before publishing, the studio's source inspector, the studio AI's
+   authoring route, `pluginInputUsage`, and the dataset drill-down route. Each handles the kind.
+2. **What a description gives that `schema` and `fields` don't.** Nothing the validator or the
+   views read. Field roles, display kinds such as `datetime`, units, choice lists, and query
+   operators all live in `fields`. A description's other parts are `operations`, `revision`,
+   `consistency`, parameters, coverage, `writable`, `actions`, `targets`, `relations`,
+   `starterPlans`, `reach`, `projectScope`, and `dataset`. The supplied description fills the
+   required ones with fixed values and leaves the rest out. So a supplied panel has no board writes,
+   no row actions or targets, and no relations, and its outline reads its `consistency` sentence.
+
+### Decisions and deviations
+
+- **Not in `queryReferenceSchema`.** The doc said to add the kind there. That schema also types
+  workflow steps, the saved-query library, and the plugin API's `queries.resolve`, none of which can
+  take rows. The kind lives on the plan's source reference (`planSourceReferenceSchema`) instead.
+- **Only source, not only primary.** Equivalence joins two primary sources without a declared
+  relation, so "only primary" would still let an agent's rows merge with Acorn's records.
+- **Defaults taken.** Decision 1: 1,000 rows and 256 KiB per source. Decision 2: **Add to
+  dashboard** places the snapshot, line included.
+- **Not done.** A plan's `refresh` interval isn't refused on a supplied plan. A rerun returns the
+  same rows.
+
+### Still open
+
+- **Service size budget.** The Node's static graph is 1,914,527 bytes on this branch and 1,912,094
+  on the base, `a06946dc2`. That's 2,433 bytes more and 427 over the 1,914,100 ceiling. The growth
+  is the new schema in `panels.ts` and `supplied.ts`, which `routes/datasets.ts` reaches at boot
+  through `plan.ts`. The ceiling is unchanged, for the coordinator to raise.
+- **Real-agent check.** The acceptance check in `pnpm dev:agent` didn't run. The launcher fails on
+  the size budget, and auto mode refused building the automation shell by hand. Once the ceiling is
+  raised, run `pnpm dev:agent -- --session supplied`. Ask a Claude agent in a task to chart your
+  commits across every repository under `~/Source` this month, and check for a bar panel with the
+  origin line.
+- **Older clients.** An older client's card can't parse the plan. It says the plan didn't pass its
+  checks, shows the call's output, and keeps the call. An older client doesn't parse a published
+  revision, so it draws a placed snapshot with no origin line and a **Refresh** that changes nothing.
+
+### For later phases
+
+- Phase 2 copies `schema`, `fields`, and `rows` into `datasetCreateSchema`. The fields already sit
+  in the schema, which `createDataset` checks. An agent-fed dataset also needs `evidence`, `reason`,
+  and a nullable `correction` in its schema, plus `identityFields` and a mode. Supplied rows carry
+  none of those, so the promotion step adds them.
+- The **Add to dashboard** menu is in `PanelToolCard.tsx` and calls `addNewPanel`. A supplied
+  panel's records name the source `core:supplied`, with the row's index as the record ID.
 
 ## Goal
 

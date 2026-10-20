@@ -30,6 +30,7 @@ export function pluginInputUsage(db: AppDatabase, pluginId: string): PluginInput
       ...(revision.projectId ? { projectId: revision.projectId } : {}),
     }
     for (const entry of revision.content.sources) {
+      if (entry.reference.kind === 'supplied') continue
       let content: QueryContent
       try {
         content =

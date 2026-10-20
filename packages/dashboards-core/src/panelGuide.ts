@@ -1,4 +1,4 @@
-import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
+import { SUPPLIED_ROW_LIMITS, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { PANEL_CAPABILITIES } from './capabilities'
 
 // What a model is told about writing a panel plan. The panel studio's AI and a chat agent's
@@ -100,6 +100,56 @@ export const panelGuideExamples = (workspaceId: string) => [
   },
 ]
 
+/** A plan over rows an agent gathered itself, here by running git log in each repository. */
+const suppliedRowsExample = {
+  request: 'Chart my commits this month across every repository under ~/Source',
+  plan: {
+    version: 2,
+    title: 'My commits this month, by repository',
+    request: 'Chart my commits this month across every repository under ~/Source',
+    time: TIME,
+    sources: [
+      {
+        id: 'commits',
+        label: 'Commits',
+        role: 'primary',
+        reference: {
+          kind: 'supplied',
+          origin: { says: 'git log in each repository under ~/Source', readAt: Date.UTC(2026, 9, 20, 4, 31) },
+          schema: {
+            type: 'object',
+            properties: { repository: { type: 'string' }, commits: { type: 'integer' } },
+            required: ['repository', 'commits'],
+            additionalProperties: false,
+          },
+          fields: [
+            { pointer: '/repository', label: 'Repository', origin: 'declared', display: { kind: 'text' } },
+            { pointer: '/commits', label: 'Commits', origin: 'declared', display: { kind: 'number' } },
+          ],
+          rows: [
+            { repository: 'acorn', commits: 212 },
+            { repository: 'site', commits: 31 },
+            { repository: 'dotfiles', commits: 4 },
+          ],
+        },
+      },
+    ],
+    columns: [
+      { id: 'repository', label: 'Repository', type: 'text', bind: { commits: { field: '/repository' } } },
+      { id: 'commits', label: 'Commits', type: 'number', bind: { commits: { field: '/commits' } } },
+    ],
+    stages: [
+      {
+        op: 'summarize',
+        by: [{ column: 'repository' }],
+        measures: [{ id: 'total', label: 'Commits', kind: 'sum', column: 'commits' }],
+      },
+    ],
+    sort: [{ column: 'total', direction: 'desc' }],
+    view: { kind: 'chart', shape: 'bar', x: 'repository', aggregate: 'sum', field: 'total' },
+  } satisfies PanelPlan,
+}
+
 /** What `panel_guide` returns: the studio's instructions, and what a chat agent needs on top of them. */
 export const panelGuide = (workspaceId: string) => ({
   instructions: PANEL_AUTHORING_INSTRUCTIONS,
@@ -112,6 +162,13 @@ export const panelGuide = (workspaceId: string) => ({
     "Put the person's words in request. A checklist of requirements is welcome but not required here.",
     'Draw the plan with panel_show. It returns every problem with its path into the plan and draws nothing until there are none; fix them and call it again. To change a panel you showed, pass the panelId it returned, which keeps the earlier version in the conversation.',
   ],
+  suppliedRows: [
+    'Check data_sources_list first. A registered source beats rows you supply, because its panel refreshes and yours never does.',
+    'When no source answers the question and you gathered the rows yourself, such as a forecast you read from a web page or commit counts from git log, put them in the plan: a source with role primary whose reference is { kind: "supplied", origin, schema, fields, rows }. It must be the plan\'s only source.',
+    'origin says where the rows came from in one line, such as "Open-Meteo forecast for Wellington", lists the https pages you read them from in urls, and gives readAt, when you read them, in milliseconds since the epoch. The panel shows it under its title.',
+    `schema is an object schema for one row, and fields describes each field, in the shapes a dataset takes. Write values as text, numbers, and booleans, and a time as an ISO 8601 string whose field has display kind datetime. Every row must fit the schema, at most ${SUPPLIED_ROW_LIMITS.rows} rows and ${SUPPLIED_ROW_LIMITS.bytes / 1024} KiB in all. Bind columns to the fields as you would a source's.`,
+    "A recipe, a how-to, or a single fact isn't data. Answer it in words, or build an app if it needs layout.",
+  ],
   choosingAView: [
     'stat: one number, such as how many pull requests are open.',
     'list: records a person reads and opens, such as their open pull requests.',
@@ -122,5 +179,5 @@ export const panelGuide = (workspaceId: string) => ({
     'Bars split by series sit side by side; set stacked: true to stack them, so each bar is the total, such as spend by day stacked by model.',
     'heatmap: use one for "when" questions across two repeating time axes, such as weekday by hour. Bind two columns to the same date, summarize by one with bucket weekday and the other with bucket hour, then set y to the weekday column, x to the hour column, and aggregate sum of the measure.',
   ],
-  examples: panelGuideExamples(workspaceId),
+  examples: [...panelGuideExamples(workspaceId), suppliedRowsExample],
 })

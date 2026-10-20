@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { queryReferenceSchema, queryScopeSchema, type QueryScope } from '../data/queries/dataQueries'
-import { parseDataPredicate, type DataPredicate } from '../data/values/dataBindings'
-import { parseDataValue, type DataValue } from '../data/values/dataValues'
+import { dataFieldsSchema, parseDataPredicate, type DataPredicate } from '../data/values/dataBindings'
+import { DataValueError, parseDataSchema, validateDataValue, type DataSchema } from '../data/values/dataSchemas'
+import { parseDataPointer, parseDataValue, type DataValue } from '../data/values/dataValues'
+import { isPluginOpenableUrl } from '../content/externalUrl'
 import { dashboardViewSchema } from './dashboardViews'
 
 export { type DashboardView } from './dashboardViews'
@@ -116,6 +118,75 @@ const predicateSchema = z.unknown().transform((value, ctx): DataPredicate => {
   }
 })
 const columnId = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/)
+
+/** Caps on one supplied source's rows. The rows live in the transcript, so they count toward its size. */
+export const SUPPLIED_ROW_LIMITS = { rows: 1000, bytes: 256 * 1024 } as const
+const suppliedRowSchema = z.unknown().transform((value, ctx): DataSchema => {
+  try {
+    const schema = parseDataSchema(value)
+    if (schema.type === 'object') return schema
+    ctx.addIssue({ code: 'custom', message: 'Supplied rows need an object schema' })
+  } catch (error) {
+    ctx.addIssue({ code: 'custom', message: `Invalid row schema: ${(error as Error).message}` })
+  }
+  return z.NEVER
+})
+const schemaAt = (schema: DataSchema, pointer: string): DataSchema | undefined =>
+  (parseDataPointer(pointer) ?? []).reduce<DataSchema | undefined>(
+    (at, key) => (at?.properties && Object.hasOwn(at.properties, key) ? at.properties[key] : undefined),
+    schema,
+  )
+/** Rows an agent gathered itself, carried in the plan in place of a registered source. `schema` and
+ *  `fields` take a dataset's shapes, so the rows can be copied into a dataset unchanged. */
+const suppliedRowsSchema = z
+  .object({
+    kind: z.literal('supplied'),
+    origin: z
+      .object({
+        says: z.string().trim().min(1).max(200),
+        urls: z.array(z.string().max(2048).refine(isPluginOpenableUrl, 'Expected an https URL')).max(8).optional(),
+        readAt: z.number().finite(),
+      })
+      .strict(),
+    schema: suppliedRowSchema,
+    fields: dataFieldsSchema,
+    rows: z.array(dataValueSchema).max(SUPPLIED_ROW_LIMITS.rows),
+  })
+  .strict()
+  .superRefine((reference, ctx) => {
+    for (const [index, field] of reference.fields.entries())
+      if (!schemaAt(reference.schema, field.pointer))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['fields', index, 'pointer'],
+          message: `${field.pointer} isn't in the schema`,
+        })
+    let failures = 0
+    for (const [index, row] of reference.rows.entries()) {
+      try {
+        validateDataValue(row, reference.schema)
+      } catch (error) {
+        const pointer = error instanceof DataValueError ? error.pointer : ''
+        ctx.addIssue({
+          code: 'custom',
+          path: ['rows', index, ...pointer.split('/').slice(1)],
+          message: (error as Error).message,
+        })
+        // Enough to fix a pattern of mistakes without one issue per row.
+        if (++failures === 10) return
+      }
+    }
+    if (!failures && new TextEncoder().encode(JSON.stringify(reference.rows)).byteLength > SUPPLIED_ROW_LIMITS.bytes)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['rows'],
+        message: `Supplied rows are over ${SUPPLIED_ROW_LIMITS.bytes / 1024} KiB`,
+      })
+  })
+/** A plan source's reference: a registered source's query, or rows an agent supplied. Only a plan keeps
+ *  supplied rows, so the query library and workflows never see them. */
+const planSourceReferenceSchema = z.discriminatedUnion('kind', [...queryReferenceSchema.options, suppliedRowsSchema])
+export type SuppliedRows = z.infer<typeof suppliedRowsSchema>
 const presentation = z.enum(['route', 'refPanel', 'pane', 'overlay', 'external'])
 const openReference = z
   .object({
@@ -323,7 +394,7 @@ export const panelPlanSchema = z
             id: columnId,
             label,
             role: z.enum(['primary', 'lookup', 'children']),
-            reference: queryReferenceSchema,
+            reference: planSourceReferenceSchema,
           })
           .strict(),
       )

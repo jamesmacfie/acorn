@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import type { DashboardDraft, DashboardRevision, DashboardScope, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataSourceDescription } from '@acorn/protocol/dataSources.ts'
+import { suppliedPlanSource } from '@acorn/dashboards-core/plan.ts'
 import { ApiError, writeJson } from '../../infra/node/apiClient'
 import { queriesClient } from '../queries/queriesClient'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
@@ -22,17 +23,22 @@ export async function describePanelSources(
   scope: DashboardScope,
   plan: PanelPlan,
 ): Promise<PanelPublicationMetadata> {
+  const describe = async (source: PanelPlan['sources'][number]) => {
+    if (source.reference.kind === 'supplied') return suppliedPlanSource(source, source.reference, scope.workspaceId)
+    const { query } = await queriesClient(nodeId, scope).resolve(source.reference, {})
+    const description = await writeJson<DataSourceDescription>('/v1/core/data-sources/describe', {
+      method: 'POST',
+      nodeId,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ operation: 'describe', source: query.source, scope: query.scope }),
+    })
+    return { query, description }
+  }
   const metadata = await Promise.all(
     plan.sources.map(async (source) => {
-      const resolved = await queriesClient(nodeId, scope).resolve(source.reference, {})
-      const description = await writeJson<DataSourceDescription>('/v1/core/data-sources/describe', {
-        method: 'POST',
-        nodeId,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ operation: 'describe', source: resolved.query.source, scope: resolved.query.scope }),
-      })
+      const { query, description } = await describe(source)
       return {
-        key: `${resolved.query.source.pluginId}:${resolved.query.source.sourceId}`,
+        key: `${query.source.pluginId}:${query.source.sourceId}`,
         roles: description.fields.flatMap((field) => field.display?.role ?? []),
       }
     }),

@@ -16,7 +16,7 @@ const { _resetPluginDistribution, _seedPluginDistribution } = await import('../.
 const { activeCacheId } = await import('../../../infra/node/activeNode')
 const { shouldPersistQuery } = await import('../../../infra/persistence/queryPersistence')
 
-const tasks: PanelPlan['sources'][number] = {
+const tasks = {
   id: 'tasks',
   label: 'Tasks',
   role: 'primary',
@@ -30,7 +30,7 @@ const tasks: PanelPlan['sources'][number] = {
       query: { source: { pluginId: 'core', sourceId: 'tasks' }, scope: { workspaceId: 'w', parameters: {} }, sort: [] },
     },
   },
-}
+} satisfies PanelPlan['sources'][number]
 // A plan with a source but an empty title, which the schema refuses.
 const invalid: PanelPlan = {
   version: 2,

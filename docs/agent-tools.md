@@ -66,7 +66,10 @@ conversation ([dashboards](./dashboards.md#panels-from-a-conversation)).
 - `panel_guide` is read-only. It returns the plan instructions the panel studio's AI gets, which both
   read from `PANEL_AUTHORING_INSTRUCTIONS` in `packages/dashboards-core/src/panelGuide.ts`, so a change
   there changes both writers. It adds the task's workspace, the rules for plans that work on Home,
-  advice on choosing a view, and two worked plans for the GitHub pull requests source.
+  advice on choosing a view, and two worked plans for the GitHub pull requests source. Its
+  `suppliedRows` section, which only a chat agent gets, says when to put rows the agent gathered in
+  the plan ([supplied rows](./dashboards/supplied-rows.md)), and when an answer isn't data at all,
+  with a worked plan of its own.
 - `panel_show` is write-risk, and takes a title, a draft plan, and the `panelId` of an earlier card when
   it revises one. It runs the check publication runs: each source is described and the plan validated
   against it, as the Node, with no records read. A plan with problems fails the call with every

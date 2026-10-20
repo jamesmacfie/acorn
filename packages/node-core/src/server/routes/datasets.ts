@@ -82,9 +82,9 @@ export const datasetsRoute = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'invalid-request')
     try {
       const input = parsed.data
-      if (input.plan.sources.length !== 1 || input.plan.relations?.length)
-        return respondError(c, 400, 'invalid-request')
       const source = input.plan.sources[0]!
+      if (input.plan.sources.length !== 1 || input.plan.relations?.length || source.reference.kind === 'supplied')
+        return respondError(c, 400, 'invalid-request')
       const invocation = { principal: c.get('principal')!, signal: c.req.raw.signal }
       const resolved = await resolveQuery(c.env, input.scope, source.reference, {}, invocation)
       const id = resolved.query.source.pluginId === 'core' ? datasetIdFromSource(resolved.query.source.sourceId) : null

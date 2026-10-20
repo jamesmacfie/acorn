@@ -19,6 +19,7 @@ import { integrationsOptions } from '../../infra/queries'
 import { dataSourceCatalogOptions } from '../dataSources/queries'
 import { failureContext } from './planInputs'
 import SourceFailureAlert from './SourceFailureAlert'
+import SuppliedOrigin from './SuppliedOrigin'
 import { runChromeAction } from '../../host/chrome/actions'
 import {
   availableContentPresentations,
@@ -98,6 +99,11 @@ export default function PublishedDashboardPanel(props: {
     enabled: !props.plan,
     staleTime: 30_000,
   }))
+  /** Rows an agent supplied: they never refresh, and where they came from shows under the title. */
+  const supplied = createMemo(() => {
+    const reference = (props.plan ?? published.data?.content)?.sources[0]?.reference
+    return reference?.kind === 'supplied' ? reference : undefined
+  })
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const loaded = createQuery(() => ({
     queryKey: props.plan
@@ -615,19 +621,22 @@ export default function PublishedDashboardPanel(props: {
             <TitleField value={published.data?.content.title ?? props.definition.title} onDone={rename().onDone} />
           )}
         </Show>
-        <Button
-          size="xs"
-          variant="ghost"
-          iconOnly
-          busy={loaded.isFetching}
-          label={`Refresh ${props.definition.title}`}
-          onPress={() => void loaded.refetch()}
-        >
-          <Icon name="refresh-cw" />
-        </Button>
+        <Show when={!supplied()}>
+          <Button
+            size="xs"
+            variant="ghost"
+            iconOnly
+            busy={loaded.isFetching}
+            label={`Refresh ${props.definition.title}`}
+            onPress={() => void loaded.refetch()}
+          >
+            <Icon name="refresh-cw" />
+          </Button>
+        </Show>
         {props.actions?.(() => published.data)}
       </div>
       <div class="dash-panel-body">
+        <Show when={supplied()}>{(reference) => <SuppliedOrigin origin={reference().origin} />}</Show>
         <Show
           when={!loaded.error || loaded.data}
           fallback={

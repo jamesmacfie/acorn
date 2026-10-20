@@ -18,7 +18,8 @@ A placed `PanelDefinition` carries the publication ID and derived indexing metad
 There is one execution path:
 
 1. Resolve the dashboard publication in its workspace or project scope.
-2. Resolve each saved or inline query, including typed parameter bindings. A filter's
+2. Resolve each saved or inline query, including typed parameter bindings. A source holding
+   [supplied rows](./dashboards/supplied-rows.md) skips this step and the next. A filter's
    `{ from: "input" }` address takes its value from the run's `inputs`, which an agent-built app passes
    ([agent-built apps](./agent-built-apps.md#what-an-app-can-reach)). A run that leaves out an input the
    plan reads fails with the input's name.
@@ -188,13 +189,11 @@ See also [data layer](./data-layer.md), [schedules](./schedules.md), and
 
 - [Panels](./dashboards/panels.md) covers a panel's layers, the field vocabulary, provenance, and row
   actions.
-
 - [Views and trends](./dashboards/views.md) covers which views a schema allows, charts, heatmaps,
   hour and weekday buckets, and stat trends.
-
 - [Mapping and the editor](./dashboards/mapping-and-editor.md) covers cross-source panels and the
   editor.
-
 - [Placements](./dashboards/placements.md) covers Home tabs, plugin regions, and the grid.
-
 - [Sampling and retention](./dashboards/sampling.md) covers the measure history behind a stat trend.
+- [Supplied rows](./dashboards/supplied-rows.md) covers a plan that carries rows an agent gathered
+  itself, and how its panel says where they came from.

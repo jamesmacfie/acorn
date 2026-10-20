@@ -158,7 +158,7 @@ A program reaches only what its view hands it, a card or the pane, and the view 
 
 | What | In a program | What the host does |
 | --- | --- | --- |
-| The app's plans | `Query("name", inputs, defaults)`, `Panel("name", inputs)` | Runs the plan from the revision's files through the dashboard run route, under the viewer's device. A query's rows are each row's values plus `_id` and `_actions`. |
+| The app's plans | `Query("name", inputs, defaults)`, `Panel("name", inputs)` | Runs the plan from the revision's files through the dashboard run route, under the viewer's device. A query's rows are each row's values plus `_id` and `_actions`. A plan can carry rows the agent gathered itself ([supplied rows](./dashboards/supplied-rows.md)), and a `Panel` over one says where they came from, as a panel card does. |
 | Plan inputs | The second argument to `Query` or `Panel` | Sent as the run's `inputs`. The Node fills the plan's `{ from: "input" }` addresses with them, and the run fails if a plan reads one that wasn't passed. |
 | The task | `Query("task", {}, {})` | Returns the ID, title, and branch of the task the app is drawn in. A project app drawn in the Apps source has no task, and the query fails. |
 | Row actions | `Mutation("rowAction", {plan, row, action})` and `@Run` | Finds the row and action in its own last run of that plan, shows a confirm, and then calls the data source's action route. A program can't name a record or an action the source didn't offer. |
