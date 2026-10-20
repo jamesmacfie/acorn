@@ -9,6 +9,7 @@ add a source, add its row here.
 | Tasks (`core:tasks`) | Core | Task in the workspace | Yes | [Data sources](../data-sources.md) |
 | Local branches (`core:local-branches`) | Core | Local branch of a project | No | [Data sources](../data-sources.md) |
 | Local worktrees (`core:local-worktrees`) | Core | Worktree of a project | Yes | [Data sources](../data-sources.md) |
+| Schedules (`core:schedules`) | Core | Schedule on the Node | Yes | [Schedules](../schedules.md#the-schedules-data-source) |
 | Managed agent sessions (`agents:sessions`) | Agents | Unarchived session | No | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
 | Agent usage records (`agents:usage-records`) | Agents | Usage report | Yes | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
 | Agent turns (`agents:turns`) | Agents | Finished turn | Yes | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |

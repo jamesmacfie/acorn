@@ -137,6 +137,28 @@ turning a trend on never creates a hidden schedule.
 Every run writes a row. `schedule_runs` keeps the 20 most recent per schedule, trimmed on write, so
 the table is bounded and nothing sweeps it.
 
+## The Schedules data source
+
+`core:schedules` puts every schedule on the Node into a dashboard panel, one record per row of
+Settings → Schedules. It reads `scheduler.list()` through the `SCHEDULER` capability
+(`packages/node-core/src/server/dataSources/coreSchedules.ts`), so it lists what Settings lists,
+including a disabled plugin's retained rows.
+
+A record has the schedule's name, owner and plugin ID, kind, cadence in words, seconds between runs,
+on and available flags, and project. It also has the last run's time, outcome, and one-line error.
+The outcome is a choice with tones. **Last run** is the time field. **Next run** is null when the
+schedule is off or unavailable, or every schedule is paused. The run ring's details and a user
+schedule's target stay out. Pressing a record opens Settings → Schedules.
+
+A user schedule's target can declare a `scope`, the workspace or project it works in. The
+dataset-capture target names its dataset's workspace and project, and the workflows plugin's target
+names the workflow's project. A schedule with a scope appears only in that workspace's reads, and a
+project-scoped read drops another project's schedules. Everything else is the Node's work, so it
+appears in every workspace. No schedule belongs to a task.
+
+Three starters ship with it: **Schedules that failed last time**, **What runs next**, and **How
+often schedules run**.
+
 ## Limits
 
 Calendar-shaped work runs as a schedule row, and anything a person might want to see, pause, or retune

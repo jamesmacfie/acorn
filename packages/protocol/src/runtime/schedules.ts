@@ -64,6 +64,10 @@ export type ScheduleRow = {
   backoffUntil?: number
   /** Stamped at creation from the target's declared tier: the consent record for a user schedule. */
   risk?: ToolRisk
+  /** Set when the target works in one workspace or project, such as a dataset capture or a workflow.
+   *  Absent for work the whole Node does. */
+  workspaceId?: string
+  projectId?: string
 }
 
 export type ScheduleRun = {

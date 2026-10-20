@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { consumePaneIntent, evictPendingIntents } from '../commands/clientEvents'
+import { clientEvents, consumePaneIntent, evictPendingIntents } from '../commands/clientEvents'
 import {
+  availableContentPresentations,
   contentLinkRegistry,
   inAppPathFor,
   learnRefPrefixes,
@@ -49,6 +50,17 @@ describe('declarative content-link resolution', () => {
       expect(resolveNamedContentTarget('linear.card', 'ENG-42')).toBeNull()
     } finally {
       own.dispose()
+    }
+  })
+  it('opens a core schedule in Settings → Schedules, whatever the surface prefers', () => {
+    const tabs: string[] = []
+    const stop = clientEvents.on('presentation:open-settings', ({ tab }) => tabs.push(tab))
+    try {
+      expect(availableContentPresentations({ kind: 'core.schedule', item: 'core:audit-prune' })).toEqual(['overlay'])
+      expect(openNamedContentTarget('core.schedule', 'core:audit-prune', { prefer: 'route' })).toBe('overlay')
+      expect(tabs).toEqual(['schedules'])
+    } finally {
+      stop()
     }
   })
   it('opens the declared pane and retains the captured item as its selection', () => {

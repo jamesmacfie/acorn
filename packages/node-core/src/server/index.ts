@@ -39,6 +39,7 @@ import { worktree } from './routes/projects/worktree'
 import { dispatchPluginFetch } from './pluginHost/fetchRoute'
 import './dataSources/coreTasks'
 import './dataSources/localGitRegistration'
+import './dataSources/coreSchedulesRegistration'
 
 // One server, one namespace: /v1. createApp() is a factory so the bootstrap can build a fresh instance.
 // Core mounts only core routers by name, under /v1/core. Every plugin-owned router arrives through the

@@ -66,6 +66,17 @@ const coreTaskContentLink: ContentLinkContribution = {
   presentations: ['route'],
 }
 
+// Core has no plugin overlays. Its overlay is the Settings layer, opened on the page `overlay` names.
+const coreScheduleContentLink: ContentLinkContribution = {
+  id: 'core.schedule',
+  providerId: 'core',
+  parse: () => null,
+  target: (item) => ({ kind: 'core.schedule', item }),
+  overlay: 'schedules',
+  presentations: ['overlay'],
+}
+const coreContentLinks = new Map([coreTaskContentLink, coreScheduleContentLink].map((link) => [link.id, link]))
+
 /** Names are bound to their registering plugin, never to a kind copied from a record. */
 export function resolveNamedContentTarget(
   kind: string,
@@ -73,9 +84,8 @@ export function resolveNamedContentTarget(
 ): { target: InAppTarget; contribution: ContentLinkContribution } | null {
   if (!item || !/^[a-z0-9-]+\.[a-z0-9-]+$/.test(kind)) return null
   const contribution =
-    kind === 'core.task'
-      ? coreTaskContentLink
-      : contentLinkRegistry.entries().find((entry) => entry.id === kind && kind.startsWith(`${entry.providerId}.`))
+    coreContentLinks.get(kind) ??
+    contentLinkRegistry.entries().find((entry) => entry.id === kind && kind.startsWith(`${entry.providerId}.`))
   if (!contribution) return null
   const candidate = contribution.target?.(item) ?? { kind, item }
   if (!candidate || candidate.kind !== kind || candidate.item !== item) return null
@@ -368,7 +378,8 @@ function openClaim(
     if (rung === 'refPanel' && openRefPanelTarget(target)) return 'refPanel'
     if (rung === 'route' && openRouteTarget(path, presentation)) return 'route'
     if (rung === 'overlay' && contribution?.overlay && typeof target.providerId === 'string') {
-      openPluginOverlay(target.providerId, contribution.overlay)
+      if (target.providerId === 'core') clientEvents.emit('presentation:open-settings', { tab: contribution.overlay })
+      else openPluginOverlay(target.providerId, contribution.overlay)
       return 'overlay'
     }
   }

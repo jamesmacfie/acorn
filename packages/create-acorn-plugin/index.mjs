@@ -593,6 +593,7 @@ export const KNOWN_SOURCES = [
   { source: 'agents:usage-records', name: 'Agent usage records' },
   { source: 'core:local-branches', name: 'Local branches', title: 'name' },
   { source: 'core:local-worktrees', name: 'Local worktrees', title: 'path' },
+  { source: 'core:schedules', name: 'Schedules', title: 'name' },
   { source: 'core:tasks', name: 'Tasks', title: 'title' },
   { source: 'git:commits', name: 'Git commits', title: 'subject' },
   { source: 'github:actions-jobs', name: 'GitHub Actions jobs', title: 'job' },

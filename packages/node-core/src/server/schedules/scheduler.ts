@@ -75,8 +75,13 @@ export type ScheduleTarget = {
     context: ScheduleRunContext,
   ): Promise<string | void>
   timezone?(target: unknown): string | undefined
+  /** The workspace or project the target works in, so the Schedules data source can scope it. A
+   *  project is enough, because its workspace is looked up. Absent means the schedule is the Node's. */
+  scope?(target: unknown): ScheduleScope | undefined
   remove?(target: unknown): Promise<void>
 }
+
+type ScheduleScope = Pick<ScheduleRow, 'workspaceId' | 'projectId'>
 
 /** What the row remembers about the one time the owner was asked. Handed to every run because a target
  *  cannot see its own row, and checking that the stamp still covers the target's current declared tier is
@@ -154,6 +159,7 @@ type Entry = {
   state: StateRow
   run?: ScheduleRunner
   timezone?: string
+  scope?: ScheduleScope | undefined
 }
 
 export type CreateScheduleInput = { name: string; kind: string; target: unknown; cadence: Cadence }
@@ -658,6 +664,7 @@ export class Scheduler {
           timeoutMs: DEFAULT_TIMEOUT_MS,
           ...(row.risk ? { risk: row.risk as ToolRisk } : {}),
           ...(parsed !== null && target?.timezone?.(parsed) ? { timezone: target.timezone(parsed) } : {}),
+          ...(parsed !== null && target?.scope ? { scope: target.scope(parsed) } : {}),
           ...(target
             ? {
                 run: (signal: AbortSignal, context?: ScheduleRunContext) => {
@@ -745,6 +752,7 @@ function toRow(entry: Entry): ScheduleRow {
     ...(entry.state.lastError === null ? {} : { lastError: entry.state.lastError }),
     ...(entry.state.backoffUntil === null ? {} : { backoffUntil: entry.state.backoffUntil }),
     ...(entry.risk ? { risk: entry.risk } : {}),
+    ...entry.scope,
   }
 }
 

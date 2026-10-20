@@ -2330,6 +2330,308 @@
       }
     ]
   },
+  "core:schedules": {
+    "name": "Schedules",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "pluginId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "cadence": {
+          "type": "string"
+        },
+        "periodSeconds": {
+          "type": "number"
+        },
+        "lastRunAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lastStatus": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastError": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nextRunAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "owner",
+        "pluginId",
+        "kind",
+        "enabled",
+        "available",
+        "cadence",
+        "periodSeconds",
+        "lastRunAt",
+        "lastStatus",
+        "lastError",
+        "nextRunAt",
+        "projectId",
+        "project"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/name",
+        "label": "Schedule",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        },
+        "query": {
+          "operators": [
+            "eq",
+            "ne",
+            "contains"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/owner",
+        "label": "Owner",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        },
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "user",
+              "label": "You"
+            },
+            {
+              "id": "plugin",
+              "label": "Plugin"
+            },
+            {
+              "id": "core",
+              "label": "Acorn"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/pluginId",
+        "label": "Plugin",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/kind",
+        "label": "Kind",
+        "description": "What the schedule runs: core or plugin work, or a target such as node-action or workflow.",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/enabled",
+        "label": "On",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        }
+      },
+      {
+        "pointer": "/available",
+        "label": "Available",
+        "description": "False when nothing on this Node can run it, such as a disabled plugin.",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        }
+      },
+      {
+        "pointer": "/cadence",
+        "label": "Runs",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/periodSeconds",
+        "label": "Seconds between runs",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        },
+        "query": {
+          "operators": [
+            "lt",
+            "lte",
+            "gt",
+            "gte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/lastRunAt",
+        "label": "Last run",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "eq",
+            "ne"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/lastStatus",
+        "label": "Last outcome",
+        "origin": "declared",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "ok",
+              "label": "Succeeded",
+              "tone": "ok"
+            },
+            {
+              "id": "error",
+              "label": "Failed",
+              "tone": "bad"
+            },
+            {
+              "id": "timeout",
+              "label": "Timed out",
+              "tone": "bad"
+            },
+            {
+              "id": "skipped",
+              "label": "Skipped",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/lastError",
+        "label": "Last error",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/nextRunAt",
+        "label": "Next run",
+        "description": "Null when the schedule is off, unavailable, or every schedule is paused.",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "eq",
+            "ne"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/project",
+        "label": "Project",
+        "description": "Null for work the whole Node does.",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        }
+      }
+    ]
+  },
   "core:tasks": {
     "name": "Tasks",
     "schema": {

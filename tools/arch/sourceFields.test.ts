@@ -5,6 +5,7 @@ import type { DataSourceDescription, DataSourceRegistration } from '../../packag
 import { registeredDataSource } from '../../packages/node-core/src/server/dataSources/registry.ts'
 import '../../packages/node-core/src/server/dataSources/coreTasks.ts'
 import '../../packages/node-core/src/server/dataSources/localGitRegistration.ts'
+import '../../packages/node-core/src/server/dataSources/coreSchedulesRegistration.ts'
 import { approvalSourceDescription } from '../../plugins/agents/src/shared/approvalSource.ts'
 import { sessionSource, sessionSourceDescription } from '../../plugins/agents/src/shared/sessionSource.ts'
 import { sessionTotalsSourceDescription } from '../../plugins/agents/src/shared/sessionTotalsSource.ts'
@@ -59,6 +60,7 @@ async function fieldLists() {
     'core:tasks': await core('tasks'),
     'core:local-branches': localBranches,
     'core:local-worktrees': await core('local-worktrees'),
+    'core:schedules': await core('schedules'),
     'agents:sessions': [sessionSource, sessionSourceDescription],
     'agents:usage-records': [usageSource, usageSourceDescription],
     'agents:turns': [turnSource, turnSourceDescription],

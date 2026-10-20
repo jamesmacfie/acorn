@@ -23,6 +23,13 @@ export function registerDatasetCaptureTarget(scheduler: Scheduler, db: AppDataba
       return row ? { datasetId: raw.datasetId } : null
     },
     risk: () => 'write',
+    scope: (raw) => {
+      const dataset = db.$client
+        .prepare('SELECT workspace_id AS workspaceId, project_id AS projectId FROM datasets WHERE id = ?')
+        .get((raw as { datasetId: string }).datasetId) as { workspaceId: string; projectId: string | null } | undefined
+      if (!dataset) return undefined
+      return { workspaceId: dataset.workspaceId, ...(dataset.projectId ? { projectId: dataset.projectId } : {}) }
+    },
     run: async (raw, signal) => {
       const { captureDataset } = await import('./capture')
       return captureDataset(db, env, (raw as { datasetId: string }).datasetId, signal)

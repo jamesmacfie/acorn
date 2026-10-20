@@ -28,6 +28,15 @@ next. On each row:
 
 **Pause every schedule on this node** stops them all until you turn it off.
 
+## Schedules on a dashboard
+
+To keep an eye on schedules from a dashboard, choose **Add panel**, then **Schedules**. The starters
+answer which schedules failed last time, what runs next, and how often each one runs. Click a row to
+open **Settings** > **Automation** > **Schedules**.
+
+A panel lists the Node's own work in every workspace. A schedule that works in one workspace or
+project, such as a dataset capture or a workflow schedule, appears only there.
+
 ## acorn's and plugins' schedules
 
 acorn keeps itself tidy on a schedule, such as removing audit log entries older than 90 days, each

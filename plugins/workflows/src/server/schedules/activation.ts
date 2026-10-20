@@ -71,6 +71,10 @@ export const workflowScheduleTarget = (
     },
     risk: () => 'execute',
     timezone: (target) => scheduleService.timezone((target as { scheduleId: string }).scheduleId),
+    scope: (target) => {
+      const projectId = scheduleService.get((target as { scheduleId: string }).scheduleId)?.projectId
+      return projectId ? { projectId } : undefined
+    },
     run: (target, signal, _consent, context) =>
       scheduleService
         .dispatch((target as { scheduleId: string }).scheduleId, {
