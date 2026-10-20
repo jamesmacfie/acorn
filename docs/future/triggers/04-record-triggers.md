@@ -98,9 +98,11 @@ else. The **Triggers** list read "Every 5 minutes, when a record is new", and th
 records change**, the inputs as **From the record**, "Last checked … Read every match.", the match,
 and the preview's "Process current matches would start …" line.
 
-That check found a loop the unit tests missed, fixed below: on a first session, renaming a task under
-a **Changes** trigger beside the **New** one started 12 runs in under a minute, because each run's task
-title also contains "triage".
+That check found a loop the unit tests missed: on a first session, renaming a task under a **Changes**
+trigger beside the **New** one started 12 runs in under a minute, because each run's task title also
+contains "triage". The task guard above fixes a trigger feeding on itself, and the run above is on
+that fix. The preview still said "would start" for the run's own task there. It applies the guard
+too since, which `records.test.ts` checks, and that build wasn't run live.
 
 Not checked live: the Workflow runs case, which needs a failed run, the five-task cap, which needs five
 task branches in this repository, and the terminal client. `records.test.ts` covers the first two, and
