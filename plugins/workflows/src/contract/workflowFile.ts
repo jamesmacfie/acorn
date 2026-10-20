@@ -37,8 +37,7 @@ export const WORKFLOW_FILE_TABLES: WorkflowFileTable[] = [
       {
         key: 'trigger',
         type: 'string',
-        description:
-          'Kept with the definition. Nothing in acorn reads it to start a run: a plugin’s trigger picks the workflows it starts.',
+        description: 'Ignored. A workflow starts on its own through a trigger in the Workflows list.',
       },
       {
         key: 'max_descendants',
@@ -402,5 +401,6 @@ export const WORKFLOW_FILE_TABLES: WorkflowFileTable[] = [
   },
 ]
 
-/** Keys the loader reads that the writer never writes, because a loaded file has already used them. */
-export const WORKFLOW_FILE_LOADER_ONLY = ['steps[].workflow']
+/** Keys the loader accepts that the writer never writes: one a loaded file has already used, or one
+ *  the loader ignores so an older file still loads. */
+export const WORKFLOW_FILE_LOADER_ONLY = ['steps[].workflow', 'trigger']

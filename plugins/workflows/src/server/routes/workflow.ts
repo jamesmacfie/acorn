@@ -314,6 +314,3 @@ export const workflow = new Hono<AppEnv>()
   .get('/runs', (c) =>
     isTaskConfined(c) ? respondError(c, 403, 'forbidden') : viaBridge(c, WORKFLOW_ROUTE, (b) => b.allRuns()),
   )
-// No trigger-poll route. The sweep is a node schedule, and "check now" is the scheduler's own run-now
-// on the settings page. A second, workflow-only door to the same sweep would need its own confinement
-// rule for no extra reach.

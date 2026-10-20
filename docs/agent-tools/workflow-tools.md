@@ -45,8 +45,7 @@ withheld whole and named, never cut short.
 ## Projections
 
 `projection.ts` decides what an agent reads of a definition. It leaves out the configuration AI
-authoring hides: a trigger, a tool allowlist, a run target, and a contributed kind's `headers` and
-`auth`. It also leaves out private values: each root input's default, any string under a
+authoring hides: a tool allowlist, a run target, and a contributed kind's `headers` and `auth`. It also leaves out private values: each root input's default, any string under a
 credential-like key such as `token` or `password`, and any string the shared secret detector flags.
 Harness, model, and options stay visible, because the owner reviews them before publication.
 `withheld` lists each path left out, such as `steps[post].with.auth`.

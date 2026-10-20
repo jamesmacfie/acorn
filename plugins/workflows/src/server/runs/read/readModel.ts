@@ -19,7 +19,7 @@ const runFields = {
   name: schema.workflowRuns.name,
   status: schema.workflowRuns.status,
   posture: schema.workflowRuns.posture,
-  trigger: schema.workflowRuns.trigger,
+  startedBy: schema.workflowRuns.startedBy,
   defJson: schema.workflowRuns.defJson,
   rootRunId: schema.workflowRuns.rootRunId,
   parentRunId: schema.workflowRuns.parentRunId,
@@ -67,7 +67,7 @@ export async function workflowRunsForTask(
     .where(
       and(
         eq(schema.workflowRuns.taskId, taskId),
-        ...(includeAgentItems ? [] : [ne(schema.workflowRuns.trigger, 'agent-map')]),
+        ...(includeAgentItems ? [] : [ne(schema.workflowRuns.startedBy, 'agent-map')]),
       ),
     )
     .orderBy(desc(schema.workflowRuns.createdAt), sql`${schema.workflowRuns}.rowid`)

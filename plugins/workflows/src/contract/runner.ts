@@ -1,6 +1,6 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
-import type { WorkflowDef } from '../shared/workflowContracts'
+import type { WorkflowDef, WorkflowStartedBy } from '../shared/workflowContracts'
 
 // workflows.runner: the lifecycle methods the composition root and Node-owned schedulers need after
 // plugin initialization, reached through this declared surface rather than an import of the runner.
@@ -15,7 +15,7 @@ type WorkflowInternalStartBase = {
   intendedRunId: string
   callerKey: string
   payloadFingerprint: string
-  trigger: string
+  startedBy: WorkflowStartedBy
 }
 
 export type WorkflowInternalStart = WorkflowInternalStartBase & ({ workflow: WorkflowDef } | { workflowId: string })

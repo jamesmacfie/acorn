@@ -44,6 +44,11 @@ agent origin in `agent_origin_json`. The editor labels it **Agent draft**, and i
 publish it ([workflow tools](../agent-tools/workflow-tools.md#drafts)). The device-only routes above
 stay closed to agents. The tool writes through the same draft store the editor uses.
 
+**A key nothing reads.** A file or row may still set `trigger`. The loader ignores it, a stored
+draft or revision drops it when it's read, and the next save leaves it out. Dropping it changes the
+definition's fingerprint, so an approved schedule over a workflow that set it moves to
+**Needs review** once.
+
 **What a row may name.** A run target, a saved query, or an agent profile is checked when the step
 runs, not when the row is saved. The node holding a definition may not have the repository at all, so
 `POST /v1/p/workflows/defs/validate` answers the loader's own problem list and leaves the

@@ -55,9 +55,6 @@ export const workflowsClientPlugin: ClientPlugin = {
       retry: workflowApi.retry,
       runForSession: workflowApi.runForSession,
     })
-    // No trigger clock here. The sweep runs on the node, because a client clock skips ticks while the
-    // window is hidden and never runs on a node with no client attached.
-    //
     // What a workflow agent tool call looks like in the transcript, with a link to what it made or
     // started. The names are a literal, not an import, so the card stays out of boot.
     ctx.extensions.register({

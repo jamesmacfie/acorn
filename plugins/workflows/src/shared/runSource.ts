@@ -43,7 +43,6 @@ const fieldSpecs: FieldSpec[] = [
       ],
     },
   },
-  // Dynamic, because a plugin's own trigger stores its contribution id here.
   {
     key: 'trigger',
     type: 'string',

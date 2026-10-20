@@ -6,6 +6,7 @@
 // CoreServices.tasks and the agents capability.
 import { sql } from 'drizzle-orm'
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import type { WorkflowStartedBy } from '../shared/workflowContracts'
 
 // Workflow runs (docs/workflows.md): the durable checkpoint for the state machine. Machine-scoped
 // like core's tasks.
@@ -17,7 +18,8 @@ export const workflowRuns = sqliteTable(
     name: text('name').notNull(),
     status: text('status').notNull(), // running | gated | cancelling | done | failed | safety-rail | cancelled
     posture: text('posture').notNull().default('gated'), // gated (default) | autonomous
-    trigger: text('trigger').notNull().default('manual'),
+    startedBy: text('started_by').$type<WorkflowStartedBy>().notNull().default('manual'),
+    triggerId: text('trigger_id'), // the trigger that started the run, null for any other start
     defJson: text('def_json').notNull(), // the WorkflowDef this run executes (frozen at start)
     // The resolved root and child definitions captured by executable preflight. Kept separate from
     // def_json so the definition shown in the run pane remains the definition the owner authored.

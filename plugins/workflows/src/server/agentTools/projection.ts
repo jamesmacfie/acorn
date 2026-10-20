@@ -2,8 +2,8 @@
 // (docs/agent-tools/workflow-tools.md § Projections).
 //
 // Two kinds of value stay on the Node. Protected configuration is the execution target and credential
-// set AI authoring hides too (../authoring/edit.ts): a trigger, a tool allowlist, a run target, and a
-// contributed kind's `headers` and `auth`. Provider choices are not on that list here, because a
+// set AI authoring hides too (../authoring/edit.ts): a tool allowlist, a run target, and a contributed
+// kind's `headers` and `auth`. Provider choices are not on that list here, because a
 // harness, model, or reasoning setting is ordinary draft content the owner reviews before
 // publication. The second kind is private: a root input's default value, which list results already
 // hide, any string under a credential-like key such as `token` or `password`, and any other string the
@@ -24,7 +24,7 @@ type Json = Record<string, unknown>
 type Segment = { key: string } | { item: string; kind?: string }
 type Located = { segments: Segment[]; reason: WithheldField['reason'] }
 
-const ROOT_PROTECTED = [['trigger'], ['tools', 'allow']]
+const ROOT_PROTECTED = [['tools', 'allow']]
 const STEP_PROTECTED = [['requiresRun'], ['tools', 'allow'], ...SCRUBBED_WITH_KEYS.map((key) => ['with', key])]
 
 // A key whose string value is a credential whether or not the detector recognises its shape. Matched at

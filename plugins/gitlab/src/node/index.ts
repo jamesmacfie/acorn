@@ -29,7 +29,6 @@ export const gitlabPlugin = (): NodePlugin => ({
   label: 'GitLab',
   required: false,
   // What other plugins may hear from this one (docs/plugins/events.md § Hearing another plugin).
-  // workflows hears `checks-changed`.
   emits: [
     { verb: 'checks-changed', description: "A merge request's pipeline jobs changed state" },
     { verb: 'pr-synced', description: "A merge request's mirror was committed" },

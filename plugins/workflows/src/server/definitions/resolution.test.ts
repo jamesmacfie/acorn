@@ -13,6 +13,7 @@ import {
   type WorkflowResolutionScope,
 } from './resolution'
 import type { WorkflowValidationCatalog } from '../validation/definition'
+import { workflowDefs, workflowRevisions } from '../../node/schema'
 
 const catalog: WorkflowValidationCatalog = {
   stepKinds: new Set(['agent']),
@@ -56,6 +57,16 @@ describe('scoped workflow resolution', () => {
   afterEach(() => {
     store.cleanup()
     rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('drops a `trigger` key that a stored draft or revision still holds', async () => {
+    const row = await createDef(store.db, { workspaceId: scope.workspaceId, projectId: scope.projectId, def: leaf() })
+    const stored = JSON.stringify({ ...leaf(), trigger: 'nightly' })
+    await store.db.update(workflowDefs).set({ defJson: stored })
+    await store.db.update(workflowRevisions).set({ defJson: stored })
+    expect((await getDef(store.db, row.id))!.def).not.toHaveProperty('trigger')
+    const resolved = await resolveScopedWorkflowDefinition(store.db, { source: 'database', id: row.id }, scope, catalog)
+    expect(resolved.definition).not.toHaveProperty('trigger')
   })
 
   it('freezes child defaults and source provenance into one stable graph fingerprint', async () => {

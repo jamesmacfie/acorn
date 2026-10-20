@@ -400,9 +400,9 @@ export class WorkflowDispatcher {
             depth: payload.rootReprocess ? 0 : payload.depth,
           },
           ...(row.taskMode === 'parent'
-            ? { trigger: 'agent-map' }
+            ? { startedBy: 'agent-map' }
             : payload.rootReprocess
-              ? { trigger: 'reprocess' }
+              ? { startedBy: 'reprocess' }
               : {}),
           effectiveTools: payload.effectiveTools,
           effectiveBudget: payload.effectiveBudget,

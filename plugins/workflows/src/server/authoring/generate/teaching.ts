@@ -213,7 +213,6 @@ export const SECTION_CONCEPTS = [
   '',
   'These look plausible and are not available here. Each one is stripped out of your answer:',
   '',
-  '  trigger          what starts a workflow on its own.',
   '  tools.allow      a named tool allowlist. Use tools.maxRisk.',
   '  model            a model name on a step. The profile decides.',
   '  configOptions    provider options on a step.',

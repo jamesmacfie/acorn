@@ -1,9 +1,8 @@
-import { describeError, type Disposable, type NodePlugin, type PluginDatabase } from '@acorn/plugin-api/node'
+import type { NodePlugin, PluginDatabase } from '@acorn/plugin-api/node'
 import { destinationQuery } from '../validation/destination'
 import { parseWorkflowScheduleTarget, WorkflowScheduleService, type WorkflowScheduleScheduler } from './service'
 import type { WorkflowSchedulesBridge } from '../routes/schedules'
 import type { WorkflowStartService } from '../runs/admission'
-import type { WorkflowRunner } from '../runs/runner'
 
 type PluginContext = Parameters<NonNullable<NodePlugin['init']>>[0]
 type ScheduleContext = Pick<PluginContext, 'core' | 'dataSources' | 'schedules'>
@@ -102,48 +101,4 @@ export const workflowScheduleBridge = (scheduleService: WorkflowScheduleService)
     runNow: (id) => scheduleService.runNow(id),
     remove: (id) => scheduleService.deleteManaged(id),
   }
-}
-
-/** A Node clock backs trigger sweeps, with a code host's `checks-changed` as an early wakeup. */
-export const registerWorkflowTriggers = (
-  ctx: Pick<PluginContext, 'core' | 'events' | 'schedules' | 'log'>,
-  runner: WorkflowRunner,
-): void => {
-  const sweep = () => {
-    void runner
-      .pollTriggers()
-      .catch((error) => ctx.log.warn(`trigger sweep after checks-changed failed: ${describeError(error).message}`))
-  }
-  // One subscription per running code host, kept in step with the roster so a code host that starts
-  // or stops after this plugin is followed too.
-  const hosts = new Map<string, Disposable>()
-  const followCodeHosts = () => {
-    const running = new Set(ctx.core.codeHosts())
-    for (const [id, subscription] of hosts) {
-      if (running.has(id)) continue
-      subscription.dispose()
-      hosts.delete(id)
-    }
-    for (const id of running) {
-      if (hosts.has(id)) continue
-      try {
-        hosts.set(id, ctx.events.on(`plugin:${id}:checks-changed`, sweep))
-      } catch {
-        // A code host that doesn't emit `checks-changed` refuses the subscription. Its tasks wait for
-        // the clock.
-      }
-    }
-  }
-  followCodeHosts()
-  ctx.events.on('plugins:changed', followCodeHosts)
-  ctx.schedules.register({
-    scheduleId: 'triggers',
-    name: 'Workflow triggers',
-    cadence: { every: 300 },
-    run: async () => {
-      const { started, errors } = await runner.pollTriggers()
-      if (errors.length) throw new Error(errors.join('; '))
-      return started ? `started ${started}` : undefined
-    },
-  })
 }

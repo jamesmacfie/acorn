@@ -519,7 +519,6 @@ describe('the user prompt', () => {
       baseline: 'acorn-1' as const,
       formatVersion: 1 as const,
       name: 'Deploy',
-      trigger: 'schedule:nightly',
       tools: { maxRisk: 'execute', allow: ['deploy'] },
       steps: [
         {
@@ -547,14 +546,7 @@ describe('the user prompt', () => {
     expect(text).toContain('"name": "ship"')
     expect(text).toContain('"url": "https://example.com/deploy"')
     expect(text).toContain('Keep every name, step, prompt, edge, input')
-    for (const hidden of [
-      'schedule:nightly',
-      'private-model',
-      '"configOptions"',
-      '"requiresRun"',
-      'secret-auth',
-      'Bearer secret',
-    ]) {
+    for (const hidden of ['private-model', '"configOptions"', '"requiresRun"', 'secret-auth', 'Bearer secret']) {
       expect(text).not.toContain(hidden)
     }
   })

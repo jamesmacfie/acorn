@@ -80,13 +80,13 @@ export function resolveWorkflowReprocess(
       )
       .all()
     const runs = db
-      .select({ trigger: schema.workflowRuns.trigger, status: schema.workflowRuns.status })
+      .select({ startedBy: schema.workflowRuns.startedBy, status: schema.workflowRuns.status })
       .from(schema.workflowRuns)
       .where(eq(schema.workflowRuns.taskId, dispatch.taskId))
       .all()
     if (
       dispatches.some((row) => row.state !== 'terminal') ||
-      runs.some((row) => row.trigger === 'agent-map' && ['running', 'gated', 'cancelling'].includes(row.status))
+      runs.some((row) => row.startedBy === 'agent-map' && ['running', 'gated', 'cancelling'].includes(row.status))
     ) {
       throw new Error('Another item is using this task’s folder. Run this item again after the loop finishes.')
     }

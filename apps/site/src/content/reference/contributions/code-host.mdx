@@ -19,8 +19,8 @@ while it runs with `ctx.codeHosts.claim(host)`. Your browser handoffs and conten
 
 To let workflows wait for your host's CI, file a `ci-settled` workflow policy, and a `review-received`
 one for reviews. A workflow's `checks-green`, `review-received`, and `ci-loop` steps ask yours when the
-task's pull request is on your host. Emit `checks-changed` when checks change, and workflow triggers
-check early instead of waiting up to five minutes.
+task's pull request is on your host. Emit `checks-changed` when checks change, so any plugin that
+listens can read them again.
 
 ## A minimal example
 

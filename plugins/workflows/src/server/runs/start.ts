@@ -9,6 +9,7 @@ import type {
   WorkflowBudget,
   WorkflowDef,
   WorkflowRunRow,
+  WorkflowStartedBy,
 } from '../../shared/workflowContracts'
 import { resolveWorkflowInputs } from '../validation/definition'
 import { MAX_CHILD_WORKFLOW_DEPTH } from '../definitions/resolution'
@@ -25,7 +26,7 @@ type WorkflowInvocationIdentity = {
 export type WorkflowStartOptions = {
   processingScope?: import('../../shared/workflowProcessing').WorkflowProcessingScope
   processingBaseline?: boolean
-  trigger?: string
+  startedBy?: WorkflowStartedBy
   inputs?: Record<string, DataValue>
   intendedRunId?: string
   invocation?: WorkflowInvocationIdentity
@@ -104,7 +105,7 @@ export async function persistWorkflowStart(
     : []
   const defJson = JSON.stringify(frozen)
   const resolvedGraphJson = options?.resolvedGraph ? JSON.stringify(options.resolvedGraph) : null
-  const trigger = options?.trigger ?? def.trigger ?? 'manual'
+  const startedBy = options?.startedBy ?? 'manual'
   const effectiveTools = options?.effectiveTools ?? def.tools ?? {}
   const effectiveBudget = options?.effectiveBudget ?? def.budget ?? {}
   const deadlineAt =
@@ -146,7 +147,7 @@ export async function persistWorkflowStart(
         existing.taskId === taskId &&
         existing.defJson === defJson &&
         existing.resolvedGraphJson === resolvedGraphJson &&
-        existing.trigger === trigger &&
+        existing.startedBy === startedBy &&
         existing.invocationKey === (options?.invocation?.callerKey ?? null) &&
         existing.payloadFingerprint === (options?.invocation?.payloadFingerprint ?? null) &&
         existing.rootRunId === (options?.invocation?.rootRunId ?? runId) &&
@@ -171,7 +172,7 @@ export async function persistWorkflowStart(
         name: def.name,
         status: 'running',
         posture: def.posture ?? 'gated',
-        trigger,
+        startedBy,
         defJson,
         resolvedGraphJson,
         rootRunId: options?.invocation?.rootRunId ?? runId,

@@ -30,8 +30,7 @@ const toolsForPrompt = <T extends { allow?: unknown }>(tools: T | undefined): T 
  *  protected field cannot make one path leak what the other withholds. */
 export function definitionForPrompt(def: WorkflowDef): PromptWorkflowDef {
   const { id: _id, source: _source, ...rest } = def as WorkflowDef & { id?: unknown; source?: unknown }
-  const { trigger: _trigger, ...visible } = rest
-  const { tools: visibleTools, ...withoutTools } = visible
+  const { tools: visibleTools, ...withoutTools } = rest
   const tools = toolsForPrompt(visibleTools)
   return {
     ...withoutTools,
@@ -120,7 +119,6 @@ export function restoreProtectedDefinition(current: WorkflowDef, changed: Workfl
   })
   return {
     ...changed,
-    ...(Object.hasOwn(current, 'trigger') ? { trigger: current.trigger } : {}),
     tools: restoreTools(current.tools, changed.tools),
     steps,
   }

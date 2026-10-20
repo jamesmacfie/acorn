@@ -51,7 +51,7 @@ lists a step kind's `select` fields point at, both shaped `{ options: [{ value, 
 
 Node-owned callers use the `workflows.runner` capability instead of HTTP. Its start request supplies
 a task ID, optional inputs, a stable caller key and payload fingerprint, a reserved run ID, and a
-trigger, with an inline definition or a saved definition ID. The plugin resolves saved references in
+start reason, with an inline definition or a saved definition ID. The plugin resolves saved references in
 the task's scope, freezes the graph, and checks a replay against the same invocation identity.
 Scheduled workflows use this handoff.
 

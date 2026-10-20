@@ -117,7 +117,7 @@ memory](./notes-and-memory.md) covers all three.
 ## Workflows
 
 Workflows come from trusted `.acorn/workflows/*.toml` files or from definitions the owner writes in
-the app. The Node stores runs, steps, gates, budgets, branches, joins, and trigger state. Agent,
+the app. The Node stores runs, steps, gates, budgets, branches, joins, and schedule state. Agent,
 terminal, GitHub-check, and human-gate steps use typed capabilities and structured step output. The
 editor creates and revises both kinds of definition, and the run pane shows progress and gate
 controls. [Workflows](./workflows.md) covers them.

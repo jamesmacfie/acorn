@@ -41,7 +41,7 @@ one-shot generation contract. The workflow editor uses `/defs/authoring/turn` fo
 editing.
 
 The edit projection removes provider choices, configured execution targets, tool allowlists,
-triggers, and the `headers` and `auth` fields of contributed step configuration from each step. The
+and the `headers` and `auth` fields of contributed step configuration from each step. The
 scoped catalog separately lists the child targets that the model may use on a new step. After the
 answer is grounded, the server restores protected values onto each surviving step with the same name
 and kind. Deleting, renaming, or changing the kind of a step deliberately breaks that identity and

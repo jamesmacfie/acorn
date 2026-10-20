@@ -392,13 +392,12 @@ describe('keys outside the vocabulary', () => {
             tools: { allow: ['bash'], maxRisk: 'write' },
           },
         ],
-        { trigger: 'on-push', tools: { allow: ['bash'], maxRisk: 'execute' } },
+        { tools: { allow: ['bash'], maxRisk: 'execute' } },
       ),
     )
     expect(result.def.tools).toEqual({ maxRisk: 'execute' })
     expect(result.def.steps[0]).toEqual({ name: 'a', after: [], prompt: 'Go.', tools: { maxRisk: 'write' } })
-    expect(codes(result)).toEqual(Array<string>(6).fill('forbidden-key'))
-    expect(messages(result)).toContain("The workflow set 'trigger'")
+    expect(codes(result)).toEqual(Array<string>(5).fill('forbidden-key'))
     expect(messages(result)).toContain('The workflow set `tools.allow`')
   })
 

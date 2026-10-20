@@ -3,7 +3,7 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { projectAddress } from '../shared/mergeRequestRef'
 
 // What gitlab announces on its own channel (docs/plugins/events.md § Hearing another plugin). Every
-// verb means "re-read the mirror". workflows hears `checks-changed`.
+// verb means "re-read the mirror".
 type GitlabVerb = 'pr-synced' | 'checks-changed' | 'pulls-changed' | 'repos-changed'
 export type GitlabEmit = (verb: GitlabVerb, payload?: Record<string, unknown>) => void
 

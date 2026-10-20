@@ -215,7 +215,7 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
       prompt: base,
       context: [
         ...upstream,
-        ...(ctx.run.trigger === 'agent-map'
+        ...(ctx.run.startedBy === 'agent-map'
           ? [{ label: 'Current item', source: 'workflow.item', content: JSON.stringify(ctx.inputs.item) }]
           : []),
         ...(task ? [{ label: 'Task context', source: 'workflow.task-context', content: task }] : []),

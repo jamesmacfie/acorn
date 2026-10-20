@@ -9,19 +9,14 @@ import { readWorkflowCheckoutActivity } from '../server/runs/checkoutActivity'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_GATES } from '../contract/events'
-import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
+import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND } from '../contract/extensions'
 import { createWorkflowExecution } from '../server/runs/activation'
 import { workflowStartService } from '../server/runs/startService'
 import { workflowControl, workflowGates } from '../server/runs/control'
 import { WorkflowRunner } from '../server/runs/runner'
 import { workflowDefinitions } from '../server/definitions/activation'
 import { WorkflowScheduleService, type WorkflowScheduleScheduler } from '../server/schedules/service'
-import {
-  workflowScheduleService,
-  workflowScheduleTarget,
-  workflowScheduleBridge,
-  registerWorkflowTriggers,
-} from '../server/schedules/activation'
+import { workflowScheduleService, workflowScheduleTarget, workflowScheduleBridge } from '../server/schedules/activation'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
 import { WORKFLOW_SCHEDULES_ROUTE, workflowScheduleRoutes } from '../server/routes/schedules'
@@ -78,12 +73,11 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         readWorkflowCheckoutActivity(store, taskIds),
       )
       const notices = buildNotices(ctx)
-      // The three seams another plugin adds work through (../contract/extensions.ts). Opened before the
+      // The two seams another plugin adds work through (../contract/extensions.ts). Opened before the
       // runner is built so a contribution filed during someone else's init is visible on the first
-      // sweep; `entries` is resolved per call, so init order still does not matter.
+      // run; `entries` is resolved per call, so init order still does not matter.
       ctx.extensionPoints.declare(WORKFLOW_STEP_KIND, 'Workflow step kinds')
       ctx.extensionPoints.declare(WORKFLOW_POLICY, 'Workflow gate policies')
-      ctx.extensionPoints.declare(WORKFLOW_TRIGGER, 'Workflow triggers')
 
       // The one decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks). A veto here is a
       // safety-rail, not a failure, which is why the point allows nothing else: a plugin that could
@@ -160,7 +154,6 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         reconciled: deps.reconciled,
       })
 
-      registerWorkflowTriggers(ctx, runner)
       await definitions
         .reconcileDraftQueries()
         .catch((error) => ctx.log.warn(`Draft query references need reconciliation: ${describeError(error).message}`))

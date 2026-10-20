@@ -2,10 +2,10 @@
 
 Workflows are durable orchestration on the Node: a graph of steps, such as agent turns, commands,
 data reads, human gates, and gates that wait for CI or a review, that runs on a task. Read this page for the version 1 definition values,
-limits, trust, and triggers, and for the topic pages. The plugin is in `plugins/workflows/`.
+limits, trust, and unattended starts, and for the topic pages. The plugin is in `plugins/workflows/`.
 
 A definition is a committed `.acorn/workflows/*.toml` file or a `workflow_defs` row you typed in the
-app, and the Node reads both as one list. SQLite stores expanded runs, steps, gates, trigger cursors,
+app, and the Node reads both as one list. SQLite stores expanded runs, steps, gates, schedules,
 and recovery state. The headless [CLI](./cli.md) lists published definitions, starts a run by its ID
 with typed JSON inputs, and inspects or waits on runs and steps. The Node owns definition resolution,
 trust, gates, recovery, and execution.
@@ -75,12 +75,11 @@ the snapshot changes. Docker's declarative matching data is outside this gate, b
 or stop services are trust-checked. A `workflow_defs` row isn't repository-authored and isn't hashed
 ([database definitions](./workflows/definitions.md#database-definitions)).
 
-## Triggers
+## Unattended starts
 
-A trigger contributed to `workflows:trigger` is asked on each sweep which workflows should start. The
-sweep runs on the Node's scheduler at the plugin cadence floor of 300 seconds, so a trigger fires on a
-machine nobody is looking at. There's no separate "check now" route: use the scheduler's own **Run
-now** on Settings → Schedules ([schedules](./schedules.md)).
+An approved schedule is the only thing that starts a workflow with nobody present
+([scheduled roots](./workflows/scheduled-roots.md)). No plugin picks a workflow to start. A plugin
+describes its data through a data source, and a workflow reads it.
 
 ## Workflow runs source
 
@@ -96,8 +95,11 @@ line of its error or cancel reason, capped at 200 characters, and its duration o
 a final status. A run retried after it settled measures to its latest final status. Selecting a row
 opens the run pane on that run.
 
+What started a run is in the `/trigger` field, labeled **Started by**: `manual`, `schedule`,
+`agent-tool`, `agent-map`, or `reprocess`. The run row stores it as `started_by`.
+
 The source scopes a workspace or project through its task ids. It pushes the start-time window and
-equality filters on workflow, status, trigger, task, and parent run into SQL, on the
+equality filters on workflow, status, start reason, task, and parent run into SQL, on the
 `(task_id, created_at)` index. It reads newest first, up to the host's 5,000-record budget, and
 reports `incomplete` with `host-budget` when that budget cuts the window. Its four starters chart
 runs by workflow and status, average run time by workflow, this week's runs, and a weekday-by-hour
@@ -126,8 +128,7 @@ heatmap of when runs start.
 
 - [File drafts and portable export](./workflows/file-drafts.md).
 
-- [Contributed step kinds](./workflows/step-kinds.md): kinds, gate policies, triggers, and progress
-  events.
+- [Contributed step kinds](./workflows/step-kinds.md): kinds, gate policies, and progress events.
 
 - [Routes and UI](./workflows/routes-and-ui.md): the run pane and its frames.
 

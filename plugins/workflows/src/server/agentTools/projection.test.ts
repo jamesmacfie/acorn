@@ -9,7 +9,6 @@ const source = (): WorkflowDef => ({
   baseline: ACORN_BASELINE,
   formatVersion: 1,
   name: 'Release',
-  trigger: 'nightly',
   tools: { allow: ['git_log'], maxRisk: 'write' },
   budget: { maxInputTokens: 1000 },
   inputs: [{ name: 'region', schema: { type: 'string' }, default: 'ap-southeast-2' }],
@@ -36,7 +35,6 @@ const source = (): WorkflowDef => ({
 describe('agentDefinitionView', () => {
   it('omits protected configuration and flagged strings but keeps provider choices', () => {
     const { definition, withheld } = agentDefinitionView(source())
-    expect(definition.trigger).toBeUndefined()
     expect(definition.tools).toEqual({ maxRisk: 'write' })
     expect(definition.steps[0]).toMatchObject({ model: 'opus', configOptions: { reasoning: 'high' } })
     expect(definition.steps[0]!.requiresRun).toBeUndefined()
@@ -46,7 +44,6 @@ describe('agentDefinitionView', () => {
     expect(definition.budget).toEqual({ maxInputTokens: 1000 })
     expect(withheld).toEqual(
       expect.arrayContaining([
-        { path: 'trigger', reason: 'protected' },
         { path: 'tools.allow', reason: 'protected' },
         { path: 'steps[plan].requiresRun', reason: 'protected' },
         { path: 'steps[post].with.auth', reason: 'protected' },
@@ -63,7 +60,6 @@ describe('agentDefinitionView', () => {
 describe('agentDraftDefinition', () => {
   it('refuses protected values from the agent on a new draft', () => {
     const draft = agentDraftDefinition(source(), null)
-    expect(draft.trigger).toBeUndefined()
     expect(draft.tools).toEqual({ maxRisk: 'write' })
     expect(draft.steps[1]!.with).toEqual({ url: 'https://example.com', apiToken: 'hunter2' })
   })
@@ -72,7 +68,6 @@ describe('agentDraftDefinition', () => {
     const view = agentDefinitionView(source()).definition
     const edited: WorkflowDef = {
       ...view,
-      trigger: 'chosen-by-agent',
       steps: [
         { ...view.steps[1]!, name: 'Post renamed' },
         { ...view.steps[0]!, kind: 'decide' },
@@ -81,7 +76,6 @@ describe('agentDraftDefinition', () => {
       ],
     }
     const draft = agentDraftDefinition(edited, source())
-    expect(draft.trigger).toBe('nightly')
     expect(draft.tools).toEqual({ allow: ['git_log'], maxRisk: 'write' })
     expect(draft.steps[0]!.with).toEqual({
       url: 'https://example.com',

@@ -12,7 +12,6 @@ const everything: WorkflowDef = {
   formatVersion: 1,
   name: 'Everything',
   posture: 'autonomous',
-  trigger: 'nightly',
   maxDescendants: 10,
   maxConcurrency: 2,
   tools: { allow: ['read_file'], maxRisk: 'write' },

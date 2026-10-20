@@ -12,7 +12,6 @@ import {
   WorkflowRunner,
   WORKFLOW_POLICY,
   WORKFLOW_STEP_KIND,
-  WORKFLOW_TRIGGER,
   type Extension,
   type PolicyContext,
   type PolicyVerdict,
@@ -785,7 +784,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     runner.stop()
   })
 
-  it('contributed step kinds, policies, and triggers execute without core ladders and persist trigger ids', async () => {
+  it('contributed step kinds and policies execute without core ladders', async () => {
     // What `ctx.extensionPoints` hands the runner: entry ids already qualified by the host, which is
     // also the name a workflow file writes for a contributed kind (plugins/workflows/src/contract/extensions.ts).
     const contributed: Record<string, Extension<unknown>[]> = {
@@ -817,35 +816,18 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
           },
         },
       ],
-      [WORKFLOW_TRIGGER]: [
-        {
-          id: 'src:pr-opened',
-          pluginId: 'src',
-          order: 0,
-          value: {
-            evaluate: async () => [
-              {
-                taskId: 'task1',
-                workflow: {
-                  baseline: 'acorn-1',
-                  formatVersion: 1,
-                  name: 'triggered',
-                  steps: [
-                    { id: 'custom', name: 'custom', kind: 'src:custom' },
-                    { id: 'policy', name: 'policy', kind: 'gate-policy', policy: 'src:always' },
-                  ],
-                },
-              },
-            ],
-          },
-        },
-      ],
     }
     const runner = new WorkflowRunner(wf.db, deps(), { handlers: (point) => (contributed[point] ?? []) as never })
-    expect(await runner.pollTriggers()).toEqual({ started: 1, errors: [] })
-    const [run] = await wf.db.select().from(workflowRuns)
-    expect(run.trigger).toBe('src:pr-opened')
-    expect((await waitDone(runner, run.id)).status).toBe('done')
+    const runId = await runner.start('task1', {
+      baseline: 'acorn-1',
+      formatVersion: 1,
+      name: 'contributed',
+      steps: [
+        { id: 'custom', name: 'custom', kind: 'src:custom' },
+        { id: 'policy', name: 'policy', kind: 'gate-policy', policy: 'src:always' },
+      ],
+    })
+    expect((await waitDone(runner, runId)).status).toBe('done')
   })
 
   it('fails an affected run when its plugin disappears, then accepts the saved kind when it returns', async () => {

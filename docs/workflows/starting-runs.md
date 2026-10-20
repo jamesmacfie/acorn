@@ -114,7 +114,7 @@ status and its consequences in front of the person doing it, and a row in a list
 
 A managed agent starts a published workflow with `workflow_run` when you've approved it for agents in
 that project. Open the workflow, choose **Agent invocation…** from its overflow menu, and pick the
-inputs agents may set, the limits, and the starts each session gets. The run's trigger is
+inputs agents may set, the limits, and the starts each session gets. The run's start reason is
 `agent-tool`. It starts after the agent's current turn ends, and the run pane names the agent that
 started it. [Workflow tools](../agent-tools/workflow-tools.md#invocation-authority) covers the checks
 and the handoff.

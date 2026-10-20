@@ -62,7 +62,6 @@ type RawWorkflow = {
   id: string
   name: string
   posture?: 'gated' | 'autonomous'
-  trigger?: string
   tools?: ToolCeiling
   budget?: WorkflowBudget
   inputs?: WorkflowInput[]
@@ -326,7 +325,6 @@ export function parseWorkflowToml(
       name: str(doc.name) ?? id,
       posture:
         posture === 'autonomous' ? 'autonomous' : posture === 'gated' || posture === undefined ? 'gated' : undefined,
-      trigger: str(doc.trigger),
       tools: parseTools(doc.tools),
       budget: parseBudget(doc.budget),
       inputs: parseInputs(doc.inputs),
@@ -425,7 +423,6 @@ function expandWorkflows(
         id: w.id,
         name: w.name,
         posture: w.posture,
-        trigger: w.trigger,
         tools: w.tools,
         budget: w.budget,
         inputs: w.inputs,

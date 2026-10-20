@@ -1,20 +1,23 @@
 # Contributed step kinds
 
-Any plugin can add a step kind, a policy, or a trigger to workflows. This page covers how a kind is
+Any plugin can add a step kind or a policy to workflows. This page covers how a kind is
 named and configured, how it describes its own form, the kinds other plugins ship, gate policies, and
 the progress events a handler can emit. The contract is in `plugins/workflows/src/shared/`.
 
 ## Contributed step kinds
 
 The built-in kinds are `agent`, `gate-human`, `gate-policy`, `ci-loop`, `decide`, `if`,
-`find-records`, `get-record-details`, `workflow`, and `workflow-map`. Workflows opens three node extension points
+`find-records`, `get-record-details`, `workflow`, and `workflow-map`. Workflows opens two node extension points
 ([node-side extension points](../plugins/node-side-extension-points.md)) and any plugin may fill them:
 
 | Point | What it adds | Named in a file as |
 | --- | --- | --- |
 | `workflows:step-kind` | a kind the runner dispatches to | a step's `kind` |
 | `workflows:policy` | a verdict source for `gate-policy` | a step's `policy` |
-| `workflows:trigger` | something that decides which workflows should start | nothing; the sweep asks it |
+
+A plugin can't start a workflow. It adds to triggers through data sources: it describes its records,
+and a workflow reads them. The [workflow triggers proposal](../future/triggers/README.md) describes
+triggers that start a run when those records change.
 
 **A contributed kind is addressed by its qualified id, a built-in by a bare word.** `kind = "agent"`
 is the built-in; `kind = "http:request"` is the http plugin's. That is deliberate: the file says which

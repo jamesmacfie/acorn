@@ -11,7 +11,13 @@ import {
   type WorkflowTaskResolutionScope,
 } from '../definitions/resolution'
 import { WorkflowValidationError } from '../validation/definition'
-import type { ToolCeiling, WorkflowBudget, WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
+import type {
+  ToolCeiling,
+  WorkflowBudget,
+  WorkflowCatalog,
+  WorkflowDef,
+  WorkflowStartedBy,
+} from '../../shared/workflowContracts'
 import type { ResolvedWorkflowGraph } from '../../shared/workflowContracts'
 import { eq } from 'drizzle-orm'
 import * as schema from '../../node/schema'
@@ -38,7 +44,7 @@ type InternalIdentity = {
   intendedRunId: string
   callerKey: string
   payloadFingerprint: string
-  trigger: string
+  startedBy: WorkflowStartedBy
 }
 
 /** Resolves, freezes, and starts definitions for routes and internal schedulers. */
@@ -93,7 +99,7 @@ export class WorkflowStartService {
           resolvedGraph: graph,
           ...(internal
             ? {
-                trigger: internal.trigger,
+                startedBy: internal.startedBy,
                 intendedRunId: internal.intendedRunId,
                 invocation: {
                   callerKey: internal.callerKey,
@@ -158,7 +164,7 @@ export class WorkflowStartService {
         resolved.provenance,
         allowDatabaseDefinitions,
         launchId
-          ? { intendedRunId: launchId, callerKey: callerKey!, payloadFingerprint: fingerprint!, trigger: 'manual' }
+          ? { intendedRunId: launchId, callerKey: callerKey!, payloadFingerprint: fingerprint!, startedBy: 'manual' }
           : undefined,
       )
     } catch (error) {
@@ -272,7 +278,7 @@ export class WorkflowStartService {
       },
       processingScope: request.processingScope,
       processingBaseline: request.baseline ?? false,
-      trigger: 'schedule',
+      startedBy: 'schedule',
     })
   }
 
@@ -303,7 +309,7 @@ export class WorkflowStartService {
         parentStepId: null,
         depth: 0,
       },
-      trigger: 'agent-tool',
+      startedBy: 'agent-tool',
       effectiveBudget: request.effectiveBudget,
       effectiveTools: request.effectiveTools,
     })

@@ -12,7 +12,7 @@ import { and, desc, eq, isNull, or } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { WorkflowAgentOrigin, WorkflowDefRow, WorkflowDefSummary } from '../../contract/wire.ts'
 import { workflowDefs, workflowDependencies } from '../../node/schema'
-import { publicationStore } from '../publication/store'
+import { publicationStore, storedWorkflowDef } from '../publication/store'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { loadWorkflowFiles, type LoadedWorkflow } from './files'
 import type { WorkflowValidationCatalog } from '../validation/definition'
@@ -43,7 +43,7 @@ const toRow = (row: Row): StoredWorkflowDef => ({
   basePublishedRevision: row.basePublishedRevision ?? null,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
-  def: JSON.parse(row.defJson) as WorkflowDef,
+  def: storedWorkflowDef(row.defJson),
   agentOrigin: row.agentOriginJson ? (JSON.parse(row.agentOriginJson) as WorkflowAgentOrigin) : null,
 })
 

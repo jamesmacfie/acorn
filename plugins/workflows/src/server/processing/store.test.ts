@@ -430,7 +430,7 @@ describe('atomic workflow processing selection', () => {
       expect.objectContaining({ name: 'Review' }),
       expect.objectContaining({
         intendedRunId: result.runId,
-        trigger: 'reprocess',
+        startedBy: 'reprocess',
         invocation: expect.objectContaining({
           rootRunId: result.runId,
           parentRunId: null,

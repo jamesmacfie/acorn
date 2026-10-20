@@ -144,7 +144,7 @@ describe('workflow_run', () => {
     })
     // The run pane names the agent and the limits the approval set.
     expect(await workflowRunById(harness.store, admitted.runId)).toMatchObject({
-      trigger: 'agent-tool',
+      startedBy: 'agent-tool',
       launchedBy: { sessionId: 'session-a', title: 'Chat session-a', limits: { maxTurns: 5, maxWallTimeMs: 600_000 } },
     })
   })

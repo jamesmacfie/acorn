@@ -167,8 +167,7 @@ task's primary change request ([gate policies](../workflows/step-kinds.md#gate-p
 `plugins/workflows/src/contract/extensions.ts`.
 
 Emit `plugin:<id>:checks-changed`, and declare the verb in `emits`, when a change request's checks
-change. The workflow trigger sweep runs early on it for every running code host, and waits for its
-five-minute clock otherwise.
+change. Any plugin may listen for it ([hearing another plugin](./events.md#hearing-another-plugin)).
 
 ## Outside the code host plugin
 

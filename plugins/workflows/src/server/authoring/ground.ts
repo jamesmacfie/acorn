@@ -33,7 +33,6 @@ const DEF_KEYS = [
   'formatVersion',
   'name',
   'posture',
-  'trigger',
   'tools',
   'budget',
   'inputs',

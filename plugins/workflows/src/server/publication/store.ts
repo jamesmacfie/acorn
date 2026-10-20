@@ -149,6 +149,13 @@ export function publicationStore(db: PluginDatabase) {
   return store
 }
 
+/** A definition read back from a row. Stored JSON can still carry a `trigger` key that nothing reads.
+ *  A revision is immutable, so the key is dropped here, and a draft's next save leaves it out. */
+export function storedWorkflowDef(json: string): WorkflowDef {
+  const { trigger: _trigger, ...def } = JSON.parse(json) as WorkflowDef & { trigger?: unknown }
+  return def
+}
+
 export async function publishedWorkflow(db: PluginDatabase, id: string, exactRevision?: number) {
   publicationStore(db).assertAvailable('workflow', id)
   const draft = db.select().from(workflowDefs).where(eq(workflowDefs.id, id)).get()
@@ -159,7 +166,7 @@ export async function publishedWorkflow(db: PluginDatabase, id: string, exactRev
     .from(workflowRevisions)
     .where(and(eq(workflowRevisions.definitionId, id), eq(workflowRevisions.revision, revision)))
     .get()
-  return row
-    ? { ...row, id, name: (JSON.parse(row.defJson) as WorkflowDef).name, def: JSON.parse(row.defJson) as WorkflowDef }
-    : null
+  if (!row) return null
+  const def = storedWorkflowDef(row.defJson)
+  return { ...row, id, name: def.name, def }
 }

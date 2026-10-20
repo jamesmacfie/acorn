@@ -176,7 +176,6 @@ export function writeWorkflowToml(def: WorkflowDef): string {
       format_version: def.formatVersion,
       name: def.name,
       posture: def.posture,
-      trigger: def.trigger,
       tools: tomlTools(def.tools),
       budget: tomlBudget(def.budget),
       max_descendants: def.maxDescendants,

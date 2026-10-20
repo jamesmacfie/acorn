@@ -33,7 +33,7 @@ describe('workflow tree safety', () => {
       name: id,
       status: 'running',
       posture: 'gated',
-      trigger: 'manual',
+      startedBy: 'manual',
       defJson: JSON.stringify({
         baseline: 'acorn-1' as const,
         formatVersion: 1 as const,

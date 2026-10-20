@@ -28,7 +28,6 @@ export const bitbucketPlugin = (): NodePlugin => ({
   label: 'Bitbucket',
   required: false,
   // What other plugins may hear from this one (docs/plugins/events.md § Hearing another plugin).
-  // workflows hears `checks-changed`.
   emits: [
     { verb: 'checks-changed', description: "A pull request's build statuses changed state" },
     { verb: 'pr-synced', description: "A pull request's mirror was committed" },

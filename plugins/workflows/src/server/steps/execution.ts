@@ -455,7 +455,7 @@ export class WorkflowStepExecution {
     // Record the session when the first event names it so the Agent pane can link a running step.
     let noted = ctx.step.agentSessionId ?? ''
     const dispatch =
-      ctx.run.trigger === 'agent-map'
+      ctx.run.startedBy === 'agent-map'
         ? (
             await this.services.db
               .select({ payload: schema.workflowDispatches.payloadJson })
@@ -505,7 +505,7 @@ export class WorkflowStepExecution {
             posture: workflowPosture(ctx.run.posture),
             managedSessionId: ctx.step.agentSessionId ?? undefined,
             ...(sessionTitle ? { sessionTitle } : {}),
-            requireManagedSession: ctx.run.trigger === 'agent-map',
+            requireManagedSession: ctx.run.startedBy === 'agent-map',
             onEvent: (event) => {
               opts.onEvent?.(event)
               ctx.emit({ at: now(), event })

@@ -18,20 +18,21 @@ type RunTask = { title: string; projectId: string; projectName: string | null }
 type Scope = { workspaceId?: string; projectId?: string }
 
 // Runs carry only a task id, so SQL narrows by the scope's task ids, which the (task_id, created_at)
-// index serves together with the time window.
+// index serves together with the time window. The public `/trigger` field is the `started_by` column,
+// so saved queries and panels that filter on it keep working.
 const fields = {
   time: { pointer: '/createdAt', column: runs.createdAt },
   equals: {
     '/name': runs.name,
     '/status': runs.status,
-    '/trigger': runs.trigger,
+    '/trigger': runs.startedBy,
     '/taskId': runs.taskId,
     '/parentRunId': runs.parentRunId,
   },
 }
-const optionColumns: Record<string, typeof runs.name | typeof runs.trigger> = {
+const optionColumns: Record<string, typeof runs.name | typeof runs.startedBy> = {
   '/name': runs.name,
-  '/trigger': runs.trigger,
+  '/trigger': runs.startedBy,
 }
 
 /**
@@ -100,7 +101,7 @@ export function createRunSourceHandler(db: PluginDatabase, core: Core): PluginFe
             id: runs.id,
             name: runs.name,
             status: runs.status,
-            trigger: runs.trigger,
+            trigger: runs.startedBy,
             taskId: runs.taskId,
             parentRunId: runs.parentRunId,
             depth: runs.depth,

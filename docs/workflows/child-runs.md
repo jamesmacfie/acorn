@@ -8,8 +8,8 @@ run in, and how clients refresh a run. [Workflow execution](./execution.md) cove
 A run raises a `workflow.run` span and each of its steps a `workflow.step` span, both through
 `ctx.telemetry`, both owned by this plugin, and all of them in one trace, so a slow step is found
 from the run rather than from a list of unrelated spans
-([telemetry.md](../telemetry.md) § Ambient attribution). The run span carries the run id, the trigger
-and the step count; a step span carries the run id and the step id. Nothing carries a prompt, a
+([telemetry.md](../telemetry.md) § Ambient attribution). The run span carries the run id, what started
+the run, and the step count; a step span carries the run id and the step id. Nothing carries a prompt, a
 result or a handoff note.
 
 The run span opens where the row is written in `start` and closes in `finishRun`, so it measures

@@ -88,10 +88,6 @@ appear rather than failing because there are none yet. The round limit, `max_ite
 the step at a safety rail. With no pull request on the task, or with its code host off or filing no
 `ci-settled` policy, `ci-loop` fails because there are no checks to read.
 
-A code host that emits `checks-changed` also wakes the workflow trigger sweep early, so a trigger
-waiting on CI doesn't wait for the five-minute clock. The sweep follows code hosts that start or stop
-after the workflows plugin.
-
 ## Related pages
 
 [Gate policies](./step-kinds.md#gate-policies) covers the policy contract and the policies that ship.

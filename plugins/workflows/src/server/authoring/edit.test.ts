@@ -6,7 +6,6 @@ const current: WorkflowDef = {
   baseline: 'acorn-1' as const,
   formatVersion: 1 as const,
   name: 'Deploy',
-  trigger: 'schedule:nightly',
   tools: { maxRisk: 'execute', allow: ['deploy'] },
   steps: [
     {
@@ -33,7 +32,6 @@ const current: WorkflowDef = {
 describe('the model-visible definition', () => {
   it('keeps editable workflow content and removes protected configuration', () => {
     const visible = definitionForPrompt(current)
-    expect(visible.trigger).toBeUndefined()
     expect(visible.tools).toEqual({ maxRisk: 'execute' })
     expect(visible.steps[0]).toMatchObject({ name: 'prepare', prompt: 'Prepare.', tools: { maxRisk: 'write' } })
     expect(visible.steps[0]?.model).toBeUndefined()
@@ -83,7 +81,7 @@ describe('protected configuration restoration', () => {
       ],
     }
     const restored = restoreProtectedDefinition(current, changed)
-    expect(restored).toMatchObject({ trigger: 'schedule:nightly', tools: { maxRisk: 'read', allow: ['deploy'] } })
+    expect(restored).toMatchObject({ tools: { maxRisk: 'read', allow: ['deploy'] } })
     expect(restored.steps[0]).toMatchObject({
       prompt: 'Prepare carefully.',
       model: 'private-model',

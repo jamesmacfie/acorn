@@ -20,7 +20,7 @@ export async function workflowRunList(db: PluginDatabase) {
       error: workflowRuns.error,
     })
     .from(workflowRuns)
-    .where(ne(workflowRuns.trigger, 'agent-map'))
+    .where(ne(workflowRuns.startedBy, 'agent-map'))
     .orderBy(desc(workflowRuns.createdAt), sql`${workflowRuns}.rowid`)
     .limit(RUN_LIST_LIMIT)
   const treeCostRows = rows.length
@@ -72,20 +72,20 @@ export async function workflowTaskNavigation(db: PluginDatabase) {
       status: workflowRuns.status,
       parentRunId: workflowRuns.parentRunId,
       rootRunId: workflowRuns.rootRunId,
-      trigger: workflowRuns.trigger,
+      startedBy: workflowRuns.startedBy,
     })
     .from(workflowRuns)
     .where(
       and(
-        ne(workflowRuns.trigger, 'agent-map'),
-        or(isNotNull(workflowRuns.parentRunId), eq(workflowRuns.trigger, 'reprocess')),
+        ne(workflowRuns.startedBy, 'agent-map'),
+        or(isNotNull(workflowRuns.parentRunId), eq(workflowRuns.startedBy, 'reprocess')),
       ),
     )
     // rowid breaks timestamp ties in insertion order.
     .orderBy(desc(workflowRuns.updatedAt), sql`${workflowRuns}.rowid`)
   const latestByTask = new Map<string, (typeof children)[number]>()
   for (const run of children) if (!latestByTask.has(run.taskId)) latestByTask.set(run.taskId, run)
-  const reprocessRuns = [...latestByTask.values()].filter((run) => run.trigger === 'reprocess' && !run.parentRunId)
+  const reprocessRuns = [...latestByTask.values()].filter((run) => run.startedBy === 'reprocess' && !run.parentRunId)
   const reprocessDispatches = reprocessRuns.length
     ? await db
         .select({ runId: workflowDispatches.runId, parentRunId: workflowDispatches.parentRunId })

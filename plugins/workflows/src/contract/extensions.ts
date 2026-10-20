@@ -1,9 +1,9 @@
 import { extensionPointId } from '@acorn/protocol/plugin/ids.ts'
-import type { PolicyContribution, StepKindContribution, WorkflowTriggerContribution } from '../shared/workflowContracts'
+import type { PolicyContribution, StepKindContribution } from '../shared/workflowContracts'
 
 // What another plugin may add to a workflow run, and the only way in (docs/workflows/step-kinds.md § Contributed
-// step kinds). These are node extension points rather than capabilities because each of the three is
-// many-to-many: any number of plugins add step kinds, and one owner would be an arbitrary winner.
+// step kinds). These are node extension points rather than capabilities because each is many-to-many:
+// any number of plugins add step kinds, and one owner would be an arbitrary winner.
 //
 // Addressing, and why a contributed kind is not a bare word. A built-in kind is `agent` or `join`; a
 // contributed one is the host-minted `<pluginId>:<entryId>`, so a `.acorn/workflows/*.toml` that says
@@ -22,7 +22,6 @@ export type {
   StepValidationContext,
   StepValidator,
   WorkflowStepDef,
-  WorkflowTriggerContribution,
 } from '../shared/workflowContracts'
 
 // A kind carries a `describe`: its label, icon, description, fields, and output description as data
@@ -37,10 +36,6 @@ export const WORKFLOW_STEP_KIND = extensionPointId<StepKindContribution>('workfl
 /** A `gate-policy` verdict source, answering pass, wait, or fail (docs/workflows/step-kinds.md § Gate
  *  policies). Entry id becomes the second half of `policy`. */
 export const WORKFLOW_POLICY = extensionPointId<PolicyContribution>('workflows:policy')
-
-/** Something that decides, on each sweep, which workflows should start. The sweep runs on the node's
- *  scheduler, so a trigger fires with no client attached (docs/schedules.md). */
-export const WORKFLOW_TRIGGER = extensionPointId<WorkflowTriggerContribution>('workflows:trigger')
 
 /** The entry ids a code host files its CI and review policies under, minted as `<pluginId>:ci-settled`
  *  and `<pluginId>:review-received`. `checks-green`, `ci-loop`, and `review-received` ask the one filed by

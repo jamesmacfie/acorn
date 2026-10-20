@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import type { PluginDatabase, SpanHandle } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
-import type { WorkflowRunRow, WorkflowStepRow } from '../../shared/workflowContracts'
+import type { WorkflowRunRow, WorkflowStartedBy, WorkflowStepRow } from '../../shared/workflowContracts'
 import type { WorkflowGateStatus, WorkflowRunStatus } from '../../contract/events'
 import type { RunnerDeps } from './deps'
 
@@ -46,9 +46,9 @@ export class WorkflowRunState {
     this.#awake.delete(runId)
   }
 
-  startRunSpan(runId: string, trigger: string, stepCount: number): void {
+  startRunSpan(runId: string, startedBy: WorkflowStartedBy, stepCount: number): void {
     const span = this.deps.telemetry?.startSpan('workflow.run', {
-      attrs: { seam: 'workflow.run', 'run.id': runId, trigger, steps: stepCount },
+      attrs: { seam: 'workflow.run', 'run.id': runId, startedBy, steps: stepCount },
     })
     if (span) this.#runSpans.set(runId, span)
   }

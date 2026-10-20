@@ -137,13 +137,15 @@ export type WorkflowDef = {
   formatVersion: 1
   name: string
   posture?: WorkflowPosture
-  trigger?: string
   tools?: ToolCeiling
   budget?: WorkflowBudget
   inputs?: WorkflowInput[]
   outputs?: WorkflowOutput[]
   steps: WorkflowStepDef[]
 }
+
+/** What started a run, stored as `workflow_runs.started_by`. */
+export type WorkflowStartedBy = 'manual' | 'schedule' | 'agent-tool' | 'agent-map' | 'reprocess'
 
 export type WorkflowRunRow = typeof schema.workflowRuns.$inferSelect
 export type WorkflowStepRow = typeof schema.workflowSteps.$inferSelect
@@ -334,15 +336,4 @@ export type PolicyContribution = {
   evaluate(ctx: PolicyContext): Promise<PolicyVerdict>
   describe: PolicyDescription
   validate?: (settings: Record<string, unknown>) => string[]
-}
-
-type WorkflowTriggerMatch = {
-  taskId: string
-  workflow: WorkflowDef
-}
-
-// The id is the extension entry's, minted by the host (../contract/extensions.ts), so a trigger does
-// not carry one of its own.
-export type WorkflowTriggerContribution = {
-  evaluate(): Promise<WorkflowTriggerMatch[]>
 }

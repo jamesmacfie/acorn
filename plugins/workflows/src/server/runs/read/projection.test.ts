@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import * as schema from '../../../node/schema'
 import { workflowRunList, workflowTaskNavigation } from './projection'
+import type { WorkflowStartedBy } from '../../../shared/workflowContracts'
 
 describe('workflow task navigation projection', () => {
   let database: TestPluginDb
@@ -17,7 +18,6 @@ describe('workflow task navigation projection', () => {
       name: id,
       status: 'done',
       posture: 'gated',
-      trigger: 'manual',
       defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: id, steps: [] }),
       rootRunId,
       parentRunId: depth ? rootRunId : null,
@@ -87,13 +87,13 @@ describe('workflow task navigation projection', () => {
       status: string,
       parentRunId: string | null,
       rootRunId: string,
-      trigger = 'manual',
+      startedBy: WorkflowStartedBy = 'manual',
     ) => ({
       id,
       taskId,
       name: id,
       status,
-      trigger,
+      startedBy,
       defJson: '{}',
       parentRunId,
       rootRunId,
@@ -150,14 +150,14 @@ describe('workflow task navigation projection', () => {
       status: string,
       parentRunId: string | null,
       rootRunId: string,
-      trigger = 'manual',
+      startedBy: WorkflowStartedBy = 'manual',
       updatedAt = 1,
     ) => ({
       id,
       taskId,
       name: id,
       status,
-      trigger,
+      startedBy,
       defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: id, steps: [] }),
       parentRunId,
       rootRunId,

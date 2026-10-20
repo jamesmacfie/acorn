@@ -137,10 +137,7 @@ describe('workflow discovery tools', () => {
     expect(file).toMatchObject({
       showing: 'file',
       editable: false,
-      withheld: [
-        { path: 'trigger', reason: 'protected' },
-        { path: 'inputs[ticket_id].default', reason: 'input-default' },
-      ],
+      withheld: [{ path: 'inputs[ticket_id].default', reason: 'input-default' }],
     })
     expect(JSON.stringify(file)).not.toContain('ABC-1')
     expect(file.definition.trigger).toBeUndefined()
@@ -280,13 +277,10 @@ describe('workflow_draft', () => {
     const source = await createPublishedDef(harness!.store, {
       workspaceId: 'workspace',
       projectId: 'project',
-      def: {
-        ...def('Source', [{ id: 'post', name: 'Post', kind: 'agent', prompt: 'Post it', requiresRun: 'web' }]),
-        trigger: 'nightly',
-      },
+      def: def('Source', [{ id: 'post', name: 'Post', kind: 'agent', prompt: 'Post it', requiresRun: 'web' }]),
     })
     const view = await harness!.call('workflow_get', { ref: { source: 'database', id: source.id } })
-    expect(view.withheld.map((field: { path: string }) => field.path)).toEqual(['trigger', 'steps[post].requiresRun'])
+    expect(view.withheld.map((field: { path: string }) => field.path)).toEqual(['steps[post].requiresRun'])
 
     const proposed = await harness!.call(
       'workflow_draft',
@@ -294,7 +288,6 @@ describe('workflow_draft', () => {
         definition: {
           ...view.definition,
           steps: [{ ...view.definition.steps[0], prompt: 'Post it twice' }],
-          trigger: 'agent-chosen',
         },
         source: { source: 'database', id: source.id },
       },
@@ -303,7 +296,7 @@ describe('workflow_draft', () => {
     expect(proposed.id).not.toBe(source.id)
     expect(proposed.diff).toMatchObject({ settings: [], steps: { changed: [{ step: 'post', fields: ['prompt'] }] } })
     const saved = await getDef(harness!.store, proposed.id)
-    expect(saved!.def).toMatchObject({ trigger: 'nightly', steps: [{ prompt: 'Post it twice', requiresRun: 'web' }] })
+    expect(saved!.def).toMatchObject({ steps: [{ prompt: 'Post it twice', requiresRun: 'web' }] })
     expect(saved!.agentOrigin).toMatchObject({
       source: { source: 'database', id: source.id },
       baseRevision: 1,

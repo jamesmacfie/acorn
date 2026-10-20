@@ -71,13 +71,20 @@ goal = "Its tests pass."
     expect(parsed?.steps[0]?.goal).toBe('')
   })
 
+  it('loads a file that still sets `trigger`, and writes it back without the key', () => {
+    const { parsed, written } = roundTrip(
+      'format_version = 1\nbaseline = "acorn-1"\nname = "w"\ntrigger = "nightly"\n[[steps]]\nid = "a"\nname = "a"\nprompt = "Go."\n',
+    )
+    expect(parsed).not.toHaveProperty('trigger')
+    expect(written).not.toContain('trigger')
+  })
+
   it('round trips the version-1 graph, typed inputs, branches, ceilings and budgets', () => {
     const { parsed, again } = roundTrip(`
 format_version = 1
 baseline = "acorn-1"
 name = "everything"
 posture = "autonomous"
-trigger = "checks-red"
 [tools]
 allow = ["read_tool"]
 max_risk = "read"

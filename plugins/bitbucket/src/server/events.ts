@@ -2,7 +2,7 @@ import type { PluginBroadcast } from '@acorn/plugin-api/node'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
 // What bitbucket announces on its own channel (docs/plugins/events.md § Hearing another plugin). Every
-// verb means "re-read the mirror". workflows hears `checks-changed`.
+// verb means "re-read the mirror".
 type BitbucketVerb = 'pr-synced' | 'checks-changed' | 'pulls-changed' | 'repos-changed'
 export type BitbucketEmit = (verb: BitbucketVerb, payload?: Record<string, unknown>) => void
 

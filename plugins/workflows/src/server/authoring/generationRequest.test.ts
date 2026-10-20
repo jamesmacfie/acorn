@@ -111,7 +111,6 @@ describe('generateWorkflowRequest', () => {
       baseline: 'acorn-1' as const,
       formatVersion: 1 as const,
       name: 'Investigate',
-      trigger: 'schedule:nightly',
       tools: { maxRisk: 'execute', allow: ['pnpm test'] },
       steps: [{ ...clean.steps[0]!, model: 'private-model', configOptions: { reasoning: 'high' } }, clean.steps[1]!],
     }
@@ -140,7 +139,6 @@ describe('generateWorkflowRequest', () => {
     expect(promptOf(generateText, 0)).not.toContain('private-model')
     expect(result).toMatchObject({
       def: {
-        trigger: 'schedule:nightly',
         tools: { maxRisk: 'read', allow: ['pnpm test'] },
         steps: [
           {

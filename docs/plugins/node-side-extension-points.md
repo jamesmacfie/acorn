@@ -83,9 +83,9 @@ back as an asynchronous function, so the contributor can call it after the first
 
 ## Points that exist
 
-- The workflows plugin declares `workflows:step-kind`, `workflows:policy`, and `workflows:trigger`.
-  The HTTP plugin contributes the `http:request` step kind, and neither imports the other's
-  implementation ([workflows](../workflows.md)).
+- The workflows plugin declares `workflows:step-kind` and `workflows:policy`. The HTTP plugin
+  contributes the `http:request` step kind, and neither imports the other's implementation
+  ([workflows](../workflows.md)).
 - The terminal plugin declares `terminal:launch-context` for plugins that supply agent startup text.
   Memory contributes its standing contract and indexes there. Terminal resolves the handlers on each
   launch and limits delivery before sending text to the terminal. The provider owns the content, and

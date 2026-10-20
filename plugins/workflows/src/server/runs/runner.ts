@@ -16,7 +16,7 @@ import { stepKindContributionProblems } from '../../shared/stepKindAvailability'
 import { gateFormEdited, gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
-import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../../contract/extensions'
+import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND } from '../../contract/extensions'
 import { buildBuiltinWorkflowContributions, type RunnablePolicy } from '../steps/builtins'
 import { WorkflowTreeSafety } from '../validation/treeSafety'
 import { assertValidWorkflow, workflowEdges, type WorkflowValidationCatalog } from '../validation/definition'
@@ -266,24 +266,6 @@ export class WorkflowRunner {
     assertValidWorkflow(def, this.validationCatalog())
   }
 
-  /** One sweep of every registered trigger. Clocked by the node's scheduler through the schedules
-   *  activation, not by a client, so a due trigger fires on a node nobody is looking at. */
-  async pollTriggers(): Promise<{ started: number; errors: string[] }> {
-    let started = 0
-    const errors: string[] = []
-    for (const trigger of this.#extensions.handlers(WORKFLOW_TRIGGER)) {
-      try {
-        for (const match of await trigger.value.evaluate()) {
-          await this.start(match.taskId, match.workflow, { trigger: trigger.id })
-          started += 1
-        }
-      } catch (error) {
-        errors.push(`${trigger.id}: ${error instanceof Error ? error.message : 'trigger failed'}`)
-      }
-    }
-    return { started, errors }
-  }
-
   async start(taskId: string, def: WorkflowDef, opts?: WorkflowStartOptions): Promise<string> {
     if ((def as WorkflowDef & { source?: string }).source === 'repo') await this.deps.authorizeRepoConfig?.(taskId)
     if (opts?.resolvedGraph?.requiresRepoTrust || opts?.requiresRepoTrust) {
@@ -306,7 +288,7 @@ export class WorkflowRunner {
       ? await this.deps.admitWork(taskId, persist)
       : await persist()
     if (!created) return runId
-    this.#state.startRunSpan(runId, opts?.trigger ?? def.trigger ?? 'manual', def.steps.length)
+    this.#state.startRunSpan(runId, opts?.startedBy ?? 'manual', def.steps.length)
     if (
       !invocationParent ||
       (deadlineAt != null && deadlineAt < (invocationParent.deadlineAt ?? Number.POSITIVE_INFINITY))
@@ -437,7 +419,7 @@ export class WorkflowRunner {
         await this.cancelRun(run.id, run.error ?? 'Cancellation completed after restart.')
       } else if (run.status === 'running') {
         for (const step of await this.steps(run.id)) {
-          if (run.trigger === 'agent-map' && step.status === 'running') {
+          if (run.startedBy === 'agent-map' && step.status === 'running') {
             if (step.agentSessionId)
               await this.deps.cancelAgentSession?.(run.taskId, step.agentSessionId).catch(() => undefined)
             await this.#state.setStep(step.id, { status: 'failed', error: AGENT_MAP_INTERRUPTED })
@@ -607,11 +589,11 @@ export class WorkflowRunner {
     if (!run) return { ok: false, error: 'No such run.' }
     if (!['failed', 'safety-rail', 'completed-with-failures'].includes(run.status))
       return { ok: false, error: `A ${run.status} run cannot be retried.` }
-    if (run.trigger === 'agent-map') {
+    if (run.startedBy === 'agent-map') {
       const active = await this.db
         .select({
           id: schema.workflowRuns.id,
-          trigger: schema.workflowRuns.trigger,
+          startedBy: schema.workflowRuns.startedBy,
           status: schema.workflowRuns.status,
         })
         .from(schema.workflowRuns)
@@ -620,7 +602,7 @@ export class WorkflowRunner {
         active.some(
           (candidate) =>
             candidate.id !== run.id &&
-            candidate.trigger === 'agent-map' &&
+            candidate.startedBy === 'agent-map' &&
             ['running', 'gated', 'cancelling'].includes(candidate.status),
         )
       ) {
