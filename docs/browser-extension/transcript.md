@@ -35,8 +35,10 @@ remembers which folds are open, by session and run, until it closes, and never s
 A call to `panel_show` or `app_show` reads as what the agent made, in the words of the desktop's
 card, from the record's `card` ([panel and app calls](./native-messaging.md#panel-and-app-calls)):
 
-- A panel reads as its title, then the run's description, such as "Pull requests by author, last 30
-  days." **Open in Acorn** opens the conversation in the desktop, where the card draws in full.
+- A finished panel draws live, as a [panel card](#panel-cards). On a host too old to run it, it
+  reads as its title, then the run's description, such as "Pull requests by author, last 30 days.",
+  and "Update the Acorn CLI to see this panel here." **Open in Acorn** opens the conversation in the
+  desktop.
 - An app reads as its name and revision, such as "Migration checklist · v3", then the revision's
   note. **Open in Acorn** opens the task's Apps pane on that app.
 - While the call checks, the line reads "Checking the plan for Commits by day…" or "Checking the
@@ -48,6 +50,32 @@ card, from the record's `card` ([panel and app calls](./native-messaging.md#pane
 folds into "N tool calls". A call with nothing to name, such as an opener whose input didn't parse,
 reads as the tool line it would have been. A call that failed its checks always gets its card line.
 `CardLineItem` in `Conversation.tsx` draws it.
+
+### Panel cards
+
+A finished `panel_show` call draws as a live panel, with the dashboard's own views, read only.
+`PanelCard` in `apps/extension/src/sidebar/` draws it, and the conversation loads it with a dynamic
+import, together with `RunPanel`, `CardFrame`, and the views, so a conversation with no panels never
+loads them.
+
+- The card shows the title, **Refresh**, and **Open in Acorn**, which opens the conversation in the
+  desktop, where **Add to dashboard** and **Edit in studio** are. Under them come the run's
+  description and the panel, capped at 480 pixels with **Expand**, as in the desktop.
+- The card asks the host to run its call with `panel.run`
+  ([panel cards](./native-messaging.md#panel-cards)) when it comes into view, on **Refresh**, on an
+  `agent` hint for its session, and when the connection comes back. A hint or the connection reruns
+  it at most once every five seconds, and only while it's in view. **Refresh** runs it at once. A card
+  scrolled out of view sends nothing. Rows the agent supplied never change, so a hint doesn't rerun
+  them, and the card has no **Refresh**.
+- A failed run keeps the last panel and says why above it. A run whose source couldn't answer keeps
+  the last panel that had data, greyed out, under the run's problems.
+- A link cell opens in a new tab through the `tabs` API. A row whose press opens an address does the
+  same. A row whose press opens a task, a pane, or an overlay says "That row opens in Acorn." with
+  **Open in Acorn**. Buttons, board moves, data source actions, and drill-downs are off, so a row with
+  only a data source action isn't pressable.
+- A newer card with the same panel ID collapses an older one to "Commits by day. Replaced by a newer
+  version." with **Show**, among the cards the sidebar has loaded. A collapsed card doesn't run.
+  **Hide this version** collapses it again.
 
 A request the agent waits on follows the transcript as the desktop's request card
 ([answering the agent](./conversations.md#answering-the-agent)).

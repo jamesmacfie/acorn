@@ -121,6 +121,10 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
     workflowDefs: [] as Record<string, unknown>[],
     workflowStartAnswer: { runId: 'run-1' } as Record<string, unknown>,
     workflowStarts: [] as { key: string; body: unknown }[],
+    // What the dashboards run route answers, every body it was sent, and a hold on its answer.
+    dashboardRun: { rows: [] } as unknown,
+    dashboardRuns: [] as Record<string, unknown>[],
+    dashboardRunDelay: null as Promise<void> | null,
   }
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
     state.paths.push(req.url ?? '')
@@ -399,6 +403,13 @@ async function fakeNode(nodeId: string, options: { protocolVersion?: number } = 
         return res.end(Buffer.from([0x89, 0x50, 0x4e, 0x47]))
       }
       return reply(200, row)
+    }
+    if (url.pathname === '/v1/core/dashboards/run' && req.method === 'POST') {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      state.dashboardRuns.push(JSON.parse(body))
+      await state.dashboardRunDelay
+      return reply(200, state.dashboardRun)
     }
     if (req.url === '/v1/core/projects') {
       await state.projectsDelay
@@ -1463,6 +1474,113 @@ describe('browser bridge handoffs', () => {
       task: { id: made.task.id },
     })
     expect(node.state.createdTasks).toHaveLength(1)
+  })
+})
+
+describe('browser bridge panel cards', () => {
+  const plan = {
+    version: 2,
+    title: 'Plan title',
+    time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+    sources: [
+      {
+        id: 'rows',
+        label: 'Rows',
+        role: 'primary',
+        reference: {
+          kind: 'supplied',
+          origin: { says: 'The agent', readAt: 1 },
+          schema: { type: 'object', properties: {} },
+          fields: [],
+          rows: [],
+        },
+      },
+    ],
+    columns: [{ id: 'title', label: 'Title', type: 'text', bind: { rows: { field: '/title' } } }],
+    stages: [],
+    view: { kind: 'table' },
+  }
+  const shown = {
+    id: 'call-1',
+    name: 'panel_show',
+    title: 'panel_show',
+    status: 'completed',
+    input: JSON.stringify({ title: 'Open pull requests', plan }),
+    output: JSON.stringify({ panelId: 'prs', shownAt: 5, description: ['Open pull requests.'] }),
+  }
+  const toolPath = '/v1/p/agents/sessions/s1/tools/call-1'
+  const request = {
+    op: 'panel.run',
+    nodeId: 'node-a',
+    sessionId: 's1',
+    toolId: 'call-1',
+    viewerZone: 'Pacific/Auckland',
+  }
+
+  async function selected() {
+    const { call, node } = await paired()
+    await call({ op: 'node.select', nodeId: 'node-a' })
+    node.state.pluginAnswers.set(toolPath, { tool: shown, turnId: 'turn-1', taskId: 't1' })
+    node.state.dashboardRun = { plan, rows: [{ id: 'rows:0', values: { title: 'One' } }], groups: [] }
+    return { call, node }
+  }
+
+  it("runs the call's plan as a draft in its task's workspace, in the sidebar's time zone", async () => {
+    const { call, node } = await selected()
+    const titled = { ...plan, title: 'Open pull requests' }
+    expect(await call(request)).toEqual({
+      nodeId: 'node-a',
+      sessionId: 's1',
+      toolId: 'call-1',
+      plan: titled,
+      run: node.state.dashboardRun,
+    })
+    expect(node.state.dashboardRuns).toEqual([
+      {
+        operation: 'run',
+        scope: { workspaceId: 'w' },
+        target: { kind: 'draft', content: titled },
+        mode: 'execution',
+        viewerZone: 'Pacific/Auckland',
+      },
+    ])
+  })
+
+  it('refuses a call that drew no panel, and one whose plan no longer validates', async () => {
+    const { call, node } = await selected()
+    const answer = (tool: Record<string, unknown>) =>
+      node.state.pluginAnswers.set(toolPath, { tool: { ...shown, ...tool }, turnId: 'turn-1', taskId: 't1' })
+    for (const tool of [
+      { name: 'app_show' },
+      { status: 'failed' },
+      // A harness records a refused call as completed, with the error as its output.
+      { output: 'Error: the plan has problems' },
+    ]) {
+      answer(tool)
+      await expect(call(request)).rejects.toMatchObject({
+        code: 'not_found',
+        message: "That call didn't draw a panel.",
+      })
+    }
+    answer({ input: JSON.stringify({ title: 'Open pull requests', plan: { ...plan, view: { kind: 'globe' } } }) })
+    await expect(call(request)).rejects.toMatchObject({
+      code: 'not_found',
+      message: "Open pull requests no longer passes its checks, so it can't be drawn.",
+    })
+    node.state.pluginAnswers.delete(toolPath)
+    await expect(call(request)).rejects.toMatchObject({ code: 'not_found' })
+    expect(node.state.dashboardRuns).toEqual([])
+  })
+
+  it('discards a run that finishes after the selection moved', async () => {
+    const { call, node } = await selected()
+    let release!: () => void
+    node.state.dashboardRunDelay = new Promise((resolve) => (release = resolve))
+    const late = call(request)
+    await vi.waitFor(() => expect(node.state.dashboardRuns).toHaveLength(1))
+    await call({ op: 'node.select', nodeId: null })
+    release()
+    await expect(late).rejects.toMatchObject({ code: 'not_selected' })
   })
 })
 

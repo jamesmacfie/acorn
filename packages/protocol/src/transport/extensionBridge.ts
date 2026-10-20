@@ -13,6 +13,7 @@ import {
   type SiteAddress,
   type SiteAssociation,
 } from '../projects/siteAssociations.ts'
+import type { PanelPlan } from '../dashboards/panels.ts'
 import type { DataSchema } from '../data/values/dataSchemas.ts'
 import type { DataValue } from '../data/values/dataValues.ts'
 import type { NodeProbeResult, NodeRecord, NodeStatus } from './broker.ts'
@@ -314,6 +315,17 @@ export const bridgeRequestSchema = z.discriminatedUnion('op', [
     taskId: rowId,
     source: browserPanelSourceId.optional(),
   }),
+  // An agent's `panel_show` call, run as the desktop's card runs it (docs/browser-extension/native-messaging.md
+  // § Panel cards). The browser names the call, never a plan: the host reads the plan from the Node.
+  // `viewerZone` is the sidebar's time zone, because the host's clock may not be the browser's.
+  z.strictObject({
+    ...envelope,
+    op: z.literal('panel.run'),
+    nodeId,
+    sessionId: rowId,
+    toolId: z.string().min(1).max(256),
+    viewerZone: z.string().min(1).max(100),
+  }),
 ])
 export type BridgeRequest = z.infer<typeof bridgeRequestSchema>
 export type BridgeOperation = BridgeRequest['op']
@@ -384,7 +396,8 @@ export type BridgeAttachmentRef = { id: string; image: boolean; name: string | n
 // the sidebar merges a call's fields by tool ID, as it merges `title` and `status`. `failed` marks a
 // call that didn't pass its checks, so nothing was drawn.
 export type BridgeToolCard =
-  | { kind: 'panel'; title?: string; description?: string[]; failed?: true }
+  // `panelId` and `shownAt` come with the result. A newer `shownAt` for the same `panelId` replaces a card.
+  | { kind: 'panel'; title?: string; description?: string[]; panelId?: string; shownAt?: number; failed?: true }
   | { kind: 'app'; appId?: string; name?: string; revision?: number; note?: string; failed?: true }
 
 // What the sidebar draws of one agent event: the session's own messages, its tool calls, and its
@@ -563,6 +576,9 @@ export type BridgeResults = {
   'workflow.steps': { nodeId: string; runId: string; steps: BridgeWorkflowStep[] }
   // Null when the plugin declares no panel, or has none for this task.
   'plugin.panel': { nodeId: string; pluginId: string; taskId: string; view: BrowserPanelView | null }
+  // `plan` is the call's plan, titled as the call is. `run` is the dashboards run route's answer,
+  // unchanged: a `DashboardRun` from dashboards-core, which this package can't import.
+  'panel.run': { nodeId: string; sessionId: string; toolId: string; plan: PanelPlan; run: unknown }
 }
 
 // Which sessions and tasks changed on the selected Node since the last hint. Nothing more: the

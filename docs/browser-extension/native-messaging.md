@@ -38,6 +38,7 @@ request carries `v: 1` and a request `id`, and the host answers with the same `i
 | `workflows.list`, `workflow.start`, `workflow.runs`, `workflow.steps` | `nodeId`, and the project, task, or run | See [workflows](./workflows.md#native-operations) |
 | `plugin.panel` | `nodeId`, `pluginId`, `taskId`, `source` (optional) | `{ nodeId, pluginId, taskId, view }`, where `view` is null when the task has no panel; see [plugin panels](./plugin-panels.md#native-operation) |
 | `requests.pending` | `nodeId` | `{ nodeId, requests }`; see [request notifications](./notifications.md#native-operation) |
+| `panel.run` | `nodeId`, `sessionId`, `toolId`, `viewerZone` | `{ nodeId, sessionId, toolId, plan, run }`; see [panel cards](#panel-cards) |
 
 A reply is `{ v, id, ok: true, result }` or `{ v, id, ok: false, error: { code, message } }`. The host
 also sends `{ v, event: 'status', status }` when the selected Node's connection changes, and
@@ -56,20 +57,40 @@ otherwise. Add an operation together with the phase that first calls it.
 
 A `session.read` tool record carries `card` when the call's MCP name is `panel_show` or `app_show`,
 so the sidebar can name what the agent made ([the conversation view](./transcript.md#panel-and-app-lines)).
-It's `{ kind: 'panel', title, description, failed }` or `{ kind: 'app', appId, name, revision, note,
-failed }`, and each field is present only when that record says it. A call's input and its result can
+It's `{ kind: 'panel', title, description, panelId, shownAt, failed }` or `{ kind: 'app', appId, name,
+revision, note, failed }`, and each field is present only when that record says it. A call's input and its result can
 arrive in different records, and the sidebar merges a call's fields by tool ID, as it merges `title`
 and `status`.
 
 `toolCard` in `apps/cli/src/browser/agents.ts` reads a panel's title, and an app's ID and note,
 from the call's input. It reads a panel's description, and an app's name and revision, from its
-result. It uses the readers the desktop's cards use: `readPanelShowCall` in `@acorn/protocol`, and
+result, with its `panelId` and `shownAt`, which tell the sidebar when a newer card replaces an older
+one. It uses the readers the desktop's cards use: `readPanelShowCall` in `@acorn/protocol`, and
 `readAppShowCall` in the trellis plugin's contract. `failed` marks a call that finished without a
 result, which is how a harness records a refused call. Nothing else from a call's input or output
 crosses the bridge.
 
 An older sidebar ignores `card`. A newer sidebar with an older host gets none, and draws the plain
 tool line.
+
+## Panel cards
+
+`panel.run` runs an agent's `panel_show` call, so the sidebar can draw it
+([panel cards](./transcript.md#panel-cards)). The browser names the call, never a plan. The host:
+
+1. Reads the call from the agents plugin's `GET /sessions/:sessionId/tools/:toolId`, which folds the
+   call across the whole session.
+2. Refuses with `not_found` unless the call is `panel_show`, completed, and its output reads as a
+   `panel_show` result. A plan that no longer passes `panelPlanSchema` is `not_found` too.
+3. Finds the workspace of the session's task, through the active task list and the project list.
+4. Runs the plan, titled with the call's title, through `POST /v1/core/dashboards/run` as a draft, in
+   `execution` mode, in that workspace, with the sidebar's `viewerZone`. The desktop's card sends the
+   same request.
+
+The run is a read: an answer that arrives after the selection moved is refused with `not_selected`.
+`plan` is the parsed plan, so the sidebar can lay out the view. `run` is the run route's answer,
+unchanged, capped so the whole reply fits the extension's 16 Mi character limit. A host from before
+`panel.run` answers `bad_request`, and the sidebar draws the call's line instead.
 
 ## Limits
 

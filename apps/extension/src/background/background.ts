@@ -233,7 +233,8 @@ export function startBackground(api: BrowserApi, hostName: string): void {
   })
 
   api.runtime.onConnect.addListener((port) => {
-    if (port.name !== 'sidebar') return
+    // A content script can open a port too, so a port counts as the sidebar only from the sidebar page.
+    if (port.name !== 'sidebar' || !port.sender?.url?.startsWith(api.runtime.getURL('sidebar.html'))) return
     sidebars.add(port)
     port.postMessage({ type: 'host', host } satisfies BackgroundMessage)
     port.postMessage(badge.current)

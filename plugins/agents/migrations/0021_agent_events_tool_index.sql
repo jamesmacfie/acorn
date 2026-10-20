@@ -1,0 +1,1 @@
+CREATE INDEX `agent_events_session_tool_idx` ON `agent_events` (`session_id`,event_json ->> '$.tool.id') WHERE event_json ->> '$.type' = 'tool';

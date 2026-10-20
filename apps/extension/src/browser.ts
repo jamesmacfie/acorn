@@ -12,6 +12,8 @@ export type Port = {
   onDisconnect: Listeners<(port: Port) => void>
   // Firefox reports why a port closed here. Chrome uses runtime.lastError inside onDisconnect.
   error?: { message?: string } | null
+  // Who opened the port, on the end `runtime.onConnect` receives.
+  sender?: MessageSender
 }
 
 export type Tab = { id?: number; windowId: number; active?: boolean; url?: string; title?: string }

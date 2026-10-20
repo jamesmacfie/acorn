@@ -9,8 +9,9 @@ sources:
   - apps/extension/src/sidebar/Agents.tsx
   - apps/extension/src/sidebar/Composer.tsx
   - apps/extension/src/sidebar/Conversation.tsx
+  - apps/extension/src/sidebar/PanelCard.tsx
   - apps/extension/src/sidebar/Requests.tsx
-checked: '6281eefb0'
+checked: '0ca51f7a5'
 ---
 
 import Keys from '../../../../components/Keys.astro'
@@ -49,9 +50,17 @@ further back.
 Three or more tool calls in a row fold into one line, such as "4 tool calls". Click it to see them. A
 call that failed stays in view under the line, which counts it in red.
 
-A dashboard panel or an app the agent made gets a line of its own, which never folds: the panel's
-title and what it shows, or the app's name, version, and what changed. **Open in Acorn** shows it
-drawn in the desktop app. A panel or app that didn't pass its checks says so in amber.
+A dashboard panel the agent made draws in the conversation with live data, as it does in the desktop
+app: its title, what it shows, and the panel itself, with **Expand** for a tall one and **Refresh**.
+It reads its data while it's on screen. A link opens in a new tab. A row that opens something in
+Acorn says so, with **Open in Acorn**. When the agent shows a changed version, the older card folds
+to one line with **Show**. To add the panel to a dashboard or edit it, use **Open in Acorn** at the
+card's top. With an older Acorn command line, the panel reads as a line with its title and what it
+shows, and asks you to update it.
+
+An app the agent made gets a line of its own, which never folds: the app's name, version, and what
+changed. **Open in Acorn** shows it drawn in the desktop app. A panel or app that didn't pass its
+checks says so in amber.
 
 While the agent works, a line above the message box says **Working**, with **Stop** to end its turn.
 While it waits on you, the line says **Waiting for you**.
@@ -92,8 +101,9 @@ never guesses an answer.
 
 ## Limits
 
-- The panel shows messages, tool calls by title, and errors. It names a panel or app the agent made,
-  but doesn't draw it. It doesn't show a tool's details or subagents' work. Open the conversation in
-  the desktop app for those.
+- The panel shows messages, tool calls by title, and errors. It draws a dashboard panel the agent
+  made, read only: no row actions, board moves, or drill-downs. It names an app the agent made, but
+  doesn't draw it. It doesn't show a tool's details or subagents' work. Open the conversation in the
+  desktop app for those.
 - It shows the attachments a message sent as chips, each screenshot with its picture.
 - Drafts stay in the browser until sent or cleared. They don't expire.

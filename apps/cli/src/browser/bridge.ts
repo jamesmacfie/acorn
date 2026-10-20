@@ -6,6 +6,7 @@ import type { NodeFetchBody, NodeFetchResponse, NodeStatus } from '@acorn/protoc
 import type { ArchiveResult, DeleteResult } from '@acorn/protocol/task.ts'
 import {
   ATTACHMENT_MAX_BYTES,
+  NATIVE_REPLY_MAX_CHARS,
   type BridgeAgentHint,
   type BridgeAttachment,
   type BridgeErrorCode,
@@ -28,6 +29,8 @@ import {
   type Task,
   type Workspace,
 } from '@acorn/protocol/api.ts'
+import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
+import { readPanelShowCall } from '@acorn/protocol/panelShowCall.ts'
 import {
   SITE_ASSOCIATIONS_MAX,
   associationMatches,
@@ -64,6 +67,7 @@ import type {
   AgentSession,
   AgentSessionList,
   AgentSessionSnapshot,
+  AgentToolCallRead,
   AgentTurn,
 } from '@acorn/plugin-agents/contract/wire.ts'
 import type { CustomAgent } from '@acorn/plugin-agents/contract/newSessionChoices.ts'
@@ -77,6 +81,7 @@ import {
   bridgeSession,
   bridgeSessionRead,
   sessionRoute,
+  toolCallRoute,
 } from './agents'
 import type { WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '@acorn/plugin-workflows/contract/wire.ts'
 import {
@@ -112,6 +117,8 @@ type Probe = Awaited<ReturnType<typeof probeNode>>
 // How long `nodes.list` waits to learn whether an offline Node changed its certificate. A refused
 // connection answers at once; a Node that accepts and then hangs costs at most this.
 const LIST_PROBE_TIMEOUT_MS = 2_000
+
+const dashboardRunRoute = '/v1/core/dashboards/run'
 
 // The native host's operations, over this browser's own custody. The certificate, the token, and the
 // broker stay in this process; replies carry node records, probe results, and project rows only.
@@ -548,6 +555,52 @@ export function createBridge(options: {
     return parsed.data
   }
 
+  // An agent's panel, run as the desktop's card runs it: the plan from the call's input, as a draft, in
+  // the workspace of the session's task. The browser names the call, so it can only run a plan an agent
+  // showed in a session this device can read.
+  async function runShownPanel(
+    request: Extract<BridgeRequest, { op: 'panel.run' }>,
+  ): Promise<BridgeResults['panel.run']> {
+    const { nodeId, sessionId, toolId } = request
+    const read = (await nodeRequest(nodeId, {
+      method: 'GET',
+      path: toolCallRoute(sessionId, toolId),
+      maxResponseBytes: NATIVE_REPLY_MAX_CHARS,
+    })) as AgentToolCallRead | null
+    const tool = read?.tool
+    const { input, result } = tool ? readPanelShowCall(tool) : {}
+    if (tool?.name !== 'panel_show' || tool.status !== 'completed' || !input || !result)
+      throw new BridgeFailure('not_found', "That call didn't draw a panel.")
+    const parsed = panelPlanSchema.safeParse(input.plan)
+    if (!parsed.success)
+      throw new BridgeFailure('not_found', `${input.title} no longer passes its checks, so it can't be drawn.`)
+    // The agent's title is what the card says, as on the desktop's card.
+    const plan = { ...parsed.data, title: input.title }
+    const [tasks, projects] = await Promise.all([
+      readList<Task>(nodeId, tasksRoute, (body) => body),
+      listProjectRows(nodeId),
+    ])
+    const projectId = tasks.find((task) => task.id === read?.taskId)?.projectId
+    const workspaceId = projects.find((project) => project.id === projectId)?.workspaceId
+    if (!workspaceId) throw new BridgeFailure('not_found', "This conversation's task is no longer active.")
+    const run = (await nodeRequest(nodeId, {
+      method: 'POST',
+      path: dashboardRunRoute,
+      body: {
+        operation: 'run',
+        scope: { workspaceId },
+        target: { kind: 'draft', content: plan },
+        mode: 'execution',
+        viewerZone: request.viewerZone,
+      },
+      read: true,
+      // The reply carries the plan beside the run, and the whole reply must fit the extension's limit.
+      maxResponseBytes: NATIVE_REPLY_MAX_CHARS - JSON.stringify(plan).length,
+    })) as { rows?: unknown } | null
+    if (!Array.isArray(run?.rows)) throw new BridgeFailure('node_error', 'The Node returned an unreadable panel run.')
+    return { nodeId, sessionId, toolId, plan, run }
+  }
+
   async function handle(request: BridgeRequest): Promise<BridgeResults[BridgeRequest['op']]> {
     switch (request.op) {
       case 'nodes.list': {
@@ -917,6 +970,8 @@ export function createBridge(options: {
         ).flat()
         return { nodeId: request.nodeId, runId: request.runId, steps: bridgeSteps(steps, sessions, bridgeSession) }
       }
+      case 'panel.run':
+        return runShownPanel(request)
       case 'plugin.panel': {
         const view = await pluginPanel(request.nodeId, request)
         return { nodeId: request.nodeId, pluginId: request.pluginId, taskId: request.taskId, view }

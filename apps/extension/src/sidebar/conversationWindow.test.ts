@@ -159,6 +159,7 @@ describe('panel and app lines', () => {
       {
         key: 'e1',
         kind: 'card',
+        toolId: 'a',
         card: { kind: 'app', appId: 'app-0123456789ab', note: 'Added due dates', name: 'Checklist', revision: 3 },
         status: 'completed',
       },
@@ -190,7 +191,7 @@ describe('panel and app lines', () => {
     ])
     expect(items).toEqual([
       { key: 'e1', kind: 'tool', title: 'panel_show', status: 'running' },
-      { key: 'e2', kind: 'card', card: { kind: 'app', failed: true }, status: 'completed' },
+      { key: 'e2', kind: 'card', toolId: 't2', card: { kind: 'app', failed: true }, status: 'completed' },
     ])
   })
 })

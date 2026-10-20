@@ -768,6 +768,7 @@ export function Workspace(props: {
               <Conversation
                 client={props.client}
                 storage={props.api.storage}
+                tabs={props.api.tabs}
                 target={{ nodeId, taskId: taskId()!, sessionId }}
                 session={session()!}
                 focused={startedSession() === sessionId}
@@ -785,6 +786,7 @@ export function Workspace(props: {
               <Conversation
                 client={props.client}
                 storage={props.api.storage}
+                tabs={props.api.tabs}
                 target={{ nodeId, taskId: open.step.session!.taskId, sessionId: open.step.session!.id }}
                 session={open.step.session!}
                 online={props.online}

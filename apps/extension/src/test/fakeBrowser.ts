@@ -73,6 +73,19 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
   const onNotificationClicked = listeners<(id: string) => void>()
   const onInstalled = listeners<() => void>()
   const onMenuClicked = listeners<(info: { menuItemId: string | number; frameId?: number }, tab?: Tab) => void>()
+  // A port from an extension page, or from a content script, as `sender` says.
+  const connect = (name: string, sender: MessageSender): Port => {
+    const close = (end: FakePort) => {
+      for (const side of [end, end.peer!]) side.closed = true
+      queueMicrotask(() => end.peer!.onDisconnect.emit(end.peer!))
+    }
+    const opener = port(name, close)
+    const receiver = Object.assign(port(name, close), { sender })
+    opener.peer = receiver
+    receiver.peer = opener
+    queueMicrotask(() => onConnect.emit(receiver))
+    return opener
+  }
   const runtime: BrowserApi['runtime'] = {
     lastError: null,
     getURL: (path) => `chrome-extension://fake/${path}`,
@@ -80,18 +93,7 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
     onMessage,
     onInstalled,
     sendMessage: async (message) => void onMessage.emit(structuredClone(message), {}, () => {}),
-    connect({ name }) {
-      const close = (end: FakePort) => {
-        for (const side of [end, end.peer!]) side.closed = true
-        queueMicrotask(() => end.peer!.onDisconnect.emit(end.peer!))
-      }
-      const sidebar = port(name, close)
-      const background = port(name, close)
-      sidebar.peer = background
-      background.peer = sidebar
-      queueMicrotask(() => onConnect.emit(background))
-      return sidebar
-    },
+    connect: ({ name }) => connect(name, { url: runtime.getURL('sidebar.html') }),
     connectNative(application) {
       const hostEnd = port(application, () => {})
       const extensionEnd = port(application, () => {
@@ -168,6 +170,8 @@ export function fakeBrowser(options: { flavor?: 'chrome' | 'firefox' } = {}) {
         // A browser answers `undefined` when no listener kept the channel open.
         if (!kept) resolve(undefined)
       }),
+    // A port a content script in the active tab opened.
+    connectFromPage: (name: string): Port => connect(name, { tab: { ...fake.activeTab }, url: fake.activeTab.url }),
     // The active tab navigated, as `tabs.onUpdated` reports it.
     navigate: (url: string | undefined): void => {
       fake.activeTab = { ...fake.activeTab, url }

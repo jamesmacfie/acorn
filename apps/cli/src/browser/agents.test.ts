@@ -143,9 +143,15 @@ describe('panel and app calls for the sidebar', () => {
       0,
     ).records.map((row) => (row.event.type === 'tool' ? row.event.card : null))
 
-  it('names a panel from its input and describes it from its result', () => {
+  it('names a panel from its input, and describes and identifies it from its result', () => {
     expect(cards({ name: 'panel_show', status: 'completed', ...panel })).toEqual([
-      { kind: 'panel', title: 'Pull requests by author', description: ['Pull requests by author, last 30 days.'] },
+      {
+        kind: 'panel',
+        title: 'Pull requests by author',
+        description: ['Pull requests by author, last 30 days.'],
+        panelId: 'p1',
+        shownAt: 5,
+      },
     ])
   })
 
@@ -157,7 +163,7 @@ describe('panel and app calls for the sidebar', () => {
       ),
     ).toEqual([
       { kind: 'panel', title: 'Pull requests by author' },
-      { kind: 'panel', description: ['Pull requests by author, last 30 days.'] },
+      { kind: 'panel', description: ['Pull requests by author, last 30 days.'], panelId: 'p1', shownAt: 5 },
     ])
   })
 
@@ -182,7 +188,12 @@ describe('panel and app calls for the sidebar', () => {
       description: Array.from({ length: 10 }, () => 'x'.repeat(400)),
     })
     const [card] = cards({ name: 'panel_show', status: 'completed', output })
-    expect(card).toEqual({ kind: 'panel', description: Array.from({ length: 8 }, () => 'x'.repeat(300)) })
+    expect(card).toEqual({
+      kind: 'panel',
+      description: Array.from({ length: 8 }, () => 'x'.repeat(300)),
+      panelId: 'p1',
+      shownAt: 5,
+    })
   })
 
   it('names an app and its revision from its result, and its note from its input', () => {

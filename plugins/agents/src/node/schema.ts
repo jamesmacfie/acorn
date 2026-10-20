@@ -132,6 +132,12 @@ export const agentEvents = sqliteTable(
     uniqueIndex('agent_events_session_seq_idx').on(t.sessionId, t.seq),
     index('agent_events_turn_seq_idx').on(t.turnId, t.seq),
     index('agent_events_created_idx').on(t.createdAt),
+    // One tool call's rows, for the route that reads a call by its ID. The read's WHERE must repeat
+    // both expressions exactly, or SQLite won't use the index. `->>` rather than `json_extract`,
+    // because drizzle-kit splits an index expression at its commas.
+    index('agent_events_session_tool_idx')
+      .on(t.sessionId, sql`event_json ->> '$.tool.id'`)
+      .where(sql`event_json ->> '$.type' = 'tool'`),
   ],
 )
 

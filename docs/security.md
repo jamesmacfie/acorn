@@ -54,6 +54,13 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
   with the session's own task token, and the route answers only for the session that token names.
   Acorn adds the bridge to the flag settings of the session it starts and writes nothing to the
   person's harness settings files ([harness bridges](./managed-agents/loop-hooks.md)).
+- **A paired browser** reaches its Node through the native host, under a device credential of its
+  own, and only through the bridge's typed operations, never a general route proxy
+  ([browser extension](./browser-extension.md#what-runs-where)). It can run any panel an agent showed
+  with `panel_show` in a session that device can read, because the host reads the plan from the call
+  and the browser only names it ([panel cards](./browser-extension/native-messaging.md#panel-cards)).
+  The desktop's card does the same under its own device, so this changes where the device can run a
+  panel from, not what it can run.
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and

@@ -13,8 +13,8 @@ import type {
 export const CONVERSATION_PAGE = 200
 
 export type ToolLine = { key: string; kind: 'tool'; title: string; status: string | null }
-// A panel or app the agent made, named on a line of its own.
-export type CardLine = { key: string; kind: 'card'; card: BridgeToolCard; status: string | null }
+// A panel or app the agent made, named on a line of its own. `toolId` names the call to the host.
+export type CardLine = { key: string; kind: 'card'; toolId: string; card: BridgeToolCard; status: string | null }
 
 // A run this long or longer folds into one line. Two lines read as quickly as a folded one would.
 const TOOL_FOLD_AT = 3
@@ -48,7 +48,7 @@ const named = (card: BridgeToolCard) =>
 // TOOL_FOLD_AT or more tool lines come back as one `tools` item.
 export function conversationItems(records: readonly BridgeConversationRecord[]): ConversationItem[] {
   const items: ConversationItem[] = []
-  const tools = new Map<string, { at: number; through: number; card: BridgeToolCard | undefined }>()
+  const tools = new Map<string, { at: number; toolId: string; through: number; card: BridgeToolCard | undefined }>()
   let message: { at: number; turnId: string | null; messageId: string | undefined } | null = null
   for (const record of records) {
     const event = record.event
@@ -90,15 +90,15 @@ export function conversationItems(records: readonly BridgeConversationRecord[]):
         open.card = mergeCard(open.card, event.card)
         continue
       }
-      tools.set(toolKey, { at: items.length, through, card: event.card })
+      tools.set(toolKey, { at: items.length, toolId: event.toolId, through, card: event.card })
       items.push({ key: record.id, kind: 'tool', title: event.title || 'Tool call', status: event.status ?? null })
     }
   }
   // After every record, because a call's card fields can arrive in any of them.
-  for (const { at, card } of tools.values()) {
+  for (const { at, toolId, card } of tools.values()) {
     const line = items[at]
     if (card && named(card) && line?.kind === 'tool')
-      items[at] = { key: line.key, kind: 'card', card, status: line.status }
+      items[at] = { key: line.key, kind: 'card', toolId, card, status: line.status }
   }
   return groupToolRuns(items)
 }

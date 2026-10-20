@@ -305,7 +305,8 @@ ul.chips > .chip { cursor: default; font-weight: var(--fw-semibold); }
 .ui-markdown :is(h1, h2, h3, h4, h5, h6) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); font-weight: var(--fw-semibold); color: var(--text); text-transform: none; letter-spacing: normal; }
 .attachments { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .attachments .thumb { display: block; height: var(--icon-box); width: auto; border-radius: var(--radius-xs); }
-.composer { position: sticky; bottom: 0; background: var(--bg); border-top: var(--chrome-divider); }
+/* Above the transcript's own sticky parts, such as a panel card's table head. */
+.composer { position: sticky; bottom: 0; z-index: var(--z-sticky); background: var(--bg); border-top: var(--chrome-divider); }
 /* The size toggle sits in the field's top corner, as on the desktop, with the text kept clear of it. */
 .composer .field { position: relative; }
 .composer .field textarea { display: block; width: 100%; padding-right: calc(var(--control-h-sm) + var(--space-4)); }

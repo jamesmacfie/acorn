@@ -155,6 +155,19 @@ describe('background', () => {
     })
   })
 
+  it("answers a port named for the sidebar only from the sidebar's own page", async () => {
+    const fake = fakeBrowser()
+    scriptedHost(fake, ['a'])
+    startBackground(fake.api, 'com.acorn.browser_bridge')
+    const page = fake.connectFromPage('sidebar')
+    const heard: unknown[] = []
+    page.onMessage.addListener((message) => heard.push(message))
+    page.postMessage({ id: 'c1', call: { op: 'nodes.list' } })
+    await settle()
+    expect(heard).toEqual([])
+    expect(await sidebar(fake).call({ op: 'nodes.list' })).toMatchObject({ ok: true })
+  })
+
   it('opens the sidebar from the toolbar in each browser, handling the click itself', async () => {
     const chrome = fakeBrowser({ flavor: 'chrome' })
     startBackground(chrome.api, 'com.acorn.browser_bridge')

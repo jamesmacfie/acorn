@@ -51,6 +51,8 @@ import type {
 
 export const agentsRoute = '/v1/p/agents'
 export const sessionRoute = (sessionId: string) => `${agentsRoute}/sessions/${encodeURIComponent(sessionId)}`
+export const toolCallRoute = (sessionId: string, toolId: string) =>
+  `${sessionRoute(sessionId)}/tools/${encodeURIComponent(toolId)}`
 export const attachmentRoute = (attachmentId: string) =>
   `${agentsRoute}/attachments/${encodeURIComponent(attachmentId)}`
 
@@ -136,6 +138,8 @@ function toolCard(tool: AgentToolCall): BridgeToolCard | undefined {
             description: result.description
               .slice(0, DESCRIPTION_LINES)
               .map((line) => line.slice(0, DESCRIPTION_LINE_LIMIT)),
+            panelId: result.panelId.slice(0, CARD_TEXT_LIMIT),
+            shownAt: result.shownAt,
           }
         : {}),
       ...(failedChecks(tool.status, result) ? { failed: true } : {}),

@@ -6,9 +6,11 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  lazy,
   on,
   onCleanup,
   onMount,
+  Suspense,
   type JSX,
 } from 'solid-js'
 import { render } from 'solid-js/web'
@@ -38,6 +40,9 @@ import type { DraftTarget } from '../localState'
 import { OpenInAcorn } from './OpenInAcorn'
 import { Requests } from './Requests'
 import { agentName, toolMark } from './state'
+
+// With the first panel a conversation draws, so a conversation without one never loads the views.
+const PanelCard = lazy(() => import('./PanelCard'))
 
 // How near the bottom of the page still counts as reading the newest message.
 const FOLLOW_SLACK_PX = 40
@@ -69,6 +74,7 @@ function followNewest(element: HTMLElement): void {
 export function Conversation(props: {
   client: BridgeClient
   storage: BrowserApi['storage']
+  tabs: BrowserApi['tabs']
   target: DraftTarget
   // The conversation's row as its task's list read it, until the conversation's own read arrives.
   session: BridgeAgentSession
@@ -135,6 +141,18 @@ export function Conversation(props: {
     return null
   }
   const items = createMemo(() => conversationItems(view()?.records ?? []))
+  // The newest version of each panel among the cards loaded, so an older one collapses, as on the desktop.
+  const newestPanels = createMemo(() => {
+    const newest = new Map<string, number>()
+    for (const item of items())
+      if (item.kind === 'card' && item.card.kind === 'panel' && item.card.panelId && item.card.shownAt)
+        newest.set(item.card.panelId, Math.max(newest.get(item.card.panelId) ?? 0, item.card.shownAt))
+    return newest
+  })
+  const replaced = (line: CardLine) =>
+    line.card.kind === 'panel' &&
+    !!line.card.panelId &&
+    (newestPanels().get(line.card.panelId) ?? 0) > (line.card.shownAt ?? 0)
   // One of the Node's waiting requests is this conversation's, which says more than the runtime state:
   // an agent can be working while a subagent waits on the person.
   const waiting = () =>
@@ -180,7 +198,18 @@ export function Conversation(props: {
                 {(item) => {
                   if (item.kind === 'tool') return <ToolLineItem line={item} />
                   if (item.kind === 'card')
-                    return <CardLineItem line={item} target={target} opensLinks={props.opensLinks} />
+                    return (
+                      <CardLineItem
+                        line={item}
+                        target={target}
+                        client={props.client}
+                        opensLinks={props.opensLinks}
+                        hint={props.hint}
+                        reconnects={props.reconnects}
+                        tabs={props.tabs}
+                        replaced={replaced(item)}
+                      />
+                    )
                   if (item.kind === 'tools')
                     return (
                       <li>
@@ -336,10 +365,21 @@ function ToolLineItem(props: { line: ToolLine }) {
 }
 
 // A panel or app the agent made, in the desktop card's words, with a link to where it draws in full:
-// the conversation for a panel, and the task's Apps pane for an app.
-function CardLineItem(props: { line: CardLine; target: DraftTarget; opensLinks: boolean }) {
+// the conversation for a panel, and the task's Apps pane for an app. A finished panel draws live, unless
+// a newer version of it replaced it.
+function CardLineItem(props: {
+  line: CardLine
+  target: DraftTarget
+  client: BridgeClient
+  opensLinks: boolean
+  hint: BridgeAgentHint | null
+  reconnects: number
+  tabs: BrowserApi['tabs']
+  replaced: boolean
+}) {
   const { nodeId, taskId, sessionId } = props.target
   const checking = () => props.line.status === 'pending' || props.line.status === 'running'
+  const [showOld, setShowOld] = createSignal(false)
   const words = () => {
     const card = props.line.card
     if (card.kind === 'panel')
@@ -358,27 +398,26 @@ function CardLineItem(props: { line: CardLine; target: DraftTarget; opensLinks: 
       href: card.appId ? appLink(nodeId, taskId, card.appId) : null,
     }
   }
+  const line = () => (
+    <Stack gap="row">
+      <Text emphasis="strong" wrap>
+        {words().name}
+      </Text>
+      <Show when={words().detail}>
+        {(detail) => (
+          <Text tone="muted" wrap>
+            {detail()}
+          </Text>
+        )}
+      </Show>
+      <Inline>
+        <OpenInAcorn href={words().href} opensLinks={props.opensLinks} />
+      </Inline>
+    </Stack>
+  )
   return (
     <li>
-      <Switch
-        fallback={
-          <Stack gap="row">
-            <Text emphasis="strong" wrap>
-              {words().name}
-            </Text>
-            <Show when={words().detail}>
-              {(detail) => (
-                <Text tone="muted" wrap>
-                  {detail()}
-                </Text>
-              )}
-            </Show>
-            <Inline>
-              <OpenInAcorn href={words().href} opensLinks={props.opensLinks} />
-            </Inline>
-          </Stack>
-        }
-      >
+      <Switch fallback={line()}>
         <Match when={props.line.card.failed}>
           <Alert tone="warn">{words().failed}</Alert>
         </Match>
@@ -386,6 +425,41 @@ function CardLineItem(props: { line: CardLine; target: DraftTarget; opensLinks: 
           <Text tone="muted" wrap>
             {words().checking}
           </Text>
+        </Match>
+        <Match when={props.line.card.kind === 'panel' && props.line.status === 'completed'}>
+          <Show
+            when={!props.replaced || showOld()}
+            fallback={
+              <Inline spread>
+                <Text tone="muted">{`${words().name}. Replaced by a newer version.`}</Text>
+                <Button size="sm" variant="ghost" onPress={() => setShowOld(true)}>
+                  Show
+                </Button>
+              </Inline>
+            }
+          >
+            <Stack gap="row">
+              <Suspense fallback={line()}>
+                <PanelCard
+                  client={props.client}
+                  target={props.target}
+                  toolId={props.line.toolId}
+                  title={words().name}
+                  href={words().href}
+                  opensLinks={props.opensLinks}
+                  hint={props.hint}
+                  reconnects={props.reconnects}
+                  tabs={props.tabs}
+                  line={line()}
+                />
+              </Suspense>
+              <Show when={props.replaced}>
+                <Button size="sm" variant="ghost" onPress={() => setShowOld(false)}>
+                  Hide this version
+                </Button>
+              </Show>
+            </Stack>
+          </Show>
         </Match>
       </Switch>
     </li>

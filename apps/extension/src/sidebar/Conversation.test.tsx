@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'solid-js/web'
 import type {
   BridgeAgentRequest,
@@ -487,17 +487,65 @@ describe('conversation', () => {
       subject.state.sessions[0]!.lastEventSeq = seq
     }
 
-    it('names a panel and links to the conversation, where it draws', async () => {
+    // The fake Node answers an operation it doesn't know with `bad_request`, as an older host does.
+    it('names a panel and links to the conversation, on a host too old to run it', async () => {
       const subject = mount()
       call(subject, 1, {
         title: 'mcp__acorn__panel_show',
         card: { kind: 'panel', title: 'Commits by day', description: ['Your commits this week,', 'by day.'] },
       })
       await openSession(subject)
-      expect(transcript(subject.root)).toEqual(['Commits by dayYour commits this week, by day.Copy Acorn link'])
+      await vi.waitFor(() =>
+        expect(transcript(subject.root)).toEqual([
+          'Commits by dayYour commits this week, by day.Copy Acorn linkUpdate the Acorn CLI to see this panel here.',
+        ]),
+      )
       expect(button(subject.root, 'Copy Acorn link')!.getAttribute('data-tip')).toBe(
         'acorn://n1/t/t1?pane=agents&item=s1',
       )
+    })
+
+    const panelRun = (request: Record<string, unknown>) => {
+      const plan = {
+        version: 2,
+        title: 'Commits',
+        time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+        sources: [],
+        columns: [{ id: 'title', label: 'Title', type: 'text', bind: {} }],
+        stages: [],
+        view: { kind: 'list' },
+      }
+      const run = {
+        plan,
+        rows: [{ id: 'r1', values: { title: `Drawn by ${request.toolId}` }, records: [] }],
+        groups: [],
+        description: [],
+        diagnostics: { problems: [], sources: [], stages: [], plugins: [], accounts: [], complete: true },
+      }
+      return { result: { nodeId: 'n1', sessionId: 's1', toolId: request.toolId, plan, run } }
+    }
+    const panelRuns = (subject: ReturnType<typeof mount>) =>
+      subject.state.requests.filter((request) => request.op === 'panel.run').map((request) => request.toolId)
+
+    it('draws a finished panel live, and collapses an older version of it until Show', async () => {
+      const subject = mount()
+      subject.state.answers.set('panel.run', panelRun)
+      call(subject, 1, { card: { kind: 'panel', title: 'Commits by day', panelId: 'commits', shownAt: 1 } })
+      call(subject, 2, { card: { kind: 'panel', title: 'Commits by day', panelId: 'commits', shownAt: 2 } })
+      await openSession(subject)
+      await vi.waitFor(() => expect(subject.root.textContent).toContain('Drawn by tool-2'))
+      expect(subject.root.querySelector('.transcript > li')!.textContent).toBe(
+        'Commits by day. Replaced by a newer version.Show',
+      )
+      // A collapsed card doesn't run.
+      expect(panelRuns(subject)).toEqual(['tool-2'])
+
+      button(subject.root, 'Show')!.click()
+      await vi.waitFor(() => expect(subject.root.textContent).toContain('Drawn by tool-1'))
+      expect(panelRuns(subject)).toEqual(['tool-2', 'tool-1'])
+      button(subject.root, 'Hide this version')!.click()
+      await settle()
+      expect(subject.root.textContent).not.toContain('Drawn by tool-1')
     })
 
     it('names an app at its revision and links to it on the Apps pane', async () => {
@@ -536,7 +584,13 @@ describe('conversation', () => {
       call(subject, 4, { card: { kind: 'panel', title: 'Commits by day' } })
       for (const seq of [5, 6, 7]) call(subject, seq, {})
       await openSession(subject)
-      expect(transcript(subject.root)).toEqual(['3 tool calls', 'Commits by dayCopy Acorn link', '3 tool calls'])
+      await vi.waitFor(() =>
+        expect(transcript(subject.root)).toEqual([
+          '3 tool calls',
+          'Commits by dayCopy Acorn linkUpdate the Acorn CLI to see this panel here.',
+          '3 tool calls',
+        ]),
+      )
     })
   })
 

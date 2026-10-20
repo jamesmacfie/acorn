@@ -30,6 +30,7 @@ import type {
   AgentSessionList,
   AgentSessionSnapshot,
   AgentSubagent,
+  AgentToolCallRead,
   AgentTurn,
   AgentWaitCondition,
   AgentWaitFacts,
@@ -1317,6 +1318,11 @@ export class AgentStore {
         nextCursor: rows.length > bounded ? (page.at(-1)?.seq ?? null) : null,
       }
     })
+  }
+
+  async toolCall(sessionId: string, toolId: string): Promise<AgentToolCallRead | null> {
+    const { readToolCall } = await import('./toolCallRead')
+    return this.db.transaction((tx) => readToolCall(tx, sessionId, toolId))
   }
 
   async unfinishedCommands(scope: CommandScope = {}): Promise<AgentEventRecord[]> {
