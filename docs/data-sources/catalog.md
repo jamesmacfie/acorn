@@ -21,8 +21,11 @@ add a source, add its row here.
 | Memories (`memory:memories`) | Memory | Memory, private ones included | Yes | [Memory page](../notes-and-memory/memory-page.md#the-memories-data-source) |
 | GitHub pull requests (`github:pull-requests`) | GitHub | Pull request | Yes | [GitHub](../github-integration.md) |
 | GitHub issues (`github:issues`) | GitHub | Issue | Yes | [GitHub](../github-integration.md) |
+| GitHub review comments (`github:review-comments`) | GitHub | Review comment, review, or conversation comment | Yes | [GitHub review comments](../github-integration/review-comments.md) |
 | GitHub Actions jobs (`github:actions-jobs`) | GitHub | Actions job | No | [GitHub](../github-integration.md) |
 | Local branches with pull requests (`github:local-branches`) | GitHub | Local branch | No | [GitHub](../github-integration.md) |
+| GitLab review comments (`gitlab:review-comments`) | GitLab | Note on a merge request | Yes | [GitLab](../gitlab-integration.md) |
+| Bitbucket review comments (`bitbucket:review-comments`) | Bitbucket | Comment on a pull request | Yes | [Bitbucket](../bitbucket-integration.md) |
 | Linear issues (`linear:issues`) | Linear | Issue | No | [Integrations](../integrations.md) |
 | Rollbar error groups (`rollbar:error-groups`) | Rollbar | Error group | No | [Rollbar](../integrations/rollbar.md) |
 

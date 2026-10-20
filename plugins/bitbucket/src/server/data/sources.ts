@@ -1,13 +1,18 @@
+import type { DataSourceQuery } from '@acorn/protocol/dataSources.ts'
 import { formatPullRequestRef, pullRequestUrl } from '../../shared/pullRequestRef'
 import { bbPages, repositoryPath } from '../bitbucketApi'
 import { forkOf } from '../mirror/pullRequests'
 import { pullRequestState, time } from '../mirror/vocabulary'
 import { login, type BitbucketPullRequest, type BitbucketUser } from '../types'
-import { pullRequestSourceDescription, stepSourceDescription } from './sourceDescriptions'
+import {
+  pullRequestSourceDescription,
+  reviewCommentSourceDescription,
+  stepSourceDescription,
+} from './sourceDescriptions'
 import { createRepositorySourceHandler } from './repositorySource'
 
-// Bitbucket's two read sources over the repositories a panel names. Pull requests read two pages of 50
-// a repository, and steps the last few pipelines' steps: past that the read says it's incomplete.
+// Bitbucket's read sources over the repositories a panel names. Pull requests read two pages of 50 a
+// repository, and steps the last few pipelines' steps: past that the read says it's incomplete.
 const PULL_REQUEST_PAGES = 2
 const PIPELINES = 5
 
@@ -49,6 +54,109 @@ export const createPullRequestSourceHandler = () =>
           }
         }),
       }
+    },
+  })
+
+// Review comments live under pull requests, so a read lists a repository's pull requests and then each
+// one's comments. This many pull requests a repository keeps that within a panel's time budget.
+const COMMENTED_PULL_REQUESTS = 25
+
+type Comment = {
+  id: number
+  user?: BitbucketUser | null
+  created_on: string
+  inline?: object | null
+  parent?: { id: number } | null
+  deleted?: boolean
+  pending?: boolean
+  resolution?: object | null
+}
+
+/** The latest lower bound a query sets on a comment's creation time, or null without one. A comment
+ *  made after it is on a pull request updated after it, so only those need reading. */
+function createdSince(query: DataSourceQuery): number | null {
+  const predicate = query.predicate
+  const bounds = (predicate?.kind === 'all' ? predicate.predicates : predicate ? [predicate] : []).flatMap((part) =>
+    part.kind === 'comparison' &&
+    part.left.address.from === 'item' &&
+    part.left.address.pointer === '/createdAt' &&
+    (part.operator === 'gt' || part.operator === 'gte') &&
+    part.right?.address.from === 'literal' &&
+    typeof part.right.address.value === 'number'
+      ? [part.right.address.value]
+      : [],
+  )
+  return bounds.length ? Math.max(...bounds) : null
+}
+
+export const createReviewCommentSourceHandler = () =>
+  createRepositorySourceHandler({
+    description: reviewCommentSourceDescription,
+    read: async (session, repository, signal, query) => {
+      const since = createdSince(query)
+      const window =
+        since === null
+          ? ''
+          : `&q=${encodeURIComponent(`updated_on >= ${new Date(since).toISOString().replace('Z', '+00:00')}`)}`
+      const pulls = await bbPages<BitbucketPullRequest>(
+        session,
+        `${repositoryPath(repository)}/pullrequests?state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on&pagelen=${COMMENTED_PULL_REQUESTS}${window}`,
+        1,
+        signal,
+      )
+      if (!pulls.ok) throw new Error('bitbucket_unavailable')
+      let truncated = pulls.value.capped
+      const records = []
+      for (const pull of pulls.value.values) {
+        const listed = await bbPages<Comment>(
+          session,
+          `${repositoryPath(repository)}/pullrequests/${pull.id}/comments?pagelen=100`,
+          1,
+          signal,
+        )
+        if (!listed.ok) throw new Error('bitbucket_unavailable')
+        truncated ||= listed.value.capped
+        // A deleted comment keeps its place in a thread, and a pending one is a draft only its author sees.
+        const comments = listed.value.values.filter((comment) => !comment.deleted && !comment.pending)
+        const byId = new Map(comments.map((comment) => [comment.id, comment]))
+        // Bitbucket resolves a thread on its first comment.
+        const threadOf = (comment: Comment) => {
+          let root = comment
+          for (let depth = 0; root.parent && byId.has(root.parent.id) && depth < comments.length; depth++)
+            root = byId.get(root.parent.id)!
+          return root
+        }
+        const pullUrl = pullRequestUrl(repository, pull.id)
+        const title = `${formatPullRequestRef(repository, pull.id)}: ${pull.title}`
+        const pullAuthor = login(pull.author)
+        for (const comment of comments) {
+          const author = login(comment.user)
+          const thread = threadOf(comment)
+          const url = `${pullUrl}#comment-${comment.id}`
+          records.push({
+            recordId: `${formatPullRequestRef(repository, pull.id)}:${comment.id}`,
+            data: {
+              id: String(comment.id),
+              title,
+              repository,
+              number: pull.id,
+              pullTitle: pull.title,
+              pullUrl,
+              author,
+              authorIsPullAuthor: author !== null && author === pullAuthor,
+              kind: comment.parent ? 'reply' : comment.inline ? 'inline' : 'conversation',
+              reviewState: null,
+              resolved: thread.resolution ? true : thread.inline ? false : null,
+              createdAt: time(comment.created_on) ?? 0,
+              url,
+            },
+            display: { title, url },
+            // The pull request's address, which Acorn opens in its own pull request view when it can.
+            action: { verb: 'openUrl' as const, url: pullUrl },
+          })
+        }
+      }
+      return { truncated, records }
     },
   })
 

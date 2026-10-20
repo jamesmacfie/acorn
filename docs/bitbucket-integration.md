@@ -104,9 +104,25 @@ squash, or fast-forward. Reviewers come from the workspace's members, and the pl
 reviewer list back by each person's uuid. A person is named by their Bitbucket nickname.
 
 The plugin opens `bitbucket:diff-line` and `bitbucket:summary-badges`, and registers the data sources
-`pull-requests` and `pipeline-steps`. The pull request source reads every state of each selected
-repository's pull requests, with the author and reviewers, so a panel filters to a person's own or to
-the ones they review. The step source reads the steps of each repository's five newest pipelines.
+`pull-requests`, `review-comments`, and `pipeline-steps`. The pull request source reads every state
+of each selected repository's pull requests, with the author and reviewers, so a panel filters to a
+person's own or to the ones they review. The step source reads the steps of each repository's five
+newest pipelines.
+
+`review-comments` has one record per comment on a pull request, with the same fields as GitHub's
+review comments: the pull request's number, title, repository, and URL, a title of
+`<repository>#<number>: <title>`, the author, whether they wrote the pull request, `kind`, whether
+the thread is resolved, the created time, and the comment URL. A comment on the diff is `inline`, a
+comment with a parent is a `reply`, and any other is `conversation`. Deleted and draft comments
+aren't records. Bitbucket gives an approval or a change request to the reviewer rather than to a
+comment, so there are no review summaries and the review state is always empty. A resolved thread
+is resolved on every comment in it. An unresolved inline thread is `false`, and an unresolved
+conversation thread is empty. A record has no comment text. Pressing a row opens the pull request.
+
+A lower bound on the created time becomes an `updated_on` query on the pull request list. Each
+repository reads its 25 most recently updated pull requests and 100 comments on each. Past either
+cap the source keeps what it read and says it's incomplete on the last page. Its starters chart
+review comments per pull request, who reviews most, and review comments per week.
 
 ## Limits
 

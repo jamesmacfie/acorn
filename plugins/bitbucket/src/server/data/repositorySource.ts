@@ -5,11 +5,12 @@ import {
   dataSourceRequestSchema,
   type DataSourceDescription,
   type DataSourcePage,
+  type DataSourceQuery,
 } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS, MISSING, readDataPointer } from '@acorn/protocol/dataValues.ts'
 import { bbPages, BITBUCKET_PROVIDER, type BitbucketSession } from '../bitbucketApi'
 
-// One handler shape for both Bitbucket sources: a read over the repositories a panel names, then the
+// One handler shape for Bitbucket's read sources: a read over the repositories a panel names, then the
 // query's filter, sort, `take`, and pages over the result. Each source says how it reads one
 // repository. GitLab's sources have the same shape (plugins/gitlab/src/server/data/projectSource.ts).
 
@@ -20,11 +21,13 @@ const MAX_REPOSITORIES = 5
 
 export type RepositorySource = {
   description: DataSourceDescription
-  /** One repository's records, and whether Bitbucket held more than the read took. */
+  /** One repository's records, and whether Bitbucket held more than the read took. The query's filter
+   *  runs over them afterwards, so a read uses it only to narrow what it asks Bitbucket for. */
   read: (
     session: BitbucketSession,
     repository: string,
     signal: AbortSignal,
+    query: DataSourceQuery,
   ) => Promise<{ records: SourceRecord[]; truncated: boolean }>
 }
 
@@ -115,7 +118,7 @@ export function createRepositorySourceHandler(source: RepositorySource): PluginF
         const records: SourceRecord[] = []
         let truncated = false
         for (const repository of repositories) {
-          const read = await source.read(session, repository, request.signal)
+          const read = await source.read(session, repository, request.signal, input.query)
           records.push(...read.records)
           truncated ||= read.truncated
         }

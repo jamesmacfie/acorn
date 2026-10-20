@@ -15,7 +15,7 @@ import { BITBUCKET_PROVIDER } from '../server/config'
 import { createBitbucketAccount } from '../server/account'
 import { ciSettledDescription, reviewReceivedDescription, validateReviewReceived } from '../server/policyDescriptions'
 import { BITBUCKET_HOST, PULL_REQUEST_PAGES } from '../shared/pullRequestRef'
-import { pullRequestSource, stepSource } from '../shared/sources'
+import { pullRequestSource, reviewCommentSource, stepSource } from '../shared/sources'
 
 // Bitbucket Cloud (docs/bitbucket-integration.md): pull requests as tasks, their review views, agent
 // context, workflow CI, and the browser button, on the seams GitHub and GitLab use.
@@ -95,12 +95,17 @@ export const bitbucketPlugin = (): NodePlugin => ({
       value: { kind: 'pull-request', read: async (...args) => (await markers()).read(...args) },
     })
 
-    // The two sources load on their first request; the descriptors register now.
+    // The three sources load on their first request; the descriptors register now.
     ctx.routes.fetch(
       lazyFetch(async () => (await import('../server/data/sources')).createPullRequestSourceHandler()),
       { prefix: '/data/pull-requests' },
     )
     ctx.dataSources.register(pullRequestSource)
+    ctx.routes.fetch(
+      lazyFetch(async () => (await import('../server/data/sources')).createReviewCommentSourceHandler()),
+      { prefix: '/data/review-comments' },
+    )
+    ctx.dataSources.register(reviewCommentSource)
     ctx.routes.fetch(
       lazyFetch(async () => (await import('../server/data/sources')).createStepSourceHandler()),
       { prefix: '/data/steps' },

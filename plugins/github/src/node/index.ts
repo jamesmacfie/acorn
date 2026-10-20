@@ -11,6 +11,7 @@ import { taskPulls } from '../server/routes/pulls/taskPulls'
 import { githubEmitter } from '../server/events'
 import { pullSource } from '../shared/pullSource'
 import { issueSource } from '../shared/issueSource'
+import { reviewCommentSource } from '../shared/reviewCommentSource'
 import { actionsSource } from '../shared/actionsRegistration'
 import { branchSource } from '../shared/branchSource'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
@@ -99,7 +100,7 @@ export const githubPlugin = (): NodePlugin => {
       // The device-flow router registers separately below because github's routes share a namespace
       // with the mirror routers, whose order is load-bearing (`mirrorRoutes`).
       ctx.providers.integration(createGithubProvider({ connectable: githubClientId() !== '' }))
-      // The four source handlers load on their first request
+      // The five source handlers load on their first request
       // (docs/plugin-authoring/the-node-half.md § Load a route on first use). The descriptors register
       // now, so the sources exist before then.
       ctx.routes.fetch(
@@ -112,6 +113,13 @@ export const githubPlugin = (): NodePlugin => {
         { prefix: '/data/issues' },
       )
       ctx.dataSources.register(issueSource)
+      ctx.routes.fetch(
+        lazyFetch(async () =>
+          (await import('../server/data/reviewCommentSourceHandler')).createReviewCommentSourceHandler(),
+        ),
+        { prefix: '/data/review-comments' },
+      )
+      ctx.dataSources.register(reviewCommentSource)
       ctx.routes.fetch(
         lazyFetch(async () =>
           (await import('../server/data/branchSourceHandler')).createBranchSourceHandler(ctx.dataSources.invoke),

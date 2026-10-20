@@ -2054,6 +2054,235 @@
       }
     ]
   },
+  "bitbucket:review-comments": {
+    "name": "Bitbucket review comments",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "number": {
+          "type": "number"
+        },
+        "pullTitle": {
+          "type": "string"
+        },
+        "pullUrl": {
+          "type": "string"
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authorIsPullAuthor": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "inline",
+            "reply",
+            "conversation"
+          ]
+        },
+        "reviewState": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resolved": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "repository",
+        "number",
+        "pullTitle",
+        "pullUrl",
+        "author",
+        "authorIsPullAuthor",
+        "kind",
+        "reviewState",
+        "resolved",
+        "createdAt",
+        "url"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "label": "Pull request",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/repository",
+        "label": "Repository",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/number",
+        "label": "Pull request number",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        },
+        "query": {
+          "operators": [],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/pullTitle",
+        "label": "Pull request title",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/pullUrl",
+        "label": "Pull request URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link"
+        }
+      },
+      {
+        "pointer": "/author",
+        "label": "Author",
+        "origin": "declared",
+        "display": {
+          "kind": "person"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/authorIsPullAuthor",
+        "label": "By the pull request author",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/kind",
+        "label": "Kind",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "inline",
+              "label": "Inline",
+              "tone": "accent"
+            },
+            {
+              "id": "reply",
+              "label": "Reply",
+              "tone": "muted"
+            },
+            {
+              "id": "conversation",
+              "label": "Conversation",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/reviewState",
+        "label": "Review state",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        }
+      },
+      {
+        "pointer": "/resolved",
+        "label": "Thread resolved",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/createdAt",
+        "label": "Created",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/url",
+        "label": "Comment URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link",
+          "role": "url"
+        }
+      }
+    ]
+  },
   "core:local-branches": {
     "name": "Local branches",
     "schema": {
@@ -4289,6 +4518,503 @@
         "origin": "declared",
         "display": {
           "kind": "boolean"
+        }
+      }
+    ]
+  },
+  "github:review-comments": {
+    "name": "GitHub review comments",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "number": {
+          "type": "number"
+        },
+        "pullTitle": {
+          "type": "string"
+        },
+        "pullUrl": {
+          "type": "string"
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authorIsPullAuthor": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "inline",
+            "reply",
+            "summary",
+            "conversation"
+          ]
+        },
+        "reviewState": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resolved": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "repository",
+        "number",
+        "pullTitle",
+        "pullUrl",
+        "author",
+        "authorIsPullAuthor",
+        "kind",
+        "reviewState",
+        "resolved",
+        "createdAt",
+        "url"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "label": "Pull request",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/repository",
+        "label": "Repository",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/number",
+        "label": "Pull request number",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        },
+        "query": {
+          "operators": [],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/pullTitle",
+        "label": "Pull request title",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/pullUrl",
+        "label": "Pull request URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link"
+        }
+      },
+      {
+        "pointer": "/author",
+        "label": "Author login",
+        "origin": "declared",
+        "display": {
+          "kind": "person"
+        },
+        "viewerMatch": "/login",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/authorIsPullAuthor",
+        "label": "By the pull request author",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/kind",
+        "label": "Kind",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "inline",
+              "label": "Inline",
+              "tone": "accent"
+            },
+            {
+              "id": "reply",
+              "label": "Reply",
+              "tone": "muted"
+            },
+            {
+              "id": "summary",
+              "label": "Review summary",
+              "tone": "ok"
+            },
+            {
+              "id": "conversation",
+              "label": "Conversation",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/reviewState",
+        "label": "Review state",
+        "origin": "declared",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "approved",
+              "label": "Approved",
+              "tone": "ok"
+            },
+            {
+              "id": "changes_requested",
+              "label": "Changes requested",
+              "tone": "bad"
+            },
+            {
+              "id": "commented",
+              "label": "Commented",
+              "tone": "muted"
+            },
+            {
+              "id": "dismissed",
+              "label": "Dismissed",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/resolved",
+        "label": "Thread resolved",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/createdAt",
+        "label": "Created",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/url",
+        "label": "Comment URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link",
+          "role": "url"
+        }
+      }
+    ]
+  },
+  "gitlab:review-comments": {
+    "name": "GitLab review comments",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "number": {
+          "type": "number"
+        },
+        "pullTitle": {
+          "type": "string"
+        },
+        "pullUrl": {
+          "type": "string"
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authorIsPullAuthor": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "inline",
+            "reply",
+            "conversation"
+          ]
+        },
+        "reviewState": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resolved": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "repository",
+        "number",
+        "pullTitle",
+        "pullUrl",
+        "author",
+        "authorIsPullAuthor",
+        "kind",
+        "reviewState",
+        "resolved",
+        "createdAt",
+        "url"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "label": "Merge request",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/repository",
+        "label": "Project",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/number",
+        "label": "Merge request number",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        },
+        "query": {
+          "operators": [],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/pullTitle",
+        "label": "Merge request title",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/pullUrl",
+        "label": "Merge request URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link"
+        }
+      },
+      {
+        "pointer": "/author",
+        "label": "Author",
+        "origin": "declared",
+        "display": {
+          "kind": "person"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/authorIsPullAuthor",
+        "label": "By the merge request author",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/kind",
+        "label": "Kind",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "inline",
+              "label": "Inline",
+              "tone": "accent"
+            },
+            {
+              "id": "reply",
+              "label": "Reply",
+              "tone": "muted"
+            },
+            {
+              "id": "conversation",
+              "label": "Conversation",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/reviewState",
+        "label": "Review state",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        }
+      },
+      {
+        "pointer": "/resolved",
+        "label": "Thread resolved",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/createdAt",
+        "label": "Created",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/url",
+        "label": "Comment URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link",
+          "role": "url"
         }
       }
     ]

@@ -207,8 +207,11 @@ export function makeFakeBitbucket(repositories: FakeRepository[]) {
   ) {
     if (rest === '' && method === 'GET') {
       const states = url.searchParams.getAll('state')
+      // The one query filter this plugin sends, `updated_on >= <time>`.
+      const since = /updated_on >= (\S+)/.exec(url.searchParams.get('q') ?? '')?.[1]
       const listed = repository.pullRequests
         .filter((pull) => (states.length ? states.includes(pull.state) : pull.state === 'OPEN'))
+        .filter((pull) => !since || Date.parse(pull.updatedOn) >= Date.parse(since))
         .sort((a, b) => b.updatedOn.localeCompare(a.updatedOn))
         .map((pull) => ({
           ...pullAnswer(repository, pull, false),

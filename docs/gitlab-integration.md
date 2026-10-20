@@ -115,8 +115,22 @@ the server's own form for the branch. The importer lists every server's projects
 **Clone** and **Link folder**.
 
 The plugin opens `gitlab:diff-line` and `gitlab:summary-badges`, with the key shape every code host
-uses, and registers the data sources `merge-requests`, `pipeline-jobs` with **Retry job**, and
-`local-branches` with the relation to a branch's merge request.
+uses, and registers the data sources `merge-requests`, `review-comments`, `pipeline-jobs` with
+**Retry job**, and `local-branches` with the relation to a branch's merge request.
+
+`review-comments` has one record per note on a merge request, with the same fields as GitHub's
+review comments: the merge request's number, title, project, and URL, a title of
+`<project>!<number>: <title>`, the author, whether they wrote the merge request, `kind`, whether
+the thread is resolved, the created time, and the note's URL. A note on the diff is `inline`, a
+later note in any thread is a `reply`, and a lone or first note off the diff is `conversation`.
+System notes aren't records. GitLab gives an approval to the reviewer rather than to a note, so
+there are no review summaries and the review state is always empty. A record has no note text.
+Pressing a row opens the merge request.
+
+A lower bound on the created time becomes `updated_after` on the merge request list. Each project
+reads its 25 most recently updated merge requests and 100 discussions on each. Past either cap the
+source keeps what it read and says it's incomplete on the last page. Its starters chart review
+comments per merge request, who reviews most, and review comments per week.
 
 ## Limits
 

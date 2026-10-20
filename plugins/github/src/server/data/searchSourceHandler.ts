@@ -24,6 +24,9 @@ export type SearchSource = {
   details?: (ref: DataRecordRef, context: Context) => Promise<Response>
   /** The source's `writable` path, which ends in `/write`. */
   write?: (request: Request, context: Context) => Promise<Response>
+  /** Page an incomplete read's records, and say `incomplete` on the last page, rather than return no
+   *  rows. Only `incomplete` on the last page lets the host read the pages before it. */
+  partial?: boolean
 }
 
 /** Disposable continuation storage, never a durable workflow selection or a cross-query cache. */
@@ -115,7 +118,7 @@ export function createSearchSourceHandler(source: SearchSource): PluginFetchHand
           if (input.operation === 'options')
             return { options: await readRepositoryOptions(token, input, request.signal) }
           const page = await source.read(token, input.query, scope.connectionId!, request.signal)
-          if (page.completeness.kind === 'incomplete') return { page: { ...page, records: [] } }
+          if (page.completeness.kind === 'incomplete' && !source.partial) return { page: { ...page, records: [] } }
           const records = selectRecords(page.records, input.query)
           const take = input.query.take
           return {
@@ -123,7 +126,11 @@ export function createSearchSourceHandler(source: SearchSource): PluginFetchHand
               ...page,
               records: take ? records.slice(0, take) : records,
               completeness:
-                take && records.length >= take ? { kind: 'bounded' as const } : { kind: 'complete' as const },
+                page.completeness.kind === 'incomplete'
+                  ? page.completeness
+                  : take && records.length >= take
+                    ? { kind: 'bounded' as const }
+                    : { kind: 'complete' as const },
             },
           }
         })
@@ -131,7 +138,6 @@ export function createSearchSourceHandler(source: SearchSource): PluginFetchHand
         if (!response) throw new Error('connection_unavailable')
         if ('options' in response) return Response.json(response.options)
         if (!response.page) throw new Error('github_unavailable')
-        if (response.page.completeness.kind === 'incomplete') return Response.json(response.page)
         selection = {
           key,
           page: response.page,

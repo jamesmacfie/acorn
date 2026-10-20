@@ -195,4 +195,6 @@ pane.
 
 - [GitHub surfaces](./github-integration/surfaces.md): pane arrangement and the conversation.
 
+- [Review comments](./github-integration/review-comments.md): the review comment data source.
+
 - [From the command palette](./github-integration/palette.md): GitHub's commands.

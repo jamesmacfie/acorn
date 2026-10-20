@@ -15,7 +15,7 @@ import { gitlabEmitter } from '../server/events'
 import { createGitlabProvider } from '../server/provider'
 import { createGitlabServers } from '../server/servers'
 import { ciSettledDescription, reviewReceivedDescription, validateReviewReceived } from '../server/policyDescriptions'
-import { branchSource, jobSource, mergeRequestSource } from '../shared/sources'
+import { branchSource, jobSource, mergeRequestSource, reviewCommentSource } from '../shared/sources'
 import type { GitlabServerSummary } from '../shared/api'
 
 // GitLab for gitlab.com and company servers (docs/gitlab-integration.md): merge requests as tasks,
@@ -105,12 +105,17 @@ export const gitlabPlugin = (): NodePlugin => ({
       value: { kind: 'pull-request', read: async (...args) => (await markers()).read(...args) },
     })
 
-    // The three sources load on their first request; the descriptors register now.
+    // The four sources load on their first request; the descriptors register now.
     ctx.routes.fetch(
       lazyFetch(async () => (await import('../server/data/sources')).createMergeRequestSourceHandler()),
       { prefix: '/data/merge-requests' },
     )
     ctx.dataSources.register(mergeRequestSource)
+    ctx.routes.fetch(
+      lazyFetch(async () => (await import('../server/data/sources')).createReviewCommentSourceHandler()),
+      { prefix: '/data/review-comments' },
+    )
+    ctx.dataSources.register(reviewCommentSource)
     ctx.routes.fetch(
       lazyFetch(async () => (await import('../server/data/sources')).createJobSourceHandler()),
       {

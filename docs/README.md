@@ -358,7 +358,8 @@ Each feature landing page above has topic pages in a folder of the same name:
 - [github-integration.md](./github-integration.md): [The GitHub
   mirror](./github-integration/mirror.md), [GitHub from the command
   palette](./github-integration/palette.md), [Reads and
-  writes](./github-integration/reads-and-writes.md), [GitHub
+  writes](./github-integration/reads-and-writes.md), [GitHub review comments
+  source](./github-integration/review-comments.md), [GitHub
   surfaces](./github-integration/surfaces.md), [Tasks and
   references](./github-integration/tasks-and-references.md).
 - [workflows.md](./workflows.md): [Agent steps](./workflows/agent-steps.md), [AI

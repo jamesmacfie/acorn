@@ -288,23 +288,29 @@ export function makeFakeGitlab(projects: FakeProject[], origin = 'https://gitlab
       )
       return json({ iid }, 201)
     }
-    if (rest === '/merge_requests' && method === 'GET')
+    if (rest === '/merge_requests' && method === 'GET') {
+      const after = query.get('updated_after')
       return json(
-        project.mergeRequests.map((mr) => ({
-          iid: mr.iid,
-          title: mr.title,
-          state: mr.state,
-          draft: mr.draft,
-          author: { username: mr.author },
-          source_branch: mr.sourceBranch,
-          target_branch: mr.targetBranch,
-          labels: mr.labels.map((label) => label.title),
-          reviewers: mr.reviewers.map((username) => ({ username })),
-          created_at: mr.updatedAt,
-          updated_at: mr.updatedAt,
-          web_url: `${origin}/${project.path}/-/merge_requests/${mr.iid}`,
-        })),
+        project.mergeRequests
+          .filter((mr) => !after || Date.parse(mr.updatedAt) >= Date.parse(after))
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+          .slice(0, Number(query.get('per_page') ?? 20))
+          .map((mr) => ({
+            iid: mr.iid,
+            title: mr.title,
+            state: mr.state,
+            draft: mr.draft,
+            author: { username: mr.author },
+            source_branch: mr.sourceBranch,
+            target_branch: mr.targetBranch,
+            labels: mr.labels.map((label) => label.title),
+            reviewers: mr.reviewers.map((username) => ({ username })),
+            created_at: mr.updatedAt,
+            updated_at: mr.updatedAt,
+            web_url: `${origin}/${project.path}/-/merge_requests/${mr.iid}`,
+          })),
       )
+    }
     const job = /^\/jobs\/(\d+)(\/trace|\/retry)?$/.exec(rest)
     if (job) {
       const found = project.mergeRequests
@@ -409,6 +415,29 @@ export function makeFakeGitlab(projects: FakeProject[], origin = 'https://gitlab
         ],
       })
       return json({ id: `d${mr.discussions.length}` }, 201)
+    }
+    if (child === '/discussions' && method === 'GET') {
+      const perPage = Number(query.get('per_page') ?? 20)
+      return json(
+        mr.discussions.slice(0, perPage).map((item) => {
+          // A thread on the diff is DiffNotes, a thread off it DiscussionNotes, and a lone comment has no type.
+          const type = item.notes[0]?.position ? 'DiffNote' : item.notes.length > 1 ? 'DiscussionNote' : null
+          return {
+            id: item.id,
+            individual_note: type === null,
+            notes: item.notes.map((note) => ({
+              id: note.id,
+              type,
+              body: note.body,
+              author: { username: note.author },
+              created_at: note.createdAt,
+              system: note.system === true,
+              resolvable: type !== null && note.system !== true,
+              ...(type === null ? {} : { resolved: item.resolved }),
+            })),
+          }
+        }),
+      )
     }
     const discussion = /^\/discussions\/([^/]+)(\/notes)?$/.exec(child)
     const found = discussion && mr.discussions.find((item) => item.id === discussion[1])

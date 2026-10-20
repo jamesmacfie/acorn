@@ -5,12 +5,13 @@ import {
   dataSourceRequestSchema,
   type DataSourceDescription,
   type DataSourcePage,
+  type DataSourceQuery,
 } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS, MISSING, readDataPointer } from '@acorn/protocol/dataValues.ts'
 import { gl, glError, GITLAB_PROVIDER, type GitlabSession } from '../gitlabApi'
 import { serverOf } from '../servers'
 
-// One handler shape for both GitLab sources: a read over the projects a panel names, then the
+// One handler shape for GitLab's read sources: a read over the projects a panel names, then the
 // query's filter, sort, `take`, and pages over the result. Each source says how it reads one project.
 
 type SourceRecord = DataSourcePage['records'][number]
@@ -19,12 +20,14 @@ const MAX_PROJECTS = 5
 
 export type ProjectSource = {
   description: DataSourceDescription
-  /** One project's records, and whether GitLab held more than the read took. */
+  /** One project's records, and whether GitLab held more than the read took. The query's filter runs
+   *  over them afterwards, so a read uses it only to narrow what it asks GitLab for. */
   read: (
     session: GitlabSession,
     project: string,
     connectionId: string,
     signal: AbortSignal,
+    query: DataSourceQuery,
   ) => Promise<{ records: SourceRecord[]; truncated: boolean }>
   /** A POST to `<handler>/<suffix>`, such as a job's retry. */
   actions?: Record<string, PluginFetchHandler>
@@ -119,7 +122,7 @@ export function createProjectSourceHandler(source: ProjectSource): PluginFetchHa
         const records: SourceRecord[] = []
         let truncated = false
         for (const project of projects) {
-          const read = await source.read(session, project, connection.id, request.signal)
+          const read = await source.read(session, project, connection.id, request.signal, input.query)
           records.push(...read.records)
           truncated ||= read.truncated
         }

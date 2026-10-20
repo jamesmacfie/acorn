@@ -1,14 +1,18 @@
 import { z } from 'zod'
 import type { PluginFetchHandler } from '@acorn/plugin-api/node'
-import { dataRecordRefSchema } from '@acorn/protocol/dataSources.ts'
-import { jobSourceDescription, mergeRequestSourceDescription } from './sourceDescriptions'
+import { dataRecordRefSchema, type DataSourceQuery } from '@acorn/protocol/dataSources.ts'
+import {
+  jobSourceDescription,
+  mergeRequestSourceDescription,
+  reviewCommentSourceDescription,
+} from './sourceDescriptions'
 import { formatMergeRequestRef, mergeRequestUrl, projectAddress } from '../../shared/mergeRequestRef'
 import { gl, glError, GITLAB_PROVIDER, projectRef, type GitlabSession } from '../gitlabApi'
 import { serverOf } from '../servers'
 import { createProjectSourceHandler } from './projectSource'
 
-// GitLab's two read sources over the projects a panel names. 100 records a project: past that the
-// read says it's incomplete rather than reading on.
+// GitLab's read sources over the projects a panel names. 100 records a project: past that the read
+// says it's incomplete rather than reading on.
 const PER_PROJECT = 100
 
 const time = (value: string | null | undefined): number | null => (value ? Date.parse(value) : null)
@@ -72,6 +76,95 @@ export const createMergeRequestSourceHandler = () =>
           }
         }),
       }
+    },
+  })
+
+// Review comments live under merge requests, so a read lists a project's merge requests and then each
+// one's discussions. This many merge requests a project keeps that within a panel's time budget.
+const COMMENTED_MERGE_REQUESTS = 25
+const DISCUSSIONS = 100
+
+type RestNote = {
+  id: number
+  type: string | null
+  system: boolean
+  author: { username: string } | null
+  created_at: string
+  resolvable: boolean
+  resolved?: boolean
+}
+
+/** The latest lower bound a query sets on a comment's creation time, or null without one. A comment
+ *  made after it is on a merge request updated after it, so only those need reading. */
+function createdSince(query: DataSourceQuery): number | null {
+  const predicate = query.predicate
+  const bounds = (predicate?.kind === 'all' ? predicate.predicates : predicate ? [predicate] : []).flatMap((part) =>
+    part.kind === 'comparison' &&
+    part.left.address.from === 'item' &&
+    part.left.address.pointer === '/createdAt' &&
+    (part.operator === 'gt' || part.operator === 'gte') &&
+    part.right?.address.from === 'literal' &&
+    typeof part.right.address.value === 'number'
+      ? [part.right.address.value]
+      : [],
+  )
+  return bounds.length ? Math.max(...bounds) : null
+}
+
+export const createReviewCommentSourceHandler = () =>
+  createProjectSourceHandler({
+    description: reviewCommentSourceDescription,
+    read: async (session, project, _connectionId, signal, query) => {
+      const address = projectAddress(new URL(session.origin).hostname, project)
+      const since = createdSince(query)
+      // One more than the read keeps, to tell a full list from a longer one.
+      const mergeRequests = await list<RestMergeRequest>(
+        session,
+        `/projects/${projectRef(project)}/merge_requests?state=all&order_by=updated_at&sort=desc&per_page=${COMMENTED_MERGE_REQUESTS + 1}${since === null ? '' : `&updated_after=${new Date(since).toISOString()}`}`,
+        signal,
+      )
+      let truncated = mergeRequests.length > COMMENTED_MERGE_REQUESTS
+      const records = []
+      for (const row of mergeRequests.slice(0, COMMENTED_MERGE_REQUESTS)) {
+        const discussions = await list<{ notes: RestNote[] }>(
+          session,
+          `/projects/${projectRef(project)}/merge_requests/${row.iid}/discussions?per_page=${DISCUSSIONS}`,
+          signal,
+        )
+        truncated ||= discussions.length >= DISCUSSIONS
+        const pullUrl = row.web_url || mergeRequestUrl(address, row.iid)
+        const title = `${project}!${row.iid}: ${row.title}`
+        const pullAuthor = row.author?.username ?? null
+        for (const discussion of discussions)
+          for (const [index, note] of discussion.notes.entries()) {
+            // A system note is GitLab's own record of an event, such as a push, not a person's comment.
+            if (note.system) continue
+            const author = note.author?.username ?? null
+            const url = `${pullUrl}#note_${note.id}`
+            records.push({
+              recordId: `${address}!${row.iid}:${note.id}`,
+              data: {
+                id: String(note.id),
+                title,
+                repository: project,
+                number: row.iid,
+                pullTitle: row.title,
+                pullUrl,
+                author,
+                authorIsPullAuthor: author !== null && author === pullAuthor,
+                kind: index > 0 ? 'reply' : note.type === 'DiffNote' ? 'inline' : 'conversation',
+                reviewState: null,
+                resolved: note.resolvable ? note.resolved === true : null,
+                createdAt: time(note.created_at) ?? 0,
+                url,
+              },
+              display: { title, url },
+              // The merge request's address, which Acorn opens in its own merge request view when it can.
+              action: { verb: 'openUrl' as const, url: pullUrl },
+            })
+          }
+      }
+      return { truncated, records }
     },
   })
 

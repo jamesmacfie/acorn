@@ -11,6 +11,9 @@ import {
   branchSource,
   issueSource,
   issueSourceDescription,
+  createReviewCommentSourceHandler,
+  reviewCommentSource,
+  reviewCommentSourceDescription,
   githubProvider,
 } from '@acorn/plugin-github/testkit'
 import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
@@ -531,6 +534,177 @@ it("draws each GitHub issue starter from the workspace's repository, with its fi
       'Issues opened per week': { rows: 1, search: `is:issue repo:org/repo created:>=${since}` },
       'Issues closed per week': { rows: 1, search: `is:issue repo:org/repo closed:>=${since}` },
       'Open issues assigned to me': { rows: 2, search: 'is:issue repo:org/repo is:open assignee:bob' },
+    })
+  } finally {
+    world.cleanup()
+  }
+})
+
+it('draws each GitHub review comment starter, reading only the pull requests updated in its window', async () => {
+  const world = makeTestDb()
+  const identity = memoryIdentityStore('owner')
+  const env = testEnv({ DB: world.db, ACTIVE_IDENTITY: identity, SECRETS: world.secrets })
+  const now = Date.parse('2026-10-20T00:00:00Z')
+  try {
+    await world.db
+      .insert(schema.workspaces)
+      .values({ id: 'reviews-ws', name: 'Workspace', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await world.db.insert(schema.projects).values({
+      id: 'reviews-project',
+      name: 'repo',
+      path: '/tmp/acorn-reviews-fixture',
+      workspaceId: 'reviews-ws',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: 'https://github.com/org/repo.git',
+      githubOwner: 'org',
+      githubName: 'repo',
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await initPlugins(
+      [
+        {
+          name: 'github',
+          init(ctx) {
+            ctx.providers.integration(githubProvider)
+            ctx.routes.fetch(createReviewCommentSourceHandler(), { prefix: '/data/review-comments' })
+            ctx.dataSources.register(reviewCommentSource)
+          },
+        },
+      ],
+      {
+        env,
+        dataDir: '',
+        capabilities: new CapabilityRegistry(),
+        core: createCoreServices({
+          db: world.db,
+          secrets: world.secrets,
+          activeIdentity: identity,
+          ...testCoreSeams(),
+        }),
+      },
+    )
+    await world.db.insert(schema.integrations).values({
+      id: 'selected',
+      userId: 'owner',
+      provider: 'github',
+      label: 'GitHub',
+      encryptedCredentials: await world.secrets.seal('selected-token'),
+      authKind: 'oauth',
+      status: 'connected',
+      createdAt: now,
+      updatedAt: now,
+    })
+    const done = { hasNextPage: false }
+    const url = 'https://github.com/org/repo/pull/7'
+    const pull = {
+      id: 'pr',
+      number: 7,
+      title: 'Fix the importer',
+      url,
+      author: { login: 'alice' },
+      repository: { nameWithOwner: 'org/repo' },
+      comments: {
+        pageInfo: done,
+        nodes: [{ id: 'talk', url, createdAt: '2026-10-12T00:00:00Z', author: { login: 'bob' } }],
+      },
+      reviews: {
+        pageInfo: done,
+        nodes: [
+          {
+            id: 'review',
+            url,
+            state: 'APPROVED',
+            submittedAt: '2026-10-13T00:00:00Z',
+            author: { login: 'carol' },
+            body: '',
+          },
+        ],
+      },
+      reviewThreads: {
+        pageInfo: done,
+        nodes: [
+          {
+            isResolved: false,
+            comments: {
+              pageInfo: done,
+              nodes: [
+                {
+                  id: 'inline',
+                  url,
+                  createdAt: '2026-10-13T00:00:00Z',
+                  author: { login: 'bob' },
+                  replyTo: null,
+                  pullRequestReview: { state: 'COMMENTED' },
+                },
+                {
+                  id: 'reply',
+                  url,
+                  createdAt: '2026-10-14T00:00:00Z',
+                  author: { login: 'alice' },
+                  replyTo: { id: 'inline' },
+                  pullRequestReview: { state: 'COMMENTED' },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    }
+    const searches: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(String(init.body)) as { query: string; variables: { q?: string } }
+        if (body.query.includes('AcornSourceViewer'))
+          return Response.json({ data: { viewer: { id: 'viewer', login: 'bob', name: null, email: null } } })
+        searches.push(body.variables.q!)
+        return Response.json({
+          data: { search: { issueCount: 1, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [pull] } },
+        })
+      }),
+    )
+    const invocation = {
+      principal: { kind: 'internal' as const, scope: 'service' as const, userId: 'owner' },
+      signal: new AbortController().signal,
+    }
+    const results: Record<string, { rows: number; search: string }> = {}
+    for (const starter of reviewCommentSourceDescription.starterPlans ?? []) {
+      // The launcher's move: onto the workspace and account the person picked.
+      const plan = panelPlanSchema.parse(starter)
+      for (const source of plan.sources)
+        if (source.reference.kind === 'inline')
+          source.reference.content.query.scope = { workspaceId: 'reviews-ws', connectionId: 'selected', parameters: {} }
+      const run = await runDashboard(
+        env,
+        {
+          scope: { workspaceId: 'reviews-ws' },
+          target: { kind: 'draft', content: plan },
+          mode: 'execution',
+          evaluationTime: now,
+        },
+        invocation,
+      )
+      expect(
+        run.diagnostics.problems.filter((problem) => problem.severity === 'error'),
+        plan.title,
+      ).toEqual([])
+      results[plan.title] = { rows: run.rows.length, search: searches.at(-1)! }
+    }
+    const since = (days: number) => new Date(now - days * 86_400_000).toISOString()
+    expect(results).toEqual({
+      'Review comments per pull request': {
+        rows: 1,
+        search: `is:pr repo:org/repo sort:updated-desc updated:>=${since(28)}`,
+      },
+      // bob and carol; alice wrote the pull request.
+      'Who reviews most': { rows: 2, search: `is:pr repo:org/repo sort:updated-desc updated:>=${since(84)}` },
+      // One week, with a bar for each kind.
+      'Review comments per week': { rows: 4, search: `is:pr repo:org/repo sort:updated-desc updated:>=${since(84)}` },
     })
   } finally {
     world.cleanup()

@@ -1,7 +1,7 @@
 import type { DataSourceRegistration } from '@acorn/protocol/dataSources.ts'
 
-// The data sources Bitbucket registers (docs/data-sources.md): pull requests and Pipelines steps, read
-// from bitbucket.org for the repositories a panel names. What each one describes is in
+// The data sources Bitbucket registers (docs/data-sources.md): pull requests, their review comments,
+// and Pipelines steps, read from bitbucket.org for the repositories a panel names. What each one describes is in
 // `sourceDescriptions`, which only the handlers load.
 
 export const pullRequestSource: DataSourceRegistration = {
@@ -12,6 +12,19 @@ export const pullRequestSource: DataSourceRegistration = {
   providerId: 'bitbucket',
   identityScope: 'Repository full name and pull request number',
   handler: '/v1/p/bitbucket/data/pull-requests',
+  titlePointer: '/title',
+  urlPointer: '/url',
+  icon: 'brand:bitbucket',
+}
+
+export const reviewCommentSource: DataSourceRegistration = {
+  sourceId: 'review-comments',
+  name: 'Bitbucket review comments',
+  singular: 'Review comment',
+  plural: 'Review comments',
+  providerId: 'bitbucket',
+  identityScope: 'Repository full name, pull request number, and comment ID',
+  handler: '/v1/p/bitbucket/data/review-comments',
   titlePointer: '/title',
   urlPointer: '/url',
   icon: 'brand:bitbucket',

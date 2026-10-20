@@ -29,6 +29,12 @@ import { issueSourceDescription as githubIssueSourceDescription } from '../../pl
 import { pullSource } from '../../plugins/github/src/shared/pullSource.ts'
 import { pullSourceDescription } from '../../plugins/github/src/shared/pullSourceDescription.ts'
 import { branchDescription } from '../../plugins/github/src/server/data/branchSourceHandler.ts'
+import { reviewCommentSource as githubReviewCommentSource } from '../../plugins/github/src/shared/reviewCommentSource.ts'
+import { reviewCommentSourceDescription as githubReviewCommentSourceDescription } from '../../plugins/github/src/shared/reviewCommentSourceDescription.ts'
+import { reviewCommentSource as gitlabReviewCommentSource } from '../../plugins/gitlab/src/shared/sources.ts'
+import { reviewCommentSourceDescription as gitlabReviewCommentSourceDescription } from '../../plugins/gitlab/src/server/data/sourceDescriptions.ts'
+import { reviewCommentSource as bitbucketReviewCommentSource } from '../../plugins/bitbucket/src/shared/sources.ts'
+import { reviewCommentSourceDescription as bitbucketReviewCommentSourceDescription } from '../../plugins/bitbucket/src/server/data/sourceDescriptions.ts'
 import { issueSource, issueSourceDescription } from '../../plugins/linear/src/shared/issueSource.ts'
 import { memorySourceDescription } from '../../plugins/memory/src/shared/memorySource.ts'
 import { memorySource } from '../../plugins/memory/src/shared/memorySourceRegistration.ts'
@@ -72,6 +78,9 @@ async function fieldLists() {
     'github:actions-jobs': [actionsSource, actionsSourceDescription],
     'github:issues': [githubIssueSource, githubIssueSourceDescription],
     'github:local-branches': [branchSource, branchDescription(localBranches[1])],
+    'github:review-comments': [githubReviewCommentSource, githubReviewCommentSourceDescription],
+    'gitlab:review-comments': [gitlabReviewCommentSource, gitlabReviewCommentSourceDescription],
+    'bitbucket:review-comments': [bitbucketReviewCommentSource, bitbucketReviewCommentSourceDescription],
     'linear:issues': [issueSource, issueSourceDescription],
     'memory:memories': [memorySource, memorySourceDescription],
     'rollbar:error-groups': [errorSource, errorSourceDescription],
