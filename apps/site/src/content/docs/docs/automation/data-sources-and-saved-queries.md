@@ -7,7 +7,7 @@ sources:
   - docs/data-sources/derived-sources.md
   - docs/data-sources/provider-sources.md
   - packages/client-core/src/features/dataSources/SourceQueryEditor.tsx
-checked: '2207e1b63'
+checked: 'ebbf1479b'
 ---
 
 A data source is a set of records a plugin can read, each with the same known fields: GitHub pull
