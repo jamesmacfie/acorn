@@ -2033,6 +2033,153 @@
       }
     ]
   },
+  "git:commits": {
+    "name": "Git commits",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sha": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorEmail": {
+          "type": "string"
+        },
+        "authoredAt": {
+          "type": "number"
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "projectName": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "filesChanged": {
+          "type": "number"
+        },
+        "linesAdded": {
+          "type": "number"
+        },
+        "linesRemoved": {
+          "type": "number"
+        },
+        "merge": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sha",
+        "subject",
+        "authorName",
+        "authorEmail",
+        "authoredAt",
+        "projectId",
+        "projectName",
+        "branch",
+        "filesChanged",
+        "linesAdded",
+        "linesRemoved",
+        "merge"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/sha",
+        "origin": "declared",
+        "label": "Commit"
+      },
+      {
+        "pointer": "/subject",
+        "origin": "declared",
+        "label": "Subject",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/authorName",
+        "origin": "declared",
+        "label": "Author"
+      },
+      {
+        "pointer": "/authorEmail",
+        "origin": "declared",
+        "label": "Author email"
+      },
+      {
+        "pointer": "/authoredAt",
+        "origin": "declared",
+        "label": "Authored",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/projectId",
+        "origin": "declared",
+        "label": "Project"
+      },
+      {
+        "pointer": "/projectName",
+        "origin": "declared",
+        "label": "Project name"
+      },
+      {
+        "pointer": "/branch",
+        "origin": "declared",
+        "label": "Branch"
+      },
+      {
+        "pointer": "/filesChanged",
+        "origin": "declared",
+        "label": "Files changed",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/linesAdded",
+        "origin": "declared",
+        "label": "Lines added",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/linesRemoved",
+        "origin": "declared",
+        "label": "Lines removed",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/merge",
+        "origin": "declared",
+        "label": "Merge commit"
+      }
+    ]
+  },
   "github:actions-jobs": {
     "name": "GitHub Actions jobs",
     "schema": {

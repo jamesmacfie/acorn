@@ -10,6 +10,7 @@ sources:
   - docs/git-client/worktrees.md
   - docs/git-client/refs-remotes-settings.md
   - docs/git-client/explanations.md
+  - plugins/git/src/shared/commitSource.ts
   - plugins/git/src/client/index.ts
   - plugins/git/src/client/paneContribution.ts
   - plugins/git/src/client/HistoryBrowse.tsx
@@ -32,7 +33,7 @@ left rail browses the whole repository.
 <Snapshot id="hero" />
 
 <PluginFacts id="git">
-  <Fragment slot="adds">The **Git** pane, with **Changes**, **History**, **Stashes**, and **Worktrees** tabs, **Git** in the left rail, palette commands, **Settings** > **Features** > **Git** and **Git display**, line blame in the Editor, and tools agents use to read the task's changes.</Fragment>
+  <Fragment slot="adds">The **Git** pane, with **Changes**, **History**, **Stashes**, and **Worktrees** tabs, **Git** in the left rail, palette commands, **Settings** > **Features** > **Git** and **Git display**, line blame in the Editor, a **Git commits** data source for dashboards, and tools agents use to read the task's changes.</Fragment>
   <Fragment slot="needs">A project that's a Git repository. To push and pull, a remote named `origin`.</Fragment>
   <Fragment slot="reach">The task's repository on the Node, through `git`.</Fragment>
 </PluginFacts>
@@ -101,6 +102,13 @@ to see its diff against its parent. A merge commit lets you choose which parent.
 
 **Explain commit** asks a model to summarize the selected commit, from its message, up to 60 file
 summaries, and 40 KiB of its diff. It changes nothing, and runs only when you press it.
+
+## Chart your commits
+
+The **Git commits** data source gives a dashboard panel one row per commit on your projects' local
+branches, with its author, time, branch, and lines added and removed. Pick it from **Add panel** to
+start from commits by day per project, when in the week you commit, lines added per project, or this
+week's commits. A panel reads at most the newest 5,000 commits and says so when there are more.
 
 ## Use stashes
 

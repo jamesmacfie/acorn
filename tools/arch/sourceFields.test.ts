@@ -10,6 +10,8 @@ import { sessionTotalsSourceDescription } from '../../plugins/agents/src/shared/
 import { sessionTotalsSource, turnSource, usageSource } from '../../plugins/agents/src/shared/sourceRegistrations.ts'
 import { turnSourceDescription } from '../../plugins/agents/src/shared/turnSource.ts'
 import { usageSourceDescription } from '../../plugins/agents/src/shared/usageSource.ts'
+import { commitSourceDescription } from '../../plugins/git/src/shared/commitSource.ts'
+import { commitSource } from '../../plugins/git/src/shared/sourceRegistrations.ts'
 import { actionsSource } from '../../plugins/github/src/shared/actionsRegistration.ts'
 import { actionsSourceDescription } from '../../plugins/github/src/shared/actionsSource.ts'
 import { branchSource } from '../../plugins/github/src/shared/branchSource.ts'
@@ -49,6 +51,7 @@ async function fieldLists() {
     'agents:usage-records': [usageSource, usageSourceDescription],
     'agents:turns': [turnSource, turnSourceDescription],
     'agents:session-totals': [sessionTotalsSource, sessionTotalsSourceDescription],
+    'git:commits': [commitSource, commitSourceDescription],
     'github:pull-requests': [pullSource, pullSourceDescription],
     'github:actions-jobs': [actionsSource, actionsSourceDescription],
     'github:issues': [githubIssueSource, githubIssueSourceDescription],

@@ -48,6 +48,13 @@ export async function registerGit(ctx: Context): Promise<() => void> {
   ctx.routes.register(lineBlameRoutes(ctx.core), { prefix: '', note: 'who last changed the Editor cursor line' })
   const { comparisonRoutes } = await import('./routes/comparison')
   ctx.routes.register(comparisonRoutes(ctx.core), { prefix: '', note: 'pin direct and merge-base comparisons' })
+  ctx.routes.fetch(
+    async (request, context) =>
+      (await import('./data/commitSource')).createCommitSourceHandler(ctx.core)(request, context),
+    { prefix: '/data/commits' },
+  )
+  const { commitSource } = await import('../shared/sourceRegistrations')
+  ctx.dataSources.register(commitSource)
   const { settingsRoutes } = await import('./routes/settings')
   ctx.routes.register(
     settingsRoutes(ctx.core, (enabled) => autoFetcher.setEnabled(enabled)),

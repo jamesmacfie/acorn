@@ -88,3 +88,23 @@ The wire types live in `plugins/git/src/shared/api.ts`. `base: null` denotes the
 for a root commit; a merge base must be one of that commit's parents. Segment requests must name a
 patch key in the chosen immutable comparison. Git runs with external diff and text conversion
 disabled. Refresh is a local read and does not fetch a remote.
+
+## Git commits data source
+
+`git:commits` is a [data source](../data-sources.md) with one record per commit reachable from a
+local branch, so a dashboard panel can chart commits per project, author, or hour. A record carries
+the commit ID, its subject as the title, the author's name and email after the mailmap, the author
+time, the project, a branch that reaches it, files changed, lines added and removed, and whether it's a
+merge. A commit on several branches counts once per project. Merge commits count no files or lines.
+
+A workspace scope reads that workspace's projects, a project scope reads that project, and a scope
+with neither reads every project on the Node. Projects without a Git checkout read nothing. A lower
+bound on the author time becomes `git log --since`, which compares commit time, so "this month"
+doesn't read a whole history. The query's own comparison then applies to the author time.
+
+Each project's `git log` reads at most 5,001 commits in 30 seconds and 16 MiB, four projects at a time.
+The Node keeps the newest 5,000 across them and reports `incomplete` with `host-budget`, and a
+covered range from the oldest time read in full, when more remain. A failed `git log` reports
+`provider-failure`. The pages of one run share one read for 60 seconds.
+`plugins/git/src/server/data/commitSource.ts` owns the read; the description and its starter panels
+are in `plugins/git/src/shared/commitSource.ts`.
