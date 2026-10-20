@@ -3,7 +3,7 @@
 The GitHub plugin connects a GitHub account, mirrors repositories and pull requests, and draws the pull
 request views. It's a provider plugin, not acorn's authentication: its token is an encrypted
 integration credential, and its repositories and pull requests are a disposable local mirror. Read this
-page for connecting, importing, the typed pull request source, and the topic pages. The plugin is in
+page for connecting, importing, the typed pull request and issue sources, and the topic pages. The plugin is in
 `plugins/github/`.
 
 ## Connecting
@@ -130,6 +130,23 @@ Provider APIs were checked on September 13, 2026 against GitHub's
 [pull-request schema](https://docs.github.com/en/graphql/reference/pulls),
 [user repository connection](https://docs.github.com/en/graphql/reference/users), and
 [search qualifiers](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests).
+
+## Typed issue source
+
+`github/issues` has one record per issue, scoped like the pull-request source: an explicit GitHub
+connection, an optional `parameters.repositories` list, and the same repository options. It searches
+with `is:issue` and skips any pull request GitHub still returns. A record carries title, number,
+repository, `state` (`open` or `closed`), `closeReason` (`completed`, `not_planned`, `duplicate`, or
+null), author, assignees, labels, milestone, comment count, created, updated, and closed times, and
+the URL. It has no body. Acorn has no issue view, so pressing a row opens the issue on GitHub.
+
+Queries narrow GitHub's search on state, author, an assignee, a label, and created, updated, or
+closed time, then check each value exactly. A label with a quote or backslash isn't sent to the
+search. Assignees match the selected account's login for **You**. The source reads up to 10 pages of
+100, which is GitHub's 1,000-match search limit. A larger search, an issue with more than 100 labels
+or assignees, or a read past the 16 MiB budget returns no rows and says it's incomplete. Continuation
+works the same way as the pull-request source. Its starters list open issues by label, issues opened
+and closed per week, and open issues assigned to you.
 
 ## Actions and logs
 

@@ -6,8 +6,11 @@ import { afterEach, expect, it, vi } from 'vitest'
 import {
   createPullSourceHandler,
   createBranchSourceHandler,
+  createIssueSourceHandler,
   pullSource,
   branchSource,
+  issueSource,
+  issueSourceDescription,
   githubProvider,
 } from '@acorn/plugin-github/testkit'
 import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
@@ -398,5 +401,138 @@ it('joins actual local branch and pull sources by account and fork head, retaini
   } finally {
     world.cleanup()
     for (const path of paths) rmSync(path, { recursive: true, force: true })
+  }
+})
+
+it("draws each GitHub issue starter from the workspace's repository, with its filters sent to GitHub's search", async () => {
+  const world = makeTestDb()
+  const identity = memoryIdentityStore('owner')
+  const env = testEnv({ DB: world.db, ACTIVE_IDENTITY: identity, SECRETS: world.secrets })
+  const now = Date.parse('2026-10-20T00:00:00Z')
+  try {
+    await world.db
+      .insert(schema.workspaces)
+      .values({ id: 'issues-ws', name: 'Workspace', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await world.db.insert(schema.projects).values({
+      id: 'issues-project',
+      name: 'repo',
+      path: '/tmp/acorn-issues-fixture',
+      workspaceId: 'issues-ws',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: 'https://github.com/org/repo.git',
+      githubOwner: 'org',
+      githubName: 'repo',
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await initPlugins(
+      [
+        {
+          name: 'github',
+          init(ctx) {
+            ctx.providers.integration(githubProvider)
+            ctx.routes.fetch(createIssueSourceHandler(), { prefix: '/data/issues' })
+            ctx.dataSources.register(issueSource)
+          },
+        },
+      ],
+      {
+        env,
+        dataDir: '',
+        capabilities: new CapabilityRegistry(),
+        core: createCoreServices({
+          db: world.db,
+          secrets: world.secrets,
+          activeIdentity: identity,
+          ...testCoreSeams(),
+        }),
+      },
+    )
+    await world.db.insert(schema.integrations).values({
+      id: 'selected',
+      userId: 'owner',
+      provider: 'github',
+      label: 'GitHub',
+      encryptedCredentials: await world.secrets.seal('selected-token'),
+      authKind: 'oauth',
+      status: 'connected',
+      createdAt: now,
+      updatedAt: now,
+    })
+    const issue = (id: string, labels: string[], closedAt: string | null) => ({
+      __typename: 'Issue',
+      id,
+      number: 1,
+      title: id,
+      url: `https://github.com/org/repo/issues/${id}`,
+      state: closedAt ? 'CLOSED' : 'OPEN',
+      stateReason: closedAt ? 'COMPLETED' : null,
+      author: { login: 'alice' },
+      repository: { nameWithOwner: 'org/repo' },
+      milestone: null,
+      comments: { totalCount: 0 },
+      assignees: { nodes: [{ login: 'bob' }], pageInfo: { hasNextPage: false, endCursor: null } },
+      labels: { nodes: labels.map((name) => ({ name })), pageInfo: { hasNextPage: false, endCursor: null } },
+      createdAt: '2026-10-01T00:00:00Z',
+      updatedAt: '2026-10-12T00:00:00Z',
+      closedAt,
+    })
+    const searches: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(String(init.body)) as { query: string; variables: { q?: string } }
+        if (body.query.includes('AcornSourceViewer'))
+          return Response.json({ data: { viewer: { id: 'viewer', login: 'bob', name: null, email: null } } })
+        searches.push(body.variables.q!)
+        const closed = body.variables.q!.includes('closed:>=')
+        const nodes = closed
+          ? [issue('fixed', ['bug'], '2026-10-10T00:00:00Z')]
+          : [issue('crash', ['bug', 'ui'], null), issue('typo', ['docs'], null)]
+        return Response.json({
+          data: { search: { issueCount: nodes.length, pageInfo: { hasNextPage: false, endCursor: null }, nodes } },
+        })
+      }),
+    )
+    const invocation = {
+      principal: { kind: 'internal' as const, scope: 'service' as const, userId: 'owner' },
+      signal: new AbortController().signal,
+    }
+    const results: Record<string, { rows: number; search: string }> = {}
+    for (const starter of issueSourceDescription.starterPlans ?? []) {
+      // The launcher's move: onto the workspace and account the person picked.
+      const plan = panelPlanSchema.parse(starter)
+      for (const source of plan.sources)
+        if (source.reference.kind === 'inline')
+          source.reference.content.query.scope = { workspaceId: 'issues-ws', connectionId: 'selected', parameters: {} }
+      const run = await runDashboard(
+        env,
+        {
+          scope: { workspaceId: 'issues-ws' },
+          target: { kind: 'draft', content: plan },
+          mode: 'execution',
+          evaluationTime: now,
+        },
+        invocation,
+      )
+      expect(
+        run.diagnostics.problems.filter((problem) => problem.severity === 'error'),
+        plan.title,
+      ).toEqual([])
+      results[plan.title] = { rows: run.rows.length, search: searches.at(-1)! }
+    }
+    const since = new Date(now - 84 * 86_400_000).toISOString()
+    expect(results).toEqual({
+      'Open issues by label': { rows: 3, search: 'is:issue repo:org/repo is:open' },
+      'Issues opened per week': { rows: 1, search: `is:issue repo:org/repo created:>=${since}` },
+      'Issues closed per week': { rows: 1, search: `is:issue repo:org/repo closed:>=${since}` },
+      'Open issues assigned to me': { rows: 2, search: 'is:issue repo:org/repo is:open assignee:bob' },
+    })
+  } finally {
+    world.cleanup()
   }
 })

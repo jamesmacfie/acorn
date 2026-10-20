@@ -2252,6 +2252,310 @@
       }
     ]
   },
+  "github:issues": {
+    "name": "GitHub issues",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "number": {
+          "type": "number"
+        },
+        "title": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "open",
+            "closed"
+          ]
+        },
+        "closeReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assignees": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "milestone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comments": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "number"
+        },
+        "closedAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "number",
+        "title",
+        "repository",
+        "url",
+        "state",
+        "closeReason",
+        "author",
+        "assignees",
+        "labels",
+        "milestone",
+        "comments",
+        "createdAt",
+        "updatedAt",
+        "closedAt"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "label": "Title",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/number",
+        "label": "Number",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        },
+        "query": {
+          "operators": [],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/repository",
+        "label": "Repository",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/url",
+        "label": "URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link",
+          "role": "url"
+        }
+      },
+      {
+        "pointer": "/state",
+        "label": "State",
+        "origin": "declared",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "open",
+              "label": "Open",
+              "tone": "accent"
+            },
+            {
+              "id": "closed",
+              "label": "Closed",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/closeReason",
+        "label": "Close reason",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "completed",
+              "label": "Completed",
+              "tone": "ok"
+            },
+            {
+              "id": "not_planned",
+              "label": "Not planned",
+              "tone": "muted"
+            },
+            {
+              "id": "duplicate",
+              "label": "Duplicate",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/author",
+        "label": "Author login",
+        "origin": "declared",
+        "display": {
+          "kind": "person"
+        },
+        "viewerMatch": "/login",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/assignees",
+        "label": "Assignees",
+        "origin": "declared",
+        "display": {
+          "kind": "person",
+          "list": true,
+          "role": "assignee"
+        },
+        "viewerMatch": "/login",
+        "query": {
+          "operators": [
+            "contains"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/labels",
+        "label": "Labels",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "list": true
+        },
+        "query": {
+          "operators": [
+            "contains"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/milestone",
+        "label": "Milestone",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/comments",
+        "label": "Comments",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        },
+        "query": {
+          "operators": [],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/createdAt",
+        "label": "Created",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/updatedAt",
+        "label": "Updated",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/closedAt",
+        "label": "Closed",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": false
+        }
+      }
+    ]
+  },
   "github:local-branches": {
     "name": "Local branches with pull requests",
     "schema": {

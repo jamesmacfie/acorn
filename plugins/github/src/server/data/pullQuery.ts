@@ -1,4 +1,4 @@
-import { compareDataValues, type DataPredicate } from '@acorn/protocol/dataBindings.ts'
+import { compareDataValues, type DataOperator, type DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import type { DataSourceQuery, DataSourcePage } from '@acorn/protocol/dataSources.ts'
 import { readDataPointer } from '@acorn/protocol/dataValues.ts'
 import { pullSourceDescription } from '../../shared/pullSourceDescription'
@@ -9,19 +9,33 @@ export const repositoryName = (value: unknown): string => {
   return value
 }
 
-function comparisons(predicate?: DataPredicate): Extract<DataPredicate, { kind: 'comparison' }>[] {
+export function comparisons(predicate?: DataPredicate): Extract<DataPredicate, { kind: 'comparison' }>[] {
   if (!predicate) return []
   if (predicate.kind === 'all') return predicate.predicates.flatMap(comparisons)
   if (predicate.kind !== 'comparison') throw new Error('unsupported_group')
   return [predicate]
 }
 
-/** Qualifiers only narrow candidates. Exact typed predicates are checked after full exhaustion. */
-export function pullSearch(query: DataSourceQuery): string {
+/** A `repo:` qualifier for each repository the scope chose. */
+export function repositoryQualifiers(query: DataSourceQuery): string[] {
   const repositories = query.scope.parameters.repositories
   if (repositories !== undefined && (!Array.isArray(repositories) || repositories.length > 50))
     throw new Error('invalid_repositories')
-  const parts = ['is:pr', ...(repositories ?? []).map((value) => `repo:${repositoryName(value)}`)]
+  return (repositories ?? []).map((value) => `repo:${repositoryName(value)}`)
+}
+
+/** A search date qualifier, such as `created:>=…`, for an ordered comparison on epoch milliseconds. */
+export function dateQualifier(name: string, operator: DataOperator, value: unknown): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('invalid_date')
+  const lower = operator === 'gt' || operator === 'gte'
+  // Search dates have second precision; include boundary seconds, then compare milliseconds.
+  const date = new Date((lower ? Math.floor(value / 1000) : Math.ceil(value / 1000)) * 1000).toISOString()
+  return `${name}:${lower ? '>=' : '<='}${date}`
+}
+
+/** Qualifiers only narrow candidates. Exact typed predicates are checked after full exhaustion. */
+export function pullSearch(query: DataSourceQuery): string {
+  const parts = ['is:pr', ...repositoryQualifiers(query)]
   for (const filter of comparisons(query.predicate)) {
     const left = filter.left.address
     const right = filter.right?.address
@@ -46,13 +60,8 @@ export function pullSearch(query: DataSourceQuery): string {
         if (typeof value !== 'boolean') throw new Error('invalid_review_filter')
         parts.push(value ? 'review-requested:@me' : '-review-requested:@me')
         break
-      default: {
-        if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('invalid_date')
-        const lower = filter.operator === 'gt' || filter.operator === 'gte'
-        // Search dates have second precision; include boundary seconds, then compare milliseconds.
-        const date = new Date((lower ? Math.floor(value / 1000) : Math.ceil(value / 1000)) * 1000).toISOString()
-        parts.push(`${left.pointer === '/createdAt' ? 'created' : 'updated'}:${lower ? '>=' : '<='}${date}`)
-      }
+      default:
+        parts.push(dateQualifier(left.pointer === '/createdAt' ? 'created' : 'updated', filter.operator, value))
     }
   }
   for (const sort of query.sort) {
@@ -62,18 +71,25 @@ export function pullSearch(query: DataSourceQuery): string {
   return parts.join(' ')
 }
 
-export function selectPulls(records: DataSourcePage['records'], query: DataSourceQuery): DataSourcePage['records'] {
+/** The query's exact filters and sort over a search's records, ties broken by record ID. */
+export function selectRecords(records: DataSourcePage['records'], query: DataSourceQuery): DataSourcePage['records'] {
   const filters = comparisons(query.predicate)
   return records
     .filter((record) =>
       filters.every((filter) => {
         if (filter.left.address.from !== 'item' || filter.right?.address.from !== 'literal')
           throw new Error('invalid_operand')
-        return compareDataValues(
-          readDataPointer(record.data, filter.left.address.pointer),
-          filter.operator,
-          filter.right.address.value,
-        )
+        // A null can't be ordered, so an open issue's null `closedAt` fails `closedAt > x` rather than
+        // failing the read. A panel's own filters treat it the same way.
+        try {
+          return compareDataValues(
+            readDataPointer(record.data, filter.left.address.pointer),
+            filter.operator,
+            filter.right.address.value,
+          )
+        } catch {
+          return false
+        }
       }),
     )
     .sort((a, b) => {

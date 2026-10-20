@@ -106,7 +106,7 @@ const SEARCH = `query AcornPullSource($q: String!, $first: Int!, $after: String)
   }
 }`
 
-async function githubData<T>(
+export async function githubData<T>(
   token: string,
   query: string,
   variables: Record<string, unknown>,

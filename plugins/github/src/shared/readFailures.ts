@@ -1,6 +1,6 @@
 // Why a GitHub read failed, in a person's words, by the code `ghError` and the data handlers
-// return. The pull list says these, and so does the pull requests data source through its failure's
-// `reason`, so a panel and the list give the same answer for the same cause.
+// return. The pull list says these, and so do the pull request and issue data sources through a
+// failure's `reason`, so a panel and the list give the same answer for the same cause.
 
 const NO_ACCESS =
   "GitHub won't show this repository to your account. If an organisation owns it, an owner may need to approve acorn's GitHub app under Third-party access."
@@ -12,6 +12,6 @@ export const READ_SENTENCES: Readonly<Record<string, string>> = {
   rate_limited: 'GitHub is limiting requests. Try again in a minute.',
   github_unavailable: "GitHub didn't answer.",
   reauth: "GitHub turned down acorn's sign-in.",
-  github_query_failed: 'GitHub turned down the search for these pull requests.',
+  github_query_failed: 'GitHub turned down this search.',
   connection_unavailable: "acorn can't use this GitHub account. Reconnect it in Settings.",
 }

@@ -13,6 +13,8 @@ import { usageSourceDescription } from '../../plugins/agents/src/shared/usageSou
 import { actionsSource } from '../../plugins/github/src/shared/actionsRegistration.ts'
 import { actionsSourceDescription } from '../../plugins/github/src/shared/actionsSource.ts'
 import { branchSource } from '../../plugins/github/src/shared/branchSource.ts'
+import { issueSource as githubIssueSource } from '../../plugins/github/src/shared/issueSource.ts'
+import { issueSourceDescription as githubIssueSourceDescription } from '../../plugins/github/src/shared/issueSourceDescription.ts'
 import { pullSource } from '../../plugins/github/src/shared/pullSource.ts'
 import { pullSourceDescription } from '../../plugins/github/src/shared/pullSourceDescription.ts'
 import { branchDescription } from '../../plugins/github/src/server/data/branchSourceHandler.ts'
@@ -49,6 +51,7 @@ async function fieldLists() {
     'agents:session-totals': [sessionTotalsSource, sessionTotalsSourceDescription],
     'github:pull-requests': [pullSource, pullSourceDescription],
     'github:actions-jobs': [actionsSource, actionsSourceDescription],
+    'github:issues': [githubIssueSource, githubIssueSourceDescription],
     'github:local-branches': [branchSource, branchDescription(localBranches[1])],
     'linear:issues': [issueSource, issueSourceDescription],
     'rollbar:error-groups': [errorSource, errorSourceDescription],

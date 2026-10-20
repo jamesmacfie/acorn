@@ -15,5 +15,8 @@ export { changeRequestRoutes } from '../server/routes/changeRequests'
 // Node source composition test in apps/node/test/integration/githubDataSource.test.ts.
 export { createPullSourceHandler } from '../server/data/pullSourceHandler'
 export { pullSource } from '../shared/pullSource'
+export { createIssueSourceHandler } from '../server/data/issueSourceHandler'
+export { issueSource } from '../shared/issueSource'
+export { issueSourceDescription } from '../shared/issueSourceDescription'
 export { createBranchSourceHandler } from '../server/data/branchSourceHandler'
 export { branchSource } from '../shared/branchSource'
