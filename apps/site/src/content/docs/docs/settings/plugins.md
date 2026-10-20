@@ -13,7 +13,7 @@ sources:
 covers:
   - plugins
   - rail-surfaces
-checked: 52225e24f
+checked: 'ec0e73ca1'
 ---
 
 This page lists every setting in **Settings** > **Plugins**. **Installed** is stored on the Node, and its
