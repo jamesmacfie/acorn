@@ -13,8 +13,11 @@ export const issueSource: DataSourceRegistration = {
   icon: 'brand:linear',
 }
 
+// Linear's priority numbers, 0 to 4, as the record's choice ids.
+export const PRIORITIES = ['none', 'urgent', 'high', 'medium', 'low'] as const
+
 export const issueSourceDescription: DataSourceDescription = {
-  revision: '1',
+  revision: '2',
   projectScope: { kind: 'external-project', parameter: '/project', record: '/projectId' },
   schema: {
     type: 'object',
@@ -36,10 +39,32 @@ export const issueSourceDescription: DataSourceDescription = {
         },
         required: ['id', 'name', 'category'],
       },
+      cycleId: { type: ['string', 'null'] },
+      cycle: { type: ['string', 'null'] },
+      assignee: { type: ['string', 'null'] },
+      priority: { type: 'string' },
+      estimate: { type: ['number', 'null'] },
       createdAt: { type: 'number' },
       updatedAt: { type: 'number' },
+      completedAt: { type: ['number', 'null'] },
     },
-    required: ['id', 'identifier', 'title', 'url', 'description', 'projectId', 'state', 'createdAt', 'updatedAt'],
+    required: [
+      'id',
+      'identifier',
+      'title',
+      'url',
+      'description',
+      'projectId',
+      'state',
+      'cycleId',
+      'cycle',
+      'assignee',
+      'priority',
+      'estimate',
+      'createdAt',
+      'updatedAt',
+      'completedAt',
+    ],
   },
   fields: [
     { pointer: '/title', label: 'Title', origin: 'declared', display: { kind: 'text', role: 'title' } },
@@ -55,6 +80,26 @@ export const issueSourceDescription: DataSourceDescription = {
     },
     { pointer: '/state/name', label: 'State name', origin: 'declared', display: { kind: 'status', role: 'status' } },
     { pointer: '/state/category', label: 'State category', origin: 'declared' },
+    { pointer: '/cycleId', label: 'Cycle ID', origin: 'declared' },
+    { pointer: '/cycle', label: 'Cycle', origin: 'declared' },
+    { pointer: '/assignee', label: 'Assignee', origin: 'declared', display: { kind: 'person', role: 'assignee' } },
+    {
+      pointer: '/priority',
+      label: 'Priority',
+      origin: 'declared',
+      display: { kind: 'enum' },
+      choices: {
+        kind: 'static',
+        values: [
+          { id: 'urgent', label: 'Urgent', tone: 'bad', rank: 1 },
+          { id: 'high', label: 'High', tone: 'warn', rank: 2 },
+          { id: 'medium', label: 'Medium', tone: 'accent', rank: 3 },
+          { id: 'low', label: 'Low', tone: 'muted', rank: 4 },
+          { id: 'none', label: 'No priority', tone: 'muted', rank: 5 },
+        ],
+      },
+    },
+    { pointer: '/estimate', label: 'Estimate', origin: 'declared', display: { kind: 'number' } },
     ...(['createdAt', 'updatedAt'] as const).map((key) => ({
       pointer: `/${key}`,
       label: key === 'createdAt' ? 'Created' : 'Updated',
@@ -62,6 +107,7 @@ export const issueSourceDescription: DataSourceDescription = {
       display: { kind: 'datetime' as const },
       query: { operators: ['gt', 'gte', 'lt', 'lte'] as ('gt' | 'gte' | 'lt' | 'lte')[], sortable: true },
     })),
+    { pointer: '/completedAt', label: 'Completed', origin: 'declared', display: { kind: 'datetime' } },
   ],
   parameters: {
     type: 'object',

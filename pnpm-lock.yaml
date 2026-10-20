@@ -1876,6 +1876,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@acorn/dashboards-core':
+        specifier: workspace:*
+        version: link:../../packages/dashboards-core
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0

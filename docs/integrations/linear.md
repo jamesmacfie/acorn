@@ -2,7 +2,8 @@
 
 The Linear plugin is a loaded plugin that reads Linear issues into a rail, a task pane, a project pane,
 and a reference panel. This page covers connections, teams and projects, the rail, the ticket view,
-rail search, palette search, and the browser handoff. The plugin is in `plugins/linear/`.
+rail search, palette search, the data sources, and the browser handoff. The plugin is in
+`plugins/linear/`.
 
 ## Linear
 
@@ -79,6 +80,53 @@ hundred active issues per keystroke would cost the same requests and miss the hu
 `searchableContent` isn't used, because it searches descriptions too and is the field most likely to
 vary by plan. [From the command palette](../integrations.md#from-the-command-palette) has the shared
 rules.
+
+## Data sources
+
+The plugin serves three [data sources](../data-sources.md) to dashboards and workflows. Each reads
+one Linear connection the person picks, through the handler in
+`plugins/linear/src/server/data/sourceHandler.ts`:
+
+| Source | One record per | Reach |
+| --- | --- | --- |
+| Linear issues (`linear:issues`) | Issue, archived ones included | One Linear project, picked from the workspace's links |
+| Linear cycles (`linear:cycles`) | Cycle, archived ones included | Every team the account reaches |
+| Linear projects (`linear:projects`) | Project, archived ones left out | Every project the account reaches |
+
+All three share one read in `plugins/linear/src/server/data/sourceRead.ts`. It sends the query's
+filters to Linear, pages through every match, then sorts and takes. When a selection passes 5,000
+records or 100 Linear pages, the read answers incomplete with no records, because sorting part of the
+matches could put the wrong rows first. A finished selection stays for 60 seconds so the host can
+page through it. Pressing a row opens it in Linear.
+
+[Provider data sources](../data-sources/provider-sources.md#linear-issues-and-rollbar-error-groups)
+covers the issues source's project and state rules. Beside its title, state, and dates, an issue
+record carries its cycle and cycle ID, assignee, priority, estimate, and completed time. Its cycle ID
+matches a cycle record's `id`.
+
+A cycle record has its team, number, title, status, start, end, and completed times, progress, and
+issue counts. Its title is the cycle's name, or "Cycle 12" when it has none. Its status is
+`active`, `upcoming`, or `past`, and a cycle completed early is past. Filters on team, status,
+start, and end go to Linear. Linear reports issue counts as one end-of-day figure per day of the
+cycle, so the source reads:
+
+- **Issues** and **Completed issues**: the latest day's figures. An upcoming cycle has none.
+- **Issues added**: the latest day's total less the first day's. Removed issues count against it.
+- **Progress**: Linear's own figure as a percentage. Completed estimate points plus a quarter of
+  in-progress points, over all points.
+
+A cycle has no address in Linear's API, so the record builds the one Linear's app uses,
+`linear.app/<workspace>/team/<key>/cycle/<number>`, from the workspace's URL key.
+
+A project record has its name, status, lead, up to 25 team names, progress, target date, and its
+started, completed, and updated times. It leaves out the description. Its status is Linear's status
+type, one of `started`, `planned`, `paused`, `backlog`, `completed`, or `canceled`, beside the
+workspace's own name for it. Filters on status and the three times go to Linear.
+
+Each source ships starter panels, defined with its description in `plugins/linear/src/shared/`. Cycles
+offers active cycles, cycles finished in the last 12 weeks, and issues completed per cycle by team.
+Projects offers projects in progress, projects by status, projects past their target date, and
+projects completed in the last 12 weeks.
 
 ## Browser handoff
 

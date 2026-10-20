@@ -5019,6 +5019,273 @@
       }
     ]
   },
+  "linear:cycles": {
+    "name": "Linear cycles",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "number": {
+          "type": "number"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "team": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "key",
+            "name"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "startsAt": {
+          "type": "number"
+        },
+        "endsAt": {
+          "type": "number"
+        },
+        "completedAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "progress": {
+          "type": "number"
+        },
+        "issueCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "completedIssueCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "addedIssueCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "number",
+        "title",
+        "url",
+        "team",
+        "status",
+        "startsAt",
+        "endsAt",
+        "completedAt",
+        "progress",
+        "issueCount",
+        "completedIssueCount",
+        "addedIssueCount"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "label": "Title",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/number",
+        "label": "Number",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        },
+        "query": {
+          "operators": [],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/url",
+        "label": "URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link",
+          "role": "url"
+        }
+      },
+      {
+        "pointer": "/team/id",
+        "label": "Team",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "dynamic",
+          "dependsOn": []
+        }
+      },
+      {
+        "pointer": "/team/name",
+        "label": "Team name",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/team/key",
+        "label": "Team key",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/status",
+        "label": "Status",
+        "origin": "declared",
+        "description": "Whether the cycle is running now, still to come, or over. A cycle completed early is over.",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "active",
+              "label": "Active",
+              "tone": "accent",
+              "rank": 1
+            },
+            {
+              "id": "upcoming",
+              "label": "Upcoming",
+              "tone": "muted",
+              "rank": 2
+            },
+            {
+              "id": "past",
+              "label": "Past",
+              "tone": "muted",
+              "rank": 3
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/startsAt",
+        "label": "Starts",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/endsAt",
+        "label": "Ends",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/completedAt",
+        "label": "Completed",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/progress",
+        "label": "Progress",
+        "origin": "declared",
+        "description": "Linear's progress, as a percentage: completed estimate points plus a quarter of in-progress points, over all points. 0 when no issue has an estimate.",
+        "display": {
+          "kind": "number",
+          "unit": "percent"
+        }
+      },
+      {
+        "pointer": "/issueCount",
+        "label": "Issues",
+        "origin": "declared",
+        "description": "Issues in the cycle at Linear's latest end-of-day count. Empty before the cycle's first day ends.",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/completedIssueCount",
+        "label": "Completed issues",
+        "origin": "declared",
+        "description": "Completed issues at Linear's latest end-of-day count.",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/addedIssueCount",
+        "label": "Issues added",
+        "origin": "declared",
+        "description": "How many more issues the cycle holds now than at the end of its first day. Issues removed count against it, so it can be negative.",
+        "display": {
+          "kind": "number"
+        }
+      }
+    ]
+  },
   "linear:issues": {
     "name": "Linear issues",
     "schema": {
@@ -5066,11 +5333,44 @@
             "category"
           ]
         },
+        "cycleId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cycle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assignee": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priority": {
+          "type": "string"
+        },
+        "estimate": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "createdAt": {
           "type": "number"
         },
         "updatedAt": {
           "type": "number"
+        },
+        "completedAt": {
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
@@ -5081,8 +5381,14 @@
         "description",
         "projectId",
         "state",
+        "cycleId",
+        "cycle",
+        "assignee",
+        "priority",
+        "estimate",
         "createdAt",
-        "updatedAt"
+        "updatedAt",
+        "completedAt"
       ]
     },
     "fields": [
@@ -5146,6 +5452,76 @@
         "origin": "declared"
       },
       {
+        "pointer": "/cycleId",
+        "label": "Cycle ID",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/cycle",
+        "label": "Cycle",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/assignee",
+        "label": "Assignee",
+        "origin": "declared",
+        "display": {
+          "kind": "person",
+          "role": "assignee"
+        }
+      },
+      {
+        "pointer": "/priority",
+        "label": "Priority",
+        "origin": "declared",
+        "display": {
+          "kind": "enum"
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "urgent",
+              "label": "Urgent",
+              "tone": "bad",
+              "rank": 1
+            },
+            {
+              "id": "high",
+              "label": "High",
+              "tone": "warn",
+              "rank": 2
+            },
+            {
+              "id": "medium",
+              "label": "Medium",
+              "tone": "accent",
+              "rank": 3
+            },
+            {
+              "id": "low",
+              "label": "Low",
+              "tone": "muted",
+              "rank": 4
+            },
+            {
+              "id": "none",
+              "label": "No priority",
+              "tone": "muted",
+              "rank": 5
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/estimate",
+        "label": "Estimate",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
         "pointer": "/createdAt",
         "label": "Created",
         "origin": "declared",
@@ -5168,6 +5544,269 @@
         "origin": "declared",
         "display": {
           "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/completedAt",
+        "label": "Completed",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      }
+    ]
+  },
+  "linear:projects": {
+    "name": "Linear projects",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "status": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "type"
+          ]
+        },
+        "lead": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "teams": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "progress": {
+          "type": "number"
+        },
+        "targetDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startedAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "completedAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "updatedAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "url",
+        "status",
+        "lead",
+        "teams",
+        "progress",
+        "targetDate",
+        "startedAt",
+        "completedAt",
+        "updatedAt"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/name",
+        "label": "Name",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/url",
+        "label": "URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link",
+          "role": "url"
+        }
+      },
+      {
+        "pointer": "/status/type",
+        "label": "Status",
+        "origin": "declared",
+        "description": "The kind of status, which every workspace shares. The status's own name is Status name.",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "started",
+              "label": "In progress",
+              "tone": "accent",
+              "rank": 1
+            },
+            {
+              "id": "planned",
+              "label": "Planned",
+              "tone": "muted",
+              "rank": 2
+            },
+            {
+              "id": "paused",
+              "label": "Paused",
+              "tone": "warn",
+              "rank": 3
+            },
+            {
+              "id": "backlog",
+              "label": "Backlog",
+              "tone": "muted",
+              "rank": 4
+            },
+            {
+              "id": "completed",
+              "label": "Completed",
+              "tone": "ok",
+              "rank": 5
+            },
+            {
+              "id": "canceled",
+              "label": "Canceled",
+              "tone": "muted",
+              "rank": 6
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/status/name",
+        "label": "Status name",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/lead",
+        "label": "Lead",
+        "origin": "declared",
+        "display": {
+          "kind": "person",
+          "role": "assignee"
+        }
+      },
+      {
+        "pointer": "/teams",
+        "label": "Teams",
+        "origin": "declared",
+        "description": "The project's teams, up to its first 25.",
+        "display": {
+          "kind": "text",
+          "list": true
+        }
+      },
+      {
+        "pointer": "/progress",
+        "label": "Progress",
+        "origin": "declared",
+        "description": "Linear's progress for the project, as a percentage.",
+        "display": {
+          "kind": "number",
+          "unit": "percent"
+        }
+      },
+      {
+        "pointer": "/targetDate",
+        "label": "Target date",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime",
+          "precision": "day"
+        }
+      },
+      {
+        "pointer": "/startedAt",
+        "label": "Started",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/completedAt",
+        "label": "Completed",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/updatedAt",
+        "label": "Updated",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
         },
         "query": {
           "operators": [

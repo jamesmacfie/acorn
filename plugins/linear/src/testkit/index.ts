@@ -2,6 +2,7 @@
 //
 //   apps/node/test/integration/plugins/linear.test.ts   everything below
 //   apps/node/test/helpers/registerProviders.ts         linearProvider, createLinearFetch
+//   apps/node/test/integration/linearDataSource.test.ts  the cycle and project starters
 //
 // `linearFetch` is re-exported for the test's imports, but the test still mocks the module it lives
 // in by its own path — a `vi.mock` has to name the module the code under test imports, and linear's
@@ -11,3 +12,5 @@ export { linearFetch, type LinearNode } from '../server/index'
 export { linearProvider, linearRef } from '../server/provider'
 export { createLinearFetch } from '../server/routes/linear'
 export type { LinearIssueDetail, LinearIssueSummary, LinearProjectIssuesResponse } from '../shared/api'
+export { cycleSourceDescription } from '../shared/cycleSource'
+export { projectSourceDescription } from '../shared/projectSource'

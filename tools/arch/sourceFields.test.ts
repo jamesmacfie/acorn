@@ -35,7 +35,9 @@ import { reviewCommentSource as gitlabReviewCommentSource } from '../../plugins/
 import { reviewCommentSourceDescription as gitlabReviewCommentSourceDescription } from '../../plugins/gitlab/src/server/data/sourceDescriptions.ts'
 import { reviewCommentSource as bitbucketReviewCommentSource } from '../../plugins/bitbucket/src/shared/sources.ts'
 import { reviewCommentSourceDescription as bitbucketReviewCommentSourceDescription } from '../../plugins/bitbucket/src/server/data/sourceDescriptions.ts'
+import { cycleSource, cycleSourceDescription } from '../../plugins/linear/src/shared/cycleSource.ts'
 import { issueSource, issueSourceDescription } from '../../plugins/linear/src/shared/issueSource.ts'
+import { projectSource, projectSourceDescription } from '../../plugins/linear/src/shared/projectSource.ts'
 import { memorySourceDescription } from '../../plugins/memory/src/shared/memorySource.ts'
 import { memorySource } from '../../plugins/memory/src/shared/memorySourceRegistration.ts'
 import { errorSource, errorSourceDescription } from '../../plugins/rollbar/src/shared/errorSource.ts'
@@ -83,7 +85,9 @@ async function fieldLists() {
     'github:review-comments': [githubReviewCommentSource, githubReviewCommentSourceDescription],
     'gitlab:review-comments': [gitlabReviewCommentSource, gitlabReviewCommentSourceDescription],
     'bitbucket:review-comments': [bitbucketReviewCommentSource, bitbucketReviewCommentSourceDescription],
+    'linear:cycles': [cycleSource, cycleSourceDescription],
     'linear:issues': [issueSource, issueSourceDescription],
+    'linear:projects': [projectSource, projectSourceDescription],
     'memory:memories': [memorySource, memorySourceDescription],
     'rollbar:error-groups': [errorSource, errorSourceDescription],
     'terminal:runs': [terminalRunSource, terminalRunSourceDescription],

@@ -24,7 +24,8 @@ selected project's teams, with provider state IDs and labels preserved. The reco
 and category separately. Two states in the same
 category remain distinct choices. A state from another project's teams fails validation.
 Project, exact state, and created/updated date predicates narrow the Linear GraphQL query.
-The records include issue descriptions and archived issues. Dates use epoch milliseconds.
+The records include issue descriptions and archived issues. Dates use epoch milliseconds. Cycles and
+projects are documented with the [Linear plugin](../integrations/linear.md#data-sources).
 
 `rollbar/error-groups` selects deduplicated items in one project connection. Its record identity
 combines the system item ID and immutable project counter. Status, level, and environment predicates

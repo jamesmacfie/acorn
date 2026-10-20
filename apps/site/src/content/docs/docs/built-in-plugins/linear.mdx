@@ -23,7 +23,7 @@ The Linear plugin brings your Linear issues into acorn: a list in the left rail,
 pane with its comments, and a panel beside a pull request that mentions one.
 
 <PluginFacts id="linear">
-  <Fragment slot="adds">The **Linear issues** source in the left rail, the **Linear** pane on a task linked to an issue, a panel for an issue a pull request links to, a palette command, a section in the task's context, and tools agents use to read and comment on linked issues.</Fragment>
+  <Fragment slot="adds">The **Linear issues** source in the left rail, the **Linear** pane on a task linked to an issue, a panel for an issue a pull request links to, a palette command, a section in the task's context, the **Linear issues**, **Linear cycles**, and **Linear projects** data sources for dashboards, and tools agents use to read and comment on linked issues.</Fragment>
   <Fragment slot="needs">A Linear personal API key, and at least one Linear project or team followed by a workspace or project.</Fragment>
 </PluginFacts>
 
@@ -91,6 +91,20 @@ An issue linked to the task is in the task's context, under **Issues**. Agents i
 linked issue's description and comments, see its images, and post a comment, through acorn's issue
 tools ([Agent tools and the MCP server](/docs/agents/agent-tools-and-the-mcp-server/)). They can act
 only on issues linked to their task.
+
+## On a dashboard
+
+Three data sources put Linear on a dashboard, each read with the Linear account you choose:
+
+- **Linear issues**: the issues in one Linear project your workspace follows.
+- **Linear cycles**: every cycle of every team the account reaches, with its progress and issue
+  counts. Its starter panels show active cycles, cycles finished in the last 12 weeks, and issues
+  completed per cycle.
+- **Linear projects**: every project the account reaches, with its status, lead, progress, and
+  target date. Its starter panels show projects in progress, projects by status, projects past their
+  target date, and projects completed in the last 12 weeks.
+
+Click a row to open it in Linear. [Dashboards](/docs/automation/dashboards/) covers adding a panel.
 
 ## Settings
 

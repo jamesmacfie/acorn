@@ -11,10 +11,10 @@ checked: '367bb285d'
 ---
 
 A data source is a set of records a plugin can read, each with the same known fields: GitHub pull
-requests, issues, and review comments, Linear issues, Rollbar errors, acorn's own tasks and schedules,
-your projects' Git commits, workflow runs, the run targets and scripts your terminals ran, agent
-sessions, what each agent turn and session spent, or your agents' memories. Dashboards and workflows'
-**Find records** steps read every record through sources.
+requests, issues, and review comments, Linear issues, cycles, and projects, Rollbar errors, acorn's own
+tasks and schedules, your projects' Git commits, workflow runs, the run targets and scripts your
+terminals ran, agent sessions, what each agent turn and session spent, or your agents' memories.
+Dashboards and workflows' **Find records** steps read every record through sources.
 This page covers what a source is, which account and projects a read reaches, saved queries, and
 sources built from other sources.
 
@@ -42,7 +42,9 @@ acorn never picks an account for you. A plugin's source gets only that account's
 a task get none of it.
 
 **Reach** says which of the workspace's links a read covers, such as the GitHub repositories of the
-workspace's projects: all of them, or the ones you pick. A read never covers a whole account.
+workspace's projects: all of them, or the ones you pick. A source with **Reach** never covers a whole
+account. Linear cycles and projects have no **Reach**: they read every team and project the account
+reaches.
 
 ## Saved queries
 

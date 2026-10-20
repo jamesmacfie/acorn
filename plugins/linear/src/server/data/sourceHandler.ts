@@ -1,9 +1,26 @@
 import { createDataSelectionPager, type PluginFetchHandler } from '@acorn/plugin-api/node'
-import { dataSourceRequestSchema } from '@acorn/protocol/dataSources.ts'
-import { issueSourceDescription } from '../../shared/issueSource'
-import { readIssueOptions, readIssues } from './issueRead'
+import {
+  dataSourceRequestSchema,
+  type DataSourceDescription,
+  type DataSourceOptions,
+  type DataSourcePage,
+  type DataSourceQuery,
+  type DataSourceRequest,
+} from '@acorn/protocol/dataSources.ts'
 
-export function createIssueSourceHandler(): PluginFetchHandler {
+type ReadRecords = (token: string, query: DataSourceQuery, signal: AbortSignal) => Promise<DataSourcePage>
+type ReadOptions = (
+  token: string,
+  input: Extract<DataSourceRequest, { operation: 'options' }>,
+  signal: AbortSignal,
+) => Promise<DataSourceOptions>
+
+/** One Linear source's route: it checks the caller and the selected connection before every read. */
+export function createLinearSourceHandler(
+  description: DataSourceDescription,
+  readRecords: ReadRecords,
+  readOptions?: ReadOptions,
+): PluginFetchHandler {
   const page = createDataSelectionPager()
   return async (request, context) => {
     if (request.method !== 'POST') return Response.json({ error: 'method_not_allowed' }, { status: 405 })
@@ -15,8 +32,13 @@ export function createIssueSourceHandler(): PluginFetchHandler {
     try {
       const input = dataSourceRequestSchema.parse(await request.json())
       request.signal.throwIfAborted()
-      if (input.operation === 'describe') return Response.json(issueSourceDescription)
-      if (input.operation === 'details' || input.operation === 'actions' || input.operation === 'identity') {
+      if (input.operation === 'describe') return Response.json(description)
+      if (
+        input.operation === 'details' ||
+        input.operation === 'actions' ||
+        input.operation === 'identity' ||
+        (input.operation === 'options' && !readOptions)
+      ) {
         return Response.json({ error: 'unsupported_operation' }, { status: 400 })
       }
       const scope = input.operation === 'query' ? input.query.scope : input.scope
@@ -31,8 +53,8 @@ export function createIssueSourceHandler(): PluginFetchHandler {
         const results = await context.providers.withConnections('linear', async (connection, token) => {
           if (connection.id !== scope.connectionId) return undefined
           return input.operation === 'options'
-            ? readIssueOptions(token, input, request.signal)
-            : readIssues(token, input.query, request.signal)
+            ? readOptions!(token, input, request.signal)
+            : readRecords(token, input.query, request.signal)
         })
         if (!results[0]) throw new Error('connection_unavailable')
         return results[0]

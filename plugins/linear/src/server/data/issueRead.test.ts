@@ -5,7 +5,9 @@ import {
   dataSourcePageSchema,
   type DataSourceRequest,
 } from '@acorn/protocol/dataSources.ts'
-import { createIssueSourceHandler } from './issueSourceHandler'
+import { createLinearSourceHandler } from './sourceHandler'
+import { readIssueOptions, readIssues } from './issueRead'
+import { issueSourceDescription } from '../../shared/issueSource'
 import { linearFetch } from '../index'
 
 vi.mock('../index', async (original) => ({ ...(await original<typeof import('../index')>()), linearFetch: vi.fn() }))
@@ -42,6 +44,7 @@ const context: PluginRequestContext = {
     },
   },
 }
+const createIssueSourceHandler = () => createLinearSourceHandler(issueSourceDescription, readIssues, readIssueOptions)
 const call = (handler: ReturnType<typeof createIssueSourceHandler>, request: DataSourceRequest, ctx = context) =>
   handler(new Request('http://acorn.test/', { method: 'POST', body: JSON.stringify(request) }), ctx)
 const page = <T>(nodes: T[], next: string | null = null) => ({
@@ -57,8 +60,13 @@ const issue = (id: string, state = 'review') => ({
   description: 'Full description',
   project: { id: 'p1' },
   state: { id: state, name: state, type: 'started' },
+  cycle: { id: 'c1', number: 12, name: null },
+  assignee: { name: 'Ada' },
+  priority: 2,
+  estimate: 3,
   createdAt: '2026-09-01T00:00:00Z',
   updatedAt: '2026-09-02T00:00:00Z',
+  completedAt: null,
 })
 const teams = () => response({ project: { teams: page([{ id: 'team1', name: 'Engineering' }]) } })
 afterEach(() => vi.clearAllMocks())
@@ -141,7 +149,18 @@ describe('Linear typed issue source', () => {
     }
     const handler = createIssueSourceHandler()
     const first = dataSourcePageSchema.parse(await (await call(handler, request)).json())
-    expect(first.records[0]).toMatchObject({ recordId: 'a', data: { state: { id: 'review', category: 'started' } } })
+    expect(first.records[0]).toMatchObject({
+      recordId: 'a',
+      data: {
+        state: { id: 'review', category: 'started' },
+        cycleId: 'c1',
+        cycle: 'Cycle 12',
+        assignee: 'Ada',
+        priority: 'high',
+        estimate: 3,
+        completedAt: null,
+      },
+    })
     if (first.completeness.kind !== 'more') throw new Error('missing continuation')
     const continued = { ...request, cursor: first.completeness.cursor }
     const last = dataSourcePageSchema.parse(await (await call(handler, continued)).json())

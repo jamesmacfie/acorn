@@ -27,7 +27,9 @@ add a source, add its row here.
 | Local branches with pull requests (`github:local-branches`) | GitHub | Local branch | No | [GitHub](../github-integration.md) |
 | GitLab review comments (`gitlab:review-comments`) | GitLab | Note on a merge request | Yes | [GitLab](../gitlab-integration.md) |
 | Bitbucket review comments (`bitbucket:review-comments`) | Bitbucket | Comment on a pull request | Yes | [Bitbucket](../bitbucket-integration.md) |
-| Linear issues (`linear:issues`) | Linear | Issue | No | [Integrations](../integrations.md) |
+| Linear issues (`linear:issues`) | Linear | Issue | No | [Linear](../integrations/linear.md#data-sources) |
+| Linear cycles (`linear:cycles`) | Linear | Cycle of a team the account reaches | Yes | [Linear](../integrations/linear.md#data-sources) |
+| Linear projects (`linear:projects`) | Linear | Project the account reaches | Yes | [Linear](../integrations/linear.md#data-sources) |
 | Rollbar error groups (`rollbar:error-groups`) | Rollbar | Error group | No | [Rollbar](../integrations/rollbar.md) |
 
 GitLab and Bitbucket serve merge requests, pull requests, CI jobs, pipeline steps, and branches the
