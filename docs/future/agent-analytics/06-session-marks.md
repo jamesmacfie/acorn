@@ -1,6 +1,64 @@
 # Phase 6: let plugins mark an agent session
 
-Date: October 19, 2026. Status: proposed. Needs nothing.
+## Completion note
+
+Built on October 20, 2026, on branch `phase-6-session-marks`.
+
+What landed:
+
+- `AGENT_SESSION_POINT` (`agents:session`) and `AGENT_SESSION_KEY` in `extensionPoints.ts`, listed in
+  `publicExtensionPoints.ts`. The agents client registers it beside its other points, with `max: 2`,
+  `acceptedMarks: 256`, and `acceptsDetail: true`. `extensionPoints.test.ts` names it.
+- `InlineAnnotationMarks` in `client-core/host/annotations`, exported from `@acorn/plugin-api/ui/host`.
+  It draws an item's marks as one button: a severity dot and the text for each mark, up to the point's
+  `max`, or dots only. Its accessible name lists every mark with its plugin. Hover or focus opens a
+  popover with each mark's text, its detail through `richTooltipDom`, and the "From <plugin>" credit.
+  The popover is mounted only while open, so a long list holds no document listeners.
+- The terminal's `InlineAnnotationMarks` in `apps/tui/src/kit/host.tsx` draws a dot and the text, with
+  no detail.
+- Agents draws it after the title on Agent Center rows, as dots only in the session list's trailing
+  slot, and beside the title in the pane header. `requestSessionMarks` in `sessions/sessionMarks.ts`
+  asks with sorted keys.
+- The trust prompt words a contributor's grant as "Mark agent sessions in Agent Center and the Agent
+  pane", from `POINT_COPY` in `trust/permissions.ts`. The key is unchanged and the line isn't high.
+- Tests: the component (`InlineAnnotationMarks.test.tsx`), including a `javascript:` link, and one
+  per surface in `AgentCenter.test.tsx`, `AgentTaskSidebar.test.tsx`, and `AgentPane.test.tsx`, each
+  with no contributor drawing nothing. Checked in `pnpm dev:agent` with a throwaway loaded plugin on
+  the `delegation-checks` fixture: all three surfaces drew the marks, and the detail dropped the
+  `javascript:` link.
+- Docs: [rows and annotations](../../plugins/rows-and-annotations.md#session-annotations),
+  [places to fill](../../contribution-kinds.md#places-to-fill), the terminal's
+  [contextual points](../../tui/plugin-losses.md#contextual-points), and an example on the site's
+  extension points page.
+
+Decisions and deviations:
+
+- `richTooltipDom` moved to `client-core/kit/lib/rendering/richTooltip.ts`, because its old module
+  imports CodeMirror for `richTooltipTheme`, and agents must not load an editor to draw a mark. The
+  editor module re-exports it, so `@acorn/plugin-api/ui/editor` is unchanged. Its test moved with it.
+- Each screen asks once. The annotation host keeps one key set per contributor, so two askers on the
+  same point clear each other's marks. Agent Center asks for its rows, and the Agent pane's detail
+  region asks for every session of its task, which covers the list and the header. The two are never
+  on screen together.
+- Agent Center asks for every row it shows, not one page at a time, because it has no paging. A fleet
+  row from another Node asks for and draws no marks, because annotation requests go to the active Node.
+- The session list's text and detail aren't in the row's tooltip. The kit's `Row` takes only a
+  one-line tip, and widening it would change the kit on both hosts. The dot is the same button as on
+  the other surfaces instead, so its name carries the text and hover or focus opens the detail.
+- In the pane header the marks sit after the title in the toolbar, where the `agents:session-header`
+  slot draws. The title takes the free width, so they appear toward the right, beside the run state.
+- Severity tones: `info` is muted, `warn` is warn, and `danger` is danger, as `AnnotationMarks` colors
+  them. The rail maps `info` to the ok dot, but a neutral fact isn't good news on a session row.
+
+What later phases need to know:
+
+- Phase 7's doc names `richTooltipDom` in `features/editor/richTooltip.ts`. It lives in
+  `kit/lib/rendering/richTooltip.ts`. The sanitizer keeps only `https` links (`safeHref` in
+  `sanitizedHtml.ts`), so it drops `acorn:` links in mark detail, as phase 7 suspected.
+- Phase 8's plugin contributes an `items` route on `agents:session` keyed `{ session }`, and invalidates
+  its marks through its descriptor or live channel.
+
+Date: October 19, 2026. Status: built October 20, 2026. Needs nothing.
 
 ## Goal
 

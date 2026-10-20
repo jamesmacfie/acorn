@@ -11,7 +11,7 @@ import {
   type JSX,
 } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
-import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
+import type { PluginAnnotationKey, PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
 import type { PromoteTaskAction } from '@acorn/client-core/features/integrations'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
@@ -22,6 +22,7 @@ import {
   type ExtensionContribution,
 } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome'
+import { annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
 import {
   compiledOwnerHost,
   createSlotChoice,
@@ -43,7 +44,7 @@ import {
 } from '@acorn/client-core/host/markdownFences/fenceViewers.ts'
 import { htmlLines } from './markdown'
 import { Line } from './cells'
-import { Badge, Icon, Lines, Row, Rows } from './showing'
+import { Badge, Icon, Lines, Row, Rows, StatusDot } from './showing'
 import { Button, CopyButton, IconButton } from './asking'
 import { Menu, Modal, ModalBody, SectionHeader } from './grouping'
 
@@ -366,6 +367,29 @@ function FenceView(props: { viewer: FenceViewer; scope: FenceScope }) {
 
 /** Keep the host API pointed at the diff renderer that owns annotation placement. */
 export { AnnotationMarks } from './showing'
+
+const MARK_TONE = { info: 'muted', warn: 'warn', danger: 'danger' } as const
+
+/** One item's marks on one line: a dot and the text for each, up to the point's `max`. The terminal has
+ *  no hover, so it shows no detail, and draws the text even where the desktop draws dots only. */
+export function InlineAnnotationMarks(props: { point: string; itemKey: PluginAnnotationKey; dotsOnly?: boolean }) {
+  const marks = () => {
+    const all = annotationsFor(props.point, props.itemKey)
+    return all.slice(0, extensionPointRegistry.get(props.point)?.max ?? all.length)
+  }
+  return (
+    <box flexDirection="row" gap={1} flexShrink={1} overflow="hidden">
+      <For each={marks()}>
+        {(mark) => (
+          <box flexDirection="row" gap={1} flexShrink={0}>
+            <StatusDot tone={MARK_TONE[mark.severity]} />
+            <Line tone={MARK_TONE[mark.severity]}>{mark.text}</Line>
+          </box>
+        )}
+      </For>
+    </box>
+  )
+}
 
 /**
  * The `rows` extension kind, in cells.

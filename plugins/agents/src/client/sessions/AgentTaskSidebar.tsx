@@ -2,6 +2,8 @@ import { agentTelemetry, startAgentView } from './agentTelemetry'
 import { createMemo, createEffect, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
 import type { AgentSession } from '../../contract/wire.ts'
+import { AGENT_SESSION_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { InlineAnnotationMarks } from '@acorn/plugin-api/ui/host'
 import {
   EmptyState,
   Fold,
@@ -271,6 +273,12 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                     leading={<RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}
                     trailing={
                       <>
+                        {/* Dots only: the list is narrow, and the words open with the detail. */}
+                        <InlineAnnotationMarks
+                          point={AGENT_SESSION_POINT}
+                          itemKey={{ session: current().id }}
+                          dotsOnly
+                        />
                         <Show when={!['none', 'unread'].includes(current().attention)}>
                           <Icon {...attentionMark(current().attention)} />
                         </Show>

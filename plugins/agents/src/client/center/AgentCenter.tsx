@@ -18,6 +18,9 @@ import {
   workspacesOptions,
 } from '@acorn/plugin-api/client'
 import { tasksRoute } from '@acorn/protocol/api.ts'
+import { AGENT_SESSION_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { InlineAnnotationMarks } from '@acorn/plugin-api/ui/host'
+import { requestSessionMarks } from '../sessions/sessionMarks'
 import { isActiveAgent, needsAttention } from '../sessions/agentActivity'
 import { managedAgentApi } from '../sessions/managedClient'
 import { managedAgentStore } from '../sessions/managedStore'
@@ -233,6 +236,15 @@ export default function AgentCenter() {
         )
     }),
   )
+  // Marks come from the active Node's plugins, so a fleet row from another Node asks for and draws none.
+  const onActiveNode = (row: AgentRow) => row.nodeId === (activeNodeId() ?? '')
+  createEffect(() =>
+    requestSessionMarks(
+      shown()
+        .filter(onActiveNode)
+        .map((row) => row.session.id),
+    ),
+  )
   createEffect(() => {
     agentTelemetry.observe('agents.center.rows_count', shown().length)
     if (tasks.isError || workspaces.isError || workspaceSessions.error || providers.error) view.fail()
@@ -445,6 +457,12 @@ export default function AgentCenter() {
                           >
                             <Inline>
                               <Text emphasis="strong">{current().session.title}</Text>
+                              <Show when={onActiveNode(current())}>
+                                <InlineAnnotationMarks
+                                  point={AGENT_SESSION_POINT}
+                                  itemKey={{ session: current().session.id }}
+                                />
+                              </Show>
                               {/* A session a workflow started, and the way back to the run. The same
                                 chip the Agent pane's header carries, so the two read alike. */}
                               <Show when={workflowRunOf(current().session)}>

@@ -1,5 +1,8 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { AGENT_SESSION_KEY, AGENT_SESSION_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { requestAnnotations } from '@acorn/plugin-api/ui/host'
+import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
 import type { AgentSession, AgentSessionDelegation, AgentSubagent } from '../../contract/wire.ts'
 import type { AgentPaneModel } from './agentPaneModel'
 import { agentSessionRoster } from './sessionRoster'
@@ -233,5 +236,43 @@ describe('the sidebar’s waiting sessions', () => {
       hold.mockRestore()
       load.mockRestore()
     }
+  })
+})
+
+describe('other plugins’ session marks', () => {
+  const registrations: { dispose(): void }[] = []
+  afterEach(() => registrations.splice(0).forEach((handle) => handle.dispose()))
+
+  it('draws a severity dot on the marked row, named with its text and its plugin, and nothing elsewhere', async () => {
+    registrations.push(
+      extensionPointRegistry.register({
+        id: AGENT_SESSION_POINT,
+        ownerId: 'agents',
+        label: 'Agent session',
+        kind: 'annotation',
+        key: [...AGENT_SESSION_KEY],
+        max: 2,
+        acceptedMarks: 256,
+        acceptsDetail: true,
+      }),
+      extensionRegistry.register({
+        id: 'session-health',
+        pluginId: 'health',
+        point: AGENT_SESSION_POINT,
+        label: 'Session health',
+        order: 10,
+        carrier: 'items',
+        marks: async () => [{ key: { session: 'marked' }, severity: 'danger', text: 'Struggling' }],
+      } as unknown as ExtensionContribution),
+    )
+    requestAnnotations(AGENT_SESSION_POINT, [{ session: 'marked' }, { session: 'plain' }])
+    mount([session('marked', { title: 'Marked' }), session('plain', { title: 'Plain' })], {})
+
+    await vi.waitFor(() => expect(rowNamed('Marked').querySelector('.annotation-inline')).not.toBeNull())
+    const mark = rowNamed('Marked').querySelector('.annotation-inline')!
+    expect(mark.getAttribute('aria-label')).toBe('Struggling, from health')
+    expect(mark.querySelector('.ui-dot')).not.toBeNull()
+    expect(mark.textContent).toBe('')
+    expect(rowNamed('Plain').querySelector('.annotation-inline')).toBeNull()
   })
 })

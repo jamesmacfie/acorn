@@ -353,6 +353,28 @@ A section on the card for a request an agent is blocked on.
 }
 ```
 
+#### `agents:session`
+
+Marks on an agent session, drawn on Agent Center rows, the task's session list, and the Agent pane's
+header. A mark may carry Markdown `detail`, which opens on hover and focus. The terminal draws the dot
+and the text, with no detail.
+
+```json manifest
+{
+  "node": "./node/index.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "agents-session",
+        "point": "agents:session",
+        "label": "Acme session health",
+        "items": "/v1/p/acme/marks/sessions"
+      }
+    ]
+  }
+}
+```
+
 ### Points `git` opens
 
 #### `git:diff-line`

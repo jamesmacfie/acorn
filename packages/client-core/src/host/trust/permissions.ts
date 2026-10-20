@@ -405,6 +405,12 @@ const HOOK_MODE_COPY: Record<HookMode, string> = {
   ask: 'Make a tool wait for you before %s can “%l”',
 }
 
+// A first-party point whose place on screen the kind's template can't name. The sentence says where
+// the contributor's marks appear, whatever the manifest calls them.
+const POINT_COPY: Readonly<Record<string, string>> = {
+  'agents:session': 'Mark agent sessions in Agent Center and the Agent pane',
+}
+
 // A grant this build has no sentence for. It still gets a line, and the line still carries the target
 // in its key, because "this package reaches into that one" is the disclosure and a shell that cannot
 // name the kind must not therefore say nothing (docs/security/plugin-storage-and-supply-chain.md § Design rules, rule 6).
@@ -440,8 +446,9 @@ export function extensionPermissionLine(grant: PluginExtensionGrant): Permission
   const disclosed = grant.kind === 'extends' && Object.hasOwn(DISCLOSED_NODE_POINTS, grant.target)
   if (disclosed)
     return line(key, { text: DISCLOSED_NODE_POINTS[grant.target]!, icon: EXTENSION_KIND_ICON.extends, high: true })
+  const worded = grant.kind === 'extends' && Object.hasOwn(POINT_COPY, grant.target)
   return line(key, {
-    text: fill(template, grant).replace('%t', grant.target),
+    text: worded ? POINT_COPY[grant.target]! : fill(template, grant).replace('%t', grant.target),
     icon: EXTENSION_KIND_ICON[grant.kind],
     // Stopping or rewriting somebody else's decision is the one cross-plugin grant that changes what
     // another package does rather than what it shows.

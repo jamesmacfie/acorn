@@ -585,6 +585,20 @@ describe('the cross-plugin grants', () => {
     })
   })
 
+  it('words a mark on an agent session with the host’s sentence, not the manifest’s label', () => {
+    const line = extensionPermissionLine({
+      kind: 'extends',
+      pointKind: 'annotation',
+      target: 'agents:session',
+      label: 'Session health',
+    })
+    expect(line).toMatchObject({
+      text: 'Mark agent sessions in Agent Center and the Agent pane',
+      high: false,
+      key: 'extension:extends:annotation:agents:session',
+    })
+  })
+
   it('still discloses a kind this build cannot name, rather than saying nothing', () => {
     // The version-skew case. A shell that cannot describe the kind must not therefore drop the line:
     // "this package reaches into that one" is the disclosure.

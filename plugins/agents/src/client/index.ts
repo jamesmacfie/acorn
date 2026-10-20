@@ -6,6 +6,7 @@
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import {
+  AGENT_SESSION_KEY,
   AGENT_TOOL_CARD_POINT,
   CORE_PLUGIN_PAGE_POINT,
   CORE_SECURITY_POINT,
@@ -173,6 +174,18 @@ export const agentsClientPlugin: ClientPlugin = {
       kind: 'remote',
       mode: 'stack',
       max: 2,
+    })
+    // What another plugin knows about a session, such as "Struggling" with its reasons, drawn on
+    // Agent Center rows, the task's session list, and the pane header. Two marks fit a row before its
+    // title truncates; the rest stay in the detail.
+    ctx.extensionPoints.register({
+      id: 'session',
+      label: 'Agent session',
+      kind: 'annotation',
+      key: [...AGENT_SESSION_KEY],
+      max: 2,
+      acceptedMarks: 256,
+      acceptsDetail: true,
     })
     // The task row's agent state, in the rail's top-right corner. The host owns the corner and the
     // collision rules; this plugin only says what is true.

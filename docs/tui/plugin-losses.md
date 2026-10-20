@@ -73,6 +73,7 @@ needs those:
 | `agent.message`, `agent.turn` | The same menus as the desktop |
 | `content.selection` | **Actions for the whole text** on a transcript message. Editor and plugin documents offer none |
 | `editor:file`, `core:source`, `core:pane` | Dots and a legend, or `+N` and a count |
+| `agents:session` | A dot and the text after the session's title in Agent Center, the session list, and the Agent pane's header. No detail, because nothing hovers or opens it |
 | Document services | **Inspect position** and **Diagnostics** in a document region. Editor's **Diagnostics** checks the saved file |
 | `preview:toolbar-actions` | Never drawn |
 | Companion overlays | `openOverlay` answers `unsupported_host` |

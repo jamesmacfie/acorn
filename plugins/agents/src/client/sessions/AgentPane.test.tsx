@@ -6,6 +6,9 @@ import type { CommandExecutionContext, ContributedCommand } from '@acorn/plugin-
 import type { AgentSession } from '../../contract/wire.ts'
 import type { AgentProviderUsage } from '../../shared/usage'
 import type { AgentPaneModel, SessionAction } from './agentPaneModel'
+import { AGENT_SESSION_KEY, AGENT_SESSION_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { requestAnnotations } from '@acorn/plugin-api/ui/host'
+import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
 
 // The header's chip: a session a workflow started says which one, and pressing it opens the run
 // (docs/managed-agents/sessions.md § Sessions). The rest of the pane needs a snapshot and a composer, so the
@@ -302,6 +305,58 @@ describe('the workflow chip', () => {
     await settle()
     expect(chip()).toBeNull()
     expect(runForSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('other plugins’ session marks', () => {
+  const registrations: { dispose(): void }[] = []
+  afterEach(() => registrations.splice(0).forEach((handle) => handle.dispose()))
+
+  it('draws the mark beside the title and opens its credited detail on focus', async () => {
+    registrations.push(
+      extensionPointRegistry.register({
+        id: AGENT_SESSION_POINT,
+        ownerId: 'agents',
+        label: 'Agent session',
+        kind: 'annotation',
+        key: [...AGENT_SESSION_KEY],
+        max: 2,
+        acceptedMarks: 256,
+        acceptsDetail: true,
+      }),
+      extensionRegistry.register({
+        id: 'session-health',
+        pluginId: 'health',
+        point: AGENT_SESSION_POINT,
+        label: 'Session health',
+        order: 10,
+        carrier: 'items',
+        marks: async () => [
+          {
+            key: { session: 'sess-1' },
+            severity: 'warn',
+            text: 'Watch',
+            detail: { kind: 'markdown', value: '**3** failed commands in a row' },
+          },
+        ],
+      } as unknown as ExtensionContribution),
+    )
+    requestAnnotations(AGENT_SESSION_POINT, [{ session: 'sess-1' }])
+    mount(session({}))
+
+    await vi.waitFor(() => expect(host.querySelector('.annotation-inline')).not.toBeNull())
+    const mark = host.querySelector<HTMLButtonElement>('.annotation-inline')!
+    expect(mark.textContent).toBe('Watch')
+    mark.focus()
+    const detail = document.querySelector('.annotation-detail')!
+    expect(detail.querySelector('strong')?.textContent).toBe('3')
+    expect(detail.textContent).toContain('From health')
+  })
+
+  it('draws nothing beside the title with no contributor', async () => {
+    mount(session({}))
+    await settle()
+    expect(host.querySelector('.annotation-inline')).toBeNull()
   })
 })
 

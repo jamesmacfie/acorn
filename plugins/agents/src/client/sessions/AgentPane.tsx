@@ -8,7 +8,11 @@ import {
   setTerminalOpen,
   type Task,
 } from '@acorn/plugin-api/client'
-import { AGENT_SESSION_HEADER_POINT, type AgentSessionHeaderProps } from '@acorn/protocol/extensionPoints.ts'
+import {
+  AGENT_SESSION_HEADER_POINT,
+  AGENT_SESSION_POINT,
+  type AgentSessionHeaderProps,
+} from '@acorn/protocol/extensionPoints.ts'
 import {
   Alert,
   Button,
@@ -28,7 +32,7 @@ import {
   Text,
   Toolbar,
 } from '@acorn/plugin-api/ui'
-import { Slot } from '@acorn/plugin-api/ui/host'
+import { InlineAnnotationMarks, Slot } from '@acorn/plugin-api/ui/host'
 import { registerSessionActionCommands } from '../commands'
 import { WORKFLOW_CONTROL } from '../../contract/workflowControl'
 import AgentConversation from './AgentConversation'
@@ -56,6 +60,7 @@ import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderCon
 import { runningBackgroundCommands } from './backgroundCommands'
 import SessionSummaryModal from './SessionSummaryModal'
 import { AGENT_PANE_ID } from '../paneIdentity'
+import { requestSessionMarks } from './sessionMarks'
 import { accountIcon, accountLabel, sessionAccount } from '../../shared/accounts'
 
 // The Agent pane's `detail` region: the open session's header, and the conversation under it.
@@ -138,7 +143,12 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
             undefined,
             { equals: sameSessionHeaderProps },
           )
-          return <Slot point={AGENT_SESSION_HEADER_POINT} taskId={props.task.id} props={header} />
+          return (
+            <>
+              <InlineAnnotationMarks point={AGENT_SESSION_POINT} itemKey={{ session: session().id }} />
+              <Slot point={AGENT_SESSION_HEADER_POINT} taskId={props.task.id} props={header} />
+            </>
+          )
         }}
       </Show>
       <Show when={workflow()}>
@@ -438,6 +448,8 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
   // The header's ••• menu, in the palette too, for as long as this region is mounted.
   // Not for an archived task: most of those actions start work, and the preview has nowhere to run it.
   if (!archived()) registerSessionActionCommands(model)
+  // Other plugins' marks for the session list and this header (`requestSessionMarks`).
+  createEffect(() => requestSessionMarks(model.taskSessions().map((session) => session.id)))
   // Usable once the session list has answered and the reader can see either the open session's
   // transcript, the start cards with the harnesses checked, or why it failed
   // (docs/telemetry/renderer.md § Feature openings). The host ignores every report after the first.

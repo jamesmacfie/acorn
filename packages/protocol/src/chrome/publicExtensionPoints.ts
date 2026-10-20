@@ -120,6 +120,16 @@ export const PUBLIC_EXTENSION_POINTS: readonly PublicExtensionPoint[] = [
     props: '{ taskId, sessionId, providerId, tokenAccounting, costAccounting, turns }',
   },
   {
+    id: 'agents:session',
+    kind: 'annotation',
+    key: ['session'],
+    max: 2,
+    acceptedMarks: 256,
+    acceptsDetail: true,
+    note: 'asked about the sessions Agent Center, the task’s session list, and the Agent pane’s header draw',
+    terminal: 'the dot and the text, with no detail',
+  },
+  {
     id: 'agents:request-card',
     kind: 'remote',
     mode: 'stack',

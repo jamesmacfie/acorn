@@ -3,6 +3,7 @@ import {
   AGENT_ATTACHMENT_POINT,
   AGENT_COMPOSER_ACTIONS_POINT,
   AGENT_REQUEST_CARD_POINT,
+  AGENT_SESSION_POINT,
   AGENT_TOOL_CARD_POINT,
 } from '@acorn/protocol/extensionPoints.ts'
 import { AGENT_ARTIFACT_POINT, AGENT_TRANSCRIPT_ATTACHMENT_POINT } from '../contract/transcriptMedia.ts'
@@ -21,6 +22,7 @@ describe('the points the agents pane opens', () => {
     expect(AGENT_REQUEST_CARD_POINT).toBe('agents:request-card')
     expect(AGENT_TRANSCRIPT_ATTACHMENT_POINT).toBe('agents:transcript-attachment')
     expect(AGENT_ARTIFACT_POINT).toBe('agents:artifact')
+    expect(AGENT_SESSION_POINT).toBe('agents:session')
   })
 
   it('names the pane the same way the collection and the notice handler do', () => {
@@ -31,6 +33,7 @@ describe('the points the agents pane opens', () => {
       AGENT_REQUEST_CARD_POINT,
       AGENT_TRANSCRIPT_ATTACHMENT_POINT,
       AGENT_ARTIFACT_POINT,
+      AGENT_SESSION_POINT,
     ]) {
       expect(point.split(':')[0]).toBe(AGENT_PANE_ID)
     }

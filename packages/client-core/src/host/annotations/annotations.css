@@ -32,3 +32,48 @@
 /* The stamp. Not a decoration and not shortenable to an icon, for the reason the row groups' owner
    label is not (docs/plugins/cooperative-extension-points.md § Cooperative extension points). */
 .annotation-mark-owner { font-size: var(--fs-xs); flex: 0 0 auto; }
+
+/* One item's marks on one line (InlineAnnotationMarks.tsx). A button with no box of its own, so a row
+   with marks is no taller than one without, and the text gives way before the row's title does. */
+.annotation-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-xs);
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+.annotation-inline:focus-visible { outline-offset: calc(-1 * var(--focus-ring-w)); }
+
+.annotation-inline-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.annotation-inline-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.annotation-inline-mark[data-severity='info'] { color: var(--text-muted); }
+.annotation-inline-mark[data-severity='warn'] { color: var(--warn); }
+.annotation-inline-mark[data-severity='danger'] { color: var(--danger); }
+
+/* The detail those marks open. `cm-document-hover` is `richTooltipDom`'s own markup, named for the
+   editor tooltip it was first drawn in; an editor styles it through `richTooltipTheme` instead. */
+.annotation-detail {
+  gap: var(--space-2);
+  max-width: min(480px, 92vw);
+  max-height: 320px;
+  overflow: auto;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-sm);
+}
+.annotation-detail-text { font-weight: var(--heading-weight); }
+.annotation-detail-mark[data-severity='warn'] .annotation-detail-text { color: var(--warn); }
+.annotation-detail-mark[data-severity='danger'] .annotation-detail-text { color: var(--danger); }
+.annotation-detail .cm-document-hover-from { margin-top: var(--space-1); font-size: var(--fs-xs); color: var(--text-muted); }

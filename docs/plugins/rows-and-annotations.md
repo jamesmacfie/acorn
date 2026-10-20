@@ -90,9 +90,11 @@ A mark may also carry `detail`, `{ "kind": "markdown" | "plaintext", "value": "â
 show on demand, such as in a tooltip. The host keeps it only for a point that sets `acceptsDetail`, and
 strips it everywhere else, so a batch of thousands of diff-line marks never carries it. A `value` over
 16 KiB of UTF-8, or a detail of the wrong shape, is dropped and the rest of the mark kept. Detail is
-untrusted: the owner draws it only through `richTooltipDom` from `@acorn/plugin-api/ui/editor`, which
-sanitizes Markdown and writes the "From <plugin>" credit. `editor:line` is the one point that accepts
-detail ([line annotations](../editor/line-annotations.md)).
+untrusted: the owner draws it only through `richTooltipDom`, which sanitizes Markdown and writes the
+"From <plugin>" credit. An editor gets it from `@acorn/plugin-api/ui/editor`. Any other owner draws
+`InlineAnnotationMarks` from `@acorn/plugin-api/ui/host`, which calls it. Two points accept detail:
+`editor:line` ([line annotations](../editor/line-annotations.md)) and
+[`agents:session`](#session-annotations).
 
 A compiled plugin contributes marks with a `marks(keys, signal)` function instead of a route:
 
@@ -131,6 +133,35 @@ legend ([rail controls and status markers](../ui-design/shell-hierarchy.md#rail-
 Editor's `editor:file` point works the same way for tree rows and document tabs, keyed
 `{ taskId, path }` ([file annotations](../editor/file-annotations.md)). Its `editor:line` point marks
 the cursor line, keyed `{ taskId, path, line, revision }` ([line annotations](../editor/line-annotations.md)).
+
+### Session annotations
+
+`agents:session` is the agents plugin's point for marks on a managed session, such as a health
+plugin's "Struggling". Its key is `{ "session": "<session-id>" }`, because a session ID is unique on
+its Node. A contributor that needs the task finds it from its own reads. The point draws two marks
+per session, accepts 256 from one contributor per request, and keeps `detail`.
+
+Agents draws marks with `InlineAnnotationMarks` in three places:
+
+- **Agent Center rows.** A severity dot and the text after the session's title. A fleet row from
+  another Node draws none, because annotation requests go to the active Node.
+- **The task's session list.** Dots only, because the list is narrow.
+- **The Agent pane's header.** The dot and the text beside the session title.
+
+An item's marks are one button, so a row gains one tab stop however many plugins marked it. Its
+accessible name lists every mark with its plugin, including any past the two drawn. Hover or focus
+opens the detail: each mark's text, its sanitized detail, and the "From <plugin>" credit. With no
+contributor, the three surfaces draw as before.
+
+The annotation host keeps one set of keys per contributor, so each screen asks once. Agent Center
+asks for its rows on the active Node, and the Agent pane asks for every session of its task, for the
+list and the header together. Keys are sorted, so a list that only reorders asks nothing new. A
+contributor refreshes its marks through descriptor invalidation or its live channel, like any
+annotation contributor ([freshness](./freshness.md)).
+
+The trust prompt words a contributor's grant as "Mark agent sessions in Agent Center and the Agent
+pane". The terminal draws the dot and the text, with no detail
+([what a plugin loses in the terminal](../tui/plugin-losses.md#contextual-points)).
 
 ### Source and pane annotations
 

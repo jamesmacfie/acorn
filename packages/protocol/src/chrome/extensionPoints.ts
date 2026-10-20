@@ -434,6 +434,15 @@ export type AgentRequestCardProps = {
   title: string
 }
 
+/**
+ * Marks on a managed session, drawn on Agent Center rows, the task's session list, and the Agent
+ * pane's header. Keyed by session id alone, because a session id is unique on its Node. The point
+ * keeps `detail`, so a mark such as "Struggling" can list its reasons where the person looks.
+ */
+export const AGENT_SESSION_POINT = 'agents:session'
+
+export const AGENT_SESSION_KEY = ['session'] as const
+
 /** A compact contribution immediately after the managed session title. Agents projects its private
  *  ledger into these bounded, JSON-safe facts; contributors decide what those facts mean and draw.
  *  This is intentionally not a cost contract: a token counter, budget warning or provider badge can
