@@ -159,7 +159,9 @@ connection until it is paired again.
 - In Firefox 151, the first native host the extension starts after Firefox starts can get no process
   and no close. The 10-second deadline above ends that port. The selection restore retries once on a
   fresh port, and **Retry** opens one, and either answers at once.
-- The sidebar draws no tool details or subagent streams. It draws the screenshots a turn sent and names any other attachment.
+- The sidebar draws no tool details or subagent streams. It draws panel and app calls as lines that
+  name what the agent made, and links to the desktop for the panel or app itself. It draws the
+  screenshots a turn sent and names any other attachment.
 - Drafts are never expired.
 
 ## Why

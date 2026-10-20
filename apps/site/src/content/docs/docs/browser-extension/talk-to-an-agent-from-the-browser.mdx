@@ -10,7 +10,7 @@ sources:
   - apps/extension/src/sidebar/Composer.tsx
   - apps/extension/src/sidebar/Conversation.tsx
   - apps/extension/src/sidebar/Requests.tsx
-checked: '41fbecc66'
+checked: '6281eefb0'
 ---
 
 import Keys from '../../../../components/Keys.astro'
@@ -48,6 +48,10 @@ further back.
 
 Three or more tool calls in a row fold into one line, such as "4 tool calls". Click it to see them. A
 call that failed stays in view under the line, which counts it in red.
+
+A dashboard panel or an app the agent made gets a line of its own, which never folds: the panel's
+title and what it shows, or the app's name, version, and what changed. **Open in Acorn** shows it
+drawn in the desktop app. A panel or app that didn't pass its checks says so in amber.
 
 While the agent works, a line above the message box says **Working**, with **Stop** to end its turn.
 While it waits on you, the line says **Waiting for you**.
@@ -88,7 +92,8 @@ never guesses an answer.
 
 ## Limits
 
-- The panel shows messages, tool calls by title, and errors. It doesn't show a tool's details or
-  subagents' work. Open the conversation in the desktop app for those.
+- The panel shows messages, tool calls by title, and errors. It names a panel or app the agent made,
+  but doesn't draw it. It doesn't show a tool's details or subagents' work. Open the conversation in
+  the desktop app for those.
 - It shows the attachments a message sent as chips, each screenshot with its picture.
 - Drafts stay in the browser until sent or cleared. They don't expire.

@@ -30,6 +30,25 @@ fold. `conversationItems` in `conversationWindow.ts` does the grouping, as a `to
 first line, so a run that grows while it streams stays the same fold. Two lines never fold. The panel
 remembers which folds are open, by session and run, until it closes, and never stores it.
 
+### Panel and app lines
+
+A call to `panel_show` or `app_show` reads as what the agent made, in the words of the desktop's
+card, from the record's `card` ([panel and app calls](./native-messaging.md#panel-and-app-calls)):
+
+- A panel reads as its title, then the run's description, such as "Pull requests by author, last 30
+  days." **Open in Acorn** opens the conversation in the desktop, where the card draws in full.
+- An app reads as its name and revision, such as "Migration checklist · v3", then the revision's
+  note. **Open in Acorn** opens the task's Apps pane on that app.
+- While the call checks, the line reads "Checking the plan for Commits by day…" or "Checking the
+  app…".
+- A call that failed its checks reads "Commits by day didn't pass its checks, so nothing was drawn.",
+  or "This app didn't…", as the kit's `Alert` in the warning tone.
+
+`conversationItems` gives such a call a `card` item, which ends a run of tool lines, so a card never
+folds into "N tool calls". A call with nothing to name, such as an opener whose input didn't parse,
+reads as the tool line it would have been. A call that failed its checks always gets its card line.
+`CardLineItem` in `Conversation.tsx` draws it.
+
 A request the agent waits on follows the transcript as the desktop's request card
 ([answering the agent](./conversations.md#answering-the-agent)).
 

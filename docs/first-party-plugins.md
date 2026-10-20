@@ -103,6 +103,8 @@ import missing from its list and on a listed import that's gone. Add the reason 
   (`browser/agents.ts` and `browser/bridge.ts`) relays managed sessions, and also reads `appApproval`,
   `lifecycle`, `sessionModel`, and `newSessionChoices`. `browser/workflows.ts` reads a run's agent
   sessions from `wire.ts`.
+- **CLI and trellis.** The native bridge (`browser/agents.ts`) reads an `app_show` call with
+  `appShowCall`, so the sidebar names an agent's app as the desktop's app card does.
 - **CLI and workflows.** The built-in `workflow` commands read the run, step, and definition shapes from
   `wire.ts`. The native bridge (`browser/bridge.ts` and `browser/workflows.ts`) relays the same shapes.
 - **Desktop and terminal.** `TaskView.tsx` opens a terminal profile through `sessionsClient`, the create

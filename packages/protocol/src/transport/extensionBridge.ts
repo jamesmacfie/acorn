@@ -376,19 +376,28 @@ export type BridgeAgentSession = {
   updatedAt: number
 }
 
-// What the sidebar draws of one agent event: the session's own messages, its tool calls, and its
-// errors. The host keeps the agents plugin's record identity and drops everything else, including a
-// tool's input and output, which a summary never shows and which can be megabytes.
 // An attachment a turn sent: a screenshot is an `image`, anything else a plain attachment.
 export type BridgeAttachmentRef = { id: string; image: boolean; name: string | null }
 
+// What a `panel_show` or `app_show` call drew, named for the sidebar's line. Each field is absent when
+// this record doesn't say it, because a call's input and its result can arrive in different records;
+// the sidebar merges a call's fields by tool ID, as it merges `title` and `status`. `failed` marks a
+// call that didn't pass its checks, so nothing was drawn.
+export type BridgeToolCard =
+  | { kind: 'panel'; title?: string; description?: string[]; failed?: true }
+  | { kind: 'app'; appId?: string; name?: string; revision?: number; note?: string; failed?: true }
+
+// What the sidebar draws of one agent event: the session's own messages, its tool calls, and its
+// errors. The host keeps the agents plugin's record identity and drops everything else, including a
+// tool's input and output, which a summary never shows and which can be megabytes. The one exception
+// is a panel or app call's `card`: a few short, capped fields read from them.
 export type BridgeConversationEvent =
   // `attachments` lists what the person's turn sent. When it's present, the text no longer carries the
   // `[Attachment: <id>]` lines that name them for the agent. `workflow` marks a workflow step's prompt.
   | { type: 'user_message'; text: string; attachments?: BridgeAttachmentRef[]; workflow?: true }
   | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean }
   // `title` and `status` absent mean unchanged, as on the agents plugin's tool call.
-  | { type: 'tool'; toolId: string; title?: string; status?: string }
+  | { type: 'tool'; toolId: string; title?: string; status?: string; card?: BridgeToolCard }
   | { type: 'error'; message: string }
 
 export type BridgeConversationRecord = {

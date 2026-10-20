@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { conversationLink, itemTaskLink, outsideItemLink, projectLink } from './acornLinks'
+import { appLink, conversationLink, itemTaskLink, outsideItemLink, projectLink } from './acornLinks'
 
 describe('Acorn links', () => {
   it("opens a handed-off item's task on the pane that shows it", () => {
@@ -15,6 +15,10 @@ describe('Acorn links', () => {
 
   it('opens a conversation on the agents pane', () => {
     expect(conversationLink('n1', 't1', 's1')).toBe('acorn://n1/t/t1?pane=agents&item=s1')
+  })
+
+  it("opens an agent's app on the Apps pane", () => {
+    expect(appLink('n1', 't1', 'app-0123456789ab')).toBe('acorn://n1/t/t1?pane=apps&item=app-0123456789ab')
   })
 
   it('opens an outside item by its address, and gives no link for one that cannot be', () => {

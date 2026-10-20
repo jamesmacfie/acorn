@@ -52,6 +52,25 @@ sends: at most one `text` part of 60,000 characters, eight `context` parts, and 
 that doesn't match the schema gets a `bad_request` reply when it has a usable `id`, and nothing
 otherwise. Add an operation together with the phase that first calls it.
 
+## Panel and app calls
+
+A `session.read` tool record carries `card` when the call's MCP name is `panel_show` or `app_show`,
+so the sidebar can name what the agent made ([the conversation view](./transcript.md#panel-and-app-lines)).
+It's `{ kind: 'panel', title, description, failed }` or `{ kind: 'app', appId, name, revision, note,
+failed }`, and each field is present only when that record says it. A call's input and its result can
+arrive in different records, and the sidebar merges a call's fields by tool ID, as it merges `title`
+and `status`.
+
+`toolCard` in `apps/cli/src/browser/agents.ts` reads a panel's title, and an app's ID and note,
+from the call's input. It reads a panel's description, and an app's name and revision, from its
+result. It uses the readers the desktop's cards use: `readPanelShowCall` in `@acorn/protocol`, and
+`readAppShowCall` in the trellis plugin's contract. `failed` marks a call that finished without a
+result, which is how a harness records a refused call. Nothing else from a call's input or output
+crosses the bridge.
+
+An older sidebar ignores `card`. A newer sidebar with an older host gets none, and draws the plain
+tool line.
+
 ## Limits
 
 The host enforces these limits:
@@ -62,6 +81,8 @@ The host enforces these limits:
   never split.
 - A malformed JSON frame is logged to stderr and skipped.
 - Bytes of an unfinished frame at end of input are discarded and logged.
+- A panel or app call's `card` carries a title, name, or note of at most 200 characters, and a
+  description of at most eight lines of 300 characters each.
 - Both browsers refuse a host message over 1 MiB, so a reply longer than 262,144 UTF-16 units goes out
   as chunk frames, `{ v, id, chunk: { index, count, data } }`.
 

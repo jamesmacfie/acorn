@@ -1,21 +1,41 @@
-import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from 'solid-js'
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createMemo,
+  createSignal,
+  on,
+  onCleanup,
+  onMount,
+  type JSX,
+} from 'solid-js'
 import { render } from 'solid-js/web'
 import type { BridgeAgentHint, BridgeAgentSession, BridgeAttachmentRef } from '@acorn/protocol/extensionBridge.ts'
 import { Text } from '@acorn/client-core/kit/components/content'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import CopyButton from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 import { Fold, Inline, Stack } from '@acorn/client-core/kit/components/layout'
-import { Button, Card, Chip } from '@acorn/client-core/kit/components/primitives.tsx'
+import { Alert, Button, Card, Chip } from '@acorn/client-core/kit/components/primitives.tsx'
 import { renderMarkdown } from '@acorn/client-core/kit/lib/markdown'
 import { runtimeIcon, runtimeTone } from '@acorn/plugin-agents/contract/runtimeState.ts'
+import { appLink, conversationLink } from '../acornLinks'
 import type { BrowserApi } from '../browser'
 import { CallFailure } from '../messages'
 import { attachmentPreviews } from './attachmentPreviews'
 import type { BridgeClient } from './bridgeClient'
 import { Composer } from './Composer'
-import { conversationItems, conversationReader, type ConversationWindow, type ToolLine } from './conversationWindow'
+import {
+  conversationItems,
+  conversationReader,
+  type CardLine,
+  type ConversationWindow,
+  type ToolLine,
+} from './conversationWindow'
 import { errorGuidance } from './guidance'
 import type { DraftTarget } from '../localState'
+import { OpenInAcorn } from './OpenInAcorn'
 import { Requests } from './Requests'
 import { agentName, toolMark } from './state'
 
@@ -55,6 +75,8 @@ export function Conversation(props: {
   // The person just started it, so the message box takes the cursor.
   focused?: boolean
   online: boolean
+  // Whether this build runs beside a desktop that opens `acorn://` links.
+  opensLinks: boolean
   hint: BridgeAgentHint | null
   reconnects: number
   // Which of its tool runs are open, by key, and the toggle. The panel keeps these while it's open.
@@ -157,6 +179,8 @@ export function Conversation(props: {
               <For each={items()}>
                 {(item) => {
                   if (item.kind === 'tool') return <ToolLineItem line={item} />
+                  if (item.kind === 'card')
+                    return <CardLineItem line={item} target={target} opensLinks={props.opensLinks} />
                   if (item.kind === 'tools')
                     return (
                       <li>
@@ -307,6 +331,63 @@ function ToolLineItem(props: { line: ToolLine }) {
           {(shown) => <Text tone={shown() === 'failed' ? 'danger' : 'muted'}> · {shown()}</Text>}
         </Show>
       </span>
+    </li>
+  )
+}
+
+// A panel or app the agent made, in the desktop card's words, with a link to where it draws in full:
+// the conversation for a panel, and the task's Apps pane for an app.
+function CardLineItem(props: { line: CardLine; target: DraftTarget; opensLinks: boolean }) {
+  const { nodeId, taskId, sessionId } = props.target
+  const checking = () => props.line.status === 'pending' || props.line.status === 'running'
+  const words = () => {
+    const card = props.line.card
+    if (card.kind === 'panel')
+      return {
+        failed: `${card.title ?? 'This panel'} didn't pass its checks, so nothing was drawn.`,
+        checking: `Checking the plan for ${card.title ?? 'a panel'}…`,
+        name: card.title ?? 'Panel',
+        detail: card.description?.join(' '),
+        href: conversationLink(nodeId, taskId, sessionId),
+      }
+    return {
+      failed: "This app didn't pass its checks, so nothing was drawn.",
+      checking: 'Checking the app…',
+      name: card.revision ? `${card.name ?? 'App'} · v${card.revision}` : (card.name ?? 'App'),
+      detail: card.note,
+      href: card.appId ? appLink(nodeId, taskId, card.appId) : null,
+    }
+  }
+  return (
+    <li>
+      <Switch
+        fallback={
+          <Stack gap="row">
+            <Text emphasis="strong" wrap>
+              {words().name}
+            </Text>
+            <Show when={words().detail}>
+              {(detail) => (
+                <Text tone="muted" wrap>
+                  {detail()}
+                </Text>
+              )}
+            </Show>
+            <Inline>
+              <OpenInAcorn href={words().href} opensLinks={props.opensLinks} />
+            </Inline>
+          </Stack>
+        }
+      >
+        <Match when={props.line.card.failed}>
+          <Alert tone="warn">{words().failed}</Alert>
+        </Match>
+        <Match when={checking()}>
+          <Text tone="muted" wrap>
+            {words().checking}
+          </Text>
+        </Match>
+      </Switch>
     </li>
   )
 }

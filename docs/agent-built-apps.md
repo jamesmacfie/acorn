@@ -106,6 +106,12 @@ A card caps at 480 pixels with **Expand**. Its plans first run when it comes int
 pause while it's off screen. `$placement` is `card`. A card in an archived task's transcript draws one
 line and not the app, because the task's data may not resolve.
 
+The browser extension's sidebar doesn't draw the app. It draws one line, such as "Migration checklist
+· v3" and the revision's note, with **Open in Acorn**, which opens the task's Apps pane on the app
+([the conversation view](./browser-extension/transcript.md#panel-and-app-lines)). The card's schemas
+and its transcript reader, `readAppShowCall`, are in `plugins/trellis/src/contract/appShowCall.ts`, so
+the extension's native host reads a call the same way.
+
 ## The Apps pane
 
 The task's **Apps** pane is `plugins/trellis/src/client/paneContribution.ts`, a `list-detail` pane

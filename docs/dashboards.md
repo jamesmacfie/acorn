@@ -112,8 +112,8 @@ of the task's workspace. Choosing one publishes the plan as a new panel and plac
 **Edit in studio** creates a new draft from the plan and opens the studio on it. Changes there don't
 flow back to the card. An agent never publishes or places a panel itself.
 
-The terminal client draws no dashboard views, so there a card is one line: the plan's description
-from the `panel_show` result, and a note that the panel draws in the desktop app.
+The terminal client and the [browser extension](./browser-extension/transcript.md#panel-and-app-lines)
+draw no dashboard views. A card there is one line saying what the panel shows, pointing to the desktop.
 
 ## Datasets and history
 

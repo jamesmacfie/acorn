@@ -132,6 +132,69 @@ function reader(last: number, startAt = last) {
   return { state, subject, views, seqs }
 }
 
+describe('panel and app lines', () => {
+  const tool = (seq: number, extra: Partial<Extract<BridgeConversationRecord['event'], { type: 'tool' }>> = {}) =>
+    record(seq, { type: 'tool', toolId: `t${seq}`, title: `Step ${seq}`, status: 'completed', ...extra })
+  const panel = (seq: number) =>
+    tool(seq, { title: 'panel_show', card: { kind: 'panel', title: 'Commits by day', description: ['This week.'] } })
+
+  it("merges a call's card across its records, as its title and status merge", () => {
+    expect(
+      conversationItems([
+        record(1, {
+          type: 'tool',
+          toolId: 'a',
+          title: 'app_show',
+          status: 'running',
+          card: { kind: 'app', appId: 'app-0123456789ab', note: 'Added due dates' },
+        }),
+        record(2, {
+          type: 'tool',
+          toolId: 'a',
+          status: 'completed',
+          card: { kind: 'app', name: 'Checklist', revision: 3 },
+        }),
+      ]),
+    ).toEqual([
+      {
+        key: 'e1',
+        kind: 'card',
+        card: { kind: 'app', appId: 'app-0123456789ab', note: 'Added due dates', name: 'Checklist', revision: 3 },
+        status: 'completed',
+      },
+    ])
+  })
+
+  it('splits a run of tool lines, so a card never folds', () => {
+    const kinds = (items: ReturnType<typeof conversationItems>) =>
+      items.map((item) => (item.kind === 'tools' ? `tools ${item.lines.length}` : item.kind))
+    // Four tool lines would fold. Split by a card, each side is two, and neither folds.
+    expect(kinds(conversationItems([tool(1), tool(2), panel(3), tool(4), tool(5)]))).toEqual([
+      'tool',
+      'tool',
+      'card',
+      'tool',
+      'tool',
+    ])
+    expect(kinds(conversationItems([tool(1), tool(2), tool(3), panel(4), tool(5), tool(6), tool(7)]))).toEqual([
+      'tools 3',
+      'card',
+      'tools 3',
+    ])
+  })
+
+  it('reads a card with nothing to name as a tool line, unless it failed its checks', () => {
+    const items = conversationItems([
+      tool(1, { title: 'panel_show', status: 'running', card: { kind: 'panel' } }),
+      tool(2, { title: 'app_show', card: { kind: 'app', failed: true } }),
+    ])
+    expect(items).toEqual([
+      { key: 'e1', kind: 'tool', title: 'panel_show', status: 'running' },
+      { key: 'e2', kind: 'card', card: { kind: 'app', failed: true }, status: 'completed' },
+    ])
+  })
+})
+
 describe('conversation reader', () => {
   it('opens on the last page and reads earlier pages on request', async () => {
     const last = CONVERSATION_PAGE * 2 + 50

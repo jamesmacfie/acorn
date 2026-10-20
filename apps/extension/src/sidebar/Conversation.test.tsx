@@ -471,6 +471,75 @@ describe('conversation', () => {
     })
   })
 
+  describe('panel and app lines', () => {
+    const call = (
+      subject: ReturnType<typeof mount>,
+      seq: number,
+      event: Partial<Extract<BridgeConversationRecord['event'], { type: 'tool' }>>,
+    ) => {
+      subject.state.events.get('s1')!.push({
+        id: `s1-t${seq}`,
+        seq,
+        turnId: 'turn',
+        createdAt: seq,
+        event: { type: 'tool', toolId: `tool-${seq}`, title: `Step ${seq}`, status: 'completed', ...event },
+      })
+      subject.state.sessions[0]!.lastEventSeq = seq
+    }
+
+    it('names a panel and links to the conversation, where it draws', async () => {
+      const subject = mount()
+      call(subject, 1, {
+        title: 'mcp__acorn__panel_show',
+        card: { kind: 'panel', title: 'Commits by day', description: ['Your commits this week,', 'by day.'] },
+      })
+      await openSession(subject)
+      expect(transcript(subject.root)).toEqual(['Commits by dayYour commits this week, by day.Copy Acorn link'])
+      expect(button(subject.root, 'Copy Acorn link')!.getAttribute('data-tip')).toBe(
+        'acorn://n1/t/t1?pane=agents&item=s1',
+      )
+    })
+
+    it('names an app at its revision and links to it on the Apps pane', async () => {
+      const subject = mount()
+      call(subject, 1, {
+        title: 'app_show',
+        card: { kind: 'app', appId: 'app-0123456789ab', note: 'Added due dates', name: 'Checklist', revision: 3 },
+      })
+      await openSession(subject)
+      expect(transcript(subject.root)).toEqual(['Checklist · v3Added due datesCopy Acorn link'])
+      expect(button(subject.root, 'Copy Acorn link')!.getAttribute('data-tip')).toBe(
+        'acorn://n1/t/t1?pane=apps&item=app-0123456789ab',
+      )
+    })
+
+    it('says while a call checks, and warns when it failed its checks', async () => {
+      const subject = mount()
+      call(subject, 1, { status: 'running', card: { kind: 'panel', title: 'Commits by day' } })
+      call(subject, 2, { status: 'running', card: { kind: 'app', appId: 'app-0123456789ab', note: 'First' } })
+      call(subject, 3, { card: { kind: 'panel', title: 'Commits by day', failed: true } })
+      call(subject, 4, { card: { kind: 'app', failed: true } })
+      await openSession(subject)
+      expect(transcript(subject.root)).toEqual([
+        'Checking the plan for Commits by day…',
+        'Checking the app…',
+        "Commits by day didn't pass its checks, so nothing was drawn.",
+        "This app didn't pass its checks, so nothing was drawn.",
+      ])
+      const warnings = [...subject.root.querySelectorAll('.transcript .ui-alert')]
+      expect(warnings.map((alert) => alert.getAttribute('data-tone'))).toEqual(['warn', 'warn'])
+    })
+
+    it('folds the tool lines on each side of a card as two runs, and never the card', async () => {
+      const subject = mount()
+      for (const seq of [1, 2, 3]) call(subject, seq, {})
+      call(subject, 4, { card: { kind: 'panel', title: 'Commits by day' } })
+      for (const seq of [5, 6, 7]) call(subject, seq, {})
+      await openSession(subject)
+      expect(transcript(subject.root)).toEqual(['3 tool calls', 'Commits by dayCopy Acorn link', '3 tool calls'])
+    })
+  })
+
   describe('the state line', () => {
     const activity = (root: HTMLElement) => root.querySelector('.composer .activity')?.textContent ?? null
 

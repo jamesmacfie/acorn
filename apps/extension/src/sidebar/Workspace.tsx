@@ -772,6 +772,7 @@ export function Workspace(props: {
                 session={session()!}
                 focused={startedSession() === sessionId}
                 online={props.online}
+                opensLinks={props.opensLinks}
                 hint={props.hint}
                 reconnects={props.reconnects}
                 folds={toolFolds()}
@@ -787,6 +788,7 @@ export function Workspace(props: {
                 target={{ nodeId, taskId: open.step.session!.taskId, sessionId: open.step.session!.id }}
                 session={open.step.session!}
                 online={props.online}
+                opensLinks={props.opensLinks}
                 hint={props.hint}
                 reconnects={props.reconnects}
                 folds={toolFolds()}
