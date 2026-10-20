@@ -169,6 +169,7 @@
       "github.pull-request",
       "github.repository",
       "gitlab.merge-request",
+      "memory.entry",
       "workflows.run"
     ],
     "brandMarks": [
