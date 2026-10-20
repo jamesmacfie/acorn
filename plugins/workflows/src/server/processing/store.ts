@@ -8,7 +8,7 @@ import type { WorkflowDef } from '../../shared/workflowContracts'
 import { stepIdentity } from '../../shared/workflowIdentity'
 import type { WorkflowDispatcher, WorkflowDispatchRequest, WorkflowTransaction } from '../dispatch/dispatcher'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
-import { processingDecision, processingFields, processingProjection } from './rules'
+import { recordChangeDecision, recordChangeFields, recordProjection } from '@acorn/protocol/recordChanges.ts'
 import { processingAttemptActive } from './readModel'
 import { resolveWorkflowReprocess } from './reprocess'
 
@@ -173,7 +173,7 @@ export class WorkflowProcessingStore {
   }
 
   private reserveSelection(tx: WorkflowTransaction, request: WorkflowSelectionRequest, retainedScopeKey?: string) {
-    const fields = processingFields(request.policy)
+    const fields = recordChangeFields(request.policy)
     const fingerprint = workflowContentFingerprint(request)
     if (new Set(request.records.map((record) => record.key)).size !== request.records.length)
       throw new Error('Selection has duplicate record identities')
@@ -256,14 +256,14 @@ export class WorkflowProcessingStore {
       if (active && request.checkpoint && state) {
         const comparedFields = fields.length ? fields : ['']
         if (
-          processingProjection(record.snapshot, comparedFields) !==
-          processingProjection(JSON.parse(state.snapshotJson), comparedFields)
+          recordProjection(record.snapshot, comparedFields) !==
+          recordProjection(JSON.parse(state.snapshotJson), comparedFields)
         )
           throw new Error('An active record has undispatched changes. Retry the check after it settles.')
       }
       if (record.previousAttemptId && record.previousAttemptId !== state?.attemptId)
         throw new Error('Reprocess must reference the latest attempt in this scope')
-      const decision = processingDecision({
+      const decision = recordChangeDecision({
         policy: request.policy,
         snapshot: record.snapshot,
         active,
@@ -294,7 +294,7 @@ export class WorkflowProcessingStore {
         tx.update(schema.workflowRecordStates)
           .set({
             fieldsJson: JSON.stringify(fields),
-            projection: processingProjection(JSON.parse(state.snapshotJson), fields),
+            projection: recordProjection(JSON.parse(state.snapshotJson), fields),
           })
           .where(eq(schema.workflowRecordStates.id, state.id))
           .run()
@@ -305,7 +305,7 @@ export class WorkflowProcessingStore {
           recordKey: record.key,
           snapshotJson: JSON.stringify(record.snapshot),
           fieldsJson: JSON.stringify(fields),
-          projection: processingProjection(record.snapshot, fields),
+          projection: recordProjection(record.snapshot, fields),
           attemptId: state?.attemptId ?? null,
           updatedAt: at,
         }

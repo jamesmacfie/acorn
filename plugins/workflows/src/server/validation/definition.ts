@@ -491,13 +491,16 @@ export function renderWith(
 
 /** The values a run starts with: the declared default unless the caller supplied one. Refuses a
  *  missing required input and a name the definition does not declare, so a bad start is a refusal
- *  rather than a prompt with a hole in it. */
+ *  rather than a prompt with a hole in it. A `deferred` input is filled later, by each record a
+ *  trigger starts a run for, so its absence isn't refused yet. */
 export function resolveWorkflowInputs(
   def: WorkflowDef,
   supplied: Record<string, DataValue> | undefined,
+  deferred: readonly string[] = [],
 ): Record<string, DataValue> {
   const declared = def.inputs ?? []
   const problems: string[] = []
+  const needed = (input: { name: string; required?: boolean }) => input.required && !deferred.includes(input.name)
   for (const name of Object.keys(supplied ?? {})) {
     if (!declared.some((input) => input.name === name)) problems.push(`workflow '${def.name}' has no input '${name}'`)
   }
@@ -506,7 +509,7 @@ export function resolveWorkflowInputs(
     const value = supplied && Object.hasOwn(supplied, input.name) ? supplied[input.name] : input.default
     if (input.schema) {
       if (value === undefined) {
-        if (input.required) problems.push(`workflow '${def.name}' needs a value for input '${input.name}'`)
+        if (needed(input)) problems.push(`workflow '${def.name}' needs a value for input '${input.name}'`)
       } else {
         try {
           resolved[input.name] = validateDataValue(value, input.schema, WORKFLOW_VALUE_BYTES)
@@ -515,7 +518,7 @@ export function resolveWorkflowInputs(
         }
       }
     } else if (value == null || (input.required && typeof value === 'string' && !value.trim())) {
-      if (input.required) problems.push(`workflow '${def.name}' needs a value for input '${input.name}'`)
+      if (needed(input)) problems.push(`workflow '${def.name}' needs a value for input '${input.name}'`)
       resolved[input.name] = value ?? ''
     } else resolved[input.name] = value
   }

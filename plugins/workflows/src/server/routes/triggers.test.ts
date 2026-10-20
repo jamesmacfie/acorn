@@ -29,6 +29,7 @@ const bridge = (overrides: Partial<WorkflowTriggersBridge> = {}): WorkflowTrigge
   get: async (id) => ({ id }),
   defaults: async () => ({ timezone: 'UTC' }),
   prepare: async (input) => input,
+  preview: async (input) => input,
   save: async (input) => input,
   approve: async (id, firstCheck, freshEpoch) => ({ id, firstCheck, freshEpoch }),
   pause: async (id, paused) => ({ id, paused }),

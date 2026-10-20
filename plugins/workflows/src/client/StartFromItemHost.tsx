@@ -17,7 +17,7 @@ import { PromoteToTaskModal } from '@acorn/plugin-api/ui/host'
 import { Field, Input, Select } from '@acorn/plugin-api/ui'
 import { workflowApi } from './workflowsClient'
 import { startWorkflow } from './startWorkflow'
-import { closeStartFromItem, prefillFromRecord, startFromItemTarget } from './startFromItem'
+import { closeStartFromItem, startFromItemTarget } from './startFromItem'
 import { collectItemWorkflowInputs, itemWorkflowInputsReady, prefillFromItem } from '../contract/itemInputs.ts'
 
 // "Start workflow…" on an integration's row, drawn (docs/workflows/starting-runs.md § Starting a run).
@@ -69,14 +69,14 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
     )
   })
 
-  const prefill = createMemo(() => ({
-    ...prefillFromItem({
+  const prefill = createMemo(() =>
+    prefillFromItem({
       title: props.target.title,
       ...(props.target.body ? { body: props.target.body } : {}),
       ...(props.target.link ? { link: props.target.link } : {}),
+      ...(props.target.record ? { record: props.target.record } : {}),
     }),
-    ...(props.target.record ? prefillFromRecord(props.target.record) : {}),
-  }))
+  )
 
   const seeded = createMemo(() => ({
     ...Object.fromEntries(

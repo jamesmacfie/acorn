@@ -7,7 +7,7 @@ import type {
 import { parseDataSchema } from '@acorn/protocol/dataSchemas.ts'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
 import { stepIdentity } from '../../shared/workflowIdentity'
-import { processingFields } from '../processing/rules'
+import { recordChangeFields } from '@acorn/protocol/recordChanges.ts'
 
 export const RUNTIME_WORKFLOW_KINDS = new Set(['workflow', 'workflow-map'])
 
@@ -206,7 +206,7 @@ export function workflowDispatchProblems(args: {
   if (kind === 'workflow-map') {
     if (step.repeat) {
       try {
-        processingFields(step.repeat)
+        recordChangeFields(step.repeat)
       } catch (error) {
         errors.push(`${label}: ${error instanceof Error ? error.message : 'Invalid repeat policy'}`)
       }

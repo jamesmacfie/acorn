@@ -11,7 +11,7 @@ import { readDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
 import { MISSING, parseDataValue } from '@acorn/protocol/dataValues.ts'
 import { workflowText, WORKFLOW_VALUE_BYTES } from './values'
-import { workflowRecordIdentity } from '../processing/rules'
+import { recordIdentity } from '@acorn/protocol/recordChanges.ts'
 
 const TITLE_LIMIT = 500
 const BOUND_TEMPLATE_RE = /\$\{([A-Za-z][A-Za-z0-9_]*)\}/g
@@ -161,7 +161,7 @@ export function resolveWorkflowMapRoster(
 
   const keys = new Set<string>()
   const entries = items.map((item, index): WorkflowMapRosterEntry => {
-    const sourceIdentity = workflowRecordIdentity(item)
+    const sourceIdentity = recordIdentity(item)
     if (!sourceIdentity && def.itemKey === undefined) throw new Error('Select a stable item key for an ordinary array')
     const rawKey = sourceIdentity ?? readWorkflowJsonPointer(item, def.itemKey!)
     if (!((typeof rawKey === 'string' && rawKey.trim()) || (typeof rawKey === 'number' && Number.isFinite(rawKey)))) {

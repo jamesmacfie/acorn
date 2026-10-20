@@ -4,6 +4,7 @@ import {
   type InternalEnvFactory,
   type NodePlugin,
 } from '@acorn/plugin-api/node'
+import type { DataSourceChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import { activateWorkflowAgentTools } from '../server/agentTools/activation'
 import { readWorkflowCheckoutActivity } from '../server/runs/checkoutActivity'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
@@ -97,6 +98,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       const starts = workflowStartService(store, runner, ctx, deps.reconciled)
       triggers = workflowTriggerService(store, starts, ctx, deps.reconciled, deps.scheduler)
       ctx.schedules.registerTarget(workflowTriggerTarget(triggers))
+      // A source saying its records changed wakes the record triggers that read it (docs/data-sources/changes.md).
+      const heard = triggers
+      ctx.events.on('data-source:changed', (frame) => heard.heard(frame as unknown as DataSourceChangedEvent))
       routeCapability = ctx.capabilities.provide(
         WORKFLOW_ROUTE,
         workflowControl(store, core, runner, dispatcher, starts, deps.reconciled),

@@ -2,7 +2,8 @@
 
 A trigger starts a published database workflow with nobody present. This page covers what a trigger
 stores, what approval freezes, how occurrences avoid overlap, and how a trigger asks the owner for
-review. Today a trigger's **When** has one kind, **On a schedule**, which the core scheduler times.
+review. A trigger's **When** is **On a schedule** or **When records change**, and the core scheduler
+times both.
 
 ## The trigger
 
@@ -23,7 +24,9 @@ The plugin's code splits by job, under `plugins/workflows/src/server/triggers/`:
 | `approval.ts` | Resolves the published workflow, freezes what the owner approved, lists changes since then, and moves a trigger to **Needs review** |
 | `occurrences.ts` | Reserves, resumes, settles, and reconciles occurrences |
 | `clock.ts` | The clock kind: loop settings, the **Track from now** baseline, and one active occurrence per trigger |
-| `service.ts` | Composes the parts for save, prepare, approve, pause, run now, delete, and views |
+| `records.ts` | The records kind: approval checks, the check, the preview, and match history. Loads on first use |
+| `recordReader.ts` | Reads a record trigger's source in its project scope, as the owner. Loads on first use |
+| `service.ts` | Composes the parts for save, prepare, approve, pause, run now, delete, views, and wakes |
 
 ## Approval and occurrences
 
@@ -34,7 +37,8 @@ the resolved graph. A timer or manual request reserves one occurrence in
 `claimed`, `task-created`, and `run-started` transitions.
 
 Occurrences that share a trigger and an overlap key never run at once. A clock trigger's overlap key is
-the trigger itself, and its `record_key` is empty. The occurrence owns overlap until the root and every
+the trigger itself, and its `record_key` is empty. A record trigger's is the record, so a slow run
+never blocks another record. The occurrence owns overlap until the root and every
 descendant are terminal, so a gated descendant blocks a later timer or **Run now** request. Pausing the
 core schedule prevents timer admission without cancelling the tree. Deleting a trigger tombstones it
 and keeps all task, run, occurrence, and record history.
@@ -66,11 +70,77 @@ source error `invalid-request`. The **Find records** step then fails with the ca
 `checkpoint-expired`, stored in `workflow_runs.error_cause`, and the trigger returns to review for an
 explicit baseline or fresh epoch.
 
+## Record triggers
+
+A record trigger's **When** is `{ "kind": "records", "query", "change" }`. `query` is an inline or saved
+query. `change` is `{ "on": "new" }`, `{ "on": "enters" }`, or `{ "on": "changes", "fields": [...] }`,
+which the dialog calls **Is new**, **Starts matching**, and **Changes**. Pointers address the record
+envelope `{ ref, data, display }`, as a For each loop's do, so a field of the data is `/data/<field>`.
+Optional keys are `incremental`, `bindings` from input name to `{ "address": { "from": "item",
+"pointer" } }`, `runsPerCheck` (10 at most, the default), and `runsPerDay` (50 at most, the default).
+The cadence is a core `every` row, 5 minutes by default and never under a minute.
+
+- **New** starts a run the first time a record matches, in this processing epoch.
+- **Starts matching** starts a run when a record matches now and didn't after the last complete read.
+- **Changes** starts a run when a matching record's watched fields differ from what the ledger kept.
+  A record seen for the first time counts as changed.
+
+The rules are `recordChangeDecision` in `packages/protocol/src/data/recordChanges.ts`, the same ones
+a For each loop uses ([record history](./record-history.md)).
+
+**Approval** describes the source, checks that `changes` names fields it describes, that only **New**
+and **Changes** continue from a checkpoint, and only on a source that declares `incremental`, that
+every binding names a declared input, and that every required input is bound, has a value, or is one
+the item rule fills. It pins a saved query at its current revision in `approved_query_json`, with the
+source it reads, and lists the trigger among that query's consumers. Changing the watched fields of an
+approved trigger needs **Start fresh**, because the ledger keeps projections, not records.
+
+**The check** reads the pinned query at the current time through every page, then decides each
+record. In one transaction it updates `workflow_trigger_records`, keyed by trigger, epoch, and record,
+reserves an occurrence of kind `record` for each admitted record up to the caps, and writes the
+checkpoint only when no admitted record was left over. A record over a cap stays undecided, so the
+next check sees it again. After the commit, each occurrence creates a root task titled
+"Workflow · record title" with origin `workflows:trigger`, then starts its run. The check returns
+"started N workflow runs", or nothing, which the run ring shows. A record whose run is still going
+starts nothing. A check that finds nothing creates nothing.
+
+How the read ends decides what the check may conclude. After a complete read, records not returned
+are marked not matching, which lets **Starts matching** fire again. After a bounded or incomplete read,
+or an incremental one, only returned records are decided, and the trigger shows "Last check read part
+of the results" with the source's reason. A refused connection, an expired checkpoint, or a query that
+changed since its checkpoint moves the trigger to **Needs review**. Any other failure is the
+scheduler's backoff.
+
+**Track from now** needs no baseline run. Approval runs the check in place, writing the ledger and
+starting nothing, and the trigger becomes active when that commits.
+
+**Guards.** A trigger never admits its own work read back as a record: a run in a tree it started,
+through the Workflow runs source, or the task it made for a run, through core's Tasks source. At the
+daily cap the trigger moves to **Needs review** with "Started 50 runs today. Review the trigger before
+it starts more.", after starting what fit in that check. Re-approval starts a new day's count.
+
+**Inputs.** Each record's inputs are the item rule from **Start workflow…**
+([starting runs](./starting-runs.md#starting-a-run)) for the names the workflow declares, then the
+owner's values, then the trigger's bindings. Graph resolution at approval leaves the inputs a record
+fills unchecked, and the check validates each record's values against the workflow's inputs. A record
+that fails gets a blocked occurrence whose reason names the record and the input, and the other
+records go on.
+
+**Hearing changes.** On `data-source:changed`, the service calls `wake(key, { minGapMs: 15_000 })` for
+each active record trigger whose pinned source matches ([say when records changed](../data-sources/changes.md)).
+It reads the trigger rows on each event rather than keeping an index, so there is nothing to rebuild
+when a trigger is approved, paused, or deleted. A paused trigger's wake does nothing.
+
 ## Add a trigger
 
 **Add trigger…** appears only for a published database workflow. It opens one shared-kit dialog on both
-hosts, which reads as "when, then what". **When** comes first, with **On a schedule** as its only
-choice, then the cadence, the timezone, and the next three checks with their timezone offsets. Then
+hosts, which reads as "when, then what". **When** comes first. **On a schedule** shows the cadence,
+the timezone, and the next three checks with their timezone offsets. **When records change** shows
+**Records from**, the shared query editor, then **Start a run when a record**, its watched fields,
+**Check every**, **Read**, **Most runs a check**, and **Preview matches**, which lists up to 20 records
+and says which ones **Process current matches** would start. Each input then reads **From the record**,
+with a field picker, or **Value**. A record trigger's dialog shows its last check and its last 50
+matches, each opening its run. The kind can't change after the first save. Then
 come the project and typed input values, which are trigger setup, not fields on a workflow draft. The
 first review adds effective execution limits and whether the first check processes current matches or
 establishes a baseline from now.

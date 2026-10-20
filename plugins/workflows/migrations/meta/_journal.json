@@ -43,6 +43,13 @@
       "when": 1792523530419,
       "tag": "0005_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792529642404,
+      "tag": "0006_record_triggers",
+      "breakpoints": true
     }
   ]
 }

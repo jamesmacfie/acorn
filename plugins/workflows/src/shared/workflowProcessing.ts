@@ -1,7 +1,8 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
+import type { RecordChangeDecision, RecordChangePolicy } from '@acorn/protocol/recordChanges.ts'
 
-export type WorkflowRepeatPolicy = { mode: 'every-match' | 'unseen' | 'changed'; fields?: string[] }
-export type WorkflowProcessingDecision = 'admitted' | 'baseline' | 'active' | 'seen' | 'unchanged'
+/** A loop's repeat modes. `enters` is a trigger's alone, because it needs a complete read every time. */
+export type WorkflowRepeatPolicy = RecordChangePolicy<'every-match' | 'unseen' | 'changed'>
 export type WorkflowProcessingScope = { scopeId: string; epoch: string }
 export type WorkflowCheckpoint = {
   queryFingerprint: string
@@ -12,7 +13,7 @@ export type WorkflowRecordHistory = {
   id: string
   position: number
   recordKey: string
-  decision: WorkflowProcessingDecision
+  decision: RecordChangeDecision
   title: string
   attemptId: string | null
   taskId: string | null

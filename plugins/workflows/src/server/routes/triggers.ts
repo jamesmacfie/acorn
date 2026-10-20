@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { dataBindingSchema, dataPointerSchema } from '@acorn/protocol/dataBindings.ts'
+import { queryReferenceSchema } from '@acorn/protocol/dataQueries.ts'
 import { DATA_LIMITS, parseDataValue } from '@acorn/protocol/dataValues.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import { requireDevice, respondError, routeCapability, viaBridge, type AppEnv } from '@acorn/plugin-api/node'
@@ -10,6 +12,7 @@ export type WorkflowTriggersBridge = {
   get(id: string): Promise<unknown> | unknown
   defaults(): Promise<unknown> | unknown
   prepare(input: WorkflowTriggerDraftInput): Promise<unknown> | unknown
+  preview(input: WorkflowTriggerDraftInput): Promise<unknown> | unknown
   save(input: WorkflowTriggerDraftInput): Promise<unknown> | unknown
   approve(id: string, firstCheck: WorkflowTriggerFirstCheck, freshEpoch: boolean): Promise<unknown>
   pause(id: string, paused: boolean): Promise<unknown>
@@ -41,7 +44,25 @@ const draftBody = z
     projectId: z.string().min(1),
     workflowId: z.string().min(1),
     inputs: z.record(z.string(), dataValue).optional(),
-    when: z.object({ kind: z.literal('clock'), timezone: z.string().min(1) }).strict(),
+    when: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('clock'), timezone: z.string().min(1) }).strict(),
+      z
+        .object({
+          kind: z.literal('records'),
+          query: queryReferenceSchema,
+          change: z.discriminatedUnion('on', [
+            z.object({ on: z.literal('new') }).strict(),
+            z.object({ on: z.literal('enters') }).strict(),
+            z.object({ on: z.literal('changes'), fields: z.array(dataPointerSchema).max(DATA_LIMITS.fields) }).strict(),
+          ]),
+          incremental: z.boolean().optional(),
+          bindings: z.record(z.string().min(1).max(200), dataBindingSchema).optional(),
+          // Circuit breakers can come down from their defaults, never up.
+          runsPerCheck: z.number().int().min(1).max(10).optional(),
+          runsPerDay: z.number().int().min(1).max(50).optional(),
+        })
+        .strict(),
+    ]),
     cadence: cadenceSchema.optional(),
     loops: z
       .array(
@@ -101,6 +122,11 @@ export const workflowTriggerRoutes = new Hono<AppEnv>()
         'Complete the project, published workflow, when it starts, and typed inputs.',
       ])
     return viaBridge(c, WORKFLOW_TRIGGERS_ROUTE, async (bridge) => bridge.prepare(parsed.data))
+  })
+  .post('/preview', async (c) => {
+    const parsed = draftBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request', ['Choose the records this trigger watches.'])
+    return viaBridge(c, WORKFLOW_TRIGGERS_ROUTE, async (bridge) => bridge.preview(parsed.data))
   })
   .post('/', async (c) => {
     const parsed = saveBody.safeParse(await c.req.json().catch(() => null))

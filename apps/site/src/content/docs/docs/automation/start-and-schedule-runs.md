@@ -1,6 +1,6 @@
 ---
 title: Start and schedule runs
-description: Start a workflow from the editor, the command palette, a pull request or issue, a commit, the command line, or an agent, and run one on a schedule.
+description: Start a workflow from the editor, the command palette, a pull request or issue, a commit, the command line, or an agent, and run one on a schedule or when records change.
 sources:
   - docs/workflows/starting-runs.md
   - docs/workflows/triggers.md
@@ -24,7 +24,8 @@ schedule. Every run, however it starts, shows in its task's **Workflows** pane.
   runs.
 - **From a pull request, issue, or error.** **Start workflow…** in the menu on a GitHub pull request,
   a Linear issue, or a Rollbar error picks a workflow and fills in inputs named `issue`, `item`, or
-  `context` with the item's title and text, and `link` or `url` with its address. Choose **New task**
+  `context` with the item's title and text, and `link` or `url` with its address. A row that carries a
+  typed record also fills `record` with the whole record, and `item` with its fields. Choose **New task**
   or **Attach to task**, then **Create & run** or **Attach & run**.
 - **From a commit.** **Start workflow here** on a commit in the Git pane's history, or **Start workflow
   at … tip** on a branch, makes a task branched from that commit and starts the run on it.
@@ -83,8 +84,30 @@ A triggered workflow runs the version you approved. If something it depends on c
 workflow being published again or a connection being removed, it stops and shows **Needs review**
 rather than running something you didn't approve. **Approve changes** starts it again.
 
-A trigger won't start a run while the last one, or any child workflow it started, is still going or
-waiting at a gate.
+A trigger on a schedule won't start a run while the last one, or any child workflow it started, is
+still going or waiting at a gate.
+
+## Run a workflow when records change
+
+A trigger can also start a run for each record that's new, starts matching, or changes, such as each
+task whose title contains "triage". Each record gets its own task, named after the workflow and the
+record, and a slow run never holds up the next record.
+
+1. Open the workflow, choose **Add trigger…**, and under **When** pick **When records change**.
+2. Under **Records from**, pick a source and add conditions, or pick a saved query.
+3. Under **Start a run when a record**, pick **Is new**, **Starts matching**, or **Changes**. For
+   **Changes**, pick the fields to watch.
+4. Pick how often to **Check every**, from a minute to an hour. A source that says when its data
+   changed makes the trigger check within seconds.
+5. For each input, pick **From the record** and a field, or **Value**. Inputs named `issue`, `item`,
+   `context`, `link`, `url`, or `record` fill the way **Start workflow…** fills them.
+6. Click **Preview matches** to see what matches now and which records the first check would start.
+   **Start tracking from now** starts none of them.
+
+A trigger starts at most 10 runs a check, and the rest wait for the next one. After 50 runs in a day
+it stops and shows **Needs review**. A trigger never starts a run for its own runs, or for the tasks it made for them.
+Its dialog lists the last 50 records it started, and says when the last check read only part of the
+results.
 
 ## In the terminal
 
@@ -94,6 +117,7 @@ The terminal client starts runs from the editor and the palette, and draws the t
 ## Limits
 
 - Only a published workflow made in the app can have a trigger. A file can't.
+- A trigger's **When** can't change kind after it's saved. Delete it and add another.
 - Turning on a trigger needs a connection to the Node. acorn won't queue it to send later.
 - Triggers run on the Node. The Node's scheduler times each one, so it's also listed in **Settings** >
   **Automation** > **Schedules** ([Schedules](/docs/automation/schedules/)), with **Open** to get back

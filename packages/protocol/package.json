@@ -73,6 +73,7 @@
     "./plugin/vocabulary.ts": "./src/plugin/vocabulary.ts",
     "./projectColor.ts": "./src/appearance/projectColor.ts",
     "./queryPublication.ts": "./src/data/queries/queryPublication.ts",
+    "./recordChanges.ts": "./src/data/recordChanges.ts",
     "./railPresentation.ts": "./src/chrome/railPresentation.ts",
     "./refResolvers.ts": "./src/content/refResolvers.ts",
     "./runTargets.ts": "./src/runtime/runTargets.ts",

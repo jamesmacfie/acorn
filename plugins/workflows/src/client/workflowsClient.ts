@@ -29,6 +29,7 @@ import type {
   WorkflowTriggerDraftInput,
   WorkflowTriggerFirstCheck,
   WorkflowTriggerPreparation,
+  WorkflowTriggerPreview,
   WorkflowTriggerView,
 } from '../shared/workflowTriggers'
 import type {
@@ -113,6 +114,8 @@ function workflowApiAt(nodeId?: string | null) {
     triggerDefaults: () => readJson<{ timezone: string }>(`${workflowTriggersRoute}/defaults`),
     prepareTrigger: (input: WorkflowTriggerDraftInput) =>
       post<WorkflowTriggerPreparation>(`${workflowTriggersRoute}/prepare`, input),
+    previewTrigger: (input: WorkflowTriggerDraftInput) =>
+      post<WorkflowTriggerPreview>(`${workflowTriggersRoute}/preview`, input),
     saveTrigger: (input: WorkflowTriggerDraftInput) => post<WorkflowTriggerView>(workflowTriggersRoute, input),
     approveTrigger: (id: string, firstCheck: WorkflowTriggerFirstCheck, freshEpoch: boolean) =>
       post<WorkflowTriggerView>(`${workflowTriggerRoute(id)}/approve`, { firstCheck, freshEpoch }),

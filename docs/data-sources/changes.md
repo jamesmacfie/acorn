@@ -22,3 +22,7 @@ code is in `packages/node-core/src/server/dataSources/changes.ts`.
 The event asks listeners to read again. It carries no records and has no delivery guarantee, so a
 listener still reads on its own schedule and treats the event as a reason to read sooner. These
 sources call it: `github:pull-requests`, `workflows:runs`, `agents:sessions`, and `core:tasks`.
+
+The workflows plugin listens. Each approved record trigger whose query reads the changed source checks
+again within seconds, at most once every 15 seconds, through the scheduler's `wake`
+([record triggers](../workflows/triggers.md#record-triggers)).

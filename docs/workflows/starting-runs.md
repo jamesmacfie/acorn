@@ -18,11 +18,15 @@ All three menus are the context-menu registry's `item.row` location
 target the row is handed carries the item's `title`, its `body`, a `link` to it, and the provider's
 own row untouched.
 
-**What the item fills in.** By input name, in `plugins/workflows/src/client/startFromItem.ts`: an
-input named `issue`, `item` or `context` gets the title and the body one blank line apart, and one
-named `link` or `url` gets the external link. Every other name is left for the person, because
-guessing at `focus` or `depth` from an error title puts words in a prompt nobody chose. The rule is
-in the workflows plugin rather than in each integration, so a new tracker gets it for free.
+**What the item fills in.** By input name, in `prefillFromItem` in
+`plugins/workflows/src/contract/itemInputs.ts`. A row that carries a typed record fills `record` with
+its envelope (`ref`, `data`, and `display`), `item` with the record's data, `issue` and `context` with
+its display title, and `link` and `url` with its display link. A row without a record fills `issue`,
+`item`, and `context` with the title and the body one blank line apart, and `link` and `url` with the
+external link. Every other name is left for the person, because guessing at `focus` or `depth` from an
+error title puts words in a prompt nobody chose. The rule is in the workflows plugin rather than in
+each integration, so a new tracker gets it for free. A record trigger fills a run's inputs by the same
+rule, after its own bindings ([record triggers](./triggers.md#record-triggers)).
 
 Where the body comes from is each tracker's own answer, and none of them makes a second call to fill
 a menu nobody opened. Linear asks for the issue description on the list query and caps it at 2,000

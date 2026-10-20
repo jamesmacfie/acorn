@@ -180,6 +180,8 @@ export async function resolveWorkflowGraph(
     scope: WorkflowResolutionScope
     catalog: WorkflowValidationCatalog
     inputs?: Record<string, DataValue>
+    /** Inputs each run supplies later, so a missing required one isn't refused here. */
+    deferredInputs?: readonly string[]
     provenance?: WorkflowDefinitionProvenance
     allowDatabaseDefinitions?: boolean
     queryRevision?: (queryId: string) => Promise<number>
@@ -187,7 +189,7 @@ export async function resolveWorkflowGraph(
 ): Promise<ResolvedWorkflowGraph> {
   const rootProblems = validateWorkflow(root, options.catalog)
   if (rootProblems.length) throw new WorkflowValidationError(rootProblems)
-  const rootInputs = resolveWorkflowInputs(root, options.inputs)
+  const rootInputs = resolveWorkflowInputs(root, options.inputs, options.deferredInputs)
   const frozenRoot = root.inputs?.length
     ? { ...structuredClone(root), inputs: root.inputs.map((input) => ({ ...input, default: rootInputs[input.name] })) }
     : structuredClone(root)

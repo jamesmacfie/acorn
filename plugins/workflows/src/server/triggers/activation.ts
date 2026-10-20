@@ -3,11 +3,12 @@ import { destinationQuery } from '../validation/destination'
 import { parseWorkflowTriggerTarget, WorkflowTriggerService, type WorkflowTriggerScheduler } from './service'
 import type { WorkflowTriggersBridge } from '../routes/triggers'
 import type { WorkflowStartService } from '../runs/admission'
+import type { TriggerSourceDescriber } from './clock'
 
 type PluginContext = Parameters<NonNullable<NodePlugin['init']>>[0]
-type TriggerContext = Pick<PluginContext, 'core' | 'dataSources' | 'schedules'>
+export type TriggerContext = Pick<PluginContext, 'core' | 'dataSources' | 'schedules'>
 
-/** Trigger source review uses the same scoped data-source invocation as run admission. */
+/** Trigger source review and record checks use the same scoped data-source invocation as run admission. */
 export const workflowTriggerService = (
   store: PluginDatabase,
   starts: WorkflowStartService,
@@ -16,45 +17,49 @@ export const workflowTriggerService = (
   scheduler?: () => WorkflowTriggerScheduler,
 ): WorkflowTriggerService => {
   const core = ctx.core
+  const invocation = () => {
+    const userId = core.identity.active()
+    if (!userId) throw new Error('Workflow triggers require an active owner')
+    return {
+      principal: { kind: 'internal' as const, scope: 'service' as const, userId },
+      signal: AbortSignal.timeout(60_000),
+    }
+  }
+  const describeSource: TriggerSourceDescriber = async (reference, scope, inputs) => {
+    // Resolution scopes also carry repo and user directories for workflow loading. The query
+    // and source seams deliberately accept only their public scope fields, so do not leak the
+    // wider workflow object across that validation boundary.
+    const queryScope = { workspaceId: scope.workspaceId, projectId: scope.projectId }
+    const resolved = await ctx.dataSources.resolveQuery(
+      queryScope,
+      destinationQuery(reference, queryScope),
+      { inputs },
+      invocation(),
+    )
+    const [description, catalog] = await Promise.all([
+      ctx.dataSources.invoke(
+        { operation: 'describe', source: resolved.query.source, scope: resolved.query.scope },
+        invocation(),
+      ),
+      ctx.dataSources.list({ ...queryScope, parameters: {} }, invocation()),
+    ])
+    const source = catalog.sources.find(
+      (candidate) =>
+        candidate.pluginId === resolved.query.source.pluginId && candidate.sourceId === resolved.query.source.sourceId,
+    )
+    return {
+      label: source?.plural ?? source?.name ?? resolved.query.source.sourceId,
+      schema: description.schema,
+      fields: description.fields,
+      incremental: description.operations.incremental,
+      ...(description.incremental?.semantics ? { incrementalReason: description.incremental.semantics } : {}),
+    }
+  }
   return new WorkflowTriggerService(store, starts, core, reconciled, {
-    scheduler: scheduler,
-    describeSource: async (reference, scope, inputs) => {
-      const userId = core.identity.active()
-      if (!userId) throw new Error('Trigger review requires an active owner')
-      const invocation = {
-        principal: { kind: 'internal' as const, scope: 'service' as const, userId },
-        signal: AbortSignal.timeout(60_000),
-      }
-      // Resolution scopes also carry repo and user directories for workflow loading. The query
-      // and source seams deliberately accept only their public scope fields, so do not leak the
-      // wider workflow object across that validation boundary.
-      const queryScope = { workspaceId: scope.workspaceId, projectId: scope.projectId }
-      const resolved = await ctx.dataSources.resolveQuery(
-        queryScope,
-        destinationQuery(reference, queryScope),
-        { inputs },
-        invocation,
-      )
-      const [description, catalog] = await Promise.all([
-        ctx.dataSources.invoke(
-          { operation: 'describe', source: resolved.query.source, scope: resolved.query.scope },
-          invocation,
-        ),
-        ctx.dataSources.list({ ...queryScope, parameters: {} }, invocation),
-      ])
-      const source = catalog.sources.find(
-        (candidate) =>
-          candidate.pluginId === resolved.query.source.pluginId &&
-          candidate.sourceId === resolved.query.source.sourceId,
-      )
-      return {
-        label: source?.plural ?? source?.name ?? resolved.query.source.sourceId,
-        schema: description.schema,
-        fields: description.fields,
-        incremental: description.operations.incremental,
-        ...(description.incremental?.semantics ? { incrementalReason: description.incremental.semantics } : {}),
-      }
-    },
+    scheduler,
+    describeSource,
+    // Loads with a record trigger's first check, approval, or preview, off the Node's boot graph.
+    records: async () => (await import('./recordReader')).triggerRecordReader(ctx, invocation, describeSource),
   })
 }
 
@@ -75,7 +80,10 @@ export const workflowTriggerTarget = (
       const row = triggers.get(triggerId(target))
       return row ? { projectId: row.projectId, rest: ['x', 'workflows', `db:${row.workflowId}`] } : undefined
     },
-    timezone: (target) => triggers.when(triggerId(target))?.timezone,
+    timezone: (target) => {
+      const when = triggers.when(triggerId(target))
+      return when?.kind === 'clock' ? when.timezone : undefined
+    },
     scope: (target) => {
       const projectId = triggers.get(triggerId(target))?.projectId
       return projectId ? { projectId } : undefined
@@ -95,9 +103,10 @@ export const workflowTriggerTarget = (
 export const workflowTriggerBridge = (triggers: WorkflowTriggerService): WorkflowTriggersBridge => {
   return {
     list: () => triggers.views(),
-    get: (id) => triggers.view(id),
+    get: (id) => triggers.detail(id),
     defaults: () => ({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' }),
     prepare: (input) => triggers.prepare(input),
+    preview: (input) => triggers.preview(input),
     save: (input) => triggers.saveManaged(input),
     approve: async (id, firstCheck, freshEpoch) => {
       await triggers.approve(id, firstCheck, freshEpoch)

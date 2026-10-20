@@ -196,12 +196,14 @@ export class WorkflowStartService {
     return started.runId
   }
 
+  /** `deferredInputs` are the ones a record trigger fills from each record. */
   async prepareTriggered(
     projectId: string,
     definitionId: string,
     inputs?: Record<string, DataValue>,
+    deferredInputs: readonly string[] = [],
   ): Promise<{ graph: ResolvedWorkflowGraph; scope: WorkflowResolutionScope }> {
-    return this.prepareInvocation({ projectId }, definitionId, inputs ?? {})
+    return this.prepareInvocation({ projectId }, definitionId, inputs ?? {}, 'start', deferredInputs)
   }
 
   /** Resolves and checks a saved definition outside a device start: for a trigger or the owner's
@@ -214,6 +216,7 @@ export class WorkflowStartService {
     definitionId: string,
     inputs: Record<string, DataValue>,
     purpose: 'review' | 'start' = 'start',
+    deferredInputs: readonly string[] = [],
   ): Promise<{ graph: ResolvedWorkflowGraph; scope: WorkflowResolutionScope }> {
     let scope: WorkflowResolutionScope
     if ('taskId' in target) {
@@ -237,6 +240,7 @@ export class WorkflowStartService {
       scope,
       catalog: this.runner.validationCatalog(),
       inputs,
+      deferredInputs,
       provenance: resolved.provenance,
       allowDatabaseDefinitions: true,
       queryRevision: this.deps.queryRevision ? (id) => this.deps.queryRevision!(id, scope) : undefined,

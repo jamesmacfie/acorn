@@ -20,7 +20,11 @@ parents do not share a child-loop state.
 Source rows use plugin, source, connection, and record ID as their identity. Retrieval scope and
 display titles are excluded. Ordinary arrays require a stable typed key. `repeat` on `workflow-map`
 supports `every-match`, `unseen`, and `changed`; the latter requires tracked JSON Pointer `fields`
-against the retained item. Source item fields therefore address its envelope, such as `/data/state`.
+against the retained item. Identity, projection, and the repeat decision live in
+`packages/protocol/src/data/recordChanges.ts`, which record triggers share. That module also has
+`enters`, which only a trigger uses, because it needs a complete read every check. A record
+trigger keeps its own ledger, `workflow_trigger_records`
+([record triggers](./triggers.md#record-triggers)). Source item fields therefore address its envelope, such as `/data/state`.
 Canonical projections distinguish missing from null, sort object keys, and preserve array order.
 Changed-field decisions compare the last admitted or baselined snapshot, so A to B to A admits both
 changes. An unchanged failed attempt is not automatically retried. Active attempts prevent competing

@@ -14,12 +14,14 @@ const TRIGGERS_TAG = '0005_triggers'
 function chainBeforeTriggers(): string {
   const folder = mkdtempSync(join(tmpdir(), 'acorn-workflows-chain-'))
   cpSync(MIGRATIONS, folder, { recursive: true })
-  rmSync(join(folder, `${TRIGGERS_TAG}.sql`))
   const journalPath = join(folder, 'meta', '_journal.json')
-  const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as { entries: { tag: string }[] }
+  const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as { entries: { idx: number; tag: string }[] }
+  const triggers = journal.entries.find((entry) => entry.tag === TRIGGERS_TAG)!.idx
+  const later = journal.entries.filter((entry) => entry.idx >= triggers)
+  for (const entry of later) rmSync(join(folder, `${entry.tag}.sql`))
   writeFileSync(
     journalPath,
-    JSON.stringify({ ...journal, entries: journal.entries.filter((entry) => entry.tag !== TRIGGERS_TAG) }),
+    JSON.stringify({ ...journal, entries: journal.entries.filter((entry) => entry.idx < triggers) }),
   )
   return folder
 }

@@ -6,9 +6,11 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import type { CompiledCoreServices, PluginDatabase } from '@acorn/plugin-api/node'
 import { ScheduleSkipped } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { ResolvedWorkflowGraph, WorkflowAuthorityReason } from '../../shared/workflowContracts'
 import type { WorkflowTriggerPayload } from '../../shared/workflowTriggers'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
+import type { WorkflowTransaction } from '../dispatch/dispatcher'
 import type { WorkflowStartService } from '../runs/admission'
 import { WorkflowAuthorityError } from '../runs/authority'
 
@@ -20,11 +22,16 @@ export type Occurrence = typeof schema.workflowTriggerOccurrences.$inferSelect
 type Run = typeof schema.workflowRuns.$inferSelect
 
 export type OccurrenceRequest = {
-  kind: 'due' | 'catch-up' | 'wake' | 'manual' | 'baseline'
+  kind: 'due' | 'catch-up' | 'wake' | 'manual' | 'baseline' | 'record'
   requestKey: string
   dueAt?: number
   /** The overlap key with the trigger: occurrences that share both never run at once. */
   recordKey: string | null
+  /** A record occurrence's own inputs and record. A clock occurrence takes the trigger's inputs. */
+  inputs?: Record<string, DataValue>
+  record?: WorkflowTriggerPayload['record']
+  /** Why this occurrence can't start, recorded as `blocked` instead of claimed. */
+  blocked?: string
 }
 
 type OccurrenceDeps = {
@@ -47,12 +54,19 @@ export class TriggerOccurrences {
   /** Reserves the occurrence for one request, or returns the one already reserved for it. A request
    *  that overlaps an active occurrence is recorded as `skipped`. */
   reserve(row: Trigger, request: OccurrenceRequest): Occurrence {
+    return this.deps.db.transaction((tx) => this.reserveIn(tx, row, request))
+  }
+
+  /** `reserve` inside a caller's transaction, so a record check commits its ledger and its
+   *  occurrences together. */
+  reserveIn(tx: WorkflowTransaction, row: Trigger, request: OccurrenceRequest): Occurrence {
     const graph = JSON.parse(row.approvedGraphJson!) as ResolvedWorkflowGraph
     const payload: WorkflowTriggerPayload = {
       graph,
-      inputs: JSON.parse(row.inputsJson),
+      inputs: request.inputs ?? JSON.parse(row.inputsJson),
       limits: JSON.parse(row.limitsJson),
       baseline: request.kind === 'baseline',
+      ...(request.record ? { record: request.record } : {}),
     }
     // `scheduleId` is the key every stored fingerprint was made with. Renaming it would make a
     // replayed request look like a different one.
@@ -63,49 +77,47 @@ export class TriggerOccurrences {
       payload,
     })
     const table = schema.workflowTriggerOccurrences
-    return this.deps.db.transaction((tx) => {
-      const existing = tx
-        .select()
-        .from(table)
-        .where(and(eq(table.triggerId, row.id), eq(table.requestKey, request.requestKey)))
-        .get()
-      if (existing) {
-        if (existing.payloadFingerprint !== fingerprint)
-          throw new Error('Occurrence request key was reused with different content.')
-        return existing
-      }
-      const active = tx
-        .select()
-        .from(table)
-        .where(
-          and(
-            eq(table.triggerId, row.id),
-            request.recordKey === null ? isNull(table.recordKey) : eq(table.recordKey, request.recordKey),
-            inArray(table.state, [...ACTIVE_OCCURRENCE]),
-          ),
-        )
-        .get()
-      const at = Date.now()
-      const values = {
-        id: randomUUID(),
-        triggerId: row.id,
-        recordKey: request.recordKey,
-        generation: row.generation,
-        kind: request.kind,
-        dueAt: request.dueAt ?? null,
-        requestKey: request.requestKey,
-        payloadFingerprint: fingerprint,
-        payloadJson: JSON.stringify(payload),
-        taskId: randomUUID(),
-        runId: randomUUID(),
-        state: active ? 'skipped' : 'claimed',
-        detail: active ? `Skipped: previous run still active (${active.runId}).` : null,
-        createdAt: at,
-        updatedAt: at,
-      }
-      tx.insert(table).values(values).run()
-      return values
-    })
+    const existing = tx
+      .select()
+      .from(table)
+      .where(and(eq(table.triggerId, row.id), eq(table.requestKey, request.requestKey)))
+      .get()
+    if (existing) {
+      if (existing.payloadFingerprint !== fingerprint)
+        throw new Error('Occurrence request key was reused with different content.')
+      return existing
+    }
+    const active = tx
+      .select()
+      .from(table)
+      .where(
+        and(
+          eq(table.triggerId, row.id),
+          request.recordKey === null ? isNull(table.recordKey) : eq(table.recordKey, request.recordKey),
+          inArray(table.state, [...ACTIVE_OCCURRENCE]),
+        ),
+      )
+      .get()
+    const at = Date.now()
+    const values = {
+      id: randomUUID(),
+      triggerId: row.id,
+      recordKey: request.recordKey,
+      generation: row.generation,
+      kind: request.kind,
+      dueAt: request.dueAt ?? null,
+      requestKey: request.requestKey,
+      payloadFingerprint: fingerprint,
+      payloadJson: JSON.stringify(payload),
+      taskId: randomUUID(),
+      runId: randomUUID(),
+      state: active ? 'skipped' : request.blocked ? 'blocked' : 'claimed',
+      detail: active ? `Skipped: previous run still active (${active.runId}).` : (request.blocked ?? null),
+      createdAt: at,
+      updatedAt: at,
+    }
+    tx.insert(table).values(values).run()
+    return values
   }
 
   /** Takes an occurrence as far as it can go: its root task, then its run. Safe to call again after
@@ -132,13 +144,13 @@ export class TriggerOccurrences {
         this.block(row.id, 'Approval changed before dispatch.')
         throw new ScheduleSkipped('workflow approval changed — review to resume')
       }
-      // Core refuses to replay an intended task with a different seed, so this one stays as it was.
+      // Core refuses to replay an intended task with a different seed, so a clock's stays as it was.
       await this.deps.tasks.createRoot(
         trigger.projectId,
         {
-          title: `${payload.graph.root.name} · scheduled`,
+          title: `${payload.graph.root.name} · ${payload.record?.title ?? 'scheduled'}`,
           branch: `workflow-${row.id.slice(0, 8)}`,
-          origin: 'workflows:schedule',
+          origin: payload.record ? 'workflows:trigger' : 'workflows:schedule',
         },
         row.taskId,
       )

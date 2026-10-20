@@ -4,14 +4,9 @@
 import { createSignal } from 'solid-js'
 import type { ItemRowTarget } from '@acorn/plugin-api/client'
 import type { DataRecord } from '@acorn/protocol/dataSources.ts'
-import { parseDataValue, type DataValue } from '@acorn/protocol/dataValues.ts'
-
-export type WorkflowSourceItemTarget = ItemRowTarget & { record?: DataRecord }
 
 /** Source-aware callers preserve the record envelope and its host-bound identity. */
-export function prefillFromRecord(record: DataRecord): Record<string, DataValue> {
-  return { record: parseDataValue(record), item: parseDataValue(record.data) }
-}
+export type WorkflowSourceItemTarget = ItemRowTarget & { record?: DataRecord }
 
 /** The row menu's ask, held until the overlay draws it. One at a time: a second right-click replaces
  *  the first rather than stacking two modals. */

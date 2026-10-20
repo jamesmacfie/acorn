@@ -117,12 +117,15 @@ These routes are device-only. A trigger starts a published workflow with nobody 
 | `GET`, `POST` | `/workflows/triggers` | List triggers with activation state, or save a draft trigger |
 | `GET` | `/workflows/triggers/defaults` | Defaults for a new trigger |
 | `POST` | `/workflows/triggers/prepare` | Check a draft trigger and preview it before saving |
-| `GET`, `DELETE` | `/workflows/triggers/:id` | Read or delete one trigger |
+| `POST` | `/workflows/triggers/preview` | A draft record trigger's source fields, up to 20 records it matches now, and whether its first check would start a run for each |
+| `GET`, `DELETE` | `/workflows/triggers/:id` | Read or delete one trigger. A record trigger's read carries its last 50 matches |
 | `POST` | `/workflows/triggers/:id/approve` | Freeze approval and choose `process-current` or `track-now`. `freshEpoch` resets processing scope |
 | `POST` | `/workflows/triggers/:id/pause`, `/run` | Pause or resume with `{ paused }`, or run it now |
 
-A draft trigger names a project, a published workflow, typed input, its `when`, and limits. Today
-`when` is `{ "kind": "clock", "timezone": "…" }`. A draft that carries a `cadence` also creates or
+A draft trigger names a project, a published workflow, typed input, its `when`, and limits. `when`
+is `{ "kind": "clock", "timezone": "…" }` or a record trigger's `{ "kind": "records", "query", "change" }`,
+with optional `incremental`, `bindings`, `runsPerCheck`, and `runsPerDay`
+([record triggers](../workflows/triggers.md#record-triggers)). A draft that carries a `cadence` also creates or
 updates the core cadence row, paused until approval, with target `{ "triggerId": "…" }` and kind
 `workflow`. The workflows plugin owns approval and occurrences. Core owns cadence, pause, deletion,
 **Run now**, and the recent-run ring ([schedules](../schedules.md)).

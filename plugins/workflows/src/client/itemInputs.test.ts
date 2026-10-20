@@ -40,6 +40,22 @@ describe('what an item fills in', () => {
     expect(prefillFromItem({})).toEqual({})
     expect(prefillFromItem({ title: '   ' })).toEqual({})
   })
+
+  it('fills a typed record by its envelope, data, title, and link', () => {
+    const record = {
+      ref: { pluginId: 'core', sourceId: 'tasks', recordId: 't-1' },
+      data: { title: 'Triage the inbox', status: 'active' },
+      display: { title: 'Triage the inbox', url: 'https://example.com/t-1' },
+    }
+    expect(prefillFromItem({ title: 'Row title', body: 'Row body', record })).toEqual({
+      record,
+      item: record.data,
+      issue: 'Triage the inbox',
+      context: 'Triage the inbox',
+      link: 'https://example.com/t-1',
+      url: 'https://example.com/t-1',
+    })
+  })
 })
 
 describe('item workflow input controls', () => {

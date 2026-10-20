@@ -31,13 +31,17 @@ import type {
   WorkflowTriggerLimits,
   WorkflowTriggerLoopSetting,
   WorkflowTriggerPreparation,
+  WorkflowTriggerPreview,
   WorkflowTriggerView,
+  WorkflowTriggerWhen,
 } from '../../shared/workflowTriggers'
+import { RECORD_FILLED_INPUTS } from '../../contract/itemInputs.ts'
 import TypedValueField from '../editor/TypedValueField'
 import { openWorkflowRun } from '../runs/runStore'
 import { workflowsSurfacePath } from '../surfacePath'
 import { workflowApi } from '../workflowsClient'
 import { closeWorkflowTrigger, triggerRequest, type TriggerRequest } from './triggerRequest'
+import { RecordMatchHistory, recordOrigin, RecordsWhenFields, type RecordsDraft } from './RecordsWhen'
 import {
   cadenceChoice,
   cadenceForChoice,
@@ -55,6 +59,10 @@ const timezoneOptions = (current: string) => {
     label: zone.replaceAll('_', ' '),
   }))
 }
+
+/** A record trigger's times read in this device's zone. */
+const zoneOf = (when: WorkflowTriggerWhen): string =>
+  when.kind === 'clock' ? when.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone
 
 const STATE_TONE = {
   draft: 'neutral',
@@ -87,6 +95,11 @@ function TriggerDialog(props: { request: TriggerRequest }) {
     ),
   )
   const [timezone, setTimezone] = createSignal('')
+  const [kind, setKind] = createSignal<WorkflowTriggerWhen['kind']>('clock')
+  const [records, setRecords] = createSignal<RecordsDraft>({ change: { on: 'new' } })
+  // Per input, whether a record trigger fills it from the record rather than a value.
+  const [fromRecord, setFromRecord] = createSignal<Record<string, boolean>>({})
+  const [preview, setPreview] = createSignal<WorkflowTriggerPreview>()
   const [cadence, setCadence] = createSignal<Cadence>({ daily: '09:00' })
   const [preparation, setPreparation] = createSignal<WorkflowTriggerPreparation>()
   const [loops, setLoops] = createSignal<WorkflowTriggerLoopSetting[]>([])
@@ -98,13 +111,32 @@ function TriggerDialog(props: { request: TriggerRequest }) {
   const [invalid, setInvalid] = createSignal<Record<string, boolean>>({})
   let initialized = false
 
+  /** Which inputs a record fills: the bound ones, and the item rule's names that have no value. */
+  const recordModes = (
+    inputs: Record<string, DataValue>,
+    bindings: RecordsDraft['bindings'] = {},
+  ): Record<string, boolean> =>
+    Object.fromEntries(
+      props.request.inputs.map((item) => [
+        item.name,
+        item.name in bindings || (RECORD_FILLED_INPUTS.includes(item.name) && !(item.name in inputs)),
+      ]),
+    )
+
   createEffect(() => {
     if (initialized || (props.request.triggerId ? !existing() : !defaults())) return
     const row = existing()
     setTrigger(row)
     setProjectId(row?.projectId ?? props.request.projectId)
     setValues(row?.inputs ?? values())
-    setTimezone(row?.when.timezone ?? defaults()?.timezone ?? '')
+    const when = row?.when
+    if (when?.kind === 'records') {
+      const { kind: _kind, ...draft } = when
+      setKind('records')
+      setRecords(draft)
+      setFromRecord(recordModes(row!.inputs, draft.bindings))
+    }
+    setTimezone(when?.kind === 'clock' ? when.timezone : (defaults()?.timezone ?? ''))
     setCadence(row?.cadence ?? { daily: '09:00' })
     setLoops(row?.loops ?? [])
     setFirstCheck(row?.firstCheck ?? 'process-current')
@@ -112,13 +144,27 @@ function TriggerDialog(props: { request: TriggerRequest }) {
     initialized = true
   })
 
+  const recordsWhen = (): WorkflowTriggerWhen => {
+    const { bindings = {}, ...draft } = records()
+    const kept = Object.entries(bindings).filter(([name]) => fromRecord()[name])
+    return {
+      kind: 'records',
+      ...draft,
+      query: draft.query!,
+      ...(kept.length ? { bindings: Object.fromEntries(kept) } : {}),
+    }
+  }
+
   const input = (): WorkflowTriggerDraftInput => ({
     ...(trigger()?.id ? { id: trigger()!.id } : {}),
     name: `${props.request.name} trigger`,
     projectId: projectId(),
     workflowId: props.request.workflowId,
-    inputs: values(),
-    when: { kind: 'clock', timezone: timezone() },
+    inputs:
+      kind() === 'records'
+        ? Object.fromEntries(Object.entries(values()).filter(([name]) => !fromRecord()[name]))
+        : values(),
+    when: kind() === 'records' ? recordsWhen() : { kind: 'clock', timezone: timezone() },
     cadence: cadence(),
     loops: loops(),
     ...(requestedLimits() ? { limits: requestedLimits() } : {}),
@@ -129,9 +175,40 @@ function TriggerDialog(props: { request: TriggerRequest }) {
     setPreparation(undefined)
   }
 
-  const missingInputs = () => props.request.inputs.some((item) => item.required && values()[item.name] === undefined)
+  const chooseKind = (next: WorkflowTriggerWhen['kind']): void =>
+    editSetup(() => {
+      setKind(next)
+      setCadence(next === 'records' ? { every: 300 } : { daily: '09:00' })
+      if (next === 'records') setFromRecord(recordModes({}, records().bindings))
+    })
+  const editRecords = (patch: Partial<RecordsDraft>): void =>
+    editSetup(() => {
+      setRecords((current) => ({ ...current, ...patch }))
+      if ('query' in patch) setPreview(undefined)
+    })
+  const bindInput = (name: string, binding: DataBinding | undefined): void =>
+    editRecords({
+      bindings: Object.fromEntries(
+        Object.entries({ ...records().bindings, [name]: binding }).filter(
+          (entry): entry is [string, DataBinding] => !!entry[1],
+        ),
+      ),
+    })
+
+  const filledByRecord = (name: string): boolean => !!records().bindings?.[name] || RECORD_FILLED_INPUTS.includes(name)
+  const missingInputs = () =>
+    props.request.inputs.some((item) =>
+      kind() === 'records' && fromRecord()[item.name]
+        ? item.required && !filledByRecord(item.name)
+        : item.required && values()[item.name] === undefined,
+    )
   const invalidFields = () => Object.values(invalid()).some(Boolean)
-  const readyForReview = () => !!projectId() && !!timezone() && !missingInputs() && !invalidFields()
+  const whenReady = (): boolean => {
+    if (kind() === 'clock') return !!timezone()
+    const { query, change } = records()
+    return !!query && (change.on !== 'changes' || change.fields.length > 0)
+  }
+  const readyForReview = () => !!projectId() && whenReady() && !missingInputs() && !invalidFields()
 
   const act = async (label: string, work: () => Promise<void>): Promise<void> => {
     setBusy(label)
@@ -159,6 +236,11 @@ function TriggerDialog(props: { request: TriggerRequest }) {
     setTrigger(saved)
     return saved
   }
+
+  const previewMatches = () =>
+    act('preview', async () => {
+      setPreview(await workflowApi.previewTrigger(input()))
+    })
 
   const saveDraft = () =>
     act('save', async () => {
@@ -212,7 +294,7 @@ function TriggerDialog(props: { request: TriggerRequest }) {
     (requestedLimits() as WorkflowTriggerLimits | undefined) ?? preparation()?.limits ?? trigger()?.limits
   const occurrences = createMemo(() => {
     try {
-      return timezone() ? nextScheduleOccurrences(cadence(), timezone()) : []
+      return kind() === 'clock' && timezone() ? nextScheduleOccurrences(cadence(), timezone()) : []
     } catch {
       return []
     }
@@ -231,17 +313,38 @@ function TriggerDialog(props: { request: TriggerRequest }) {
       await workflowApi.deleteTrigger(trigger()!.id)
       closeWorkflowTrigger()
     })
-  const openRun = (): void => {
-    const latest = trigger()?.latest
-    const task = (tasks.data ?? []).find((candidate) => candidate.id === latest?.taskId)
-    if (!latest || !task) return
+  const openRun = (run: { taskId: string; runId: string } | undefined): void => {
+    const task = (tasks.data ?? []).find((candidate) => candidate.id === run?.taskId)
+    if (!run || !task) return
     closeWorkflowTrigger()
-    openWorkflowRun(task, latest.runId, navigate)
+    openWorkflowRun(task, run.runId, navigate)
   }
+  const workspaceId = () => (projects.data ?? []).find((project) => project.id === projectId())?.workspaceId ?? ''
   const reviewWorkflow = (): void => {
     closeWorkflowTrigger()
     navigate(workflowsSurfacePath(projectId(), `db:${props.request.workflowId}`))
   }
+
+  const valueField = (item: TriggerRequest['inputs'][number]) => (
+    <TypedValueField
+      label={item.required ? `${item.label ?? item.name} *` : (item.label ?? item.name)}
+      schema={item.schema}
+      hint={item.description}
+      value={values()[item.name]}
+      required={item.required}
+      onValidity={(valid) => setInvalid((current) => ({ ...current, [item.name]: !valid }))}
+      onChange={(value) =>
+        editSetup(() =>
+          setValues((current) => {
+            const next = { ...current }
+            if (value === undefined) delete next[item.name]
+            else next[item.name] = value
+            return next
+          }),
+        )
+      }
+    />
+  )
 
   return (
     <Modal onDismiss={closeWorkflowTrigger} title={`Trigger for ${props.request.name}`} size="lg">
@@ -252,7 +355,7 @@ function TriggerDialog(props: { request: TriggerRequest }) {
               <Inline gap="inline" wrap>
                 <Badge tone={STATE_TONE[row().state]}>{triggerStateLabel(row().state)}</Badge>
                 <Show when={row().nextRunAt}>
-                  <Text emphasis="muted">Next {formatOccurrence(row().nextRunAt!, row().when.timezone)}</Text>
+                  <Text emphasis="muted">Next {formatOccurrence(row().nextRunAt!, zoneOf(row().when))}</Text>
                 </Show>
               </Inline>
             )}
@@ -284,36 +387,54 @@ function TriggerDialog(props: { request: TriggerRequest }) {
 
           <SectionHeader level="group">When</SectionHeader>
           <Field label="When" group>
-            {/* One kind for now. A trigger on records changing becomes the second choice. */}
             <Select
               label="When"
-              value="clock"
-              options={[{ value: 'clock', label: 'On a schedule' }]}
-              onChange={() => {}}
-            />
-          </Field>
-          <Field label="Cadence" group>
-            <Select
-              label="Cadence"
-              value={cadenceChoice(cadence())}
+              value={kind()}
+              disabled={!!trigger()?.id}
               options={[
-                { value: 'hourly', label: 'Every hour' },
-                { value: 'daily', label: 'Every day at 09:00' },
-                { value: 'weekly', label: 'Every Monday at 09:00' },
+                { value: 'clock', label: 'On a schedule' },
+                { value: 'records', label: 'When records change' },
               ]}
-              onChange={(value) =>
-                editSetup(() => setCadence(cadenceForChoice(value as 'hourly' | 'daily' | 'weekly')))
-              }
+              onChange={(value) => chooseKind(value as WorkflowTriggerWhen['kind'])}
             />
           </Field>
-          <Field label="Timezone" group>
-            <Select
-              label="Timezone"
-              value={timezone()}
-              options={timezoneOptions(timezone())}
-              onChange={(value) => editSetup(() => setTimezone(value))}
+          <Show when={kind() === 'records'}>
+            <RecordsWhenFields
+              workspaceId={workspaceId()}
+              projectId={projectId()}
+              draft={records()}
+              cadence={cadence()}
+              preview={preview()}
+              previewing={busy() === 'preview'}
+              onDraft={editRecords}
+              onCadence={(next) => editSetup(() => setCadence(next))}
+              onPreview={() => void previewMatches()}
             />
-          </Field>
+          </Show>
+          <Show when={kind() === 'clock'}>
+            <Field label="Cadence" group>
+              <Select
+                label="Cadence"
+                value={cadenceChoice(cadence())}
+                options={[
+                  { value: 'hourly', label: 'Every hour' },
+                  { value: 'daily', label: 'Every day at 09:00' },
+                  { value: 'weekly', label: 'Every Monday at 09:00' },
+                ]}
+                onChange={(value) =>
+                  editSetup(() => setCadence(cadenceForChoice(value as 'hourly' | 'daily' | 'weekly')))
+                }
+              />
+            </Field>
+            <Field label="Timezone" group>
+              <Select
+                label="Timezone"
+                value={timezone()}
+                options={timezoneOptions(timezone())}
+                onChange={(value) => editSetup(() => setTimezone(value))}
+              />
+            </Field>
+          </Show>
 
           <Show when={occurrences().length}>
             <Stack gap="row">
@@ -336,24 +457,43 @@ function TriggerDialog(props: { request: TriggerRequest }) {
 
           <For each={props.request.inputs}>
             {(item) => (
-              <TypedValueField
-                label={item.required ? `${item.label ?? item.name} *` : (item.label ?? item.name)}
-                schema={item.schema}
-                hint={item.description}
-                value={values()[item.name]}
-                required={item.required}
-                onValidity={(valid) => setInvalid((current) => ({ ...current, [item.name]: !valid }))}
-                onChange={(value) =>
-                  editSetup(() =>
-                    setValues((current) => {
-                      const next = { ...current }
-                      if (value === undefined) delete next[item.name]
-                      else next[item.name] = value
-                      return next
-                    }),
-                  )
-                }
-              />
+              <Show when={kind() === 'records'} fallback={valueField(item)}>
+                <Field label={item.required ? `${item.label ?? item.name} *` : (item.label ?? item.name)} group>
+                  <Select
+                    label={`${item.label ?? item.name} comes from`}
+                    value={fromRecord()[item.name] ? 'record' : 'value'}
+                    options={[
+                      { value: 'record', label: 'From the record' },
+                      { value: 'value', label: 'Value' },
+                    ]}
+                    onChange={(value) =>
+                      editSetup(() => setFromRecord((current) => ({ ...current, [item.name]: value === 'record' })))
+                    }
+                  />
+                </Field>
+                <Show when={fromRecord()[item.name]} fallback={valueField(item)}>
+                  <Show
+                    when={preview()}
+                    fallback={
+                      <Text emphasis="muted" wrap>
+                        {RECORD_FILLED_INPUTS.includes(item.name)
+                          ? 'Filled the way Start workflow… fills it. Preview the matches to pick a field instead.'
+                          : 'Preview the matches to pick a field.'}
+                      </Text>
+                    }
+                  >
+                    {(described) => (
+                      <TypedBindingPicker
+                        label={`${item.label ?? item.name} field`}
+                        origins={recordOrigin(described())}
+                        destination={item.schema}
+                        value={records().bindings?.[item.name]}
+                        onChange={(binding) => bindInput(item.name, binding)}
+                      />
+                    )}
+                  </Show>
+                </Show>
+              </Show>
             )}
           </For>
 
@@ -523,7 +663,10 @@ function TriggerDialog(props: { request: TriggerRequest }) {
             )}
           </Show>
 
-          <Show when={trigger()?.latest}>
+          <Show when={trigger()?.when.kind === 'records' ? trigger() : undefined}>
+            {(row) => <RecordMatchHistory trigger={row()} onOpenRun={openRun} />}
+          </Show>
+          <Show when={trigger()?.when.kind === 'clock' ? trigger()?.latest : undefined}>
             {(latest) => (
               <Alert
                 title={`${latest().kind === 'manual' ? 'Run now' : latest().kind === 'baseline' ? 'Baseline' : 'Latest check'} · ${latest().state}`}
@@ -532,7 +675,7 @@ function TriggerDialog(props: { request: TriggerRequest }) {
                   <Show when={latest().detail}>
                     <Text wrap>{latest().detail}</Text>
                   </Show>
-                  <Button size="sm" onPress={openRun}>
+                  <Button size="sm" onPress={() => openRun(latest())}>
                     Open run{latest().state === 'active' ? ' to cancel' : ''}
                   </Button>
                 </Stack>

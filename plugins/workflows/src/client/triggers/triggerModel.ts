@@ -1,5 +1,6 @@
 import { describeCadence, type Cadence } from '@acorn/protocol/schedules.ts'
 import type {
+  WorkflowRecordChange,
   WorkflowTriggerDisplayState,
   WorkflowTriggerLimits,
   WorkflowTriggerView,
@@ -117,8 +118,15 @@ export const cadenceChoice = (cadence: Cadence): 'hourly' | 'daily' | 'weekly' =
 export const cadenceForChoice = (choice: 'hourly' | 'daily' | 'weekly'): Cadence =>
   choice === 'hourly' ? { every: 3600 } : choice === 'daily' ? { daily: '09:00' } : { weekly: { day: 1, at: '09:00' } }
 
-/** A trigger's When in one line, such as "Daily at 09:00". */
-export const whenSummary = (trigger: Pick<WorkflowTriggerView, 'cadence'>): string => {
+/** How the dialog names a record trigger's change rule. */
+export const changeLabel = (on: WorkflowRecordChange['on']): string =>
+  on === 'new' ? 'Is new' : on === 'enters' ? 'Starts matching' : 'Changes'
+
+/** A trigger's When in one line, such as "Daily at 09:00" or "Every 5 minutes, when a record is new". */
+export const whenSummary = (trigger: Pick<WorkflowTriggerView, 'cadence' | 'when'>): string => {
   const cadence = describeCadence(trigger.cadence)
-  return cadence[0]!.toUpperCase() + cadence.slice(1)
+  const line = cadence[0]!.toUpperCase() + cadence.slice(1)
+  return trigger.when.kind === 'records'
+    ? `${line}, when a record ${changeLabel(trigger.when.change.on).toLowerCase()}`
+    : line
 }

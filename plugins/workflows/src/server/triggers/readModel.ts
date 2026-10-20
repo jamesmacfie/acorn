@@ -4,6 +4,7 @@ import type { ScheduleRow } from '@acorn/protocol/schedules.ts'
 import * as schema from '../../node/schema'
 import type { ResolvedWorkflowGraph, WorkflowAuthorityReason } from '../../shared/workflowContracts'
 import type {
+  WorkflowTriggerCheck,
   WorkflowTriggerFirstCheck,
   WorkflowTriggerLoopSetting,
   WorkflowTriggerState,
@@ -72,7 +73,14 @@ export async function workflowTriggerView(
     ...(occurrence
       ? {
           latest: {
-            kind: occurrence.kind === 'baseline' ? 'baseline' : occurrence.kind === 'manual' ? 'manual' : 'scheduled',
+            kind:
+              occurrence.kind === 'baseline'
+                ? 'baseline'
+                : occurrence.kind === 'manual'
+                  ? 'manual'
+                  : occurrence.kind === 'record'
+                    ? 'match'
+                    : 'scheduled',
             state: ACTIVE_OCCURRENCE.includes(occurrence.state as (typeof ACTIVE_OCCURRENCE)[number])
               ? 'active'
               : occurrence.state === 'terminal'
@@ -87,6 +95,7 @@ export async function workflowTriggerView(
           },
         }
       : {}),
+    ...(row.lastCheckJson ? { lastCheck: JSON.parse(row.lastCheckJson) as WorkflowTriggerCheck } : {}),
     updatedAt: row.updatedAt,
   }
 }

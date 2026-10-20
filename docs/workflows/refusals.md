@@ -57,7 +57,12 @@ reopening a settled decision, each with what would reopen it.
 - **Automatic retries of failed items.** A retry is an explicit action.
 - **Timestamp checkpoints for every source.** An incremental read needs the source's own
   continuation contract.
-- **Overlapping runs of one trigger.** The next occurrence is skipped and links to the active run.
+- **Overlapping runs of one trigger.** A clock trigger skips the next occurrence and links to the
+  active run. A record trigger runs each record on its own, so it starts nothing for a record whose
+  run is still going and sees that record again on a later check.
+- **A trigger fed by its own runs.** A record trigger never admits a run it started, read through the
+  Workflow runs source, or the task it made for one, read through core's Tasks source. A longer loop
+  through another source, or between two triggers, meets the daily cap.
 - **Implicit triggers from a draft.** Only a published workflow can have a trigger, through an explicit
   approval that freezes its graph and limits.
 - **A generic provider write-back contract.** Writes go through workflow actions. Dashboard write-back
@@ -75,7 +80,12 @@ throws `WorkflowAuthorityError` with one of these reasons:
 | `connection-required` | A data source needs an account that isn't connected |
 | `input-required` | A connection input, such as an account picker, has no value on this Node |
 | `not-published` | The workflow or a saved query it uses has no published revision |
-| `missing` | The project, the task, or a configured record loop no longer exists |
+| `missing` | The project, the task, a configured record loop, or a field a record trigger watches no longer exists. A record trigger's expired checkpoint, or a query that changed since its checkpoint, says this too |
 | `untrusted` | The project's repository configuration hasn't been reviewed and trusted |
 
 Any other failure is treated as passing, and the scheduler tries again.
+
+A record trigger also stops and asks for review when it starts its daily number of runs, 50 by
+default: "Started 50 runs today. Review the trigger before it starts more." A record whose values
+don't fit the workflow's inputs isn't a refusal of the trigger. Its occurrence is blocked with a
+reason that names the record and the input, and the other records go on.

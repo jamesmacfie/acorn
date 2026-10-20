@@ -5,7 +5,7 @@
 // plugins/agents' session table, are plain IDs rather than foreign keys, dereferenced through
 // CoreServices.tasks and the agents capability.
 import { sql } from 'drizzle-orm'
-import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import type { WorkflowAuthorityReason, WorkflowRunErrorCause, WorkflowStartedBy } from '../shared/workflowContracts'
 
 // Workflow runs (docs/workflows.md): the durable checkpoint for the state machine. Machine-scoped
@@ -337,6 +337,13 @@ export const workflowTriggers = sqliteTable(
     error: text('error'),
     // Set when `error` came from a typed authority refusal, so the view can tell "reconnect" from "review".
     errorReason: text('error_reason').$type<WorkflowAuthorityReason>(),
+    // A record trigger's query as approval pinned it, a saved query at its revision. Null for a clock.
+    approvedQueryJson: text('approved_query_json'),
+    // An incremental record trigger's checkpoint, and the fingerprint of the query it continues.
+    boundaryJson: text('boundary_json'),
+    queryFingerprint: text('query_fingerprint'),
+    // A record trigger's last check: when it ran and whether it read everything (WorkflowTriggerCheck).
+    lastCheckJson: text('last_check_json'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
@@ -351,7 +358,9 @@ export const workflowTriggerOccurrences = sqliteTable(
     // The record this occurrence handles. Null for a clock trigger, whose occurrences overlap per trigger.
     recordKey: text('record_key'),
     generation: integer('generation').notNull(),
-    kind: text('kind').notNull(), // due | catch-up | wake | manual | baseline
+    kind: text('kind').notNull(), // due | catch-up | wake | manual | baseline | record
+    // A clock occurrence's due instant. Null for a record occurrence, so one check can start many
+    // without meeting the per-instant unique index below.
     dueAt: integer('due_at'),
     requestKey: text('request_key').notNull(),
     payloadFingerprint: text('payload_fingerprint').notNull(),
@@ -370,6 +379,25 @@ export const workflowTriggerOccurrences = sqliteTable(
     uniqueIndex('workflow_trigger_occurrences_run_uq').on(table.runId),
     index('workflow_trigger_occurrences_state_idx').on(table.triggerId, table.state, table.updatedAt),
   ],
+)
+
+// A record trigger's memory of each record it has seen, per processing epoch. **Start fresh** starts a
+// new epoch, so old rows stay as history and stop counting.
+export const workflowTriggerRecords = sqliteTable(
+  'workflow_trigger_records',
+  {
+    triggerId: text('trigger_id').notNull(),
+    epoch: text('epoch').notNull(),
+    recordKey: text('record_key').notNull(),
+    // The tracked fields as the decision last kept them (`recordProjection`).
+    projection: text('projection').notNull(),
+    // Whether the record matched after the last read that could tell, which only a complete read can.
+    matching: integer('matching', { mode: 'boolean' }).notNull(),
+    firstSeenAt: integer('first_seen_at').notNull(),
+    lastSeenAt: integer('last_seen_at').notNull(),
+    lastOccurrenceId: text('last_occurrence_id'),
+  },
+  (table) => [primaryKey({ columns: [table.triggerId, table.epoch, table.recordKey] })],
 )
 
 // The owner's approval for agents to start one definition in one project

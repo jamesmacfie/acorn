@@ -23,8 +23,15 @@ describe('workflow trigger editor model', () => {
 
   it('keeps the UI vocabulary human-facing', () => {
     expect(triggerStateLabel('needs-review')).toBe('Needs review')
-    expect(whenSummary({ cadence: { daily: '09:00' } })).toBe('Daily at 09:00')
-    expect(whenSummary({ cadence: { every: 3600 } })).toBe('Every hour')
+    const clock = { kind: 'clock' as const, timezone: 'UTC' }
+    expect(whenSummary({ cadence: { daily: '09:00' }, when: clock })).toBe('Daily at 09:00')
+    expect(whenSummary({ cadence: { every: 3600 }, when: clock })).toBe('Every hour')
+    const records = {
+      kind: 'records' as const,
+      query: { kind: 'saved' as const, queryId: 'q', bindings: {} },
+      change: { on: 'enters' as const },
+    }
+    expect(whenSummary({ cadence: { every: 300 }, when: records })).toMatch(/, when a record starts matching$/)
     expect(cadenceForChoice('weekly')).toEqual({ weekly: { day: 1, at: '09:00' } })
     expect(limitsSummary({ maxDescendants: 80, maxConcurrency: 3, budget: { maxWallTimeMs: 7_200_000 } })).toBe(
       'Up to 80 tasks, 3 at a time, 120 minutes.',

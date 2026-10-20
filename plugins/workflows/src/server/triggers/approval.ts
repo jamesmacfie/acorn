@@ -14,6 +14,7 @@ import type {
   WorkflowTriggerLoop,
   WorkflowTriggerLoopSetting,
   WorkflowTriggerPayload,
+  WorkflowTriggerWhen,
 } from '../../shared/workflowTriggers'
 import type { WorkflowStartService } from '../runs/admission'
 import type { WorkflowResolutionScope } from '../definitions/resolution'
@@ -41,16 +42,18 @@ const frozenInputs = (
   ...supplied,
 })
 
-/** The published workflow as the trigger would run it now, with its loop settings applied. A refusal
- *  only the owner can fix throws WorkflowAuthorityError. */
+/** The published workflow as the trigger would run it now, with its loop settings applied. `deferred`
+ *  names the inputs a record trigger fills from each record. A refusal only the owner can fix throws
+ *  WorkflowAuthorityError. */
 export async function resolveTriggerGraph(
   resolver: TriggerResolver,
   target: { projectId: string; workflowId: string },
   inputs: Record<string, DataValue>,
   loops: readonly WorkflowTriggerLoopSetting[],
+  deferred: readonly string[] = [],
 ): Promise<{ graph: ResolvedWorkflowGraph; scope: WorkflowResolutionScope; loops: WorkflowTriggerLoop[] }> {
   try {
-    const prepared = await resolver.starts.prepareTriggered(target.projectId, target.workflowId, inputs)
+    const prepared = await resolver.starts.prepareTriggered(target.projectId, target.workflowId, inputs, deferred)
     const available = resolver.describeSource
       ? await describeTriggerLoops(
           prepared.graph,
@@ -68,20 +71,30 @@ export async function resolveTriggerGraph(
 }
 
 /** Records the owner's approval: the graph with its limits, the frozen inputs, and a new generation, so
- *  an occurrence reserved under the old approval can't start. `freshEpoch` forgets record history. */
+ *  an occurrence reserved under the old approval can't start. `freshEpoch` forgets record history. A
+ *  record trigger keeps only the values the owner gave, because the graph already holds the defaults
+ *  and a default mustn't hide what the record fills. `approvedQuery` is a record trigger's pinned query. */
 export function freezeApproval(
   db: PluginDatabase,
   row: Trigger,
-  approved: { graph: ResolvedWorkflowGraph; scope: WorkflowResolutionScope; limits: WorkflowTriggerLimits },
+  approved: {
+    graph: ResolvedWorkflowGraph
+    scope: WorkflowResolutionScope
+    limits: WorkflowTriggerLimits
+    approvedQuery?: unknown
+  },
   requestedInputs: Record<string, DataValue>,
   firstCheck: WorkflowTriggerFirstCheck,
   freshEpoch: boolean,
 ): void {
   const graph = applyTriggerLimits(approved.graph, approved.limits)
+  const records = approved.approvedQuery !== undefined
   db.update(schema.workflowTriggers)
     .set({
       workspaceId: approved.scope.workspaceId,
-      inputsJson: JSON.stringify(frozenInputs(graph, requestedInputs)),
+      inputsJson: JSON.stringify(records ? requestedInputs : frozenInputs(graph, requestedInputs)),
+      approvedQueryJson: records ? JSON.stringify(approved.approvedQuery) : null,
+      ...(freshEpoch ? { boundaryJson: null, queryFingerprint: null } : {}),
       limitsJson: JSON.stringify(approved.limits),
       approvedGraphJson: JSON.stringify(graph),
       approvedGraphDigest: graph.fingerprint,
@@ -105,7 +118,12 @@ export async function stillApproved(
   loops: readonly WorkflowTriggerLoopSetting[],
   payload: WorkflowTriggerPayload,
 ): Promise<boolean> {
-  const current = await resolveTriggerGraph(resolver, row, payload.inputs, loops)
+  const when = JSON.parse(row.whenJson) as WorkflowTriggerWhen
+  // A record trigger's runs differ only in what each record fills, so the owner's values are what
+  // approval resolved.
+  const inputs = when.kind === 'records' ? (JSON.parse(row.inputsJson) as Record<string, DataValue>) : payload.inputs
+  const deferred = when.kind === 'records' ? (await import('./records')).recordFilledInputs(when, inputs) : []
+  const current = await resolveTriggerGraph(resolver, row, inputs, loops, deferred)
   return applyTriggerLimits(current.graph, payload.limits).fingerprint === row.approvedGraphDigest
 }
 
@@ -134,9 +152,12 @@ export function reviewTriggersAfterPublication(
     const affectedWorkflow = graph.nodes.some(
       (node) => node.provenance.source === 'database' && changedWorkflows.has(node.provenance.id),
     )
-    const affectedQuery = graph.nodes.some((node) =>
-      node.definition.steps.some((step) => step.query?.kind === 'saved' && changedQueries.has(step.query.queryId)),
-    )
+    const when = JSON.parse(row.whenJson) as WorkflowTriggerWhen
+    const affectedQuery =
+      (when.kind === 'records' && when.query.kind === 'saved' && changedQueries.has(when.query.queryId)) ||
+      graph.nodes.some((node) =>
+        node.definition.steps.some((step) => step.query?.kind === 'saved' && changedQueries.has(step.query.queryId)),
+      )
     if (!affectedWorkflow && !affectedQuery) continue
     moveToReview(
       db,

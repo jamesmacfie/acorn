@@ -17,12 +17,12 @@ import type {
   WorkflowTriggerLoopSetting,
   WorkflowTriggerWhen,
 } from '../../shared/workflowTriggers'
-import { processingFields } from '../processing/rules'
+import { recordChangeFields } from '@acorn/protocol/recordChanges.ts'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
 import { WorkflowAuthorityError } from '../runs/authority'
 import type { Occurrence, OccurrenceRequest, Trigger, TriggerOccurrences } from './occurrences'
 
-type TriggerSourceDescription = {
+export type TriggerSourceDescription = {
   label: string
   schema: DataSchema
   fields: DataField[]
@@ -189,7 +189,8 @@ function targets(graph: ResolvedWorkflowGraph, rootInputs: Record<string, DataVa
   )
 }
 
-const recordSchema = (schema: DataSchema): DataSchema => ({
+/** The record envelope a loop's item and a record trigger's pointers address. */
+export const recordSchema = (schema: DataSchema): DataSchema => ({
   type: 'object',
   properties: {
     ref: { type: 'object' },
@@ -199,7 +200,7 @@ const recordSchema = (schema: DataSchema): DataSchema => ({
   required: ['ref', 'data'],
 })
 
-const prefixedFields = (fields: readonly DataField[]): DataField[] =>
+export const prefixedFields = (fields: readonly DataField[]): DataField[] =>
   fields.map((field) => ({
     ...field,
     pointer: `/data${field.pointer}`,
@@ -261,7 +262,7 @@ export function applyTriggerLoopSettings(
           'missing',
           'A configured record loop no longer exists in the published workflow.',
         )
-      const fields = processingFields(setting.repeat)
+      const fields = recordChangeFields(setting.repeat)
       const availableFields = new Set(descriptor.fields.map((field) => field.pointer))
       if (fields.some((field) => !availableFields.has(field)))
         throw new WorkflowAuthorityError('missing', 'A tracked field is no longer available from this record source.')

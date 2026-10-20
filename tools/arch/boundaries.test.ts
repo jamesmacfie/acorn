@@ -813,8 +813,9 @@ describe('architecture boundaries', () => {
       // the native host, and the extension share without the `api.ts` facade, and the list of client apps
       // a plugin can name, which custody reads without the manifest contract, and the manifest vocabulary
       // the plugin_authoring tool and the public site's plugin reference share, and the artwork reference
-      // and rail presentation answer, which the tree host, the rail, and the examples read without it.
-      '@acorn/protocol': 90,
+      // and rail presentation answer, which the tree host, the rail, and the examples read without it,
+      // and the record change rules that workflow loops, record triggers, and their preview share.
+      '@acorn/protocol': 91,
       // client-core publishes narrow entrypoints where a consumer can't take a barrel that pulls in
       // renderer-only modules. Pure leaves the terminal, logic tests or remote trees need: model-provider
       // error guidance, `kit/lib/savedSignal`, `kit/lib/formatChord`, `kit/lib/ansi`, and the address

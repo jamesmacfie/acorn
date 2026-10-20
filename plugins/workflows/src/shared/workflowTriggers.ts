@@ -1,12 +1,31 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
-import type { DataField } from '@acorn/protocol/dataBindings.ts'
+import type { DataBinding, DataField } from '@acorn/protocol/dataBindings.ts'
+import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { Cadence } from '@acorn/protocol/schedules.ts'
 import type { ResolvedWorkflowGraph, WorkflowBudget } from './workflowContracts'
 import type { WorkflowRepeatPolicy } from './workflowProcessing'
 
-/** What makes a trigger start a run. A clock trigger's cadence lives on core's scheduler row. */
-export type WorkflowTriggerWhen = { kind: 'clock'; timezone: string }
+/** Which records start a run: one that's new, starts matching, or changes in the fields named. */
+export type WorkflowRecordChange = { on: 'new' } | { on: 'enters' } | { on: 'changes'; fields: string[] }
+
+/** A record trigger. Its pointers address the record envelope `{ ref, data, display }`, as a For each
+ *  loop's do, so a field of the record's data is `/data/<field>`. */
+export type WorkflowRecordsWhen = {
+  kind: 'records'
+  query: QueryReference
+  change: WorkflowRecordChange
+  /** Continue from the source's checkpoint instead of reading every match. Never with `enters`. */
+  incremental?: boolean
+  /** Workflow inputs filled from the record, each `{ address: { from: 'item', pointer } }`. */
+  bindings?: Record<string, DataBinding>
+  /** Circuit breakers: runs started by one check, and in any 24 hours. */
+  runsPerCheck?: number
+  runsPerDay?: number
+}
+
+/** What makes a trigger start a run. Either kind's cadence lives on core's scheduler row. */
+export type WorkflowTriggerWhen = { kind: 'clock'; timezone: string } | WorkflowRecordsWhen
 
 export type WorkflowTriggerState = 'draft' | 'baselining' | 'active' | 'needs-review' | 'baseline-failed' | 'deleted'
 export type WorkflowTriggerFirstCheck = 'process-current' | 'track-now'
@@ -41,8 +60,37 @@ export type WorkflowTriggerPreparation = {
   changes: Array<{ kind: 'workflow' | 'query' | 'field' | 'source'; label: string }>
 }
 
+/** A record trigger's last check: when it ran, how many runs it started, and whether it read every
+ *  match. `partial` is the source's reason when it didn't. */
+export type WorkflowTriggerCheck = { at: number; started: number; partial?: string }
+
+/** One record a record trigger started a run for. */
+export type WorkflowTriggerMatch = {
+  title: string
+  reason: WorkflowRecordChange['on']
+  state: WorkflowTriggerOccurrenceSummary['state']
+  taskId: string
+  runId: string
+  runStatus?: string
+  detail?: string
+  createdAt: number
+}
+
+/** What a record trigger's query returns now, and what its first check would do with it. */
+export type WorkflowTriggerPreview = {
+  source: {
+    label: string
+    schema: DataSchema
+    fields: DataField[]
+    incremental: boolean
+    incrementalReason?: string
+  }
+  records: Array<{ title: string; link?: string; wouldStart: boolean }>
+  partial?: string
+}
+
 type WorkflowTriggerOccurrenceSummary = {
-  kind: 'scheduled' | 'manual' | 'baseline'
+  kind: 'scheduled' | 'manual' | 'baseline' | 'match'
   state: 'active' | 'completed' | 'skipped' | 'blocked'
   taskId: string
   runId: string
@@ -66,6 +114,9 @@ export type WorkflowTriggerView = {
   error?: string
   nextRunAt?: number
   latest?: WorkflowTriggerOccurrenceSummary
+  lastCheck?: WorkflowTriggerCheck
+  /** A record trigger's last 50 matches, newest first. Only a single trigger's read carries them. */
+  matches?: WorkflowTriggerMatch[]
   updatedAt: number
 }
 
@@ -74,6 +125,8 @@ export type WorkflowTriggerPayload = {
   inputs: Record<string, DataValue>
   limits: WorkflowTriggerLimits
   baseline: boolean
+  /** The record a record trigger's occurrence handles, which names its task. */
+  record?: { title: string; reason: WorkflowRecordChange['on'] }
 }
 
 export type WorkflowTriggerDraftInput = {
