@@ -643,6 +643,7 @@ export class AgentStore {
       const owned = this.deleteOwnedRows(tx, sessionId)
       tx.delete(schema.agentEvents).where(eq(schema.agentEvents.sessionId, sessionId)).run()
       // Here and not in deleteOwnedRows, because the retention pass keeps a session's facts.
+      tx.delete(schema.agentToolCallFacts).where(eq(schema.agentToolCallFacts.sessionId, sessionId)).run()
       tx.delete(schema.agentTurnFacts).where(eq(schema.agentTurnFacts.sessionId, sessionId)).run()
       tx.delete(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).run()
       return owned

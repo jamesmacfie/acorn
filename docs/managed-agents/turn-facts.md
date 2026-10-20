@@ -3,7 +3,7 @@
 The agents plugin writes one row of numbers for each finished turn into `agent_turn_facts`. The row
 answers how long a turn ran, how long it waited on you, how its tool calls went, what it changed, how
 full its context got, and what it spent. This page covers the columns, the rules behind them, when
-rows are written, what removes them, and the data sources that read them. Read it before you change a rule or read the table.
+rows are written, and what removes them. Read it before you change a rule or read the table.
 
 The table is declared in `plugins/agents/src/node/schema.ts`. The rules are the pure function
 `computeTurnFacts` in `plugins/agents/src/server/sessions/turnFacts.ts`. `TurnFactsWriter` in
@@ -37,6 +37,22 @@ tool input in memory to count repeats and never stores it. The row holds tokens,
 reader prices them with your pricing preferences when it reads, so a price change reaches old turns
 without a rewrite.
 
+### Tool call rows
+
+`agent_tool_call_facts` holds one row per call of a finished turn, its subagents' calls included. The
+key is `(turn_id, seq)`, where `seq` is the sequence of the call's first ledger row, and the table is
+indexed by `(task_id, started_at)`. A row holds the session, task, project, and provider IDs, then:
+
+| Column | Holds |
+| --- | --- |
+| `tool` | The call's MCP tool name, or its kind, such as `execute` or `edit`, when it has none. Null when it has neither |
+| `status`, `exit_code`, `failed` | The call's final status, `unknown` when it reported none, its exit code, and whether it failed by the rule below |
+| `in_subagent` | Whether a subagent made the call |
+| `started_at`, `duration_ms` | When the call's first row landed, and the time to its last row. The duration is null unless the call settled and has two rows |
+
+A call's title holds the command or path it ran, so the row keeps the tool's name and leaves the title
+out. `computeToolCallFacts` in `turnFacts.ts` writes these rows from the same fold as the turn's row.
+
 ## The rules
 
 A tool call spans several ledger rows ([how the ledger stores a tool
@@ -44,6 +60,7 @@ call](./transcript-store.md#how-the-ledger-stores-a-tool-call)). The rules fold 
 `mergeToolCall`, as the transcript does, and order the calls by their first row. Then:
 
 - **Failures.** A call failed when its status is `failed`, or when it reported a nonzero `exitCode`.
+  The turn's count and each call row's `failed` use this one rule.
 - **Runs.** Failure runs and repeat runs are counted per stream: the session's own calls, and each
   subagent's. Parallel subagents interleave their calls in one turn, so one stream would break every
   run. When two runs tie, the first one counts.
@@ -87,8 +104,8 @@ writer, which it loads on the first settled turn. The writer reads three things:
    dropped in SQLite by `json_remove`.
 3. The usage baseline.
 
-It never reads the rest of the session. It computes the row and upserts it in one transaction,
-outside the transaction that settled the turn. Then the engine publishes `plugin:agents:turn-facts`
+It never reads the rest of the session. It computes the row and upserts it, and replaces the turn's
+call rows, in one transaction, outside the transaction that settled the turn. Then the engine publishes `plugin:agents:turn-facts`
 with the task, session, and turn IDs ([session events](./session-events.md#cross-plugin-lifecycle)).
 A reader that refreshes on `turn-changed` would race the writer, so this event says the row exists.
 A failed write is logged and left to the backfill. It never fails the turn.
@@ -111,46 +128,14 @@ would send thousands.
 
 - The [retention pass](./history-retention.md) keeps a session's facts when it removes its history.
   They hold numbers only, and they let you see last year's spend after the transcripts are gone.
-- Deleting a session removes its facts in the same transaction (`AgentStore.deleteSession`).
+- Deleting a session removes its facts and call rows in the same transaction (`AgentStore.deleteSession`).
 - Deleting a task removes its facts, because the purge deletes each of its sessions.
 
 ## Data sources
 
-Two agents data sources serve the facts. Each ships starter panels.
-
-**Agent turns** (`turns`) has one record per row, with the columns in camel case and without
-`version`. Each record adds four things:
-
-- `costUsd` and `costSource`, priced when the source is read by `agentUsageCost` in
-  `plugins/agents/src/shared/pricing.ts`, the rule `usage-records` uses. A turn with no tokens isn't
-  estimated, so a Claude Code turn costs what it reported, or is unknown.
-- `contextPeak`, the peak context as a percentage of the window, or null.
-- `taskTitle` and `projectName`, read from core once per query.
-
-`provider` and `model` answer `options` with the values the rows hold. `completedAt` is the time
-field. Its starters are spend by day, spend this month by project, time agents waited on you, and
-failed turns this week.
-
-**Agent session totals** (`session-totals`) groups the rows in scope by session, and leaves out a
-session with no finished turn. A record sums the time, waiting, calls, failures, changed and rewritten
-files, subagents, tokens, and the cost of the turns that have one. It keeps the most failures in a
-row, the most repeated calls, the most files rewritten, and the peak context of any one turn, with the
-turn number and sequence where the worst failure run and repeat run started. It also carries the
-session's title, provider, kind, and archived mark, its task's title and status, its project, and how
-many change requests the session attached. Archived sessions are included, and so are sessions whose
-history the retention pass removed. `lastCompletedAt` is the time field. Its starter lists the most
-expensive sessions this month.
-
-All three agents sources read through `sourceQuery.ts` in `plugins/agents/src/server/data`:
-
-1. The scope's workspace and project become the task IDs from `tasks.inProject`, archived and
-   cancelled tasks included. A scope with neither reads the whole Node.
-2. Comparisons on the time field, and `eq` on IDs, provider, and model, go into SQL. The whole query
-   then runs in memory over what SQL returned, so SQL only narrows the read.
-3. The read is newest first and stops at the 5,000-record budget. When rows of the window remain, the
-   source reports `incomplete` with `host-budget`, covered from the oldest record it kept.
-
-Coverage is `events`, and complete once no finished turn waits for its facts (`turnFactsPending`).
+**Agent turns**, **Agent session totals**, and **Agent tool calls** read these tables, and **Agent
+approvals** reads the session's requests. For their records, starters, scope, and read budget, and
+for why tool calls have rows of their own, see [agents data sources](./turn-facts/data-sources.md).
 
 ## Measurements
 
@@ -162,9 +147,11 @@ On October 20, 2026, on an Apple M2 Pro:
   3,294 rows in 4.1 seconds, in 68 steps. The longest step held the database for 161 ms.
 - That copy's largest turn has 18,966 events, and 16.5 MB of them are tool rows. Writing its facts
   took about 62 ms, most of it SQLite reading the rows.
-- On the same copy, the "Spend by day, last 30 days" starter read 3,294 turns over 33 pages and came
-  back complete. Reading every page and running the plan's stages took 0.71 s, warm, the median of
-  four runs in the plugin's test tier.
+
+- On a later copy, 3.5 GB with 878,721 events and 3,326 turns, raising `TURN_FACTS_VERSION` to 2
+  made the backfill rewrite every turn and write 150,696 call rows, 8,338 of them failed, in 8.2 s
+  over 80 steps. The longest step, one turn with thousands of calls, held the database for 265 ms.
+  The call table and its indexes took 43 MB.
 
 ## Limits
 

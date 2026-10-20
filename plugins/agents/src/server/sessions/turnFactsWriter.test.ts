@@ -105,6 +105,15 @@ describe('turn facts', () => {
     const row = db.transaction((tx) => writeTurnFacts(tx, turn.id, 'project'))
     expect(row).toMatchObject({ firstSeq: 10_002, toolCalls: 1, toolFailures: 1, projectId: 'project' })
     expect(facts(turn.id)).toEqual(row)
+
+    // The call's row goes in with the turn's, and a rewrite replaces it rather than adding another.
+    const calls = () =>
+      db.select().from(schema.agentToolCallFacts).where(eq(schema.agentToolCallFacts.turnId, turn.id)).all()
+    expect(calls()).toMatchObject([{ seq: 10_003, tool: 'execute', exitCode: 1, failed: true, projectId: 'project' }])
+    db.transaction((tx) => writeTurnFacts(tx, turn.id, 'project'))
+    expect(calls()).toHaveLength(1)
+    await store.deleteSession(earlier.sessionId)
+    expect(calls()).toEqual([])
   })
 
   it('writes the facts of a turn when it settles, then says so', async () => {

@@ -229,6 +229,34 @@ export const agentTurnFacts = sqliteTable(
   ],
 )
 
+// One row per tool call of a finished turn, written with the turn's facts and gone with them. Numbers
+// and identifiers only: no tool input, output, title, or path. A busy week holds tens of thousands of
+// calls, too many to fold from the ledger at read time (docs/managed-agents/turn-facts.md).
+export const agentToolCallFacts = sqliteTable(
+  'agent_tool_call_facts',
+  {
+    turnId: text('turn_id').notNull(),
+    // The sequence of the call's first ledger row.
+    seq: integer('seq').notNull(),
+    sessionId: text('session_id').notNull(),
+    taskId: text('task_id').notNull(),
+    projectId: text('project_id'),
+    provider: text('provider').notNull(),
+    // The MCP tool name, or the call's kind when it has none.
+    tool: text('tool'),
+    status: text('status').notNull(),
+    exitCode: integer('exit_code'),
+    failed: integer('failed', { mode: 'boolean' }).notNull(),
+    inSubagent: integer('in_subagent', { mode: 'boolean' }).notNull(),
+    startedAt: integer('started_at').notNull(),
+    durationMs: integer('duration_ms'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.turnId, t.seq] }),
+    index('agent_tool_call_facts_task_started_idx').on(t.taskId, t.startedAt),
+  ],
+)
+
 export const agentAttachments = sqliteTable(
   'agent_attachments',
   {

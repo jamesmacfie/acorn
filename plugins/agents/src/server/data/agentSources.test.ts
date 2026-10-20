@@ -8,7 +8,9 @@ import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import * as schema from '../../node/schema'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { TURN_FACTS_VERSION } from '../sessions/turnFacts'
+import { createApprovalSourceHandler } from './approvalSourceHandler'
 import { createSessionTotalsSourceHandler } from './sessionTotalsSourceHandler'
+import { createToolCallSourceHandler } from './toolCallSourceHandler'
 import { createTurnSourceHandler } from './turnSourceHandler'
 import { createUsageSourceHandler } from './usageSourceHandler'
 import { usageRecords } from './usageRecords'
@@ -53,9 +55,10 @@ async function readAll(
         sort: [],
         ...(predicate ? { predicate } : {}),
       },
-    })) as Page & { completeness: { cursor?: string } }
+    })) as Page & { completeness: { cursor?: string }; coveredRange?: { start: number } }
     records.push(...page.records)
-    if (page.completeness.kind !== 'more') return { records, completeness: page.completeness }
+    if (page.completeness.kind !== 'more')
+      return { records, completeness: page.completeness, coveredRange: page.coveredRange }
     cursor = page.completeness.cursor
   }
 }
@@ -235,16 +238,11 @@ describe('agents data sources', () => {
       for (const record of records) expect(record.data).toEqual(october.get(record.recordId))
 
       // Without a window the newest 5,000 come back, marked as cut.
-      const unbounded = (await post(handler, {
-        operation: 'query',
-        mode: 'execution',
-        evaluationTime: Date.now(),
-        pageSize: 100,
-        query: { source: { pluginId: 'agents', sourceId: 'usage-records' }, scope: { parameters: {} }, sort: [] },
-      })) as Page & { coveredRange: { start: number } }
+      const unbounded = await readAll(handler, 'usage-records', {})
       expect(unbounded.completeness).toEqual({ kind: 'incomplete', cause: 'host-budget' })
+      expect(unbounded.records).toHaveLength(5_000)
       expect(unbounded.records[0]?.recordId).toBe(events.at(-1)?.id)
-      expect(unbounded.coveredRange.start).toBe(events[1_000]?.createdAt)
+      expect(unbounded.coveredRange?.start).toBe(events[1_000]?.createdAt)
     })
   })
 
@@ -425,6 +423,192 @@ describe('agents data sources', () => {
       // A window on the last finished turn leaves out the session that ended before it.
       const october = await readAll(totals, 'session-totals', { projectId }, after('/lastCompletedAt', OCTOBER))
       expect(october.records.map((record) => record.recordId)).toEqual([archived])
+    })
+  })
+
+  describe('Agent tool calls', () => {
+    const toolCall = (
+      taskId: string,
+      projectId: string,
+      values: Partial<typeof schema.agentToolCallFacts.$inferInsert> & { seq: number; startedAt: number },
+    ) =>
+      db
+        .insert(schema.agentToolCallFacts)
+        .values({
+          turnId: 'turn',
+          sessionId: 'session',
+          taskId,
+          projectId,
+          provider: 'claude',
+          tool: 'execute',
+          status: 'completed',
+          exitCode: null,
+          failed: false,
+          inSubagent: false,
+          durationMs: 10,
+          ...values,
+        })
+        .run()
+
+    it("reads a project's calls newest first, and cuts the read at the budget", async () => {
+      const home = await workspace('Home')
+      const api = await project(home, 'api')
+      const apiTask = await task(api, 'Fix login')
+      const elsewhere = await project(await workspace('Other'), 'site')
+      const otherTask = await task(elsewhere, 'Elsewhere')
+      db.transaction(() => {
+        for (let seq = 1; seq <= 6_000; seq++)
+          toolCall(apiTask, api, {
+            seq,
+            startedAt: OCTOBER + seq * 1_000,
+            ...(seq % 100 === 0 ? { tool: 'memory_get', status: 'failed', failed: true } : {}),
+          })
+        toolCall(otherTask, elsewhere, { seq: 1, turnId: 'other', startedAt: OCTOBER + 1, failed: true })
+      })
+      const handler = createToolCallSourceHandler(db, ctx.core)
+
+      const whole = await readAll(handler, 'tool-calls', { workspaceId: home })
+      expect(whole.completeness).toEqual({ kind: 'incomplete', cause: 'host-budget' })
+      expect(whole.records).toHaveLength(5_000)
+      expect(whole.records[0]).toMatchObject({ recordId: 'turn:6000' })
+      expect(whole.coveredRange?.start).toBe(OCTOBER + 1_001 * 1_000)
+      expect(whole.records[0]!.data).toEqual({
+        turnId: 'turn',
+        seq: 6_000,
+        sessionId: 'session',
+        taskId: apiTask,
+        taskTitle: 'Fix login',
+        projectId: api,
+        projectName: 'api',
+        provider: 'claude',
+        tool: 'memory_get',
+        status: 'failed',
+        exitCode: null,
+        failed: true,
+        inSubagent: false,
+        startedAt: OCTOBER + 6_000_000,
+        durationMs: 10,
+      })
+
+      // Failures and a window go into SQL, so the read stays inside the budget and comes back whole.
+      const failed = await readAll(
+        handler,
+        'tool-calls',
+        { workspaceId: home },
+        {
+          kind: 'all',
+          predicates: [
+            after('/startedAt', OCTOBER + 3_000_000),
+            {
+              kind: 'comparison',
+              left: { address: { from: 'item', pointer: '/failed' } },
+              operator: 'eq',
+              right: { address: { from: 'literal', value: true } },
+            },
+          ],
+        },
+      )
+      expect(failed.completeness).toEqual({ kind: 'complete' })
+      expect(failed.records).toHaveLength(30)
+      expect(failed.records.every((record) => record.data.tool === 'memory_get')).toBe(true)
+
+      await expect(
+        post(handler, {
+          operation: 'options',
+          source: { pluginId: 'agents', sourceId: 'tool-calls' },
+          scope: { workspaceId: home, parameters: {} },
+          target: 'field',
+          pointer: '/tool',
+        }),
+      ).resolves.toEqual({
+        options: [
+          { id: 'execute', label: 'execute' },
+          { id: 'memory_get', label: 'memory_get' },
+        ],
+        exhausted: true,
+      })
+    })
+  })
+
+  describe('Agent approvals', () => {
+    it('reads how each request resolved, and none of its text', async () => {
+      const home = await workspace('Home')
+      const api = await project(home, 'api')
+      const taskId = await task(api, 'Fix login')
+      const sessionId = session(taskId, { provider: 'claude' })
+      const otherTask = await task(await project(await workspace('Other'), 'site'), 'Elsewhere')
+      const options = [
+        { id: 'yes', kind: 'allow_once', name: 'Allow the secret command' },
+        { id: 'no', kind: 'reject_once', name: 'Refuse' },
+      ]
+      const request = (
+        id: string,
+        values: Partial<typeof schema.agentRequests.$inferInsert> & { createdAt: number },
+        inSession = sessionId,
+      ) =>
+        db
+          .insert(schema.agentRequests)
+          .values({
+            id,
+            sessionId: inSession,
+            turnId: null,
+            providerRequestId: id,
+            kind: 'permission',
+            status: 'resolved',
+            title: 'Run the secret command',
+            detail: 'secret detail',
+            payloadJson: JSON.stringify({ options, questions: [{ question: 'secret question' }] }),
+            resolvedAt: values.createdAt + 5_000,
+            ...values,
+          })
+          .run()
+      request('allowed', { createdAt: OCTOBER + 1, resolutionJson: JSON.stringify({ optionId: 'yes' }) })
+      request('denied', { createdAt: OCTOBER + 2, resolutionJson: JSON.stringify({ optionId: 'no' }) })
+      request('answered', {
+        createdAt: OCTOBER + 3,
+        kind: 'question',
+        resolutionJson: JSON.stringify({ answers: { q: 'secret answer' } }),
+      })
+      request('blocked', {
+        createdAt: OCTOBER + 4,
+        resolutionJson: JSON.stringify({ blocked: { by: 'Policy', reason: 'secret reason' } }),
+        resolvedAt: OCTOBER + 4,
+      })
+      request('expired', { createdAt: OCTOBER + 5, status: 'expired' })
+      request('pending', { createdAt: OCTOBER + 6, status: 'pending', resolvedAt: null })
+      request('earlier', { createdAt: OCTOBER - 1, resolutionJson: JSON.stringify({ optionId: 'yes' }) })
+      request('elsewhere', { createdAt: OCTOBER + 7 }, session(otherTask))
+      const handler = createApprovalSourceHandler(db, ctx.core)
+
+      const { records, completeness } = await readAll(
+        handler,
+        'approvals',
+        { workspaceId: home },
+        after('/createdAt', OCTOBER),
+      )
+      expect(completeness).toEqual({ kind: 'complete' })
+      expect(records.map((record) => [record.recordId, record.data.outcome, record.data.waitMs])).toEqual([
+        ['pending', 'pending', null],
+        ['expired', 'expired', 5_000],
+        ['blocked', 'blocked', 0],
+        ['answered', 'answered', 5_000],
+        ['denied', 'denied', 5_000],
+        ['allowed', 'allowed', 5_000],
+      ])
+      expect(records.at(-1)!.data).toEqual({
+        kind: 'permission',
+        outcome: 'allowed',
+        waitMs: 5_000,
+        createdAt: OCTOBER + 1,
+        sessionId,
+        turnId: null,
+        taskId,
+        taskTitle: 'Fix login',
+        projectId: api,
+        projectName: 'api',
+        provider: 'claude',
+      })
+      expect(JSON.stringify(records)).not.toMatch(/secret/)
     })
   })
 })

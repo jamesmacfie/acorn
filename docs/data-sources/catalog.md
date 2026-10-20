@@ -9,10 +9,12 @@ add a source, add its row here.
 | Tasks (`core:tasks`) | Core | Task in the workspace | Yes | [Data sources](../data-sources.md) |
 | Local branches (`core:local-branches`) | Core | Local branch of a project | No | [Data sources](../data-sources.md) |
 | Local worktrees (`core:local-worktrees`) | Core | Worktree of a project | Yes | [Data sources](../data-sources.md) |
-| Managed agent sessions (`agents:sessions`) | Agents | Unarchived session | No | [Turn facts](../managed-agents/turn-facts.md#data-sources) |
-| Agent usage records (`agents:usage-records`) | Agents | Usage report | Yes | [Turn facts](../managed-agents/turn-facts.md#data-sources) |
-| Agent turns (`agents:turns`) | Agents | Finished turn | Yes | [Turn facts](../managed-agents/turn-facts.md#data-sources) |
-| Agent session totals (`agents:session-totals`) | Agents | Session with a finished turn | Yes | [Turn facts](../managed-agents/turn-facts.md#data-sources) |
+| Managed agent sessions (`agents:sessions`) | Agents | Unarchived session | No | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
+| Agent usage records (`agents:usage-records`) | Agents | Usage report | Yes | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
+| Agent turns (`agents:turns`) | Agents | Finished turn | Yes | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
+| Agent session totals (`agents:session-totals`) | Agents | Session with a finished turn | Yes | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
+| Agent tool calls (`agents:tool-calls`) | Agents | Tool call of a finished turn | Yes | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
+| Agent approvals (`agents:approvals`) | Agents | Permission or question request | Yes | [Agents data sources](../managed-agents/turn-facts/data-sources.md) |
 | Git commits (`git:commits`) | Git | Commit, once per project | Yes | [History](../git-client/history.md#git-commits-data-source) |
 | Workflow runs (`workflows:runs`) | Workflows | Run, child runs included | Yes | [Workflows](../workflows.md#workflow-runs-source) |
 | Memories (`memory:memories`) | Memory | Memory, private ones included | Yes | [Memory page](../notes-and-memory/memory-page.md#the-memories-data-source) |

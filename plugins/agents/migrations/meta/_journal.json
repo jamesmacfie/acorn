@@ -113,6 +113,13 @@
       "when": 1792435475326,
       "tag": "0019_agent_turn_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1792472110812,
+      "tag": "0020_agent_tool_call_facts",
+      "breakpoints": true
     }
   ]
 }

@@ -64,7 +64,7 @@ export async function tasksOfRows(
 }
 
 /** The columns SQL compares, by field pointer: the time field with `gt`, `gte`, `lt`, and `lte`, and the
- *  `equals` fields with `eq` on a string. */
+ *  `equals` fields with `eq` on a string or a boolean. */
 export type SqlFields = { time: { pointer: string; column: SQLWrapper }; equals: Record<string, SQLWrapper> }
 
 const TIME_OPERATORS = { gt, gte, lt, lte }
@@ -82,7 +82,8 @@ export function sqlFilters(predicate: DataPredicate | undefined, fields: SqlFiel
     const column = fields.equals[pointer]
     if (pointer === fields.time.pointer && typeof value === 'number' && Object.hasOwn(TIME_OPERATORS, part.operator))
       filters.time.push(TIME_OPERATORS[part.operator as keyof typeof TIME_OPERATORS](fields.time.column, value))
-    else if (part.operator === 'eq' && typeof value === 'string' && column) filters.equals.push(eq(column, value))
+    else if (part.operator === 'eq' && (typeof value === 'string' || typeof value === 'boolean') && column)
+      filters.equals.push(eq(column, value))
   }
   if (predicate) visit(predicate)
   return filters
@@ -113,7 +114,8 @@ function matches(data: DataValue, predicate: DataPredicate): boolean {
 
 /**
  * Filters, sorts, and pages records read newest first. Sorting is stable, so ties keep that order. A
- * read the budget cut is `incomplete`, and its covered range starts at the oldest record it kept.
+ * read the budget cut is `incomplete` on its last page, because the host stops paging at the first
+ * page that isn't `more`. Its covered range starts at the oldest record it kept.
  */
 export function sourcePage<T extends SourceRecord>(
   input: QueryInput,
@@ -141,10 +143,10 @@ export function sourcePage<T extends SourceRecord>(
   const oldest = read.records.at(-1)
   return {
     records: selected,
-    completeness: read.truncated
-      ? { kind: 'incomplete' as const, cause: 'host-budget' as const }
-      : more
-        ? { kind: 'more' as const, cursor: String(offset + selected.length) }
+    completeness: more
+      ? { kind: 'more' as const, cursor: String(offset + selected.length) }
+      : read.truncated
+        ? { kind: 'incomplete' as const, cause: 'host-budget' as const }
         : take && records.length >= take
           ? { kind: 'bounded' as const }
           : { kind: 'complete' as const },

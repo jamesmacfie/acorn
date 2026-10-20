@@ -35,3 +35,26 @@ export const sessionTotalsSource: DataSourceRegistration = {
   titlePointer: '/title',
   icon: 'bot',
 }
+
+export const toolCallSource: DataSourceRegistration = {
+  sourceId: 'tool-calls',
+  name: 'Agent tool calls',
+  singular: 'Agent tool call',
+  plural: 'Agent tool calls',
+  identityScope:
+    "Managed turn UUID and the sequence of the call's first event; one record per tool call of a finished turn",
+  handler: '/v1/p/agents/data/tool-calls',
+  titlePointer: '/tool',
+  icon: 'bot',
+}
+
+export const approvalSource: DataSourceRegistration = {
+  sourceId: 'approvals',
+  name: 'Agent approvals',
+  singular: 'Agent approval',
+  plural: 'Agent approvals',
+  identityScope: 'Managed request UUID; one record per permission, question, or other request',
+  handler: '/v1/p/agents/data/approvals',
+  titlePointer: '/kind',
+  icon: 'bot',
+}

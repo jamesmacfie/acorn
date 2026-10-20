@@ -585,8 +585,10 @@ export const SDK_VERSION = '1.2.0'
  * A copy, because this package has no dependencies. index.test.ts holds it to the SDK's field lists.
  */
 export const KNOWN_SOURCES = [
+  { source: 'agents:approvals', name: 'Agent approvals', title: 'taskTitle' },
   { source: 'agents:session-totals', name: 'Agent session totals', title: 'title' },
   { source: 'agents:sessions', name: 'Managed agent sessions', title: 'title' },
+  { source: 'agents:tool-calls', name: 'Agent tool calls', title: 'taskTitle' },
   { source: 'agents:turns', name: 'Agent turns', title: 'taskTitle' },
   { source: 'agents:usage-records', name: 'Agent usage records' },
   { source: 'core:local-branches', name: 'Local branches', title: 'name' },

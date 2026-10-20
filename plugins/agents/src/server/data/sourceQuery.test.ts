@@ -99,12 +99,16 @@ describe('agents source query', () => {
     ).toEqual(['b', 'a', 'c'])
   })
 
-  it('reports a read the budget cut as incomplete, covered from its oldest kept row', () => {
+  it('pages a read the budget cut, and reports it incomplete on its last page, covered from its oldest kept row', () => {
     const read = withinBudget(Array.from({ length: READ_LIMIT }, (_, index) => record(`r${index}`, READ_LIMIT - index)))
     expect(read.truncated).toBe(true)
-    const page = sourcePage(query(), { records: read.rows, truncated: read.truncated }, '/completedAt')
-    expect(page.completeness).toEqual({ kind: 'incomplete', cause: 'host-budget' })
-    expect(page.coveredRange?.start).toBe(2)
+    const cut = { records: read.rows, truncated: read.truncated }
+    // The host stops at the first page that isn't `more`, so an early `incomplete` would cut it to one page.
+    expect(sourcePage(query(), cut, '/completedAt').completeness).toEqual({ kind: 'more', cursor: '100' })
+    const last = sourcePage(query(undefined, { cursor: '4900' }), cut, '/completedAt')
+    expect(last.records).toHaveLength(100)
+    expect(last.completeness).toEqual({ kind: 'incomplete', cause: 'host-budget' })
+    expect(last.coveredRange?.start).toBe(2)
 
     const whole = withinBudget(read.rows.slice(1))
     expect(whole.truncated).toBe(false)

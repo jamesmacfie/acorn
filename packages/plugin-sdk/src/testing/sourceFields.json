@@ -1,4 +1,253 @@
 {
+  "agents:approvals": {
+    "name": "Agent approvals",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "waitMs": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "turnId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "taskTitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "outcome",
+        "waitMs",
+        "createdAt",
+        "sessionId",
+        "turnId",
+        "taskId",
+        "taskTitle",
+        "projectId",
+        "projectName",
+        "provider"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/kind",
+        "origin": "declared",
+        "label": "Kind",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "permission",
+              "label": "Permission"
+            },
+            {
+              "id": "question",
+              "label": "Question"
+            },
+            {
+              "id": "elicitation",
+              "label": "Elicitation"
+            },
+            {
+              "id": "workflow_gate",
+              "label": "Workflow gate"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/outcome",
+        "origin": "declared",
+        "label": "Outcome",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "allowed",
+              "label": "Allowed",
+              "tone": "ok"
+            },
+            {
+              "id": "denied",
+              "label": "Denied",
+              "tone": "bad"
+            },
+            {
+              "id": "answered",
+              "label": "Answered",
+              "tone": "ok"
+            },
+            {
+              "id": "blocked",
+              "label": "Blocked by a policy",
+              "tone": "warn"
+            },
+            {
+              "id": "cancelled",
+              "label": "Cancelled",
+              "tone": "muted"
+            },
+            {
+              "id": "expired",
+              "label": "Expired",
+              "tone": "muted"
+            },
+            {
+              "id": "pending",
+              "label": "Waiting",
+              "tone": "accent"
+            },
+            {
+              "id": "other",
+              "label": "Other",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/waitMs",
+        "origin": "declared",
+        "label": "Wait",
+        "description": "From the request to its resolution or expiry. Null while it waits.",
+        "display": {
+          "kind": "number",
+          "unit": "ms"
+        }
+      },
+      {
+        "pointer": "/createdAt",
+        "origin": "declared",
+        "label": "Asked",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/sessionId",
+        "origin": "declared",
+        "label": "Session",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/turnId",
+        "origin": "declared",
+        "label": "Turn",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/taskId",
+        "origin": "declared",
+        "label": "Task",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/taskTitle",
+        "origin": "declared",
+        "label": "Task title",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/projectId",
+        "origin": "declared",
+        "label": "Project"
+      },
+      {
+        "pointer": "/projectName",
+        "origin": "declared",
+        "label": "Project name"
+      },
+      {
+        "pointer": "/provider",
+        "origin": "declared",
+        "label": "Provider",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      }
+    ]
+  },
   "agents:session-totals": {
     "name": "Agent session totals",
     "schema": {
@@ -663,6 +912,303 @@
             "lte"
           ],
           "sortable": true
+        }
+      }
+    ]
+  },
+  "agents:tool-calls": {
+    "name": "Agent tool calls",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tool": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "exitCode": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "failed": {
+          "type": "boolean"
+        },
+        "inSubagent": {
+          "type": "boolean"
+        },
+        "seq": {
+          "type": "number"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "turnId": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "taskTitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "number"
+        },
+        "durationMs": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "tool",
+        "status",
+        "exitCode",
+        "failed",
+        "inSubagent",
+        "seq",
+        "sessionId",
+        "turnId",
+        "taskId",
+        "taskTitle",
+        "projectId",
+        "projectName",
+        "provider",
+        "startedAt",
+        "durationMs"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/tool",
+        "origin": "declared",
+        "label": "Tool",
+        "description": "The MCP tool's name, or the call's kind, such as execute or edit, for a built-in tool.",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "dynamic",
+          "dependsOn": []
+        }
+      },
+      {
+        "pointer": "/status",
+        "origin": "declared",
+        "label": "Status",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "completed",
+              "label": "Completed",
+              "tone": "ok"
+            },
+            {
+              "id": "failed",
+              "label": "Failed",
+              "tone": "bad"
+            },
+            {
+              "id": "cancelled",
+              "label": "Cancelled",
+              "tone": "muted"
+            },
+            {
+              "id": "interrupted",
+              "label": "Interrupted",
+              "tone": "warn"
+            },
+            {
+              "id": "running",
+              "label": "Running",
+              "tone": "accent"
+            },
+            {
+              "id": "pending",
+              "label": "Pending",
+              "tone": "muted"
+            },
+            {
+              "id": "unknown",
+              "label": "Unknown",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/exitCode",
+        "origin": "declared",
+        "label": "Exit code"
+      },
+      {
+        "pointer": "/failed",
+        "origin": "declared",
+        "label": "Failed",
+        "description": "The call failed, or its command exited with a nonzero code.",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/inSubagent",
+        "origin": "declared",
+        "label": "In a subagent",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/seq",
+        "origin": "declared",
+        "label": "Event",
+        "description": "The sequence number of the call's first event."
+      },
+      {
+        "pointer": "/sessionId",
+        "origin": "declared",
+        "label": "Session",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/turnId",
+        "origin": "declared",
+        "label": "Turn",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/taskId",
+        "origin": "declared",
+        "label": "Task",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/taskTitle",
+        "origin": "declared",
+        "label": "Task title",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/projectId",
+        "origin": "declared",
+        "label": "Project",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/projectName",
+        "origin": "declared",
+        "label": "Project name"
+      },
+      {
+        "pointer": "/provider",
+        "origin": "declared",
+        "label": "Provider",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "dynamic",
+          "dependsOn": []
+        }
+      },
+      {
+        "pointer": "/startedAt",
+        "origin": "declared",
+        "label": "Started",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/durationMs",
+        "origin": "declared",
+        "label": "Duration",
+        "description": "From the first update to the last, for a call that settled. Null when one end is unknown.",
+        "display": {
+          "kind": "number",
+          "unit": "ms"
         }
       }
     ]

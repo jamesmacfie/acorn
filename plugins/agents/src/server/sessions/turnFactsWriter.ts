@@ -3,7 +3,7 @@ import { createLogger, describeError, type PluginDatabase } from '@acorn/plugin-
 import * as schema from '../../node/schema'
 import type { AgentUsage } from '../../contract/wire.ts'
 import { parseStoredEvent } from './ledgerFold'
-import { computeTurnFacts, type TurnFacts, type TurnFactsInput } from './turnFacts'
+import { computeToolCallFacts, computeTurnFacts, type TurnFacts, type TurnFactsInput } from './turnFacts'
 
 const log = createLogger('agents:turn-facts', 'agents')
 
@@ -42,8 +42,8 @@ const usageBefore = (tx: Transaction, sessionId: string, ordinal: number): Agent
 }
 
 /**
- * Reads one turn, works out its facts, and stores them in the caller's transaction. Returns the row,
- * or null when the turn is gone or never ran.
+ * Reads one turn, works out its facts and its tool calls, and stores them in the caller's transaction.
+ * Returns the turn's row, or null when the turn is gone or never ran.
  */
 export function writeTurnFacts(tx: Transaction, turnId: string, projectId: string | null): TurnFacts | null {
   const head = tx
@@ -82,17 +82,25 @@ export function writeTurnFacts(tx: Transaction, turnId: string, projectId: strin
     .from(schema.agentRequests)
     .where(and(eq(schema.agentRequests.sessionId, head.turn.sessionId), eq(schema.agentRequests.turnId, turnId)))
     .all()
-  const facts = computeTurnFacts({
+  const input: TurnFactsInput = {
     ...head,
     projectId,
     events,
     requests: requests.map((request) => ({ ...request, blocked: Boolean(request.blocked) })),
     usageBefore: usageBefore(tx, head.turn.sessionId, head.turn.ordinal),
-  })
-  if (facts)
-    tx.insert(schema.agentTurnFacts)
-      .values(facts)
-      .onConflictDoUpdate({ target: schema.agentTurnFacts.turnId, set: facts })
+  }
+  const facts = computeTurnFacts(input)
+  if (!facts) return null
+  tx.insert(schema.agentTurnFacts)
+    .values(facts)
+    .onConflictDoUpdate({ target: schema.agentTurnFacts.turnId, set: facts })
+    .run()
+  tx.delete(schema.agentToolCallFacts).where(eq(schema.agentToolCallFacts.turnId, turnId)).run()
+  const calls = computeToolCallFacts(input)
+  // A statement at a time keeps a long turn's thousands of calls inside SQLite's variable limit.
+  for (let at = 0; at < calls.length; at += 500)
+    tx.insert(schema.agentToolCallFacts)
+      .values(calls.slice(at, at + 500))
       .run()
   return facts
 }

@@ -29,8 +29,9 @@ narrows the read in SQL, and the source also reads each session's earlier report
 record in the window counts from. The read is newest first, so the 5,000-record budget drops the
 oldest records, and the source reports `incomplete` when records of the window remain. Removed
 history is outside its coverage. Any convenience total must use the same pricing and delta policy.
-For one record per finished turn or per session, read **Agent turns** and **Agent session totals**
-([turn facts](./managed-agents/turn-facts.md#data-sources)). The pure per-event token
+For one record per finished turn, session, tool call, or approval, read **Agent turns**, **Agent
+session totals**, **Agent tool calls**, and **Agent approvals**
+([agents data sources](./managed-agents/turn-facts/data-sources.md)). The pure per-event token
 pricing formula lives in `@acorn/protocol/usageCost.ts` and is shared with the `agent-cost` badge.
 
 ## Pages

@@ -7,7 +7,7 @@ import { normalizeAcpUpdate } from '../drivers/acpNormalizer'
 import { CodexChildRouter } from '../drivers/codexChildRouting'
 import { normalizeCodexNotification } from '../drivers/codexNormalizer'
 import type { JsonRpcNotification } from '../drivers/jsonRpcProcess'
-import { computeTurnFacts, TURN_FACTS_VERSION, type TurnFactsInput } from './turnFacts'
+import { computeToolCallFacts, computeTurnFacts, TURN_FACTS_VERSION, type TurnFactsInput } from './turnFacts'
 
 const STARTED = 1_000_000
 
@@ -218,5 +218,53 @@ describe('computeTurnFacts', () => {
     expect(computeTurnFacts(input([], { turn: { ...turn, status: 'active', completedAt: null } }))).toBeNull()
     expect(computeTurnFacts(input([], { turn: { ...turn, status: 'cancelled', startedAt: null } }))).toBeNull()
     expect(computeTurnFacts(input([], { turn: { ...turn, status: 'steered' } }))).toBeNull()
+  })
+})
+
+describe('computeToolCallFacts', () => {
+  it('writes one row per call with numbers and identifiers only', () => {
+    const rows = computeToolCallFacts(
+      input([
+        call('a', { status: 'running', title: 'rm -rf /secret', paths: ['/secret'] }),
+        call('b', { name: 'memory_get', kind: 'mcp', exitCode: 2, subagentId: 'helper' }),
+        call('a', { status: 'completed', output: 'the output' }),
+        call('c', { status: 'running', kind: undefined }),
+      ]),
+    )
+    expect(rows).toEqual([
+      {
+        turnId: 'turn',
+        seq: 1,
+        sessionId: 'session',
+        taskId: 'task',
+        projectId: 'project',
+        provider: 'claude',
+        tool: 'execute',
+        status: 'completed',
+        exitCode: null,
+        failed: false,
+        inSubagent: false,
+        startedAt: STARTED + 1000,
+        durationMs: 2000,
+      },
+      // A settled call seen once has no known start, so no duration.
+      expect.objectContaining({
+        seq: 2,
+        tool: 'memory_get',
+        exitCode: 2,
+        failed: true,
+        inSubagent: true,
+        durationMs: null,
+      }),
+      expect.objectContaining({ seq: 4, tool: null, status: 'running', failed: false, durationMs: null }),
+    ])
+    expect(JSON.stringify(rows)).not.toMatch(/secret|output|command/)
+  })
+
+  it('writes none for a turn that has not finished', () => {
+    const { turn } = input([])
+    expect(
+      computeToolCallFacts(input([call('a')], { turn: { ...turn, status: 'active', completedAt: null } })),
+    ).toEqual([])
   })
 })

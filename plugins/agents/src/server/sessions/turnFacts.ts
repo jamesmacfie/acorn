@@ -7,9 +7,10 @@ import { modelAtTurn, usageDeltas } from '../data/usageRecords'
 // captured harness traffic. TurnFactsWriter reads the inputs and stores the row.
 
 /** The rules' version. Raise it when a rule changes, and the backfill pass rewrites every older row. */
-export const TURN_FACTS_VERSION = 1
+export const TURN_FACTS_VERSION = 2
 
 export type TurnFacts = typeof schema.agentTurnFacts.$inferInsert
+export type ToolCallFacts = typeof schema.agentToolCallFacts.$inferInsert
 
 export type TurnFactsInput = {
   turn: {
@@ -36,14 +37,56 @@ const SETTLED = new Set(['completed', 'failed', 'cancelled', 'interrupted'])
 const OUTPUT = new Set(['assistant_message', 'reasoning', 'tool'])
 const WAITS_ON_PERSON = new Set(['permission', 'question'])
 
+type FoldedCall = { seq: number; startedAt: number; lastAt: number; rows: number; tool: AgentToolCall }
+
+/** One call per tool id, folded the way the transcript folds it, in the order the calls started. */
+function foldCalls(events: TurnFactsInput['events']): FoldedCall[] {
+  const calls = new Map<string, FoldedCall>()
+  for (const { seq, createdAt, event } of events) {
+    if (event.type !== 'tool') continue
+    const call = calls.get(event.tool.id)
+    if (call) {
+      call.lastAt = createdAt
+      call.rows++
+      call.tool = mergeToolCall(call.tool, event.tool)
+    } else calls.set(event.tool.id, { seq, startedAt: createdAt, lastAt: createdAt, rows: 1, tool: event.tool })
+  }
+  return [...calls.values()].sort((left, right) => left.seq - right.seq)
+}
+
+const callFailed = (tool: AgentToolCall) => tool.status === 'failed' || (tool.exitCode != null && tool.exitCode !== 0)
+
+type FinishedTurn = TurnFactsInput['turn'] & { startedAt: number; completedAt: number }
+const finished = (turn: TurnFactsInput['turn']): turn is FinishedTurn =>
+  SETTLED.has(turn.status) && turn.startedAt != null && turn.completedAt != null
+
+/** One row per tool call of a finished turn, or none when the turn never started or hasn't finished. */
+export function computeToolCallFacts(input: TurnFactsInput): ToolCallFacts[] {
+  if (!finished(input.turn)) return []
+  return foldCalls(input.events).map(({ seq, startedAt, lastAt, rows, tool }) => ({
+    turnId: input.turn.id,
+    seq,
+    sessionId: input.turn.sessionId,
+    taskId: input.taskId,
+    projectId: input.projectId,
+    provider: input.provider,
+    tool: tool.name || tool.kind || null,
+    status: tool.status ?? 'unknown',
+    exitCode: tool.exitCode ?? null,
+    failed: callFailed(tool),
+    inSubagent: tool.subagentId != null,
+    // The ledger keeps a call's first row and its latest, so a settled call with two has both ends.
+    durationMs: rows > 1 && SETTLED.has(tool.status ?? '') ? lastAt - startedAt : null,
+    startedAt,
+  }))
+}
+
 /** The row for a finished turn, or null when the turn never started or hasn't finished. */
 export function computeTurnFacts(input: TurnFactsInput): TurnFacts | null {
   const { turn, events } = input
-  if (!SETTLED.has(turn.status) || turn.startedAt == null || turn.completedAt == null) return null
+  if (!finished(turn)) return null
   const { startedAt, completedAt } = turn
 
-  // One call per tool id, folded the way the transcript folds it, in the order the calls started.
-  const calls = new Map<string, { seq: number; tool: AgentToolCall }>()
   const paths = new Map<string, Set<string>>()
   const subagents = new Set<string>()
   let firstOutputAt: number | null = null
@@ -57,11 +100,7 @@ export function computeTurnFacts(input: TurnFactsInput): TurnFacts | null {
 
   for (const { seq, createdAt, event } of events) {
     if (firstOutputAt === null && OUTPUT.has(event.type)) firstOutputAt = createdAt
-    if (event.type === 'tool') {
-      const call = calls.get(event.tool.id)
-      if (call) call.tool = mergeToolCall(call.tool, event.tool)
-      else calls.set(event.tool.id, { seq, tool: event.tool })
-    } else if (event.type === 'file_change' && event.path) {
+    if (event.type === 'file_change' && event.path) {
       // A change with no id is never folded, so each one is an edit of its own.
       const edits = paths.get(event.path) ?? new Set<string>()
       edits.add(event.changeId ?? `seq:${seq}`)
@@ -89,11 +128,12 @@ export function computeTurnFacts(input: TurnFactsInput): TurnFacts | null {
   let repeatedCalls = 0
   let longestRepeatRun = 0
   let repeatRunSeq: number | null = null
-  for (const { seq, tool } of [...calls.values()].sort((left, right) => left.seq - right.seq)) {
+  const calls = foldCalls(events)
+  for (const { seq, tool } of calls) {
     const streamId = tool.subagentId ?? ''
     const stream = streams.get(streamId) ?? { key: null, repeating: 0, repeatingSeq: seq, failing: 0, failingSeq: seq }
     streams.set(streamId, stream)
-    if (tool.status === 'failed' || (tool.exitCode != null && tool.exitCode !== 0)) {
+    if (callFailed(tool)) {
       toolFailures++
       if (stream.failing++ === 0) stream.failingSeq = seq
       if (stream.failing > longestFailureRun) {
@@ -142,7 +182,7 @@ export function computeTurnFacts(input: TurnFactsInput): TurnFacts | null {
       0,
     ),
     approvals: waits.length,
-    toolCalls: calls.size,
+    toolCalls: calls.length,
     toolFailures,
     longestFailureRun,
     failureRunSeq,

@@ -5,9 +5,17 @@ import type { DataSourceDescription, DataSourceRegistration } from '../../packag
 import { registeredDataSource } from '../../packages/node-core/src/server/dataSources/registry.ts'
 import '../../packages/node-core/src/server/dataSources/coreTasks.ts'
 import '../../packages/node-core/src/server/dataSources/localGitRegistration.ts'
+import { approvalSourceDescription } from '../../plugins/agents/src/shared/approvalSource.ts'
 import { sessionSource, sessionSourceDescription } from '../../plugins/agents/src/shared/sessionSource.ts'
 import { sessionTotalsSourceDescription } from '../../plugins/agents/src/shared/sessionTotalsSource.ts'
-import { sessionTotalsSource, turnSource, usageSource } from '../../plugins/agents/src/shared/sourceRegistrations.ts'
+import {
+  approvalSource,
+  sessionTotalsSource,
+  toolCallSource,
+  turnSource,
+  usageSource,
+} from '../../plugins/agents/src/shared/sourceRegistrations.ts'
+import { toolCallSourceDescription } from '../../plugins/agents/src/shared/toolCallSource.ts'
 import { turnSourceDescription } from '../../plugins/agents/src/shared/turnSource.ts'
 import { usageSourceDescription } from '../../plugins/agents/src/shared/usageSource.ts'
 import { commitSourceDescription } from '../../plugins/git/src/shared/commitSource.ts'
@@ -55,6 +63,8 @@ async function fieldLists() {
     'agents:usage-records': [usageSource, usageSourceDescription],
     'agents:turns': [turnSource, turnSourceDescription],
     'agents:session-totals': [sessionTotalsSource, sessionTotalsSourceDescription],
+    'agents:tool-calls': [toolCallSource, toolCallSourceDescription],
+    'agents:approvals': [approvalSource, approvalSourceDescription],
     'git:commits': [commitSource, commitSourceDescription],
     'github:pull-requests': [pullSource, pullSourceDescription],
     'github:actions-jobs': [actionsSource, actionsSourceDescription],

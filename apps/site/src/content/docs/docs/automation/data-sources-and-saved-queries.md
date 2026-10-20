@@ -88,5 +88,7 @@ others.
 - A source whose plugin is off, or whose account is gone, is unavailable. acorn never treats it as
   empty.
 - The agent sessions source reads at most 5,000 sessions, and says it's partial past that.
-- The agent usage records, turns, and session totals sources read the newest 5,000 records in a
-  panel's time window, and say they're partial when the window holds more.
+- The agent usage records, turns, session totals, tool calls, and approvals sources read the newest
+  5,000 records in a panel's time window, and say they're partial when the window holds more. A
+  busy day can hold more than 5,000 tool calls, so filter tool calls on **Failed**, a tool, or a
+  session to read a longer window whole.
