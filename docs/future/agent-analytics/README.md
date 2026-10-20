@@ -1,6 +1,7 @@
 # Agent analytics
 
-Date: October 19, 2026. Status: proposed. Implementation not started.
+Date: October 19, 2026. Status: built. All eight phases landed on October 20, 2026. Each phase's
+completion note, at the top of its page, records what landed and how it was checked.
 
 This programme plans what core needs so a plugin can show how a workspace's agents spend time and
 money, and where they struggle. Its last phase builds that plugin, `acorn-analytics`, in its own

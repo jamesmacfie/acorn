@@ -6,6 +6,7 @@ import { turnSourceDescription } from '../../shared/turnSource'
 import { readAgentPricingPreferences } from '../pricingStore'
 import { turnFactsPending } from '../sessions/turnFactsBackfill'
 import { READ_LIMIT, scopeTasks, sourceHandler, sourcePage, sqlFilters, tasksOfRows, withinBudget } from './sourceQuery'
+import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 
 const facts = schema.agentTurnFacts
 type TurnFactsRow = Omit<typeof facts.$inferSelect, 'version'>
@@ -103,7 +104,7 @@ export function createTurnSourceHandler(
             projectName: task?.projectName ?? null,
           },
           taskId: row.taskId,
-          action: { verb: 'openPane' as const, pane: 'agent' },
+          action: { verb: 'openPane' as const, pane: AGENT_PANE_ID },
           target: { kind: 'agents.session', item: row.sessionId },
         }
       })

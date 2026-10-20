@@ -49,7 +49,7 @@ describe('managed session data source', () => {
           recordId: 'session-1',
           data: { title: 'Review', state: 'running', model: null },
           taskId: 'task-1',
-          action: { verb: 'openPane', pane: 'agent' },
+          action: { verb: 'openPane', pane: 'agents' },
         },
       ],
       completeness: { kind: 'complete' },

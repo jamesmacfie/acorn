@@ -59,7 +59,7 @@ import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderContext'
 import { runningBackgroundCommands } from './backgroundCommands'
 import SessionSummaryModal from './SessionSummaryModal'
-import { AGENT_PANE_ID } from '../paneIdentity'
+import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 import { requestSessionMarks } from './sessionMarks'
 import { accountIcon, accountLabel, sessionAccount } from '../../shared/accounts'
 

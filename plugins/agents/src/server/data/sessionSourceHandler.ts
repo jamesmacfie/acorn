@@ -5,6 +5,7 @@ import { DATA_LIMITS, MISSING, readDataPointer } from '@acorn/protocol/dataValue
 import type { AgentSession } from '../../contract/wire.ts'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
 import { sessionSourceDescription } from '../../shared/sessionSource'
+import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 
 export function createSessionSourceHandler(runtime: ManagedAgentRuntime): PluginFetchHandler {
   return async (request, context) => {
@@ -50,7 +51,7 @@ export function createSessionSourceHandler(runtime: ManagedAgentRuntime): Plugin
         },
         display: { title: session.title || session.providerId },
         taskId: session.taskId,
-        action: { verb: 'openPane' as const, pane: 'agent' },
+        action: { verb: 'openPane' as const, pane: AGENT_PANE_ID },
         target: { kind: 'agents.session', item: session.id },
       }))
       const comparisons = input.query.predicate

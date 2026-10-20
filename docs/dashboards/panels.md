@@ -81,6 +81,10 @@ and opens a read-only side panel at the original evaluation instant. **Add as pa
 detail plan. Summary-stage and measure-filter arguments to `deriveDrilldownPlan` narrow the
 underlying records to the selected measure at the run's evaluation instant.
 
+A row's `openPane` action takes the reader to the row's task and selects the row's record in the pane.
+When the record's `target` opens that same pane on a named item, the pane selects that item instead, so
+an **Agent turns** row selects its session (`paneItem` in `PublishedDashboardPanel.tsx`).
+
 `openUrl` isn't automatically a trip to the browser. The dispatcher first asks the content-link
 registry whether acorn has its own surface for the URL (`openInAppUrl` in
 `packages/client-core/src/host/registries/panes/contentLinks.ts`). There are three destinations:

@@ -85,6 +85,7 @@
       "agents:composer-actions",
       "agents:session-header",
       "agents:request-card",
+      "agents:session",
       "bitbucket:diff-line",
       "bitbucket:summary-badges",
       "context:section",

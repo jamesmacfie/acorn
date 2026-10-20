@@ -8,7 +8,7 @@ import { agentSessionsFor, type RailMarkerContribution } from '@acorn/plugin-api
 import type { AgentSession } from '../contract/wire.ts'
 import { isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { managedAgentStore } from './sessions/managedStore'
-import { AGENT_PANE_ID } from './paneIdentity'
+import { AGENT_PANE_ID } from '../shared/paneIdentity'
 import { agentRailMarkers } from '../contract/runtimeState.ts'
 
 // The task's own slice, not the roster: this runs for every row in the rail, and a slice only wakes the

@@ -24,6 +24,7 @@ import {
   availableContentPresentations,
   openInAppUrl,
   openNamedContentTarget,
+  resolveNamedContentTarget,
 } from '../../host/registries/panes/contentLinks'
 import { taskById } from '../tasks/taskLookup'
 import { allProjects } from '../projects/projectLookup'
@@ -52,6 +53,16 @@ import { groupField } from './shaping'
 const RISK_CONFIRM: Record<string, { says: string; verb: string }> = {
   write: { says: 'change something', verb: 'Make this change?' },
   execute: { says: 'run something', verb: 'Run this action?' },
+}
+/** The item an `openPane` action selects: the row's own id, unless the record's target opens that same
+ *  pane on a named item. An agent turn's record is a turn, and its target names the turn's session. */
+export function paneItem(row: DashboardDisplayRow, action: DataRecordAction): string {
+  const target = row.recordItems?.[0]?.target
+  const claim = target && action.verb === 'openPane' ? resolveNamedContentTarget(target.kind, target.item) : null
+  const item = claim?.target.item
+  return action.verb === 'openPane' && claim?.target.pane === action.pane && typeof item === 'string'
+    ? item
+    : (row.sourceRowId ?? row.id)
 }
 const opensRecord = (action: DataRecordAction | undefined): action is DataRecordAction =>
   !!action && ['openPane', 'openTask', 'openUrl', 'openOverlay', 'navigate'].includes(action.verb)
@@ -300,7 +311,7 @@ export default function PublishedDashboardPanel(props: {
       prefer: prefer === 'external' || prefer === 'overlay' ? 'route' : prefer,
       ...(row.taskId ? { taskId: row.taskId } : {}),
       projectId: taskById(row.taskId ?? '')?.projectId ?? row.records?.[0]?.scope?.projectId,
-      item: { id: row.sourceRowId ?? row.id, title: rowTitle(row) },
+      item: { id: paneItem(row, action), title: rowTitle(row) },
     })
   }
   const activateAction = (

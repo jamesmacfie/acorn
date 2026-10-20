@@ -25,7 +25,7 @@ import {
 } from './sessions/managedSelection'
 import { activateManagedAgentNotifications, managedAgentStore } from './sessions/managedStore'
 import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
-import { agentPaneContribution } from './paneContribution'
+import { AGENT_PANE_ID, agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
 import { managedReferenceTarget } from './referenceContribution'
 import { agentCenterSourceContribution } from './sourceContribution'
@@ -66,7 +66,7 @@ export const agentsClientPlugin: ClientPlugin = {
       id: 'agents.session',
       providerId: 'agents',
       parse: () => null,
-      target: (item) => ({ kind: 'agents.session', item, pane: 'agent' }),
+      target: (item) => ({ kind: 'agents.session', item, pane: AGENT_PANE_ID }),
       presentations: ['pane'],
     })
     for (const mark of PROVIDER_MARKS) ctx.brandMarks.register(mark)

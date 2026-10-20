@@ -1,7 +1,7 @@
 import { agentTelemetry, markAgentSelection, startAgentView } from './agentTelemetry'
 import { createSignal } from 'solid-js'
 import { clientEvents, consumePaneIntent, dispatchLayout, registerNoticeTargetHandler } from '@acorn/plugin-api/client'
-import { AGENT_PANE_ID } from '../paneIdentity'
+import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 
 const [selectedByTask, setSelectedByTask] = createSignal<Record<string, string | undefined>>({})
 const [focusedRequestBySession, setFocusedRequestBySession] = createSignal<Record<string, string | undefined>>({})
@@ -107,7 +107,7 @@ export function clearLinkedManagedEvent(sessionId: string): void {
 export function openManagedSession(taskId: string, sessionId: string, requestId?: string): void {
   selectManagedSession(taskId, sessionId)
   setFocusedRequestBySession((current) => ({ ...current, [sessionId]: requestId }))
-  dispatchLayout(taskId, { type: 'show', pane: 'agents' })
+  dispatchLayout(taskId, { type: 'show', pane: AGENT_PANE_ID })
 }
 
 // The attention inbox's id for a session row, built in one place so the row and the acknowledgement

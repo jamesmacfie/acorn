@@ -6,6 +6,7 @@ import { readAgentPricingPreferences } from '../pricingStore'
 import { turnFactsPending } from '../sessions/turnFactsBackfill'
 import { READ_LIMIT, scopeTasks, sourceHandler, sourcePage, sqlFilters, tasksOfRows, withinBudget } from './sourceQuery'
 import { contextPeak, turnCost } from './turnSourceHandler'
+import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 
 const facts = schema.agentTurnFacts
 const lastCompletedAt = sql<number>`max(${facts.completedAt})`
@@ -124,7 +125,7 @@ export function createSessionTotalsSourceHandler(
               contextPeak: peaks.length ? Math.max(...peaks) : null,
             },
             taskId: first.turn.taskId,
-            action: { verb: 'openPane' as const, pane: 'agent' },
+            action: { verb: 'openPane' as const, pane: AGENT_PANE_ID },
             target: { kind: 'agents.session', item: sessionId },
           },
         ]

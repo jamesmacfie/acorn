@@ -16,7 +16,7 @@ import {
   requestTerminalFocusIntent,
   setTerminalOpen,
 } from '@acorn/plugin-api/client'
-import { AGENT_PANE_ID } from '../paneIdentity'
+import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
   Alert,

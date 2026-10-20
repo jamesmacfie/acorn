@@ -41,3 +41,35 @@ it('runs an unpublished plan as a draft, without a publication', () => {
     undefined,
   )
 })
+
+// An agent turn's row is a turn, and its target names the session, which is what the Agent pane selects.
+it("selects the target's item when the record's target opens the same pane", async () => {
+  const { paneItem } = await import('./PublishedDashboardPanel')
+  const { contentLinkRegistry } = await import('../../host/registries/panes/contentLinks')
+  const link = contentLinkRegistry.register({
+    id: 'agents.session',
+    providerId: 'agents',
+    parse: () => null,
+    target: (item) => ({ kind: 'agents.session', item, pane: 'agents' }),
+  })
+  try {
+    const row = {
+      id: 'turns:turn-1',
+      sourceRowId: 'turn-1',
+      values: {},
+      pluginId: 'agents',
+      sourceId: 'turns',
+      recordItems: [
+        {
+          ref: { pluginId: 'agents', sourceId: 'turns', recordId: 'turn-1' },
+          target: { kind: 'agents.session', item: 'session-1' },
+        },
+      ],
+    }
+    expect(paneItem(row, { verb: 'openPane', pane: 'agents' })).toBe('session-1')
+    expect(paneItem(row, { verb: 'openPane', pane: 'board' })).toBe('turn-1')
+    expect(paneItem({ ...row, recordItems: [] }, { verb: 'openPane', pane: 'agents' })).toBe('turn-1')
+  } finally {
+    link.dispose()
+  }
+})

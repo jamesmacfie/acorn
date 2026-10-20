@@ -49,7 +49,8 @@ the count stays put. The detail column is the open session: a header, the transc
 composer. Every surface is a tree of kit nodes with no stylesheet, so the same source draws in the
 shell and through the remote root ([the closed kit](../ui-design/closed-kit.md)).
 
-`plugins/agents/src/client/paneIdentity.ts` owns the pane ID used by registration and navigation.
+`plugins/agents/src/shared/paneIdentity.ts` owns the pane ID used by registration, navigation, and the
+agents sources' records.
 `sessions/managedSelection.ts` owns task and session selection, subagent selection, one-shot focus,
 and the per-session **Chats only** choice for the app lifetime. Pane registration reads those
 choices through the pane model; it does not own a second selection store.
