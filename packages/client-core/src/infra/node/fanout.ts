@@ -1,4 +1,4 @@
-import { createEffect, createResource, onCleanup, type Accessor, type InitializedResourceReturn } from 'solid-js'
+import { createEffect, createResource, onCleanup, type Accessor, type ResourceActions } from 'solid-js'
 import { hashKey } from '@tanstack/solid-query'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import { clientFor, nodeIsStarting, nodes, nodeState, nodeStatus } from './fleet'
@@ -170,7 +170,7 @@ export function createFleetQuery<T, D = void>(
   options: FleetQueryOptions = {},
   // Initialized, so a consumer never handles `undefined`. Whatever the per-node caches hold is the
   // pre-answer state, and an empty one renders as no rows rather than a spinner with no deadline.
-): InitializedResourceReturn<FleetResult<T>> {
+): [Accessor<FleetResult<T>>, ResourceActions<FleetResult<T>>] {
   const resource = createResource(
     // The fleet is part of the source, so pairing, unpairing or a node coming back re-runs the fan-out.
     // The ids are joined into a string, because an array literal compares by identity and never matches.
@@ -205,7 +205,10 @@ export function createFleetQuery<T, D = void>(
     const timer = setTimeout(() => void resource[1].refetch(), delay)
     onCleanup(() => clearTimeout(timer))
   })
-  return resource
+  // `latest`, not the resource itself. Reading a resource inside a Suspense boundary suspends on every
+  // refetch, even with an initial value, so one offline node held a whole page on its loading spinner
+  // for each 5 s deadline and each retry. `latest` serves the last answer while the next one runs.
+  return [() => resource[0].latest, resource[1]]
 }
 
 // How long to wait before asking an unavailable node again, or `null` to stop asking.
