@@ -6,7 +6,7 @@ sources:
   - docs/notes-and-memory.md
   - plugins/context/src/client/ContextPane.tsx
   - plugins/context/src/client/contextModel.ts
-checked: 90ded85ca
+checked: '70489f534'
 ---
 
 This page covers task context: the bundle of facts an agent gets about the task it works in, and the

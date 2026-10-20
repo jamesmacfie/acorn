@@ -7,7 +7,7 @@ sources:
   - docs/agent-tools/orchestration.md
   - docs/managed-agents/defaults.md
   - docs/notes-and-memory.md
-checked: 52225e24f
+checked: '70489f534'
 ---
 
 This page covers two ways one agent hands work to another. In _delegation_, an agent starts another

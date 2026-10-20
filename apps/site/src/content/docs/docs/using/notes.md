@@ -6,7 +6,7 @@ sources:
   - docs/agent-tools/context-sections.md
   - plugins/notes/src/client/NotesPane.tsx
   - plugins/notes/src/client/commands.ts
-checked: 90ded85ca
+checked: '70489f534'
 ---
 
 This page covers the Notes pane: the three places a note can live, writing and finding notes, and how

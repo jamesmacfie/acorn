@@ -11,7 +11,7 @@ sources:
   - docs/managed-agents/defaults.md
   - plugins/terminal/src/client/TerminalPanel.tsx
   - plugins/agents/src/server/profiles/aider.ts
-checked: 52225e24f
+checked: '70489f534'
 ---
 
 This page covers running an agent's own CLI in the task's terminal drawer, instead of as a managed

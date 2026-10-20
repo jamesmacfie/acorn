@@ -14,7 +14,7 @@ covers:
   - datasets
   - runs
   - workflows
-checked: 52225e24f
+checked: '70489f534'
 ---
 
 This page lists every setting in **Settings** > **Automation**. Every page here is stored on the Node,
