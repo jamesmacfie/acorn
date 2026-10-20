@@ -10,7 +10,7 @@ sources:
   - docs/dashboards/panels.md
   - docs/tui/sources-and-settings.md
   - packages/client-core/src/features/dashboards/studio/PanelLauncher.tsx
-checked: '979e7a7b9'
+checked: 'a472c1512'
 ---
 
 A dashboard is a grid of panels, and each panel shows records from your data sources: open pull
