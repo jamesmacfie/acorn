@@ -8,7 +8,7 @@ sources:
   - docs/panes.md
   - apps/desktop/src-tauri/tauri.release.json
   - apps/desktop/scripts/dist.mjs
-checked: 90ded85ca
+checked: 'cba7f787d'
 ---
 
 This page covers `acorn://` links: what one can point at, how to copy one, and how to open one in the
