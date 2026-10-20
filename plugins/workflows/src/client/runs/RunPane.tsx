@@ -1,7 +1,9 @@
 import { createMemo, createSignal, Show } from 'solid-js'
-import { formatRelativeTime, readLocal, type Task, writeLocal } from '@acorn/plugin-api/client'
+import { useNavigate } from '@solidjs/router'
+import { formatRelativeTime, readLocal, setSelectedSource, type Task, writeLocal } from '@acorn/plugin-api/client'
 import {
   Badge,
+  Button,
   ConfirmButton,
   EmptyState,
   Icon,
@@ -19,6 +21,7 @@ import { RunGraph } from './RunGraph'
 import { formatUsage, kindLabel, runGlyph, runTone, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import { isLiveRun, type RunPaneModel } from './runPaneModel'
 import type { WorkflowRunProjection } from '../../contract/wire.ts'
+import { WORKFLOWS_SOURCE_ID, workflowsSurfacePath } from '../surfacePath'
 
 // The run pane's list column: this task's runs, then the selected run's steps in the same reading
 // order and the same indentation the editor draws (docs/workflows/routes-and-ui.md § Routes and UI).
@@ -213,16 +216,36 @@ const launchedByLabel = (launch: NonNullable<WorkflowRunProjection['launchedBy']
  *  whole run. */
 export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
+  const navigate = useNavigate()
   const usage = createMemo(() => formatUsage(model.selectedRun()?.usage))
   return (
     <Show when={model.selectedRun()}>
       {(run) => (
         <Toolbar size="sm" ariaLabel="Run status">
           <Text emphasis="muted">
-            {[statusLabel(run().status), usage(), run().launchedBy && launchedByLabel(run().launchedBy!)]
+            {[
+              statusLabel(run().status),
+              usage(),
+              run().launchedBy && launchedByLabel(run().launchedBy!),
+              run().triggeredBy && 'Started by a trigger',
+            ]
               .filter(Boolean)
               .join(' · ')}
           </Text>
+          <Show when={run().triggeredBy}>
+            {(trigger) => (
+              <Button
+                size="sm"
+                variant="ghost"
+                onPress={() => {
+                  setSelectedSource(WORKFLOWS_SOURCE_ID)
+                  navigate(workflowsSurfacePath(trigger().projectId, `db:${trigger().workflowId}`))
+                }}
+              >
+                Open trigger
+              </Button>
+            )}
+          </Show>
           <Toolbar.Spacer />
           <Show
             when={isLiveRun(run())}

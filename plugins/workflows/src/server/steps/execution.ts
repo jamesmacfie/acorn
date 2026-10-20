@@ -16,6 +16,7 @@ import type {
   StepHandlerOutcome,
   WorkflowDef,
   WorkflowPosture,
+  WorkflowRunErrorCause,
   WorkflowRunRow,
   WorkflowStepDef,
   WorkflowStepRow,
@@ -62,6 +63,7 @@ type ExecutionServices = {
     status: 'done' | 'completed-with-failures' | 'failed' | 'safety-rail' | 'cancelled',
     error?: string,
     stepId?: string,
+    cause?: WorkflowRunErrorCause,
   ): Promise<void>
   safetyRailRun(runId: string, reason: string, trigger?: { runId: string; stepId: string }): Promise<void>
 }
@@ -389,7 +391,13 @@ export class WorkflowStepExecution {
     }
     if (outcome.status === 'failed' || outcome.status === 'safety-rail') {
       await this.services.state.setStep(step.id, { ...patch, status: outcome.status, error: outcome.error })
-      await this.services.finishRun(run, outcome.status, `Step '${def.name}': ${outcome.error}`, step.id)
+      await this.services.finishRun(
+        run,
+        outcome.status,
+        `Step '${def.name}': ${outcome.error}`,
+        step.id,
+        outcome.status === 'failed' ? outcome.cause : undefined,
+      )
       return
     }
     await this.services.state.setStep(step.id, {

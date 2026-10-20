@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ResolvedWorkflowGraph, WorkflowDef } from '../../shared/workflowContracts'
-import { applyScheduleLoopSettings, describeScheduleLoops } from './model'
+import { applyTriggerLoopSettings, describeTriggerLoops } from './clock'
 
 const query = {
   kind: 'inline' as const,
@@ -61,20 +61,20 @@ const source = async () => ({
   incremental: true,
 })
 
-describe('workflow schedule setup model', () => {
+describe('clock trigger loop settings', () => {
   it('describes only record loops and prefixes tracked fields into the durable record snapshot', async () => {
-    const loops = await describeScheduleLoops(graph(), { workspaceId: 'w' }, {}, source)
+    const loops = await describeTriggerLoops(graph(), { workspaceId: 'w' }, {}, source)
     expect(loops).toHaveLength(1)
     expect(loops[0]).toMatchObject({ label: 'Review issues', sourceLabel: 'Issues', checkpointAvailable: true })
     expect(loops[0]!.fields).toContainEqual(expect.objectContaining({ pointer: '/data/state', label: 'State' }))
 
     const ordinary = graph()
     ordinary.root.steps[0] = { id: 'find', name: 'Produce values', kind: 'agent', prompt: 'Return values.' }
-    expect(await describeScheduleLoops(ordinary, { workspaceId: 'w' }, {}, source)).toEqual([])
+    expect(await describeTriggerLoops(ordinary, { workspaceId: 'w' }, {}, source)).toEqual([])
   })
 
   it('withholds checkpoint selection when one query feeds several tracked loops', async () => {
-    const loops = await describeScheduleLoops(graph(true), { workspaceId: 'w' }, {}, source)
+    const loops = await describeTriggerLoops(graph(true), { workspaceId: 'w' }, {}, source)
     expect(loops).toHaveLength(2)
     expect(loops.every((loop) => !loop.checkpointAvailable)).toBe(true)
     expect(loops[0]!.checkpointReason).toMatch(/more than one loop/)
@@ -82,11 +82,11 @@ describe('workflow schedule setup model', () => {
 
   it('applies repeat fields to the loop and continuation to its source without changing other steps', async () => {
     const original = graph()
-    const loops = await describeScheduleLoops(original, { workspaceId: 'w' }, {}, source)
+    const loops = await describeTriggerLoops(original, { workspaceId: 'w' }, {}, source)
     const configured = [
       { loopId: loops[0]!.loopId, repeat: { mode: 'changed' as const, fields: ['/data/state'] }, incremental: true },
     ]
-    const applied = applyScheduleLoopSettings(original, loops, configured)
+    const applied = applyTriggerLoopSettings(original, loops, configured)
     expect(applied.root.steps.find((step) => step.id === 'find')?.incremental).toBe(true)
     expect(applied.root.steps.find((step) => step.id === 'loop')?.repeat).toEqual({
       mode: 'changed',
@@ -97,14 +97,14 @@ describe('workflow schedule setup model', () => {
 
   it('refuses forged checkpoint and empty selected-field settings', async () => {
     const original = graph(true)
-    const loops = await describeScheduleLoops(original, { workspaceId: 'w' }, {}, source)
+    const loops = await describeTriggerLoops(original, { workspaceId: 'w' }, {}, source)
     expect(() =>
-      applyScheduleLoopSettings(original, loops, [
+      applyTriggerLoopSettings(original, loops, [
         { loopId: loops[0]!.loopId, repeat: { mode: 'changed', fields: [] }, incremental: true },
       ]),
     ).toThrow(/Select at least one tracked field/)
     expect(() =>
-      applyScheduleLoopSettings(original, loops, [
+      applyTriggerLoopSettings(original, loops, [
         { loopId: loops[0]!.loopId, repeat: { mode: 'changed', fields: ['/data/private'] }, incremental: false },
       ]),
     ).toThrow(/no longer available/)

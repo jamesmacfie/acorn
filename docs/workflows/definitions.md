@@ -28,7 +28,7 @@ database definitions or create a root run through HTTP.
 inputs and requires a device principal before reading the body. Task and service credentials are
 refused for every definition layer. A root start creates fresh tool authority, budget, deadline,
 and cancellation lineage; repository trust alone does not preserve the calling agent's limits.
-Trusted schedules and frozen child dispatch use their admission capabilities directly.
+Approved triggers and frozen child dispatch use their admission capabilities directly.
 Inline definition bodies are refused. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
 anything else names a row. The node resolves it and applies the layer's own rule, which is stronger
 than trusting a `source` field in the request body.
@@ -46,7 +46,7 @@ stay closed to agents. The tool writes through the same draft store the editor u
 
 **A key nothing reads.** A file or row may still set `trigger`. The loader ignores it, a stored
 draft or revision drops it when it's read, and the next save leaves it out. Dropping it changes the
-definition's fingerprint, so an approved schedule over a workflow that set it moves to
+definition's fingerprint, so an approved trigger over a workflow that set it moves to
 **Needs review** once.
 
 **What a row may name.** A run target, a saved query, or an agent profile is checked when the step

@@ -1,25 +1,28 @@
+// The clock kind: a trigger the core scheduler fires on a cadence. It owns the settings for the
+// workflow's For each loops, the Track from now baseline run, and one active occurrence per trigger
+// (docs/workflows/triggers.md).
+import { randomUUID } from 'node:crypto'
+import { and, eq } from 'drizzle-orm'
+import type { PluginDatabase } from '@acorn/plugin-api/node'
 import { dataBindingSchema, type DataField } from '@acorn/protocol/dataBindings.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { QueryReference, QueryScope } from '@acorn/protocol/dataQueries.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { resolveDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
-import type {
-  ResolvedWorkflowGraph,
-  ResolvedWorkflowNode,
-  WorkflowBudget,
-  WorkflowStepDef,
-} from '../../shared/workflowContracts'
+import * as schema from '../../node/schema'
+import type { ResolvedWorkflowGraph, ResolvedWorkflowNode, WorkflowStepDef } from '../../shared/workflowContracts'
 import { stepIdentity } from '../../shared/workflowIdentity'
 import type {
-  WorkflowScheduleDraftInput,
-  WorkflowScheduleLimits,
-  WorkflowScheduleLoop,
-  WorkflowScheduleLoopSetting,
-} from '../../shared/workflowSchedules'
+  WorkflowTriggerLoop,
+  WorkflowTriggerLoopSetting,
+  WorkflowTriggerWhen,
+} from '../../shared/workflowTriggers'
 import { processingFields } from '../processing/rules'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
+import { WorkflowAuthorityError } from '../runs/authority'
+import type { Occurrence, OccurrenceRequest, Trigger, TriggerOccurrences } from './occurrences'
 
-type ScheduleSourceDescription = {
+type TriggerSourceDescription = {
   label: string
   schema: DataSchema
   fields: DataField[]
@@ -27,52 +30,101 @@ type ScheduleSourceDescription = {
   incrementalReason?: string
 }
 
-export type ScheduleSourceDescriber = (
+export type TriggerSourceDescriber = (
   reference: QueryReference,
   scope: QueryScope,
   inputs: Record<string, DataValue>,
-) => Promise<ScheduleSourceDescription>
+) => Promise<TriggerSourceDescription>
 
-export const DEFAULT_SCHEDULE_WALL_TIME_MS = 24 * 60 * 60 * 1000
+/** How the core scheduler asked for this occurrence. */
+export type ClockContext = { reason: 'due' | 'manual' | 'catch-up'; dueAt?: number; requestKey?: string }
 
-export function effectiveScheduleLimits(
-  graph: ResolvedWorkflowGraph,
-  requested?: WorkflowScheduleDraftInput['limits'],
-): WorkflowScheduleLimits {
-  const root = graph.root
-  const maxDescendants = requested?.maxDescendants ?? root.maxDescendants ?? 100
-  const maxConcurrency = requested?.maxConcurrency ?? root.maxConcurrency ?? 4
-  const requestedBudget: WorkflowBudget = requested?.budget ?? {}
-  const maxWallTimeMs = requestedBudget.maxWallTimeMs ?? root.budget?.maxWallTimeMs ?? DEFAULT_SCHEDULE_WALL_TIME_MS
-  if (
-    !Number.isSafeInteger(maxDescendants) ||
-    maxDescendants < 1 ||
-    maxDescendants > Math.min(root.maxDescendants ?? 500, 500)
-  ) {
-    throw new Error('Scheduled max descendants must be from 1 to the workflow ceiling.')
+export function clockWhen(raw: unknown): WorkflowTriggerWhen | null {
+  const when = raw as Partial<WorkflowTriggerWhen> | null
+  if (when?.kind !== 'clock' || typeof when.timezone !== 'string') return null
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: when.timezone }).format()
+    return { kind: 'clock', timezone: when.timezone }
+  } catch {
+    return null
   }
-  if (
-    !Number.isSafeInteger(maxConcurrency) ||
-    maxConcurrency < 1 ||
-    maxConcurrency > Math.min(root.maxConcurrency ?? 4, 4)
-  ) {
-    throw new Error('Scheduled concurrency must be from 1 to the workflow ceiling.')
+}
+
+export const configuredLoops = (row: Trigger): WorkflowTriggerLoopSetting[] =>
+  JSON.parse(row.loopsJson || '[]') as WorkflowTriggerLoopSetting[]
+
+/** A due tick replays by its instant, so a catch-up after a restart reuses the occurrence it reserved.
+ *  The record key is null: one occurrence runs at a time for the whole trigger. */
+export function clockOccurrence(row: Trigger, context: ClockContext): OccurrenceRequest {
+  if (context.reason !== 'manual' && context.dueAt === undefined)
+    throw new Error('Scheduled occurrences require their persisted due instant.')
+  return {
+    kind: context.reason,
+    dueAt: context.dueAt,
+    requestKey:
+      context.reason === 'manual'
+        ? `manual:${context.requestKey ?? randomUUID()}`
+        : `due:${row.generation}:${context.dueAt}`,
+    recordKey: null,
   }
-  if (
-    !Number.isFinite(maxWallTimeMs) ||
-    maxWallTimeMs <= 0 ||
-    (root.budget?.maxWallTimeMs != null && maxWallTimeMs > root.budget.maxWallTimeMs)
-  ) {
-    throw new Error('Scheduled wall time must be finite and no wider than the workflow budget.')
-  }
-  for (const field of ['maxCostUsd', 'maxInputTokens', 'maxOutputTokens', 'maxTurns'] as const) {
-    const value = requestedBudget[field]
-    const ceiling = root.budget?.[field]
-    if (value != null && (!Number.isFinite(value) || value < 0 || (ceiling != null && value > ceiling))) {
-      throw new Error(`Scheduled ${field} must be finite and no wider than the workflow budget.`)
+}
+
+/** Track from now: one run that records today's matches without acting on them. The trigger stays
+ *  `baselining` until that run settles, and becomes `baseline-failed` if it can't start. */
+export async function startBaseline(db: PluginDatabase, occurrences: TriggerOccurrences, row: Trigger): Promise<void> {
+  const occurrence = occurrences.reserve(row, {
+    kind: 'baseline',
+    requestKey: `baseline:${row.generation}`,
+    recordKey: null,
+  })
+  try {
+    await occurrences.resume(occurrence)
+  } catch (error) {
+    const current = db.select().from(schema.workflowTriggers).where(eq(schema.workflowTriggers.id, row.id)).get()
+    if (current?.state !== 'needs-review') {
+      db.update(schema.workflowTriggers)
+        .set({
+          state: 'baseline-failed',
+          error: error instanceof Error ? error.message : 'Baseline check could not start.',
+          errorReason: null,
+          updatedAt: Date.now(),
+        })
+        .where(and(eq(schema.workflowTriggers.id, row.id), eq(schema.workflowTriggers.generation, row.generation)))
+        .run()
     }
+    throw error
   }
-  return { maxDescendants, maxConcurrency, budget: { ...root.budget, ...requestedBudget, maxWallTimeMs } }
+}
+
+/** What a settled run tree means for a clock trigger. Returns true when a baseline finished and the
+ *  trigger became active, so the caller turns its cadence on. */
+export function settleClockRun(
+  db: PluginDatabase,
+  occurrence: Occurrence,
+  run: typeof schema.workflowRuns.$inferSelect,
+  moveToReview: (id: string, error: string) => void,
+): boolean {
+  if (occurrence.kind !== 'baseline') {
+    if (run.status === 'failed' && run.errorCause === 'checkpoint-expired')
+      moveToReview(occurrence.triggerId, run.error ?? 'Incremental continuation needs review.')
+    return false
+  }
+  const ok = run.status === 'done' || run.status === 'completed-with-failures'
+  db.update(schema.workflowTriggers)
+    .set({
+      state: ok ? 'active' : 'baseline-failed',
+      error: ok ? null : (run.error ?? 'Baseline check failed.'),
+      errorReason: null,
+      updatedAt: Date.now(),
+    })
+    .where(
+      and(
+        eq(schema.workflowTriggers.id, occurrence.triggerId),
+        eq(schema.workflowTriggers.generation, occurrence.generation),
+      ),
+    )
+    .run()
+  return ok
 }
 
 type LoopTarget = {
@@ -153,13 +205,13 @@ const prefixedFields = (fields: readonly DataField[]): DataField[] =>
     pointer: `/data${field.pointer}`,
   }))
 
-export async function describeScheduleLoops(
+export async function describeTriggerLoops(
   graph: ResolvedWorkflowGraph,
   scope: QueryScope,
   rootInputs: Record<string, DataValue>,
-  describe: ScheduleSourceDescriber,
-  configured: readonly WorkflowScheduleLoopSetting[] = [],
-): Promise<WorkflowScheduleLoop[]> {
+  describe: TriggerSourceDescriber,
+  configured: readonly WorkflowTriggerLoopSetting[] = [],
+): Promise<WorkflowTriggerLoop[]> {
   const settings = new Map(configured.map((setting) => [setting.loopId, setting]))
   const recordLoops = targets(graph, rootInputs).filter(
     (target) => target.source?.kind === 'find-records' && target.source.query,
@@ -195,20 +247,24 @@ export async function describeScheduleLoops(
   )
 }
 
-export function applyScheduleLoopSettings(
+export function applyTriggerLoopSettings(
   graph: ResolvedWorkflowGraph,
-  available: readonly WorkflowScheduleLoop[],
-  configured: readonly WorkflowScheduleLoopSetting[],
+  available: readonly WorkflowTriggerLoop[],
+  configured: readonly WorkflowTriggerLoopSetting[],
 ): ResolvedWorkflowGraph {
   const descriptors = new Map(available.map((loop) => [loop.loopId, loop]))
   const settings = new Map(
     configured.map((setting) => {
       const descriptor = descriptors.get(setting.loopId)
-      if (!descriptor) throw new Error('A configured record loop no longer exists in the published workflow.')
+      if (!descriptor)
+        throw new WorkflowAuthorityError(
+          'missing',
+          'A configured record loop no longer exists in the published workflow.',
+        )
       const fields = processingFields(setting.repeat)
       const availableFields = new Set(descriptor.fields.map((field) => field.pointer))
       if (fields.some((field) => !availableFields.has(field)))
-        throw new Error('A tracked field is no longer available from this record source.')
+        throw new WorkflowAuthorityError('missing', 'A tracked field is no longer available from this record source.')
       if (setting.incremental && !descriptor.checkpointAvailable)
         throw new Error(descriptor.checkpointReason ?? 'That source cannot use a continuation checkpoint.')
       return [setting.loopId, setting]
@@ -236,36 +292,4 @@ export function applyScheduleLoopSettings(
     nodes.map(({ path, definition, provenance, defaultInputs }) => ({ path, definition, provenance, defaultInputs })),
   )
   return { ...graph, root, nodes, fingerprint }
-}
-
-export function scheduleChanges(
-  approved: ResolvedWorkflowGraph | null,
-  current: ResolvedWorkflowGraph,
-): Array<{ kind: 'workflow' | 'query' | 'field'; label: string }> {
-  if (!approved) return []
-  const previous = new Map(approved.nodes.map((node) => [pathKey(node.path), node]))
-  const changes: Array<{ kind: 'workflow' | 'query' | 'field'; label: string }> = []
-  for (const node of current.nodes) {
-    const prior = previous.get(pathKey(node.path))
-    if (!prior || prior.fingerprint !== node.fingerprint)
-      changes.push({ kind: 'workflow', label: node.definition.name })
-    const priorSteps = new Map(prior?.definition.steps.map((step) => [stepIdentity(step), step]) ?? [])
-    for (const step of node.definition.steps) {
-      const priorStep = priorSteps.get(stepIdentity(step))
-      if (step.kind === 'find-records' && JSON.stringify(step.query) !== JSON.stringify(priorStep?.query)) {
-        changes.push({ kind: 'query', label: step.name })
-      }
-      if (
-        step.kind === 'workflow-map' &&
-        JSON.stringify(step.repeat ?? { mode: 'every-match' }) !==
-          JSON.stringify(priorStep?.repeat ?? { mode: 'every-match' })
-      ) {
-        changes.push({ kind: 'field', label: step.name })
-      }
-    }
-  }
-  return changes.filter(
-    (change, index) =>
-      changes.findIndex((candidate) => candidate.kind === change.kind && candidate.label === change.label) === index,
-  )
 }

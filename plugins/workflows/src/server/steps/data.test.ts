@@ -86,6 +86,29 @@ describe('workflow data and condition steps', () => {
     await expect(h.handlers['find-records'](ctx)).rejects.toThrow('forbidden')
     expect(h.resolve).not.toHaveBeenCalled()
   })
+  it('names an expired checkpoint as the cause only when a continued query is refused', async () => {
+    const h = harness()
+    const refused = Object.assign(new Error('invalid-request: cursor expired'), { code: 'invalid-request' })
+    h.invoke.mockRejectedValue(refused)
+    const frozen = (incremental?: unknown) => {
+      const ctx = context()
+      const continued = { ...query, ...(incremental ? { incremental } : {}) }
+      ctx.step.inputsJson = JSON.stringify({
+        dataSelection: { resolved: { query: continued, parameters: {} }, evaluationTime: 1 },
+      })
+      return ctx
+    }
+    expect(await h.handlers['find-records'](frozen({ kind: 'continue', boundary: 'b' }))).toMatchObject({
+      status: 'failed',
+      cause: 'checkpoint-expired',
+    })
+    await expect(h.handlers['find-records'](frozen({ kind: 'baseline' }))).rejects.toThrow('cursor expired')
+    await expect(h.handlers['find-records'](frozen())).rejects.toThrow('cursor expired')
+    h.invoke.mockRejectedValue(Object.assign(new Error('rate-limited'), { code: 'rate-limited' }))
+    await expect(h.handlers['find-records'](frozen({ kind: 'continue', boundary: 'b' }))).rejects.toThrow(
+      'rate-limited',
+    )
+  })
   it('retains exact reference scope, typed details and fetched time; missing records fail', async () => {
     const h = harness()
     const ref = { ...source, recordId: 'record', scope }

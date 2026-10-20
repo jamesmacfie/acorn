@@ -369,8 +369,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   [Editor details](./workflows/editor-details.md), [Workflow execution](./workflows/execution.md),
   [File drafts and portable export](./workflows/file-drafts.md), [Polling
   gates](./workflows/polling-gates.md), [Record processing history](./workflows/record-history.md), [What workflows refuses](./workflows/refusals.md),
-  [Workflow routes and UI](./workflows/routes-and-ui.md), [Scheduled
-  roots](./workflows/scheduled-roots.md), [Starting runs](./workflows/starting-runs.md),
+  [Workflow routes and UI](./workflows/routes-and-ui.md), [Triggers](./workflows/triggers.md),
+  [Starting runs](./workflows/starting-runs.md),
   [Contributed step kinds](./workflows/step-kinds.md), [Typed data and
   conditions](./workflows/typed-data.md).
 - [notes-and-memory.md](./notes-and-memory.md): [The Memory

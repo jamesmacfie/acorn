@@ -1,5 +1,9 @@
-import type { Cadence } from '@acorn/protocol/schedules.ts'
-import type { WorkflowScheduleDisplayState, WorkflowScheduleLimits } from '../../shared/workflowSchedules'
+import { describeCadence, type Cadence } from '@acorn/protocol/schedules.ts'
+import type {
+  WorkflowTriggerDisplayState,
+  WorkflowTriggerLimits,
+  WorkflowTriggerView,
+} from '../../shared/workflowTriggers'
 
 const parseTime = (value: string): [number, number] => value.split(':').map(Number) as [number, number]
 
@@ -81,7 +85,7 @@ export function nextScheduleOccurrences(cadence: Cadence, timezone: string, afte
   return result
 }
 
-/** "Oct 3, 2026, 9:00 AM GMT+13": to the minute, because a schedule never fires on a second. */
+/** "Oct 3, 2026, 9:00 AM GMT+13": to the minute, because a clock trigger never fires on a second. */
 export const formatOccurrence = (instant: number, timezone: string): string =>
   new Intl.DateTimeFormat(undefined, {
     timeZone: timezone,
@@ -93,7 +97,7 @@ export const formatOccurrence = (instant: number, timezone: string): string =>
     timeZoneName: 'short',
   }).format(instant)
 
-export const scheduleStateLabel = (state: WorkflowScheduleDisplayState): string =>
+export const triggerStateLabel = (state: WorkflowTriggerDisplayState): string =>
   ({
     draft: 'Draft',
     activating: 'Activating',
@@ -104,7 +108,7 @@ export const scheduleStateLabel = (state: WorkflowScheduleDisplayState): string 
   })[state]
 
 /** In minutes, the unit the Definition inspector and this dialog's own field use. */
-export const limitsSummary = (limits: WorkflowScheduleLimits): string =>
+export const limitsSummary = (limits: WorkflowTriggerLimits): string =>
   `Up to ${limits.maxDescendants} tasks, ${limits.maxConcurrency} at a time, ${limits.budget.maxWallTimeMs / 60_000} minutes.`
 
 export const cadenceChoice = (cadence: Cadence): 'hourly' | 'daily' | 'weekly' =>
@@ -112,3 +116,9 @@ export const cadenceChoice = (cadence: Cadence): 'hourly' | 'daily' | 'weekly' =
 
 export const cadenceForChoice = (choice: 'hourly' | 'daily' | 'weekly'): Cadence =>
   choice === 'hourly' ? { every: 3600 } : choice === 'daily' ? { daily: '09:00' } : { weekly: { day: 1, at: '09:00' } }
+
+/** A trigger's When in one line, such as "Daily at 09:00". */
+export const whenSummary = (trigger: Pick<WorkflowTriggerView, 'cadence'>): string => {
+  const cadence = describeCadence(trigger.cadence)
+  return cadence[0]!.toUpperCase() + cadence.slice(1)
+}

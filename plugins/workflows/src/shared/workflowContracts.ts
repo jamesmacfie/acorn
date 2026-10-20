@@ -145,7 +145,19 @@ export type WorkflowDef = {
 }
 
 /** What started a run, stored as `workflow_runs.started_by`. */
-export type WorkflowStartedBy = 'manual' | 'schedule' | 'agent-tool' | 'agent-map' | 'reprocess'
+export type WorkflowStartedBy = 'manual' | 'trigger' | 'agent-tool' | 'agent-map' | 'reprocess'
+
+/** Why an unattended start was refused in a way only the owner can fix (docs/workflows/refusals.md). */
+export type WorkflowAuthorityReason =
+  | 'forbidden'
+  | 'connection-required'
+  | 'not-published'
+  | 'missing'
+  | 'untrusted'
+  | 'input-required'
+
+/** What a failed run's error means, stored beside its text as `workflow_runs.error_cause`. */
+export type WorkflowRunErrorCause = 'checkpoint-expired'
 
 export type WorkflowRunRow = typeof schema.workflowRuns.$inferSelect
 export type WorkflowStepRow = typeof schema.workflowSteps.$inferSelect
@@ -213,7 +225,7 @@ type StepHandlerData = {
 export type StepHandlerOutcome =
   | ({ status: 'done' } & StepHandlerData)
   | ({ status: 'completed-with-failures'; error: string } & StepHandlerData)
-  | ({ status: 'failed'; error: string } & StepHandlerData)
+  | ({ status: 'failed'; error: string; cause?: WorkflowRunErrorCause } & StepHandlerData)
   | ({ status: 'safety-rail'; error: string; scope?: 'admission' } & StepHandlerData)
   // `inputs` is frozen into the step before it waits, so a gate's proposal cannot move under its
   // reviewer and stays readable after the run ends.

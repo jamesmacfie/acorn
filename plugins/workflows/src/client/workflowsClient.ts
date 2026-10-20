@@ -26,11 +26,11 @@ import type { WorkflowGenerateRequest, WorkflowGenerateResult, WorkflowTaskGroup
 import type { WorkflowCatalog } from '../shared/workflowContracts'
 import type { WorkflowRecordAttempt, WorkflowRecordFilter, WorkflowRecordPage } from '../shared/workflowProcessing'
 import type {
-  WorkflowScheduleDraftInput,
-  WorkflowScheduleFirstCheck,
-  WorkflowSchedulePreparation,
-  WorkflowScheduleView,
-} from '../shared/workflowSchedules'
+  WorkflowTriggerDraftInput,
+  WorkflowTriggerFirstCheck,
+  WorkflowTriggerPreparation,
+  WorkflowTriggerView,
+} from '../shared/workflowTriggers'
 import type {
   WorkflowInvocationApproval,
   WorkflowInvocationPolicy,
@@ -81,8 +81,8 @@ const workflowModelBackendsRoute = `${workflowDefsRoute}/model-connections`
 // Every step kind, policy and profile this node can run, with the form each kind draws. The editor's
 // Add menu and its inspector are both built from it (`WorkflowCatalog`).
 const workflowCatalogRoute = '/v1/p/workflows/catalog'
-const workflowSchedulesRoute = '/v1/p/workflows/workflows/schedules'
-const workflowScheduleRoute = (id: string) => `${workflowSchedulesRoute}/${encodeURIComponent(id)}`
+const workflowTriggersRoute = '/v1/p/workflows/workflows/triggers'
+const workflowTriggerRoute = (id: string) => `${workflowTriggersRoute}/${encodeURIComponent(id)}`
 // The owner's approvals for agents to start a workflow, device only (../server/routes/invocation.ts).
 const workflowInvocationRoute = '/v1/p/workflows/workflows/invocation'
 // The harnesses, with the config options each one advertises. Read from the agents plugin's own route
@@ -108,18 +108,18 @@ function workflowApiAt(nodeId?: string | null) {
   const post = <T>(path: string, body: unknown, method: 'POST' | 'PUT' = 'POST') =>
     writeJson<T>(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
   return {
-    schedules: () => readJson<WorkflowScheduleView[]>(workflowSchedulesRoute),
-    schedule: (id: string) => readJson<WorkflowScheduleView>(workflowScheduleRoute(id)),
-    scheduleDefaults: () => readJson<{ timezone: string }>(`${workflowSchedulesRoute}/defaults`),
-    prepareSchedule: (input: WorkflowScheduleDraftInput) =>
-      post<WorkflowSchedulePreparation>(`${workflowSchedulesRoute}/prepare`, input),
-    saveSchedule: (input: WorkflowScheduleDraftInput) => post<WorkflowScheduleView>(workflowSchedulesRoute, input),
-    approveSchedule: (id: string, firstCheck: WorkflowScheduleFirstCheck, freshEpoch: boolean) =>
-      post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/approve`, { firstCheck, freshEpoch }),
-    pauseSchedule: (id: string, paused: boolean) =>
-      post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/pause`, { paused }),
-    runScheduleNow: (id: string) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/run`, {}),
-    deleteSchedule: (id: string) => writeJson<{ deleted: true }>(workflowScheduleRoute(id), { method: 'DELETE' }),
+    triggers: () => readJson<WorkflowTriggerView[]>(workflowTriggersRoute),
+    trigger: (id: string) => readJson<WorkflowTriggerView>(workflowTriggerRoute(id)),
+    triggerDefaults: () => readJson<{ timezone: string }>(`${workflowTriggersRoute}/defaults`),
+    prepareTrigger: (input: WorkflowTriggerDraftInput) =>
+      post<WorkflowTriggerPreparation>(`${workflowTriggersRoute}/prepare`, input),
+    saveTrigger: (input: WorkflowTriggerDraftInput) => post<WorkflowTriggerView>(workflowTriggersRoute, input),
+    approveTrigger: (id: string, firstCheck: WorkflowTriggerFirstCheck, freshEpoch: boolean) =>
+      post<WorkflowTriggerView>(`${workflowTriggerRoute(id)}/approve`, { firstCheck, freshEpoch }),
+    pauseTrigger: (id: string, paused: boolean) =>
+      post<WorkflowTriggerView>(`${workflowTriggerRoute(id)}/pause`, { paused }),
+    runTriggerNow: (id: string) => post<WorkflowTriggerView>(`${workflowTriggerRoute(id)}/run`, {}),
+    deleteTrigger: (id: string) => writeJson<{ deleted: true }>(workflowTriggerRoute(id), { method: 'DELETE' }),
     invocationReview: (projectId: string, definitionKey: string) =>
       readJson<WorkflowInvocationReview>(
         `${workflowInvocationRoute}/review?projectId=${encodeURIComponent(projectId)}&definition=${encodeURIComponent(definitionKey)}`,

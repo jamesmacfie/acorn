@@ -6,7 +6,7 @@
 // CoreServices.tasks and the agents capability.
 import { sql } from 'drizzle-orm'
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
-import type { WorkflowStartedBy } from '../shared/workflowContracts'
+import type { WorkflowAuthorityReason, WorkflowRunErrorCause, WorkflowStartedBy } from '../shared/workflowContracts'
 
 // Workflow runs (docs/workflows.md): the durable checkpoint for the state machine. Machine-scoped
 // like core's tasks.
@@ -37,6 +37,7 @@ export const workflowRuns = sqliteTable(
     requiresRepoTrust: integer('requires_repo_trust', { mode: 'boolean' }).notNull().default(false),
     deadlineAt: integer('deadline_at'),
     error: text('error'),
+    errorCause: text('error_cause').$type<WorkflowRunErrorCause>(), // what a failure means, beside its text
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
@@ -312,20 +313,21 @@ export const workflowProcessingBoundaries = sqliteTable('workflow_processing_bou
   updatedAt: integer('updated_at').notNull(),
 })
 
-// Approved schedule bindings and their replay ledger are workflow-owned. Core owns cadence and
-// invokes the target by id; this database owns everything specific to workflow approval/recovery.
-export const workflowSchedules = sqliteTable(
-  'workflow_schedules',
+// Approved triggers and their replay ledger are workflow-owned. A clock trigger's cadence lives on
+// core's scheduler row, which invokes the trigger by id; this database owns everything specific to
+// workflow approval and recovery (docs/workflows/triggers.md).
+export const workflowTriggers = sqliteTable(
+  'workflow_triggers',
   {
     id: text('id').primaryKey(),
     schedulerKey: text('scheduler_key').unique(),
     workspaceId: text('workspace_id').notNull(),
     projectId: text('project_id').notNull(),
     workflowId: text('workflow_id').notNull(),
+    whenJson: text('when_json').notNull(), // WorkflowTriggerWhen
     inputsJson: text('inputs_json').notNull(),
-    timezone: text('timezone').notNull(),
     limitsJson: text('limits_json').notNull(),
-    loopsJson: text('loops_json').notNull().default('[]'),
+    loopsJson: text('loops_json').notNull().default('[]'), // the clock kind's For each loop settings
     approvedGraphJson: text('approved_graph_json'),
     approvedGraphDigest: text('approved_graph_digest'),
     generation: integer('generation').notNull().default(0),
@@ -333,17 +335,21 @@ export const workflowSchedules = sqliteTable(
     state: text('state').notNull(), // draft | baselining | active | needs-review | baseline-failed | deleted
     firstCheck: text('first_check').notNull().default('process-current'),
     error: text('error'),
+    // Set when `error` came from a typed authority refusal, so the view can tell "reconnect" from "review".
+    errorReason: text('error_reason').$type<WorkflowAuthorityReason>(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [index('workflow_schedules_project_idx').on(table.projectId, table.updatedAt)],
+  (table) => [index('workflow_triggers_project_idx').on(table.projectId, table.updatedAt)],
 )
 
-export const workflowScheduleOccurrences = sqliteTable(
-  'workflow_schedule_occurrences',
+export const workflowTriggerOccurrences = sqliteTable(
+  'workflow_trigger_occurrences',
   {
     id: text('id').primaryKey(),
-    scheduleId: text('schedule_id').notNull(),
+    triggerId: text('trigger_id').notNull(),
+    // The record this occurrence handles. Null for a clock trigger, whose occurrences overlap per trigger.
+    recordKey: text('record_key'),
     generation: integer('generation').notNull(),
     kind: text('kind').notNull(), // due | catch-up | manual | baseline
     dueAt: integer('due_at'),
@@ -358,11 +364,11 @@ export const workflowScheduleOccurrences = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [
-    uniqueIndex('workflow_schedule_occurrences_request_uq').on(table.scheduleId, table.requestKey),
-    uniqueIndex('workflow_schedule_occurrences_due_uq').on(table.scheduleId, table.generation, table.dueAt),
-    uniqueIndex('workflow_schedule_occurrences_task_uq').on(table.taskId),
-    uniqueIndex('workflow_schedule_occurrences_run_uq').on(table.runId),
-    index('workflow_schedule_occurrences_state_idx').on(table.scheduleId, table.state, table.updatedAt),
+    uniqueIndex('workflow_trigger_occurrences_request_uq').on(table.triggerId, table.requestKey),
+    uniqueIndex('workflow_trigger_occurrences_due_uq').on(table.triggerId, table.generation, table.dueAt),
+    uniqueIndex('workflow_trigger_occurrences_task_uq').on(table.taskId),
+    uniqueIndex('workflow_trigger_occurrences_run_uq').on(table.runId),
+    index('workflow_trigger_occurrences_state_idx').on(table.triggerId, table.state, table.updatedAt),
   ],
 )
 

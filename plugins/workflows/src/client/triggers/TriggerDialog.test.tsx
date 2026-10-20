@@ -1,8 +1,8 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WorkflowSchedulePreparation, WorkflowScheduleView } from '../../shared/workflowSchedules'
+import type { WorkflowTriggerPreparation, WorkflowTriggerView } from '../../shared/workflowTriggers'
 
-const preparation: WorkflowSchedulePreparation = {
+const preparation: WorkflowTriggerPreparation = {
   workflowName: 'Triage issues',
   limits: { maxDescendants: 80, maxConcurrency: 3, budget: { maxWallTimeMs: 7_200_000 } },
   loops: [
@@ -19,13 +19,13 @@ const preparation: WorkflowSchedulePreparation = {
   ],
   changes: [],
 }
-const active: WorkflowScheduleView = {
-  id: 'schedule',
+const active: WorkflowTriggerView = {
+  id: 'trigger',
   projectId: 'project',
   workflowId: 'workflow',
   workflowName: 'Triage issues',
   inputs: {},
-  timezone: 'Pacific/Auckland',
+  when: { kind: 'clock', timezone: 'Pacific/Auckland' },
   cadence: { daily: '09:00' },
   limits: preparation.limits,
   loops: preparation.loops.map((loop) => loop.setting),
@@ -33,19 +33,19 @@ const active: WorkflowScheduleView = {
   state: 'active',
   updatedAt: 1,
 }
-const prepareSchedule = vi.fn(async (_input: unknown) => preparation)
-const saveSchedule = vi.fn(async (_input: unknown) => ({ ...active, state: 'draft' as const }))
-const approveSchedule = vi.fn(async (_id: string, _first: string, _fresh: boolean) => active)
+const prepareTrigger = vi.fn(async (_input: unknown) => preparation)
+const saveTrigger = vi.fn(async (_input: unknown) => ({ ...active, state: 'draft' as const }))
+const approveTrigger = vi.fn(async (_id: string, _first: string, _fresh: boolean) => active)
 
 vi.mock('../workflowsClient', () => ({
   workflowApi: {
-    scheduleDefaults: async () => ({ timezone: 'Pacific/Auckland' }),
-    prepareSchedule: (input: unknown) => prepareSchedule(input),
-    saveSchedule: (input: unknown) => saveSchedule(input),
-    approveSchedule: (id: string, first: string, fresh: boolean) => approveSchedule(id, first, fresh),
-    pauseSchedule: async () => active,
-    runScheduleNow: async () => active,
-    deleteSchedule: async () => ({ deleted: true }),
+    triggerDefaults: async () => ({ timezone: 'Pacific/Auckland' }),
+    prepareTrigger: (input: unknown) => prepareTrigger(input),
+    saveTrigger: (input: unknown) => saveTrigger(input),
+    approveTrigger: (id: string, first: string, fresh: boolean) => approveTrigger(id, first, fresh),
+    pauseTrigger: async () => active,
+    runTriggerNow: async () => active,
+    deleteTrigger: async () => ({ deleted: true }),
   },
 }))
 vi.mock('@solidjs/router', () => ({ useNavigate: () => () => undefined }))
@@ -54,8 +54,8 @@ vi.mock('@tanstack/solid-query', () => ({
   useQueryClient: () => ({ invalidateQueries: async () => undefined }),
 }))
 
-const { default: ScheduleDialogHost } = await import('./ScheduleDialog')
-const { closeWorkflowSchedule, requestWorkflowSchedule } = await import('./scheduleRequest')
+const { default: TriggerDialogHost } = await import('./TriggerDialog')
+const { closeWorkflowTrigger, requestWorkflowTrigger } = await import('./triggerRequest')
 
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
@@ -79,21 +79,22 @@ beforeEach(async () => {
   vi.setSystemTime(new Date('2026-07-01T00:00:00Z'))
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => <ScheduleDialogHost />, host)
-  requestWorkflowSchedule({ workflowId: 'workflow', name: 'Triage issues', projectId: 'project', inputs: [] })
+  dispose = render(() => <TriggerDialogHost />, host)
+  requestWorkflowTrigger({ workflowId: 'workflow', name: 'Triage issues', projectId: 'project', inputs: [] })
   await settle()
 })
 
 afterEach(() => {
-  closeWorkflowSchedule()
+  closeWorkflowTrigger()
   dispose?.()
   host.remove()
   vi.clearAllMocks()
   vi.useRealTimers()
 })
 
-describe('workflow schedule setup', () => {
+describe('workflow trigger setup', () => {
   it('progressively reveals record policy, first check, concrete times, and limits', async () => {
+    expect(document.body.textContent).toContain('On a schedule')
     expect(document.body.textContent).not.toContain('Repeat handling')
     expect(document.body.textContent).not.toContain('Activation is a separate device action')
     await press('Review activation')
@@ -108,19 +109,22 @@ describe('workflow schedule setup', () => {
   it('saves a disabled draft separately and retains history on activation by default', async () => {
     await press('Review activation')
     await press('Save draft')
-    expect(saveSchedule).toHaveBeenCalledOnce()
-    expect(approveSchedule).not.toHaveBeenCalled()
+    expect(saveTrigger).toHaveBeenCalledOnce()
+    expect(saveTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({ when: { kind: 'clock', timezone: 'Pacific/Auckland' } }),
+    )
+    expect(approveTrigger).not.toHaveBeenCalled()
     await press('Activate')
-    expect(approveSchedule).toHaveBeenCalledWith('schedule', 'process-current', false)
+    expect(approveTrigger).toHaveBeenCalledWith('trigger', 'process-current', false)
   })
 
   it('reports an offline activation failure without retrying or queueing it', async () => {
-    approveSchedule.mockRejectedValueOnce(new Error('Node offline'))
+    approveTrigger.mockRejectedValueOnce(new Error('Node offline'))
     await press('Review activation')
     await press('Activate')
     expect(document.body.textContent).toContain('Node offline')
-    expect(approveSchedule).toHaveBeenCalledOnce()
+    expect(approveTrigger).toHaveBeenCalledOnce()
     await settle()
-    expect(approveSchedule).toHaveBeenCalledOnce()
+    expect(approveTrigger).toHaveBeenCalledOnce()
   })
 })

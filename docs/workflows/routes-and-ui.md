@@ -19,9 +19,9 @@ newest first, then the selected run's steps, and one step's detail beside them. 
 a task that has never run a workflow, so the pane strip does not grow a button for every task; which
 tasks those are is one node-wide read the plugin keeps in memory (`runs/runStore.ts`).
 Every client-side start marks its task as soon as the node confirms a run ID. Opening a confirmed run
-from the recent-run list or a schedule does the same before navigating, so the pane is available while
+from the recent-run list or a trigger does the same before navigating, so the pane is available while
 the node-wide read catches up. A read started before the confirmation cannot clear that hint.
-Every way into a run (a recent-run row, a schedule's **Open run**, and **Run…** in the editor or the
+Every way into a run (a recent-run row, a trigger's **Open run**, and **Run…** in the editor or the
 start dialog) goes through `openWorkflowRun` in `runs/runStore.ts`, which activates the task with the
 Workflows pane showing before it navigates: the shell draws what the rail source says, not the address.
 

@@ -192,6 +192,15 @@ export default function App() {
   // Panes deep-link here rather than receiving an `openSettings` prop: the layer is the shell's, and
   // threading a callback through every pane that might ever want one is worse than one event.
   onMount(() => onCleanup(clientEvents.on('presentation:open-settings', ({ tab }) => openSettings(tab))))
+  onMount(() =>
+    onCleanup(
+      clientEvents.on('presentation:close-settings', () => {
+        cancelSettingsOpening()
+        setSettingsRequest(null)
+        setSettingsLink(null)
+      }),
+    ),
+  )
   // The terminal drawer belongs to a task, not the app: it's shown only in the Task view (a Source
   // browse like Pull requests has no terminal) and its open/closed state is tracked per task, so
   // switching tabs swaps it. `termOpen` reflects the active task's state within the Task view.

@@ -4,7 +4,8 @@ import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { QueryPublicationRequest, QueryPublicationResult } from '@acorn/protocol/queryPublication.ts'
 import type { QueryBindingContext, QueryConsumer, QueryReference, QueryScope } from '@acorn/protocol/dataQueries.ts'
 import { resolveQueryParameters } from '@acorn/protocol/dataQueryResolution.ts'
-import { workflowDependencies, workflowSchedules } from '../../node/schema'
+import { workflowDependencies } from '../../node/schema'
+import { reviewTriggersAfterPublication } from '../triggers/approval'
 import type { WorkflowPublication, WorkflowPublicationSelection } from '../../shared/workflowPublication'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { getDef } from '../definitions/store'
@@ -254,31 +255,7 @@ export function workflowPublication(db: PluginDatabase, services: WorkflowPublic
         const changedQueries = new Set(
           operation.writes.filter((write) => write.kind === 'query').map((write) => write.id),
         )
-        for (const schedule of db.select().from(workflowSchedules).all()) {
-          if (!schedule.approvedGraphJson || schedule.state === 'deleted') continue
-          const graph = JSON.parse(
-            schedule.approvedGraphJson,
-          ) as import('../../shared/workflowContracts').ResolvedWorkflowGraph
-          const affectedWorkflow = graph.nodes.some(
-            (node) => node.provenance.source === 'database' && changedWorkflows.has(node.provenance.id),
-          )
-          const affectedQuery = graph.nodes.some((node) =>
-            node.definition.steps.some(
-              (step) => step.query?.kind === 'saved' && changedQueries.has(step.query.queryId),
-            ),
-          )
-          if (!affectedWorkflow && !affectedQuery) continue
-          db.update(workflowSchedules)
-            .set({
-              state: 'needs-review',
-              error: affectedQuery
-                ? 'A published shared query changed. Review this schedule before it runs again.'
-                : 'A published workflow dependency changed. Review this schedule before it runs again.',
-              updatedAt: Date.now(),
-            })
-            .where(eq(workflowSchedules.id, schedule.id))
-            .run()
-        }
+        reviewTriggersAfterPublication(db, changedWorkflows, changedQueries)
       } catch (error) {
         store.state(id, 'needs-reconciliation', error instanceof Error ? error.message : 'Publication interrupted')
       }

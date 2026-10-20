@@ -3,11 +3,11 @@ title: Start and schedule runs
 description: Start a workflow from the editor, the command palette, a pull request or issue, a commit, the command line, or an agent, and run one on a schedule.
 sources:
   - docs/workflows/starting-runs.md
-  - docs/workflows/scheduled-roots.md
+  - docs/workflows/triggers.md
   - docs/schedules/user-schedules.md
   - docs/cli/agents-and-workflows.md
-  - plugins/workflows/src/client/schedules/ScheduleDialog.tsx
-  - plugins/workflows/src/client/schedules/scheduleModel.ts
+  - plugins/workflows/src/client/triggers/TriggerDialog.tsx
+  - plugins/workflows/src/client/triggers/triggerModel.ts
   - plugins/git/src/client/launchWorkflow.ts
 checked: 07aa959a0
 ---
@@ -61,37 +61,40 @@ The agent's run starts after its current turn ends, and the run pane names the a
 
 ## Run a workflow on a schedule
 
-A workflow you made in the app, once published, can run on its own. Each time, acorn makes a task and
-starts the run on it.
+A workflow you made in the app, once published, can run on its own when a trigger starts it. Each
+time, acorn makes a task and starts the run on it.
 
-1. Open the workflow, and choose **Schedule…** from **More actions**.
-2. Pick the **Project**, the inputs, the **Cadence**, such as **Every day at 09:00**, and the
-   **Timezone**.
+1. Open the workflow, and choose **Add trigger…** from **More actions**.
+2. Under **When**, keep **On a schedule**, and pick the **Cadence**, such as **Every day at 09:00**,
+   and the **Timezone**. Then pick the **Project** and the inputs.
 3. For a workflow that runs once per record, choose what happens to records that already ran, under
    **Repeat handling**, and whether the first check runs on **Process current matches** or **Start
    tracking from now**.
 4. Check **Next three checks**, which lists the next three times it will run, and the limits.
 5. Click **Save draft** to keep it paused, or **Activate** to start it.
 
-The **Workflows** list shows schedules in their own section, each **Active**, **Paused**, **Needs
-review**, or **Unavailable**. **Run now** starts a run straight away, even while paused. **Pause**
-stops future runs without stopping one in progress, and **Delete schedule** keeps the runs it made.
+The **Workflows** list shows triggers in their own **Triggers** section. Each row says when it runs,
+such as **Daily at 09:00**, and whether it's **Active**, **Paused**, **Needs review**, or
+**Unavailable**. **Run now** starts a run straight away, even while paused. **Pause** stops future runs
+without stopping one in progress, and **Delete trigger** keeps the runs it made. A run a trigger
+started says so in its run pane, with **Open trigger**.
 
-A scheduled workflow runs the version you approved. If something it depends on changes, such as the
+A triggered workflow runs the version you approved. If something it depends on changes, such as the
 workflow being published again or a connection being removed, it stops and shows **Needs review**
 rather than running something you didn't approve. **Approve changes** starts it again.
 
-A schedule won't start a run while the last one, or any child workflow it started, is still going or
+A trigger won't start a run while the last one, or any child workflow it started, is still going or
 waiting at a gate.
 
 ## In the terminal
 
-The terminal client starts runs from the editor and the palette, and draws the schedule dialog.
+The terminal client starts runs from the editor and the palette, and draws the trigger dialog.
 **Start workflow…** on a pull request, issue, or error is desktop only.
 
 ## Limits
 
-- Only a published workflow made in the app can be scheduled. A file can't.
-- Turning on a schedule needs a connection to the Node. acorn won't queue it to send later.
-- Schedules run on the Node. Every schedule on a Node is listed in **Settings** > **Automation** >
-  **Schedules** ([Schedules](/docs/automation/schedules/)).
+- Only a published workflow made in the app can have a trigger. A file can't.
+- Turning on a trigger needs a connection to the Node. acorn won't queue it to send later.
+- Triggers run on the Node. The Node's scheduler times each one, so it's also listed in **Settings** >
+  **Automation** > **Schedules** ([Schedules](/docs/automation/schedules/)), with **Open** to get back
+  to it.

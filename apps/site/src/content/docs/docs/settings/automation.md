@@ -24,7 +24,8 @@ which Node.
 ## Schedules
 
 Every schedule on the Node: acorn's own upkeep, the ones plugins register, and ones you add. Each row
-names its owner, says when it runs next and last ran, and has **History** and **Run now**
+names its owner, says when it runs next and last ran, and has **History** and **Run now**. A workflow
+trigger's row also has **Open**, which opens the workflow it starts
 ([Schedules](/docs/automation/schedules/)).
 
 | Setting | What it changes | Stored on | Default |

@@ -5,22 +5,25 @@ import type { Cadence } from '@acorn/protocol/schedules.ts'
 import type { ResolvedWorkflowGraph, WorkflowBudget } from './workflowContracts'
 import type { WorkflowRepeatPolicy } from './workflowProcessing'
 
-export type WorkflowScheduleState = 'draft' | 'baselining' | 'active' | 'needs-review' | 'baseline-failed' | 'deleted'
-export type WorkflowScheduleFirstCheck = 'process-current' | 'track-now'
-export type WorkflowScheduleDisplayState = 'draft' | 'activating' | 'active' | 'paused' | 'needs-review' | 'unavailable'
-export type WorkflowScheduleLimits = {
+/** What makes a trigger start a run. A clock trigger's cadence lives on core's scheduler row. */
+export type WorkflowTriggerWhen = { kind: 'clock'; timezone: string }
+
+export type WorkflowTriggerState = 'draft' | 'baselining' | 'active' | 'needs-review' | 'baseline-failed' | 'deleted'
+export type WorkflowTriggerFirstCheck = 'process-current' | 'track-now'
+export type WorkflowTriggerDisplayState = 'draft' | 'activating' | 'active' | 'paused' | 'needs-review' | 'unavailable'
+export type WorkflowTriggerLimits = {
   maxDescendants: number
   maxConcurrency: number
   budget: WorkflowBudget & { maxWallTimeMs: number }
 }
 
-export type WorkflowScheduleLoopSetting = {
+export type WorkflowTriggerLoopSetting = {
   loopId: string
   repeat: WorkflowRepeatPolicy
   incremental: boolean
 }
 
-export type WorkflowScheduleLoop = {
+export type WorkflowTriggerLoop = {
   loopId: string
   label: string
   sourceLabel: string
@@ -28,17 +31,17 @@ export type WorkflowScheduleLoop = {
   fields: DataField[]
   checkpointAvailable: boolean
   checkpointReason?: string
-  setting: WorkflowScheduleLoopSetting
+  setting: WorkflowTriggerLoopSetting
 }
 
-export type WorkflowSchedulePreparation = {
+export type WorkflowTriggerPreparation = {
   workflowName: string
-  limits: WorkflowScheduleLimits
-  loops: WorkflowScheduleLoop[]
+  limits: WorkflowTriggerLimits
+  loops: WorkflowTriggerLoop[]
   changes: Array<{ kind: 'workflow' | 'query' | 'field' | 'source'; label: string }>
 }
 
-type WorkflowScheduleOccurrenceSummary = {
+type WorkflowTriggerOccurrenceSummary = {
   kind: 'scheduled' | 'manual' | 'baseline'
   state: 'active' | 'completed' | 'skipped' | 'blocked'
   taskId: string
@@ -47,40 +50,40 @@ type WorkflowScheduleOccurrenceSummary = {
   createdAt: number
 }
 
-/** Device-facing schedule projection. Recovery identities and approval fingerprints never cross the route. */
-export type WorkflowScheduleView = {
+/** Device-facing trigger projection. Recovery identities and approval fingerprints never cross the route. */
+export type WorkflowTriggerView = {
   id: string
   projectId: string
   workflowId: string
   workflowName: string
   inputs: Record<string, DataValue>
-  timezone: string
+  when: WorkflowTriggerWhen
   cadence: Cadence
-  limits: WorkflowScheduleLimits
-  loops: WorkflowScheduleLoopSetting[]
-  firstCheck: WorkflowScheduleFirstCheck
-  state: WorkflowScheduleDisplayState
+  limits: WorkflowTriggerLimits
+  loops: WorkflowTriggerLoopSetting[]
+  firstCheck: WorkflowTriggerFirstCheck
+  state: WorkflowTriggerDisplayState
   error?: string
   nextRunAt?: number
-  latest?: WorkflowScheduleOccurrenceSummary
+  latest?: WorkflowTriggerOccurrenceSummary
   updatedAt: number
 }
 
-export type WorkflowSchedulePayload = {
+export type WorkflowTriggerPayload = {
   graph: ResolvedWorkflowGraph
   inputs: Record<string, DataValue>
-  limits: WorkflowScheduleLimits
+  limits: WorkflowTriggerLimits
   baseline: boolean
 }
 
-export type WorkflowScheduleDraftInput = {
+export type WorkflowTriggerDraftInput = {
   id?: string
   name?: string
   projectId: string
   workflowId: string
   inputs?: Record<string, DataValue>
-  timezone: string
+  when: WorkflowTriggerWhen
   cadence?: Cadence
-  loops?: WorkflowScheduleLoopSetting[]
+  loops?: WorkflowTriggerLoopSetting[]
   limits?: { maxDescendants?: number; maxConcurrency?: number; budget?: WorkflowBudget }
 }

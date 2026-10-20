@@ -39,7 +39,7 @@ export const createWorkflowExecution = (
   ctx: RunnerContext,
   internalEnv: InternalEnvFactory,
   notices: WorkflowNotices,
-  settleSchedule: (runId: string) => Promise<void>,
+  settleTrigger: (runId: string) => Promise<void>,
 ): { runner: WorkflowRunner; dispatcher: WorkflowDispatcher } => {
   const core = ctx.core
   const notify: RunnerDeps['notify'] = (taskId, kind, title, ref) =>
@@ -245,16 +245,16 @@ export const createWorkflowExecution = (
       // Each active run keeps the computer awake (docs/node-distribution/keep-awake.md).
       holdAwake: () => ctx.capabilities.get(NODE_KEEP_AWAKE)?.hold(),
       onRunTerminal: async (taskId, runId) => {
-        await settleSchedule(runId).catch((error) =>
-          ctx.log.warn(`workflow schedule settlement failed: ${describeError(error).message}`),
+        await settleTrigger(runId).catch((error) =>
+          ctx.log.warn(`workflow trigger settlement failed: ${describeError(error).message}`),
         )
         const [run] = await store
           .select({ status: workflowRuns.status, completedAt: workflowRuns.updatedAt })
           .from(workflowRuns)
           .where(eq(workflowRuns.id, runId))
           .limit(1)
-        // `setRun` announces the terminal status before this callback. Repeat it after schedule
-        // settlement so clients that refresh both read models cannot race the schedule write.
+        // `setRun` announces the terminal status before this callback. Repeat it after trigger
+        // settlement so clients that refresh both read models cannot race the trigger write.
         if (run)
           ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), taskId, runId, status: run.status })
         if (run)

@@ -20,6 +20,7 @@ const runFields = {
   status: schema.workflowRuns.status,
   posture: schema.workflowRuns.posture,
   startedBy: schema.workflowRuns.startedBy,
+  triggerId: schema.workflowRuns.triggerId,
   defJson: schema.workflowRuns.defJson,
   rootRunId: schema.workflowRuns.rootRunId,
   parentRunId: schema.workflowRuns.parentRunId,
@@ -107,6 +108,20 @@ export async function workflowRunsForTask(
         )
     ).map((launch) => [launch.id, launch]),
   )
+  const triggerIds = [...new Set(rows.map((row) => row.triggerId).filter((id): id is string => !!id))]
+  const triggers = new Map(
+    (triggerIds.length
+      ? await db
+          .select({
+            triggerId: schema.workflowTriggers.id,
+            projectId: schema.workflowTriggers.projectId,
+            workflowId: schema.workflowTriggers.workflowId,
+          })
+          .from(schema.workflowTriggers)
+          .where(inArray(schema.workflowTriggers.id, triggerIds))
+      : []
+    ).map((trigger) => [trigger.triggerId, trigger]),
+  )
   const treeAdmissions = new Map<string, Admission[]>()
   const ownAdmissions = new Map<string, Admission[]>()
   for (const admission of admissions) {
@@ -130,6 +145,7 @@ export async function workflowRunsForTask(
       parentTaskId: parent?.taskId ?? null,
       parentRunName: parent?.name ?? null,
       usage: usageSummary(usageRows),
+      ...(row.triggerId && triggers.has(row.triggerId) ? { triggeredBy: triggers.get(row.triggerId)! } : {}),
       ...(launches.has(row.id)
         ? {
             launchedBy: (({ sessionId, title, effectiveJson }) => ({

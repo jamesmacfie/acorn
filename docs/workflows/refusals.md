@@ -20,7 +20,7 @@ reopening a settled decision, each with what would reopen it.
   an options route is what kinds use ([step kinds](./step-kinds.md#a-kind-describes-its-own-form)).
 - **Running an unpublished draft.** Publication keeps the runnable version clear.
 - **AI that applies or publishes changes itself.** A proposal is one undoable draft edit, and
-  publication and schedule activation stay separate steps. Record samples go to a model only with
+  publication and trigger activation stay separate steps. Record samples go to a model only with
   your opt-in.
 - **Authority from an AI-authored definition.** Generation names only catalogued targets, and start
   still applies source trust and the root's limits.
@@ -57,8 +57,25 @@ reopening a settled decision, each with what would reopen it.
 - **Automatic retries of failed items.** A retry is an explicit action.
 - **Timestamp checkpoints for every source.** An incremental read needs the source's own
   continuation contract.
-- **Overlapping runs of one schedule.** The next occurrence is skipped and links to the active run.
-- **Implicit triggers from a draft.** Only a published workflow can be scheduled, through an explicit
+- **Overlapping runs of one trigger.** The next occurrence is skipped and links to the active run.
+- **Implicit triggers from a draft.** Only a published workflow can have a trigger, through an explicit
   approval that freezes its graph and limits.
 - **A generic provider write-back contract.** Writes go through workflow actions. Dashboard write-back
   shipped in the dashboards programme. See [dashboards](../dashboards.md#published-panels).
+
+## Unattended starts
+
+A trigger starts a run with nobody present, so a refusal only the owner can fix stops it and asks for
+review rather than retrying (see [triggers](./triggers.md#review-and-refusals)). The start service
+throws `WorkflowAuthorityError` with one of these reasons:
+
+| Reason | When |
+| --- | --- |
+| `forbidden` | A data source refused the Node's access |
+| `connection-required` | A data source needs an account that isn't connected |
+| `input-required` | A connection input, such as an account picker, has no value on this Node |
+| `not-published` | The workflow or a saved query it uses has no published revision |
+| `missing` | The project, the task, or a configured record loop no longer exists |
+| `untrusted` | The project's repository configuration hasn't been reviewed and trusted |
+
+Any other failure is treated as passing, and the scheduler tries again.

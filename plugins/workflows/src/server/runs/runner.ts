@@ -10,7 +10,12 @@ import {
   type PluginDatabase,
 } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
-import type { WorkflowDef, WorkflowRunRow, WorkflowStepRow } from '../../shared/workflowContracts'
+import type {
+  WorkflowDef,
+  WorkflowRunErrorCause,
+  WorkflowRunRow,
+  WorkflowStepRow,
+} from '../../shared/workflowContracts'
 import type { StepKindContribution, WorkflowCatalog } from '../../shared/workflowContracts'
 import { stepKindContributionProblems } from '../../shared/stepKindAvailability'
 import { gateFormEdited, gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
@@ -98,7 +103,7 @@ export class WorkflowRunner {
       treeSafety: this.#treeSafety,
       state: this.#state,
       kind: (kind) => this.#stepKind(kind),
-      finishRun: (run, status, error, stepId) => this.finishRun(run, status, error, stepId),
+      finishRun: (run, status, error, stepId, cause) => this.finishRun(run, status, error, stepId, cause),
       safetyRailRun: (runId, reason, trigger) => this.safetyRailRun(runId, reason, trigger),
     })
     this.#childLifecycle = new WorkflowChildLifecycle(this.db, {
@@ -673,12 +678,12 @@ export class WorkflowRunner {
         await this.#state.setStep(row.id, { status: 'pending', error: null })
       }
     }
-    await this.#state.setRun(runId, { status: 'running', error: null })
+    await this.#state.setRun(runId, { status: 'running', error: null, errorCause: null })
     // Reopen only the waiting dispatch path. Successful siblings retain their original attempts.
     let child = run
     for (const ancestor of ancestors) {
       if (child.parentStepId) await this.#state.setStep(child.parentStepId, { status: 'pending', error: null })
-      await this.#state.setRun(ancestor.id, { status: 'running', error: null })
+      await this.#state.setRun(ancestor.id, { status: 'running', error: null, errorCause: null })
       this.armDeadline(ancestor)
       child = ancestor
     }
@@ -691,6 +696,7 @@ export class WorkflowRunner {
     status: 'done' | 'completed-with-failures' | 'failed' | 'safety-rail' | 'cancelled',
     error?: string,
     stepId?: string,
+    cause?: WorkflowRunErrorCause,
   ): Promise<void> {
     const current = await this.run(run.id)
     if (!current || TERMINAL_RUN.has(current.status)) return
@@ -698,7 +704,7 @@ export class WorkflowRunner {
     const timer = this.#deadlineTimers.get(run.id)
     if (timer) clearTimeout(timer)
     this.#deadlineTimers.delete(run.id)
-    await this.#state.setRun(run.id, { status, error: error ?? null })
+    await this.#state.setRun(run.id, { status, error: error ?? null, errorCause: cause ?? null })
     this.#state.finishRunSpan(run.id, status)
     await this.#execution
       .queueHandoff(() => this.deps.finishHandoffs?.(run.taskId, run.id) ?? Promise.resolve())

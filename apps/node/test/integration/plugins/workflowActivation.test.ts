@@ -28,7 +28,7 @@ const WORKFLOW_ROUTE = capabilityId<{
   cancel(runId: string): Promise<{ ok: boolean }>
 }>('workflows.route')
 const WORKFLOW_DEFS_ROUTE = capabilityId<unknown>('workflows.defs')
-const WORKFLOW_SCHEDULES_ROUTE = capabilityId<{ defaults(): { timezone: string } }>('workflows.schedules.route')
+const WORKFLOW_TRIGGERS_ROUTE = capabilityId<{ defaults(): { timezone: string } }>('workflows.triggers.route')
 
 registerBuiltInProfiles()
 
@@ -105,7 +105,7 @@ it('activates route capabilities and runs managed execution through a late-bound
   const route = ctx.capabilities.get(WORKFLOW_ROUTE)
   expect(route).toBeDefined()
   expect(ctx.capabilities.get(WORKFLOW_DEFS_ROUTE)).toBeDefined()
-  expect(ctx.capabilities.get(WORKFLOW_SCHEDULES_ROUTE)?.defaults()).toEqual({ timezone: expect.any(String) })
+  expect(ctx.capabilities.get(WORKFLOW_TRIGGERS_ROUTE)?.defaults()).toEqual({ timezone: expect.any(String) })
 
   const execute = vi.fn(
     async (_request: AgentSessionExecuteRequest): Promise<NonNullable<Awaited<ReturnType<AgentSessionExecute>>>> => ({

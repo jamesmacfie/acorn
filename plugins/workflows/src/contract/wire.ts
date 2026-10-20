@@ -210,6 +210,8 @@ export type WorkflowRunProjection = WorkflowRunRow & {
   usage: WorkflowUsageSummary | null
   /** The agent session that started this run with `workflow_run`, and the limits it ran under. */
   launchedBy?: { sessionId: string; title: string; limits: WorkflowBudget }
+  /** The trigger that started this root, and the workflow page whose Triggers list holds it. */
+  triggeredBy?: { triggerId: string; projectId: string; workflowId: string }
 }
 
 export type WorkflowStepProjection = WorkflowStepRow & {

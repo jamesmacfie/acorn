@@ -26,14 +26,14 @@ import {
 } from '@acorn/plugin-api/ui'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
-import type { WorkflowScheduleDisplayState } from '../shared/workflowSchedules'
+import type { WorkflowTriggerDisplayState } from '../shared/workflowTriggers'
 import { emptyDefinition } from './editor/draft'
 import { defRefKey, parseDefRef, SOURCE_GLYPH } from './editor/draftStore'
 import StartDialogHost from './editor/StartDialog'
 import WorkflowEditor from './editor/WorkflowEditor'
-import ScheduleDialogHost from './schedules/ScheduleDialog'
-import { requestWorkflowSchedule } from './schedules/scheduleRequest'
-import { scheduleStateLabel } from './schedules/scheduleModel'
+import TriggerDialogHost from './triggers/TriggerDialog'
+import { requestWorkflowTrigger } from './triggers/triggerRequest'
+import { triggerStateLabel, whenSummary } from './triggers/triggerModel'
 import { openWorkflowRun } from './runs/runStore'
 import { runGlyph, runTone, statusLabel } from './runs/runDisplay'
 import { workflowsSurfacePath, WORKFLOWS_SOURCE_ID } from './surfacePath'
@@ -50,7 +50,7 @@ const RECENT_RUNS = 20
 // One line, so the icon census sees every name in it: it scans a line for a literal only when the
 // line mentions an icon, and a map spread over five lines mentions one on none of them
 // (client-core scripts/icon-census.mjs).
-const SCHEDULE_GLYPH: Record<WorkflowScheduleDisplayState, string> = {
+const TRIGGER_GLYPH: Record<WorkflowTriggerDisplayState, string> = {
   draft: 'pencil',
   activating: 'loader-circle',
   active: 'clock',
@@ -72,7 +72,7 @@ const initials = (name: string): string =>
 /** `repo:nightly` is the layer and the file's id; a reader knows the file. */
 const fileName = (source: string): string => `${source.replace(/^[a-z]+:/, '')}.toml`
 
-const scheduleTone = (state: WorkflowScheduleDisplayState): 'ok' | 'danger' | 'warn' | undefined =>
+const triggerTone = (state: WorkflowTriggerDisplayState): 'ok' | 'danger' | 'warn' | undefined =>
   state === 'active' ? 'ok' : state === 'unavailable' ? 'danger' : state === 'needs-review' ? 'warn' : undefined
 
 /** The routed project, and the workspace it belongs to. Both halves ask, so neither can answer
@@ -112,9 +112,9 @@ export function WorkflowsBrowseList() {
     async (workspaceId) => workflowApi.defsList(workspaceId),
   )
   const [runs, { refetch: refetchRuns }] = createResource(async () => workflowApi.allRuns().catch(() => ({ runs: [] })))
-  const schedules = createQuery(() => ({
-    queryKey: ['workflow-schedules'],
-    queryFn: () => workflowApi.schedules(),
+  const triggers = createQuery(() => ({
+    queryKey: ['workflow-triggers'],
+    queryFn: () => workflowApi.triggers(),
     refetchInterval: 30_000,
   }))
 
@@ -123,10 +123,10 @@ export function WorkflowsBrowseList() {
     const stopDefs = onPluginFrame('workflows', pluginChannel('workflows', 'defs-changed'), () => void refetchDefs())
     const stopPlugins = wsOnPluginsChanged(() => void refetchDefs())
     const stopRuns = onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), () => {
-      // A baseline run also completes schedule activation. Refresh both read models so the rail does
+      // A baseline run also completes trigger activation. Refresh both read models so the rail does
       // not keep showing “Activating” until its polling interval after the run has settled.
       void refetchRuns()
-      void schedules.refetch()
+      void triggers.refetch()
     })
     onCleanup(() => {
       stopDefs()
@@ -147,8 +147,8 @@ export function WorkflowsBrowseList() {
   const recent = createMemo<RunRowInput[]>(() =>
     (runs()?.runs ?? []).filter((run) => !!run.taskId && workspaceTasks().has(run.taskId)).slice(0, RECENT_RUNS),
   )
-  const projectSchedules = createMemo(() =>
-    (schedules.data ?? []).filter((schedule) => schedule.projectId === scope.projectId()),
+  const projectTriggers = createMemo(() =>
+    (triggers.data ?? []).filter((trigger) => trigger.projectId === scope.projectId()),
   )
 
   // A file that does not parse keys on its own address, so pressing it opens the editor, which says
@@ -189,15 +189,15 @@ export function WorkflowsBrowseList() {
     if (task) openWorkflowRun(task, runId, navigate)
   }
 
-  const openSchedule = (scheduleId: string): void => {
-    const schedule = projectSchedules().find((candidate) => candidate.id === scheduleId)
-    if (!schedule) return
-    const definition = definitions().find((candidate) => candidate.id === schedule.workflowId)
-    requestWorkflowSchedule({
-      scheduleId: schedule.id,
-      workflowId: schedule.workflowId,
-      name: definition?.name ?? schedule.workflowName,
-      projectId: schedule.projectId,
+  const openTrigger = (triggerId: string): void => {
+    const trigger = projectTriggers().find((candidate) => candidate.id === triggerId)
+    if (!trigger) return
+    const definition = definitions().find((candidate) => candidate.id === trigger.workflowId)
+    requestWorkflowTrigger({
+      triggerId: trigger.id,
+      workflowId: trigger.workflowId,
+      name: definition?.name ?? trigger.workflowName,
+      projectId: trigger.projectId,
       inputs: definition?.inputs ?? [],
     })
   }
@@ -314,46 +314,40 @@ export function WorkflowsBrowseList() {
         </Show>
       </Show>
 
-      <Show when={projectSchedules().length}>
-        <SectionHeader level="group" count={projectSchedules().length}>
-          Schedules
+      <Show when={projectTriggers().length}>
+        <SectionHeader level="group" count={projectTriggers().length}>
+          Triggers
         </SectionHeader>
         <Rows
-          id="workflows.browse.schedules"
-          ariaLabel="Workflow schedules"
-          items={projectSchedules().map((schedule) => ({ key: schedule.id, label: schedule.workflowName }))}
-          onSelect={openSchedule}
-          onActivate={openSchedule}
+          id="workflows.browse.triggers"
+          ariaLabel="Workflow triggers"
+          items={projectTriggers().map((trigger) => ({ key: trigger.id, label: trigger.workflowName }))}
+          onSelect={openTrigger}
+          onActivate={openTrigger}
         >
           {(item, itemProps, selected) => (
-            <Show when={projectSchedules().find((schedule) => schedule.id === item.key)}>
-              {(schedule) => (
+            <Show when={projectTriggers().find((trigger) => trigger.id === item.key)}>
+              {(trigger) => (
                 <Row
                   item={itemProps}
                   selected={selected()}
-                  onPress={() => openSchedule(schedule().id)}
-                  title={schedule().workflowName}
-                  // Collapsed: the state, because a schedule that has stopped checking is the only
+                  onPress={() => openTrigger(trigger().id)}
+                  title={trigger().workflowName}
+                  // Collapsed: the state, because a trigger that has stopped checking is the only
                   // reason to look at this list at a glance. The workflow name is the tooltip.
                   collapsed={
                     collapsed() ? (
-                      <Icon name={SCHEDULE_GLYPH[schedule().state]} tone={scheduleTone(schedule().state)} />
+                      <Icon name={TRIGGER_GLYPH[trigger().state]} tone={triggerTone(trigger().state)} />
                     ) : undefined
                   }
-                  meta={
-                    <Text emphasis="muted">
-                      {schedule().nextRunAt
-                        ? new Date(schedule().nextRunAt!).toLocaleString()
-                        : (schedule().error ?? 'No check planned')}
-                    </Text>
-                  }
+                  meta={<Text emphasis="muted">{whenSummary(trigger())}</Text>}
                   trailing={
-                    <Badge tone={scheduleTone(schedule().state)} size="xs">
-                      {scheduleStateLabel(schedule().state)}
+                    <Badge tone={triggerTone(trigger().state)} size="xs">
+                      {triggerStateLabel(trigger().state)}
                     </Badge>
                   }
                 >
-                  {schedule().workflowName}
+                  {trigger().workflowName}
                 </Row>
               )}
             </Show>
@@ -414,7 +408,7 @@ export function WorkflowsBrowseList() {
       {/* The one mount for the start dialog: this region is on screen whenever the source is, and the
           editor's Run button asks for it from the other half of the layout. */}
       <StartDialogHost />
-      <ScheduleDialogHost />
+      <TriggerDialogHost />
     </Stack>
   )
 }

@@ -12,7 +12,7 @@ decisions, eligible child dispatches, and a checkpoint in one transaction. Core 
 only after that transaction commits. Recovery reuses the reserved task and run IDs.
 
 A root can receive `processingScope: { scopeId, epoch }` through the internal start seam. The scope
-is frozen in the same transaction as the root and its steps. Schedule integration uses its schedule
+is frozen in the same transaction as the root and its steps. A trigger uses its trigger
 ID and explicit epoch. A manual root without this option receives independent history. Loop paths
 use stable step IDs and ancestor item identities, so label edits do not reset history and nested
 parents do not share a child-loop state.

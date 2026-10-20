@@ -13,6 +13,48 @@ describe('workflow run read model', () => {
   })
   afterEach(() => store.cleanup())
 
+  it('names the trigger that started a root run, and the workflow page that holds it', async () => {
+    store.db
+      .insert(schema.workflowTriggers)
+      .values({
+        id: 'trigger',
+        workspaceId: 'workspace',
+        projectId: 'project',
+        workflowId: 'workflow',
+        whenJson: '{"kind":"clock","timezone":"UTC"}',
+        inputsJson: '{}',
+        limitsJson: '{}',
+        epoch: 'epoch',
+        state: 'active',
+        createdAt: at,
+        updatedAt: at,
+      })
+      .run()
+    store.db
+      .insert(schema.workflowRuns)
+      .values(
+        [{ id: 'triggered', triggerId: 'trigger' }, { id: 'manual' }].map((run) => ({
+          ...run,
+          taskId: 'task',
+          name: run.id,
+          status: 'done',
+          startedBy: run.triggerId ? ('trigger' as const) : ('manual' as const),
+          defJson: '{}',
+          rootRunId: run.id,
+          createdAt: at,
+          updatedAt: at,
+        })),
+      )
+      .run()
+    const rows = await workflowRunsForTask(store.db, 'task')
+    expect(rows.find((row) => row.id === 'triggered')?.triggeredBy).toEqual({
+      triggerId: 'trigger',
+      projectId: 'project',
+      workflowId: 'workflow',
+    })
+    expect(rows.find((row) => row.id === 'manual')).not.toHaveProperty('triggeredBy')
+  })
+
   it('retains every frozen task run with stable ties, missing lineage, and zero versus unknown usage', async () => {
     const defJson = '{"name":"Frozen","steps":[{"id":"original","name":"Original"}]}'
     store.db
@@ -59,6 +101,7 @@ describe('workflow run read model', () => {
       status: 'failed',
       posture: 'gated',
       startedBy: 'manual',
+      triggerId: null,
       defJson,
       rootRunId: 'missing',
       parentRunId: 'missing',

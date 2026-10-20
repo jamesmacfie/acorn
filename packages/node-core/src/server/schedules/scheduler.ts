@@ -78,6 +78,8 @@ export type ScheduleTarget = {
   /** The workspace or project the target works in, so the Schedules data source can scope it. A
    *  project is enough, because its workspace is looked up. Absent means the schedule is the Node's. */
   scope?(target: unknown): ScheduleScope | undefined
+  /** Where the target lives in the app, so the settings row can open it. */
+  opens?(target: unknown): ScheduleRow['opens']
   remove?(target: unknown): Promise<void>
 }
 
@@ -160,6 +162,7 @@ type Entry = {
   run?: ScheduleRunner
   timezone?: string
   scope?: ScheduleScope | undefined
+  opens?: ScheduleRow['opens']
 }
 
 export type CreateScheduleInput = { name: string; kind: string; target: unknown; cadence: Cadence }
@@ -665,6 +668,7 @@ export class Scheduler {
           ...(row.risk ? { risk: row.risk as ToolRisk } : {}),
           ...(parsed !== null && target?.timezone?.(parsed) ? { timezone: target.timezone(parsed) } : {}),
           ...(parsed !== null && target?.scope ? { scope: target.scope(parsed) } : {}),
+          ...(parsed !== null && target?.opens ? { opens: target.opens(parsed) } : {}),
           ...(target
             ? {
                 run: (signal: AbortSignal, context?: ScheduleRunContext) => {
@@ -753,6 +757,7 @@ function toRow(entry: Entry): ScheduleRow {
     ...(entry.state.backoffUntil === null ? {} : { backoffUntil: entry.state.backoffUntil }),
     ...(entry.risk ? { risk: entry.risk } : {}),
     ...entry.scope,
+    ...(entry.opens ? { opens: entry.opens } : {}),
   }
 }
 

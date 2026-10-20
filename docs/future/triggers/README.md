@@ -19,11 +19,11 @@ whose **For each** remembers which ones it handled. That works for a morning bat
 trigger in three ways:
 
 - **Every check is a task.** Each occurrence of a schedule creates a root task and a root run before
-  it knows whether anything matched (`WorkflowScheduleService.resume` in
-  `plugins/workflows/src/server/schedules/service.ts`). A check every five minutes makes 288 tasks a
-  day, almost all empty.
+  it knows whether anything matched (`TriggerOccurrences.resume` in
+  `plugins/workflows/src/server/triggers/occurrences.ts`). A check every five minutes makes 288 tasks
+  a day, almost all empty.
 - **One slow run blocks every later check.** An occurrence owns overlap until the root run and every
-  child are finished ([scheduled roots](../../workflows/scheduled-roots.md)). If a pull request review
+  child are finished ([triggers](../../workflows/triggers.md)). If a pull request review
   takes 40 minutes, no new pull request is noticed for 40 minutes.
 - **Checks only happen on a clock.** The floor for a user schedule is 60 seconds, and a plugin has
   no way to say "my data just changed, look now".

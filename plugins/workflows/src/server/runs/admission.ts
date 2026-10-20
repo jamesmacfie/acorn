@@ -22,6 +22,8 @@ import type { ResolvedWorkflowGraph } from '../../shared/workflowContracts'
 import { eq } from 'drizzle-orm'
 import * as schema from '../../node/schema'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
+import { publishedWorkflow } from '../publication/store'
+import { asAuthorityError, WorkflowAuthorityError } from './authority'
 
 type ProjectScope = {
   id: string
@@ -47,7 +49,7 @@ type InternalIdentity = {
   startedBy: WorkflowStartedBy
 }
 
-/** Resolves, freezes, and starts definitions for routes and internal schedulers. */
+/** Resolves, freezes, and starts definitions for routes, triggers, and agent launches. */
 export class WorkflowStartService {
   constructor(
     private readonly db: PluginDatabase,
@@ -194,7 +196,7 @@ export class WorkflowStartService {
     return started.runId
   }
 
-  async prepareScheduled(
+  async prepareTriggered(
     projectId: string,
     definitionId: string,
     inputs?: Record<string, DataValue>,
@@ -202,11 +204,11 @@ export class WorkflowStartService {
     return this.prepareInvocation({ projectId }, definitionId, inputs ?? {})
   }
 
-  /** Resolves and checks a saved definition outside a device start: for a schedule or the owner's
+  /** Resolves and checks a saved definition outside a device start: for a trigger or the owner's
    *  agent invocation review (a project), or for an agent's launch (a task, whose checkout supplies
    *  repository files). A `review` has no caller values yet, so required inputs are left unchecked,
    *  and it skips the trust check, which a start makes on its own. Neither changes the graph's
-   *  executable shape. */
+   *  executable shape. A refusal only the owner can fix throws WorkflowAuthorityError. */
   async prepareInvocation(
     target: { projectId: string } | { taskId: string },
     definitionId: string,
@@ -216,19 +218,17 @@ export class WorkflowStartService {
     let scope: WorkflowResolutionScope
     if ('taskId' in target) {
       const taskScope = await this.deps.taskScope(target.taskId)
-      if (!taskScope) throw new Error('That task no longer exists.')
+      if (!taskScope) throw new WorkflowAuthorityError('missing', 'That task no longer exists.')
       scope = taskScope
     } else {
       const project = await this.deps.project(target.projectId)
-      if (!project) throw new Error('That project no longer exists.')
+      if (!project) throw new WorkflowAuthorityError('missing', 'That project no longer exists.')
       scope = { workspaceId: project.workspaceId, projectId: project.id, repoDir: project.path, userDir: this.userDir }
     }
-    const resolved = await resolveScopedWorkflowDefinition(
-      this.db,
-      this.definitionRef(definitionId),
-      scope,
-      this.runner.validationCatalog(),
-    )
+    const ref = this.definitionRef(definitionId)
+    if (ref.source === 'database' && !(await publishedWorkflow(this.db, ref.id)))
+      throw new WorkflowAuthorityError('not-published', 'That workflow is no longer published.')
+    const resolved = await resolveScopedWorkflowDefinition(this.db, ref, scope, this.runner.validationCatalog())
     const definition =
       purpose === 'review' && resolved.definition.inputs
         ? { ...resolved.definition, inputs: resolved.definition.inputs.map((input) => ({ ...input, required: false })) }
@@ -241,15 +241,25 @@ export class WorkflowStartService {
       allowDatabaseDefinitions: true,
       queryRevision: this.deps.queryRevision ? (id) => this.deps.queryRevision!(id, scope) : undefined,
     })
-    if (graph.requiresRepoTrust && purpose === 'start') {
-      if ('taskId' in target) await this.deps.authorizeRepoConfig(target.taskId)
-      else await this.deps.authorizeProjectConfig?.(target.projectId)
+    try {
+      if (graph.requiresRepoTrust && purpose === 'start') {
+        if ('taskId' in target) await this.deps.authorizeRepoConfig(target.taskId)
+        else
+          await this.deps.authorizeProjectConfig?.(target.projectId).catch((error: unknown) => {
+            // The project exists (checked above), so this check refuses only an unreviewed configuration.
+            throw new WorkflowAuthorityError('untrusted', error instanceof Error ? error.message : String(error))
+          })
+      }
+      await this.deps.validateDestination?.(graph, scope)
+    } catch (error) {
+      throw asAuthorityError(error)
     }
-    await this.deps.validateDestination?.(graph, scope)
     return { graph, scope }
   }
 
-  async startScheduled(request: {
+  /** Starts a trigger's root run. A refusal only the owner can fix throws WorkflowAuthorityError. */
+  async startTriggered(request: {
+    triggerId: string
     taskId: string
     graph: ResolvedWorkflowGraph
     intendedRunId: string
@@ -260,10 +270,14 @@ export class WorkflowStartService {
     baseline?: boolean
   }): Promise<string> {
     await this.deps.reconciled
-    if (request.graph.requiresRepoTrust) await this.deps.authorizeRepoConfig(request.taskId)
-    const scope = await this.deps.taskScope(request.taskId)
-    if (!scope) throw new Error('That task no longer exists.')
-    await this.deps.validateDestination?.(request.graph, scope)
+    try {
+      if (request.graph.requiresRepoTrust) await this.deps.authorizeRepoConfig(request.taskId)
+      const scope = await this.deps.taskScope(request.taskId)
+      if (!scope) throw new WorkflowAuthorityError('missing', 'That task no longer exists.')
+      await this.deps.validateDestination?.(request.graph, scope)
+    } catch (error) {
+      throw asAuthorityError(error)
+    }
     return this.runner.start(request.taskId, request.graph.root, {
       inputs: request.inputs,
       resolvedGraph: request.graph,
@@ -278,7 +292,8 @@ export class WorkflowStartService {
       },
       processingScope: request.processingScope,
       processingBaseline: request.baseline ?? false,
-      startedBy: 'schedule',
+      startedBy: 'trigger',
+      triggerId: request.triggerId,
     })
   }
 

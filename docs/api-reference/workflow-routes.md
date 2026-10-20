@@ -1,7 +1,7 @@
 # Workflow routes
 
 This page lists the workflows plugin's routes under `/v1/p/workflows`: definitions, runs, processing
-history, schedule bindings, and agent invocation approvals. It's part of the [API reference](../api-reference.md). The workflows
+history, triggers, and agent invocation approvals. It's part of the [API reference](../api-reference.md). The workflows
 plugin owns durable definitions, runs, steps, gates, and reconciliation, and
 [workflows.md](../workflows.md) owns the model. Paths below are relative to `/v1/p/workflows`.
 
@@ -53,7 +53,6 @@ Node-owned callers use the `workflows.runner` capability instead of HTTP. Its st
 a task ID, optional inputs, a stable caller key and payload fingerprint, a reserved run ID, and a
 start reason, with an inline definition or a saved definition ID. The plugin resolves saved references in
 the task's scope, freezes the graph, and checks a replay against the same invocation identity.
-Scheduled workflows use this handoff.
 
 ## Processing history
 
@@ -108,23 +107,29 @@ failure keeps the status the provider seam gave it, so `provider_not_connected` 
 model calls, so the client passes a 240-second `timeoutMs` ([transport](./transport.md#transport)).
 Generation spends the owner's provider key, and the device-only gate on `/defs` covers it.
 
-## Schedule bindings
+## Triggers
 
-These routes are device-only.
+These routes are device-only. A trigger starts a published workflow with nobody present
+([triggers](../workflows/triggers.md)).
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET`, `POST` | `/workflows/schedules` | List bindings with activation state, or save a draft binding |
-| `GET` | `/workflows/schedules/defaults` | Defaults for a new binding |
-| `POST` | `/workflows/schedules/prepare` | Check a draft binding and preview it before saving |
-| `GET`, `DELETE` | `/workflows/schedules/:id` | Read or delete one binding |
-| `POST` | `/workflows/schedules/:id/approve` | Freeze approval and choose `process-current` or `track-now`. `freshEpoch` resets processing scope |
-| `POST` | `/workflows/schedules/:id/pause`, `/run` | Pause or resume with `{ paused }`, or run it now |
+| `GET`, `POST` | `/workflows/triggers` | List triggers with activation state, or save a draft trigger |
+| `GET` | `/workflows/triggers/defaults` | Defaults for a new trigger |
+| `POST` | `/workflows/triggers/prepare` | Check a draft trigger and preview it before saving |
+| `GET`, `DELETE` | `/workflows/triggers/:id` | Read or delete one trigger |
+| `POST` | `/workflows/triggers/:id/approve` | Freeze approval and choose `process-current` or `track-now`. `freshEpoch` resets processing scope |
+| `POST` | `/workflows/triggers/:id/pause`, `/run` | Pause or resume with `{ paused }`, or run it now |
 
-A draft binding names a project, a published workflow, typed input, a timezone, and limits. Create the
-core cadence row separately, with target `{ "scheduleId": "…" }` and kind `workflow`. The workflows
-plugin owns approval and occurrences. Core owns cadence, pause, deletion, **Run now**, and the
-recent-run ring ([schedules](../schedules.md)).
+A draft trigger names a project, a published workflow, typed input, its `when`, and limits. Today
+`when` is `{ "kind": "clock", "timezone": "…" }`. A draft that carries a `cadence` also creates or
+updates the core cadence row, paused until approval, with target `{ "triggerId": "…" }` and kind
+`workflow`. The workflows plugin owns approval and occurrences. Core owns cadence, pause, deletion,
+**Run now**, and the recent-run ring ([schedules](../schedules.md)).
+
+`/workflows/schedules` answers the same operations for clients built before triggers. It reads a draft's
+`timezone` as a clock `when`, and adds `timezone` to each trigger it returns. It's a mixed-version path
+until January 19, 2027 ([versioning](./versioning.md#mixed-builds)).
 
 ## Agent invocation
 

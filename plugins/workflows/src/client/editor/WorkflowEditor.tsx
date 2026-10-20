@@ -67,7 +67,7 @@ import { childWorkflowDefinition, connectCreatedChild } from './childAuthoring'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { mergeWorkflow } from '../../shared/workflowMerge'
-import { requestWorkflowSchedule } from '../schedules/scheduleRequest'
+import { requestWorkflowTrigger } from '../triggers/triggerRequest'
 import { openWorkflowRun } from '../runs/runStore'
 import type { WorkflowAgentOrigin } from '../../contract/wire'
 import InvocationDialog from './InvocationDialog'
@@ -283,11 +283,11 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     })
   }
 
-  const schedule = (): void => {
+  const addTrigger = (): void => {
     const ref = store.ref()
     const published = store.publishedDef()
     if (!ref || ref.source !== 'database' || !published) return
-    requestWorkflowSchedule({
+    requestWorkflowTrigger({
       workflowId: ref.id,
       name: published.name,
       projectId: props.projectId,
@@ -297,7 +297,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
 
   const publish = async (): Promise<void> => {
     await store.publish()
-    await queryClient.invalidateQueries({ queryKey: ['workflow-schedules'] })
+    await queryClient.invalidateQueries({ queryKey: ['workflow-triggers'] })
   }
 
   // Which review dialog is open. Preparing a publication or an export is what opens one, and the
@@ -377,7 +377,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         <Badge
           tip={
             store.publishedRevision()
-              ? `Version ${store.publishedRevision()}. Runs and schedules use this version.`
+              ? `Version ${store.publishedRevision()}. Runs and triggers use this version.`
               : undefined
           }
         >
@@ -461,8 +461,8 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
                 {isDatabase() && !store.publishedRevision() ? 'Agent invocation… (publish first)' : 'Agent invocation…'}
               </Menu.Item>
               <Show when={isDatabase()}>
-                <Menu.Item context={menu} disabled={!store.publishedRevision()} onSelect={schedule}>
-                  {store.publishedRevision() ? 'Schedule…' : 'Schedule… (publish first)'}
+                <Menu.Item context={menu} disabled={!store.publishedRevision()} onSelect={addTrigger}>
+                  {store.publishedRevision() ? 'Add trigger…' : 'Add trigger… (publish first)'}
                 </Menu.Item>
                 <Menu.Item
                   context={menu}
@@ -591,7 +591,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
             <Modal title="Publish workflow" size="md" onDismiss={() => setReview(undefined)}>
               <ModalBody>
                 <Stack gap="row">
-                  <Text wrap>Runs and schedules use the published version. Publishing saves:</Text>
+                  <Text wrap>Runs and triggers use the published version. Publishing saves:</Text>
                   <For each={operation().writes}>
                     {(write) => (
                       <Text>{`${write.name}${write.kind === 'query' ? ' (saved query)' : ''}, version ${write.kind === 'workflow' ? write.revision : write.plan.intendedRevision}`}</Text>

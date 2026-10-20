@@ -1,7 +1,7 @@
 # User schedules
 
 This page covers schedules the owner creates: the target kinds, how consent is taken and how it fails
-closed, workflow schedules, the routes, and Settings → Schedules. Read it before you add a target kind
+closed, workflow triggers, the routes, and Settings → Schedules. Read it before you add a target kind
 or change the creation flow. It's part of [schedules](../schedules.md).
 
 ## Targets: what a user schedule may do
@@ -51,9 +51,11 @@ Both record `skipped`, not an error, so there's no backoff and no red row. A tar
 
 ### `workflow`
 
-The target is `{ scheduleId }`. Core owns the cadence row and calls the workflows plugin through the
-target registry. The workflows plugin owns the approved project, published graph, typed inputs, limits,
-timezone, processing epoch, and occurrence history ([workflow routes](../api-reference/workflow-routes.md#schedule-bindings)).
+The target is `{ triggerId }`, and it names a workflow trigger whose **When** is **On a schedule**
+([triggers](../workflows/triggers.md)). Rows stored before triggers keep `{ scheduleId }`, and the
+target still reads them. Core owns the cadence row and calls the workflows plugin through the target
+registry. The workflows plugin owns the approved project, published graph, typed inputs, limits,
+timezone, processing epoch, and occurrence history ([workflow routes](../api-reference/workflow-routes.md#triggers)).
 
 An occurrence reserves stable root task and run IDs before either cross-database effect. Its unique
 request key covers a manual run, and its generation plus due instant covers a timer run. Restart
@@ -62,23 +64,28 @@ while any run in the first occurrence's tree is still active or gated.
 
 Approval freezes the resolved root and child graph, published query revisions, inputs, and narrowed
 limits. Every dispatch resolves the graph and source destination again before it creates a task. A
-changed dependency, revoked connection, missing publication, or untrusted repository moves the schedule
+changed dependency, revoked connection, missing publication, or untrusted repository moves the trigger
 to review instead of starting work. A temporary source failure leaves the reserved occurrence for
 backoff or restart reconciliation.
 
-The workflows plugin gives calendar cadences an IANA timezone. A daylight-saving gap skips the missing
-local occurrence, and a fold runs the first matching instant once. Pausing stops timer admission and
-doesn't cancel an active run tree. **Run now** still admits work for a paused row. Deleting the core row
-leaves a workflow-owned tombstone and keeps its task, run, occurrence, and processing history.
+The trigger's **When** gives calendar cadences an IANA timezone. A daylight-saving gap skips the
+missing local occurrence, and a fold runs the first matching instant once. Pausing stops timer
+admission and doesn't cancel an active run tree. **Run now** still admits work for a paused row.
+Deleting the core row leaves a workflow-owned tombstone and keeps its task, run, occurrence, and
+processing history.
 
-The schedule is authored from **Schedule…** on a published database workflow. Setup is progressive:
-project, typed inputs, cadence, and timezone first, then record repeat and checkpoint policy for loops
-that need it, then the first-check choice, three concrete occurrences, and the effective limits. The
-core cadence is created paused and enabled only after approval, or after a track-from-now baseline
-succeeds. The device view shows Active, Paused, Needs review, or Unavailable, with repair actions, the
-most recent run, and the next occurrence, and leaves out approval digests, epochs, request keys, and
-continuation tokens. Editing an approved schedule keeps processing history unless the owner picks
-**Start fresh**. The client never queues an activation while disconnected.
+The trigger is authored from **Add trigger…** on a published database workflow. Setup is progressive:
+**When**, with the cadence and timezone, then the project and typed inputs, then record repeat and
+checkpoint policy for loops that need it, then the first-check choice, three concrete occurrences, and
+the effective limits. The core cadence is created paused and enabled only after approval, or after a
+track-from-now baseline succeeds. The device view shows Active, Paused, Needs review, or Unavailable,
+with repair actions, the most recent run, and the next occurrence, and leaves out approval digests,
+epochs, request keys, and continuation tokens. Editing an approved trigger keeps processing history
+unless the owner picks **Start fresh**. The client never queues an activation while disconnected.
+
+A target may say where its work lives in the app (`ScheduleTarget.opens`). Settings → Schedules then
+offers **Open** on the row. A workflow trigger's row opens the workflow's page, whose **Triggers** list
+holds it.
 
 ## Routes
 

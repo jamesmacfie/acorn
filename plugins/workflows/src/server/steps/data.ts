@@ -94,13 +94,27 @@ export function workflowDataHandlers(
         // Crash/retry resumes these exact arguments, even if a saved query or wall clock changes.
         await services.setStep(context.step.id, { inputsJson: JSON.stringify({ ...prior, dataSelection: frozen }) })
       }
-      const result = await access.invoke({
-        operation: 'query',
+      const request = {
+        operation: 'query' as const,
         query: frozen.resolved.query,
         evaluationTime: frozen.evaluationTime,
-        mode: 'execution',
+        mode: 'execution' as const,
         pageSize: DATA_LIMITS.options,
-      })
+      }
+      let result: DataSourceResponse<typeof request>
+      try {
+        result = await access.invoke(request)
+      } catch (error) {
+        // A source refuses a checkpoint it can no longer continue from as an invalid request. Only the
+        // owner can choose what happens next, so the run records why it failed (docs/workflows/triggers.md).
+        const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+        if (frozen.resolved.query.incremental?.kind !== 'continue' || code !== 'invalid-request') throw error
+        return {
+          status: 'failed',
+          error: `The source could not continue from the last checkpoint: ${error instanceof Error ? error.message : String(error)}`,
+          cause: 'checkpoint-expired',
+        }
+      }
       if (!['complete', 'bounded'].includes(result.completeness.kind))
         throw new Error('Incomplete selection; dependent steps cannot run')
       const structured = { ...result, provenance: frozen.resolved }

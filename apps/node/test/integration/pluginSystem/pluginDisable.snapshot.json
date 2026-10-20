@@ -72,7 +72,8 @@
       "workflows",
       "workflows/data/runs",
       "workflows/workflows/invocation",
-      "workflows/workflows/schedules"
+      "workflows/workflows/schedules",
+      "workflows/workflows/triggers"
     ],
     "tools": [
       "agent_cancel",
@@ -198,7 +199,7 @@
       "workflows.notices",
       "workflows.route",
       "workflows.runner",
-      "workflows.schedules.route"
+      "workflows.triggers.route"
     ],
     "databases": [
       "agents.sqlite",
@@ -390,7 +391,8 @@
         "workflows",
         "workflows/data/runs",
         "workflows/workflows/invocation",
-        "workflows/workflows/schedules"
+        "workflows/workflows/schedules",
+        "workflows/workflows/triggers"
       ],
       "tools": [
         "workflow_cancel",
@@ -410,7 +412,7 @@
         "workflows.notices",
         "workflows.route",
         "workflows.runner",
-        "workflows.schedules.route"
+        "workflows.triggers.route"
       ],
       "databases": [
         "workflows.sqlite"

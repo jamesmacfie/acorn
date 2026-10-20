@@ -68,6 +68,9 @@ export type ScheduleRow = {
    *  Absent for work the whole Node does. */
   workspaceId?: string
   projectId?: string
+  /** Where the thing this row runs lives in its project, as path segments after the project, so the
+   *  settings list can open it. A workflow trigger names its workflow's page. */
+  opens?: { projectId: string; rest: string[] }
 }
 
 export type ScheduleRun = {

@@ -4,6 +4,7 @@ import type { ResolvedWorkflowGraph } from '../../shared/workflowContracts'
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import { resolveDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
+import { WorkflowAuthorityError } from '../runs/authority'
 
 export function destinationQuery(reference: QueryReference, scope: QueryScope): QueryReference {
   if (
@@ -60,7 +61,10 @@ export async function validateWorkflowDestination(
       for (const input of node.definition.inputs ?? [])
         if (input.connection) {
           if (typeof inputs[input.name] !== 'string' || !inputs[input.name])
-            throw new Error(`Select ${input.label ?? input.name} on this Node before running`)
+            throw new WorkflowAuthorityError(
+              'input-required',
+              `Select ${input.label ?? input.name} on this Node before running`,
+            )
         }
       const reference = structuredClone(step.query)
       const unavailable = new Set<string>()

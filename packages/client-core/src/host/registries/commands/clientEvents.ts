@@ -49,6 +49,8 @@ type ClientEventMap = {
   // UiSlotContext's `openSettings`, so the request is an event rather than a prop threaded through
   // every pane that might ever need one.
   'presentation:open-settings': { tab: string }
+  // A settings page that opens a place outside settings, such as a schedule's Open, closes the layer first.
+  'presentation:close-settings': Record<string, never>
   'presentation:open-link': { href: string }
   // A surface-scoped plugin command, on its way to the frame region of a composed pane
   // (docs/editor/composed-panes.md § Communication between regions). Not retained like a pane intent:

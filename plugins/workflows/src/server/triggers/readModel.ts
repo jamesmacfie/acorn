@@ -2,39 +2,42 @@ import { eq } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { ScheduleRow } from '@acorn/protocol/schedules.ts'
 import * as schema from '../../node/schema'
-import type { ResolvedWorkflowGraph } from '../../shared/workflowContracts'
+import type { ResolvedWorkflowGraph, WorkflowAuthorityReason } from '../../shared/workflowContracts'
 import type {
-  WorkflowScheduleFirstCheck,
-  WorkflowScheduleLoopSetting,
-  WorkflowScheduleState,
-  WorkflowScheduleView,
-} from '../../shared/workflowSchedules'
-import { DEFAULT_SCHEDULE_WALL_TIME_MS, effectiveScheduleLimits } from './model'
+  WorkflowTriggerFirstCheck,
+  WorkflowTriggerLoopSetting,
+  WorkflowTriggerState,
+  WorkflowTriggerView,
+  WorkflowTriggerWhen,
+} from '../../shared/workflowTriggers'
+import { DEFAULT_TRIGGER_WALL_TIME_MS, effectiveTriggerLimits } from './limits'
+import { ACTIVE_OCCURRENCE, type Trigger } from './occurrences'
 
-type Schedule = typeof schema.workflowSchedules.$inferSelect
-const ACTIVE_OCCURRENCE = ['claimed', 'task-created', 'run-started'] as const
+/** Refusals the owner fixes outside the trigger, by reconnecting an account or restoring what's gone. */
+const UNAVAILABLE: ReadonlySet<WorkflowAuthorityReason | null> = new Set([
+  'connection-required',
+  'input-required',
+  'missing',
+])
 
-export async function workflowScheduleView(
+export async function workflowTriggerView(
   db: PluginDatabase,
-  row: Schedule,
+  row: Trigger,
   scheduler?: { list(): Promise<ScheduleRow[]> },
-): Promise<WorkflowScheduleView> {
+): Promise<WorkflowTriggerView> {
   const scheduled = row.schedulerKey
     ? (await scheduler?.list())?.find((entry) => entry.key === row.schedulerKey)
     : undefined
   const occurrence = db
     .select()
-    .from(schema.workflowScheduleOccurrences)
-    .where(eq(schema.workflowScheduleOccurrences.scheduleId, row.id))
-    .orderBy(schema.workflowScheduleOccurrences.updatedAt)
+    .from(schema.workflowTriggerOccurrences)
+    .where(eq(schema.workflowTriggerOccurrences.triggerId, row.id))
+    .orderBy(schema.workflowTriggerOccurrences.updatedAt)
     .all()
     .at(-1)
-  const internal = row.state as WorkflowScheduleState
-  const unavailable =
-    !!row.schedulerKey &&
-    (!scheduled?.registered ||
-      /connection|required|unavailable|revoked|disabled|no longer exists/i.test(row.error ?? ''))
-  const displayState: WorkflowScheduleView['state'] = unavailable
+  const internal = row.state as WorkflowTriggerState
+  const unavailable = !!row.schedulerKey && (!scheduled?.registered || UNAVAILABLE.has(row.errorReason))
+  const displayState: WorkflowTriggerView['state'] = unavailable
     ? 'unavailable'
     : internal === 'active' && scheduled?.enabled === false
       ? 'paused'
@@ -50,19 +53,19 @@ export async function workflowScheduleView(
     id: row.id,
     projectId: row.projectId,
     workflowId: row.workflowId,
-    workflowName: approved?.root.name ?? scheduled?.name ?? 'Scheduled workflow',
+    workflowName: approved?.root.name ?? scheduled?.name ?? 'Workflow trigger',
     inputs: JSON.parse(row.inputsJson),
-    timezone: row.timezone,
+    when: JSON.parse(row.whenJson) as WorkflowTriggerWhen,
     cadence: scheduled?.cadence ?? { daily: '09:00' },
     limits: approved
-      ? effectiveScheduleLimits(approved, JSON.parse(row.limitsJson))
+      ? effectiveTriggerLimits(approved, JSON.parse(row.limitsJson))
       : {
           maxDescendants: 100,
           maxConcurrency: 4,
-          budget: { maxWallTimeMs: DEFAULT_SCHEDULE_WALL_TIME_MS },
+          budget: { maxWallTimeMs: DEFAULT_TRIGGER_WALL_TIME_MS },
         },
-    loops: JSON.parse(row.loopsJson || '[]') as WorkflowScheduleLoopSetting[],
-    firstCheck: row.firstCheck as WorkflowScheduleFirstCheck,
+    loops: JSON.parse(row.loopsJson || '[]') as WorkflowTriggerLoopSetting[],
+    firstCheck: row.firstCheck as WorkflowTriggerFirstCheck,
     state: displayState,
     ...(row.error ? { error: row.error } : {}),
     ...(scheduled?.nextRunAt && displayState === 'active' ? { nextRunAt: scheduled.nextRunAt } : {}),

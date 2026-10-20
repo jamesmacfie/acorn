@@ -1,26 +1,26 @@
 import type { NodePlugin, PluginDatabase } from '@acorn/plugin-api/node'
 import { destinationQuery } from '../validation/destination'
-import { parseWorkflowScheduleTarget, WorkflowScheduleService, type WorkflowScheduleScheduler } from './service'
-import type { WorkflowSchedulesBridge } from '../routes/schedules'
+import { parseWorkflowTriggerTarget, WorkflowTriggerService, type WorkflowTriggerScheduler } from './service'
+import type { WorkflowTriggersBridge } from '../routes/triggers'
 import type { WorkflowStartService } from '../runs/admission'
 
 type PluginContext = Parameters<NonNullable<NodePlugin['init']>>[0]
-type ScheduleContext = Pick<PluginContext, 'core' | 'dataSources' | 'schedules'>
+type TriggerContext = Pick<PluginContext, 'core' | 'dataSources' | 'schedules'>
 
-/** Schedule source review uses the same scoped data-source invocation as run admission. */
-export const workflowScheduleService = (
+/** Trigger source review uses the same scoped data-source invocation as run admission. */
+export const workflowTriggerService = (
   store: PluginDatabase,
   starts: WorkflowStartService,
-  ctx: ScheduleContext,
+  ctx: TriggerContext,
   reconciled: Promise<void>,
-  scheduler?: () => WorkflowScheduleScheduler,
-): WorkflowScheduleService => {
+  scheduler?: () => WorkflowTriggerScheduler,
+): WorkflowTriggerService => {
   const core = ctx.core
-  const scheduleService = new WorkflowScheduleService(store, starts, core, reconciled, {
+  return new WorkflowTriggerService(store, starts, core, reconciled, {
     scheduler: scheduler,
     describeSource: async (reference, scope, inputs) => {
       const userId = core.identity.active()
-      if (!userId) throw new Error('Schedule review requires an active owner')
+      if (!userId) throw new Error('Trigger review requires an active owner')
       const invocation = {
         principal: { kind: 'internal' as const, scope: 'service' as const, userId },
         signal: AbortSignal.timeout(60_000),
@@ -56,49 +56,55 @@ export const workflowScheduleService = (
       }
     },
   })
-  return scheduleService
 }
 
-export const workflowScheduleTarget = (
-  scheduleService: WorkflowScheduleService,
-): Parameters<ScheduleContext['schedules']['registerTarget']>[0] => {
+/** The scheduler target a clock trigger's core row points at. The kind stays `workflow`. */
+export const workflowTriggerTarget = (
+  triggers: WorkflowTriggerService,
+): Parameters<TriggerContext['schedules']['registerTarget']>[0] => {
+  const triggerId = (target: unknown) => (target as { triggerId: string }).triggerId
   return {
     kind: 'workflow',
     parse: (raw) => {
-      const parsed = parseWorkflowScheduleTarget(raw)
-      return parsed && scheduleService.get(parsed.scheduleId) ? parsed : null
+      const parsed = parseWorkflowTriggerTarget(raw)
+      return parsed && triggers.get(parsed.triggerId) ? parsed : null
     },
     risk: () => 'execute',
-    timezone: (target) => scheduleService.timezone((target as { scheduleId: string }).scheduleId),
+    // The workflow's page, whose Triggers list holds this one.
+    opens: (target) => {
+      const row = triggers.get(triggerId(target))
+      return row ? { projectId: row.projectId, rest: ['x', 'workflows', `db:${row.workflowId}`] } : undefined
+    },
+    timezone: (target) => triggers.when(triggerId(target))?.timezone,
     scope: (target) => {
-      const projectId = scheduleService.get((target as { scheduleId: string }).scheduleId)?.projectId
+      const projectId = triggers.get(triggerId(target))?.projectId
       return projectId ? { projectId } : undefined
     },
     run: (target, signal, _consent, context) =>
-      scheduleService
-        .dispatch((target as { scheduleId: string }).scheduleId, {
+      triggers
+        .dispatch(triggerId(target), {
           reason: context.reason,
           dueAt: context.dueAt,
           requestKey: context.requestKey,
         })
         .then((result) => (signal.aborted ? Promise.reject(signal.reason) : result)),
-    remove: (target) => scheduleService.remove((target as { scheduleId: string }).scheduleId),
+    remove: (target) => triggers.remove(triggerId(target)),
   }
 }
 
-export const workflowScheduleBridge = (scheduleService: WorkflowScheduleService): WorkflowSchedulesBridge => {
+export const workflowTriggerBridge = (triggers: WorkflowTriggerService): WorkflowTriggersBridge => {
   return {
-    list: () => scheduleService.views(),
-    get: (id) => scheduleService.view(id),
+    list: () => triggers.views(),
+    get: (id) => triggers.view(id),
     defaults: () => ({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' }),
-    prepare: (input) => scheduleService.prepare(input),
-    save: (input) => scheduleService.saveManaged(input),
+    prepare: (input) => triggers.prepare(input),
+    save: (input) => triggers.saveManaged(input),
     approve: async (id, firstCheck, freshEpoch) => {
-      await scheduleService.approve(id, firstCheck, freshEpoch)
-      return scheduleService.view(id)
+      await triggers.approve(id, firstCheck, freshEpoch)
+      return triggers.view(id)
     },
-    pause: (id, paused) => scheduleService.pause(id, paused),
-    runNow: (id) => scheduleService.runNow(id),
-    remove: (id) => scheduleService.deleteManaged(id),
+    pause: (id, paused) => triggers.pause(id, paused),
+    runNow: (id) => triggers.runNow(id),
+    remove: (id) => triggers.deleteManaged(id),
   }
 }

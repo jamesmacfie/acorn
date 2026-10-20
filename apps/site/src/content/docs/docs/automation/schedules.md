@@ -24,6 +24,7 @@ next. On each row:
 - The switch pauses or resumes that schedule. A paused schedule keeps its settings.
 - **Run now** runs it straight away, even while paused.
 - **History** lists its last 20 runs.
+- **Open**, on a workflow trigger's row, opens the workflow it starts.
 - **Delete schedule** removes one of yours. What it already made stays.
 
 **Pause every schedule on this node** stops them all until you turn it off.
@@ -66,7 +67,7 @@ the schedule stops running and says **You agreed to** the old risk, with **Accep
 start it again. If the action goes away, because its plugin is off or removed, runs are skipped until
 it comes back.
 
-To run a workflow on a schedule, use **Schedule…** in the workflow's editor ([Start and schedule
+To run a workflow on a schedule, use **Add trigger…** in the workflow's editor ([Start and schedule
 runs](/docs/automation/start-and-schedule-runs/#run-a-workflow-on-a-schedule)).
 
 ## When a schedule runs

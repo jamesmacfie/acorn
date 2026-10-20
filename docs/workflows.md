@@ -5,7 +5,7 @@ data reads, human gates, and gates that wait for CI or a review, that runs on a 
 limits, trust, and unattended starts, and for the topic pages. The plugin is in `plugins/workflows/`.
 
 A definition is a committed `.acorn/workflows/*.toml` file or a `workflow_defs` row you typed in the
-app, and the Node reads both as one list. SQLite stores expanded runs, steps, gates, schedules,
+app, and the Node reads both as one list. SQLite stores expanded runs, steps, gates, triggers,
 and recovery state. The headless [CLI](./cli.md) lists published definitions, starts a run by its ID
 with typed JSON inputs, and inspects or waits on runs and steps. The Node owns definition resolution,
 trust, gates, recovery, and execution.
@@ -54,7 +54,7 @@ with a diagnostic that names the file. There's no read-time normalization or exe
 The built-in `write-dataset` step binds an array from a completed predecessor to
 `dataset: { id, version, rows }`. The Node derives workspace and project from the running task,
 requires a workflow-fed dataset there, validates the current schema version and every row, and
-writes them transactionally. A scheduled workflow can use the same step; the step does not create or
+writes them transactionally. A triggered workflow can use the same step; the step does not create or
 change dataset definitions.
 
 Dashboard board moves use source-declared field mutations through the Node's `act` route. They do not
@@ -77,8 +77,8 @@ or stop services are trust-checked. A `workflow_defs` row isn't repository-autho
 
 ## Unattended starts
 
-An approved schedule is the only thing that starts a workflow with nobody present
-([scheduled roots](./workflows/scheduled-roots.md)). No plugin picks a workflow to start. A plugin
+An approved trigger is the only thing that starts a workflow with nobody present
+([triggers](./workflows/triggers.md)). No plugin picks a workflow to start. A plugin
 describes its data through a data source, and a workflow reads it.
 
 ## Workflow runs source
@@ -95,8 +95,10 @@ line of its error or cancel reason, capped at 200 characters, and its duration o
 a final status. A run retried after it settled measures to its latest final status. Selecting a row
 opens the run pane on that run.
 
-What started a run is in the `/trigger` field, labeled **Started by**: `manual`, `schedule`,
-`agent-tool`, `agent-map`, or `reprocess`. The run row stores it as `started_by`.
+What started a run is in the `/trigger` field, labeled **Started by**: `manual`, `trigger`,
+`agent-tool`, `agent-map`, or `reprocess`. The run row stores it as `started_by`, and a run a trigger
+started stores the trigger's ID as `trigger_id`. Runs from before triggers that said `schedule` now say
+`trigger`, so a saved query that filtered on `schedule` needs the new value.
 
 The source scopes a workspace or project through its task ids. It pushes the start-time window and
 equality filters on workflow, status, start reason, task, and parent run into SQL, on the
@@ -117,7 +119,7 @@ heatmap of when runs start.
 - [Workflow tools](./agent-tools/workflow-tools.md): how an agent finds workflows, saves drafts, and
   starts one you approved for agents.
 
-- [Workflow authoring](./workflows/authoring.md): the editor, scheduling, child workflows, and AI
+- [Workflow authoring](./workflows/authoring.md): the editor, triggers, child workflows, and AI
   generation.
 - [AI authoring](./workflows/ai-authoring.md): generating and editing with a model.
 - [Editor details](./workflows/editor-details.md): the draft rules, the graph view, the JSON tab,
@@ -139,7 +141,7 @@ heatmap of when runs start.
 
 - [Record processing history](./workflows/record-history.md): the processing ledger and checkpoints.
 
-- [Scheduled roots](./workflows/scheduled-roots.md): workflows on a Node schedule.
+- [Triggers](./workflows/triggers.md): workflows a trigger starts with nobody present.
 
 - [What workflows refuses](./workflows/refusals.md): settled decisions and what would reopen them.
 

@@ -27,6 +27,8 @@ export type WorkflowStartOptions = {
   processingScope?: import('../../shared/workflowProcessing').WorkflowProcessingScope
   processingBaseline?: boolean
   startedBy?: WorkflowStartedBy
+  /** The trigger that started this root, recorded as `workflow_runs.trigger_id`. */
+  triggerId?: string
   inputs?: Record<string, DataValue>
   intendedRunId?: string
   invocation?: WorkflowInvocationIdentity
@@ -148,6 +150,7 @@ export async function persistWorkflowStart(
         existing.defJson === defJson &&
         existing.resolvedGraphJson === resolvedGraphJson &&
         existing.startedBy === startedBy &&
+        existing.triggerId === (options?.triggerId ?? null) &&
         existing.invocationKey === (options?.invocation?.callerKey ?? null) &&
         existing.payloadFingerprint === (options?.invocation?.payloadFingerprint ?? null) &&
         existing.rootRunId === (options?.invocation?.rootRunId ?? runId) &&
@@ -173,6 +176,7 @@ export async function persistWorkflowStart(
         status: 'running',
         posture: def.posture ?? 'gated',
         startedBy,
+        triggerId: options?.triggerId ?? null,
         defJson,
         resolvedGraphJson,
         rootRunId: options?.invocation?.rootRunId ?? runId,

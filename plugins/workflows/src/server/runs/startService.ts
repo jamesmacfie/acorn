@@ -3,6 +3,7 @@ import { type NodePlugin, type PluginDatabase } from '@acorn/plugin-api/node'
 import { workflowTaskResolutionScope } from '../definitions/resolution'
 import { validateWorkflowDestination } from '../validation/destination'
 import { WorkflowStartService } from './admission'
+import { WorkflowAuthorityError } from './authority'
 import type { WorkflowRunner } from './runner'
 
 type PluginContext = Parameters<NonNullable<NodePlugin['init']>>[0]
@@ -15,7 +16,7 @@ export const workflowStartService = (
   reconciled: Promise<void>,
 ): WorkflowStartService => {
   const core = ctx.core
-  // Scope construction lives beside definition resolution, so routes, child dispatch, and schedules
+  // Scope construction lives beside definition resolution, so routes, child dispatch, and triggers
   // cannot disagree about which workspace, project, or checkout applies.
   const taskScope = (taskId: string) => workflowTaskResolutionScope(core, taskId, homedir())
   return new WorkflowStartService(
@@ -50,7 +51,7 @@ export const workflowStartService = (
           { action: 'inspect', queryId, workspaceId: scope.workspaceId, projectId: scope.projectId },
           { principal: { kind: 'internal', scope: 'service', userId }, signal: AbortSignal.timeout(60_000) },
         )
-        if (!result.published) throw new Error('Query is not published')
+        if (!result.published) throw new WorkflowAuthorityError('not-published', 'Query is not published')
         return result.published.revision
       },
     },

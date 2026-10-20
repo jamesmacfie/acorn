@@ -38,6 +38,8 @@ import { Inline } from '../../kit/components/layout/Inline'
 import { Stack } from '../../kit/components/layout/Stack'
 import { confirmAction } from '../../host/registries/shell/willPhase'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
+import { buildLink } from '../../host/registries/commands/addresses'
+import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { createSettingSave, type SettingSave } from './settingSave'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
@@ -312,6 +314,22 @@ export default function SchedulesSettings(props: { nodeId: string | null }) {
                       {row.enabled ? `next ${formatWhen(row.nextRunAt, now)}` : 'paused'}
                       <Show when={row.lastRunAt}>{(last) => <> · last run {formatRelativeTime(last(), now)}</>}</Show>
                     </Text>
+                    <Show when={nodeId() ? row.opens : undefined}>
+                      {(opens) => (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onPress={() => {
+                            clientEvents.emit('presentation:close-settings', {})
+                            clientEvents.emit('presentation:open-link', {
+                              href: buildLink(nodeId()!, { kind: 'project', ...opens() }),
+                            })
+                          }}
+                        >
+                          Open
+                        </Button>
+                      )}
+                    </Show>
                     <Button
                       variant="ghost"
                       size="xs"

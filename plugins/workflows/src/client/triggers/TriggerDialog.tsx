@@ -26,26 +26,26 @@ import type { DataBinding } from '@acorn/protocol/dataBindings.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { Cadence } from '@acorn/protocol/schedules.ts'
 import type {
-  WorkflowScheduleDraftInput,
-  WorkflowScheduleFirstCheck,
-  WorkflowScheduleLimits,
-  WorkflowScheduleLoopSetting,
-  WorkflowSchedulePreparation,
-  WorkflowScheduleView,
-} from '../../shared/workflowSchedules'
+  WorkflowTriggerDraftInput,
+  WorkflowTriggerFirstCheck,
+  WorkflowTriggerLimits,
+  WorkflowTriggerLoopSetting,
+  WorkflowTriggerPreparation,
+  WorkflowTriggerView,
+} from '../../shared/workflowTriggers'
 import TypedValueField from '../editor/TypedValueField'
 import { openWorkflowRun } from '../runs/runStore'
 import { workflowsSurfacePath } from '../surfacePath'
 import { workflowApi } from '../workflowsClient'
-import { closeWorkflowSchedule, scheduleRequest, type ScheduleRequest } from './scheduleRequest'
+import { closeWorkflowTrigger, triggerRequest, type TriggerRequest } from './triggerRequest'
 import {
   cadenceChoice,
   cadenceForChoice,
   formatOccurrence,
   limitsSummary,
   nextScheduleOccurrences,
-  scheduleStateLabel,
-} from './scheduleModel'
+  triggerStateLabel,
+} from './triggerModel'
 
 /** Every zone this runtime knows, with the chosen one kept even when it does not. */
 const timezoneOptions = (current: string) => {
@@ -65,21 +65,21 @@ const STATE_TONE = {
   unavailable: 'danger',
 } as const
 
-export default function ScheduleDialogHost() {
-  return <Show when={scheduleRequest()}>{(request) => <ScheduleDialog request={request()} />}</Show>
+export default function TriggerDialogHost() {
+  return <Show when={triggerRequest()}>{(request) => <TriggerDialog request={request()} />}</Show>
 }
 
-function ScheduleDialog(props: { request: ScheduleRequest }) {
+function TriggerDialog(props: { request: TriggerRequest }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const projects = createQuery(() => projectsOptions(true))
   const tasks = createQuery(() => tasksOptions(true))
   const [existing] = createResource(
-    () => props.request.scheduleId,
-    (id) => (id ? workflowApi.schedule(id) : Promise.resolve(undefined)),
+    () => props.request.triggerId,
+    (id) => (id ? workflowApi.trigger(id) : Promise.resolve(undefined)),
   )
-  const [defaults] = createResource(() => workflowApi.scheduleDefaults().catch(() => ({ timezone: 'UTC' })))
-  const [schedule, setSchedule] = createSignal<WorkflowScheduleView>()
+  const [defaults] = createResource(() => workflowApi.triggerDefaults().catch(() => ({ timezone: 'UTC' })))
+  const [trigger, setTrigger] = createSignal<WorkflowTriggerView>()
   const [projectId, setProjectId] = createSignal(props.request.projectId)
   const [values, setValues] = createSignal<Record<string, DataValue>>(
     Object.fromEntries(
@@ -88,23 +88,23 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
   )
   const [timezone, setTimezone] = createSignal('')
   const [cadence, setCadence] = createSignal<Cadence>({ daily: '09:00' })
-  const [preparation, setPreparation] = createSignal<WorkflowSchedulePreparation>()
-  const [loops, setLoops] = createSignal<WorkflowScheduleLoopSetting[]>([])
-  const [firstCheck, setFirstCheck] = createSignal<WorkflowScheduleFirstCheck>('process-current')
+  const [preparation, setPreparation] = createSignal<WorkflowTriggerPreparation>()
+  const [loops, setLoops] = createSignal<WorkflowTriggerLoopSetting[]>([])
+  const [firstCheck, setFirstCheck] = createSignal<WorkflowTriggerFirstCheck>('process-current')
   const [freshStart, setFreshStart] = createSignal(false)
-  const [requestedLimits, setRequestedLimits] = createSignal<WorkflowScheduleDraftInput['limits']>()
+  const [requestedLimits, setRequestedLimits] = createSignal<WorkflowTriggerDraftInput['limits']>()
   const [busy, setBusy] = createSignal('')
   const [error, setError] = createSignal('')
   const [invalid, setInvalid] = createSignal<Record<string, boolean>>({})
   let initialized = false
 
   createEffect(() => {
-    if (initialized || (props.request.scheduleId ? !existing() : !defaults())) return
+    if (initialized || (props.request.triggerId ? !existing() : !defaults())) return
     const row = existing()
-    setSchedule(row)
+    setTrigger(row)
     setProjectId(row?.projectId ?? props.request.projectId)
     setValues(row?.inputs ?? values())
-    setTimezone(row?.timezone ?? defaults()?.timezone ?? '')
+    setTimezone(row?.when.timezone ?? defaults()?.timezone ?? '')
     setCadence(row?.cadence ?? { daily: '09:00' })
     setLoops(row?.loops ?? [])
     setFirstCheck(row?.firstCheck ?? 'process-current')
@@ -112,13 +112,13 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
     initialized = true
   })
 
-  const input = (): WorkflowScheduleDraftInput => ({
-    ...(schedule()?.id ? { id: schedule()!.id } : {}),
-    name: `${props.request.name} schedule`,
+  const input = (): WorkflowTriggerDraftInput => ({
+    ...(trigger()?.id ? { id: trigger()!.id } : {}),
+    name: `${props.request.name} trigger`,
     projectId: projectId(),
     workflowId: props.request.workflowId,
     inputs: values(),
-    timezone: timezone(),
+    when: { kind: 'clock', timezone: timezone() },
     cadence: cadence(),
     loops: loops(),
     ...(requestedLimits() ? { limits: requestedLimits() } : {}),
@@ -138,7 +138,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
     setError('')
     try {
       await work()
-      await queryClient.invalidateQueries({ queryKey: ['workflow-schedules'] })
+      await queryClient.invalidateQueries({ queryKey: ['workflow-triggers'] })
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure))
     } finally {
@@ -148,15 +148,15 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
 
   const review = () =>
     act('review', async () => {
-      const result = await workflowApi.prepareSchedule(input())
+      const result = await workflowApi.prepareTrigger(input())
       setPreparation(result)
       setLoops(result.loops.map((loop) => loops().find((item) => item.loopId === loop.loopId) ?? loop.setting))
       if (!requestedLimits()) setRequestedLimits(result.limits)
     })
 
-  const save = async (): Promise<WorkflowScheduleView> => {
-    const saved = await workflowApi.saveSchedule(input())
-    setSchedule(saved)
+  const save = async (): Promise<WorkflowTriggerView> => {
+    const saved = await workflowApi.saveTrigger(input())
+    setTrigger(saved)
     return saved
   }
 
@@ -172,17 +172,17 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
         throw new Error('Choose at least one field for every “Run again when these fields change” loop.')
       }
       const saved = await save()
-      const active = await workflowApi.approveSchedule(saved.id, firstCheck(), freshStart())
-      setSchedule(active)
+      const active = await workflowApi.approveTrigger(saved.id, firstCheck(), freshStart())
+      setTrigger(active)
       setFreshStart(false)
     })
 
-  const patchLoop = (id: string, patch: Partial<WorkflowScheduleLoopSetting>): void => {
+  const patchLoop = (id: string, patch: Partial<WorkflowTriggerLoopSetting>): void => {
     setLoops((current) => current.map((loop) => (loop.loopId === id ? { ...loop, ...patch } : loop)))
   }
 
   const updateTrackedField = (
-    loop: WorkflowScheduleLoopSetting,
+    loop: WorkflowTriggerLoopSetting,
     index: number,
     binding: DataBinding | undefined,
   ): void => {
@@ -199,7 +199,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
     setRequestedLimits((current) => ({ ...current, [key]: value }))
   }
   // Shown in minutes, the unit the Definition inspector uses; stored in milliseconds.
-  const wallMinutes = (limits: WorkflowScheduleLimits): number =>
+  const wallMinutes = (limits: WorkflowTriggerLimits): number =>
     (requestedLimits()?.budget?.maxWallTimeMs ?? limits.budget.maxWallTimeMs) / 60_000
   const setWallMinutes = (raw: string): void => {
     setRequestedLimits((current) => ({
@@ -209,7 +209,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
   }
 
   const effectiveLimits = () =>
-    (requestedLimits() as WorkflowScheduleLimits | undefined) ?? preparation()?.limits ?? schedule()?.limits
+    (requestedLimits() as WorkflowTriggerLimits | undefined) ?? preparation()?.limits ?? trigger()?.limits
   const occurrences = createMemo(() => {
     try {
       return timezone() ? nextScheduleOccurrences(cadence(), timezone()) : []
@@ -220,39 +220,39 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
 
   const pause = (paused: boolean) =>
     act(paused ? 'pause' : 'resume', async () => {
-      setSchedule(await workflowApi.pauseSchedule(schedule()!.id, paused))
+      setTrigger(await workflowApi.pauseTrigger(trigger()!.id, paused))
     })
   const runNow = () =>
     act('run', async () => {
-      setSchedule(await workflowApi.runScheduleNow(schedule()!.id))
+      setTrigger(await workflowApi.runTriggerNow(trigger()!.id))
     })
   const remove = () =>
     act('delete', async () => {
-      await workflowApi.deleteSchedule(schedule()!.id)
-      closeWorkflowSchedule()
+      await workflowApi.deleteTrigger(trigger()!.id)
+      closeWorkflowTrigger()
     })
   const openRun = (): void => {
-    const latest = schedule()?.latest
+    const latest = trigger()?.latest
     const task = (tasks.data ?? []).find((candidate) => candidate.id === latest?.taskId)
     if (!latest || !task) return
-    closeWorkflowSchedule()
+    closeWorkflowTrigger()
     openWorkflowRun(task, latest.runId, navigate)
   }
   const reviewWorkflow = (): void => {
-    closeWorkflowSchedule()
+    closeWorkflowTrigger()
     navigate(workflowsSurfacePath(projectId(), `db:${props.request.workflowId}`))
   }
 
   return (
-    <Modal onDismiss={closeWorkflowSchedule} title={`Schedule ${props.request.name}`} size="lg">
+    <Modal onDismiss={closeWorkflowTrigger} title={`Trigger for ${props.request.name}`} size="lg">
       <ModalBody>
         <Stack gap="stack">
-          <Show when={schedule()}>
+          <Show when={trigger()}>
             {(row) => (
               <Inline gap="inline" wrap>
-                <Badge tone={STATE_TONE[row().state]}>{scheduleStateLabel(row().state)}</Badge>
+                <Badge tone={STATE_TONE[row().state]}>{triggerStateLabel(row().state)}</Badge>
                 <Show when={row().nextRunAt}>
-                  <Text emphasis="muted">Next {formatOccurrence(row().nextRunAt!, row().timezone)}</Text>
+                  <Text emphasis="muted">Next {formatOccurrence(row().nextRunAt!, row().when.timezone)}</Text>
                 </Show>
               </Inline>
             )}
@@ -260,12 +260,12 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
           <Show when={error()}>
             <Alert tone="danger">{error()}</Alert>
           </Show>
-          <Show when={schedule()?.error}>
+          <Show when={trigger()?.error}>
             {(message) => (
-              <Alert tone="warn" title={scheduleStateLabel(schedule()!.state)}>
+              <Alert tone="warn" title={triggerStateLabel(trigger()!.state)}>
                 <Stack gap="row">
                   <Text wrap>{message()}</Text>
-                  <Show when={schedule()?.state === 'needs-review'}>
+                  <Show when={trigger()?.state === 'needs-review'}>
                     <Inline gap="inline" wrap>
                       <Button size="sm" onPress={() => void review()}>
                         Review activation
@@ -282,38 +282,16 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
             )}
           </Show>
 
-          <Field label="Project" hint="Each scheduled run makes its task in this project." group>
+          <SectionHeader level="group">When</SectionHeader>
+          <Field label="When" group>
+            {/* One kind for now. A trigger on records changing becomes the second choice. */}
             <Select
-              label="Project"
-              value={projectId()}
-              options={(projects.data ?? []).map((project) => ({ value: project.id, label: project.name }))}
-              onChange={(value) => editSetup(() => setProjectId(value))}
+              label="When"
+              value="clock"
+              options={[{ value: 'clock', label: 'On a schedule' }]}
+              onChange={() => {}}
             />
           </Field>
-
-          <For each={props.request.inputs}>
-            {(item) => (
-              <TypedValueField
-                label={item.required ? `${item.label ?? item.name} *` : (item.label ?? item.name)}
-                schema={item.schema}
-                hint={item.description}
-                value={values()[item.name]}
-                required={item.required}
-                onValidity={(valid) => setInvalid((current) => ({ ...current, [item.name]: !valid }))}
-                onChange={(value) =>
-                  editSetup(() =>
-                    setValues((current) => {
-                      const next = { ...current }
-                      if (value === undefined) delete next[item.name]
-                      else next[item.name] = value
-                      return next
-                    }),
-                  )
-                }
-              />
-            )}
-          </For>
-
           <Field label="Cadence" group>
             <Select
               label="Cadence"
@@ -345,6 +323,39 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
               </For>
             </Stack>
           </Show>
+
+          <SectionHeader level="group">{`Then start ${props.request.name}`}</SectionHeader>
+          <Field label="Project" hint="Each run this trigger starts makes its task in this project." group>
+            <Select
+              label="Project"
+              value={projectId()}
+              options={(projects.data ?? []).map((project) => ({ value: project.id, label: project.name }))}
+              onChange={(value) => editSetup(() => setProjectId(value))}
+            />
+          </Field>
+
+          <For each={props.request.inputs}>
+            {(item) => (
+              <TypedValueField
+                label={item.required ? `${item.label ?? item.name} *` : (item.label ?? item.name)}
+                schema={item.schema}
+                hint={item.description}
+                value={values()[item.name]}
+                required={item.required}
+                onValidity={(valid) => setInvalid((current) => ({ ...current, [item.name]: !valid }))}
+                onChange={(value) =>
+                  editSetup(() =>
+                    setValues((current) => {
+                      const next = { ...current }
+                      if (value === undefined) delete next[item.name]
+                      else next[item.name] = value
+                      return next
+                    }),
+                  )
+                }
+              />
+            )}
+          </For>
 
           <Show when={preparation()?.loops}>
             {(described) => (
@@ -448,7 +459,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
                       { value: 'process-current', label: 'Process current matches' },
                       { value: 'track-now', label: 'Start tracking from now' },
                     ]}
-                    onChange={(value) => setFirstCheck(value as WorkflowScheduleFirstCheck)}
+                    onChange={(value) => setFirstCheck(value as WorkflowTriggerFirstCheck)}
                   />
                 </Field>
                 <Alert title="Limits">{limitsSummary(effectiveLimits() ?? reviewed().limits)}</Alert>
@@ -498,7 +509,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
                     </Stack>
                   </Alert>
                 </Show>
-                <Show when={schedule()?.id}>
+                <Show when={trigger()?.id}>
                   <Fold label="Advanced change review" level="group">
                     <Checkbox
                       label="Start fresh"
@@ -512,7 +523,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
             )}
           </Show>
 
-          <Show when={schedule()?.latest}>
+          <Show when={trigger()?.latest}>
             {(latest) => (
               <Alert
                 title={`${latest().kind === 'manual' ? 'Run now' : latest().kind === 'baseline' ? 'Baseline' : 'Latest check'} · ${latest().state}`}
@@ -528,7 +539,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
               </Alert>
             )}
           </Show>
-          <Show when={schedule()?.state === 'unavailable'}>
+          <Show when={trigger()?.state === 'unavailable'}>
             <Button size="sm" onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
               Reconnect in Settings
             </Button>
@@ -536,18 +547,18 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
         </Stack>
       </ModalBody>
       <ModalActions>
-        <Show when={schedule()?.id}>
+        <Show when={trigger()?.id}>
           <Button
             variant="ghost"
-            disabled={!!busy() || !['active', 'paused'].includes(schedule()!.state)}
+            disabled={!!busy() || !['active', 'paused'].includes(trigger()!.state)}
             onPress={() => void runNow()}
           >
             Run now
           </Button>
           <Show
-            when={schedule()?.state === 'active'}
+            when={trigger()?.state === 'active'}
             fallback={
-              <Show when={schedule()?.state === 'paused'}>
+              <Show when={trigger()?.state === 'paused'}>
                 <Button variant="ghost" disabled={!!busy()} onPress={() => void pause(false)}>
                   Resume
                 </Button>
@@ -560,15 +571,15 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
           </Show>
           <ConfirmButton
             tone="danger"
-            confirmLabel="Delete schedule?"
+            confirmLabel="Delete trigger?"
             disabled={!!busy()}
             onConfirm={() => void remove()}
           >
-            Delete schedule
+            Delete trigger
           </ConfirmButton>
           <Toolbar.Spacer />
         </Show>
-        <Button variant="ghost" onPress={closeWorkflowSchedule}>
+        <Button variant="ghost" onPress={closeWorkflowTrigger}>
           Close
         </Button>
         <Button disabled={!readyForReview() || !!busy()} busy={busy() === 'review'} onPress={() => void review()}>
@@ -584,7 +595,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
           title="Activation never waits in a queue while you're offline."
           onPress={() => void activate()}
         >
-          {schedule()?.state === 'needs-review' ? 'Approve changes' : 'Activate'}
+          {trigger()?.state === 'needs-review' ? 'Approve changes' : 'Activate'}
         </Button>
       </ModalActions>
     </Modal>

@@ -127,7 +127,7 @@ describe('workflow publication', () => {
     })
     expect(graph.root.steps[0]?.query).toMatchObject({ revision: 3 })
   })
-  it('moves schedules using a republished workflow to review without replacing their approved snapshot', async () => {
+  it('moves triggers using a republished workflow to review without replacing their approved snapshot', async () => {
     const row = await draft(leaf())
     const publication = workflowPublication(db.db, services)
     await publication.publish((await publication.prepare({ id: row.id, revision: 1 })).id)
@@ -138,14 +138,14 @@ describe('workflow publication', () => {
       provenance: { source: 'database', id: row.id, revision: published.revision },
     })
     db.db
-      .insert(schema.workflowSchedules)
+      .insert(schema.workflowTriggers)
       .values({
-        id: 'schedule',
+        id: 'trigger',
         workspaceId: scope.workspaceId,
         projectId: scope.projectId,
         workflowId: row.id,
+        whenJson: '{"kind":"clock","timezone":"UTC"}',
         inputsJson: '{}',
-        timezone: 'UTC',
         limitsJson: '{}',
         approvedGraphJson: JSON.stringify(graph),
         approvedGraphDigest: graph.fingerprint,
@@ -160,14 +160,10 @@ describe('workflow publication', () => {
     expect((await publication.publish((await publication.prepare({ id: row.id, revision: 2 })).id)).state).toBe(
       'complete',
     )
-    const schedule = db.db
-      .select()
-      .from(schema.workflowSchedules)
-      .where(eq(schema.workflowSchedules.id, 'schedule'))
-      .get()!
-    expect(schedule).toMatchObject({ state: 'needs-review', epoch: 'history' })
-    expect(schedule.approvedGraphJson).toBe(JSON.stringify(graph))
-    expect(schedule.error).toMatch(/workflow dependency changed/i)
+    const trigger = db.db.select().from(schema.workflowTriggers).where(eq(schema.workflowTriggers.id, 'trigger')).get()!
+    expect(trigger).toMatchObject({ state: 'needs-review', epoch: 'history' })
+    expect(trigger.approvedGraphJson).toBe(JSON.stringify(graph))
+    expect(trigger.error).toBe('A published workflow dependency changed. Review this schedule before it runs again.')
   })
   it.each(['hold', 'write', 'consumer', 'release'])(
     'resumes after an ambiguous %s without creating another revision',

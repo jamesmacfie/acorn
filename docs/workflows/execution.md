@@ -22,7 +22,7 @@ The Node implementation follows those boundaries under `plugins/workflows/src/se
 adapters, start and control commands, graph ticks, retry, recovery, row writes, and termination.
 Its `read/` folder projects persisted runs for the client. `steps/` renders handler inputs and records
 step outcomes. `dispatch/` reserves and waits for child workflows. `processing/` owns tracked record
-attempts and incremental checkpoints. `schedules/` owns scheduled admission.
+attempts and incremental checkpoints. `triggers/` owns unattended starts.
 `routes/` exposes the Node capabilities without owning execution state.
 
 `plugins/workflows/src/node/index.ts` opens migrated storage, connects the runner and child dispatcher,

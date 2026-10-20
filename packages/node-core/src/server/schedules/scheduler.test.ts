@@ -327,6 +327,7 @@ describe('scheduler', () => {
       kind: 'noop',
       risk: () => 'read',
       parse: (target) => target,
+      opens: () => ({ projectId: 'project', rest: ['x', 'noop'] }),
       run: async (_target, _signal, _consent, context) => {
         contexts.push(context)
         return 'did nothing'
@@ -336,7 +337,12 @@ describe('scheduler', () => {
     await scheduler.start()
 
     const created = await scheduler.create({ name: 'Mine', kind: 'noop', target: { a: 1 }, cadence: { every: 3600 } })
-    expect(created).toMatchObject({ owner: 'user', registered: true, risk: 'read' })
+    expect(created).toMatchObject({
+      owner: 'user',
+      registered: true,
+      risk: 'read',
+      opens: { projectId: 'project', rest: ['x', 'noop'] },
+    })
     await scheduler.patch(created.key, { enabled: false })
     // Pausing suppresses timer admission. It does not turn Run now into Resume or cancellation.
     expect(await scheduler.runNow(created.key, 'same-click')).toMatchObject({ status: 'ok', detail: 'did nothing' })

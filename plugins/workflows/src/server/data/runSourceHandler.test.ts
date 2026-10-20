@@ -160,7 +160,7 @@ it('shapes a record: duration once settled, a short error, and a child run', asy
   const root = run(taskId, {
     createdAt: OCTOBER,
     status: 'failed',
-    startedBy: 'schedule',
+    startedBy: 'trigger',
     error: `Step 'Test' failed.\n${'    at frame\n'.repeat(50)}`,
   })
   const child = run(taskId, {
@@ -180,7 +180,7 @@ it('shapes a record: duration once settled, a short error, and a child run', asy
       runId: root.id,
       name: 'Review',
       status: 'failed',
-      trigger: 'schedule',
+      trigger: 'trigger',
       taskId,
       taskTitle: 'Fix login',
       projectName: 'api',

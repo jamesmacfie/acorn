@@ -14,15 +14,15 @@ const api = (overrides: Record<string, unknown> = {}) => ({
   deleteDef: vi.fn(async () => ({ ok: true })),
   preparePublication: vi.fn(async () => ({ id: 'op' })),
   publish: vi.fn(async () => ({ state: 'complete', error: null })),
-  scheduleDefaults: vi.fn(async () => ({ timezone: 'Pacific/Auckland' })),
-  saveSchedule: vi.fn(async () => ({ id: 'schedule' })),
-  approveSchedule: vi.fn(async () => ({ id: 'schedule' })),
-  deleteSchedule: vi.fn(async () => ({ deleted: true })),
+  triggerDefaults: vi.fn(async () => ({ timezone: 'Pacific/Auckland' })),
+  saveTrigger: vi.fn(async () => ({ id: 'trigger' })),
+  approveTrigger: vi.fn(async () => ({ id: 'trigger' })),
+  deleteTrigger: vi.fn(async () => ({ deleted: true })),
   ...overrides,
 })
 
 describe('scheduleAgentPrompt', () => {
-  it('publishes a one-step agent workflow and approves its schedule', async () => {
+  it('publishes a one-step agent workflow and approves its trigger', async () => {
     const calls = api()
     const scheduled = await scheduleAgentPrompt(input, calls as never)
     expect(calls.createDef).toHaveBeenCalledWith(
@@ -32,19 +32,23 @@ describe('scheduleAgentPrompt', () => {
       }),
     )
     expect(calls.publish).toHaveBeenCalledWith('op')
-    expect(calls.saveSchedule).toHaveBeenCalledWith(
-      expect.objectContaining({ workflowId: 'def', timezone: 'Pacific/Auckland', cadence: { daily: '09:00' } }),
+    expect(calls.saveTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'def',
+        when: { kind: 'clock', timezone: 'Pacific/Auckland' },
+        cadence: { daily: '09:00' },
+      }),
     )
-    expect(calls.approveSchedule).toHaveBeenCalledWith('schedule', 'process-current', false)
+    expect(calls.approveTrigger).toHaveBeenCalledWith('trigger', 'process-current', false)
     await scheduled.undo()
-    expect(calls.deleteSchedule).toHaveBeenCalledWith('schedule')
+    expect(calls.deleteTrigger).toHaveBeenCalledWith('trigger')
     expect(calls.deleteDef).toHaveBeenCalledWith('def')
   })
 
-  it('takes back the workflow and schedule when approval fails', async () => {
-    const calls = api({ approveSchedule: vi.fn(async () => Promise.reject(new Error('refused'))) })
+  it('takes back the workflow and trigger when approval fails', async () => {
+    const calls = api({ approveTrigger: vi.fn(async () => Promise.reject(new Error('refused'))) })
     await expect(scheduleAgentPrompt(input, calls as never)).rejects.toThrow('refused')
-    expect(calls.deleteSchedule).toHaveBeenCalledWith('schedule')
+    expect(calls.deleteTrigger).toHaveBeenCalledWith('trigger')
     expect(calls.deleteDef).toHaveBeenCalledWith('def')
   })
 })

@@ -62,7 +62,8 @@ export async function assertProjectRepoConfigTrusted(db: AppDatabase, projectId:
     .from(schema.configAcks)
     .where(and(eq(schema.configAcks.projectId, current.projectId), eq(schema.configAcks.hash, current.snapshot.hash)))
     .get()
-  if (!ack) throw new Error('Repository configuration must be reviewed and trusted before this schedule can dispatch.')
+  if (!ack)
+    throw new Error('Repository configuration must be reviewed and trusted before this trigger can start a run.')
 }
 
 export async function repoConfigTrustReview(db: AppDatabase, taskId: string): Promise<RepoConfigTrustReview> {

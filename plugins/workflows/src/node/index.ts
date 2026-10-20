@@ -15,11 +15,11 @@ import { workflowStartService } from '../server/runs/startService'
 import { workflowControl, workflowGates } from '../server/runs/control'
 import { WorkflowRunner } from '../server/runs/runner'
 import { workflowDefinitions } from '../server/definitions/activation'
-import { WorkflowScheduleService, type WorkflowScheduleScheduler } from '../server/schedules/service'
-import { workflowScheduleService, workflowScheduleTarget, workflowScheduleBridge } from '../server/schedules/activation'
+import { WorkflowTriggerService, type WorkflowTriggerScheduler } from '../server/triggers/service'
+import { workflowTriggerService, workflowTriggerTarget, workflowTriggerBridge } from '../server/triggers/activation'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
-import { WORKFLOW_SCHEDULES_ROUTE, workflowScheduleRoutes } from '../server/routes/schedules'
+import { legacyWorkflowScheduleRoutes, WORKFLOW_TRIGGERS_ROUTE, workflowTriggerRoutes } from '../server/routes/triggers'
 import { runSource } from '../shared/runSourceRegistration'
 
 export type WorkflowsPluginDeps = {
@@ -28,9 +28,9 @@ export type WorkflowsPluginDeps = {
   // workflow:start, gate, cancel, and kill all await it: reconcile() sweeps every 'running' step to
   // 'pending', so a run started before the sweep has its live step re-queued underneath it.
   reconciled: Promise<void>
-  // Resolved when schedule commands need the core scheduler. The scheduler may not be registered
+  // Resolved when trigger commands need the core scheduler. The scheduler may not be registered
   // when this plugin is constructed.
-  scheduler?: () => WorkflowScheduleScheduler
+  scheduler?: () => WorkflowTriggerScheduler
 }
 
 export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
@@ -38,8 +38,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   let live: WorkflowRunner | null = null
   let routeCapability: { dispose(): void } | null = null
   let defsCapability: { dispose(): void } | null = null
-  let schedulesCapability: { dispose(): void } | null = null
-  let stopScheduleRecovery: (() => void) | null = null
+  let triggersCapability: { dispose(): void } | null = null
+  let stopTriggerRecovery: (() => void) | null = null
   let stopCheckoutActivity: (() => void) | null = null
   let agentTools: { dispose(): void } | null = null
   // The step stream (`WORKFLOWS_NOTICES`). It goes out on core's `workflow:` channel as a frame written
@@ -62,7 +62,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
     migrationsModule: import.meta.url,
     init: async (ctx) => {
       let active = true
-      stopScheduleRecovery = () => {
+      stopTriggerRecovery = () => {
         active = false
       }
       // Opened and migrated by the host before init returns. The runner and the bridge below both
@@ -88,31 +88,32 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         payload: { taskId: 'string', runId: 'string', stepId: 'string', step: 'string', kind: 'string' },
         allows: ['observe', 'veto'],
       })
-      let scheduleService: WorkflowScheduleService | null = null
+      let triggers: WorkflowTriggerService | null = null
       const { runner, dispatcher } = createWorkflowExecution(store, ctx, deps.internalEnv, notices, async (runId) => {
-        await scheduleService?.settleRun(runId)
+        await triggers?.settleRun(runId)
       })
       live = runner
 
       const starts = workflowStartService(store, runner, ctx, deps.reconciled)
-      scheduleService = workflowScheduleService(store, starts, ctx, deps.reconciled, deps.scheduler)
-      ctx.schedules.registerTarget(workflowScheduleTarget(scheduleService))
+      triggers = workflowTriggerService(store, starts, ctx, deps.reconciled, deps.scheduler)
+      ctx.schedules.registerTarget(workflowTriggerTarget(triggers))
       routeCapability = ctx.capabilities.provide(
         WORKFLOW_ROUTE,
         workflowControl(store, core, runner, dispatcher, starts, deps.reconciled),
       )
       const definitions = workflowDefinitions(store, ctx, runner, starts)
       defsCapability = ctx.capabilities.provide(WORKFLOW_DEFS_ROUTE, definitions.bridge)
-      schedulesCapability = ctx.capabilities.provide(WORKFLOW_SCHEDULES_ROUTE, workflowScheduleBridge(scheduleService))
+      triggersCapability = ctx.capabilities.provide(WORKFLOW_TRIGGERS_ROUTE, workflowTriggerBridge(triggers))
 
       // Namespace-root router: it owns both task-scoped (/tasks/:id/workflows) and run-scoped
       // (/workflows/runs/:runId/...) paths. The internal paths are registered as declared, so the
       // client route builders and the server surface share one contract.
       ctx.routes.register(workflow, { prefix: '', note: 'workflow control' })
       ctx.routes.register(workflowDefsRoutes, { prefix: '', note: '/defs — definitions stored as rows, device only' })
-      ctx.routes.register(workflowScheduleRoutes, {
+      ctx.routes.register(workflowTriggerRoutes, { prefix: '/workflows/triggers', note: 'approved workflow triggers' })
+      ctx.routes.register(legacyWorkflowScheduleRoutes, {
         prefix: '/workflows/schedules',
-        note: 'approved workflow schedules',
+        note: 'alias of /workflows/triggers for clients built before triggers',
       })
 
       // This plugin's runs, for the merged list core assembles (@acorn/protocol/runs.ts). A pointer at
@@ -158,8 +159,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         .reconcileDraftQueries()
         .catch((error) => ctx.log.warn(`Draft query references need reconciliation: ${describeError(error).message}`))
       void deps.reconciled
-        .then(() => (active ? scheduleService?.reconcile() : undefined))
-        .catch((error) => ctx.log.warn(`workflow schedule recovery failed: ${describeError(error).message}`))
+        .then(() => (active ? triggers?.reconcile() : undefined))
+        .catch((error) => ctx.log.warn(`workflow trigger recovery failed: ${describeError(error).message}`))
     },
     // The bridge slot is cleared explicitly rather than trusting teardown order: a second
     // startServiceRuntime in one process would otherwise serve workflow requests through the first
@@ -171,15 +172,15 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
     dispose: () => {
       stopCheckoutActivity?.()
       stopCheckoutActivity = null
-      stopScheduleRecovery?.()
-      stopScheduleRecovery = null
+      stopTriggerRecovery?.()
+      stopTriggerRecovery = null
       agentTools?.dispose()
       agentTools = null
       live?.stop()
       live = null
       routeCapability?.dispose()
       defsCapability?.dispose()
-      schedulesCapability?.dispose()
+      triggersCapability?.dispose()
     },
   }
 }

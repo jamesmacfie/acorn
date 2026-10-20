@@ -71,7 +71,7 @@ requiredness. Raw pointers and JSON Schema remain available in **Code**, but the
 not require them. Session or task title templates, ordinary-array identity keys, and execution limits remain
 under **Advanced** until validation requires them.
 
-[Scheduled roots](./scheduled-roots.md#schedule-a-published-workflow) covers **Schedule…**.
+[Triggers](./triggers.md#add-a-trigger) covers **Add trigger…**.
 
 The agent fields are the editor's, not any kind's: the harness from the catalog's profiles, then one
 select per option that harness advertises through `GET /v1/p/agents/providers`, then where the step
