@@ -25,6 +25,7 @@ import {
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
 import { WORKFLOW_SCHEDULES_ROUTE, workflowScheduleRoutes } from '../server/routes/schedules'
+import { runSource } from '../shared/runSourceRegistration'
 
 export type WorkflowsPluginDeps = {
   internalEnv: InternalEnvFactory
@@ -123,6 +124,14 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // This plugin's runs, for the merged list core assembles (@acorn/protocol/runs.ts). A pointer at
       // the route above, so nothing here knows what else is on that list.
       ctx.runs.register({ runs: '/v1/p/workflows/runs' })
+      // The Workflow runs data source. Its handler loads on the first read, to stay inside the service
+      // boot budget (apps/node/scripts/check-service-budget.mjs).
+      ctx.routes.fetch(
+        async (request, context) =>
+          (await import('../server/data/runSourceHandler')).createRunSourceHandler(store, core)(request, context),
+        { prefix: '/data/runs' },
+      )
+      ctx.dataSources.register(runSource)
 
       // reconcile() is not called here. It has to run after the listener binds and before the
       // composition root resolves `deps.reconciled`, so the root drives it through this capability

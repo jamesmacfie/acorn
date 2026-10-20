@@ -3766,5 +3766,285 @@
         }
       }
     ]
+  },
+  "workflows:runs": {
+    "name": "Workflow runs",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "taskTitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parentRunId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "depth": {
+          "type": "number"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "number"
+        },
+        "durationMs": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "runId",
+        "name",
+        "status",
+        "trigger",
+        "taskId",
+        "taskTitle",
+        "projectId",
+        "projectName",
+        "parentRunId",
+        "depth",
+        "error",
+        "createdAt",
+        "updatedAt",
+        "durationMs"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/runId",
+        "origin": "declared",
+        "label": "Run"
+      },
+      {
+        "pointer": "/name",
+        "origin": "declared",
+        "label": "Workflow",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "dynamic",
+          "dependsOn": []
+        }
+      },
+      {
+        "pointer": "/status",
+        "origin": "declared",
+        "label": "Status",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "running",
+              "label": "Running",
+              "tone": "accent"
+            },
+            {
+              "id": "gated",
+              "label": "Waiting on you",
+              "tone": "warn"
+            },
+            {
+              "id": "cancelling",
+              "label": "Cancelling",
+              "tone": "muted"
+            },
+            {
+              "id": "done",
+              "label": "Done",
+              "tone": "ok"
+            },
+            {
+              "id": "completed-with-failures",
+              "label": "Done with failures",
+              "tone": "warn"
+            },
+            {
+              "id": "failed",
+              "label": "Failed",
+              "tone": "bad"
+            },
+            {
+              "id": "safety-rail",
+              "label": "Stopped by a safety rail",
+              "tone": "bad"
+            },
+            {
+              "id": "cancelled",
+              "label": "Cancelled",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/trigger",
+        "origin": "declared",
+        "label": "Started by",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "dynamic",
+          "dependsOn": []
+        }
+      },
+      {
+        "pointer": "/taskId",
+        "origin": "declared",
+        "label": "Task",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/taskTitle",
+        "origin": "declared",
+        "label": "Task title"
+      },
+      {
+        "pointer": "/projectId",
+        "origin": "declared",
+        "label": "Project",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/projectName",
+        "origin": "declared",
+        "label": "Project name"
+      },
+      {
+        "pointer": "/parentRunId",
+        "origin": "declared",
+        "label": "Parent run",
+        "description": "The run that started this one as a child, or null for a run started on its own.",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/depth",
+        "origin": "declared",
+        "label": "Nesting depth",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/error",
+        "origin": "declared",
+        "label": "Error",
+        "description": "The first line of the run's error or cancel reason, at most 200 characters."
+      },
+      {
+        "pointer": "/createdAt",
+        "origin": "declared",
+        "label": "Started",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/updatedAt",
+        "origin": "declared",
+        "label": "Last update",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/durationMs",
+        "origin": "declared",
+        "label": "Duration",
+        "description": "From start to its final status, or null while the run is still going.",
+        "display": {
+          "kind": "number",
+          "unit": "ms"
+        }
+      }
+    ]
   }
 }

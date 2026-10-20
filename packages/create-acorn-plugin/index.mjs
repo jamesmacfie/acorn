@@ -597,6 +597,7 @@ export const KNOWN_SOURCES = [
   { source: 'github:pull-requests', name: 'GitHub pull requests', title: 'title' },
   { source: 'linear:issues', name: 'Linear issues', title: 'title' },
   { source: 'rollbar:error-groups', name: 'Rollbar error groups', title: 'title' },
+  { source: 'workflows:runs', name: 'Workflow runs', title: 'name' },
 ]
 
 /** An input name from a source id: `github:pull-requests` → `pullRequests`. */

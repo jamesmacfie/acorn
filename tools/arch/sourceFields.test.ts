@@ -22,6 +22,8 @@ import { pullSourceDescription } from '../../plugins/github/src/shared/pullSourc
 import { branchDescription } from '../../plugins/github/src/server/data/branchSourceHandler.ts'
 import { issueSource, issueSourceDescription } from '../../plugins/linear/src/shared/issueSource.ts'
 import { errorSource, errorSourceDescription } from '../../plugins/rollbar/src/shared/errorSource.ts'
+import { runSourceDescription } from '../../plugins/workflows/src/shared/runSource.ts'
+import { runSource } from '../../plugins/workflows/src/shared/runSourceRegistration.ts'
 
 // The field lists `fixtures()` in acorn-plugin-sdk/testing builds test records from
 // (docs/plugin-authoring/testing.md § Test a derived source). They're checked in, so a change to a
@@ -58,6 +60,7 @@ async function fieldLists() {
     'github:local-branches': [branchSource, branchDescription(localBranches[1])],
     'linear:issues': [issueSource, issueSourceDescription],
     'rollbar:error-groups': [errorSource, errorSourceDescription],
+    'workflows:runs': [runSource, runSourceDescription],
   }
   return Object.fromEntries(
     Object.entries(sources)

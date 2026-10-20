@@ -82,6 +82,27 @@ sweep runs on the Node's scheduler at the plugin cadence floor of 300 seconds, s
 machine nobody is looking at. There's no separate "check now" route: use the scheduler's own **Run
 now** on Settings → Schedules ([schedules](./schedules.md)).
 
+## Workflow runs source
+
+The plugin serves the **Workflow runs** data source (`workflows:runs`), one record per run from
+`workflow_runs`, child runs included. Use it in a dashboard to see which workflows fail most, how
+long runs take, and what ran this week. The description and starters are in
+`plugins/workflows/src/shared/runSource.ts`, and the read is in
+`plugins/workflows/src/server/data/runSourceHandler.ts`.
+
+A record carries the workflow's name, its status with a tone, what started it, its task and project,
+its parent run and nesting depth, and its start and last update times. It also carries the first
+line of its error or cancel reason, capped at 200 characters, and its duration once the run reaches
+a final status. A run retried after it settled measures to its latest final status. Selecting a row
+opens the run pane on that run.
+
+The source scopes a workspace or project through its task ids. It pushes the start-time window and
+equality filters on workflow, status, trigger, task, and parent run into SQL, on the
+`(task_id, created_at)` index. It reads newest first, up to the host's 5,000-record budget, and
+reports `incomplete` with `host-budget` when that budget cuts the window. Its four starters chart
+runs by workflow and status, average run time by workflow, this week's runs, and a weekday-by-hour
+heatmap of when runs start.
+
 ## Pages
 
 - [Workflow execution](./workflows/execution.md): the execution model, the graph, what an agent step
