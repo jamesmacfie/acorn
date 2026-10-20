@@ -1,13 +1,15 @@
-import { createHash } from 'node:crypto'
 import {
   BridgeError,
+  createDataSelectionPager,
+  createDataSourceHandler,
+  DATA_READ_LIMIT,
   dataComparisons,
   selectDataRecords,
   type CoreServices,
   type PluginFetchHandler,
 } from '@acorn/plugin-api/node'
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
-import { dataSourceRequestSchema, type DataSourceRequest } from '@acorn/protocol/dataSources.ts'
+import type { DataSourcePage, DataSourceRequest } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 import { commitSourceDescription } from '../../shared/commitSource'
 import { repositoryFor } from '../history'
@@ -16,13 +18,10 @@ type Core = Pick<CoreServices, 'git' | 'projects'>
 type QueryInput = Extract<DataSourceRequest, { operation: 'query' }>
 type Project = { id: string; name: string }
 type CommitRecord = { recordId: string; data: { authoredAt: number } & Record<string, string | number | boolean> }
-type Read = { records: CommitRecord[]; cause: 'host-budget' | 'provider-failure' | null; coveredFrom: number | null }
 
 // %x1e starts each commit, so the --shortstat line that follows it stays with it. %S is the branch
 // `--branches` reached the commit through. %aN and %aE apply the repository's mailmap.
 const FORMAT = '%x1e%H%x00%P%x00%aN%x00%aE%x00%at%x00%S%x00%s'
-// One past the host's record budget, so a project that fills it shows that more remain.
-const READ_LIMIT = DATA_LIMITS.selectionRecords + 1
 
 /** The projects a scope reaches: a workspace's, one project, or with neither, every project on the Node.
  *  Only device and service principals call this source, so a whole-Node read is the person's own view. */
@@ -97,7 +96,7 @@ async function projectCommits(core: Core, project: Project, since: number | null
     [
       'log',
       '--branches',
-      `--max-count=${READ_LIMIT}`,
+      `--max-count=${DATA_READ_LIMIT}`,
       '--shortstat',
       `--format=${FORMAT}`,
       // Git compares this to the commit time, which is never before the author time unless a clock was
@@ -112,11 +111,11 @@ async function projectCommits(core: Core, project: Project, since: number | null
   const records = parseCommits(project, result.stdout)
   // A cut stream ends mid-commit, so its last record may lack its stat.
   if (result.truncated) records.pop()
-  return { records, failed: false, full: result.truncated || records.length >= READ_LIMIT }
+  return { records, failed: false, full: result.truncated || records.length >= DATA_READ_LIMIT }
 }
 
-/** Every project's commits newest author time first, up to the host's record budget. */
-async function readCommits(core: Core, input: QueryInput, signal: AbortSignal): Promise<Read> {
+/** Every project's commits newest author time first, up to the host's record budget, selected by the query. */
+async function readCommits(core: Core, input: QueryInput, signal: AbortSignal): Promise<DataSourcePage> {
   const since = authoredSince(input.query.predicate)
   const projects = await scopeProjects(core, input.query.scope)
   const records: CommitRecord[] = []
@@ -137,68 +136,25 @@ async function readCommits(core: Core, input: QueryInput, signal: AbortSignal): 
   records.sort((left, right) => right.data.authoredAt - left.data.authoredAt)
   if (records.length > DATA_LIMITS.selectionRecords)
     floors.push(records[DATA_LIMITS.selectionRecords - 1]!.data.authoredAt)
+  const selected = selectDataRecords(records.slice(0, DATA_LIMITS.selectionRecords), input.query)
   return {
-    records: records.slice(0, DATA_LIMITS.selectionRecords),
-    cause: failed ? 'provider-failure' : floors.length ? 'host-budget' : null,
-    coveredFrom: floors.length ? Math.max(...floors) : null,
-  }
-}
-
-// A run reads every page within one evaluation time, so its pages share one Git read for the host's
-// query time instead of running `git log` again for each 100 records.
-const reads = new Map<string, { expires: number; read: Promise<Read> }>()
-function retainedRead(input: QueryInput, read: () => Promise<Read>): Promise<Read> {
-  const now = Date.now()
-  for (const [key, entry] of reads) if (entry.expires <= now) reads.delete(key)
-  const key = createHash('sha256')
-    .update(JSON.stringify([input.query.scope, input.query.predicate ?? null, input.evaluationTime]))
-    .digest('hex')
-  const retained = reads.get(key)
-  if (retained) return retained.read
-  if (reads.size >= 16) reads.delete(reads.keys().next().value!)
-  const entry = { expires: now + DATA_LIMITS.queryMs, read: read() }
-  entry.read.catch(() => reads.delete(key))
-  reads.set(key, entry)
-  return entry.read
-}
-
-async function commitPage(core: Core, input: QueryInput, signal: AbortSignal) {
-  const read = await retainedRead(input, () => readCommits(core, input, signal))
-  const selected = selectDataRecords(read.records, input.query)
-  const offset = input.cursor ? Number(input.cursor) : 0
-  if (!Number.isSafeInteger(offset) || offset < 0 || offset >= Math.max(selected.records.length, 1))
-    throw new Error('invalid_cursor')
-  const records = selected.records.slice(offset, offset + input.pageSize)
-  const next = offset + records.length
-  return {
-    records,
-    completeness:
-      next < selected.records.length
-        ? { kind: 'more' as const, cursor: String(next) }
-        : read.cause
-          ? { kind: 'incomplete' as const, cause: read.cause }
-          : selected.completeness,
-    ...(read.coveredFrom === null ? {} : { coveredRange: { start: read.coveredFrom, end: input.evaluationTime } }),
+    ...selected,
+    ...(failed || floors.length
+      ? { completeness: { kind: 'incomplete', cause: failed ? 'provider-failure' : 'host-budget' } }
+      : {}),
+    ...(floors.length ? { coveredRange: { start: Math.max(...floors), end: input.evaluationTime } } : {}),
     revision: commitSourceDescription.revision,
     readTime: Date.now(),
   }
 }
 
-export function createCommitSourceHandler(core: Core): PluginFetchHandler {
-  return async (request, context) => {
-    if (request.method !== 'POST') return Response.json({ error: 'method_not_allowed' }, { status: 405 })
-    if (
-      context.principal.kind !== 'device' &&
-      !(context.principal.kind === 'internal' && context.principal.scope === 'service')
-    )
-      return Response.json({ error: 'forbidden' }, { status: 403 })
-    try {
-      const input = dataSourceRequestSchema.parse(await request.json())
-      if (input.operation === 'describe') return Response.json(commitSourceDescription)
-      if (input.operation !== 'query') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
-      return Response.json(await commitPage(core, input, request.signal))
-    } catch {
-      return Response.json({ error: 'git_commit_source_failed' }, { status: 502 })
-    }
-  }
-}
+// A run's pages share one Git read, instead of running `git log` again for each 100 records. The
+// handler is made for every request, so the pager lives here.
+const pager = createDataSelectionPager()
+
+export const createCommitSourceHandler = (core: Core): PluginFetchHandler =>
+  createDataSourceHandler({
+    description: commitSourceDescription,
+    failure: 'git_commit_source_failed',
+    query: (input, context, signal) => pager(context.userId, input, () => readCommits(core, input, signal)),
+  })

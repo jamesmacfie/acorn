@@ -46,7 +46,9 @@ session's requests with its history, so this source covers only sessions whose h
 starters are approvals by kind and outcome, how long they waited by day, and a heatmap of when agents
 ask.
 
-These sources and **Agent usage records** read through `sourceQuery.ts` in `plugins/agents/src/server/data`:
+These sources and **Agent usage records** read through the plugin API's `sqlDataFilters` and
+`pageDataRecords` ([serve a query](../../data-sources/serve-a-query.md)), with the scope's tasks from
+`scopeTasks.ts` in `plugins/agents/src/server/data`:
 
 1. The scope's workspace and project become the task IDs from `tasks.inProject`, archived and
    cancelled tasks included. A scope with neither reads the whole Node.

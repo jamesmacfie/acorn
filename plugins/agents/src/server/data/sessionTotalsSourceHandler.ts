@@ -1,10 +1,19 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
-import type { CoreServices, PluginDatabase, PluginFetchHandler } from '@acorn/plugin-api/node'
+import {
+  createDataSourceHandler,
+  DATA_READ_LIMIT,
+  pageDataRecords,
+  sqlDataFilters,
+  withinDataBudget,
+  type CoreServices,
+  type PluginDatabase,
+  type PluginFetchHandler,
+} from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import { sessionTotalsSourceDescription } from '../../shared/sessionTotalsSource'
 import { readAgentPricingPreferences } from '../pricingStore'
 import { turnFactsPending } from '../sessions/turnFactsBackfill'
-import { READ_LIMIT, scopeTasks, sourceHandler, sourcePage, sqlFilters, tasksOfRows, withinBudget } from './sourceQuery'
+import { scopeTasks, tasksOfRows } from './scopeTasks'
 import { contextPeak, turnCost } from './turnSourceHandler'
 import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 
@@ -32,14 +41,14 @@ export function createSessionTotalsSourceHandler(
   db: PluginDatabase,
   core: Pick<CoreServices, 'tasks' | 'projects' | 'prefs'>,
 ): PluginFetchHandler {
-  return sourceHandler({
+  return createDataSourceHandler({
     description: sessionTotalsSourceDescription,
     coverageComplete: () => !turnFactsPending(db),
     failure: 'agent_session_totals_source_failed',
     query: async (input, context) => {
       const scoped = await scopeTasks(core, input.query.scope)
-      const { time, equals } = sqlFilters(input.query.predicate, fields)
-      const sessions = withinBudget(
+      const { time, equals } = sqlDataFilters(input.query.predicate, fields)
+      const sessions = withinDataBudget(
         await db
           .select({ id: facts.sessionId })
           .from(facts)
@@ -47,7 +56,7 @@ export function createSessionTotalsSourceHandler(
           .groupBy(facts.sessionId)
           .having(and(...time))
           .orderBy(desc(lastCompletedAt), desc(facts.sessionId))
-          .limit(READ_LIMIT),
+          .limit(DATA_READ_LIMIT),
       )
       const rows = await db
         .select({
@@ -130,7 +139,11 @@ export function createSessionTotalsSourceHandler(
           },
         ]
       })
-      const page = sourcePage(input, { records, truncated: sessions.truncated }, '/lastCompletedAt')
+      const page = pageDataRecords(
+        input,
+        { records, truncated: sessions.truncated },
+        { timePointer: '/lastCompletedAt', readOrder: true },
+      )
       // One read per task on the page, not per task in the read.
       const changeRequests = new Map<string, { sessionId?: string }[]>()
       for (const { data } of page.records)

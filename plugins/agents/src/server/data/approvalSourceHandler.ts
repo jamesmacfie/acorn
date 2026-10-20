@@ -1,8 +1,17 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
-import type { CoreServices, PluginDatabase, PluginFetchHandler } from '@acorn/plugin-api/node'
+import {
+  createDataSourceHandler,
+  DATA_READ_LIMIT,
+  pageDataRecords,
+  sqlDataFilters,
+  withinDataBudget,
+  type CoreServices,
+  type PluginDatabase,
+  type PluginFetchHandler,
+} from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import { approvalSourceDescription } from '../../shared/approvalSource'
-import { READ_LIMIT, scopeTasks, sourceHandler, sourcePage, sqlFilters, tasksOfRows, withinBudget } from './sourceQuery'
+import { scopeTasks, tasksOfRows } from './scopeTasks'
 import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 
 const requests = schema.agentRequests
@@ -37,13 +46,13 @@ export function createApprovalSourceHandler(
   db: PluginDatabase,
   core: Pick<CoreServices, 'tasks' | 'projects'>,
 ): PluginFetchHandler {
-  return sourceHandler({
+  return createDataSourceHandler({
     description: approvalSourceDescription,
     failure: 'agent_approval_source_failed',
     query: async (input) => {
       const scoped = await scopeTasks(core, input.query.scope)
-      const { time, equals } = sqlFilters(input.query.predicate, fields)
-      const read = withinBudget(
+      const { time, equals } = sqlDataFilters(input.query.predicate, fields)
+      const read = withinDataBudget(
         await db
           .select({
             id: requests.id,
@@ -63,7 +72,7 @@ export function createApprovalSourceHandler(
           .leftJoin(schema.agentTurnFacts, eq(requests.turnId, schema.agentTurnFacts.turnId))
           .where(and(...time, ...equals, scoped ? inArray(sessions.taskId, [...scoped.keys()]) : undefined))
           .orderBy(desc(requests.createdAt), desc(requests.id))
-          .limit(READ_LIMIT),
+          .limit(DATA_READ_LIMIT),
       )
       const tasks = await tasksOfRows(
         core,
@@ -86,7 +95,11 @@ export function createApprovalSourceHandler(
           target: { kind: 'agents.session', item: row.sessionId },
         }
       })
-      return sourcePage(input, { records, truncated: read.truncated }, '/createdAt')
+      return pageDataRecords(
+        input,
+        { records, truncated: read.truncated },
+        { timePointer: '/createdAt', readOrder: true },
+      )
     },
   })
 }

@@ -1,11 +1,21 @@
-import { createHash } from 'node:crypto'
-import { dataComparisons, DATA_LIMITS, selectDataRecords, type PluginFetchHandler } from '@acorn/plugin-api/node'
-import { dataSourceRequestSchema, type DataSourceQuery, type DataSourceRequest } from '@acorn/protocol/dataSources.ts'
+import {
+  createDataSelectionPager,
+  dataComparisons,
+  DATA_LIMITS,
+  DATA_READ_LIMIT,
+  selectDataRecords,
+  type PluginFetchHandler,
+} from '@acorn/plugin-api/node'
+import {
+  dataSourceRequestSchema,
+  type DataSourcePage,
+  type DataSourceQuery,
+  type DataSourceRequest,
+} from '@acorn/protocol/dataSources.ts'
 import { occurrenceCountSourceDescription } from '../../shared/occurrenceCountSource'
 import { levelName, occurrenceMetricsPath, rollbarData, rollbarFetch } from '../index'
 import { CAPS } from '../normalize'
 
-type QueryInput = Extract<DataSourceRequest, { operation: 'query' }>
 type CountRecord = {
   recordId: string
   data: {
@@ -20,13 +30,10 @@ type CountRecord = {
   }
   action: { verb: 'openUrl'; url: string }
 }
-type Read = { records: CountRecord[]; full: boolean }
 type MetricsResult = { timepoints?: { timestamp?: unknown; metrics_rows?: unknown }[] }
 
 const DAY_SECONDS = 86_400
 const DAY_MS = DAY_SECONDS * 1000
-// One past the host's record budget, so a read that fills it shows that older days remain.
-const READ_LIMIT = DATA_LIMITS.selectionRecords + 1
 const FILTERS: Record<string, string> = {
   '/level': 'item_level',
   '/environment': 'environment',
@@ -68,7 +75,7 @@ function metricsQuery(query: DataSourceQuery) {
     group_by: ['item_id', 'item_counter', 'item_title', 'item_level', 'environment'],
     filters,
     sort: { field: 'timestamp', order: 'desc' },
-    limit: READ_LIMIT,
+    limit: DATA_READ_LIMIT,
   }
 }
 
@@ -97,10 +104,14 @@ function countRecord(timestamp: unknown, row: unknown): CountRecord {
   }
 }
 
-/** The connection's daily counts, newest day first, up to the host's record budget. */
-async function readCounts(token: string, query: DataSourceQuery, signal: AbortSignal): Promise<Read> {
+/** The connection's daily counts, newest day first, up to the host's record budget, selected by the query. */
+async function readCounts(
+  token: string,
+  input: Extract<DataSourceRequest, { operation: 'query' }>,
+  signal: AbortSignal,
+): Promise<DataSourcePage> {
   const result = await rollbarData<MetricsResult>(
-    await rollbarFetch(token, occurrenceMetricsPath, signal, metricsQuery(query)),
+    await rollbarFetch(token, occurrenceMetricsPath, signal, metricsQuery(input.query)),
   )
   if (!Array.isArray(result.timepoints)) throw new Error('invalid_page')
   const records: CountRecord[] = []
@@ -115,55 +126,26 @@ async function readCounts(token: string, query: DataSourceQuery, signal: AbortSi
     }
   }
   records.sort((left, right) => right.data.day - left.data.day)
-  return {
-    records: records.slice(0, DATA_LIMITS.selectionRecords),
-    full: records.length > DATA_LIMITS.selectionRecords,
-  }
-}
-
-// A run reads every page within one evaluation time, so its pages share one Rollbar query instead of
-// asking again for each 100 records.
-const reads = new Map<string, { expires: number; read: Promise<Read> }>()
-function retainedRead(owner: string, input: QueryInput, read: () => Promise<Read>): Promise<Read> {
-  const now = Date.now()
-  for (const [key, entry] of reads) if (entry.expires <= now) reads.delete(key)
-  const key = createHash('sha256')
-    .update(JSON.stringify([owner, input.query.scope, input.query.predicate ?? null, input.evaluationTime]))
-    .digest('hex')
-  const retained = reads.get(key)
-  if (retained) return retained.read
-  if (reads.size >= 16) reads.delete(reads.keys().next().value!)
-  const entry = { expires: now + DATA_LIMITS.queryMs, read: read() }
-  entry.read.catch(() => reads.delete(key))
-  reads.set(key, entry)
-  return entry.read
-}
-
-function countPage(read: Read, input: QueryInput) {
-  const selected = selectDataRecords(read.records, input.query)
-  const offset = input.cursor ? Number(input.cursor) : 0
-  if (!Number.isSafeInteger(offset) || offset < 0 || offset >= Math.max(selected.records.length, 1))
-    throw new Error('invalid_cursor')
-  const records = selected.records.slice(offset, offset + input.pageSize)
-  const next = offset + records.length
+  const kept = records.slice(0, DATA_LIMITS.selectionRecords)
+  const selected = selectDataRecords(kept, input.query)
   // The oldest kept day may have lost some groups to the budget, so full coverage starts the day after.
-  const oldest = read.records.at(-1)?.data.day
+  const oldest = kept.at(-1)?.data.day
   return {
-    records,
-    // Answer `more` until the last page: the host stops at the first page that is anything else.
-    completeness:
-      next < selected.records.length
-        ? { kind: 'more' as const, cursor: String(next) }
-        : read.full
-          ? { kind: 'incomplete' as const, cause: 'host-budget' as const }
-          : selected.completeness,
-    ...(read.full && oldest !== undefined
-      ? { coveredRange: { start: oldest + DAY_MS, end: input.evaluationTime } }
+    ...selected,
+    ...(records.length > kept.length && oldest !== undefined
+      ? {
+          completeness: { kind: 'incomplete', cause: 'host-budget' },
+          coveredRange: { start: oldest + DAY_MS, end: input.evaluationTime },
+        }
       : {}),
     revision: occurrenceCountSourceDescription.revision,
     readTime: Date.now(),
   }
 }
+
+// A run's pages share one Rollbar query instead of asking again for each 100 records. The handler is
+// made for every request, so the pager lives here.
+const pager = createDataSelectionPager()
 
 /** A refusal Rollbar explains, as the one-sentence reason the host shows. */
 function failure(error: unknown): Response {
@@ -205,14 +187,15 @@ export function createOccurrenceCountSourceHandler(): PluginFetchHandler {
         )
       )
         throw new Error('connection_unavailable')
-      const read = await retainedRead(context.userId, input, async () => {
-        const results = await context.providers.withConnections('rollbar', async (connection, token) =>
-          connection.id === connectionId ? readCounts(token, input.query, request.signal) : undefined,
-        )
-        if (!results[0]) throw new Error('connection_unavailable')
-        return results[0]
-      })
-      return Response.json(await countPage(read, input))
+      return Response.json(
+        await pager(context.userId, input, async () => {
+          const results = await context.providers.withConnections('rollbar', async (connection, token) =>
+            connection.id === connectionId ? readCounts(token, input, request.signal) : undefined,
+          )
+          if (!results[0]) throw new Error('connection_unavailable')
+          return results[0]
+        }),
+      )
     } catch (error) {
       return failure(error)
     }

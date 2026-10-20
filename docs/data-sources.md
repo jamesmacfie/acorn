@@ -11,7 +11,7 @@ their own plugin routes. The [source catalog](./data-sources/catalog.md) lists e
 its owner, and where its fields are documented. A core task's `worktreeChanged` stays `null` until
 the Node has inspected its worktree. The agent sessions source reads every unarchived session through
 the store's cursor, up to the host's 5,000-record budget, and reports `incomplete` with `host-budget`
-when more remain. No client registers a source or discovers a schema on its own.
+on its last page when more remain. No client registers a source or discovers a schema on its own.
 
 ## Identity, reach, time, and coverage
 
@@ -65,6 +65,7 @@ The host binds `pluginId` and sends both carriers through the same registry and 
 Handlers remain private to the Node registry. Reload and disable clear registrations and discovered
 IDs through the plugin host's normal lifecycle. A failing handler answers non-2xx (429 for a rate
 limit) and may add `{ "reason": "<one sentence>" }`. The Node keeps 300 characters of it, no more.
+To answer a query, use the helpers in [serve a query](./data-sources/serve-a-query.md).
 
 Optional `providerId` declares the source's connection provider. Each invocation selects one
 `connectionId`; no default account is inferred. The host checks provider ownership, active identity,
@@ -193,3 +194,5 @@ intents. [Record processing history](./workflows/record-history.md) has the tran
 - [Provider data sources](./data-sources/provider-sources.md) covers Linear issues and Rollbar error
   groups.
 - [Derived sources](./data-sources/derived-sources.md) covers sources that read other sources as inputs.
+- [Serve a query](./data-sources/serve-a-query.md) covers the plugin API helpers that filter, budget,
+  and page a source's read.

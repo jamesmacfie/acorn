@@ -1,12 +1,13 @@
 import { and, count, desc, gt, gte, inArray, lt, lte, min, type SQL } from 'drizzle-orm'
 import {
+  createDataSourceHandler,
   dataComparisons,
-  selectDataRecords,
+  pageDataRecords,
   type CoreServices,
   type PluginDatabase,
   type PluginFetchHandler,
 } from '@acorn/plugin-api/node'
-import { dataSourceRequestSchema, type DataSourceRequest } from '@acorn/protocol/dataSources.ts'
+import type { DataSourceRequest } from '@acorn/protocol/dataSources.ts'
 import { terminalRuns } from '../node/schema'
 import { runSourceDescription } from '../shared/runSource'
 import { RUN_RECORD_CAP } from './runRecords'
@@ -100,40 +101,18 @@ async function runPage(db: PluginDatabase, core: Core, input: QueryInput) {
       },
     }
   })
-  const selected = selectDataRecords(records, input.query)
-  const offset = input.cursor ? Number(input.cursor) : 0
-  if (!Number.isSafeInteger(offset) || offset < 0 || offset >= Math.max(selected.records.length, 1))
-    throw new Error('invalid_cursor')
-  const page = selected.records.slice(offset, offset + input.pageSize)
-  const next = offset + page.length
   const [kept] = await db.select({ rows: count(), oldest: min(terminalRuns.finishedAt) }).from(terminalRuns)
   return {
-    records: page,
-    completeness:
-      next < selected.records.length ? { kind: 'more' as const, cursor: String(next) } : selected.completeness,
+    ...pageDataRecords(input, { records, truncated: false }),
     ...(kept!.rows >= RUN_RECORD_CAP && kept!.oldest !== null
       ? { coveredRange: { start: kept!.oldest, end: input.evaluationTime } }
       : {}),
-    revision: runSourceDescription.revision,
-    readTime: Date.now(),
   }
 }
 
-export function createRunSourceHandler(db: PluginDatabase, core: Core): PluginFetchHandler {
-  return async (request, context) => {
-    if (request.method !== 'POST') return Response.json({ error: 'method_not_allowed' }, { status: 405 })
-    if (
-      context.principal.kind !== 'device' &&
-      !(context.principal.kind === 'internal' && context.principal.scope === 'service')
-    )
-      return Response.json({ error: 'forbidden' }, { status: 403 })
-    try {
-      const input = dataSourceRequestSchema.parse(await request.json())
-      if (input.operation === 'describe') return Response.json(runSourceDescription)
-      if (input.operation !== 'query') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
-      return Response.json(await runPage(db, core, input))
-    } catch {
-      return Response.json({ error: 'terminal_run_source_failed' }, { status: 502 })
-    }
-  }
-}
+export const createRunSourceHandler = (db: PluginDatabase, core: Core): PluginFetchHandler =>
+  createDataSourceHandler({
+    description: runSourceDescription,
+    failure: 'terminal_run_source_failed',
+    query: (input) => runPage(db, core, input),
+  })

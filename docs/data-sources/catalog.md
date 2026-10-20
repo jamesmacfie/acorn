@@ -37,6 +37,6 @@ GitLab and Bitbucket serve merge requests, pull requests, CI jobs, pipeline step
 same way the GitHub plugin does.
 
 Sources that read Acorn's own database push a time window into SQL and read newest first, so the
-host's 5,000-record budget drops the oldest records. Git commits push the window into `git log`.
+host's 5,000-record budget drops the oldest records ([serve a query](./serve-a-query.md)). Git commits push the window into `git log`.
 Sources that call a provider page through its API and report `incomplete` when the provider or the
 budget stops them.

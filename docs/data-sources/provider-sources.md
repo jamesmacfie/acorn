@@ -50,10 +50,11 @@ shared detail byte limit applies. Raw request headers, bodies, and person data a
 Detail calls check cancellation between resource reads; an in-flight provider resource refresh
 uses the resource layer's own lifecycle. Query HTTP calls receive the request abort signal.
 
-The plugin API's `createDataSelectionPager` handles ephemeral retained pages. Its caller must
-reauthorize every invocation and validate the candidate selection before retaining it.
-`dataComparisons` and `selectDataRecords` support literal comparisons in `all` groups and numeric
-sorting. They do not implement a host query fallback or advertise provider capabilities.
+The plugin API's `createDataSelectionPager` handles ephemeral retained pages
+([serve a query](./serve-a-query.md)). Its caller must reauthorize every invocation
+and validate the candidate selection before retaining it. `dataComparisons` supports literal
+comparisons in `all` groups, and `selectDataRecords` adds `any` groups and numeric sorting. They do
+not implement a host query fallback or advertise provider capabilities.
 
 Provider API references checked on September 13, 2026:
 

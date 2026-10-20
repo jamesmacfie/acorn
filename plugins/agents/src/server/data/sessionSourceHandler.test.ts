@@ -82,7 +82,7 @@ describe('managed session data source', () => {
         },
       },
     }) as unknown as ManagedAgentRuntime
-  const query = (pageSize = 100) =>
+  const query = (pageSize = 100, cursor?: string) =>
     new Request('http://plugin/v1/p/agents/data/sessions', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -91,6 +91,7 @@ describe('managed session data source', () => {
         mode: 'execution',
         evaluationTime: 7,
         pageSize,
+        ...(cursor ? { cursor } : {}),
         query: { source: { pluginId: 'agents', sourceId: 'sessions' }, scope: { parameters: {} }, sort: [] },
       }),
     })
@@ -102,8 +103,14 @@ describe('managed session data source', () => {
     expect(body.completeness).toEqual({ kind: 'more', cursor: '100' })
   })
 
-  it('says the read is incomplete when the host budget stops it', async () => {
-    const response = await createSessionSourceHandler(pagedRuntime(6_000))(query(), context)
-    await expect(response.json()).resolves.toMatchObject({ completeness: { kind: 'incomplete', cause: 'host-budget' } })
+  it('pages a read the host budget stopped, and says so on its last page', async () => {
+    const handler = createSessionSourceHandler(pagedRuntime(6_000))
+    // The host stops at the first page that isn't `more`, so an early `incomplete` would cut it to one page.
+    await expect((await handler(query(), context)).json()).resolves.toMatchObject({
+      completeness: { kind: 'more', cursor: '100' },
+    })
+    const last = (await (await handler(query(100, '4900'), context)).json()) as { records: unknown[] }
+    expect(last).toMatchObject({ completeness: { kind: 'incomplete', cause: 'host-budget' } })
+    expect(last.records).toHaveLength(100)
   })
 })

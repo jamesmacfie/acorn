@@ -1,9 +1,18 @@
 import { and, asc, desc, inArray, isNotNull } from 'drizzle-orm'
-import type { CoreServices, PluginDatabase, PluginFetchHandler } from '@acorn/plugin-api/node'
+import {
+  createDataSourceHandler,
+  DATA_READ_LIMIT,
+  pageDataRecords,
+  sqlDataFilters,
+  withinDataBudget,
+  type CoreServices,
+  type PluginDatabase,
+  type PluginFetchHandler,
+} from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import { toolCallSourceDescription } from '../../shared/toolCallSource'
 import { turnFactsPending } from '../sessions/turnFactsBackfill'
-import { READ_LIMIT, scopeTasks, sourceHandler, sourcePage, sqlFilters, tasksOfRows, withinBudget } from './sourceQuery'
+import { scopeTasks, tasksOfRows } from './scopeTasks'
 import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 
 const calls = schema.agentToolCallFacts
@@ -31,7 +40,7 @@ export function createToolCallSourceHandler(
   db: PluginDatabase,
   core: Pick<CoreServices, 'tasks' | 'projects'>,
 ): PluginFetchHandler {
-  return sourceHandler({
+  return createDataSourceHandler({
     description: toolCallSourceDescription,
     coverageComplete: () => !turnFactsPending(db),
     failure: 'agent_tool_call_source_failed',
@@ -54,14 +63,14 @@ export function createToolCallSourceHandler(
     },
     query: async (input) => {
       const scoped = await scopeTasks(core, input.query.scope)
-      const { time, equals } = sqlFilters(input.query.predicate, fields)
-      const read = withinBudget(
+      const { time, equals } = sqlDataFilters(input.query.predicate, fields)
+      const read = withinDataBudget(
         await db
           .select()
           .from(calls)
           .where(and(...time, ...equals, scoped ? inArray(calls.taskId, [...scoped.keys()]) : undefined))
           .orderBy(desc(calls.startedAt), desc(calls.turnId), desc(calls.seq))
-          .limit(READ_LIMIT),
+          .limit(DATA_READ_LIMIT),
       )
       const tasks = await tasksOfRows(
         core,
@@ -78,7 +87,11 @@ export function createToolCallSourceHandler(
           target: { kind: 'agents.session', item: row.sessionId },
         }
       })
-      return sourcePage(input, { records, truncated: read.truncated }, '/startedAt')
+      return pageDataRecords(
+        input,
+        { records, truncated: read.truncated },
+        { timePointer: '/startedAt', readOrder: true },
+      )
     },
   })
 }

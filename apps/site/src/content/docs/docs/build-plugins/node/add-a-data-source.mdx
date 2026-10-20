@@ -12,7 +12,7 @@ sources:
   - examples/plugins/acme-readiness/acorn-plugin.json
   - examples/plugins/acme-readiness/src/source.ts
   - examples/plugins/acme-readiness/src/index.ts
-checked: '367bb285d'
+checked: '2207e1b63'
 ---
 
 import { Steps } from '@astrojs/starlight/components'
@@ -134,6 +134,8 @@ and [`examples/plugins/acme-readiness`](https://github.com/jamesmacfie/acorn/tre
   your back.
 - A record id that changes between reads. Panels and details find a record by it.
 - Returning the same record twice across pages, or the same cursor twice. acorn refuses the read.
+- Answering `incomplete` before the last page. acorn stops at the first page that isn't `more`, so a
+  read you cut answers `more` until its last page, and says it's `incomplete` there.
 - A record over 256 KiB. It fails rather than being cut.
 
 A derived source's inputs must be other plugins' sources, named `<pluginId>:<sourceId>`:

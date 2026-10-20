@@ -1,11 +1,20 @@
 import { and, asc, desc, inArray, isNotNull } from 'drizzle-orm'
-import type { CoreServices, PluginDatabase, PluginFetchHandler } from '@acorn/plugin-api/node'
+import {
+  createDataSourceHandler,
+  DATA_READ_LIMIT,
+  pageDataRecords,
+  sqlDataFilters,
+  withinDataBudget,
+  type CoreServices,
+  type PluginDatabase,
+  type PluginFetchHandler,
+} from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import { agentUsageCost, type AgentPricingPreferences } from '../../shared/pricing'
 import { turnSourceDescription } from '../../shared/turnSource'
 import { readAgentPricingPreferences } from '../pricingStore'
 import { turnFactsPending } from '../sessions/turnFactsBackfill'
-import { READ_LIMIT, scopeTasks, sourceHandler, sourcePage, sqlFilters, tasksOfRows, withinBudget } from './sourceQuery'
+import { scopeTasks, tasksOfRows } from './scopeTasks'
 import { AGENT_PANE_ID } from '../../shared/paneIdentity'
 
 const facts = schema.agentTurnFacts
@@ -54,7 +63,7 @@ export function createTurnSourceHandler(
   db: PluginDatabase,
   core: Pick<CoreServices, 'tasks' | 'projects' | 'prefs'>,
 ): PluginFetchHandler {
-  return sourceHandler({
+  return createDataSourceHandler({
     description: turnSourceDescription,
     coverageComplete: () => !turnFactsPending(db),
     failure: 'agent_turn_source_failed',
@@ -77,14 +86,14 @@ export function createTurnSourceHandler(
     },
     query: async (input, context) => {
       const scoped = await scopeTasks(core, input.query.scope)
-      const { time, equals } = sqlFilters(input.query.predicate, fields)
-      const read = withinBudget(
+      const { time, equals } = sqlDataFilters(input.query.predicate, fields)
+      const read = withinDataBudget(
         await db
           .select()
           .from(facts)
           .where(and(...time, ...equals, scoped ? inArray(facts.taskId, [...scoped.keys()]) : undefined))
           .orderBy(desc(facts.completedAt), desc(facts.turnId))
-          .limit(READ_LIMIT),
+          .limit(DATA_READ_LIMIT),
       )
       const tasks = await tasksOfRows(
         core,
@@ -108,7 +117,11 @@ export function createTurnSourceHandler(
           target: { kind: 'agents.session', item: row.sessionId },
         }
       })
-      return sourcePage(input, { records, truncated: read.truncated }, '/completedAt')
+      return pageDataRecords(
+        input,
+        { records, truncated: read.truncated },
+        { timePointer: '/completedAt', readOrder: true },
+      )
     },
   })
 }

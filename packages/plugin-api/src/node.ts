@@ -249,4 +249,13 @@ export type {
 } from '@acorn/node-core/server/nodeProviders/registry.ts'
 export { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 
-export { createDataSelectionPager, dataComparisons, selectDataRecords } from '@acorn/node-core/server/dataSources'
+export {
+  createDataSelectionPager,
+  createDataSourceHandler,
+  DATA_READ_LIMIT,
+  dataComparisons,
+  pageDataRecords,
+  selectDataRecords,
+  sqlDataFilters,
+  withinDataBudget,
+} from '@acorn/node-core/server/dataSources'

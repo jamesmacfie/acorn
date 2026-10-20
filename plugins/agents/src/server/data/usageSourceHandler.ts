@@ -1,10 +1,19 @@
 import { and, asc, desc, eq, inArray, lt, sql, type SQL } from 'drizzle-orm'
-import type { CoreServices, PluginDatabase, PluginFetchHandler } from '@acorn/plugin-api/node'
+import {
+  createDataSourceHandler,
+  DATA_READ_LIMIT,
+  pageDataRecords,
+  sqlDataFilters,
+  withinDataBudget,
+  type CoreServices,
+  type PluginDatabase,
+  type PluginFetchHandler,
+} from '@acorn/plugin-api/node'
 import type { AgentUsage } from '../../contract/wire'
 import * as schema from '../../node/schema'
 import { usageSourceDescription } from '../../shared/usageSource'
 import { readAgentPricingPreferences } from '../pricingStore'
-import { READ_LIMIT, scopeTasks, sourceHandler, sourcePage, sqlFilters, withinBudget } from './sourceQuery'
+import { scopeTasks } from './scopeTasks'
 import { modelAtTurn, usageRecords, type UsageEventInput } from './usageRecords'
 
 // A record counts from its session's earlier reports, and its model and turn can change within a
@@ -52,18 +61,18 @@ export function createUsageSourceHandler(
       .innerJoin(schema.agentSessions, eq(schema.agentEvents.sessionId, schema.agentSessions.id))
       .leftJoin(schema.agentTurns, eq(schema.agentEvents.turnId, schema.agentTurns.id))
       .where(and(eq(sql<string>`json_extract(${schema.agentEvents.eventJson}, '$.type')`, 'usage'), where))
-  return sourceHandler({
+  return createDataSourceHandler({
     description: usageSourceDescription,
     failure: 'agent_usage_source_failed',
     query: async (input, context) => {
       const tasks = await scopeTasks(core, input.query.scope)
-      const { time, equals } = sqlFilters(input.query.predicate, fields)
-      const read = withinBudget(
+      const { time, equals } = sqlDataFilters(input.query.predicate, fields)
+      const read = withinDataBudget(
         await usageEvents(
           and(...time, ...equals, tasks ? inArray(schema.agentSessions.taskId, [...tasks.keys()]) : undefined),
         )
           .orderBy(desc(schema.agentEvents.createdAt), desc(schema.agentEvents.sessionId), desc(schema.agentEvents.seq))
-          .limit(READ_LIMIT),
+          .limit(DATA_READ_LIMIT),
       )
       // Each session's reports before the first one kept, which that one's deltas count from.
       const firstSeq = new Map<string, number>()
@@ -81,7 +90,7 @@ export function createUsageSourceHandler(
       const records = usageRecords([...earlier, ...[...read.rows].reverse()].flatMap(usageEvent), preferences)
         .filter((record) => kept.has(record.recordId))
         .reverse()
-      return sourcePage(input, { records, truncated: read.truncated }, '/at')
+      return pageDataRecords(input, { records, truncated: read.truncated }, { timePointer: '/at', readOrder: true })
     },
   })
 }

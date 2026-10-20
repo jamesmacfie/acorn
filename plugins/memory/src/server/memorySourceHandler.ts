@@ -1,6 +1,11 @@
-import { selectDataRecords, type CoreServices, type PluginFetchHandler } from '@acorn/plugin-api/node'
-import { dataSourceRequestSchema, type DataSourceRequest } from '@acorn/protocol/dataSources.ts'
-import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
+import {
+  createDataSourceHandler,
+  pageDataRecords,
+  withinDataBudget,
+  type CoreServices,
+  type PluginFetchHandler,
+} from '@acorn/plugin-api/node'
+import type { DataSourceRequest } from '@acorn/protocol/dataSources.ts'
 import type { MemoryRow, MemoryScope } from '../contract/library'
 import { memorySourceDescription } from '../shared/memorySource'
 
@@ -63,45 +68,20 @@ async function memoryPage(input: QueryInput, list: ListMemories, projects: Proje
     ...(await list(null, 'private')),
     ...(await Promise.all(reached.map((project) => list(project.id, 'project')))).flat(),
   ].sort((left, right) => right.updatedAt - left.updatedAt)
-  const kept = rows.slice(0, DATA_LIMITS.selectionRecords)
-  const truncated = rows.length > kept.length
-  const selection = selectDataRecords(
-    kept.map((row) => memoryRecord(row, row.projectId ? (names.get(row.projectId) ?? null) : null)),
-    input.query,
+  const kept = withinDataBudget(rows)
+  return pageDataRecords(
+    input,
+    {
+      records: kept.rows.map((row) => memoryRecord(row, row.projectId ? (names.get(row.projectId) ?? null) : null)),
+      truncated: kept.truncated,
+    },
+    { timePointer: '/updatedAt' },
   )
-  const offset = input.cursor ? Number(input.cursor) : 0
-  if (!Number.isSafeInteger(offset) || offset < 0 || offset > selection.records.length)
-    throw new Error('invalid_cursor')
-  const records = selection.records.slice(offset, offset + input.pageSize)
-  const next = offset + records.length
-  return {
-    records,
-    completeness:
-      next < selection.records.length
-        ? { kind: 'more' as const, cursor: String(next) }
-        : truncated
-          ? { kind: 'incomplete' as const, cause: 'host-budget' as const }
-          : selection.completeness,
-    ...(truncated ? { coveredRange: { start: kept.at(-1)!.updatedAt, end: Date.now() } } : {}),
-  }
 }
 
-export function createMemorySourceHandler(list: ListMemories, projects: Projects): PluginFetchHandler {
-  return async (request, context) => {
-    if (request.method !== 'POST') return Response.json({ error: 'method_not_allowed' }, { status: 405 })
-    if (
-      context.principal.kind !== 'device' &&
-      !(context.principal.kind === 'internal' && context.principal.scope === 'service')
-    )
-      return Response.json({ error: 'forbidden' }, { status: 403 })
-    try {
-      const input = dataSourceRequestSchema.parse(await request.json())
-      if (input.operation === 'describe') return Response.json(memorySourceDescription)
-      if (input.operation !== 'query') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
-      const page = await memoryPage(input, list, projects)
-      return Response.json({ ...page, revision: memorySourceDescription.revision, readTime: Date.now() })
-    } catch {
-      return Response.json({ error: 'memory_source_failed' }, { status: 502 })
-    }
-  }
-}
+export const createMemorySourceHandler = (list: ListMemories, projects: Projects): PluginFetchHandler =>
+  createDataSourceHandler({
+    description: memorySourceDescription,
+    failure: 'memory_source_failed',
+    query: (input) => memoryPage(input, list, projects),
+  })

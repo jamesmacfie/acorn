@@ -244,7 +244,11 @@ it('reads the window complete past the budget, and marks an unbounded read cut',
       sort: [],
     },
   })) as Page
-  expect(unbounded.completeness).toEqual({ kind: 'incomplete', cause: 'host-budget' })
+  // The host stops at the first page that isn't `more`, so the cut shows on the last page.
+  expect(unbounded.completeness).toEqual({ kind: 'more', cursor: '100' })
   expect(unbounded.records[0]?.recordId).toBe(rows.at(-1)?.id)
   expect(unbounded.coveredRange?.start).toBe(rows[100]?.createdAt)
+  const cut = await readAll({ workspaceId: home })
+  expect(cut.completeness).toEqual({ kind: 'incomplete', cause: 'host-budget' })
+  expect(cut.records).toHaveLength(DATA_LIMITS.selectionRecords)
 })

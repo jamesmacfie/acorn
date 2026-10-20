@@ -1,9 +1,17 @@
 import { and, asc, desc, inArray } from 'drizzle-orm'
-import type { CoreServices, PluginDatabase, PluginFetchHandler } from '@acorn/plugin-api/node'
+import {
+  createDataSourceHandler,
+  DATA_READ_LIMIT,
+  pageDataRecords,
+  sqlDataFilters,
+  withinDataBudget,
+  type CoreServices,
+  type PluginDatabase,
+  type PluginFetchHandler,
+} from '@acorn/plugin-api/node'
 import { workflowRuns as runs } from '../../node/schema'
 import { runSourceDescription } from '../../shared/runSource'
 import { TERMINAL_WORKFLOW_STATUSES } from '../../shared/runStatus'
-import { READ_LIMIT, sourceHandler, sourcePage, sqlFilters, withinBudget } from './sourceQuery'
 
 type Core = Pick<CoreServices, 'tasks' | 'projects'>
 type RunTask = { title: string; projectId: string; projectName: string | null }
@@ -63,7 +71,7 @@ async function tasksById(core: Core, taskIds: readonly string[]): Promise<Map<st
 const shortError = (error: string | null): string | null => error?.split('\n', 1)[0]!.slice(0, 200) || null
 
 export function createRunSourceHandler(db: PluginDatabase, core: Core): PluginFetchHandler {
-  return sourceHandler({
+  return createDataSourceHandler({
     description: runSourceDescription,
     failure: 'workflow_run_source_failed',
     options: async (input) => {
@@ -85,8 +93,8 @@ export function createRunSourceHandler(db: PluginDatabase, core: Core): PluginFe
     },
     query: async (input) => {
       const scoped = await scopeTasks(core, input.query.scope)
-      const { time, equals } = sqlFilters(input.query.predicate, fields)
-      const read = withinBudget(
+      const { time, equals } = sqlDataFilters(input.query.predicate, fields)
+      const read = withinDataBudget(
         await db
           .select({
             id: runs.id,
@@ -103,7 +111,7 @@ export function createRunSourceHandler(db: PluginDatabase, core: Core): PluginFe
           .from(runs)
           .where(and(...time, ...equals, scoped ? inArray(runs.taskId, [...scoped.keys()]) : undefined))
           .orderBy(desc(runs.createdAt), desc(runs.id))
-          .limit(READ_LIMIT),
+          .limit(DATA_READ_LIMIT),
       )
       const tasks =
         scoped ??
@@ -130,7 +138,11 @@ export function createRunSourceHandler(db: PluginDatabase, core: Core): PluginFe
           target: { kind: 'workflows.run', item: id },
         }
       })
-      return sourcePage(input, { records, truncated: read.truncated }, '/createdAt')
+      return pageDataRecords(
+        input,
+        { records, truncated: read.truncated },
+        { timePointer: '/createdAt', readOrder: true },
+      )
     },
   })
 }

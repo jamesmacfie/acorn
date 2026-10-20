@@ -246,6 +246,7 @@ node: CompiledPluginBroadcast
 node: CoreProcService
 node: CoreServices
 node: DATA_LIMITS
+node: DATA_READ_LIMIT
 node: DataColumn
 node: DataTable
 node: DeliverableSkill
@@ -331,6 +332,7 @@ node: confineExistingFile
 node: connectProvider
 node: connectionHasCapability
 node: createDataSelectionPager
+node: createDataSourceHandler
 node: createLogger
 node: dataComparisons
 node: decodeSecretInput
@@ -362,6 +364,7 @@ node: listProfiles
 node: mayActOnTask
 node: mirrorFootprintCapability
 node: ownerId
+node: pageDataRecords
 node: parseCached
 node: parseJson
 node: pastedContent
@@ -396,12 +399,14 @@ node: selectDataRecords
 node: serveThenRevalidate
 node: serverName
 node: setRouteTestCapability
+node: sqlDataFilters
 node: taskContext
 node: textAdapter
 node: tmuxAvailable
 node: toolOutputDir
 node: truncateBytes
 node: viaBridge
+node: withinDataBudget
 node: worktreeGitText
 node: worktreeStatusText
 testkit/client: Disposable
