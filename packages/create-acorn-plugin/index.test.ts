@@ -545,10 +545,12 @@ it('builds, tests, and loads a data source package from the packed SDK outside t
 
 it('asks what a row is and what it reads under --data-source', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'acorn scaffold-'))
+  // The prompt lists KNOWN_SOURCES numbered from 1, so pick by position rather than a fixed number.
+  const pick = (source: string) => KNOWN_SOURCES.findIndex((known) => known.source === source) + 1
   try {
     execFileSync(process.execPath, [CLI, 'readiness', '--data-source'], {
       cwd,
-      input: 'Issue\n11, 10\n10\n',
+      input: `Issue\n${pick('linear:issues')}, ${pick('github:pull-requests')}\n${pick('github:pull-requests')}\n`,
       stdio: 'pipe',
     })
     const manifest = JSON.parse(readFileSync(join(cwd, 'readiness', 'acorn-plugin.json'), 'utf8'))
